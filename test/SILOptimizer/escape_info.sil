@@ -37,6 +37,15 @@ class Z {
 class DerivedZ : Z {
 }
 
+final class F {
+  @_hasStorage var y: Y
+}
+
+struct TwoF {
+  @_hasStorage var a: F
+  @_hasStorage var b: F
+}
+
 class WZ {
   @_hasStorage weak var w: @sil_weak Y?
   @_hasStorage unowned var u: @sil_unowned Y
@@ -780,6 +789,85 @@ bb0:
   (%6, %7) = destructure_struct %5 : $Str
   destroy_value %7 : $(X, X)
   return %6 : $X
+}
+
+sil [escapes !%0.**] @$s4test1FCfD : $@convention(method) (@owned F) -> ()
+
+// CHECK-LABEL: Escape information for destructure_struct_walkup:
+// CHECK: arg0[c0]:   %2 = alloc_ref $Y                               // user: %9
+// CHECK: arg1[c0]:   %3 = alloc_ref $Y                               // user: %13
+// CHECK: End function destructure_struct_walkup
+sil [ossa] @destructure_struct_walkup : $@convention(thin) (@owned F, @owned F) -> () {
+bb0(%0 : @owned $F, %1 : @owned $F):
+  %2 = alloc_ref $Y
+  %3 = alloc_ref $Y
+  %4 = struct $TwoF (%0 : $F, %1 : $F)
+  (%5, %6) = destructure_struct %4 : $TwoF
+  %7 = begin_borrow %5 : $F
+  %8 = ref_element_addr %7 : $F, #F.y
+  store %2 to [init] %8 : $*Y
+  end_borrow %7 : $F
+  %11 = begin_borrow %6 : $F
+  %12 = ref_element_addr %11 : $F, #F.y
+  store %3 to [init] %12 : $*Y
+  end_borrow %11 : $F
+  destroy_value %5 : $F
+  destroy_value %6 : $F
+  %17 = tuple ()
+  return %17 : $()
+}
+
+// CHECK-LABEL: Escape information for destructure_struct_walkdown:
+// CHECK:  -    :   %0 = alloc_ref $F                               // user: %2
+// CHECK: return[]:   %1 = alloc_ref $F                               // user: %2
+// CHECK: End function destructure_struct_walkdown
+sil [ossa] @destructure_struct_walkdown : $@convention(thin) () -> @owned F {
+bb0:
+  %0 = alloc_ref $F
+  %1 = alloc_ref $F
+  %2 = struct $TwoF (%0 : $F, %1 : $F)
+  (%3, %4) = destructure_struct %2 : $TwoF
+  destroy_value %3 : $F
+  return %4 : $F
+}
+
+
+// CHECK-LABEL: Escape information for destructure_tuple_walkup:
+// CHECK: arg0[c0]:   %2 = alloc_ref $Y                               // user: %9
+// CHECK: arg1[c0]:   %3 = alloc_ref $Y                               // user: %13
+// CHECK: End function destructure_tuple_walkup
+sil [ossa] @destructure_tuple_walkup : $@convention(thin) (@owned F, @owned F) -> () {
+bb0(%0 : @owned $F, %1 : @owned $F):
+  %2 = alloc_ref $Y
+  %3 = alloc_ref $Y
+  %4 = tuple (%0 : $F, %1 : $F)
+  (%5, %6) = destructure_tuple %4 : $(F, F)
+  %7 = begin_borrow %5 : $F
+  %8 = ref_element_addr %7 : $F, #F.y
+  store %2 to [init] %8 : $*Y
+  end_borrow %7 : $F
+  %11 = begin_borrow %6 : $F
+  %12 = ref_element_addr %11 : $F, #F.y
+  store %3 to [init] %12 : $*Y
+  end_borrow %11 : $F
+  destroy_value %5 : $F
+  destroy_value %6 : $F
+  %17 = tuple ()
+  return %17 : $()
+}
+
+// CHECK-LABEL: Escape information for destructure_tuple_walkdown:
+// CHECK:  -    :   %0 = alloc_ref $F                               // user: %2
+// CHECK: return[]:   %1 = alloc_ref $F                               // user: %2
+// CHECK: End function destructure_tuple_walkdown
+sil [ossa] @destructure_tuple_walkdown : $@convention(thin) () -> @owned F {
+bb0:
+  %0 = alloc_ref $F
+  %1 = alloc_ref $F
+  %2 = tuple (%0 : $F, %1 : $F)
+  (%3, %4) = destructure_tuple %2 : $(F, F)
+  destroy_value %3 : $F
+  return %4 : $F
 }
 
 // CHECK-LABEL: Escape information for call_arg_to_arg:

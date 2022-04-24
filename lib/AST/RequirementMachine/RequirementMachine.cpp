@@ -320,7 +320,7 @@ RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
     llvm::dbgs() << "Adding generic signature " << sig << " {\n";
   }
 
-  // Collect the top-level requirements, and all transtively-referenced
+  // Collect the top-level requirements, and all transitively-referenced
   // protocol requirement signatures.
   RuleBuilder builder(Context, System.getReferencedProtocols());
   builder.initWithGenericSignatureRequirements(sig.getRequirements());
@@ -422,7 +422,7 @@ RequirementMachine::initWithWrittenRequirements(
     llvm::dbgs() << "\n";
   }
 
-  // Collect the top-level requirements, and all transtively-referenced
+  // Collect the top-level requirements, and all transitively-referenced
   // protocol requirement signatures.
   RuleBuilder builder(Context, System.getReferencedProtocols());
   builder.initWithWrittenRequirements(requirements);

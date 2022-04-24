@@ -39,7 +39,7 @@ namespace {
 class OperandOwnershipClassifier
   : public SILInstructionVisitor<OperandOwnershipClassifier, OperandOwnership> {
   LLVM_ATTRIBUTE_UNUSED SILModule &mod;
-  // Allow module conventions to be overriden while lowering between canonical
+  // Allow module conventions to be overridden while lowering between canonical
   // and lowered SIL stages.
   SILModuleConventions silConv;
 
@@ -271,7 +271,7 @@ OPERAND_OWNERSHIP(InteriorPointer, OpenExistentialBox)
 OPERAND_OWNERSHIP(InteriorPointer, HopToExecutor)
 OPERAND_OWNERSHIP(InteriorPointer, ExtractExecutor)
 
-// Instructions that propagate a value value within a borrow scope.
+// Instructions that propagate a value within a borrow scope.
 OPERAND_OWNERSHIP(ForwardingBorrow, TupleExtract)
 OPERAND_OWNERSHIP(ForwardingBorrow, StructExtract)
 OPERAND_OWNERSHIP(ForwardingBorrow, DifferentiableFunctionExtract)
@@ -430,7 +430,7 @@ OperandOwnershipClassifier::visitStoreBorrowInst(StoreBorrowInst *i) {
   return OperandOwnership::TrivialUse;
 }
 
-// Get the OperandOwnership for instaneous apply, yield, and return uses.
+// Get the OperandOwnership for instantaneous apply, yield, and return uses.
 // This does not apply to uses that begin an explicit borrow scope in the
 // caller, such as begin_apply.
 static OperandOwnership getFunctionArgOwnership(SILArgumentConvention argConv,

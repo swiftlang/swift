@@ -33,7 +33,7 @@ module ExplicitClassSpecialization {
   requires cplusplus
 }
 
-module ClassTemplateInstantionExistingSpecialization {
+module ClassTemplateInstantiationExistingSpecialization {
   header "class-template-instantiation-existing-specialization.h"
   requires cplusplus
 }

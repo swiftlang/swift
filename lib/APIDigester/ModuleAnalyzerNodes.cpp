@@ -539,7 +539,7 @@ Optional<SDKNodeDeclType*> SDKNodeDeclType::getSuperclass() const {
   return None;
 }
 
-/// Finding the node through all children, including the inheritted ones,
+/// Finding the node through all children, including the inherited ones,
 /// whose printed name matches with the given name.
 Optional<SDKNodeDecl*>
 SDKNodeDeclType::lookupChildByPrintedName(StringRef Name) const {
@@ -1343,7 +1343,7 @@ static std::vector<DeclAttrKind> collectDeclAttributes(Decl *D) {
     if (VD->COND && !llvm::is_contained(Results, DeclAttrKind::KIND_NAME))                        \
       Results.emplace_back(DeclAttrKind::KIND_NAME);
     // These attributes may be semantically applicable to the current decl but absent from
-    // the actual AST. Populting them to the nodes ensure we don't have false positives.
+    // the actual AST. Populating them to the nodes ensure we don't have false positives.
     HANDLE(isObjC(), DAK_ObjC)
     HANDLE(isFinal(), DAK_Final)
     HANDLE(isDynamic(), DAK_Dynamic)
@@ -2262,14 +2262,14 @@ class ConstExtractor: public ASTWalker {
     allConsts.emplace_back(file, kind, offset, length, Value, ReferencedD);
   }
 
-  void record(Expr *E, Expr *ValueProvider, StringRef ReferecedD = "") {
+  void record(Expr *E, Expr *ValueProvider, StringRef ReferencedD = "") {
     std::string content;
     llvm::raw_string_ostream os(content);
     ValueProvider->printConstExprValue(&os, nullptr);
     assert(!content.empty());
     auto buffered = SCtx.buffer(content);
     switch(ValueProvider->getKind()) {
-#define CASE(X) case ExprKind::X: record(E, ConstKind::X, buffered, ReferecedD); break;
+#define CASE(X) case ExprKind::X: record(E, ConstKind::X, buffered, ReferencedD); break;
       CASE(StringLiteral)
       CASE(IntegerLiteral)
       CASE(FloatLiteral)
@@ -2397,10 +2397,10 @@ swift::ide::api::getEmptySDKNodeRoot(SDKContext &SDKCtx) {
 
 SDKNodeRoot*
 swift::ide::api::getSDKNodeRoot(SDKContext &SDKCtx,
-                                 const CompilerInvocation &InitInvok,
+                                 const CompilerInvocation &InitInvoke,
                                  const llvm::StringSet<> &ModuleNames) {
   CheckerOptions Opts = SDKCtx.getOpts();
-  CompilerInvocation Invocation(InitInvok);
+  CompilerInvocation Invocation(InitInvoke);
 
   CompilerInstance &CI = SDKCtx.newCompilerInstance();
   // Display diagnostics to stderr.
@@ -2467,11 +2467,11 @@ void swift::ide::api::dumpSDKRoot(SDKNodeRoot *Root, StringRef OutputFile) {
   dumpSDKRoot(Root, PayLoad(), OutputFile);
 }
 
-int swift::ide::api::dumpSDKContent(const CompilerInvocation &InitInvok,
+int swift::ide::api::dumpSDKContent(const CompilerInvocation &InitInvoke,
                                     const llvm::StringSet<> &ModuleNames,
                                     StringRef OutputFile, CheckerOptions Opts) {
   SDKContext SDKCtx(Opts);
-  SDKNodeRoot *Root = getSDKNodeRoot(SDKCtx, InitInvok, ModuleNames);
+  SDKNodeRoot *Root = getSDKNodeRoot(SDKCtx, InitInvoke, ModuleNames);
   if (!Root)
     return 1;
   dumpSDKRoot(Root, OutputFile);

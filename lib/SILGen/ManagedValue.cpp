@@ -206,13 +206,21 @@ ManagedValue ManagedValue::materialize(SILGenFunction &SGF,
                                   StoreOwnershipQualifier::Init);
 
     // SEMANTIC SIL TODO: This should really be called a temporary LValue.
-    return ManagedValue::forOwnedAddressRValue(temporary,
-                                          SGF.enterDestroyCleanup(temporary));
-  } else {
-    auto object = SGF.emitManagedBeginBorrow(loc, getValue());
-    SGF.emitManagedStoreBorrow(loc, object.getValue(), temporary);
-    return ManagedValue::forBorrowedAddressRValue(temporary);
+    return ManagedValue::forOwnedAddressRValue(
+        temporary, SGF.enterDestroyCleanup(temporary));
   }
+  auto &lowering = SGF.getTypeLowering(getType());
+  if (lowering.isAddressOnly()) {
+    assert(!SGF.silConv.useLoweredAddresses());
+    auto copy = SGF.B.createCopyValue(loc, getValue());
+    SGF.B.emitStoreValueOperation(loc, copy, temporary,
+                                  StoreOwnershipQualifier::Init);
+    return ManagedValue::forOwnedAddressRValue(
+        temporary, SGF.enterDestroyCleanup(temporary));
+  }
+  auto object = SGF.emitManagedBeginBorrow(loc, getValue());
+  SGF.emitManagedStoreBorrow(loc, object.getValue(), temporary);
+  return ManagedValue::forBorrowedAddressRValue(temporary);
 }
 
 void ManagedValue::print(raw_ostream &os) const {

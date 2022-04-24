@@ -953,12 +953,12 @@ struct EscapeInfo {
         case let mvr as MultipleValueInstructionResult:
           let inst = mvr.instruction
           switch inst {
-            case is DestructureStructInst, is DestructureTupleInst:
-              val = inst.operands[0].value
-              // TODO: only push the specific result index.
-              // But currently there is no O(0) method to get the result index
-              // from a result value.
-              p = p.popAllValueFields().push(.anyValueFields)
+            case let dsi as DestructureStructInst:
+              p = p.push(.structField, index: mvr.index)
+              val = dsi.operand
+            case let dti as DestructureTupleInst:
+              p = p.push(.tupleField, index: mvr.index)
+              val = dti.operand
             case let bcm as BeginCOWMutationInst:
               val = bcm.operand
             default:

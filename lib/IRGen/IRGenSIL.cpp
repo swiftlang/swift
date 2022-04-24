@@ -682,7 +682,7 @@ public:
 
   /// To make it unambiguous whether a `var` binding has been initialized,
   /// zero-initialize the shadow copy alloca. LLDB uses the first pointer-sized
-  /// field to recognize to detect uninitizialized variables. This can be
+  /// field to recognize to detect uninitialized variables. This can be
   /// removed once swiftc switches to @llvm.dbg.addr() intrinsics.
   void zeroInit(llvm::AllocaInst *AI) {
     if (!AI)
@@ -4754,7 +4754,7 @@ static bool isInvariantAddress(SILValue v) {
   }
   // TODO: We could be more aggressive about considering addresses based on
   // `let` variables as invariant when the type of the address is known not to
-  // have any sharably-mutable interior storage (in other words, no weak refs,
+  // have any shareably-mutable interior storage (in other words, no weak refs,
   // atomics, etc.). However, this currently miscompiles some programs.
   // if (accessedAddress->getType().isAddress() && isLetAddress(accessedAddress)) {
   //  return true;
@@ -5308,7 +5308,7 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
     return;
 
   VarDecl *Decl = i->getDecl();
-  // Describe the underlying alloca. This way an llvm.dbg.declare instrinsic
+  // Describe the underlying alloca. This way an llvm.dbg.declare intrinsic
   // is used, which is valid for the entire lifetime of the alloca.
   if (auto *BitCast = dyn_cast<llvm::BitCastInst>(addr)) {
     auto *Op0 = BitCast->getOperand(0);

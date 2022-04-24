@@ -125,7 +125,7 @@ void SILFunctionBuilder::addFunctionAttributes(
     if (ParameterList *paramList = fnDecl->getParameters()) {
       for (ParamDecl *pd : *paramList) {
         // Give up on tuples. Their elements are added as individual
-        // argumenst. It destroys the 1-1 relation ship between parameters
+        // arguments. It destroys the 1-1 relation ship between parameters
         // and arguments.
         if (isa<TupleType>(CanType(pd->getType())))
           break;
@@ -322,7 +322,7 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
         F->setSpecialPurpose(SILFunction::Purpose::LazyPropertyGetter);
         
         // Lazy property getters should not get inlined because they are usually
-        // non-tivial functions (otherwise the user would not implement it as
+        // non-trivial functions (otherwise the user would not implement it as
         // lazy property). Inlining such getters would most likely not benefit
         // other optimizations because the top-level switch_enum cannot be
         // constant folded in most cases.

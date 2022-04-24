@@ -526,6 +526,11 @@ BridgedInstruction MultiValueInstResult_getParent(BridgedMultiValueResult result
   return {static_cast<MultipleValueInstructionResult *>(result.obj)->getParent()};
 }
 
+SwiftInt MultiValueInstResult_getIndex(BridgedMultiValueResult result) {
+  auto *rs = static_cast<MultipleValueInstructionResult *>(result.obj);
+  return (SwiftInt)rs->getIndex();
+}
+
 SwiftInt MultipleValueInstruction_getNumResults(BridgedInstruction inst) {
   return castToInst<MultipleValueInstruction>(inst)->getNumResults();
 }
@@ -700,10 +705,10 @@ BridgedInstruction SILBuilder_createBuiltinBinaryFunction(
 }
 
 BridgedInstruction SILBuilder_createCondFail(BridgedInstruction insertionPoint,
-          BridgedLocation loc, BridgedValue condition, BridgedStringRef messge) {
+          BridgedLocation loc, BridgedValue condition, BridgedStringRef message) {
   SILBuilder builder(castToInst(insertionPoint), getSILDebugScope(loc));
   return {builder.createCondFail(getRegularLocation(loc),
-    castToSILValue(condition), getStringRef(messge))};
+    castToSILValue(condition), getStringRef(message))};
 }
 
 BridgedInstruction SILBuilder_createIntegerLiteral(BridgedInstruction insertionPoint,

@@ -119,13 +119,13 @@ StringRef getSILInstructionName(SILInstructionKind Kind);
 ///
 /// *NOTE* The reason why this does not store the size of the stored element is
 /// that just from the number of elements we can infer the size of each element
-/// due to the restricted problem space. Specificially:
+/// due to the restricted problem space. Specifically:
 ///
-/// 1. Size == 0 implies nothing is stored and thus element size is irrelevent.
+/// 1. Size == 0 implies nothing is stored and thus element size is irrelevant.
 /// 2. Size == 1 implies we either had a single value instruction or a multiple
 /// value instruction, but no matter what instruction we had, we are going to
 /// store the results at the same starting location so element size is
-/// irrelevent.
+/// irrelevant.
 /// 3. Size > 1 implies we must be storing multiple value instruction results
 /// implying that the size of each stored element must be
 /// sizeof(MultipleValueInstructionResult).
@@ -854,7 +854,7 @@ public:
 };
 
 inline SILNode *SILInstruction::asSILNode() {
-  // Even if this insttruction is not a NonSingleValueInstruction, but a
+  // Even if this instruction is not a NonSingleValueInstruction, but a
   // SingleValueInstruction, the SILNode is at the same offset as in a
   // NonSingleValueInstruction. See the top-level comment of SILInstruction.
   SILNode *node = (NonSingleValueInstruction *)this;
@@ -1374,7 +1374,7 @@ public:
   /// end of the specific subclass object.
   ///
   /// *NOTE* subclassDeltaOffset must be use only 5 bits. This gives us to
-  /// support subclasses up to 32 bytes in size. We can scavange up to 6 more
+  /// support subclasses up to 32 bytes in size. We can scavenge up to 6 more
   /// bits from ValueBase if this is not large enough.
   MultipleValueInstructionResult(unsigned index, SILType type,
                                  ValueOwnershipKind ownershipKind);
@@ -2277,7 +2277,7 @@ public:
     return getAllOperands().slice(getNumTailTypes() + 1);
   }
   // Is the deinit and the size of the dynamic type known to be equivalent to
-  // the the base type (i.e `this->getType()`).
+  // the base type (i.e `this->getType()`).
   bool isDynamicTypeDeinitAndSizeKnownEquivalentToBaseType() const;
 };
 
@@ -5875,7 +5875,7 @@ class SetDeallocatingInst
 
 /// ObjectInst - Represents a object value type.
 ///
-/// This instruction can only appear at the end of a gobal variable's
+/// This instruction can only appear at the end of a global variable's
 /// static initializer list.
 class ObjectInst final : public InstructionBaseWithTrailingOperands<
                              SILInstructionKind::ObjectInst, ObjectInst,
@@ -9309,7 +9309,7 @@ public:
   }
 };
 
-/// LinearFunctionInst - given a function, its derivative and traspose functions,
+/// LinearFunctionInst - given a function, its derivative and transpose functions,
 /// create an `@differentiable(_linear)` function that represents a bundle of these.
 class LinearFunctionInst final
     : public InstructionBaseWithTrailingOperands<
@@ -9512,7 +9512,7 @@ SILFunction *ApplyInstBase<Impl, Base, false>::getCalleeFunction() const {
   SILValue Callee = getCalleeOrigin();
 
   while (true) {
-    // Intentionally don't lookup throught dynamic_function_ref and
+    // Intentionally don't lookup through dynamic_function_ref and
     // previous_dynamic_function_ref as the target of those functions is not
     // statically known.
     if (auto *FRI = dyn_cast<FunctionRefInst>(Callee))

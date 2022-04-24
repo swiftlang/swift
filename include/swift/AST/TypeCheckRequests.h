@@ -3212,7 +3212,7 @@ void simple_display(llvm::raw_ostream &out, ConformanceLookupKind kind);
 
 /// Lookup and expand all conformances in the given context.
 ///
-/// This request specifically accomodates algorithms for retrieving all
+/// This request specifically accommodates algorithms for retrieving all
 /// conformances in the primary, even those that are unstated in source but
 /// are implied by other conformances, inherited from other types, or synthesized
 /// by the compiler. A simple case of this is the following:

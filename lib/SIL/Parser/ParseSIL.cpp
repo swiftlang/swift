@@ -3277,14 +3277,14 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     break;
   }
   case SILInstructionKind::IsEscapingClosureInst: {
-    bool IsObjcVerifcationType = false;
-    if (parseSILOptional(IsObjcVerifcationType, *this, "objc"))
+    bool IsObjcVerificationType = false;
+    if (parseSILOptional(IsObjcVerificationType, *this, "objc"))
       return true;
     if (parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))
       return true;
     ResultVal = B.createIsEscapingClosure(
         InstLoc, Val,
-        IsObjcVerifcationType ? IsEscapingClosureInst::ObjCEscaping
+        IsObjcVerificationType ? IsEscapingClosureInst::ObjCEscaping
                               : IsEscapingClosureInst::WithoutActuallyEscaping);
     break;
   }

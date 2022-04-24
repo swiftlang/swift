@@ -152,7 +152,7 @@ public:
   /// must be interpreted by the \c SyntaxParseAction, which likely also needs
   /// the node type (layout or token) to interpret the data.
   /// The data opaque data returned by this function *must not* be used to
-  /// record the node, only to insepect it.
+  /// record the node, only to inspect it.
   OpaqueSyntaxNode getUnsafeDeferredOpaqueData() const {
     assert(isDeferredLayout() || isDeferredToken());
     return Data.getOpaque();

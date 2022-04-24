@@ -22,7 +22,7 @@ func windows10() {}
 windows10()
 // expected-note@-1 {{add 'if #available' version check}}
 
-func coniditonal_compilation() {
+func conditional_compilation() {
   if #available(Windows 10, *) {
   }
 }

@@ -1532,8 +1532,16 @@ IterableDeclContext::getLocalConformances(ConformanceLookupKind lookupKind)
       // Look for a Sendable conformance globally. If it is synthesized
       // and matches this declaration context, use it.
       auto dc = getAsGenericContext();
+
+      SmallPtrSet<ProtocolConformance *, 4> known;
       for (auto conformance : findSynthesizedConformances(dc)) {
-        result.push_back(conformance);
+        // Compute the known set of conformances for the first time.
+        if (known.empty()) {
+          known.insert(result.begin(), result.end());
+        }
+
+        if (known.insert(conformance).second)
+          result.push_back(conformance);
       }
       break;
     }

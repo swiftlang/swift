@@ -3762,7 +3762,7 @@ SetTestSuite.test("SetAlgebra.Contains.EmptySet") {
   expectFalse(s.contains(1070))
 }
 
-// Test formItersection()
+// Test formIntersection()
 
 SetTestSuite.test("SetAlgebra.FormIntersection.SingleEntry") {
   do {

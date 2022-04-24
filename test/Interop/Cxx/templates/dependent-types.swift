@@ -23,7 +23,7 @@ DependentTypesTestSuite.test("Different dependent inferred by arg.") {
   expectEqual(m.getValue(), 42)
 }
 
-DependentTypesTestSuite.test("Instanciate the same function twice") {
+DependentTypesTestSuite.test("Instantiate the same function twice") {
   // Intentionally test the same thing twice.
   let m = dependantReturnTypeInffered(42) as! M<Int>
   expectEqual(m.getValue(), 42)

@@ -138,14 +138,14 @@ void swift_slowDealloc(void *ptr, size_t bytes, size_t alignMask);
 /// \param args The arguments to pass to the constructor for \c T.
 ///
 /// \returns A pointer to a new, fully constructed instance of \c T. This
-/// 	function never returns \c nullptr. The caller is responsible for
+///   function never returns \c nullptr. The caller is responsible for
 ///   eventually destroying the resulting object by passing it to
 ///   \c swift_cxx_deleteObject().
 ///
 /// This function avoids the use of the global \c operator \c new (which may be
 /// overridden by other code in a process) in favor of calling
 /// \c swift_slowAlloc() and constructing the new object with placement new.
-/// 
+///
 /// This function is capable of returning well-aligned memory even on platforms
 /// that do not implement the C++17 "over-aligned new" feature.
 template <typename T, typename... Args>
@@ -159,7 +159,7 @@ static inline T *swift_cxx_newObject(Args &&... args) {
 /// Destruct and deallocate an instance of type \c T.
 ///
 /// \param ptr A pointer to an instance of type \c T previously created with a
-/// 	call to \c swift_cxx_newObject().
+///   call to \c swift_cxx_newObject().
 ///
 /// This function avoids the use of the global \c operator \c delete (which may
 /// be overridden by other code in a process) in favor of directly calling the
@@ -171,8 +171,8 @@ static inline T *swift_cxx_newObject(Args &&... args) {
 template <typename T>
 static inline void swift_cxx_deleteObject(T *ptr) {
   if (ptr) {
-  	ptr->~T();
-  	swift_slowDealloc(ptr, sizeof(T), alignof(T) - 1);
+    ptr->~T();
+    swift_slowDealloc(ptr, sizeof(T), alignof(T) - 1);
   }
 }
 

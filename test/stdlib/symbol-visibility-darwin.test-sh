@@ -14,7 +14,7 @@
 // RUN: %llvm-nm --defined-only --extern-only --no-weak --demangle %platform-dylib-dir/%target-library-name(swiftRemoteMirror) > %t/swiftRemoteMirror-no-weak.txt
 // RUN: diff -u %t/swiftRemoteMirror-all.txt %t/swiftRemoteMirror-no-weak.txt
 
-// NOTE: swiftDemanging is not checked because it is incorportated into
+// NOTE: swiftDemanging is not checked because it is incorporated into
 // swiftCore and swiftRemoteMirror.  Both of those checks ensure that the
 // symbols are handled properly.
 

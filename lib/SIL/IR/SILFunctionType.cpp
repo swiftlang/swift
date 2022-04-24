@@ -399,7 +399,7 @@ static CanGenericSignature buildDifferentiableGenericSignature(CanGenericSignatu
 
         // The GSB used to drop requirements which reference non-existent
         // generic parameters, whereas the RequirementMachine asserts now.
-        // Filter thes requirements out explicitly to preserve the old
+        // Filter these requirements out explicitly to preserve the old
         // behavior.
         if (std::find_if(genericParams.begin(), genericParams.end(),
                          [interfaceTy](CanGenericTypeParamType t) -> bool {
@@ -716,7 +716,7 @@ static CanSILFunctionType getAutoDiffPullbackType(
         std::distance(originalFnTy->getParameters().begin(), &*inoutParamIt);
     auto inoutParam = originalFnTy->getParameters()[paramIndex];
     // The pullback parameter convention depends on whether the original `inout`
-    // paramater is a differentiability parameter.
+    // parameter is a differentiability parameter.
     // - If yes, the pullback parameter convention is `@inout`.
     // - If no, the pullback parameter convention is `@in_guaranteed`.
     auto inoutParamTanType = getAutoDiffTangentTypeForLinearMap(
@@ -2279,7 +2279,7 @@ struct DefaultAllocatorConventions : DefaultConventions {
   }
 };
 
-/// The default conventions for Swift setter acccessors.
+/// The default conventions for Swift setter accessories.
 ///
 /// These take self at +0, but all other parameters at +1. This is because we
 /// assume that setter parameters are likely to be values to be forwarded into
@@ -3943,7 +3943,7 @@ public:
     //   add the appropriate invocation substitutions.
     //
     // - Otherwise, if there are pattern substitutions, just substitute
-    //   those; the other components are inside the patttern generic
+    //   those; the other components are inside the pattern generic
     //   signature.
     //
     // - Otherwise, substitute the basic components.
@@ -3969,7 +3969,7 @@ public:
 
     auto patternSubs = origType->getPatternSubstitutions();
 
-    // If we have an invocation signatture, we generally shouldn't
+    // If we have an invocation signature, we generally shouldn't
     // substitute into the pattern substitutions and component types.
     if (auto sig = origType->getInvocationGenericSignature()) {
       // Substitute the invocation substitutions if present.
@@ -4630,7 +4630,7 @@ static bool areABICompatibleParamsOrReturns(SILType a, SILType b,
 
     // Opaque types are compatible with their substitution.
     if (inFunction) {
-      auto opaqueTypesSubsituted = aa;
+      auto opaqueTypesSubstituted = aa;
       auto *dc = inFunction->getDeclContext();
       auto *currentModule = inFunction->getModule().getSwiftModule();
       if (!dc || !dc->isChildContextOf(currentModule))
@@ -4639,15 +4639,15 @@ static bool areABICompatibleParamsOrReturns(SILType a, SILType b,
           dc, inFunction->getResilienceExpansion(),
           inFunction->getModule().isWholeModule());
       if (aa.getASTType()->hasOpaqueArchetype())
-        opaqueTypesSubsituted = aa.subst(inFunction->getModule(), replacer,
+        opaqueTypesSubstituted = aa.subst(inFunction->getModule(), replacer,
                                          replacer, CanGenericSignature(), true);
 
-      auto opaqueTypesSubsituted2 = bb;
+      auto opaqueTypesSubstituted2 = bb;
       if (bb.getASTType()->hasOpaqueArchetype())
-        opaqueTypesSubsituted2 =
+        opaqueTypesSubstituted2 =
             bb.subst(inFunction->getModule(), replacer, replacer,
                      CanGenericSignature(), true);
-      if (opaqueTypesSubsituted == opaqueTypesSubsituted2)
+      if (opaqueTypesSubstituted == opaqueTypesSubstituted2)
         continue;
     }
 

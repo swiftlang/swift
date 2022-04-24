@@ -346,7 +346,7 @@ void verifyKeyPathComponent(SILModule &M,
       // TODO: This should probably be unconditionally +1 when we
       // can represent that.
       require(newValueParam.getConvention() == normalArgConvention,
-              "setter value parameter should havee normal arg convention");
+              "setter value parameter should have normal arg convention");
 
       auto baseParam = substSetterType->getParameters()[1];
       require(baseParam.getConvention() == normalArgConvention
@@ -1011,7 +1011,7 @@ public:
 
         // Address-only values are potentially unmovable when borrowed. See also
         // checkOwnershipForwardingInst. A phi implies a move of its arguments
-        // because they can't necessarilly all reuse the same storage.
+        // because they can't necessarily all reuse the same storage.
         require((!arg->getType().isAddressOnly(F)
                  || arg->getOwnershipKind() != OwnershipKind::Guaranteed),
                 "Guaranteed address-only phi not allowed--implies a copy");
@@ -1301,7 +1301,7 @@ public:
     if (!varInfo)
       return;
 
-    // Retrive debug variable type
+    // Retrieve debug variable type
     SILType DebugVarTy;
     if (varInfo->Type)
       DebugVarTy = *varInfo->Type;
@@ -1315,9 +1315,9 @@ public:
       case SILInstructionKind::DebugValueInst:
         DebugVarTy = inst->getOperand(0)->getType();
         if (DebugVarTy.isAddress()) {
-          auto Expr = varInfo->DIExpr.operands();
-          if (!Expr.empty() &&
-              Expr.begin()->getOperator() == SILDIExprOperator::Dereference)
+          // FIXME: op_deref could be applied to address types only.
+          // FIXME: Add this check
+          if (varInfo->DIExpr.startsWithDeref())
             DebugVarTy = DebugVarTy.getObjectType();
         }
         break;
@@ -1343,9 +1343,16 @@ public:
           require(DebugVars[argNum].first == varInfo->Name,
                   "Scope contains conflicting debug variables for one function "
                   "argument");
-          // Check for type
-          require(DebugVars[argNum].second == DebugVarTy,
+          // The source variable might change its location (e.g. due to
+          // optimizations). Check for most common transformations (e.g. loading
+          // to SSA value and vice versa) as well
+          require(DebugVars[argNum].second == DebugVarTy ||
+                  (DebugVars[argNum].second.isAddress() &&
+                   DebugVars[argNum].second.getObjectType() == DebugVarTy) ||
+                  (DebugVarTy.isAddress() &&
+                   DebugVars[argNum].second == DebugVarTy.getObjectType()),
                   "conflicting debug variable type!");
+          DebugVars[argNum].second = DebugVarTy;
         } else {
           // Reserve enough space.
           while (DebugVars.size() <= argNum) {
@@ -1949,9 +1956,9 @@ public:
           return true;
         if (t.getASTType() == t.getASTContext().TheNativeObjectType)
           return true;
-        if (auto clas = t.getClassOrBoundGenericClass())
+        if (auto clazz = t.getClassOrBoundGenericClass())
           // Must be a class defined in Swift.
-          return clas->hasKnownSwiftImplementation();
+          return clazz->hasKnownSwiftImplementation();
         return false;
       };
       
@@ -2304,7 +2311,7 @@ public:
     // those accesses.
     identifyFormalAccess(BAI);
     // FIXME: rdar://57291811 - the following check for valid storage will be
-    // reenabled shortly. A fix is planned. In the meantime, the possiblity that
+    // reenabled shortly. A fix is planned. In the meantime, the possibility that
     // a real miscompilation could be caused by this failure is insignificant.
     // I will probably enable a much broader SILVerification of address-type
     // block arguments first to ensure we never hit this check again.
@@ -5108,7 +5115,7 @@ public:
     require(IEC->getVerificationType() == IsEscapingClosureInst::ObjCEscaping ||
                 IEC->getVerificationType() ==
                     IsEscapingClosureInst::WithoutActuallyEscaping,
-            "unknown verfication type");
+            "unknown verification type");
   }
 
   void checkDifferentiableFunctionInst(DifferentiableFunctionInst *dfi) {

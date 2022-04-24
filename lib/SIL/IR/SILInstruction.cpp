@@ -240,7 +240,7 @@ SILInstructionKind swift::getSILInstructionKind(StringRef name) {
   llvm::errs() << "Unknown SIL instruction name\n";
   abort();
 #endif
-  llvm_unreachable("Unknown SIL insruction name");
+  llvm_unreachable("Unknown SIL instruction name");
 }
 
 /// Map SILInstructionKind to a corresponding SILInstruction name.
@@ -1444,7 +1444,7 @@ SILInstructionResultArray::SILInstructionResultArray(
   auto *Value = static_cast<const ValueBase *>(SVI);
   assert(uintptr_t(Value) != uintptr_t(SVI) &&
          "Expected value to be offset from SVI since it is not the first "
-         "multi-inheritence parent");
+         "multi-inheritance parent");
   Pointer = reinterpret_cast<const uint8_t *>(Value);
 
 #ifndef NDEBUG

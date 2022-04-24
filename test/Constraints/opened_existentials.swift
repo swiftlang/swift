@@ -202,7 +202,7 @@ func testTakeValueAndClosure(p: any P) {
   takeValueAndClosure(p, body: overloadedGenericFunctionTakingP)
   takeValueAndClosure(p, body: genericFunctionTakingPQ) // expected-error{{global function 'genericFunctionTakingPQ' requires that 'T' conform to 'Q'}}
 
-  // Do not allow opening if there are any uses of the the type parameter before
+  // Do not allow opening if there are any uses of the type parameter before
   // the opened parameter. This maintains left-to-right evaluation order.
   takeValueAndClosureBackwards( // expected-error{{type 'any P' cannot conform to 'P'}}
     // expected-note@-1{{only concrete types such as structs, enums and classes can conform to protocols}}

@@ -32,7 +32,7 @@ namespace swift {
 enum class ModuleSearchPathKind {
   Import,
   Framework,
-  DarwinImplictFramework,
+  DarwinImplicitFramework,
   RuntimeLibrary,
 };
 
@@ -117,7 +117,7 @@ class ModuleSearchPathLookup {
   /// Scan the directory at \p SearchPath for files and add those files to the
   /// lookup table. \p Kind specifies the search path kind and \p Index the
   /// index of \p SearchPath within that search path kind. Search paths with
-  /// lower indicies are considered first.
+  /// lower indices are considered first.
   /// The \p SearchPath is stored by as a \c StringRef, so the string backing it
   /// must be alive as long as this lookup table is alive and not cleared.
   void addFilesInPathToLookupTable(llvm::vfs::FileSystem *FS,
@@ -334,7 +334,7 @@ public:
   /// A set of compiled modules that may be ready to use.
   std::vector<std::string> CandidateCompiledModules;
 
-  /// A map of explict Swift module information.
+  /// A map of explicit Swift module information.
   std::string ExplicitSwiftModuleMap;
 
   /// A map of placeholder Swift module dependency information.

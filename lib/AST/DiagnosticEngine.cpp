@@ -504,7 +504,7 @@ static bool isInterestingTypealias(Type type) {
   return true;
 }
 
-/// Walks the type recursivelly desugaring  types to display, but skipping
+/// Walks the type recursively desugaring  types to display, but skipping
 /// `GenericTypeParamType` because we would lose association with its original
 /// declaration and end up presenting the parameter in τ_0_0 format on
 /// diagnostic.

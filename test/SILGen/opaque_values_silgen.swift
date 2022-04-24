@@ -62,12 +62,14 @@ func forEachStmt() {
 // ---
 // CHECK-LABEL: sil hidden [ossa] @$s20opaque_values_silgen12openExistBoxySSs5Error_pF : $@convention(thin) (@guaranteed Error) -> @owned String {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $Error):
-// HECK:   [[OPAQUE_ARG:%.*]] = open_existential_box_value [[ARG]] : $Error to $@opened({{.*}}) Error
-// HECK:   [[ALLOC_OPEN:%.*]] = alloc_stack $@opened({{.*}}) Error
-// HECK:   store_borrow [[OPAQUE_ARG]] to [[ALLOC_OPEN]]
-// HECK:   dealloc_stack [[ALLOC_OPEN]]
+// CHECK:   [[OPAQUE_ARG:%.*]] = open_existential_box_value [[ARG]] : $Error to $@opened({{.*}}) Error
+// CHECK:   [[ALLOC_OPEN:%.*]] = alloc_stack $@opened({{.*}}) Error
+// CHECK:   [[COPY:%.*]] = copy_value [[OPAQUE_ARG]]
+// CHECK:   store [[COPY]] to [init] [[ALLOC_OPEN]]
+// CHECK:   destroy_addr [[ALLOC_OPEN]]
+// CHECK:   dealloc_stack [[ALLOC_OPEN]]
 // CHECK-NOT:   destroy_value [[ARG]] : $Error
-// HECK:   return {{.*}} : $String
+// CHECK:   return {{.*}} : $String
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen12openExistBoxySSs5Error_pF'
 func openExistBox(_ x: Error) -> String {
   return x._domain

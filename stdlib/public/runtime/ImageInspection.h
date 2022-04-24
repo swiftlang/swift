@@ -114,13 +114,31 @@ int lookupSymbol(const void *address, SymbolInfo *info);
 /// \param body A function to invoke. This function attempts to first initialize
 ///   the Debug Help library. The result of that operation is passed to this
 ///   function.
+/// \param context A caller-supplied value to pass to \a body.
 ///
 /// On Windows, the Debug Help library (DbgHelp.lib) is not thread-safe. All
 /// calls into it from the Swift runtime and stdlib should route through this
 /// function.
 SWIFT_RUNTIME_STDLIB_SPI
 void _swift_withWin32DbgHelpLibrary(
-  const std::function<void(bool /*isInitialized*/)>& body);
+  void (* body)(bool isInitialized, void *context), void *context);
+
+/// Configure the environment to allow calling into the Debug Help library.
+///
+/// \param body A function to invoke. This function attempts to first initialize
+///   the Debug Help library. The result of that operation is passed to this
+///   function.
+///
+/// On Windows, the Debug Help library (DbgHelp.lib) is not thread-safe. All
+/// calls into it from the Swift runtime and stdlib should route through this
+/// function.
+static inline void _swift_withWin32DbgHelpLibrary(
+  const std::function<void(bool /*isInitialized*/)> &body) {
+  _swift_withWin32DbgHelpLibrary([](bool isInitialized, void *context) {
+    auto bodyp = reinterpret_cast<std::function<void(bool)> *>(context);
+    (* bodyp)(isInitialized);
+  }, const_cast<void *>(reinterpret_cast<const void *>(&body)));
+}
 
 /// Configure the environment to allow calling into the Debug Help library.
 ///

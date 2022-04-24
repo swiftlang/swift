@@ -112,7 +112,7 @@ if case 42 = 42, #available(macOS 10.51, *), #unavailable(macOS 10.52) { // expe
 if #available(macOS 10.51, *), case 42 = 42, #unavailable(macOS 10.52) { // expected-error {{#available and #unavailable cannot be in the same statement}}
 }
 
-// Allow availabiility and unavailability to mix if they are not in the same statement.
+// Allow availability and unavailability to mix if they are not in the same statement.
 if #unavailable(macOS 11) {
   if #available(macOS 10, *) { }
 }

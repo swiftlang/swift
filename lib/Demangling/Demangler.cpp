@@ -3231,8 +3231,6 @@ NodePointer Demangler::demangleSpecialType() {
       return popFunctionType(Node::Kind::CFunctionPointer);
     case 'g':
     case 'G':
-    case 'h':
-    case 'H':
       return demangleExtendedExistentialShape(specialChar);
     case 'z':
       switch (auto cchar = nextChar()) {
@@ -3382,47 +3380,19 @@ NodePointer Demangler::demangleSpecialType() {
 }
 
 NodePointer Demangler::demangleExtendedExistentialShape(char nodeKind) {
-  assert(nodeKind == 'g' || nodeKind == 'G' ||
-         nodeKind == 'h' || nodeKind == 'H');
+  assert(nodeKind == 'g' || nodeKind == 'G');
 
-  NodePointer type = nullptr;
-  if (nodeKind == 'h' || nodeKind == 'H')
-    type = popNode(Node::Kind::Type);
+  NodePointer type = popNode(Node::Kind::Type);
 
   NodePointer genSig = nullptr;
-  if (nodeKind == 'G' || nodeKind == 'H')
+  if (nodeKind == 'G')
     genSig = popNode(Node::Kind::DependentGenericSignature);
-
-  NodePointer reqSig = popNode(Node::Kind::DependentGenericSignature);
-
-  NodePointer valueStorage = [&]() -> NodePointer {
-    switch (nextChar()) {
-    case 'o':
-      return createNode(Node::Kind::ExtendedExistentialValueStorage,
-                        "opaque");
-    case 'c':
-      return createNode(Node::Kind::ExtendedExistentialValueStorage,
-                        "class");
-    case 'm':
-      return createNode(Node::Kind::ExtendedExistentialValueStorage,
-                        "metatype");
-    default:
-      return nullptr;
-    }
-  }();
-  if (!valueStorage) return nullptr;
-
-  // Make a default type expression if one wasn't given.
-  if (!type) {
-    type = createType(getDependentGenericParamType(genSig ? 1 : 0, 0));
-  }
 
   if (genSig) {
     return createWithChildren(Node::Kind::ExtendedExistentialTypeShape,
-                              reqSig, genSig, type, valueStorage);
+                              genSig, type);
   } else {
-    return createWithChildren(Node::Kind::ExtendedExistentialTypeShape,
-                              reqSig, type, valueStorage);
+    return createWithChild(Node::Kind::ExtendedExistentialTypeShape, type);
   }
 }
 

@@ -281,7 +281,7 @@ llvm::Constant *IRGenModule::getAddrOfObjCMethodName(StringRef selector) {
 
 /// Get or create an Objective-C selector reference.  Always returns
 /// an i8**.  The design is that the compiler will emit a load of this
-/// pointer, and the linker will ensure that that pointer is unique.
+/// pointer, and the linker will ensure that pointer is unique.
 llvm::Constant *IRGenModule::getAddrOfObjCSelectorRef(StringRef selector) {
   // Check whether a reference for this selector already exists.
   auto &entry = ObjCSelectorRefs[selector];

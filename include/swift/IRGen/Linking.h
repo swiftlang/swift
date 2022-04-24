@@ -125,10 +125,6 @@ class LinkEntity {
     ExtendedExistentialIsUniqueMask = 0x100,
     ExtendedExistentialIsSharedShift = 9,
     ExtendedExistentialIsSharedMask = 0x200,
-    ExtendedExistentialMetatypeDepthShift = 10,
-    ExtendedExistentialMetatypeDepthMask =
-      ~(KindMask | ExtendedExistentialIsUniqueMask |
-        ExtendedExistentialIsSharedMask),
   };
 #define LINKENTITY_SET_FIELD(field, value) (value << field##Shift)
 #define LINKENTITY_GET_FIELD(value, field) ((value & field##Mask) >> field##Shift)
@@ -1368,9 +1364,7 @@ public:
   }
 
   static LinkEntity forExtendedExistentialTypeShape(CanGenericSignature genSig,
-                                                    CanExistentialType
-                                                      existentialType,
-                                                    unsigned metatypeDepth,
+                                                    CanType existentialType,
                                                     bool isUnique,
                                                     bool isShared) {
     LinkEntity entity;
@@ -1380,8 +1374,7 @@ public:
     entity.Data =
         LINKENTITY_SET_FIELD(Kind, unsigned(Kind::ExtendedExistentialTypeShape))
       | LINKENTITY_SET_FIELD(ExtendedExistentialIsUnique, unsigned(isUnique))
-      | LINKENTITY_SET_FIELD(ExtendedExistentialIsShared, unsigned(isShared))
-      | LINKENTITY_SET_FIELD(ExtendedExistentialMetatypeDepth, metatypeDepth);
+      | LINKENTITY_SET_FIELD(ExtendedExistentialIsShared, unsigned(isShared));
     return entity;
   }
 
@@ -1484,9 +1477,9 @@ public:
              reinterpret_cast<const GenericSignatureImpl*>(SecondaryPointer));
   }
 
-  CanExistentialType getExtendedExistentialTypeShapeType() const {
+  CanType getExtendedExistentialTypeShapeType() const {
     assert(getKind() == Kind::ExtendedExistentialTypeShape);
-    return cast<ExistentialType>(CanType(reinterpret_cast<TypeBase*>(Pointer)));
+    return CanType(reinterpret_cast<TypeBase*>(Pointer));
   }
 
   bool isExtendedExistentialTypeShapeUnique() const {
@@ -1497,11 +1490,6 @@ public:
   bool isExtendedExistentialTypeShapeShared() const {
     assert(getKind() == Kind::ExtendedExistentialTypeShape);
     return LINKENTITY_GET_FIELD(Data, ExtendedExistentialIsShared);
-  }
-
-  unsigned getExtendedExistentialTypeShapeMetatypeDepth() const {
-    assert(getKind() == Kind::ExtendedExistentialTypeShape);
-    return LINKENTITY_GET_FIELD(Data, ExtendedExistentialMetatypeDepth);
   }
 
   bool isDynamicallyReplaceable() const {

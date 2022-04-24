@@ -846,7 +846,7 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
     status |= CurriedParameterClause;
   }
 
-  // If the decl uses currying syntax, complain that that syntax has gone away.
+  // If the decl uses currying syntax, complain that syntax has gone away.
   if (MultipleParameterLists) {
     diagnose(BodyParams->getStartLoc(),
              diag::parameter_curry_syntax_removed);

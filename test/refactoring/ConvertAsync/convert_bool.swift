@@ -320,7 +320,7 @@ func testConvertBool() async throws {
 
   // Don't handle the case where multiple flag checks are done in a single
   // condition, because it's not exactly clear what the user is doing. It's a
-  // little unfortunate that we'll allow multiple flag checks in seperate
+  // little unfortunate that we'll allow multiple flag checks in separate
   // conditions, but both of these cases seem somewhat uncommon, and there's no
   // real way to completely enforce a single flag param across e.g multiple calls
   // to the same function, so this is probably okay for now.

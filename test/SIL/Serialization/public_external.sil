@@ -53,7 +53,7 @@ sil shared @se : $@convention(thin) () -> () {
 // Check that external non-shared functions are serialized only
 // if they are referenced from something reachable from non-external functions.
 // Since all these fN functions are referenced only from an external function,
-// do not serialize even their declrations.
+// do not serialize even their declarations.
 
 // CHECK-NOT: sil{{.*}}@fn1 : $@convention(thin) () -> ()
 sil public_external [serialized] [noinline] @fn1 : $@convention(thin) () -> () {

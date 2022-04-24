@@ -1,4 +1,4 @@
-//===--- ModuleAnaluzerNodes.h - Nodes for API differ tool ---------------====//
+//===--- ModuleAnalyzerNodes.h - Nodes for API differ tool ---------------====//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -142,7 +142,7 @@ public:
 };
 
 // Describing some attributes with ABI/API impact. The addition or removal of these
-// attributes is considerred breakage.
+// attributes is considered breakage.
 struct BreakingAttributeInfo {
   const DeclAttrKind Kind;
   const StringRef Content;
@@ -357,7 +357,7 @@ class SDKNodeDecl: public SDKNode {
   uint8_t ReferenceOwnership;
   StringRef GenericSig;
   // In ABI mode, this field is populated as a user-friendly version of GenericSig.
-  // Dignostic preferes the sugared versions if they differ as well.
+  // Diagnostic preferes the sugared versions if they differ as well.
   StringRef SugaredGenericSig;
   Optional<uint8_t> FixedBinaryOrder;
   PlatformIntroVersion introVersions;
@@ -571,7 +571,7 @@ public:
 
   Optional<SDKNodeDeclType*> getSuperclass() const;
 
-  /// Finding the node through all children, including the inheritted ones,
+  /// Finding the node through all children, including the inherited ones,
   /// whose printed name matches with the given name.
   Optional<SDKNodeDecl*> lookupChildByPrintedName(StringRef Name) const;
   SDKNodeType *getRawValueType() const;
@@ -797,14 +797,14 @@ public:
 
 void detectRename(SDKNode *L, SDKNode *R);
 
-int dumpSwiftModules(const CompilerInvocation &InitInvok,
+int dumpSwiftModules(const CompilerInvocation &InitInvoke,
                      const llvm::StringSet<> &ModuleNames,
                      StringRef OutputDir,
                      const std::vector<std::string> PrintApis,
                      CheckerOptions Opts);
 
 SDKNodeRoot *getSDKNodeRoot(SDKContext &SDKCtx,
-                            const CompilerInvocation &InitInvok,
+                            const CompilerInvocation &InitInvoke,
                             const llvm::StringSet<> &ModuleNames);
 
 SDKNodeRoot *getEmptySDKNodeRoot(SDKContext &SDKCtx);
@@ -812,7 +812,7 @@ SDKNodeRoot *getEmptySDKNodeRoot(SDKContext &SDKCtx);
 void dumpSDKRoot(SDKNodeRoot *Root, PayLoad load, StringRef OutputFile);
 void dumpSDKRoot(SDKNodeRoot *Root, StringRef OutputFile);
 
-int dumpSDKContent(const CompilerInvocation &InitInvok,
+int dumpSDKContent(const CompilerInvocation &InitInvoke,
                    const llvm::StringSet<> &ModuleNames,
                    StringRef OutputFile, CheckerOptions Opts);
 

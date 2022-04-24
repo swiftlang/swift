@@ -4429,6 +4429,11 @@ TinyPtrVector<ValueDecl *> CXXNamespaceMemberLookup::evaluate(
 DeclRefExpr *getInteropStaticCastDeclRefExpr(ASTContext &ctx,
                                              const clang::Module *owningModule,
                                              Type base, Type derived) {
+  if (base->isForeignReferenceType() && derived->isForeignReferenceType()) {
+    base = base->wrapInPointer(PTK_UnsafePointer);
+    derived = derived->wrapInPointer(PTK_UnsafePointer);
+  }
+
   // Lookup our static cast helper function.
   // TODO: change this to stdlib or something.
   auto wrapperModule =
@@ -4440,7 +4445,7 @@ DeclRefExpr *getInteropStaticCastDeclRefExpr(ASTContext &ctx,
       "Did you forget to define a __swift_interopStaticCast helper function?");
   FuncDecl *staticCastFn = cast<FuncDecl>(results.back());
 
-  // Now we have to force instanciate this. We can't let the type checker do
+  // Now we have to force instantiate this. We can't let the type checker do
   // this yet because it can't infer the "To" type.
   auto subst =
       SubstitutionMap::get(staticCastFn->getGenericSignature(), {derived, base},
@@ -4467,8 +4472,8 @@ DeclRefExpr *getInteropStaticCastDeclRefExpr(ASTContext &ctx,
 // %3 = %2!
 // return %3.pointee
 MemberRefExpr *getInOutSelfInteropStaticCast(FuncDecl *funcDecl,
-                                             StructDecl *baseStruct,
-                                             StructDecl *derivedStruct) {
+                                             NominalTypeDecl *baseStruct,
+                                             NominalTypeDecl *derivedStruct) {
   auto &ctx = funcDecl->getASTContext();
 
   auto inoutSelf = [&ctx](FuncDecl *funcDecl) {
@@ -4532,18 +4537,13 @@ MemberRefExpr *getInOutSelfInteropStaticCast(FuncDecl *funcDecl,
                       ->getResult());
   casted->setThrows(false);
 
-  // Now force unwrap the casted pointer.
-  auto unwrapped = new (ctx) ForceValueExpr(casted, SourceLoc());
-  unwrapped->setType(baseStruct->getSelfInterfaceType()->wrapInPointer(
-      PTK_UnsafeMutablePointer));
-
   SubstitutionMap pointeeSubst = SubstitutionMap::get(
       ctx.getUnsafeMutablePointerDecl()->getGenericSignature(),
       {baseStruct->getSelfInterfaceType()}, {});
   VarDecl *pointeePropertyDecl =
       ctx.getPointerPointeePropertyDecl(PTK_UnsafeMutablePointer);
   auto pointeePropertyRefExpr = new (ctx) MemberRefExpr(
-      unwrapped, SourceLoc(),
+      casted, SourceLoc(),
       ConcreteDeclRef(pointeePropertyDecl, pointeeSubst), DeclNameLoc(),
       /*implicit=*/true);
   pointeePropertyRefExpr->setType(
@@ -4568,9 +4568,9 @@ synthesizeBaseClassMethodBody(AbstractFunctionDecl *afd, void *context) {
 
   auto funcDecl = cast<FuncDecl>(afd);
   auto derivedStruct =
-      cast<StructDecl>(funcDecl->getDeclContext()->getAsDecl());
+      cast<NominalTypeDecl>(funcDecl->getDeclContext()->getAsDecl());
   auto baseMember = static_cast<FuncDecl *>(context);
-  auto baseStruct = cast<StructDecl>(baseMember->getDeclContext()->getAsDecl());
+  auto baseStruct = cast<NominalTypeDecl>(baseMember->getDeclContext()->getAsDecl());
   auto baseType = baseStruct->getDeclaredType();
 
   SmallVector<Expr *, 8> forwardingParams;
@@ -4638,10 +4638,10 @@ synthesizeBaseClassFieldGetterBody(AbstractFunctionDecl *afd, void *context) {
 
   AccessorDecl *getterDecl = cast<AccessorDecl>(afd);
   AbstractStorageDecl *baseClassVar = static_cast<AbstractStorageDecl *>(context);
-  StructDecl *baseStruct =
-      cast<StructDecl>(baseClassVar->getDeclContext()->getAsDecl());
-  StructDecl *derivedStruct =
-      cast<StructDecl>(getterDecl->getDeclContext()->getAsDecl());
+  NominalTypeDecl *baseStruct =
+      cast<NominalTypeDecl>(baseClassVar->getDeclContext()->getAsDecl());
+  NominalTypeDecl *derivedStruct =
+      cast<NominalTypeDecl>(getterDecl->getDeclContext()->getAsDecl());
 
   auto selfDecl = getterDecl->getImplicitSelfDecl();
   auto selfExpr = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
@@ -4701,10 +4701,10 @@ synthesizeBaseClassFieldSetterBody(AbstractFunctionDecl *afd, void *context) {
   AbstractStorageDecl *baseClassVar = static_cast<AbstractStorageDecl *>(context);
   ASTContext &ctx = setterDecl->getASTContext();
 
-  StructDecl *baseStruct =
-      cast<StructDecl>(baseClassVar->getDeclContext()->getAsDecl());
-  StructDecl *derivedStruct =
-      cast<StructDecl>(setterDecl->getDeclContext()->getAsDecl());
+  NominalTypeDecl *baseStruct =
+      cast<NominalTypeDecl>(baseClassVar->getDeclContext()->getAsDecl());
+  NominalTypeDecl *derivedStruct =
+      cast<NominalTypeDecl>(setterDecl->getDeclContext()->getAsDecl());
 
   auto *pointeePropertyRefExpr =
       getInOutSelfInteropStaticCast(setterDecl, baseStruct, derivedStruct);
@@ -4941,7 +4941,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
         if (cast<ValueDecl>(import)->getName() == name)
           continue;
 
-        auto baseResults = cast<StructDecl>(import)->lookupDirect(name);
+        auto baseResults = cast<NominalTypeDecl>(import)->lookupDirect(name);
         for (auto foundInBase : baseResults) {
           if (auto newDecl = cloneBaseMemberDecl(foundInBase, recordDecl)) {
             result.push_back(newDecl);
@@ -5254,7 +5254,7 @@ clang::FunctionDecl *ClangImporter::instantiateCXXFunctionTemplate(
     return nullptr;
   }
 
-  // Instanciate a specialization of this template using the substitution map.
+  // Instantiate a specialization of this template using the substitution map.
   auto *templateArgList = clang::TemplateArgumentList::CreateCopy(
       func->getASTContext(), templateSubst);
   auto &sema = getClangInstance().getSema();

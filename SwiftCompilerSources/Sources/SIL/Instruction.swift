@@ -144,6 +144,8 @@ public final class MultipleValueInstructionResult : Value {
 
   public var definingInstruction: Instruction? { instruction }
 
+  public var index: Int { MultiValueInstResult_getIndex(bridged) }
+
   var bridged: BridgedMultiValueResult {
     BridgedMultiValueResult(obj: SwiftObject(self))
   }
@@ -568,10 +570,10 @@ final public class BeginCOWMutationInst : MultipleValueInstruction,
   public var bufferResult: Value { return getResult(index: 1) }
 }
 
-final public class DestructureStructInst : MultipleValueInstruction {
+final public class DestructureStructInst : MultipleValueInstruction, UnaryInstruction {
 }
 
-final public class DestructureTupleInst : MultipleValueInstruction {
+final public class DestructureTupleInst : MultipleValueInstruction, UnaryInstruction {
 }
 
 final public class BeginApplyInst : MultipleValueInstruction, FullApplySite {

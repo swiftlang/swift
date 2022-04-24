@@ -422,10 +422,6 @@ def disable_implicit_concurrency_module_import : Flag<["-"],
   "disable-implicit-concurrency-module-import">,
   HelpText<"Disable the implicit import of the _Concurrency module.">;
 
-def disable_implicit_distributed_module_import : Flag<["-"],
-  "disable-implicit-distributed-module-import">,
-  HelpText<"Disable the implicit import of the Distributed module.">;
-
 def disable_implicit_string_processing_module_import : Flag<["-"],
   "disable-implicit-string-processing-module-import">,
   HelpText<"Disable the implicit import of the _StringProcessing module.">;

@@ -1364,7 +1364,7 @@ for (step, evilBoundsCheck) in [ (1, true), (-1, false), (-1, true) ] {
     ? "invalid Collection: less than 'count' elements in collection"
     : "invalid Collection: more than 'count' elements in collection"
 
-  // The invalid Collection error is a _debugPreconditon that will only fire
+  // The invalid Collection error is a _debugPrecondition that will only fire
   // in a Debug assert configuration.
   let expectedToFail = (step < 0 && evilBoundsCheck) ||
                        _isDebugAssertConfiguration()

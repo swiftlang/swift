@@ -788,7 +788,8 @@ Expr *addImplicitLoadExpr(
 /// an empty optional.
 ProtocolConformanceRef containsProtocol(Type T, ProtocolDecl *Proto,
                                         ModuleDecl *M,
-                                        bool skipConditionalRequirements=false);
+                                        bool skipConditionalRequirements=false,
+                                        bool allowMissing=false);
 
 /// Determine whether the given type conforms to the given protocol.
 ///
@@ -999,7 +1000,8 @@ bool diagnoseDeclRefExportability(SourceLoc loc,
 bool diagnoseConformanceExportability(SourceLoc loc,
                                       const RootProtocolConformance *rootConf,
                                       const ExtensionDecl *ext,
-                                      const ExportContext &where);
+                                      const ExportContext &where,
+                                      bool useConformanceAvailabilityErrorsOpt = false);
 
 /// \name Availability checking
 ///

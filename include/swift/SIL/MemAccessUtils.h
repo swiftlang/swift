@@ -267,7 +267,7 @@ enum class AccessUseType { Exact, Inner, Overlapping };
 /// The enum values are ordered.  Each successive cast kind is more
 /// transformative than the last.
 ///
-/// TODO: Distinguish between LayoutEquivalent and LayoutCompatibile.
+/// TODO: Distinguish between LayoutEquivalent and LayoutCompatible.
 enum class AccessStorageCast { Identity, Type };
 
 /// The physical representation used to identify access information and common
@@ -367,7 +367,7 @@ protected:
     // Define bits for use in the AccessEnforcementOpts pass. Each begin_access
     // in the function is mapped to one instance of this subclass.  Reserve a
     // bit for a seenNestedConflict flag, which is the per-begin-access result
-    // of pass-specific analysis. The remaning bits are sufficient to index all
+    // of pass-specific analysis. The remaining bits are sufficient to index all
     // begin_[unpaired_]access instructions.
     //
     // `AccessRepresentation` refers to the AccessRepresentationBitfield defined
@@ -559,7 +559,7 @@ public:
 private:
   // Disable direct comparison because we allow subclassing with bitfields.
   // Currently, we use DenseMapInfo to unique storage, which defines key
-  // equalilty only in terms of the base AccessStorage class bits.
+  // equality only in terms of the base AccessStorage class bits.
   bool operator==(const AccessRepresentation &) const = delete;
   bool operator!=(const AccessRepresentation &) const = delete;
 };
@@ -567,7 +567,7 @@ private:
 /// The base of a formal access.
 ///
 /// Note that the SILValue that represents a storage object is not
-/// necessarilly an address type. It may instead be a SILBoxType. So, even
+/// necessarily an address type. It may instead be a SILBoxType. So, even
 /// though address phis are not allowed, finding the base of an access may
 /// require traversing phis.
 class AccessBase : public AccessRepresentation {
@@ -991,7 +991,7 @@ namespace swift {
 /// this, we instead consider it an invalid AccessPath. This is the only case in
 /// which AccessPath::storage can differ from AccessStorage::compute().
 ///
-/// Storing an AccessPath ammortizes to constant space. To cache identification
+/// Storing an AccessPath amortizes to constant space. To cache identification
 /// of address locations, AccessPath should be used rather than the
 /// ProjectionPath which requires quadratic space in the number of address
 /// values and quadratic time when comparing addresses.
@@ -1199,7 +1199,7 @@ public:
 
 // Encapsulate the result of computing an AccessPath. AccessPath does not store
 // the base address of the formal access because it does not always uniquely
-// indentify the access, but AccessPath users may use the base address to to
+// identify the access, but AccessPath users may use the base address to to
 // recover the def-use chain for a specific global_addr or ref_element_addr.
 struct AccessPathWithBase {
   AccessPath accessPath;
@@ -1819,7 +1819,7 @@ public:
 
   // Secondary entry point to check that cloning will succeed.
   bool canCloneUseDefChain(SILValue addr) {
-    // Use any valid address as a placeholder. It is innaccessible.
+    // Use any valid address as a placeholder. It is inaccessible.
     placeHolder = addr;
     return cloneRecursive(addr);
   }

@@ -578,12 +578,12 @@ void ASTContext::operator delete(void *Data) throw() {
 }
 
 ASTContext *ASTContext::get(LangOptions &langOpts,
-                            TypeCheckerOptions &typeckOpts, SILOptions &silOpts,
+                            TypeCheckerOptions &typecheckOpts, SILOptions &silOpts,
                             SearchPathOptions &SearchPathOpts,
                             ClangImporterOptions &ClangImporterOpts,
                             symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
                             SourceManager &SourceMgr, DiagnosticEngine &Diags) {
-  // If more than two data structures are concatentated, then the aggregate
+  // If more than two data structures are concatenated, then the aggregate
   // size math needs to become more complicated due to per-struct alignment
   // constraints.
   auto align = std::max(alignof(ASTContext), alignof(Implementation));
@@ -594,16 +594,16 @@ ASTContext *ASTContext::get(LangOptions &langOpts,
       llvm::alignAddr(impl, llvm::Align(alignof(Implementation))));
   new (impl) Implementation();
   return new (mem)
-      ASTContext(langOpts, typeckOpts, silOpts, SearchPathOpts,
+      ASTContext(langOpts, typecheckOpts, silOpts, SearchPathOpts,
                  ClangImporterOpts, SymbolGraphOpts, SourceMgr, Diags);
 }
 
-ASTContext::ASTContext(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
+ASTContext::ASTContext(LangOptions &langOpts, TypeCheckerOptions &typecheckOpts,
                        SILOptions &silOpts, SearchPathOptions &SearchPathOpts,
                        ClangImporterOptions &ClangImporterOpts,
                        symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
                        SourceManager &SourceMgr, DiagnosticEngine &Diags)
-    : LangOpts(langOpts), TypeCheckerOpts(typeckOpts), SILOpts(silOpts),
+    : LangOpts(langOpts), TypeCheckerOpts(typecheckOpts), SILOpts(silOpts),
       SearchPathOpts(SearchPathOpts), ClangImporterOpts(ClangImporterOpts),
       SymbolGraphOpts(SymbolGraphOpts), SourceMgr(SourceMgr), Diags(Diags),
       evaluator(Diags, langOpts), TheBuiltinModule(createBuiltinModule(*this)),
@@ -2510,7 +2510,7 @@ bool ASTContext::hasDelayedConformanceErrors(
     if (entry != getImpl().DelayedConformanceDiags.end())
       return hasDelayedErrors(entry->second);
 
-    return false; // unknown conformance, so no delayed delayed diags either.
+    return false; // unknown conformance, so no delayed diags either.
   }
   
   // check all conformances for any delayed errors
@@ -5014,15 +5014,15 @@ bool ASTContext::isTypeBridgedInExternalModule(
 }
 
 bool ASTContext::isObjCClassWithMultipleSwiftBridgedTypes(Type t) {
-  auto clas = t->getClassOrBoundGenericClass();
-  if (!clas)
+  auto clazz = t->getClassOrBoundGenericClass();
+  if (!clazz)
     return false;
   
-  if (clas == getNSErrorDecl())
+  if (clazz == getNSErrorDecl())
     return true;
-  if (clas == getNSNumberDecl())
+  if (clazz == getNSNumberDecl())
     return true;
-  if (clas == getNSValueDecl())
+  if (clazz == getNSValueDecl())
     return true;
   
   return false;

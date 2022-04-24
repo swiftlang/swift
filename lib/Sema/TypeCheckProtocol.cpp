@@ -5538,7 +5538,8 @@ void ConformanceChecker::emitDelayedDiags() {
 
 ProtocolConformanceRef
 TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M,
-                              bool skipConditionalRequirements) {
+                              bool skipConditionalRequirements,
+                              bool allowMissing) {
   // Existential types don't need to conform, i.e., they only need to
   // contain the protocol.
   if (T->isExistentialType()) {
@@ -5560,8 +5561,9 @@ TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M,
     if (auto superclass = layout.getSuperclass()) {
       auto result =
           (skipConditionalRequirements
-           ? M->lookupConformance(superclass, Proto)
-           : TypeChecker::conformsToProtocol(superclass, Proto, M));
+           ? M->lookupConformance(superclass, Proto, allowMissing)
+           : TypeChecker::conformsToProtocol(
+               superclass, Proto, M, allowMissing));
       if (result) {
         return result;
       }
@@ -5579,13 +5581,22 @@ TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M,
         return ProtocolConformanceRef(Proto);
     }
 
+    // FIXME: Unify with shouldCreateMissingConformances
+    if (allowMissing &&
+        Proto->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+      return ProtocolConformanceRef(
+          M->getASTContext().getBuiltinConformance(
+            T, Proto, GenericSignature(), { },
+            BuiltinConformanceKind::Missing));
+    }
+
     return ProtocolConformanceRef::forInvalid();
   }
 
   // For non-existential types, this is equivalent to checking conformance.
   return (skipConditionalRequirements
-          ? M->lookupConformance(T, Proto)
-          : TypeChecker::conformsToProtocol(T, Proto, M));
+          ? M->lookupConformance(T, Proto, allowMissing)
+          : TypeChecker::conformsToProtocol(T, Proto, M, allowMissing));
 }
 
 ProtocolConformanceRef

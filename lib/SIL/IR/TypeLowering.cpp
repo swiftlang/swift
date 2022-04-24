@@ -1791,7 +1791,7 @@ namespace {
         //
         // Note: if the type is in a different module, the lowering does
         // not depend on the resilience expansion, so we do not need to set
-        // the isResilent() flag above.
+        // the isResilient() flag above.
         if (!sameModule || Expansion.getResilienceExpansion() ==
                                ResilienceExpansion::Minimal) {
           properties.addSubobject(RecursiveProperties::forOpaque());
@@ -2122,7 +2122,7 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
   auto loweredSubstType =
       computeLoweredRValueType(forExpansion, origType, substType);
 
-  // If that didn't change the type and the key is cachable, there's no
+  // If that didn't change the type and the key is cacheable, there's no
   // point in re-checking the table, so just construct a type lowering
   // and cache it.
   if (loweredSubstType == substType && key.isCacheable()) {
@@ -3324,7 +3324,7 @@ public:
     return (isa<SubstitutableType>(type) || isa<DependentMemberType>(type));
   };
 
-  // We can fast-path some of these checks by proviing these two overrides:
+  // We can fast-path some of these checks by providing these two overrides:
   bool visitSubstitutableType(CanSubstitutableType type1,
                               CanSubstitutableType type2) {
     return false;

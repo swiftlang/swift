@@ -202,7 +202,7 @@ ERROR(scanner_find_cycle, none,
 ERROR(scanner_arguments_invalid, none,
       "dependencies scanner cannot be configured with arguments: '%0'", (StringRef))
 
-WARNING(warn_scaner_deserialize_failed, none,
+WARNING(warn_scanner_deserialize_failed, none,
         "Failed to load module scanning dependency cache from: '%0', re-building scanner cache from scratch.", (StringRef))
 
 REMARK(remark_reuse_cache, none,

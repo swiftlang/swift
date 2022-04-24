@@ -12,7 +12,7 @@
 ///
 /// \file
 /// This file contains the table used by SILDIExprInfo to map from
-/// SILDIExprOperator to suppliment information like the operator string.
+/// SILDIExprOperator to supplement information like the operator string.
 ///
 //===----------------------------------------------------------------------===//
 

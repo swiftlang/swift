@@ -25,7 +25,7 @@ where C.Elements : BidirectionalCollection {
   _ = xs.flatMap(f) // expected-warning {{'flatMap' is deprecated: Please use compactMap(_:) for the case where closure returns an optional value}} expected-note {{compactMap}}
 }
 
-func flatMapOnCollectinoOfStrings<
+func flatMapOnCollectionOfStrings<
   C : Collection
 >(xs: C, f: (C.Element) -> String?) {
   _ = xs.flatMap(f) // expected-warning {{'flatMap' is deprecated: Please use compactMap(_:) for the case where closure returns an optional value}} expected-note {{compactMap}}

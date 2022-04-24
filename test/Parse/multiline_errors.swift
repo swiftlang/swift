@@ -137,7 +137,7 @@ _ = "hello\(
             // expected-error@-2 {{unterminated string literal}}
 
 _ = """
-  line one \ non-whitepace
+  line one \ non-whitespace
   line two
   """
   // expected-error@-3 {{invalid escape sequence in literal}}

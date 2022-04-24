@@ -392,7 +392,7 @@ suite.test("Exhaustive Index Interchange")
       let curSubChar = str[curScalarIdx]
 
       // If there is a Character prior to this scalar, remember it and check
-      // that misalignd code unit indices also produce it.
+      // that misaligned code unit indices also produce it.
       let scalarPriorCharacter: Character?
       if scalarStartIdx == str.startIndex {
         scalarPriorCharacter = nil

@@ -22,13 +22,13 @@ cake: Accessor RemoveSetters.Value.Modify() has been removed
 cake: Accessor RemoveSetters.Value.Set() has been removed
 cake: Accessor RemoveSetters.subscript(_:).Modify() has been removed
 cake: Accessor RemoveSetters.subscript(_:).Set() has been removed
-cake: AssociatedType RequiementChanges.removedType has been removed
+cake: AssociatedType RequirementChanges.removedType has been removed
 cake: Class C3 has been removed
 cake: Constructor Somestruct2.init(_:) has been removed
 cake: Func C4.foo() has been removed
 cake: Func Int.IntEnhancer() has been removed
-cake: Func RequiementChanges.removedFunc() has been removed
-cake: Var RequiementChanges.removedVar has been removed
+cake: Func RequirementChanges.removedFunc() has been removed
+cake: Var RequirementChanges.removedVar has been removed
 
 /* Moved Decls */
 cake: Class ClassToStruct has been changed to a Struct
@@ -77,7 +77,7 @@ cake: Func Float.floatHigher() is a new API without @available attribute
 cake: Func FutureKind.==(_:_:) is a new API without @available attribute
 cake: Func FutureKind.hash(into:) is a new API without @available attribute
 cake: Func HasMutatingMethodClone.foo() has self access kind changing from Mutating to NonMutating
-cake: Func RequiementChanges.addedFunc() is a new API without @available attribute
+cake: Func RequirementChanges.addedFunc() is a new API without @available attribute
 cake: Func S1.foo1() has self access kind changing from NonMutating to Mutating
 cake: Func S1.foo3() is now static
 cake: Func _NoResilientClass.NoLongerFinalFunc() is now without final
@@ -87,7 +87,7 @@ cake: Struct C6 is now with @frozen
 cake: Var C1.CIIns1 changes from weak to strong
 cake: Var C1.CIIns2 changes from strong to weak
 cake: Var FutureKind.hashValue is a new API without @available attribute
-cake: Var RequiementChanges.addedVar is a new API without @available attribute
+cake: Var RequirementChanges.addedVar is a new API without @available attribute
 cake: Var fixedLayoutStruct.$__lazy_storage_$_lazy_d is a new API without @available attribute
 cake: Var fixedLayoutStruct.c is a new API without @available attribute
 
@@ -114,10 +114,10 @@ cake: Struct fixedLayoutStruct has removed conformance to P1
 /* Protocol Requirement Change */
 cake: Accessor HasMutatingMethodClone.bar.Get() now requires new witness table entry
 cake: AssociatedType AssociatedTypePro.T1 has removed default type Swift.Int
-cake: AssociatedType RequiementChanges.addedTypeWithoutDefault has been added as a protocol requirement
+cake: AssociatedType RequirementChanges.addedTypeWithoutDefault has been added as a protocol requirement
 cake: Func HasMutatingMethodClone.foo() now requires new witness table entry
-cake: Func RequiementChanges.addedFunc() has been added as a protocol requirement
-cake: Var RequiementChanges.addedVar has been added as a protocol requirement
+cake: Func RequirementChanges.addedFunc() has been added as a protocol requirement
+cake: Var RequirementChanges.addedVar has been added as a protocol requirement
 
 /* Class Inheritance Change */
 cake: Class SubGenericClass has changed its super class from cake.GenericClass<cake.P1> to cake.GenericClass<cake.P2>

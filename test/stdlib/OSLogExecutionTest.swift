@@ -36,7 +36,7 @@ internal struct OSLogBufferChecker {
     buffer = byteBuffer
   }
 
-  /// Bit mask for setting bits in the peamble. The bits denoted by the bit
+  /// Bit mask for setting bits in the preamble. The bits denoted by the bit
   /// mask indicate whether there is an argument that is private, and whether
   /// there is an argument that is non-scalar: String, NSObject or Pointer.
   internal enum PreambleBitMask: UInt8 {

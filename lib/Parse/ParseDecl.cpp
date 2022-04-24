@@ -1716,7 +1716,7 @@ void Parser::parseAllAvailabilityMacroArguments() {
   // The sub-parser is not actually parsing the source file but the LangOpts
   // AvailabilityMacros. No point creating a libSyntax tree for it. In fact, the
   // creation of a libSyntax tree would always fail because the
-  // AvailibilityMacro is not valid Swift source code.
+  // AvailabilityMacro is not valid Swift source code.
   LangOpts.BuildSyntaxTree = false;
 
   for (StringRef macro: LangOpts.AvailabilityMacros) {
@@ -2921,7 +2921,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     StringRef message;
     if (consumeIf(tok::l_paren)) {
       if (!Tok.is(tok::identifier)) {
-        llvm_unreachable("Flag must start with an indentifier");
+        llvm_unreachable("Flag must start with an identifier");
       }
 
       StringRef flag = Tok.getText();
@@ -6343,7 +6343,7 @@ static bool parseAccessorIntroducer(Parser &P,
 /// \endverbatim
 ///
 /// While only 'get' accessors currently support such specifiers,
-/// this routine will also diagnose unspported effects specifiers on
+/// this routine will also diagnose unsupported effects specifiers on
 /// other accessors.
 ///
 /// \param accessors the accessors we've parsed already.

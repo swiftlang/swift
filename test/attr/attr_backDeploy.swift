@@ -283,7 +283,7 @@ public func trailingWildcardFunc() {}
 public func embeddedWildcardFunc() {}
 
 @_backDeploy(before: _myProject 3.0) // expected-error {{reference to undefined version '3.0' for availability macro '_myProject'}}
-public func macroVersionned() {}
+public func macroVersioned() {}
 
 @_backDeploy(before: _myProject) // expected-error {{reference to undefined version '0' for availability macro '_myProject'}}
 public func missingMacroVersion() {}
@@ -295,11 +295,11 @@ public func unknownMacroMissingVersion() {}
 
 @_backDeploy(before: _unknownMacro 1.0) // expected-warning {{unknown platform '_unknownMacro' for attribute '@_backDeploy'}}
 // expected-error@-1 {{expected at least one platform version in '@_backDeploy' attribute}}
-public func unknownMacroVersionned() {}
+public func unknownMacroVersioned() {}
 
 @available(macOS 11.0, *)
 @_backDeploy(before: _unknownMacro 1.0, _myProject 2.0) // expected-warning {{unknown platform '_unknownMacro' for attribute '@_backDeploy'}}
-public func knownAndUnknownMacroVersionned() {}
+public func knownAndUnknownMacroVersioned() {}
 
 @_backDeploy() // expected-error {{expected 'before:' in '@_backDeploy' attribute}}
 // expected-error@-1 {{expected at least one platform version in '@_backDeploy' attribute}}

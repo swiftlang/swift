@@ -127,7 +127,7 @@ protected:
 ///      loop-nest relative to \p dominatingBlock causing us to go around a
 ///      backedge and hit the block during our traversal. In this case, we
 ///      have already during the traversal passed the exiting blocks of the
-///      sub-loop as joint postdominace completion set blocks. This is useful
+///      sub-loop as joint postdominance completion set blocks. This is useful
 ///      if one is using this API for lifetime extension purposes of lifetime
 ///      ending uses and one needs to insert compensating copy_value at these
 ///      locations due to the lack of strong control-equivalence in between
