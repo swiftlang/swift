@@ -767,7 +767,7 @@ private:
            "Generic param decls in extension should always be implicit and "
            "shadow a generic param in the extended type.");
     assert(Extension->getExtendedNominal() &&
-           "The implict generic types on the extension should only be created "
+           "The implicit generic types on the extension should only be created "
            "if the extended type was found");
 
     auto ExtendedTypeGenSig =
