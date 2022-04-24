@@ -3,11 +3,11 @@
 Visual Studio 2019 or newer is needed to build the Swift SDK for Android on
 Windows.
 
-## Install Dependencies
+## 1. Install Dependencies
 - Install the latest version of [Visual Studio](https://www.visualstudio.com/downloads/)
 - Make sure to include the android NDK in your installation.
 
-## Clone the repositories
+## 2. Clone the repositories
 1. Configure git to work with Unix file endings
 1. Clone `apple/swift-llvm` into a directory named `llvm`
 1. Clone `apple/swift-corelibs-libdispatch` into a directory named `swift-corelibs-libdispatch`
@@ -34,7 +34,7 @@ git clone https://github.com/apple/swift-corelibs-xctest swift-corelibs-xctest
 git clone https://github.com/compnerd/swift-build swift-build
 ```
 
-## Acquire the lastest toolchain and dependencies
+## 3. Acquire the lastest toolchain and dependencies
 
 1. Download the toolchain, ICU, libxml2, and curl for android from
    [Azure](https://dev.azure.com/compnerd/swift-build) into `S:\b\a\Library`.
@@ -43,7 +43,7 @@ git clone https://github.com/compnerd/swift-build swift-build
   [compnerd/swift-build](https://www.github.com/compnerd/swift-build) under
   the utilities directory.
 
-## Configure LLVM
+## 4. Configure LLVM
 
 ```cmd
 md S:\b\a\llvm
@@ -57,7 +57,7 @@ cmake -C S:\swift-build\cmake\caches\android-armv7.cmake                        
   S:/llvm
 ```
 
-## Build and install the standard library
+## 5. Build and install the standard library
 
 - We must build and install the standard library to build the remainder of the
   SDK
@@ -79,7 +79,7 @@ ninja
 ninja install
 ```
 
-## Build libdispatch
+## 6. Build libdispatch
 
 - We *cannot* install libdispatch until after all builds are complete as that
   will cause the Dispatch module to be imported twice and fail to build.
@@ -102,7 +102,7 @@ cmake -C S:\swift-build\cmake\caches\android-armv7.cmake                        
 ninja
 ```
 
-## Build foundation
+## 7. Build foundation
 
 ```cmd
 md S:\b\a\foundation
@@ -131,7 +131,7 @@ cmake -C S:\swift-build\cmake\caches\android-armv7.cmake                        
 ninja
 ```
 
-## Build XCTest
+## 8. Build XCTest
 
 ```cmd
 md S:\b\a\xctest
@@ -153,21 +153,21 @@ cmake -C S:\swift-build\cmake\caches\android-armv7.cmake                        
 ninja
 ```
 
-## Install libdispatch
+## 9. Install libdispatch
 
 ```cmd
 cd S:\b\a\libdispatch
 ninja install
 ```
 
-## Install Foundation
+## 10. Install Foundation
 
 ```cmd
 cd S:\b\a\foundation
 ninja install
 ```
 
-## Install XCTest
+## 11. Install XCTest
 
 ```cmd
 cd S:\b\a\xctest
