@@ -32,6 +32,7 @@
 #include "swift/FrontendTool/FrontendTool.h"
 #include "swift/DriverTool/DriverTool.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/Triple.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ConvertUTF.h"
 #include "llvm/Support/Errno.h"
@@ -168,12 +169,13 @@ static bool appendSwiftDriverName(SmallString<256> &buffer) {
     return true;
   }
 
-  llvm::sys::path::append(buffer, "swift-driver");
+  StringRef execSuffix(llvm::Triple(llvm::sys::getProcessTriple()).isOSWindows() ? ".exe" : "");
+  llvm::sys::path::append(buffer, "swift-driver" + execSuffix);
   if (llvm::sys::fs::exists(buffer)) {
     return true;
   }
   llvm::sys::path::remove_filename(buffer);
-  llvm::sys::path::append(buffer, "swift-driver-new");
+  llvm::sys::path::append(buffer, "swift-driver-new" + execSuffix);
   if (llvm::sys::fs::exists(buffer)) {
     return true;
   }
