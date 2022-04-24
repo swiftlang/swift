@@ -15,72 +15,174 @@ on:
       - swiftwasm-release/5.4
       - swiftwasm-release/5.5
       - swiftwasm-release/5.6
+    types: [opened, synchronize, reopened, labeled]
 jobs:
-  build_toolchain:
+  start-runner:
+    name: Start self-hosted EC2 runner
+    runs-on: ubuntu-latest
+    # Run only on main branches to avoid triggers by non-collaborator
+    if: ${{ github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'check-self-hosted-ci') }}
+    outputs:
+      ubuntu20_04_aarch64-label: ${{ steps.start-ubuntu20_04_aarch64-runner.outputs.label }}
+      amazonlinux2_x86_64-label: ${{ steps.start-amazonlinux2_x86_64-runner.outputs.label }}
+      ubuntu20_04_aarch64-ec2-instance-id: ${{ steps.start-ubuntu20_04_aarch64-runner.outputs.ec2-instance-id }}
+      amazonlinux2_x86_64-ec2-instance-id: ${{ steps.start-amazonlinux2_x86_64-runner.outputs.ec2-instance-id }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Start EC2 runner (ubuntu20_04_aarch64)
+        id: start-ubuntu20_04_aarch64-runner
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: start
+          github-token: ${{ secrets.SWIFTWASM_BUILDBOT_TOKEN }}
+          ec2-image-id: ami-0d08b938af6d9dbb0 # swiftwasm-ci/ubuntu/images/hvm-ssd/ubuntu-focal-20.04-arm64-server-20211129
+          ec2-instance-type: c6g.large
+          subnet-id: subnet-327f4a13
+          security-group-id: sg-0429f5ec2bee9dc0c
+      - name: Start EC2 runner (amazonlinux2_x86_64)
+        id: start-amazonlinux2_x86_64-runner
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: start
+          github-token: ${{ secrets.SWIFTWASM_BUILDBOT_TOKEN }}
+          ec2-image-id: ami-059fc55111c686d49 # swiftwasm-ci/amzn2-ami-kernel-5.10-hvm-2.0.20211223.0-x86_64-gp2
+          ec2-instance-type: c6i.large
+          subnet-id: subnet-327f4a13
+          security-group-id: sg-0429f5ec2bee9dc0c
+  stop-runner:
+    name: Stop self-hosted EC2 runner
+    needs: [start-runner, build-toolchain]
+    runs-on: ubuntu-latest
+    # Required to stop the runner even if the error happened in the previous jobs
+    if: ${{ always() && needs.start-runner.result == 'success' }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Stop EC2 runner (ubuntu20_04_aarch64)
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: stop
+          github-token: ${{ secrets.SWIFTWASM_BUILDBOT_TOKEN }}
+          label: ${{ needs.start-runner.outputs.ubuntu20_04_aarch64-label }}
+          ec2-instance-id: ${{ needs.start-runner.outputs.ubuntu20_04_aarch64-ec2-instance-id }}
+      - name: Stop EC2 runner (amazonlinux2_x86_64)
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: stop
+          github-token: ${{ secrets.SWIFTWASM_BUILDBOT_TOKEN }}
+          label: ${{ needs.start-runner.outputs.amazonlinux2_x86_64-label }}
+          ec2-instance-id: ${{ needs.start-runner.outputs.amazonlinux2_x86_64-ec2-instance-id }}
+
+  build-matrix:
+    name: Build matrix
+    needs: [start-runner]
+    runs-on: ubuntu-latest
+    if: ${{ always() }}
+    outputs:
+      entries: ${{ steps.generate.outputs.entries }}
+    steps:
+      - name: Generate entries
+        id: generate
+        run: |
+          MATRIX_ENTRIES="["
+          MATRIX_ENTRIES="$MATRIX_ENTRIES"$(cat <<EOS
+          {
+            "build_os": "ubuntu-18.04",
+            "agent_query": "ubuntu-18.04",
+            "target": "ubuntu18.04_x86_64",
+            "run_stdlib_test": true,
+            "run_full_test": false,
+            "run_e2e_test": true,
+            "build_hello_wasm": true,
+            "clean_build_dir": false,
+            "free_disk_space": true
+          },
+          {
+            "build_os": "ubuntu-20.04",
+            "agent_query": "ubuntu-20.04",
+            "target": "ubuntu20.04_x86_64",
+            "run_stdlib_test": true,
+            "run_full_test": false,
+            "run_e2e_test": true,
+            "build_hello_wasm": true,
+            "clean_build_dir": false,
+            "free_disk_space": true
+          },
+          {
+            "build_os": "macos-11",
+            "agent_query": "macos-11",
+            "target": "macos_x86_64",
+            "run_stdlib_test": true,
+            "run_full_test": true,
+            "run_e2e_test": true,
+            "build_hello_wasm": true,
+            "clean_build_dir": false
+          },
+          {
+            "build_os": "macos-11",
+            "agent_query": ["self-hosted", "macOS", "ARM64"],
+            "target": "macos_arm64",
+            "run_stdlib_test": false,
+            "run_full_test": false,
+            "run_e2e_test": false,
+            "build_hello_wasm": true,
+            "clean_build_dir": true
+          }
+          EOS
+          )
+
+          if [[ ${{ needs.start-runner.result }} == "success" ]]; then
+            MATRIX_ENTRIES="$MATRIX_ENTRIES,"
+            MATRIX_ENTRIES="$MATRIX_ENTRIES"$(cat <<EOS
+          {
+            "build_os": "amazon-linux-2",
+            "agent_query": "${{ needs.start-runner.outputs.amazonlinux2_x86_64-label }}",
+            "target": "amazonlinux2_x86_64",
+            "run_stdlib_test": false,
+            "run_full_test": false,
+            "run_e2e_test": false,
+            "build_hello_wasm": true,
+            "clean_build_dir": false
+          }
+          EOS
+            )
+
+            MATRIX_ENTRIES="$MATRIX_ENTRIES,"
+            MATRIX_ENTRIES="$MATRIX_ENTRIES"$(cat <<EOS
+          {
+            "build_os": "ubuntu-20.04",
+            "agent_query": "${{ needs.start-runner.outputs.ubuntu20_04_aarch64-label }}",
+            "target": "ubuntu20.04_aarch64",
+            "run_stdlib_test": false,
+            "run_full_test": false,
+            "run_e2e_test": false,
+            "build_hello_wasm": true,
+            "clean_build_dir": false
+          }
+          EOS
+            )
+          fi
+          MATRIX_ENTRIES="$MATRIX_ENTRIES]"
+          MATRIX_ENTRIES="${MATRIX_ENTRIES//$'\n'/''}"
+          echo "::set-output name=entries::$MATRIX_ENTRIES"
+
+  build-toolchain:
     env:
       TOOLCHAIN_CHANNEL: DEVELOPMENT
       DEVELOPER_DIR: /Applications/Xcode_13.0.app/Contents/Developer/
+    needs: [build-matrix]
     strategy:
       matrix:
-        include:
-          - build_os: amazon-linux-2
-            agent_query: [AmazonLinux2, X64]
-            target: amazonlinux2_x86_64
-            run_stdlib_test: false
-            run_full_test: false
-            run_e2e_test: false
-            build_hello_wasm: true
-            clean_build_dir: true
-
-          - build_os: ubuntu-18.04
-            agent_query: ubuntu-18.04
-            target: ubuntu18.04_x86_64
-            run_stdlib_test: true
-            run_full_test: false
-            run_e2e_test: true
-            build_hello_wasm: true
-            clean_build_dir: false
-            free_disk_space: true
-
-          - build_os: ubuntu-20.04
-            agent_query: ubuntu-20.04
-            target: ubuntu20.04_x86_64
-            run_stdlib_test: true
-            run_full_test: false
-            run_e2e_test: true
-            build_hello_wasm: true
-            clean_build_dir: false
-            free_disk_space: true
-
-          - build_os: ubuntu-20.04
-            agent_query: [ubuntu20.04, ARM64]
-            target: ubuntu20.04_aarch64
-            run_stdlib_test: false
-            run_full_test: false
-            run_e2e_test: false
-            build_hello_wasm: true
-            clean_build_dir: true
-
-          - build_os: macos-11
-            agent_query: macos-11
-            target: macos_x86_64
-            run_stdlib_test: true
-            run_full_test: true
-            run_e2e_test: true
-            build_hello_wasm: true
-            clean_build_dir: false
-
-          - build_os: macos-11
-            agent_query: [self-hosted, macOS, ARM64]
-            target: macos_arm64
-            # FIXME: Enable stdlib test after wasmer fixes singlepass bug on arm64,
-            # fixes cranelift bug on x64, or wasmtime supports arm64
-            # Currently it's hard to run tests on both x64 and arm64.
-            run_stdlib_test: false
-            run_full_test: false
-            run_e2e_test: false
-            build_hello_wasm: true
-            clean_build_dir: true
+        include: ${{ fromJSON(needs.build-matrix.outputs.entries) }}
 
     name: Target ${{ matrix.target }}
     timeout-minutes: 0
@@ -114,10 +216,8 @@ jobs:
 
       - name: Prepare sccache timestamp
         id: cache_timestamp
-        shell: cmake -P {0}
         run: |
-          string(TIMESTAMP current_date "%Y-%m-%d-%H;%M;%S" UTC)
-          message("::set-output name=timestamp::${current_date}")
+          echo "::set-output name=timestamp::$(date +'%Y-%m-%d-%I-%M-%S')"
 
       - name: Check Xcode version
         if: ${{ startsWith(matrix.build_os, 'macos-') }}
