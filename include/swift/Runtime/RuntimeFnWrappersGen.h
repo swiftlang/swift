@@ -17,11 +17,11 @@
 #define SWIFT_RUNTIME_RUNTIMEFNWRAPPERSGEN_H
 
 #include "swift/SIL/RuntimeEffect.h"
-#include "llvm/IR/Module.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/IR/Module.h"
 
 namespace swift {
-  
+
 class AvailabilityContext;
 class ASTContext;
 
@@ -34,14 +34,12 @@ enum class RuntimeAvailability {
 /// Generate an llvm declaration for a runtime entry with a
 /// given name, return types, argument types, attributes and
 /// a calling convention.
-llvm::Constant *getRuntimeFn(llvm::Module &Module,
-                      llvm::Constant *&cache,
-                      char const *name,
-                      llvm::CallingConv::ID cc,
-                      RuntimeAvailability availability,
-                      llvm::ArrayRef<llvm::Type*> retTypes,
-                      llvm::ArrayRef<llvm::Type*> argTypes,
-                      llvm::ArrayRef<llvm::Attribute::AttrKind> attrs);
+llvm::Constant *getRuntimeFn(llvm::Module &Module, llvm::Constant *&cache,
+                             char const *name, llvm::CallingConv::ID cc,
+                             RuntimeAvailability availability,
+                             llvm::ArrayRef<llvm::Type *> retTypes,
+                             llvm::ArrayRef<llvm::Type *> argTypes,
+                             llvm::ArrayRef<llvm::Attribute::AttrKind> attrs);
 
-} /* Namespace swift */
+} // namespace swift
 #endif
