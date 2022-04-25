@@ -5141,6 +5141,7 @@ getActualSILFunctionTypeRepresentation(uint8_t rep) {
   CASE(Method)
   CASE(ObjCMethod)
   CASE(WitnessMethod)
+  CASE(CXXMethod)
 #undef CASE
   default:
     return None;
