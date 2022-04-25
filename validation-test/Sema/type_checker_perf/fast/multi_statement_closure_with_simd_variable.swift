@@ -16,6 +16,6 @@ test {
 
   let width: Float = 2
 
-  let p = Int(max(20, min(1000, (simd_distance(a, b) + simd_distance(b, c) + simd_distance(c, d)) / width / 4)))
+  let p = Int(max(20, min(1000, (simd_distance(a, b) + simd_distance(b, c) + simd_distance(c, d)) / width)))
   print(p)
 }
