@@ -182,7 +182,7 @@ if (NOT BOOTSTRAPPING_MODE)
   add_library(swiftCompilerModules ALIAS swiftCompilerStub)
 
 else()
-  # Note: "Swift" is not added intentinally here, because it would break
+  # Note: "Swift" is not added intentionally here, because it would break
   # the bootstrapping build in case no swift toolchain is installed on the host.
   project(SwiftInTheCompiler LANGUAGES C CXX)
 

@@ -1,4 +1,4 @@
-//===--- PassRegistration.swift - Register optimzation passes -------------===//
+//===--- PassRegistration.swift - Register optimization passes -------------===//
 //
 // This source file is part of the Swift.org open source project
 //
