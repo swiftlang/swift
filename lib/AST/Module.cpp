@@ -1051,13 +1051,6 @@ static bool shouldCreateMissingConformances(Type type, ProtocolDecl *proto) {
     return true;
   }
 
-  // A 'distributed actor' may have to create missing Codable conformances.
-  if (auto nominal = dyn_cast_or_null<ClassDecl>(type->getAnyNominal())) {
-    return nominal->isDistributedActor() &&
-           (proto->isSpecificProtocol(swift::KnownProtocolKind::Decodable) ||
-            proto->isSpecificProtocol(swift::KnownProtocolKind::Encodable));
-  }
-
   return false;
 }
 
