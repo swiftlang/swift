@@ -27,18 +27,12 @@
 #if __has_include(<dispatch/private.h>)
 #include <dispatch/private.h>
 #else
-extern "C" {
 DISPATCH_ENUM(dispatch_clockid, uintptr_t,
   DISPATCH_CLOCKID_UPTIME = 1,
   DISPATCH_CLOCKID_MONOTONIC = 2,
   DISPATCH_CLOCKID_WALLTIME = 3,
   DISPATCH_CLOCKID_REALTIME = 3,
 );
-
-DISPATCH_EXPORT DISPATCH_WARN_RESULT DISPATCH_NOTHROW
-dispatch_time_t
-dispatch_time_from_nsec(dispatch_clockid_t clock, uint64_t deadline);
-}
 #endif
 
 #if !defined(_WIN32)
@@ -242,17 +236,71 @@ static void swift_task_enqueueGlobalWithDelayImpl(JobDelay delay,
 }
 
 #define DISPATCH_UP_OR_MONOTONIC_TIME_MASK  (1ULL << 63)
+#define DISPATCH_WALLTIME_MASK  (1ULL << 62)
+#define DISPATCH_TIME_MAX_VALUE (DISPATCH_WALLTIME_MASK - 1)
 
 struct __swift_job_source {
   dispatch_source_t source;
   Job *job;
 };
 
-static void __swift_run_job_leeway(Job *job) {
-  dispatch_source_t source = (dispatch_source_t)job->Reserved;
-  job->Reserved = nullptr;
+static void __swift_run_job_leeway(struct __swift_job_source *jobSource) {
+  dispatch_source_t source = jobSource->source;
+  Job *job = jobSource->job;
+  free(jobSource);
   __swift_run_job(job);
   dispatch_release(source);
+}
+
+#if defined(__i386__) || defined(__x86_64__) || !defined(__APPLE__)
+#define TIME_UNIT_USES_NANOSECONDS 1
+#else
+#define TIME_UNIT_USES_NANOSECONDS 0
+#endif
+
+#if TIME_UNIT_USES_NANOSECONDS
+// x86 currently implements mach time in nanoseconds
+// this is NOT likely to change
+static inline uint64_t
+time_nano2mach(uint64_t nsec) {
+  return nsec;
+}
+#else
+#define DISPATCH_USE_HOST_TIME 1
+#if defined(__APPLE__)
+#if defined(__arm__) || defined(__arm64__)
+// Apple arm platforms currently use a fixed mach timebase of 125/3 (24 MHz)
+static inline uint64_t
+time_nano2mach(uint64_t nsec) {
+  if (!nsec) {
+    return nsec;
+  }
+  if (nsec >= (uint64_t)INT64_MAX) {
+    return INT64_MAX;
+  }
+  if (nsec >= UINT64_MAX / 3ull) {
+    return (nsec / 125ull) * 3ull;
+  } else {
+    return (nsec * 3ull) / 125ull;
+  }
+}
+#endif
+#endif
+#endif
+
+static inline dispatch_time_t
+clock_and_value_to_time(int clock, long long deadline) {
+  uint64_t value = time_nano2mach((uint64_t)deadline);
+  if (value >= DISPATCH_TIME_MAX_VALUE) {
+    return DISPATCH_TIME_FOREVER;
+  }
+  switch (clock) {
+  case swift_clock_id_suspending:
+    return value;
+  case swift_clock_id_continuous:
+    return value | DISPATCH_UP_OR_MONOTONIC_TIME_MASK;
+  }
+  __builtin_unreachable();
 }
 
 SWIFT_CC(swift)
@@ -276,20 +324,31 @@ static void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
     dispatchClock = DISPATCH_CLOCKID_UPTIME;
   }
   uint64_t deadline = sec * NSEC_PER_SEC + nsec;
-  dispatch_time_t when = dispatch_time_from_nsec(dispatchClock, deadline);
-  dispatch_source_t source = 
-    dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, queue);
-  job->Reserved = source;
-  dispatch_set_context(source, job);
-  uint64_t leeway = 0;
+  dispatch_time_t when = clock_and_value_to_time(clock, deadline);
+  
   if (tnsec != -1) {
-    leeway = tsec * NSEC_PER_SEC + tnsec;
-  }
-  dispatch_source_set_timer(source, when, 
-                            DISPATCH_TIME_FOREVER, leeway);
-  dispatch_source_set_event_handler_f(source, 
+    uint64_t leeway = tsec * NSEC_PER_SEC + tnsec;
+
+    dispatch_source_t source = 
+      dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, queue);
+    
+    struct __swift_job_source *jobSource = 
+      (struct __swift_job_source *)malloc(sizeof(struct __swift_job_source));
+    jobSource->job = job;
+    jobSource->source = source;
+
+    dispatch_set_context(source, jobSource);
+    dispatch_source_set_timer(source, when, 
+                              DISPATCH_TIME_FOREVER, leeway);
+    dispatch_source_set_event_handler_f(source, 
                                   (dispatch_function_t)&__swift_run_job_leeway);
-  dispatch_activate(source);
+    
+    dispatch_activate(source);
+  } else {
+    dispatch_function_t dispatchFunction = &__swift_run_job;
+    void *dispatchContext = job;
+    dispatch_after_f(when, queue, dispatchContext, dispatchFunction);
+  }
 }
 
 SWIFT_CC(swift)
