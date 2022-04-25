@@ -13,9 +13,6 @@
 // rdar://90373022
 // UNSUPPORTED: OS=watchos
 
-// FIXME(distributed): seems to fail also on simulator on x86_64?
-// REQUIRES: rdar90373022
-
 import Distributed
 
 distributed actor Worker {

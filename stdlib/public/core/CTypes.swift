@@ -47,7 +47,7 @@ public typealias CShort = Int16
 public typealias CInt = Int32
 
 /// The C 'long' type.
-#if os(Windows) && arch(x86_64)
+#if os(Windows) && (arch(x86_64) || arch(arm64))
 public typealias CLong = Int32
 #else
 public typealias CLong = Int

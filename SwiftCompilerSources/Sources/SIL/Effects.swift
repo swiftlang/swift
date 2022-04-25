@@ -185,11 +185,17 @@ public struct FunctionEffects : CustomStringConvertible, CustomReflectable {
       }
   }
 
-  public func canEscape(path: ArgumentEffect.Path) -> Bool {
+  public func canEscape(argumentIndex: Int, path: ArgumentEffect.Path, analyzeAddresses: Bool) -> Bool {
     return !argumentEffects.contains(where: {
-      if case .notEscaping = $0.kind,
-          $0.selectedArg.matches(.argument(0), path) {
-        return true
+      if case .notEscaping = $0.kind, $0.selectedArg.value == .argument(argumentIndex) {
+
+        // Any address of a class property of an object, which is passed to the function, cannot
+        // escape the function. Whereas a value stored in such a property could escape.
+        let p = (analyzeAddresses ? path.popLastClassAndValuesFromTail() : path)
+
+        if p.matches(pattern: $0.selectedArg.pathPattern) {
+          return true
+        }
       }
       return false
     })

@@ -173,6 +173,8 @@ void Function_register(SwiftMetatype metatype,
             FunctionCopyEffectsFn copyEffectsFn,
             FunctionGetEffectFlagsFn hasEffectsFn);
 
+SwiftInt PassContext_continueWithNextSubpassRun(BridgedPassContext passContext,
+                                                OptionalBridgedInstruction inst);
 void PassContext_notifyChanges(BridgedPassContext passContext,
                                enum ChangeNotificationKind changeKind);
 void PassContext_eraseInstruction(BridgedPassContext passContext,
