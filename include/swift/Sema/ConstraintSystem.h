@@ -5415,9 +5415,9 @@ public:
   
   /// Determine if we've already explored too many paths in an
   /// attempt to solve this expression.
-  bool isExpressionAlreadyTooComplex = false;
-  bool getExpressionTooComplex(size_t solutionMemory) {
-    if (isExpressionAlreadyTooComplex)
+  bool isAlreadyTooComplex = false;
+  bool isTooComplex(size_t solutionMemory) {
+    if (isAlreadyTooComplex)
       return true;
 
     auto CancellationFlag = getASTContext().CancellationFlag;
@@ -5428,7 +5428,7 @@ public:
     MaxMemory = std::max(used, MaxMemory);
     auto threshold = getASTContext().TypeCheckerOpts.SolverMemoryThreshold;
     if (MaxMemory > threshold) {
-      return isExpressionAlreadyTooComplex= true;
+      return isAlreadyTooComplex= true;
     }
 
     if (Timer && Timer->isExpired()) {
@@ -5437,27 +5437,27 @@ public:
       // emitting an error.
       Timer->disableWarning();
 
-      return isExpressionAlreadyTooComplex = true;
+      return isAlreadyTooComplex = true;
     }
 
     // Bail out once we've looked at a really large number of
     // choices.
     if (CountScopes > getASTContext().TypeCheckerOpts.SolverBindingThreshold) {
-      return isExpressionAlreadyTooComplex = true;
+      return isAlreadyTooComplex = true;
     }
 
     return false;
   }
 
-  bool getExpressionTooComplex(SmallVectorImpl<Solution> const &solutions) {
-    if (isExpressionAlreadyTooComplex)
+  bool isTooComplex(SmallVectorImpl<Solution> const &solutions) {
+    if (isAlreadyTooComplex)
       return true;
 
     size_t solutionMemory = 0;
     for (auto const& s : solutions) {
       solutionMemory += s.getTotalMemory();
     }
-    return getExpressionTooComplex(solutionMemory);
+    return isTooComplex(solutionMemory);
   }
 
   // If the given constraint is an applied disjunction, get the argument function

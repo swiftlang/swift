@@ -3776,7 +3776,7 @@ SolutionResult ConstraintSystem::salvage() {
     // Fall through to produce diagnostics.
   }
 
-  if (getExpressionTooComplex(viable))
+  if (isTooComplex(viable))
     return SolutionResult::forTooComplex();
 
   // Could not produce a specific diagnostic; punt to the client.
