@@ -4427,27 +4427,6 @@ public:
 #endif
   }
 };
-
-class EmitBreadcrumbCleanup : public Cleanup {
-  ExecutorBreadcrumb breadcrumb;
-
-public:
-  EmitBreadcrumbCleanup(ExecutorBreadcrumb &&breadcrumb)
-    : breadcrumb(std::move(breadcrumb)) {}
-
-  void emit(SILGenFunction &SGF, CleanupLocation l,
-            ForUnwind_t forUnwind) override {
-    breadcrumb.emit(SGF, l);
-  }
-
-  void dump(SILGenFunction &SGF) const override {
-#ifndef NDEBUG
-    llvm::errs() << "EmitBreadcrumbCleanup "
-                 << "State:" << getState()
-                 << "NeedsEmit:" << breadcrumb.needsEmit();
-#endif
-  }
-};
 } // end anonymous namespace
 
 //===----------------------------------------------------------------------===//
@@ -4694,14 +4673,12 @@ RValue SILGenFunction::emitApply(
                               *foreignError, calleeTypeInfo.foreign.async);
   }
 
-  // For objc async calls, push cleanups to be used on
+  // For objc async calls, push cleanup to be used on
   // both result and throw paths prior to finishing the result plan.
   if (calleeTypeInfo.foreign.async) {
     for (auto unmanagedCopy : unmanagedCopies) {
       Cleanups.pushCleanup<FixLifetimeDestroyCleanup>(unmanagedCopy);
     }
-    // save breadcrumb as a clean-up so it is emitted in result / throw cases.
-    Cleanups.pushCleanup<EmitBreadcrumbCleanup>(std::move(breadcrumb));
   } else {
     assert(unmanagedCopies.empty());
   }
@@ -4710,6 +4687,10 @@ RValue SILGenFunction::emitApply(
   RValue result = resultPlan->finish(*this, loc, substResultType,
                                      directResultsArray, bridgedForeignError);
   assert(directResultsArray.empty() && "didn't claim all direct results");
+
+  if (calleeTypeInfo.foreign.async) {
+    breadcrumb.emit(*this, loc);
+  }
 
   return result;
 }
