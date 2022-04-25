@@ -1206,7 +1206,7 @@ ERROR(missing_address_of_yield,none,
       "yielding mutable value of type %0 requires explicit '&'",
       (Type))
 ERROR(extraneous_address_of,none,
-      "use of extraneous '&'",
+      "'&' may only be used to pass an argument to inout parameter",
       ())
 ERROR(extra_address_of,none,
       "'&' used with non-inout argument of type %0",

@@ -132,10 +132,10 @@ func inoutFuncWithDefaultArg1(x: inout Int = 1) {} // expected-error {{cannot pr
 func inoutFuncWithDefaultArg2(x: inout Int = bLiteral) {} // expected-error {{cannot provide default value to inout parameter 'x'}}
 func inoutFuncWithDefaultArg3(x: inout Int = aLiteral) {} // expected-error {{cannot provide default value to inout parameter 'x'}}
 func inoutFuncWithDefaultArg4(x: inout Int = &aLiteral) {} // expected-error {{cannot provide default value to inout parameter 'x'}}
-// expected-error@-1 {{use of extraneous '&'}}
+// expected-error@-1 {{'&' may only be used to pass an argument to inout parameter}}
 
 func inoutFuncWithDefaultArg5(x: inout Int = &bLiteral) {} // expected-error {{cannot provide default value to inout parameter 'x'}}
-// expected-error@-1 {{use of extraneous '&'}}
+// expected-error@-1 {{'&' may only be used to pass an argument to inout parameter}}
 
 func inoutFuncWithDefaultArg6(x: inout Int = #file) {} // expected-error {{cannot provide default value to inout parameter 'x'}}
 // expected-error@-1 {{default argument value of type 'String' cannot be converted to type 'Int'}}
