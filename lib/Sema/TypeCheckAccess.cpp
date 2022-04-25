@@ -1583,6 +1583,11 @@ class DeclAvailabilityChecker : public DeclVisitor<DeclAvailabilityChecker> {
     // Don't bother checking errors.
     if (type && type->hasError())
       return;
+    
+    // If the decl which references this type is unavailable on the current
+    // platform, don't diagnose the availability of the type.
+    if (AvailableAttr::isUnavailable(context))
+      return;
 
     DeclAvailabilityFlags flags = None;
 
