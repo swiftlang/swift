@@ -77,7 +77,7 @@ using namespace metadataimpl;
 // GenericParamDescriptor is a single byte, so while it's difficult to
 // imagine needing even a quarter this many generic params, there's very
 // little harm in doing it.
-constexpr GenericParamDescriptor
+const GenericParamDescriptor
 swift::ImplicitGenericParamDescriptors[MaxNumImplicitGenericParamDescriptors] = {
 #define D GenericParamDescriptor::implicit()
   D,D,D,D, D,D,D,D, D,D,D,D, D,D,D,D, D,D,D,D, D,D,D,D, D,D,D,D, D,D,D,D,
@@ -85,6 +85,12 @@ swift::ImplicitGenericParamDescriptors[MaxNumImplicitGenericParamDescriptors] = 
 #undef D
 };
 static_assert(MaxNumImplicitGenericParamDescriptors == 64, "length mismatch");
+
+template <>
+const GenericParamDescriptor *
+swift::targetImplicitGenericParamDescriptors<InProcess>() {
+  return ImplicitGenericParamDescriptors;
+}
 
 static ClassMetadata *
 _swift_relocateClassMetadata(const ClassDescriptor *description,
@@ -378,7 +384,7 @@ namespace {
   class GenericMetadataCache :
     public MetadataCache<GenericCacheEntry, GenericMetadataCacheTag> {
   public:
-    GenericSignatureLayout SigLayout;
+    GenericSignatureLayout<InProcess> SigLayout;
 
     GenericMetadataCache(const TargetGenericContext<InProcess> &genericContext)
       : SigLayout(genericContext.getGenericSignature()) {
@@ -4364,7 +4370,8 @@ ExtendedExistentialTypeCacheEntry::getOrCreateVWT(Key key) {
   auto sigSizeInWords = shape->ReqSigHeader.getArgumentLayoutSizeInWords();
 
 #ifndef NDEBUG
-  auto layout = GenericSignatureLayout(shape->getRequirementSignature());
+  auto layout =
+      GenericSignatureLayout<InProcess>(shape->getRequirementSignature());
   assert(layout.NumKeyParameters == shape->ReqSigHeader.NumParams &&
          "requirement signature for existential includes a "
          "redundant parameter?");

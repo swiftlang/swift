@@ -51,6 +51,19 @@ using namespace swift::remoteAST;
 using irgen::Alignment;
 using irgen::Size;
 
+template <class Runtime>
+const GenericParamDescriptor *swift::targetImplicitGenericParamDescriptors() {
+  static const GenericParamDescriptor
+      buffer[MaxNumImplicitGenericParamDescriptors] = {
+#define D GenericParamDescriptor::implicit()
+          D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D,
+          D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D,
+          D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D
+#undef D
+      };
+  return buffer;
+}
+
 static inline RemoteAddress operator+(RemoteAddress address, Size offset) {
   return RemoteAddress(address.getAddressData() + offset.getValue());
 }
