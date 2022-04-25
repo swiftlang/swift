@@ -24,6 +24,22 @@
 
 #if SWIFT_CONCURRENCY_ENABLE_DISPATCH
 #include <dispatch/dispatch.h>
+#if __has_include(<dispatch/private.h>)
+#include <dispatch/private.h>
+#else
+extern "C" {
+DISPATCH_ENUM(dispatch_clockid, uintptr_t,
+  DISPATCH_CLOCKID_UPTIME = 1,
+  DISPATCH_CLOCKID_MONOTONIC = 2,
+  DISPATCH_CLOCKID_WALLTIME = 3,
+  DISPATCH_CLOCKID_REALTIME = 3,
+);
+
+DISPATCH_EXPORT DISPATCH_WARN_RESULT DISPATCH_NOTHROW
+dispatch_time_t
+dispatch_time_from_nsec(dispatch_clockid_t clock, uint64_t deadline);
+}
+#endif
 
 #if !defined(_WIN32)
 #include <dlfcn.h>
@@ -227,6 +243,18 @@ static void swift_task_enqueueGlobalWithDelayImpl(JobDelay delay,
 
 #define DISPATCH_UP_OR_MONOTONIC_TIME_MASK  (1ULL << 63)
 
+struct __swift_job_source {
+  dispatch_source_t source;
+  Job *job;
+};
+
+static void __swift_run_job_leeway(Job *job) {
+  dispatch_source_t source = (dispatch_source_t)job->Reserved;
+  job->Reserved = nullptr;
+  __swift_run_job(job);
+  dispatch_release(source);
+}
+
 SWIFT_CC(swift)
 static void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
                                                      long long nsec,
@@ -234,10 +262,6 @@ static void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
                                                      long long tnsec,
                                                      int clock, Job *job) {
   assert(job && "no job provided");
-
-  dispatch_function_t dispatchFunction = &__swift_run_job;
-  void *dispatchContext = job;
-
   JobPriority priority = job->getPriority();
 
   auto queue = getGlobalQueue(priority);
@@ -245,20 +269,27 @@ static void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
   job->SchedulerPrivate[Job::DispatchQueueIndex] =
       DISPATCH_QUEUE_GLOBAL_EXECUTOR;
 
-  long long nowSec;
-  long long nowNsec;
-  swift_get_time(&nowSec, &nowNsec, (swift_clock_id)clock);
-
-  uint64_t delta = (sec - nowSec) * NSEC_PER_SEC + nsec - nowNsec;
-
-  dispatch_time_t when = dispatch_time(DISPATCH_TIME_NOW, delta);
-
+  dispatch_clockid_t dispatchClock;
   if (clock == swift_clock_id_continuous) {
-    when |= DISPATCH_UP_OR_MONOTONIC_TIME_MASK;
+    dispatchClock = DISPATCH_CLOCKID_MONOTONIC;
+  } else {
+    dispatchClock = DISPATCH_CLOCKID_UPTIME;
   }
-  // TODO: this should pass the leeway/tolerance along when it is not -1 nanoseconds
-  // either a dispatch_source can be created or a better dispatch_after_f can be made for this
-  dispatch_after_f(when, queue, dispatchContext, dispatchFunction);
+  uint64_t deadline = sec * NSEC_PER_SEC + nsec;
+  dispatch_time_t when = dispatch_time_from_nsec(dispatchClock, deadline);
+  dispatch_source_t source = 
+    dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, queue);
+  job->Reserved = source;
+  dispatch_set_context(source, job);
+  uint64_t leeway = 0;
+  if (tnsec != -1) {
+    leeway = tsec * NSEC_PER_SEC + tnsec;
+  }
+  dispatch_source_set_timer(source, when, 
+                            DISPATCH_TIME_FOREVER, leeway);
+  dispatch_source_set_event_handler_f(source, 
+                                  (dispatch_function_t)&__swift_run_job_leeway);
+  dispatch_activate(source);
 }
 
 SWIFT_CC(swift)

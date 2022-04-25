@@ -21,6 +21,14 @@ var tests = TestSuite("Time")
       expectTrue(elapsed < .milliseconds(200))
     }
 
+    tests.test("ContinuousClock sleep longer") {
+      let elapsed = await ContinuousClock().measure {
+        try! await Task.sleep(until: .now + .seconds(1), clock: .continuous)
+      }
+      expectTrue(elapsed > .seconds(1) - .milliseconds(90))
+      expectTrue(elapsed < .seconds(1) + .milliseconds(200))
+    }
+
     tests.test("SuspendingClock sleep") {
       let clock = SuspendingClock()
       let elapsed = await clock.measure {
@@ -29,6 +37,14 @@ var tests = TestSuite("Time")
       // give a reasonable range of expected elapsed time
       expectTrue(elapsed > .milliseconds(90))
       expectTrue(elapsed < .milliseconds(200))
+    }
+
+    tests.test("SuspendingClock sleep longer") {
+      let elapsed = await SuspendingClock().measure {
+        try! await Task.sleep(until: .now + .seconds(1), clock: .suspending)
+      }
+      expectTrue(elapsed > .seconds(1) - .milliseconds(90))
+      expectTrue(elapsed < .seconds(1) + .milliseconds(200))
     }
 
     tests.test("duration addition") {
