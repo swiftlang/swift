@@ -29,7 +29,7 @@ public func test(
 
 // Test replacements that look like renames.
 
-// Please only include one parameter per function, so that we test that that one
+// Please only include one parameter per function, so that we test that one
 // parameter is enough to get the function dropped from the recovery interface.
 public func testReplacementA(_: BeforeReplacedType) {}
 

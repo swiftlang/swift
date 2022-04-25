@@ -251,7 +251,7 @@ public:
 
   using DeclMembersData = SmallVector<DeclID, 2>;
   // In-memory representation of what will eventually be an on-disk
-  // hash table of all ValueDecl-members of a paticular DeclBaseName.
+  // hash table of all ValueDecl-members of a particular DeclBaseName.
   using DeclMembersTable = llvm::MapVector<uint32_t, DeclMembersData>;
 
   using DeclMemberNamesData = std::pair<serialization::BitOffset,
@@ -400,7 +400,7 @@ private:
   /// Top-level entry point for serializing a module.
   void writeAST(ModuleOrSourceFile DC);
 
-  /// Serializes the given dependnecy graph into the incremental information
+  /// Serializes the given dependency graph into the incremental information
   /// section of this swift module.
   void writeIncrementalInfo(
       const fine_grained_dependencies::SourceFileDepGraph *DepGraph);

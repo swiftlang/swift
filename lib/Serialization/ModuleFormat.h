@@ -1128,7 +1128,7 @@ namespace decls_block {
     BCFixed<1>,          // throws?
     DifferentiabilityKindField, // differentiability kind
     TypeIDField,         // global actor
-    GenericSignatureIDField // generic signture
+    GenericSignatureIDField // generic signature
 
     // trailed by parameters
   >;

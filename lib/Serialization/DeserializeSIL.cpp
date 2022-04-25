@@ -616,7 +616,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     fn->setSerialized(IsSerialized_t(isSerialized));
 
     // If the serialized function comes from the same module, we're merging
-    // modules, and can update the the linkage directly. This is needed to
+    // modules, and can update the linkage directly. This is needed to
     // correctly update the linkage for forward declarations to entities defined
     // in another file of the same module – we want to ensure the linkage
     // reflects the fact that the entity isn't really external and shouldn't be
@@ -697,7 +697,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   builder.setHasOwnership(fn, hasQualifiedOwnership);
 
   // Mark this function as deserialized. This avoids rerunning diagnostic
-  // passes. Certain passes in the madatory pipeline may not work as expected
+  // passes. Certain passes in the mandatory pipeline may not work as expected
   // after arbitrary optimization and lowering.
   if (!MF->isSIB())
     fn->setWasDeserializedCanonical();
@@ -710,7 +710,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   }
 
   // Read and instantiate the specialize attributes.
-  bool shouldAddSpecAtttrs = fn->getSpecializeAttrs().empty();
+  bool shouldAddSpecAttrs = fn->getSpecializeAttrs().empty();
   bool shouldAddEffectAttrs = !fn->hasArgumentEffects();
   for (unsigned attrIdx = 0; attrIdx < numAttrs; ++attrIdx) {
     llvm::Expected<llvm::BitstreamEntry> maybeNext =
@@ -777,7 +777,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
     auto specializedSig = MF->getGenericSignature(specializedSigID);
     // Only add the specialize attributes once.
-    if (shouldAddSpecAtttrs) {
+    if (shouldAddSpecAttrs) {
       // Read the substitution list and construct a SILSpecializeAttr.
       fn->addSpecializeAttr(SILSpecializeAttr::create(
           SILMod, specializedSig, exported != 0, specializationKind, target,
