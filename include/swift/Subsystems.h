@@ -35,6 +35,7 @@ namespace llvm {
   class Module;
   class TargetOptions;
   class TargetMachine;
+  class PassBuilder;
 }
 
 namespace swift {
@@ -232,6 +233,10 @@ namespace swift {
                       StringRef ModuleName, const PrimarySpecificPaths &PSPs,
                       StringRef PrivateDiscriminator,
                       llvm::GlobalVariable **outModuleHash = nullptr);
+
+  /// Register pipeline parsing callbacks, which add Swift specific LLVM passes
+  /// for the given pass builder instance.
+  void registerLLVMPipelineParsingCallback(llvm::PassBuilder &PB);
 
   /// Given an already created LLVM module, construct a pass pipeline and run
   /// the Swift LLVM Pipeline upon it. This does not cause the module to be

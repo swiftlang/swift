@@ -14,7 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "irgen"
 #include "IRGenModule.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/DiagnosticsIRGen.h"
@@ -65,6 +64,7 @@
 #include "llvm/MC/SubtargetFeature.h"
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Object/ObjectFile.h"
+#include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -88,6 +88,8 @@
 #if HAVE_UNISTD_H
 #include <unistd.h>
 #endif
+
+#define DEBUG_TYPE "irgen"
 
 using namespace swift;
 using namespace irgen;
@@ -216,6 +218,8 @@ void setModuleFlags(IRGenModule &IGM) {
   }
 }
 
+void swift::registerLLVMPipelineParsingCallback(llvm::PassBuilder &PB) {
+}
 void swift::performLLVMOptimizations(const IRGenOptions &Opts,
                                      llvm::Module *Module,
                                      llvm::TargetMachine *TargetMachine) {

@@ -52,6 +52,7 @@
 #include "llvm/LinkAllPasses.h"
 #include "llvm/MC/SubtargetFeature.h"
 #include "llvm/MC/TargetRegistry.h"
+#include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Host.h"
@@ -97,6 +98,11 @@ static llvm::cl::opt<std::string>
 static llvm::cl::opt<bool>
     PrintStats("print-stats",
                llvm::cl::desc("Should LLVM Statistics be printed"));
+
+static llvm::cl::opt<bool>
+    EnableNewPM("enable-new-pm",
+                llvm::cl::desc("Enable the new pass manager"),
+                llvm::cl::init(false));
 
 static llvm::cl::opt<std::string> InputFilename(llvm::cl::Positional,
                                           llvm::cl::desc("<input file>"),
@@ -174,6 +180,42 @@ static inline void addPass(llvm::legacy::PassManagerBase &PM, llvm::Pass *P) {
 static void runSpecificPasses(StringRef Binary, llvm::Module *M,
                               llvm::TargetMachine *TM,
                               llvm::Triple &ModuleTriple) {
+  llvm::PassBuilder PB(TM);
+
+  // Create and register the essential analysis managers.
+  llvm::FunctionAnalysisManager FAM;
+  llvm::ModuleAnalysisManager MAM;
+
+  PB.registerModuleAnalyses(MAM);
+  PB.registerFunctionAnalyses(FAM);
+
+  llvm::TargetLibraryInfoImpl TLII(ModuleTriple);
+  FAM.registerPass([&] { return llvm::TargetLibraryAnalysis(TLII); });
+
+  // Register Swift specific passes
+  swift::registerLLVMPipelineParsingCallback(PB);
+
+  const llvm::DataLayout &DL = M->getDataLayout();
+  if (DL.isDefault() && !DefaultDataLayout.empty()) {
+    M->setDataLayout(DefaultDataLayout);
+  }
+
+  llvm::ModulePassManager MPM;
+
+  // Add passes from the command line options.
+  for (auto P : PassList) {
+    if (auto Err = PB.parsePassPipeline(MPM, P->getPassArgument())) {
+      llvm::errs() << Binary << ": " << toString(std::move(Err)) << "\n";
+    }
+  }
+
+  // Do it.
+  MPM.run(*M, MAM);
+}
+
+static void runSpecificPassesByLegacyPM(StringRef Binary, llvm::Module *M,
+                                        llvm::TargetMachine *TM,
+                                        llvm::Triple &ModuleTriple) {
   llvm::legacy::PassManager Passes;
   llvm::TargetLibraryInfoImpl TLII(ModuleTriple);
   Passes.add(new llvm::TargetLibraryInfoWrapperPass(TLII));
@@ -314,7 +356,11 @@ int main(int argc, char **argv) {
     // Then perform the optimizations.
     performLLVMOptimizations(Opts, M.get(), TM.get());
   } else {
-    runSpecificPasses(argv[0], M.get(), TM.get(), ModuleTriple);
+    if (EnableNewPM) {
+      runSpecificPasses(argv[0], M.get(), TM.get(), ModuleTriple);
+    } else {
+      runSpecificPassesByLegacyPM(argv[0], M.get(), TM.get(), ModuleTriple);
+    }
   }
 
   // Finally dump the output.
