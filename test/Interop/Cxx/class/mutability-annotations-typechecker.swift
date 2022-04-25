@@ -1,5 +1,4 @@
-// RUN: %target-typecheck-verify-swift -I %S/Inputs -enable-experimental-cxx-interop \
-// RUN:     -verify -verify-additional-file %S/Inputs/mutability-annotations.h -verify-ignore-unknown
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs %s -enable-experimental-cxx-interop -verify -verify-additional-file %S/Inputs/mutability-annotations.h
 
 import MutabilityAnnotations
 
