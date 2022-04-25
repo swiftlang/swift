@@ -68,24 +68,14 @@ class BuilderClosureVisitor
   ConstraintSystem *cs;
   DeclContext *dc;
   ASTContext &ctx;
-  Type builderType;
-  NominalTypeDecl *builder = nullptr;
-  Identifier buildOptionalId;
-  llvm::SmallDenseMap<DeclName, bool> supportedOps;
 
-  /// The variable used as a base for all `build*` operations added
-  /// by this transform.
-  VarDecl *builderVar = nullptr;
+  ResultBuilder builder;
 
   SkipUnhandledConstructInResultBuilder::UnhandledNode unhandledNode;
 
   /// Whether an error occurred during application of the builder closure,
   /// e.g., during constraint generation.
   bool hadError = false;
-
-  /// Counter used to give unique names to the variables that are
-  /// created implicitly.
-  unsigned varCounter = 0;
 
   /// The record of what happened when we applied the builder transform.
   AppliedBuilderTransform applied;
@@ -98,53 +88,7 @@ class BuilderClosureVisitor
     if (!cs)
       return nullptr;
 
-    SmallVector<Argument, 4> args;
-    for (auto i : indices(argExprs)) {
-      auto *expr = argExprs[i];
-      auto label = argLabels.empty() ? Identifier() : argLabels[i];
-      auto labelLoc = argLabels.empty() ? SourceLoc() : expr->getStartLoc();
-      args.emplace_back(labelLoc, label, expr);
-    }
-
-    auto *baseExpr = new (ctx) DeclRefExpr({builderVar}, DeclNameLoc(loc),
-                                           /*isImplicit=*/true);
-
-    auto memberRef = new (ctx) UnresolvedDotExpr(
-        baseExpr, loc, DeclNameRef(fnName), DeclNameLoc(loc),
-        /*implicit=*/true);
-    memberRef->setFunctionRefKind(FunctionRefKind::SingleApply);
-
-    auto openLoc = args.empty() ? loc : argExprs.front()->getStartLoc();
-    auto closeLoc = args.empty() ? loc : argExprs.back()->getEndLoc();
-
-    auto *argList = ArgumentList::createImplicit(ctx, openLoc, args, closeLoc);
-    return CallExpr::createImplicit(ctx, memberRef, argList);
-  }
-
-  /// Check whether the builder supports the given operation.
-  bool builderSupports(Identifier fnBaseName,
-                       ArrayRef<Identifier> argLabels = {},
-                       bool checkAvailability = false) {
-    DeclName name(dc->getASTContext(), fnBaseName, argLabels);
-    auto known = supportedOps.find(name);
-    if (known != supportedOps.end()) {
-      return known->second;
-    }
-
-    return supportedOps[name] = TypeChecker::typeSupportsBuilderOp(
-               builderType, dc, fnBaseName, argLabels, /*allResults*/ {},
-               checkAvailability);
-  }
-
-  /// Build an implicit variable in this context.
-  VarDecl *buildVar(SourceLoc loc) {
-    // Create the implicit variable.
-    Identifier name = ctx.getIdentifier(
-        ("$__builder" + Twine(varCounter++)).str());
-    auto var = new (ctx) VarDecl(/*isStatic=*/false, VarDecl::Introducer::Var,
-                                 loc, name, dc);
-    var->setImplicit();
-    return var;
+    return builder.buildCall(loc, fnName, argExprs, argLabels);
   }
 
   /// Capture the given expression into an implicitly-generated variable.
@@ -168,7 +112,7 @@ class BuilderClosureVisitor
     }
 
     // Create the implicit variable.
-    auto var = buildVar(expr->getStartLoc());
+    auto var = builder.buildVar(expr->getStartLoc());
 
     // Record the new variable and its corresponding expression & statement.
     if (auto forStmt = forEntity.dyn_cast<Stmt *>()) {
@@ -184,36 +128,12 @@ class BuilderClosureVisitor
     return var;
   }
 
-  /// Build an implicit reference to the given variable.
-  DeclRefExpr *buildVarRef(VarDecl *var, SourceLoc loc) {
-    return new (ctx) DeclRefExpr(var, DeclNameLoc(loc), /*Implicit=*/true);
-  }
-
 public:
   BuilderClosureVisitor(ASTContext &ctx, ConstraintSystem *cs, DeclContext *dc,
                         Type builderType, Type bodyResultType)
-      : cs(cs), dc(dc), ctx(ctx), builderType(builderType) {
-    builder = builderType->getAnyNominal();
-    applied.builderType = builderType;
+      : cs(cs), dc(dc), ctx(ctx), builder(cs, dc, builderType) {
+    applied.builderType = builder.getType();
     applied.bodyResultType = bodyResultType;
-
-    // Use buildOptional(_:) if available, otherwise fall back to buildIf
-    // when available.
-    if (builderSupports(ctx.Id_buildOptional) ||
-        !builderSupports(ctx.Id_buildIf))
-      buildOptionalId = ctx.Id_buildOptional;
-    else
-      buildOptionalId = ctx.Id_buildIf;
-
-    // If we are about to generate constraints, let's establish builder
-    // variable for the base of `build*` calls.
-    if (cs) {
-      builderVar = new (ctx) VarDecl(
-          /*isStatic=*/false, VarDecl::Introducer::Let,
-          /*nameLoc=*/SourceLoc(), ctx.Id_builderSelf, dc);
-      builderVar->setImplicit();
-      cs->setType(builderVar, MetatypeType::get(cs->simplifyType(builderType)));
-    }
   }
 
   /// Apply the builder transform to the given statement.
@@ -222,11 +142,11 @@ public:
     if (!bodyVar)
       return None;
 
-    applied.returnExpr = buildVarRef(bodyVar, stmt->getEndLoc());
+    applied.returnExpr = builder.buildVarRef(bodyVar, stmt->getEndLoc());
 
     // If there is a buildFinalResult(_:), call it.
     ASTContext &ctx = cs->getASTContext();
-    if (builderSupports(ctx.Id_buildFinalResult, { Identifier() })) {
+    if (builder.supports(ctx.Id_buildFinalResult, {Identifier()})) {
       applied.returnExpr = buildCallIfWanted(
           applied.returnExpr->getLoc(), ctx.Id_buildFinalResult,
           { applied.returnExpr }, { Identifier() });
@@ -302,7 +222,7 @@ protected:
       if (!childVar)
         return;
 
-      expressions.push_back(buildVarRef(childVar, childVar->getLoc()));
+      expressions.push_back(builder.buildVarRef(childVar, childVar->getLoc()));
     };
 
     for (auto node : braceStmt->getElements()) {
@@ -350,7 +270,7 @@ protected:
       }
 
       auto expr = node.get<Expr *>();
-      if (cs && builderSupports(ctx.Id_buildExpression)) {
+      if (cs && builder.supports(ctx.Id_buildExpression)) {
         expr = buildCallIfWanted(expr->getLoc(), ctx.Id_buildExpression,
                                  { expr }, { Identifier() });
       }
@@ -366,11 +286,11 @@ protected:
     // `buildPartialBlock(accumulated:next:)`, use this to combine
     // subexpressions pairwise.
     if (!expressions.empty() &&
-        builderSupports(ctx.Id_buildPartialBlock, {ctx.Id_first},
-                        /*checkAvailability*/ true) &&
-        builderSupports(ctx.Id_buildPartialBlock,
-                        {ctx.Id_accumulated, ctx.Id_next},
-                        /*checkAvailability*/ true)) {
+        builder.supports(ctx.Id_buildPartialBlock, {ctx.Id_first},
+                         /*checkAvailability*/ true) &&
+        builder.supports(ctx.Id_buildPartialBlock,
+                         {ctx.Id_accumulated, ctx.Id_next},
+                         /*checkAvailability*/ true)) {
       // NOTE: The current implementation uses one-way constraints in between
       // subexpressions. It's functionally equivalent to the following:
       //   let v0 = Builder.buildPartialBlock(first: arg_0)
@@ -391,11 +311,11 @@ protected:
     // If `buildBlock` does not exist at this point, it could be the case that
     // `buildPartialBlock` did not have the sufficient availability for this
     // call site.  Diagnose it.
-    else if (!builderSupports(ctx.Id_buildBlock)) {
+    else if (!builder.supports(ctx.Id_buildBlock)) {
       ctx.Diags.diagnose(
           braceStmt->getStartLoc(),
           diag::result_builder_missing_available_buildpartialblock,
-          builderType);
+          builder.getType());
       return nullptr;
     }
     // Otherwise, call `buildBlock` on all subexpressions.
@@ -412,18 +332,12 @@ protected:
     return captureExpr(call, /*oneWay=*/true, braceStmt);
   }
 
-  VarDecl *visitReturnStmt(ReturnStmt *stmt) {
-    if (!unhandledNode)
-      unhandledNode = stmt;
-    return nullptr;
-  }
-
   VarDecl *visitDoStmt(DoStmt *doStmt) {
     auto childVar = visitBraceStmt(doStmt->getBody());
     if (!childVar)
       return nullptr;
 
-    auto childRef = buildVarRef(childVar, doStmt->getEndLoc());
+    auto childRef = builder.buildVarRef(childVar, doStmt->getEndLoc());
 
     return captureExpr(childRef, /*oneWay=*/true, doStmt);
   }
@@ -462,14 +376,14 @@ protected:
       return false;
 
     // If there's a missing 'else', we need 'buildOptional' to exist.
-    if (isOptional && !builderSupports(buildOptionalId))
+    if (isOptional && !builder.supportsOptional())
       return false;
 
     // If there are multiple clauses, we need 'buildEither(first:)' and
     // 'buildEither(second:)' to both exist.
     if (numPayloads > 1) {
-      if (!builderSupports(ctx.Id_buildEither, {ctx.Id_first}) ||
-          !builderSupports(ctx.Id_buildEither, {ctx.Id_second}))
+      if (!builder.supports(ctx.Id_buildEither, {ctx.Id_first}) ||
+          !builder.supports(ctx.Id_buildEither, {ctx.Id_second}))
         return false;
     }
 
@@ -536,14 +450,14 @@ protected:
     if (!cs || !thenVar || (elseChainVar && !*elseChainVar))
       return nullptr;
 
-    Expr *thenVarRefExpr = buildVarRef(
-        thenVar, ifStmt->getThenStmt()->getEndLoc());
+    Expr *thenVarRefExpr =
+        builder.buildVarRef(thenVar, ifStmt->getThenStmt()->getEndLoc());
 
     // If there is a #available in the condition, wrap the 'then' in a call to
     // buildLimitedAvailability(_:).
     auto availabilityCond = findAvailabilityCondition(ifStmt->getCond());
     bool supportsAvailability =
-        availabilityCond && builderSupports(ctx.Id_buildLimitedAvailability);
+        availabilityCond && builder.supports(ctx.Id_buildLimitedAvailability);
     if (supportsAvailability &&
         !availabilityCond->getAvailability()->isUnavailability()) {
       thenVarRefExpr = buildCallIfWanted(ifStmt->getThenStmt()->getEndLoc(),
@@ -568,12 +482,13 @@ protected:
     // - If there's an `else if`, the chain expression from that
     //   should already be producing a chain result.
     } else if (isElseIf) {
-      elseExpr = buildVarRef(*elseChainVar, ifStmt->getEndLoc());
+      elseExpr = builder.buildVarRef(*elseChainVar, ifStmt->getEndLoc());
       elseLoc = ifStmt->getElseLoc();
 
       // - Otherwise, wrap it to produce a chain result.
     } else {
-      Expr *elseVarRefExpr = buildVarRef(*elseChainVar, ifStmt->getEndLoc());
+      Expr *elseVarRefExpr =
+          builder.buildVarRef(*elseChainVar, ifStmt->getEndLoc());
 
       // If there is a #unavailable in the condition, wrap the 'else' in a call
       // to buildLimitedAvailability(_:).
@@ -592,10 +507,12 @@ protected:
     // The operand should have optional type if we had optional results,
     // so we just need to call `buildIf` now, since we're at the top level.
     if (isOptional && isTopLevel) {
-      thenExpr = buildCallIfWanted(ifStmt->getEndLoc(), buildOptionalId,
-                                   thenExpr,  /*argLabels=*/{ });
-      elseExpr = buildCallIfWanted(ifStmt->getEndLoc(), buildOptionalId,
-                                   elseExpr,  /*argLabels=*/{ });
+      thenExpr =
+          buildCallIfWanted(ifStmt->getEndLoc(), builder.getBuildOptionalId(),
+                            thenExpr, /*argLabels=*/{});
+      elseExpr =
+          buildCallIfWanted(ifStmt->getEndLoc(), builder.getBuildOptionalId(),
+                            elseExpr, /*argLabels=*/{});
     }
 
     thenExpr = cs->generateConstraints(thenExpr, dc);
@@ -621,7 +538,7 @@ protected:
     }
 
     // Create a variable to capture the result of this expression.
-    auto ifVar = buildVar(ifStmt->getStartLoc());
+    auto ifVar = builder.buildVar(ifStmt->getStartLoc());
     cs->setType(ifVar, resultType);
     applied.capturedStmts.insert({ifStmt, { ifVar, { thenExpr, elseExpr }}});
     return ifVar;
@@ -758,7 +675,7 @@ protected:
 
       // Build the expression that injects the case variable into appropriate
       // buildEither(first:)/buildEither(second:) chain.
-      Expr *caseVarRef = buildVarRef(caseVar, caseStmt->getEndLoc());
+      Expr *caseVarRef = builder.buildVarRef(caseVar, caseStmt->getEndLoc());
       Expr *injectedCaseExpr = buildWrappedChainPayload(
           caseVarRef, idx, capturedCaseVars.size(), /*isOptional=*/false);
 
@@ -788,7 +705,7 @@ protected:
     }
 
     // Create a variable to capture the result of evaluating the switch.
-    auto switchVar = buildVar(switchStmt->getStartLoc());
+    auto switchVar = builder.buildVar(switchStmt->getStartLoc());
     cs->setType(switchVar, resultType);
     applied.capturedStmts.insert(
         {switchStmt, { switchVar, std::move(injectedCaseExprs) } });
@@ -832,7 +749,7 @@ protected:
   VarDecl *visitForEachStmt(ForEachStmt *forEachStmt) {
     // for...in statements are handled via buildArray(_:); bail out if the
     // builder does not support it.
-    if (!builderSupports(ctx.Id_buildArray)) {
+    if (!builder.supports(ctx.Id_buildArray)) {
       if (!unhandledNode)
         unhandledNode = forEachStmt;
       return nullptr;
@@ -878,7 +795,7 @@ protected:
     // iteration of the loop. We need a fresh type variable to remove the
     // lvalue-ness of the array variable.
     SourceLoc loc = forEachStmt->getForLoc();
-    VarDecl *arrayVar = buildVar(loc);
+    VarDecl *arrayVar = builder.buildVar(loc);
     Type arrayElementType = cs->createTypeVariable(
         cs->getConstraintLocator(forEachStmt), 0);
     cs->addConstraint(ConstraintKind::Equal, cs->getType(bodyVar),
@@ -905,13 +822,13 @@ protected:
     // Form a call to Array.append(_:) to add the result of executing each
     // iteration of the loop body to the array formed above.
     SourceLoc endLoc = forEachStmt->getEndLoc();
-    auto arrayVarRef = buildVarRef(arrayVar, endLoc);
+    auto arrayVarRef = builder.buildVarRef(arrayVar, endLoc);
     auto arrayAppendRef = new (ctx) UnresolvedDotExpr(
         arrayVarRef, endLoc, DeclNameRef(ctx.getIdentifier("append")),
         DeclNameLoc(endLoc), /*implicit=*/true);
     arrayAppendRef->setFunctionRefKind(FunctionRefKind::SingleApply);
 
-    auto bodyVarRef = buildVarRef(bodyVar, endLoc);
+    auto bodyVarRef = builder.buildVarRef(bodyVar, endLoc);
     auto *argList = ArgumentList::createImplicit(
         ctx, endLoc, {Argument::unlabeled(bodyVarRef)}, endLoc);
     Expr *arrayAppendCall =
@@ -925,7 +842,7 @@ protected:
     // Form the final call to buildArray(arrayVar) to allow the function
     // builder to reshape the array into whatever it wants as the result of
     // the for-each loop.
-    auto finalArrayVarRef = buildVarRef(arrayVar, endLoc);
+    auto finalArrayVarRef = builder.buildVarRef(arrayVar, endLoc);
     auto buildArrayCall = buildCallIfWanted(
         endLoc, ctx.Id_buildArray, { finalArrayVarRef }, { Identifier() });
     assert(buildArrayCall);
@@ -937,7 +854,7 @@ protected:
 
     // Form a final variable for the for-each expression itself, which will
     // be initialized with the call to the result builder's buildArray(_:).
-    auto finalForEachVar = buildVar(loc);
+    auto finalForEachVar = builder.buildVar(loc);
     cs->setType(finalForEachVar, cs->getType(buildArrayCall));
     applied.capturedStmts.insert(
       {forEachStmt, {
@@ -977,6 +894,7 @@ protected:
   CONTROL_FLOW_STMT(Fallthrough)
   CONTROL_FLOW_STMT(Fail)
   CONTROL_FLOW_STMT(PoundAssert)
+  CONTROL_FLOW_STMT(Return)
 
 #undef CONTROL_FLOW_STMT
 };
@@ -2219,4 +2137,84 @@ void swift::printResultBuilderBuildFunction(
     printer.printNewline();
     printer << "}";
   }
+}
+
+ResultBuilder::ResultBuilder(ConstraintSystem *CS, DeclContext *DC,
+                             Type builderType)
+    : DC(DC), BuilderType(CS ? CS->simplifyType(builderType) : builderType) {
+  auto &ctx = DC->getASTContext();
+  // Use buildOptional(_:) if available, otherwise fall back to buildIf
+  // when available.
+  BuildOptionalId =
+      (supports(ctx.Id_buildOptional) || !supports(ctx.Id_buildIf))
+          ? ctx.Id_buildOptional
+          : ctx.Id_buildIf;
+
+  if (CS) {
+    BuilderSelf = new (ctx) VarDecl(
+        /*isStatic=*/false, VarDecl::Introducer::Let,
+        /*nameLoc=*/SourceLoc(), ctx.Id_builderSelf, DC);
+    BuilderSelf->setImplicit();
+    CS->setType(BuilderSelf, MetatypeType::get(BuilderType));
+  }
+}
+
+bool ResultBuilder::supports(Identifier fnBaseName,
+                             ArrayRef<Identifier> argLabels,
+                             bool checkAvailability) {
+  DeclName name(DC->getASTContext(), fnBaseName, argLabels);
+  auto known = SupportedOps.find(name);
+  if (known != SupportedOps.end()) {
+    return known->second;
+  }
+
+  return SupportedOps[name] = TypeChecker::typeSupportsBuilderOp(
+             BuilderType, DC, fnBaseName, argLabels, /*allResults*/ {},
+             checkAvailability);
+}
+
+Expr *ResultBuilder::buildCall(SourceLoc loc, Identifier fnName,
+                               ArrayRef<Expr *> argExprs,
+                               ArrayRef<Identifier> argLabels) const {
+  assert(BuilderSelf);
+
+  auto &ctx = DC->getASTContext();
+
+  SmallVector<Argument, 4> args;
+  for (auto i : indices(argExprs)) {
+    auto *expr = argExprs[i];
+    auto label = argLabels.empty() ? Identifier() : argLabels[i];
+    auto labelLoc = argLabels.empty() ? SourceLoc() : expr->getStartLoc();
+    args.emplace_back(labelLoc, label, expr);
+  }
+
+  auto *baseExpr = new (ctx) DeclRefExpr({BuilderSelf}, DeclNameLoc(loc),
+                                         /*isImplicit=*/true);
+
+  auto memberRef = new (ctx)
+      UnresolvedDotExpr(baseExpr, loc, DeclNameRef(fnName), DeclNameLoc(loc),
+                        /*implicit=*/true);
+  memberRef->setFunctionRefKind(FunctionRefKind::SingleApply);
+
+  auto openLoc = args.empty() ? loc : argExprs.front()->getStartLoc();
+  auto closeLoc = args.empty() ? loc : argExprs.back()->getEndLoc();
+
+  auto *argList = ArgumentList::createImplicit(ctx, openLoc, args, closeLoc);
+  return CallExpr::createImplicit(ctx, memberRef, argList);
+}
+
+VarDecl *ResultBuilder::buildVar(SourceLoc loc) {
+  auto &ctx = DC->getASTContext();
+  // Create the implicit variable.
+  Identifier name =
+      ctx.getIdentifier(("$__builder" + Twine(VarCounter++)).str());
+  auto var = new (ctx)
+      VarDecl(/*isStatic=*/false, VarDecl::Introducer::Var, loc, name, DC);
+  var->setImplicit();
+  return var;
+}
+
+DeclRefExpr *ResultBuilder::buildVarRef(VarDecl *var, SourceLoc loc) {
+  return new (DC->getASTContext())
+      DeclRefExpr(var, DeclNameLoc(loc), /*Implicit=*/true);
 }

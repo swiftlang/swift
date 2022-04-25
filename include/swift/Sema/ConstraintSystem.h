@@ -105,6 +105,50 @@ enum class FreeTypeVariableBinding {
 
 namespace constraints {
 
+struct ResultBuilder {
+private:
+  DeclContext *DC;
+  /// An implicit variable that represents `Self` type of the result builder.
+  VarDecl *BuilderSelf;
+  Type BuilderType;
+  llvm::SmallDenseMap<DeclName, bool> SupportedOps;
+
+  Identifier BuildOptionalId;
+
+  /// Counter used to give unique names to the variables that are
+  /// created implicitly.
+  unsigned VarCounter = 0;
+
+public:
+  ResultBuilder(ConstraintSystem *CS, DeclContext *DC, Type builderType);
+
+  DeclContext *getDeclContext() const { return DC; }
+
+  Type getType() const { return BuilderType; }
+
+  NominalTypeDecl *getBuilderDecl() const {
+    return BuilderType->getAnyNominal();
+  }
+
+  Identifier getBuildOptionalId() const { return BuildOptionalId; }
+
+  bool supports(Identifier fnBaseName, ArrayRef<Identifier> argLabels = {},
+                bool checkAvailability = false);
+
+  bool supportsOptional() { return supports(getBuildOptionalId()); }
+
+  Expr *buildCall(SourceLoc loc, Identifier fnName,
+                  ArrayRef<Expr *> argExprs,
+                  ArrayRef<Identifier> argLabels) const;
+
+  /// Build an implicit variable in this context.
+  VarDecl *buildVar(SourceLoc loc);
+
+  /// Build a reference to a given variable and mark it
+  /// as located at a given source location.
+  DeclRefExpr *buildVarRef(VarDecl *var, SourceLoc loc);
+};
+
 /// Describes the algorithm to use for trailing closure matching.
 enum class TrailingClosureMatching {
   /// Match a trailing closure to the first parameter that appears to work.
