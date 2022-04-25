@@ -165,6 +165,8 @@ public:
   using BuiltTypeDecl = typename BuilderType::BuiltTypeDecl;
   using BuiltProtocolDecl = typename BuilderType::BuiltProtocolDecl;
   using BuiltRequirement = typename BuilderType::BuiltRequirement;
+  using BuiltSubstitution = typename BuilderType::BuiltSubstitution;
+  using BuiltGenericTypeParam = typename BuilderType::BuiltGenericTypeParam;
   using StoredPointer = typename Runtime::StoredPointer;
   using StoredSignedPointer = typename Runtime::StoredSignedPointer;
   using StoredSize = typename Runtime::StoredSize;

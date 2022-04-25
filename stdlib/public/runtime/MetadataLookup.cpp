@@ -1323,6 +1323,8 @@ public:
   using BuiltType = const Metadata *;
   using BuiltTypeDecl = const ContextDescriptor *;
   using BuiltProtocolDecl = ProtocolDescriptorRef;
+  using BuiltSubstitution = std::pair<BuiltType, BuiltType>;
+  using BuiltGenericTypeParam = const Metadata *;
 
   BuiltType decodeMangledType(NodePointer node,
                               bool forRequirement = true) {
