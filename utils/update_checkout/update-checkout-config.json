@@ -127,9 +127,9 @@
             }
         },
         "rebranch": {
-            "aliases": ["rebranch"],
+            "aliases": ["rebranch", "stable/20220421"],
             "repos": {
-                "llvm-project": "stable/20211026",
+                "llvm-project": "stable/20220421",
                 "swift": "rebranch",
                 "cmark": "main",
                 "llbuild": "main",
@@ -151,12 +151,20 @@
                 "swift-xcode-playground-support": "main",
                 "ninja": "release",
                 "icu": "release-65-1",
-                "yams": "4.0.2",
+                "yams": "5.0.0",
                 "cmake": "v3.19.6",
                 "indexstore-db": "main",
                 "sourcekit-lsp": "main",
                 "swift-format": "main",
                 "swift-installer-scripts": "main",
+                "swift-docc": "main",
+                "swift-lmdb": "main",
+                "swift-docc-render-artifact": "main",
+                "swift-docc-symbolkit": "main",
+                "swift-markdown": "main",
+                "swift-cmark-gfm": "gfm",
+                "swift-nio": "2.31.2",
+                "swift-nio-ssl": "2.15.0",
                 "swift-experimental-string-processing": "swift/main"
             }
         },
