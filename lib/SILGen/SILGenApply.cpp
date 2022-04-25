@@ -4589,7 +4589,7 @@ RValue SILGenFunction::emitApply(
   // generates `await_async_continuation`.
   // Lifetime is extended by creating unmanaged copies here and by pushing the
   // cleanups required just before the result plan is generated.
-  SmallVector<SILValue, 8> unmanagedCopies;
+  SmallVector<ManagedValue, 8> unmanagedCopies;
   if (calleeTypeInfo.foreign.async) {
     for (auto arg : args) {
       if (arg.hasCleanup()) {
@@ -4676,14 +4676,12 @@ RValue SILGenFunction::emitApply(
                               *foreignError, calleeTypeInfo.foreign.async);
   }
 
-  // For objc async calls, push cleanup to be used on
-  // both result and throw paths prior to finishing the result plan.
-  if (calleeTypeInfo.foreign.async) {
-    for (auto unmanagedCopy : unmanagedCopies) {
-      Cleanups.pushCleanup<FixLifetimeDestroyCleanup>(unmanagedCopy);
-    }
-  } else {
-    assert(unmanagedCopies.empty());
+  // For objc async calls, push cleanup to be used on throw paths in the result
+  // planner.
+  for (unsigned i : indices(unmanagedCopies)) {
+    SILValue value = unmanagedCopies[i].getValue();
+    Cleanups.pushCleanup<FixLifetimeDestroyCleanup>(value);
+    unmanagedCopies[i] = ManagedValue(value, Cleanups.getTopCleanup());
   }
 
   auto directResultsArray = makeArrayRef(directResults);
@@ -4691,7 +4689,16 @@ RValue SILGenFunction::emitApply(
                                      directResultsArray, bridgedForeignError);
   assert(directResultsArray.empty() && "didn't claim all direct results");
 
+  // For objc async calls, generate cleanup on the resume path here and forward
+  // the previously pushed cleanups.
   if (calleeTypeInfo.foreign.async) {
+    for (auto unmanagedCopy : unmanagedCopies) {
+      auto value = unmanagedCopy.forward(*this);
+      B.emitFixLifetime(loc, value);
+      B.emitDestroyOperation(loc, value);
+    }
+
+    // hop back to the current executor
     breadcrumb.emit(*this, loc);
   }
 
