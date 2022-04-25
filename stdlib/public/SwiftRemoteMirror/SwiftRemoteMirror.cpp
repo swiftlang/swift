@@ -43,6 +43,19 @@ using Runtime = External<NoObjCInterop<RuntimeTarget<sizeof(uintptr_t)>>>;
 #endif
 using NativeReflectionContext = swift::reflection::ReflectionContext<Runtime>;
 
+template <class Runtime>
+const GenericParamDescriptor *swift::targetImplicitGenericParamDescriptors() {
+  static const GenericParamDescriptor
+      buffer[MaxNumImplicitGenericParamDescriptors] = {
+#define D GenericParamDescriptor::implicit()
+          D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D,
+          D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D,
+          D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D
+#undef D
+      };
+  return buffer;
+}
+
 struct SwiftReflectionContext {
   NativeReflectionContext *nativeContext;
   std::vector<std::function<void()>> freeFuncs;
