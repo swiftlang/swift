@@ -41,6 +41,8 @@ sil [escapes !%0.**] @inout_class_argument : $@convention(thin) (@inout X) -> ()
 sil @container_argument : $@convention(thin) (@guaranteed Container) -> ()
 sil @take_closure_as_addr : $@convention(thin) (@in @callee_guaranteed () -> ()) -> ()
 sil [escapes !%0.**] @closure_with_inout : $@convention(thin) (@inout Str) -> ()
+sil [escapes %0 => %r, %0.c*.v** => %r.c*.v**] @initX : $@convention(method) (@owned X) -> @owned X
+sil @modifyStr : $@convention(method) (@inout Str) -> ()
 
 // CHECK-LABEL: Address escape information for test_simple:
 // CHECK:       value:  %1 = struct_element_addr %0 : $*Str, #Str.a
@@ -330,7 +332,7 @@ bb0:
 
 // CHECK-LABEL: Address escape information for partial_apply_with_inout:
 // CHECK:       value:  %0 = alloc_stack $Str
-// CHECK-NEXT:    -     %7 = apply %6(%4) : $@convention(thin) (@in @callee_guaranteed () -> ()) -> ()
+// CHECK-NEXT:    ==>   %7 = apply %6(%4) : $@convention(thin) (@in @callee_guaranteed () -> ()) -> ()
 // CHECK-NEXT:    -     %9 = apply %8() : $@convention(thin) () -> ()
 // CHECK:       End function partial_apply_with_inout
 sil @partial_apply_with_inout : $@convention(thin) () -> () {
@@ -409,6 +411,24 @@ bb0(%0 : $Int):
   dealloc_stack %3 : $*XandInt
   %13 = tuple ()
   return %13 : $()
+}
+
+// CHECK-LABEL: Address escape information for bidirectly_forward_property_addr:
+// CHECK:       value:  %3 = ref_element_addr %2 : $X, #X.s
+// CHECK-NEXT:    ==>   %2 = apply %1(%0) : $@convention(method) (@owned X) -> @owned X
+// CHECK-NEXT:    ==>   %6 = apply %5(%3) : $@convention(method) (@inout Str) -> ()
+// CHECK:      End function bidirectly_forward_property_addr
+sil @bidirectly_forward_property_addr : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $X
+  %1 = function_ref @initX : $@convention(method) (@owned X) -> @owned X
+  %2 = apply %1(%0) : $@convention(method) (@owned X) -> @owned X
+  %3 = ref_element_addr %2 : $X, #X.s
+  fix_lifetime %3 : $*Str
+  %5 = function_ref @modifyStr : $@convention(method) (@inout Str) -> ()
+  %6 = apply %5(%3) : $@convention(method) (@inout Str) -> ()
+  %7 = tuple ()
+  return %7 : $()
 }
 
 // CHECK-LABEL: Address escape information for test_addr_alias1:
