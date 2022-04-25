@@ -1,5 +1,5 @@
 // RUN: %target-build-swift -g %s
-// This test occaisionally fails to link.
+// This test occasionally fails to link.
 // REQUIRES: SR14775
 
 // TF-1232: IRGenDebugInfo crash due to lack of proper mangling for
