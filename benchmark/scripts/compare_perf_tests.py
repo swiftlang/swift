@@ -22,7 +22,7 @@ class `PerformanceTestSamples` is collection of `Sample`s and their statistics.
 class `PerformanceTestResult` is a summary of performance test execution.
 class `LogParser` converts log files into `PerformanceTestResult`s.
 class `ResultComparison` compares new and old `PerformanceTestResult`s.
-class `TestComparator` analyzes changes betweeen the old and new test results.
+class `TestComparator` analyzes changes between the old and new test results.
 class `ReportFormatter` creates the test comparison report in specified format.
 
 """
@@ -111,7 +111,7 @@ class PerformanceTestSamples(object):
 
         Experimentally, this rule seems to perform well-enough on the
         benchmark runtimes in the microbenchmark range to filter out
-        the environment noise caused by preemtive multitasking.
+        the environment noise caused by preemptive multitasking.
         """
         lo = (
             0
@@ -205,7 +205,7 @@ class PerformanceTestSamples(object):
 
     @property
     def cv(self):
-        """Coeficient of Variation (%)."""
+        """Coefficient of Variation (%)."""
         return (self.sd / self.mean) if self.mean else 0
 
     @property
@@ -225,7 +225,7 @@ class PerformanceTestResult(object):
     Reported by the test driver (Benchmark_O, Benchmark_Onone, Benchmark_Osize
     or Benchmark_Driver).
 
-    It suppors 2 log formats emitted by the test driver. Legacy format with
+    It supports 2 log formats emitted by the test driver. Legacy format with
     statistics for normal distribution (MEAN, SD):
         #,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs),MAX_RSS(B)
     And new quantiles format with variable number of columns:
@@ -311,7 +311,7 @@ class PerformanceTestResult(object):
         """Merge two results.
 
         Recomputes min, max and mean statistics. If all `samples` are
-        avaliable, it recomputes all the statistics.
+        available, it recomputes all the statistics.
         The use case here is comparing test results parsed from concatenated
         log files from multiple runs of benchmark driver.
         """
@@ -514,12 +514,12 @@ class LogParser(object):
 
 
 class TestComparator(object):
-    """Analyzes changes betweeen the old and new test results.
+    """Analyzes changes between the old and new test results.
 
     It determines which tests were `added`, `removed` and which can be
     compared. It then splits the `ResultComparison`s into 3 groups according to
     the `delta_threshold` by the change in performance: `increased`,
-    `descreased` and `unchanged`. Whole computaion is performed during
+    `descreased` and `unchanged`. Whole computation is performed during
     initialization and results are provided as properties on this object.
 
     The lists of `added`, `removed` and `unchanged` tests are sorted
@@ -576,7 +576,7 @@ class TestComparator(object):
 
 
 class ReportFormatter(object):
-    """Creates the report from perfromance test comparison in specified format.
+    """Creates the report from performance test comparison in specified format.
 
     `ReportFormatter` formats the `PerformanceTestResult`s and
     `ResultComparison`s provided by `TestComparator` into report table.
