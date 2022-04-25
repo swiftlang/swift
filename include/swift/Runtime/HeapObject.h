@@ -302,7 +302,7 @@ bool swift_isUniquelyReferenced_nonNull_native(const struct HeapObject *);
 /// \p type: 0 - withoutActuallyEscaping verification
 ///              Was the closure passed to a withoutActuallyEscaping block
 ///              escaped in the block?
-///          1 - @objc closure sentinel verfication
+///          1 - @objc closure sentinel verification
 ///              Was the closure passed to Objective-C escaped?
 SWIFT_RUNTIME_EXPORT
 bool swift_isEscapingClosureAtFileLocation(const struct HeapObject *object,

@@ -61,7 +61,7 @@ constexpr static const StringLiteral DEFAULT_ACTOR_STORAGE_FIELD_NAME =
 constexpr static const StringLiteral BUILTIN_TYPE_NAME_PREFIX = "Builtin.";
 
 /// The default SPI group name to associate with Clang SPIs.
-constexpr static const StringLiteral CLANG_MODULE_DEFUALT_SPI_GROUP_NAME =
+constexpr static const StringLiteral CLANG_MODULE_DEFAULT_SPI_GROUP_NAME =
   "OBJC_DEFAULT_SPI_GROUP";
 
 /// The attribute name for @_spi_available
