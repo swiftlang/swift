@@ -1374,7 +1374,7 @@ ConstraintSystem::solveImpl(SolutionApplicationTarget &target,
   SmallVector<Solution, 4> solutions;
   solve(solutions, allowFreeTypeVariables);
 
-  if (getExpressionTooComplex(solutions))
+  if (isTooComplex(solutions))
     return SolutionResult::forTooComplex();
 
   switch (solutions.size()) {
@@ -1415,7 +1415,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
   filterSolutions(solutions);
 
   // We fail if there is no solution or the expression was too complex.
-  return solutions.empty() || getExpressionTooComplex(solutions);
+  return solutions.empty() || isTooComplex(solutions);
 }
 
 void ConstraintSystem::solveImpl(SmallVectorImpl<Solution> &solutions) {

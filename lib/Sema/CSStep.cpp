@@ -251,7 +251,7 @@ bool SplitterStep::mergePartialSolutions() const {
 
     // Since merging partial solutions can go exponential, make sure we didn't
     // pass the "too complex" thresholds including allocated memory and time.
-    if (CS.getExpressionTooComplex(solutionMemory))
+    if (CS.isTooComplex(solutionMemory))
       return false;
 
   } while (nextCombination(counts, indices));
@@ -313,7 +313,7 @@ StepResult ComponentStep::take(bool prevFailed) {
   // One of the previous components created by "split"
   // failed, it means that we can't solve this component.
   if ((prevFailed && DependsOnPartialSolutions.empty()) ||
-      CS.getExpressionTooComplex(Solutions))
+      CS.isTooComplex(Solutions))
     return done(/*isSuccess=*/false);
 
   // Setup active scope, only if previous component didn't fail.

@@ -506,7 +506,7 @@ public:
   StepResult take(bool prevFailed) override {
     // Before attempting the next choice, let's check whether the constraint
     // system is too complex already.
-    if (CS.getExpressionTooComplex(Solutions))
+    if (CS.isTooComplex(Solutions))
       return done(/*isSuccess=*/false);
 
     while (auto choice = Producer()) {
