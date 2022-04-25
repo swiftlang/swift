@@ -59,6 +59,8 @@ public:
   using BuiltType = swift::Type;
   using BuiltTypeDecl = swift::GenericTypeDecl *; // nominal or type alias
   using BuiltProtocolDecl = swift::ProtocolDecl *;
+  using BuiltGenericTypeParam = swift::GenericTypeParamType *;
+  using BuiltRequirement = swift::Requirement;
   explicit ASTBuilder(ASTContext &ctx) : Ctx(ctx) {}
 
   ASTContext &getASTContext() { return Ctx; }
@@ -134,7 +136,6 @@ public:
   Type createSILBoxType(Type base);
   using BuiltSILBoxField = llvm::PointerIntPair<Type, 1>;
   using BuiltSubstitution = std::pair<Type, Type>;
-  using BuiltRequirement = swift::Requirement;
   using BuiltLayoutConstraint = swift::LayoutConstraint;
   Type createSILBoxTypeWithLayout(ArrayRef<BuiltSILBoxField> Fields,
                                   ArrayRef<BuiltSubstitution> Substitutions,
