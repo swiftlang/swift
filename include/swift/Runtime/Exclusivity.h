@@ -73,7 +73,7 @@ void swift_dumpTrackedAccesses();
 #endif
 
 // When building the concurrency library for back deployment, we rename these
-// symbols unformly so they don't conflict with the real concurrency library.
+// symbols uniformly so they don't conflict with the real concurrency library.
 #ifdef SWIFT_CONCURRENCY_BACK_DEPLOYMENT
 #  define swift_task_enterThreadLocalContext swift_task_enterThreadLocalContextBackDeploy
 #  define swift_task_exitThreadLocalContext swift_task_exitThreadLocalContextBackDeploy

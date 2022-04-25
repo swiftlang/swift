@@ -76,7 +76,7 @@ protected:
   /// RawSyntax's \c SyntaxArena outlives this \c SyntaxDataRef.
   ///
   /// In \c SyntaxData, the backing \c SyntaxArena is retained via the \c Arena
-  /// property, lifiting the responsibility to guarantee the \c RawSyntax node
+  /// property, lifting the responsibility to guarantee the \c RawSyntax node
   /// stays alive from the user.
   AbsoluteRawSyntax AbsoluteRaw;
 

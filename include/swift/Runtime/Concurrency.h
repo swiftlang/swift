@@ -216,7 +216,7 @@ void swift_taskGroup_destroy(TaskGroup *group);
 /// more 'pending' child to account for.
 ///
 /// This function SHOULD be called from the AsyncTask running the task group,
-/// however is generally thread-safe as it only only works with the group status.
+/// however is generally thread-safe as it only works with the group status.
 ///
 /// Its Swift signature is
 ///
