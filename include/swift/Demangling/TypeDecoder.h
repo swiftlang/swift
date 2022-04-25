@@ -465,6 +465,8 @@ class TypeDecoder {
   using BuiltRequirement = typename BuilderType::BuiltRequirement;
   using BuiltLayoutConstraint = typename BuilderType::BuiltLayoutConstraint;
   using BuiltGenericTypeParam = typename BuilderType::BuiltGenericTypeParam;
+  using BuiltGenericSignature = typename BuilderType::BuiltGenericSignature;
+  using BuiltSubstitutionMap = typename BuilderType::BuiltSubstitutionMap;
   using NodeKind = Demangle::Node::Kind;
 
   BuilderType &Builder;

@@ -595,6 +595,10 @@ Type ASTBuilder::createProtocolCompositionType(
   return ExistentialType::get(composition);
 }
 
+Type ASTBuilder::createProtocolTypeFromDecl(ProtocolDecl *protocol) {
+  return protocol->getDeclaredInterfaceType();
+}
+
 static MetatypeRepresentation
 getMetatypeRepresentation(ImplMetatypeRepresentation repr) {
   switch (repr) {
@@ -792,6 +796,29 @@ Type ASTBuilder::createDictionaryType(Type key, Type value) {
 
 Type ASTBuilder::createParenType(Type base) {
   return ParenType::get(Ctx, base);
+}
+
+GenericSignature
+ASTBuilder::createGenericSignature(ArrayRef<BuiltType> builtParams,
+                                   ArrayRef<BuiltRequirement> requirements) {
+  std::vector<BuiltGenericTypeParam> params;
+  for (auto &param : builtParams) {
+    auto paramTy = param->getAs<GenericTypeParamType>();
+    if (!paramTy)
+      return GenericSignature();
+    params.push_back(paramTy);
+  }
+  return GenericSignature::get(params, requirements);
+}
+
+SubstitutionMap
+ASTBuilder::createSubstitutionMap(BuiltGenericSignature sig,
+                                  ArrayRef<BuiltType> replacements) {
+  return SubstitutionMap::get(sig, replacements, {});
+}
+
+Type ASTBuilder::subst(Type subject, const BuiltSubstitutionMap &Subs) const {
+  return subject.subst(Subs);
 }
 
 bool ASTBuilder::validateParentType(TypeDecl *decl, Type parent) {
