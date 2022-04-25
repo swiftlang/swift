@@ -21,6 +21,10 @@ namespace swift {
 inline BridgedDiagnosticEngine getBridgedDiagnosticEngine(DiagnosticEngine *D) {
   return {(void *)D};
 }
+inline BridgedOptionalDiagnosticEngine
+getBridgedOptionalDiagnosticEngine(DiagnosticEngine *D) {
+  return {(void *)D};
+}
 
 } // namespace swift
 

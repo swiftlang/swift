@@ -14,9 +14,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Parse/Parser.h"
+#include "swift/AST/BridgingUtils.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/Basic/BridgingUtils.h"
 #include "swift/Parse/ParsedSyntaxRecorder.h"
+#include "swift/Parse/Parser.h"
 #include "swift/Parse/SyntaxParsingContext.h"
 #include "swift/Syntax/SyntaxKind.h"
 
@@ -41,19 +43,18 @@ ParserResult<Expr> Parser::parseExprRegexLiteral() {
 
   // Let the Swift library parse the contents, returning an error, or null if
   // successful.
-  // TODO: We need to be able to pass back a source location to emit the error
-  // at.
-  const char *errorStr = nullptr;
   unsigned version;
   auto capturesBuf = Context.AllocateUninitialized<uint8_t>(
       RegexLiteralExpr::getCaptureStructureSerializationAllocationSize(
           regexText.size()));
-  regexLiteralParsingFn(regexText.str().c_str(), &errorStr, &version,
-                        /*captureStructureOut*/ capturesBuf.data(),
-                        /*captureStructureSize*/ capturesBuf.size());
+  bool hadError =
+      regexLiteralParsingFn(regexText.str().c_str(), &version,
+                            /*captureStructureOut*/ capturesBuf.data(),
+                            /*captureStructureSize*/ capturesBuf.size(),
+                            /*diagBaseLoc*/ getBridgedSourceLoc(Tok.getLoc()),
+                            getBridgedDiagnosticEngine(&Diags));
   auto loc = consumeToken();
-  if (errorStr) {
-    diagnose(loc, diag::regex_literal_parsing_error, errorStr);
+  if (hadError) {
     return makeParserResult(new (Context) ErrorExpr(loc));
   }
   return makeParserResult(RegexLiteralExpr::createParsed(
