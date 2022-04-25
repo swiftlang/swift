@@ -43,6 +43,9 @@ let releaseDevirtualizerPass = FunctionPass(
           // these we know that they don't have associated objects, which are
           // _not_ released by the deinit method.
           if let deallocStackRef = instruction as? DeallocStackRefInst {
+            if !context.continueWithNextSubpassRun(for: release) {
+              return
+            }
             tryDevirtualizeReleaseOfObject(context, release, deallocStackRef)
             lastRelease = nil
             continue
