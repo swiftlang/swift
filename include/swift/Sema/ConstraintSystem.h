@@ -5494,6 +5494,9 @@ public:
   }
 
   bool getExpressionTooComplex(SmallVectorImpl<Solution> const &solutions) {
+    if (isExpressionAlreadyTooComplex)
+      return true;
+
     size_t solutionMemory = 0;
     for (auto const& s : solutions) {
       solutionMemory += s.getTotalMemory();
