@@ -247,7 +247,7 @@ class TestPerformanceTestResult(unittest.TestCase):
     def test_init_delta_quantiles(self):
         # #,TEST,SAMPLES,MIN(μs),𝚫MEDIAN,𝚫MAX
         # 2-quantile from 2 samples in repeated min, when delta encoded,
-        # the difference is 0, which is ommited -- only separator remains
+        # the difference is 0, which is omitted -- only separator remains
         log = "202,DropWhileArray,2,265,,22"
         r = PerformanceTestResult(log.split(","), quantiles=True, delta=True)
         self.assertEqual((r.num_samples, r.min, r.median, r.max), (2, 265, 265, 287))
@@ -257,7 +257,7 @@ class TestPerformanceTestResult(unittest.TestCase):
     def test_init_oversampled_quantiles(self):
         """When num_samples is < quantile + 1, some of the measurements are
         repeated in the report summary. Samples should contain only true
-        values, discarding the repetated artifacts from quantile estimation.
+        values, discarding the repeated artifacts from quantile estimation.
 
         The test string is slightly massaged output of the following R script:
         subsample <- function(x, q) {
@@ -517,7 +517,7 @@ class OldAndNewLog(unittest.TestCase):
 
 class TestLogParser(unittest.TestCase):
     def test_parse_results_csv(self):
-        """Ignores uknown lines, extracts data from supported formats."""
+        """Ignores unknown lines, extracts data from supported formats."""
         log = """#,TEST,SAMPLES,MIN(us),MAX(us),MEAN(us),SD(us),MEDIAN(us)
 7,Array.append.Array.Int?,20,10,10,10,0,10
 21,Bridging.NSArray.as!.Array.NSString,20,11,11,11,0,11

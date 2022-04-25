@@ -15,7 +15,7 @@
 #
 # Performs a very fast check which benchmarks regressed and improved.
 #
-# Initially runs the benchmars with a low sample count and just re-runs those
+# Initially runs the benchmarks with a low sample count and just re-runs those
 # benchmarks which differ.
 # Also reports code size differences.
 #
@@ -224,7 +224,7 @@ def measure(driver, tests, i):
 
 
 def merge(results, other_results):
-    """"Merge the other PreformanceTestResults into the first dictionary."""
+    """"Merge the other PerformanceTestResults into the first dictionary."""
     for test, result in other_results.items():
         results[test].merge(result)
     return results
