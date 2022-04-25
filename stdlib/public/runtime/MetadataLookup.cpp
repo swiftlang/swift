@@ -1334,7 +1334,9 @@ public:
   using BuiltType = const Metadata *;
   using BuiltTypeDecl = const ContextDescriptor *;
   using BuiltProtocolDecl = ProtocolDescriptorRef;
+  using BuiltGenericSignature = const Metadata *;
   using BuiltSubstitution = std::pair<BuiltType, BuiltType>;
+  using BuiltSubstitutionMap = llvm::ArrayRef<BuiltSubstitution>;
   using BuiltGenericTypeParam = const Metadata *;
 
   BuiltType decodeMangledType(NodePointer node,
@@ -1659,7 +1661,6 @@ public:
   }
 
   using BuiltSILBoxField = llvm::PointerIntPair<BuiltType, 1>;
-  using BuiltSubstitution = std::pair<BuiltType, BuiltType>;
   struct BuiltLayoutConstraint {
     bool operator==(BuiltLayoutConstraint rhs) const { return true; }
     operator bool() const { return true; }
