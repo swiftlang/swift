@@ -778,8 +778,7 @@ public:
   llvm::raw_ostream &printPretty(llvm::raw_ostream &os) const;
 
   /// Dump this name to standard error.
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
-                            "only for use within the debugger");
+  SWIFT_DEBUG_DUMP;
 };
 
 inline DeclNameRef DeclNameRef::getFromOpaqueValue(void *p) {
