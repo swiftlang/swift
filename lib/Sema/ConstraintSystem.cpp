@@ -3784,7 +3784,7 @@ SolutionResult ConstraintSystem::salvage() {
   }
 
   if (isTooComplex(viable))
-    return SolutionResult::forTooComplex();
+    return SolutionResult::forTooComplex(getTooComplexRange());
 
   // Could not produce a specific diagnostic; punt to the client.
   return SolutionResult::forUndiagnosedError();
