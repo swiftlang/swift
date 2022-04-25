@@ -77,7 +77,7 @@
 //    INDEX_WITH_NEGATIVE-NOT: second_out.o
 //    INDEX_WITH_NEGATIVE-NOT: second_different.o
 //
-//    Run with a diferent -index-unit-output-path
+//    Run with a different -index-unit-output-path
 //    RUN: echo '{                                                     ' > %/t/outputmap-different2.json
 //    RUN: echo '   "%/t/main.swift":{                                 ' >> %/t/outputmap-different2.json
 //    RUN: echo '      "object": "%/t/main_different.o",               ' >> %/t/outputmap-different2.json
