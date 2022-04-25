@@ -24,7 +24,7 @@ namespace llvm {
   void initializeSwiftARCOptPass(PassRegistry &);
   void initializeSwiftARCContractPass(PassRegistry &);
   void initializeInlineTreePrinterPass(PassRegistry &);
-  void initializeSwiftMergeFunctionsPass(PassRegistry &);
+  void initializeSwiftMergeFunctionsLegacyPassPass(PassRegistry &);
   void initializeSwiftDbgAddrBlockSplitterPass(PassRegistry &);
 }
 
@@ -32,8 +32,8 @@ namespace swift {
   llvm::FunctionPass *createSwiftARCOptPass();
   llvm::FunctionPass *createSwiftARCContractPass();
   llvm::ModulePass *createInlineTreePrinterPass();
-  llvm::ModulePass *createSwiftMergeFunctionsPass(bool ptrAuthEnabled,
-                                                  unsigned ptrAuthKey);
+  llvm::ModulePass *createSwiftMergeFunctionsLegacyPass(bool ptrAuthEnabled,
+                                                        unsigned ptrAuthKey);
   llvm::FunctionPass *createSwiftDbgAddrBlockSplitter();
   llvm::ImmutablePass *createSwiftAAWrapperPass();
   llvm::ImmutablePass *createSwiftRCIdentityPass();

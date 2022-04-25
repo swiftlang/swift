@@ -102,6 +102,23 @@ namespace swift {
     static char ID;
     InlineTreePrinter() : llvm::ModulePass(ID) {}
   };
+
+  struct SwiftMergeFunctionsPass
+      : public llvm::PassInfoMixin<SwiftMergeFunctionsPass> {
+
+    bool ptrAuthOptionsSet = false;
+    bool ptrAuthEnabled = false;
+    unsigned ptrAuthKey = 0;
+
+    SwiftMergeFunctionsPass() {}
+    SwiftMergeFunctionsPass(bool ptrAuthEnabled, unsigned ptrAuthKey)
+        : ptrAuthOptionsSet(true), ptrAuthEnabled(ptrAuthEnabled),
+          ptrAuthKey(ptrAuthKey) {}
+
+    llvm::PreservedAnalyses run(llvm::Module &M,
+                                llvm::ModuleAnalysisManager &AM);
+  };
+
 } // end namespace swift
 
 #endif

@@ -235,19 +235,15 @@ namespace {
 /// parameter. The original functions are replaced by thunks which call the
 /// merged function with the specific argument constants.
 ///
-class SwiftMergeFunctions : public ModulePass {
+class SwiftMergeFunctions {
 public:
-  static char ID;
-  SwiftMergeFunctions()
-    : ModulePass(ID), FnTree(FunctionNodeCmp(&GlobalNumbers)) {
-  }
+  SwiftMergeFunctions(bool ptrAuthOptionsSet, bool ptrAuthEnabled,
+                      unsigned ptrAuthKey)
+      : FnTree(FunctionNodeCmp(&GlobalNumbers)),
+        ptrAuthOptionsSet(ptrAuthOptionsSet), ptrAuthEnabled(ptrAuthEnabled),
+        ptrAuthKey(ptrAuthKey) {}
 
-  SwiftMergeFunctions(bool ptrAuthEnabled, unsigned ptrAuthKey)
-    : ModulePass(ID), FnTree(FunctionNodeCmp(&GlobalNumbers)),
-      ptrAuthOptionsSet(true), ptrAuthEnabled(ptrAuthEnabled),
-      ptrAuthKey(ptrAuthKey) { }
-
-  bool runOnModule(Module &M) override;
+  bool runOnModule(Module &M);
 
 private:
   struct FunctionEntry;
@@ -531,20 +527,47 @@ private:
                             const ParamInfos &Params, unsigned FuncIdx);
 };
 
+struct SwiftMergeFunctionsLegacyPass : public ModulePass {
+  static char ID;
+
+  bool ptrAuthOptionsSet = false;
+  bool ptrAuthEnabled = false;
+  unsigned ptrAuthKey = 0;
+
+  SwiftMergeFunctionsLegacyPass() : ModulePass(ID) {}
+  SwiftMergeFunctionsLegacyPass(bool ptrAuthEnabled, unsigned ptrAuthKey)
+      : ModulePass(ID), ptrAuthOptionsSet(true), ptrAuthEnabled(ptrAuthEnabled),
+        ptrAuthKey(ptrAuthKey) {}
+
+  bool runOnModule(Module &M) override {
+    SwiftMergeFunctions MF(ptrAuthEnabled, ptrAuthKey, ptrAuthOptionsSet);
+    return MF.runOnModule(M);
+  }
+};
+
 } // end anonymous namespace
 
-char SwiftMergeFunctions::ID = 0;
-INITIALIZE_PASS_BEGIN(SwiftMergeFunctions,
-                      "swift-merge-functions", "Swift merge function pass",
-                      false, false)
-INITIALIZE_PASS_END(SwiftMergeFunctions,
-                    "swift-merge-functions", "Swift merge function pass",
-                    false, false)
+PreservedAnalyses SwiftMergeFunctionsPass::run(Module &M,
+                                               ModuleAnalysisManager &AM) {
+  SwiftMergeFunctions MF(ptrAuthEnabled, ptrAuthKey, ptrAuthOptionsSet);
+  if (!MF.runOnModule(M)) {
+    return PreservedAnalyses::all();
+  }
+  return PreservedAnalyses::none();
+}
 
-llvm::ModulePass *swift::createSwiftMergeFunctionsPass(bool ptrAuthEnabled,
-                                                       unsigned ptrAuthKey) {
-  initializeSwiftMergeFunctionsPass(*llvm::PassRegistry::getPassRegistry());
-  return new SwiftMergeFunctions(ptrAuthEnabled, ptrAuthKey);
+char SwiftMergeFunctionsLegacyPass::ID = 0;
+INITIALIZE_PASS_BEGIN(SwiftMergeFunctionsLegacyPass, "swift-merge-functions",
+                      "Swift merge function pass", false, false)
+INITIALIZE_PASS_END(SwiftMergeFunctionsLegacyPass, "swift-merge-functions",
+                    "Swift merge function pass", false, false)
+
+llvm::ModulePass *
+swift::createSwiftMergeFunctionsLegacyPass(bool ptrAuthEnabled,
+                                           unsigned ptrAuthKey) {
+  initializeSwiftMergeFunctionsLegacyPassPass(
+      *llvm::PassRegistry::getPassRegistry());
+  return new SwiftMergeFunctionsLegacyPass(ptrAuthEnabled, ptrAuthKey);
 }
 
 bool SwiftMergeFunctions::doSanityCheck(std::vector<WeakTrackingVH> &Worklist) {

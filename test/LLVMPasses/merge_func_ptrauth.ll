@@ -1,4 +1,5 @@
 ; RUN: %swift-llvm-opt -swift-merge-functions -swiftmergefunc-threshold=4 %s | %FileCheck %s
+; RUN: %swift-llvm-opt -enable-new-pm -swift-merge-functions -swiftmergefunc-threshold=4 %s | %FileCheck %s
 ; REQUIRES: CODEGENERATOR=AArch64
 
 target triple = "arm64e-apple-macosx11.0.0"

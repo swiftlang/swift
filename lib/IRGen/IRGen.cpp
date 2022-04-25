@@ -219,6 +219,15 @@ void setModuleFlags(IRGenModule &IGM) {
 }
 
 void swift::registerLLVMPipelineParsingCallback(llvm::PassBuilder &PB) {
+  PB.registerPipelineParsingCallback(
+      [&](StringRef Name, ModulePassManager &PM,
+          ArrayRef<PassBuilder::PipelineElement> InnerPipeline) {
+        if (Name == "swift-merge-functions") {
+          PM.addPass(SwiftMergeFunctionsPass());
+          return true;
+        }
+        return false;
+      });
 }
 void swift::performLLVMOptimizations(const IRGenOptions &Opts,
                                      llvm::Module *Module,
@@ -293,7 +302,7 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
         if (Builder.OptLevel > 0) {
           const PointerAuthSchema &schema = Opts.PointerAuth.FunctionPointers;
           unsigned key = (schema.isEnabled() ? schema.getKey() : 0);
-          PM.add(createSwiftMergeFunctionsPass(schema.isEnabled(), key));
+          PM.add(createSwiftMergeFunctionsLegacyPass(schema.isEnabled(), key));
         }
       });
   }
