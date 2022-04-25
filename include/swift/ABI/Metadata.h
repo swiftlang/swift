@@ -1735,6 +1735,12 @@ public:
 using ExistentialTypeMetadata
   = TargetExistentialTypeMetadata<InProcess>;
 
+template<typename Runtime>
+struct TargetExistentialTypeExpression {
+  /// The type expression.
+  TargetRelativeDirectPointer<Runtime, const char, /*nullable*/ false> name;
+};
+
 /// A description of the shape of an existential type.
 ///
 /// An existential type has the general form:
@@ -1791,7 +1797,7 @@ struct TargetExtendedExistentialTypeShape
       // Optional generalization signature header
       TargetGenericContextDescriptorHeader<Runtime>,
       // Optional type subexpression
-      TargetRelativeDirectPointer<Runtime, const char, /*nullable*/ false>,
+      TargetExistentialTypeExpression<Runtime>,
       // Optional suggested value witnesses
       TargetRelativeIndirectablePointer<Runtime, const TargetValueWitnessTable<Runtime>,
                                         /*nullable*/ false>,
@@ -1802,8 +1808,6 @@ struct TargetExtendedExistentialTypeShape
       // for generalization signature
       TargetGenericRequirementDescriptor<Runtime>> {
 private:
-  using RelativeStringPointer =
-    TargetRelativeDirectPointer<Runtime, const char, /*nullable*/ false>;
   using RelativeValueWitnessTablePointer =
     TargetRelativeIndirectablePointer<Runtime,
                                       const TargetValueWitnessTable<Runtime>,
@@ -1812,7 +1816,7 @@ private:
     swift::ABI::TrailingObjects<
       TargetExtendedExistentialTypeShape<Runtime>,
       TargetGenericContextDescriptorHeader<Runtime>,
-      RelativeStringPointer,
+      TargetExistentialTypeExpression<Runtime>,
       RelativeValueWitnessTablePointer,
       GenericParamDescriptor,
       TargetGenericRequirementDescriptor<Runtime>>;
@@ -1825,7 +1829,7 @@ private:
     return Flags.hasGeneralizationSignature();
   }
 
-  size_t numTrailingObjects(OverloadToken<RelativeStringPointer>) const {
+  size_t numTrailingObjects(OverloadToken<TargetExistentialTypeExpression<Runtime>>) const {
     return Flags.hasTypeExpression();
   }
 
@@ -1879,12 +1883,13 @@ public:
   /// we nonetheless distinguish at compile time.  Storing this also
   /// allows us to far more easily produce a formal type from this
   /// shape reflectively.
-  RelativeStringPointer ExistentialType;
+  TargetRelativeDirectPointer<Runtime, const char, /*nullable*/ false>
+      ExistentialType;
 
   /// The header describing the requirement signature of the existential.
   TargetGenericContextDescriptorHeader<Runtime> ReqSigHeader;
 
-  RuntimeGenericSignature getRequirementSignature() const {
+  RuntimeGenericSignature<Runtime> getRequirementSignature() const {
     return {ReqSigHeader, getReqSigParams(), getReqSigRequirements()};
   }
 
@@ -1894,8 +1899,8 @@ public:
 
   const GenericParamDescriptor *getReqSigParams() const {
     return Flags.hasImplicitReqSigParams()
-             ? ImplicitGenericParamDescriptors
-             : this->template getTrailingObjects<GenericParamDescriptor>();
+               ? swift::targetImplicitGenericParamDescriptors<Runtime>()
+               : this->template getTrailingObjects<GenericParamDescriptor>();
   }
 
   unsigned getNumReqSigRequirements() const {
@@ -1911,10 +1916,11 @@ public:
   /// The type expression of the existential, as a symbolic mangled type
   /// string.  Must be null if the header is just the (single)
   /// requirement type parameter.
-  TargetPointer<Runtime, const char> getTypeExpression() const {
+  const TargetExistentialTypeExpression<Runtime> *getTypeExpression() const {
     return Flags.hasTypeExpression()
-      ? this->template getTrailingObjects<RelativeStringPointer>()->get()
-      : nullptr;
+               ? this->template getTrailingObjects<
+                     TargetExistentialTypeExpression<Runtime>>()
+               : nullptr;
   }
 
   bool isTypeExpressionOpaque() const {
@@ -1961,8 +1967,8 @@ public:
     return Flags.hasGeneralizationSignature();
   }
 
-  RuntimeGenericSignature getGeneralizationSignature() const {
-    if (!hasGeneralizationSignature()) return RuntimeGenericSignature();
+  RuntimeGenericSignature<Runtime> getGeneralizationSignature() const {
+    if (!hasGeneralizationSignature()) return RuntimeGenericSignature<Runtime>();
     return {*getGenSigHeader(), getGenSigParams(), getGenSigRequirements()};
   }
 
@@ -1974,7 +1980,7 @@ public:
   const GenericParamDescriptor *getGenSigParams() const {
     assert(hasGeneralizationSignature());
     if (Flags.hasImplicitGenSigParams())
-      return ImplicitGenericParamDescriptors;
+      return swift::targetImplicitGenericParamDescriptors<Runtime>();
     auto base = this->template getTrailingObjects<GenericParamDescriptor>();
     if (!Flags.hasImplicitReqSigParams())
       base += getNumReqSigParams();
@@ -2086,6 +2092,8 @@ struct TargetExtendedExistentialTypeMetadata
     swift::ABI::TrailingObjects<
       TargetExtendedExistentialTypeMetadata<Runtime>,
       ConstTargetPointer<Runtime, void>> {
+  using StoredSize = typename Runtime::StoredSize;
+
 private:
   using TrailingObjects =
     swift::ABI::TrailingObjects<
@@ -2097,8 +2105,11 @@ private:
   using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
 
   size_t numTrailingObjects(OverloadToken<ConstTargetPointer<Runtime, void>>) const {
-    return Shape->getGenSigLayoutSizeInWords();
+    return Shape->getGenSigArgumentLayoutSizeInWords();
   }
+
+public:
+  static constexpr StoredSize OffsetToArguments = sizeof(TargetMetadata<Runtime>);
 
 public:
   explicit constexpr
@@ -2112,6 +2123,11 @@ public:
 
   ConstTargetPointer<Runtime, void> const *getGeneralizationArguments() const {
     return this->template getTrailingObjects<ConstTargetPointer<Runtime, void>>();
+  }
+
+public:
+  static bool classof(const TargetMetadata<Runtime> *metadata) {
+    return metadata->getKind() == MetadataKind::ExtendedExistential;
   }
 };
 using ExtendedExistentialTypeMetadata
