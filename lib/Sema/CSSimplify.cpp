@@ -2670,11 +2670,15 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   }
 
   /// Whether to downgrade to a concurrency warning.
-  auto isConcurrencyWarning = [&] {
-    if (contextRequiresStrictConcurrencyChecking(DC, GetClosureType{*this})
-        && !hasPreconcurrencyCallee(this, locator))
+  auto isConcurrencyWarning = [&](bool forSendable) {
+    // Except for Sendable warnings, don't downgrade to an error in strict
+    // contexts without a preconcurrency callee.
+    if (!forSendable &&
+        contextRequiresStrictConcurrencyChecking(DC, GetClosureType{*this}) &&
+        !hasPreconcurrencyCallee(this, locator))
       return false;
 
+    // We can only handle the downgrade for conversions.
     switch (kind) {
     case ConstraintKind::Conversion:
     case ConstraintKind::ArgumentConversion:
@@ -2694,7 +2698,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
       auto *fix = AddSendableAttribute::create(
           *this, func1, func2, getConstraintLocator(locator),
-          isConcurrencyWarning());
+          isConcurrencyWarning(true));
       if (recordFix(fix))
         return getTypeMatchFailure(locator);
     }
@@ -2729,7 +2733,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
       auto *fix = MarkGlobalActorFunction::create(
           *this, func1, func2, getConstraintLocator(locator),
-          isConcurrencyWarning());
+          isConcurrencyWarning(false));
 
       if (recordFix(fix))
         return getTypeMatchFailure(locator);
