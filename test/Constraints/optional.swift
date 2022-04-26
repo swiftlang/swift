@@ -470,17 +470,17 @@ func rdar75146811() {
   var arr: [Double]! = []
 
   test(&arr) // expected-error {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
-  test((&arr)) // expected-error {{use of extraneous '&'}}
+  test((&arr)) // expected-error {{'&' may only be used to pass an argument to inout parameter}}
   // expected-error@-1 {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
   test(&(arr)) // expected-error {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
 
   test_tuple(&arr, x: 0) // expected-error {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
-  test_tuple((&arr), x: 0) // expected-error {{use of extraneous '&'}}
+  test_tuple((&arr), x: 0) // expected-error {{'&' may only be used to pass an argument to inout parameter}}
   // expected-error@-1 {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
   test_tuple(&(arr), x: 0) // expected-error {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
 
   test_named(x: &arr) // expected-error {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
-  test_named(x: (&arr)) // expected-error {{use of extraneous '&'}}
+  test_named(x: (&arr)) // expected-error {{'&' may only be used to pass an argument to inout parameter}}
   // expected-error@-1 {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
   test_named(x: &(arr)) // expected-error {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
 }

@@ -542,8 +542,8 @@ func testInOut(_ arg: inout Int) {
   takesExplicitInt(x) // expected-error{{passing value of type 'Int' to an inout parameter requires explicit '&'}} {{20-20=&}}
   takesExplicitInt(&x)
   takesInt(&x) // expected-error{{'&' used with non-inout argument of type 'Int'}}
-  var y = &x //expected-error {{use of extraneous '&'}}
-  var z = &arg //expected-error {{use of extraneous '&'}}
+  var y = &x //expected-error {{'&' may only be used to pass an argument to inout parameter}}
+  var z = &arg //expected-error {{'&' may only be used to pass an argument to inout parameter}}
 
   takesExplicitInt(5) // expected-error {{cannot pass immutable value as inout argument: literals are not mutable}}
 }
@@ -701,8 +701,8 @@ func test() {
   let y = Foo()
 
   // rdar://15708430
-  (&x).method()  // expected-error {{use of extraneous '&'}}
-  (&x).mutatingMethod() // expected-error {{use of extraneous '&'}}
+  (&x).method()  // expected-error {{'&' may only be used to pass an argument to inout parameter}}
+  (&x).mutatingMethod() // expected-error {{'&' may only be used to pass an argument to inout parameter}}
 }
 
 
@@ -832,20 +832,20 @@ public struct TestPropMethodOverloadGroup {
 // <rdar://problem/18496742> Passing ternary operator expression as inout crashes Swift compiler
 func inoutTests(_ arr: inout Int) {
   var x = 1, y = 2
-  (true ? &x : &y) // expected-error {{use of extraneous '&'}}
-  let a = (true ? &x : &y) // expected-error {{use of extraneous '&'}}
+  (true ? &x : &y) // expected-error {{'&' may only be used to pass an argument to inout parameter}}
+  let a = (true ? &x : &y) // expected-error {{'&' may only be used to pass an argument to inout parameter}}
 
-  inoutTests(true ? &x : &y) // expected-error {{use of extraneous '&'}}
+  inoutTests(true ? &x : &y) // expected-error {{'&' may only be used to pass an argument to inout parameter}}
 
-  &_ // expected-error {{use of extraneous '&'}}
+  &_ // expected-error {{'&' may only be used to pass an argument to inout parameter}}
 
-  inoutTests((&x, 24).0) // expected-error {{use of extraneous '&'}}
+  inoutTests((&x, 24).0) // expected-error {{'&' may only be used to pass an argument to inout parameter}}
 
-  inoutTests((&x)) // expected-error {{use of extraneous '&'}} {{15-16=(}} {{14-15=&}}
+  inoutTests((&x)) // expected-error {{'&' may only be used to pass an argument to inout parameter}} {{15-16=(}} {{14-15=&}}
   inoutTests(&x)
   
   // <rdar://problem/17489894> inout not rejected as operand to assignment operator
-  &x += y  // expected-error {{use of extraneous '&'}}
+  &x += y  // expected-error {{'&' may only be used to pass an argument to inout parameter}}
 
   // <rdar://problem/23249098>
   func takeAny(_ x: Any) {}
@@ -861,7 +861,7 @@ func inoutTests(_ arr: inout Int) {
 // <rdar://problem/20802757> Compiler crash in default argument & inout expr
 var g20802757 = 2
 func r20802757(_ z: inout Int = &g20802757) { // expected-error {{cannot provide default value to inout parameter 'z'}}
-  // expected-error@-1 {{use of extraneous '&'}}
+  // expected-error@-1 {{'&' may only be used to pass an argument to inout parameter}}
   print(z)
 }
 
