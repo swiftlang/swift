@@ -1,4 +1,6 @@
 // RUN: not %target-swift-frontend -primary-file %s -o %t.out -emit-module -emit-module-path %t.swiftmodule -frontend-parseable-output 2>&1 | %FileCheck %s
+// Check without primary files (WMO):
+// RUN: not %target-swift-frontend %s -o %t.out -emit-module -emit-module-path %t.swiftmodule -frontend-parseable-output 2>&1 | %FileCheck %s
 
 func foo() {
     return 11;
@@ -7,11 +9,10 @@ func foo() {
 // CHECK-NEXT: {
 // CHECK-NEXT:   "kind": "began",
 // CHECK-NEXT:   "name": "compile",
-// CHECK-NEXT:   "command": "{{.*[\\/]}}swift-frontend{{(\.exe)?}}{{.*}}-primary-file {{.*[\\/]}}parseable_output_error.swift -o {{.*[\\/]}}parseable_output_error.swift.tmp.out  -emit-module -emit-module-path {{.*[\\/]}}parseable_output_error.swift.tmp.swiftmodule -frontend-parseable-output",
+// CHECK-NEXT:   "command": "{{.*[\\/]}}swift-frontend{{(\.exe)?}}{{.*}} {{.*[\\/]}}parseable_output_error.swift -o {{.*[\\/]}}parseable_output_error.swift.tmp.out  -emit-module -emit-module-path {{.*[\\/]}}parseable_output_error.swift.tmp.swiftmodule -frontend-parseable-output",
 // CHECK-NEXT:   "command_executable": "{{.*[\\/]}}swift{{(-frontend|c)?(\.exe)?}}",
 // CHECK-NEXT:   "command_arguments": [
-// CHECK:          "-primary-file",
-// CHECK-NEXT:     "{{.*[\\/]}}parseable_output_error.swift",
+// CHECK:     "{{.*[\\/]}}parseable_output_error.swift",
 // CHECK-NEXT:     "-o",
 // CHECK-NEXT:     "{{.*[\\/]}}parseable_output_error.swift.tmp.out",
 // CHECK-NEXT:     "-emit-module",
@@ -43,7 +44,7 @@ func foo() {
 // CHECK-NEXT:   "kind": "finished",
 // CHECK-NEXT:   "name": "compile",
 // CHECK-NEXT:   "pid": [[PID]],
-// CHECK-NEXT:   "output": "{{.*[\\/]}}parseable_output_error.swift:4:12: error: unexpected non-void return value in void function{{.*}}return 11;{{.*[\\/]}}parseable_output_error.swift:4:12: note: did you mean to add a return type?{{.*}}return 11;
+// CHECK-NEXT:   "output": "{{.*[\\/]}}parseable_output_error.swift:6:12: error: unexpected non-void return value in void function{{.*}}return 11;{{.*[\\/]}}parseable_output_error.swift:6:12: note: did you mean to add a return type?{{.*}}return 11;
 // CHECK-NEXT:   "process": {
 // CHECK-NEXT:     "real_pid": [[PID]]
 // CHECK-NEXT:   },
