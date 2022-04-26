@@ -260,7 +260,7 @@ static void createConjunction(ConstraintSystem &cs,
     if (isIsolated)
       element.walk(paramCollector);
 
-    constraints.push_back(Constraint::createClosureBodyElement(
+    constraints.push_back(Constraint::createSyntacticElement(
         cs, element, context, elementLoc, isDiscarded));
   }
 
@@ -293,25 +293,26 @@ static ProtocolDecl *getSequenceProtocol(ASTContext &ctx, SourceLoc loc,
 }
 
 /// Statement visitor that generates constraints for a given closure body.
-class ClosureConstraintGenerator
-    : public StmtVisitor<ClosureConstraintGenerator, void> {
-  friend StmtVisitor<ClosureConstraintGenerator, void>;
+class SyntacticElementConstraintGenerator
+    : public StmtVisitor<SyntacticElementConstraintGenerator, void> {
+  friend StmtVisitor<SyntacticElementConstraintGenerator, void>;
 
   ConstraintSystem &cs;
-  ClosureExpr *closure;
+  AnyFunctionRef context;
+  Type resultType;
   ConstraintLocator *locator;
 
 public:
   /// Whether an error was encountered while generating constraints.
   bool hadError = false;
 
-  ClosureConstraintGenerator(ConstraintSystem &cs, ClosureExpr *closure,
-                             ConstraintLocator *locator)
-      : cs(cs), closure(closure), locator(locator) {}
+  SyntacticElementConstraintGenerator(ConstraintSystem &cs, AnyFunctionRef fn,
+                                      Type resultTy, ConstraintLocator *locator)
+      : cs(cs), context(fn), resultType(resultTy), locator(locator) {}
 
   void visitPattern(Pattern *pattern, ContextualTypeInfo context) {
     auto parentElement =
-        locator->getLastElementAs<LocatorPathElt::ClosureBodyElement>();
+        locator->getLastElementAs<LocatorPathElt::SyntacticElement>();
 
     if (!parentElement) {
       hadError = true;
@@ -333,13 +334,13 @@ public:
     llvm_unreachable("Unsupported pattern");
   }
 
-  void visitCaseItem(CaseLabelItem *caseItem, ContextualTypeInfo context) {
-    assert(context.purpose == CTP_CaseStmt);
+  void visitCaseItem(CaseLabelItem *caseItem, ContextualTypeInfo contextInfo) {
+    assert(contextInfo.purpose == CTP_CaseStmt);
 
     // Resolve the pattern.
     auto *pattern = caseItem->getPattern();
     if (!caseItem->isPatternResolved()) {
-      pattern = TypeChecker::resolvePattern(pattern, closure,
+      pattern = TypeChecker::resolvePattern(pattern, context.getAsDeclContext(),
                                             /*isStmtCondition=*/false);
       if (!pattern) {
         hadError = true;
@@ -353,13 +354,13 @@ public:
     // always be converted into a conjunction.
 
     // Generate constraints for pattern.
-    visitPattern(pattern, context);
+    visitPattern(pattern, contextInfo);
 
     auto *guardExpr = caseItem->getGuardExpr();
 
     // Generate constraints for `where` clause (if any).
     if (guardExpr) {
-      guardExpr = cs.generateConstraints(guardExpr, closure);
+      guardExpr = cs.generateConstraints(guardExpr, context.getAsDeclContext());
       if (!guardExpr) {
         hadError = true;
         return;
@@ -388,7 +389,7 @@ private:
     // Verify pattern.
     {
       auto contextualPattern =
-          ContextualPattern::forRawPattern(pattern, closure);
+          ContextualPattern::forRawPattern(pattern, context.getAsDeclContext());
       Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
 
       if (patternType->hasError()) {
@@ -427,7 +428,7 @@ private:
 
     {
       SolutionApplicationTarget target(
-          sequenceExpr, closure, CTP_ForEachSequence,
+          sequenceExpr, context.getAsDeclContext(), CTP_ForEachSequence,
           sequenceProto->getDeclaredInterfaceType(),
           /*isDiscarded=*/false);
 
@@ -472,16 +473,15 @@ private:
 
     Type makeIteratorType =
         cs.createTypeVariable(locator, TVO_CanBindToNoEscape);
-    cs.addValueWitnessConstraint(
-        LValueType::get(sequenceType), makeIterator, makeIteratorType,
-        closure, FunctionRefKind::Compound,
-        cs.getConstraintLocator(sequenceLocator, ConstraintLocator::Witness));
+    cs.addValueWitnessConstraint(LValueType::get(sequenceType), makeIterator,
+                                 makeIteratorType, context.getAsDeclContext(),
+                                 FunctionRefKind::Compound, contextualLocator);
 
     // After successful constraint generation, let's record
     // solution application target with all relevant information.
     {
       auto target = SolutionApplicationTarget::forForEachStmt(
-          forEachStmt, sequenceProto, closure,
+          forEachStmt, sequenceProto, context.getAsDeclContext(),
           /*bindTypeVarsOneWay=*/false,
           /*contextualPurpose=*/CTP_ForEachSequence);
 
@@ -534,7 +534,7 @@ private:
   void visitPatternBinding(PatternBindingDecl *patternBinding,
                            SmallVectorImpl<ElementInfo> &patterns) {
     auto *baseLoc = cs.getConstraintLocator(
-        locator, LocatorPathElt::ClosureBodyElement(patternBinding));
+        locator, LocatorPathElt::SyntacticElement(patternBinding));
 
     for (unsigned index : range(patternBinding->getNumPatternEntries())) {
       auto *pattern = TypeChecker::resolvePattern(
@@ -790,7 +790,7 @@ private:
         {makeElement(
             errorExpr,
             cs.getConstraintLocator(
-                locator, LocatorPathElt::ClosureBodyElement(errorExpr)),
+                locator, LocatorPathElt::SyntacticElement(errorExpr)),
             {errType, CTP_ThrowStmt})},
         locator);
   }
@@ -809,9 +809,9 @@ private:
     // be handled together with pattern because pattern can
     // inform a type of sequence element e.g. `for i: Int8 in 0 ..< 8`
     {
-      Pattern *pattern =
-          TypeChecker::resolvePattern(forEachStmt->getPattern(), closure,
-                                      /*isStmtCondition=*/false);
+      Pattern *pattern = TypeChecker::resolvePattern(forEachStmt->getPattern(),
+                                                     context.getAsDeclContext(),
+                                                     /*isStmtCondition=*/false);
 
       if (!pattern) {
         hadError = true;
@@ -838,7 +838,7 @@ private:
            "Unsupported statement: Switch");
 
     auto *switchLoc = cs.getConstraintLocator(
-        locator, LocatorPathElt::ClosureBodyElement(switchStmt));
+        locator, LocatorPathElt::SyntacticElement(switchStmt));
 
     SmallVector<ElementInfo, 4> elements;
     {
@@ -846,7 +846,8 @@ private:
       {
         elements.push_back(makeElement(subjectExpr, switchLoc));
 
-        SolutionApplicationTarget target(subjectExpr, closure, CTP_Unused,
+        SolutionApplicationTarget target(subjectExpr,
+                                         context.getAsDeclContext(), CTP_Unused,
                                          Type(), /*isDiscarded=*/false);
 
         cs.setSolutionApplicationTarget(switchStmt, target);
@@ -864,7 +865,7 @@ private:
            "Unsupported statement: DoCatch");
 
     auto *doLoc = cs.getConstraintLocator(
-        locator, LocatorPathElt::ClosureBodyElement(doStmt));
+        locator, LocatorPathElt::SyntacticElement(doStmt));
 
     SmallVector<ElementInfo, 4> elements;
 
@@ -887,7 +888,7 @@ private:
 
     {
       auto parent =
-          locator->castLastElementTo<LocatorPathElt::ClosureBodyElement>()
+          locator->castLastElementTo<LocatorPathElt::SyntacticElement>()
               .getElement();
 
       if (parent.isStmt(StmtKind::Switch)) {
@@ -901,10 +902,10 @@ private:
       }
     }
 
-    bindSwitchCasePatternVars(closure, caseStmt);
+    bindSwitchCasePatternVars(context.getAsDeclContext(), caseStmt);
 
     auto *caseLoc = cs.getConstraintLocator(
-        locator, LocatorPathElt::ClosureBodyElement(caseStmt));
+        locator, LocatorPathElt::SyntacticElement(caseStmt));
 
     SmallVector<ElementInfo, 4> elements;
     for (auto &caseLabelItem : caseStmt->getMutableCaseLabelItems()) {
@@ -923,7 +924,7 @@ private:
 
       if (isChildOf(StmtKind::Case)) {
         auto *caseStmt = cast<CaseStmt>(
-            locator->castLastElementTo<LocatorPathElt::ClosureBodyElement>()
+            locator->castLastElementTo<LocatorPathElt::SyntacticElement>()
                 .asStmt());
 
         for (auto caseBodyVar : caseStmt->getCaseBodyVariablesOrEmptyArray()) {
@@ -949,7 +950,7 @@ private:
         elements.push_back(makeElement(
             element,
             cs.getConstraintLocator(
-                locator, LocatorPathElt::ClosureBodyElement(element)),
+                locator, LocatorPathElt::SyntacticElement(element)),
             /*contextualInfo=*/{}, isDiscarded));
       }
 
@@ -960,7 +961,7 @@ private:
     for (auto node : braceStmt->getElements()) {
       if (auto expr = node.dyn_cast<Expr *>()) {
         auto generatedExpr = cs.generateConstraints(
-            expr, closure, /*isInputExpression=*/false);
+            expr, context.getAsDeclContext(), /*isInputExpression=*/false);
         if (!generatedExpr) {
           hadError = true;
         }
@@ -973,24 +974,27 @@ private:
   }
 
   void visitReturnStmt(ReturnStmt *returnStmt) {
-    auto contextualTy = cs.getClosureType(closure)->getResult();
+    auto *closure =
+        dyn_cast_or_null<ClosureExpr>(context.getAbstractClosureExpr());
 
     // Single-expression closures are effectively a `return` statement,
     // so let's give them a special locator as to indicate that.
     // Return statements might not have a result if we have a closure whose
     // implicit returned value is coerced to Void.
-    if (closure->hasSingleExpressionBody() && returnStmt->hasResult()) {
+    if (closure && closure->hasSingleExpressionBody() &&
+        returnStmt->hasResult()) {
       auto *expr = returnStmt->getResult();
       assert(expr && "single expression closure without expression?");
 
-      expr = cs.generateConstraints(expr, closure, /*isInputExpression=*/false);
+      expr = cs.generateConstraints(expr, closure,
+                                    /*isInputExpression=*/false);
       if (!expr) {
         hadError = true;
         return;
       }
 
       cs.addConstraint(
-          ConstraintKind::Conversion, cs.getType(expr), contextualTy,
+          ConstraintKind::Conversion, cs.getType(expr), resultType,
           cs.getConstraintLocator(
               closure, LocatorPathElt::ClosureBody(
                            /*hasReturn=*/!returnStmt->isImplicit())));
@@ -1005,11 +1009,11 @@ private:
     } else {
       // If this is simplify `return`, let's create an empty tuple
       // which is also useful if contextual turns out to be e.g. `Void?`.
-      resultExpr = getVoidExpr(closure->getASTContext());
+      resultExpr = getVoidExpr(cs.getASTContext());
     }
 
-    SolutionApplicationTarget target(resultExpr, closure, CTP_ReturnStmt,
-                                     contextualTy,
+    SolutionApplicationTarget target(resultExpr, context.getAsDeclContext(),
+                                     CTP_ReturnStmt, resultType,
                                      /*isDiscarded=*/false);
 
     if (cs.generateConstraints(target, FreeTypeVariableBinding::Disallow)) {
@@ -1017,14 +1021,18 @@ private:
       return;
     }
 
-    cs.setContextualType(target.getAsExpr(), TypeLoc::withoutLoc(contextualTy),
+    cs.setContextualType(target.getAsExpr(), TypeLoc::withoutLoc(resultType),
                          CTP_ReturnStmt);
     cs.setSolutionApplicationTarget(returnStmt, target);
   }
 
   bool isSupportedMultiStatementClosure() const {
-    return !closure->hasSingleExpressionBody() &&
-           cs.participatesInInference(closure);
+    if (auto *closure =
+            dyn_cast_or_null<ClosureExpr>(context.getAbstractClosureExpr())) {
+      return !closure->hasSingleExpressionBody() &&
+             cs.participatesInInference(closure);
+    }
+    return true;
   }
 
 #define UNSUPPORTED_STMT(STMT) void visit##STMT##Stmt(STMT##Stmt *) { \
@@ -1046,7 +1054,7 @@ private:
       return false;
 
     auto parentElt =
-        locator->getLastElementAs<LocatorPathElt::ClosureBodyElement>();
+        locator->getLastElementAs<LocatorPathElt::SyntacticElement>();
     return parentElt ? parentElt->getElement().isStmt(kind) : false;
   }
 };
@@ -1056,8 +1064,10 @@ bool ConstraintSystem::generateConstraints(ClosureExpr *closure) {
   auto &ctx = closure->getASTContext();
 
   if (participatesInInference(closure)) {
-    ClosureConstraintGenerator generator(*this, closure,
-                                         getConstraintLocator(closure));
+    SyntacticElementConstraintGenerator generator(
+        *this, closure, getClosureType(closure)->getResult(),
+        getConstraintLocator(closure));
+
     generator.visit(closure->getBody());
 
     if (closure->hasSingleExpressionBody())
@@ -1115,20 +1125,21 @@ bool isConditionOfStmt(ConstraintLocatorBuilder locator) {
   if (path.empty())
     return false;
 
-  if (auto closureElt = path.back().getAs<LocatorPathElt::ClosureBodyElement>())
+  if (auto closureElt = path.back().getAs<LocatorPathElt::SyntacticElement>())
     return closureElt->getElement().dyn_cast<Stmt *>();
 
   return false;
 }
 
 ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyClosureBodyElementConstraint(
+ConstraintSystem::simplifySyntacticElementConstraint(
     ASTNode element, ContextualTypeInfo context, bool isDiscarded,
     TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
   auto *closure = castToExpr<ClosureExpr>(locator.getAnchor());
 
-  ClosureConstraintGenerator generator(*this, closure,
-                                       getConstraintLocator(locator));
+  SyntacticElementConstraintGenerator generator(
+      *this, closure, getClosureType(closure)->getResult(),
+      getConstraintLocator(locator));
 
   if (auto *expr = element.dyn_cast<Expr *>()) {
     SolutionApplicationTarget target(expr, closure, context.purpose,
@@ -1160,12 +1171,12 @@ ConstraintSystem::simplifyClosureBodyElementConstraint(
 namespace {
 
 /// Statement visitor that applies constraints for a given closure body.
-class ClosureConstraintApplication
-    : public StmtVisitor<ClosureConstraintApplication, ASTNode> {
-  friend StmtVisitor<ClosureConstraintApplication, ASTNode>;
+class SyntacticElementSolutionApplication
+    : public StmtVisitor<SyntacticElementSolutionApplication, ASTNode> {
+  friend StmtVisitor<SyntacticElementSolutionApplication, ASTNode>;
 
   Solution &solution;
-  ClosureExpr *closure;
+  AnyFunctionRef context;
   Type resultType;
   RewriteTargetFn rewriteTarget;
   bool isSingleExpression;
@@ -1177,19 +1188,19 @@ public:
   /// Whether an error was encountered while generating constraints.
   bool hadError = false;
 
-  ClosureConstraintApplication(
-      Solution &solution, ClosureExpr *closure, Type resultType,
-      RewriteTargetFn rewriteTarget)
-    : solution(solution), closure(closure), resultType(resultType),
-      rewriteTarget(rewriteTarget),
-      isSingleExpression(closure->hasSingleExpressionBody()) { }
+  SyntacticElementSolutionApplication(Solution &solution,
+                                      AnyFunctionRef context, Type resultType,
+                                      RewriteTargetFn rewriteTarget)
+      : solution(solution), context(context), resultType(resultType),
+        rewriteTarget(rewriteTarget),
+        isSingleExpression(context.hasSingleExpressionBody()) {}
 
 private:
   /// Rewrite an expression without any particularly special context.
   Expr *rewriteExpr(Expr *expr) {
-    auto result = rewriteTarget(
-      SolutionApplicationTarget(expr, closure, CTP_Unused, Type(),
-                                /*isDiscarded=*/false));
+    auto result = rewriteTarget(SolutionApplicationTarget(
+        expr, context.getAsDeclContext(), CTP_Unused, Type(),
+        /*isDiscarded=*/false));
     if (result)
       return result->getAsExpr();
 
@@ -1202,7 +1213,7 @@ private:
       return {};
 
     if (auto *stmt = getAsStmt(rewritten))
-      performStmtDiagnostics(stmt, closure);
+      performStmtDiagnostics(stmt, context.getAsDeclContext());
 
     return rewritten;
   }
@@ -1236,11 +1247,11 @@ private:
   }
 
   ASTNode visitBreakStmt(BreakStmt *breakStmt) {
+    auto *DC = context.getAsDeclContext();
     if (auto target = findBreakOrContinueStmtTarget(
-            closure->getASTContext(), closure->getParentSourceFile(),
-            breakStmt->getLoc(), breakStmt->getTargetName(),
-            breakStmt->getTargetLoc(),
-            /*isContinue=*/false, closure)) {
+            DC->getASTContext(), DC->getParentSourceFile(), breakStmt->getLoc(),
+            breakStmt->getTargetName(), breakStmt->getTargetLoc(),
+            /*isContinue=*/false, context.getAsDeclContext())) {
       breakStmt->setTarget(target);
     }
 
@@ -1248,10 +1259,12 @@ private:
   }
 
   ASTNode visitContinueStmt(ContinueStmt *continueStmt) {
+    auto *DC = context.getAsDeclContext();
     if (auto target = findBreakOrContinueStmtTarget(
-            closure->getASTContext(), closure->getParentSourceFile(),
+            DC->getASTContext(), DC->getParentSourceFile(),
             continueStmt->getLoc(), continueStmt->getTargetName(),
-            continueStmt->getTargetLoc(), /*isContinue=*/true, closure)) {
+            continueStmt->getTargetLoc(), /*isContinue=*/true,
+            context.getAsDeclContext())) {
       continueStmt->setTarget(target);
     }
 
@@ -1259,7 +1272,7 @@ private:
   }
 
   ASTNode visitFallthroughStmt(FallthroughStmt *fallthroughStmt) {
-    if (checkFallthroughStmt(closure, fallthroughStmt))
+    if (checkFallthroughStmt(context.getAsDeclContext(), fallthroughStmt))
       hadError = true;
     return fallthroughStmt;
   }
@@ -1268,7 +1281,7 @@ private:
     TypeChecker::typeCheckDecl(deferStmt->getTempDecl());
 
     Expr *theCall = deferStmt->getCallExpr();
-    TypeChecker::typeCheckExpression(theCall, closure);
+    TypeChecker::typeCheckExpression(theCall, context.getAsDeclContext());
     deferStmt->setCallExpr(theCall);
 
     return deferStmt;
@@ -1276,8 +1289,8 @@ private:
 
   ASTNode visitIfStmt(IfStmt *ifStmt) {
     // Rewrite the condition.
-    if (auto condition = rewriteTarget(
-            SolutionApplicationTarget(ifStmt->getCond(), closure)))
+    if (auto condition = rewriteTarget(SolutionApplicationTarget(
+            ifStmt->getCond(), context.getAsDeclContext())))
       ifStmt->setCond(*condition->getAsStmtCondition());
     else
       hadError = true;
@@ -1292,8 +1305,8 @@ private:
   }
 
   ASTNode visitGuardStmt(GuardStmt *guardStmt) {
-    if (auto condition = rewriteTarget(
-            SolutionApplicationTarget(guardStmt->getCond(), closure)))
+    if (auto condition = rewriteTarget(SolutionApplicationTarget(
+            guardStmt->getCond(), context.getAsDeclContext())))
       guardStmt->setCond(*condition->getAsStmtCondition());
     else
       hadError = true;
@@ -1304,8 +1317,8 @@ private:
   }
 
   ASTNode visitWhileStmt(WhileStmt *whileStmt) {
-    if (auto condition = rewriteTarget(
-          SolutionApplicationTarget(whileStmt->getCond(), closure)))
+    if (auto condition = rewriteTarget(SolutionApplicationTarget(
+            whileStmt->getCond(), context.getAsDeclContext())))
       whileStmt->setCond(*condition->getAsStmtCondition());
     else
       hadError = true;
@@ -1379,7 +1392,8 @@ private:
 
     // Check to see if the sequence expr is throwing (in async context),
     // if so require the stmt to have a `try`.
-    hadError |= diagnoseUnhandledThrowsInAsyncContext(closure, forEachStmt);
+    hadError |= diagnoseUnhandledThrowsInAsyncContext(
+        context.getAsDeclContext(), forEachStmt);
 
     return forEachStmt;
   }
@@ -1422,8 +1436,8 @@ private:
       }
     }
 
-    TypeChecker::checkSwitchExhaustiveness(switchStmt, closure,
-                                           limitExhaustivityChecks);
+    TypeChecker::checkSwitchExhaustiveness(
+        switchStmt, context.getAsDeclContext(), limitExhaustivityChecks);
 
     return switchStmt;
   }
@@ -1443,7 +1457,8 @@ private:
   void visitCaseStmtPreamble(CaseStmt *caseStmt) {
     // Translate the patterns and guard expressions for each case label item.
     for (auto &caseItem : caseStmt->getMutableCaseLabelItems()) {
-      SolutionApplicationTarget caseTarget(&caseItem, closure);
+      SolutionApplicationTarget caseTarget(&caseItem,
+                                           context.getAsDeclContext());
       if (!rewriteTarget(caseTarget)) {
         hadError = true;
       }
@@ -1476,7 +1491,7 @@ private:
     if (!braceStmt->empty()) {
       if (auto stmt = braceStmt->getLastElement().dyn_cast<Stmt *>()) {
         if (auto deferStmt = dyn_cast<DeferStmt>(stmt)) {
-          auto &diags = closure->getASTContext().Diags;
+          auto &diags = cs.getASTContext().Diags;
           diags
               .diagnose(deferStmt->getStartLoc(), diag::defer_stmt_at_block_end)
               .fixItReplace(deferStmt->getStartLoc(), "do");
@@ -1518,7 +1533,8 @@ private:
     // of the body if there is none. This wasn't needed before SE-0326
     // because result type was (incorrectly) inferred as `Void` due to
     // the body being skipped.
-    if (!closure->hasSingleExpressionBody() &&
+    auto *closure = context.getAbstractClosureExpr();
+    if (closure && !closure->hasSingleExpressionBody() &&
         closure->getBody() == braceStmt) {
       if (resultType->getOptionalObjectType() &&
           resultType->lookThroughAllOptionalTypes()->isVoid() &&
@@ -1531,8 +1547,8 @@ private:
   }
 
   ASTNode addImplicitVoidReturn(BraceStmt *braceStmt) {
-    auto &ctx = closure->getASTContext();
     auto &cs = solution.getConstraintSystem();
+    auto &ctx = cs.getASTContext();
 
     auto *resultExpr = getVoidExpr(ctx);
     cs.cacheExprTypes(resultExpr);
@@ -1544,8 +1560,8 @@ private:
     // to it, to make sure that optional injection happens required
     // number of times.
     {
-      SolutionApplicationTarget target(resultExpr, closure, CTP_ReturnStmt,
-                                       resultType,
+      SolutionApplicationTarget target(resultExpr, context.getAsDeclContext(),
+                                       CTP_ReturnStmt, resultType,
                                        /*isDiscarded=*/false);
       cs.setSolutionApplicationTarget(returnStmt, target);
 
@@ -1610,7 +1626,7 @@ private:
     }
 
     SolutionApplicationTarget resultTarget(
-        resultExpr, closure,
+        resultExpr, context.getAsDeclContext(),
         mode == convertToResult ? CTP_ReturnStmt : CTP_Unused,
         mode == convertToResult ? resultType : Type(),
         /*isDiscarded=*/false);
@@ -1657,7 +1673,7 @@ private:
 public:
   /// Apply solution to the closure and return updated body.
   ASTNode apply() {
-    auto body = visit(closure->getBody());
+    auto body = visit(context.getBody());
 
     // Since local functions can capture variables that are declared
     // after them, let's type-check them after all of the pattern
@@ -1668,7 +1684,6 @@ public:
     return body;
   }
 };
-
 }
 
 SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
@@ -1761,7 +1776,7 @@ bool ConstraintSystem::applySolutionToBody(Solution &solution,
   llvm::SaveAndRestore<DeclContext *> savedDC(currentDC, closure);
 
   auto closureType = cs.getType(closure)->castTo<FunctionType>();
-  ClosureConstraintApplication application(
+  SyntacticElementSolutionApplication application(
       solution, closure, closureType->getResult(), rewriteTarget);
   auto body = application.apply();
 
@@ -1779,10 +1794,10 @@ void ConjunctionElement::findReferencedVariables(
   auto referencedVars = Element->getTypeVariables();
   typeVars.insert(referencedVars.begin(), referencedVars.end());
 
-  if (Element->getKind() != ConstraintKind::ClosureBodyElement)
+  if (Element->getKind() != ConstraintKind::SyntacticElement)
     return;
 
-  ASTNode element = Element->getClosureElement();
+  ASTNode element = Element->getSyntacticElement();
   auto *locator = Element->getLocator();
 
   TypeVariableRefFinder refFinder(cs, locator->getAnchor(), typeVars);

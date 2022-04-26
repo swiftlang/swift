@@ -209,10 +209,9 @@ enum class ConstraintKind : char {
   /// inferred from a conversion, so the check is more relax comparing to
   /// `ConformsTo`.
   TransitivelyConformsTo,
-  /// Represents an AST node contained in a body of a closure. It has only
-  /// one type - type variable representing type of a node, other side is
-  /// the AST node to infer the type for.
-  ClosureBodyElement,
+  /// Represents an AST node contained in a body of a function/closure.
+  /// It only has an AST node to generate constraints and infer the type for.
+  SyntacticElement,
   /// Do not add new uses of this, it only exists to retain compatibility for
   /// rdar://85263844.
   ///
@@ -240,8 +239,8 @@ enum class ConstraintClassification : char {
   /// A conjunction constraint.
   Conjunction,
 
-  /// An element of a closure body.
-  ClosureElement,
+  /// An element of a closure/function body.
+  SyntacticElement,
 };
 
 /// Specifies a restriction on the kind of conversion that should be
@@ -450,7 +449,7 @@ class Constraint final : public llvm::ilist_node<Constraint>,
       ContextualTypeInfo Context;
       /// Identifies whether result of this node is unused.
       bool IsDiscarded;
-    } ClosureElement;
+    } SyntacticElement;
   };
 
   /// The locator that describes where in the expression this
@@ -591,12 +590,12 @@ public:
       Optional<TrailingClosureMatching> trailingClosureMatching,
       ConstraintLocator *locator);
 
-  static Constraint *createClosureBodyElement(ConstraintSystem &cs,
+  static Constraint *createSyntacticElement(ConstraintSystem &cs,
                                               ASTNode node,
                                               ConstraintLocator *locator,
                                               bool isDiscarded = false);
 
-  static Constraint *createClosureBodyElement(ConstraintSystem &cs,
+  static Constraint *createSyntacticElement(ConstraintSystem &cs,
                                               ASTNode node,
                                               ContextualTypeInfo context,
                                               ConstraintLocator *locator,
@@ -710,8 +709,8 @@ public:
     case ConstraintKind::Conjunction:
       return ConstraintClassification::Conjunction;
 
-    case ConstraintKind::ClosureBodyElement:
-      return ConstraintClassification::ClosureElement;
+    case ConstraintKind::SyntacticElement:
+      return ConstraintClassification::SyntacticElement;
     }
 
     llvm_unreachable("Unhandled ConstraintKind in switch.");
@@ -734,7 +733,7 @@ public:
     case ConstraintKind::ValueWitness:
       return Member.First;
 
-    case ConstraintKind::ClosureBodyElement:
+    case ConstraintKind::SyntacticElement:
       llvm_unreachable("closure body element constraint has no type operands");
 
     default:
@@ -748,7 +747,7 @@ public:
     case ConstraintKind::Disjunction:
     case ConstraintKind::Conjunction:
     case ConstraintKind::BindOverload:
-    case ConstraintKind::ClosureBodyElement:
+    case ConstraintKind::SyntacticElement:
       llvm_unreachable("constraint has no second type");
 
     case ConstraintKind::ValueMember:
@@ -857,19 +856,19 @@ public:
     return Member.UseDC;
   }
 
-  ASTNode getClosureElement() const {
-    assert(Kind == ConstraintKind::ClosureBodyElement);
-    return ClosureElement.Element;
+  ASTNode getSyntacticElement() const {
+    assert(Kind == ConstraintKind::SyntacticElement);
+    return SyntacticElement.Element;
   }
 
   ContextualTypeInfo getElementContext() const {
-    assert(Kind == ConstraintKind::ClosureBodyElement);
-    return ClosureElement.Context;
+    assert(Kind == ConstraintKind::SyntacticElement);
+    return SyntacticElement.Context;
   }
 
   bool isDiscardedElement() const {
-    assert(Kind == ConstraintKind::ClosureBodyElement);
-    return ClosureElement.IsDiscarded;
+    assert(Kind == ConstraintKind::SyntacticElement);
+    return SyntacticElement.IsDiscarded;
   }
 
   /// For an applicable function constraint, retrieve the trailing closure
