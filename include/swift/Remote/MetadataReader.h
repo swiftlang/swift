@@ -996,6 +996,119 @@ public:
     swift_unreachable("Unhandled MetadataKind in switch");
   }
 
+  TypeLookupErrorOr<typename BuilderType::BuiltGenericSignature>
+  decodeRuntimeGenericSignature(ShapeRef contextRef,
+                                const RuntimeGenericSignature<Runtime> &Sig) {
+    std::vector<BuiltType> params;
+    for (unsigned sigIdx : indices(Sig.getParams())) {
+      auto param =
+          Builder.createGenericTypeParameterType(/*depth*/ 0, /*index*/ sigIdx);
+      if (!param)
+        return TypeLookupError("Failed to read generic parameter type in "
+                               "runtime generic signature.");
+      params.push_back(param);
+    }
+
+    std::vector<BuiltRequirement> reqs;
+    for (auto &req : Sig.getRequirements()) {
+      if (!req.hasKnownKind()) {
+        return TypeLookupError("unknown kind");
+      }
+
+      Demangler ldem;
+      auto lhsTypeNode = ldem.demangleType(req.getParam());
+      if (!lhsTypeNode) {
+        return TypeLookupError("Failed to read subject type in requirement of "
+                               "runtime generic signature.");
+      }
+
+      BuiltType subjectType = decodeMangledType(lhsTypeNode).getType();
+      if (!subjectType)
+        return TypeLookupError("Failed to read subject type in requirement of "
+                               "runtime generic signature.");
+
+      switch (req.Flags.getKind()) {
+      case GenericRequirementKind::SameType: {
+        Demangler rdem;
+        auto demangledConstraint =
+            demangle(RemoteRef<char>(req.getMangledTypeName().data(),
+                                     req.getMangledTypeName().data()),
+                     MangledNameKind::Type, rdem);
+        auto constraintType = decodeMangledType(demangledConstraint);
+        if (auto *error = constraintType.getError()) {
+          return *error;
+        }
+
+        reqs.push_back(BuiltRequirement(RequirementKind::SameType, subjectType,
+                                        constraintType.getType()));
+        break;
+      }
+      case GenericRequirementKind::Protocol: {
+        /// Resolver to turn a protocol reference into a protocol declaration.
+        struct ProtocolReferenceResolver {
+          using Result = BuiltType;
+
+          BuilderType &builder;
+
+          BuiltType failure() const { return BuiltType(); }
+
+          BuiltType swiftProtocol(Demangle::Node *node) {
+            auto decl = builder.createProtocolDecl(node);
+            if (!decl)
+              return failure();
+            return builder.createProtocolTypeFromDecl(decl);
+          }
+
+#if SWIFT_OBJC_INTEROP
+          BuiltType objcProtocol(StringRef name) {
+            auto decl = builder.createObjCProtocolDecl(name.str());
+            if (!decl)
+              return failure();
+            return builder.createProtocolTypeFromDecl(decl);
+          }
+#endif
+        } resolver{Builder};
+
+        Demangler dem;
+        auto protocolAddress =
+            resolveRelativeIndirectProtocol(contextRef, req.Protocol);
+        auto protocol = readProtocol(protocolAddress, dem, resolver);
+        if (!protocol) {
+          return TypeLookupError("Failed to read protocol type in conformance "
+                                 "requirement of runtime generic signature.");
+        }
+
+        reqs.push_back(BuiltRequirement(RequirementKind::Conformance,
+                                        subjectType, protocol));
+        break;
+      }
+      case GenericRequirementKind::BaseClass: {
+        Demangler rdem;
+        auto demangledConstraint =
+            demangle(RemoteRef<char>(req.getMangledTypeName().data(),
+                                     req.getMangledTypeName().data()),
+                     MangledNameKind::Type, rdem);
+        auto constraintType = decodeMangledType(demangledConstraint);
+        if (auto *error = constraintType.getError()) {
+          return *error;
+        }
+
+        reqs.push_back(BuiltRequirement(RequirementKind::Superclass,
+                                        subjectType, constraintType.getType()));
+        break;
+      }
+      case GenericRequirementKind::SameConformance:
+        return TypeLookupError("Unexpected same conformance requirement in "
+                               "runtime generic signature");
+      case GenericRequirementKind::Layout:
+        return TypeLookupError(
+            "Unexpected layout requirement in runtime generic signature");
+      }
+    }
+
+    return Builder.createGenericSignature(params, reqs);
+  }
+
   TypeLookupErrorOr<typename BuilderType::BuiltType>
   readTypeFromMangledName(const char *MangledTypeName, size_t Length) {
     Demangle::Demangler Dem;
@@ -2201,8 +2314,9 @@ private:
   /// Resolve a relative target protocol descriptor pointer, which uses
   /// the lowest bit to indicate an indirect vs. direct relative reference and
   /// the second lowest bit to indicate whether it is an Objective-C protocol.
+  template<typename Base>
   StoredPointer resolveRelativeIndirectProtocol(
-      ContextDescriptorRef descriptor,
+      RemoteRef<Base> descriptor,
       const RelativeTargetProtocolDescriptorPointer<Runtime> &protocol) {
     // Map the offset from within our local buffer to the remote address.
     auto distance = (intptr_t)&protocol - (intptr_t)descriptor.getLocalBuffer();
