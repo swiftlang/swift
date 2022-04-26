@@ -809,7 +809,7 @@ public:
                            SILDebugVariable VarInfo,
                            const SILDebugScope *Scope) {
     bool canStore =
-        cast<llvm::PointerType>(Alloca->getType())->getElementType() ==
+        cast<llvm::PointerType>(Alloca->getType())->getPointerElementType() ==
         Val->getType();
     if (canStore)
       return true;
@@ -909,7 +909,7 @@ public:
     auto *Address = Alloca.getAddress();
     if (WasMoved) {
       auto nonPtrAllocaType =
-          cast<llvm::PointerType>(Address->getType())->getElementType();
+          cast<llvm::PointerType>(Address->getType())->getPointerElementType();
       if (nonPtrAllocaType != Storage->getType())
         Address = Builder.CreateBitOrPointerCast(
             Address, llvm::PointerType::get(Storage->getType(), 0));

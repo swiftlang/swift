@@ -4904,7 +4904,7 @@ Callee irgen::getBlockPointerCallee(IRGenFunction &IGF,
   auto castBlockPtr = IGF.Builder.CreateBitCast(blockPtr, blockPtrTy);
 
   // Extract the invocation pointer for blocks.
-  auto blockStructTy = blockPtrTy->getElementType();
+  auto blockStructTy = blockPtrTy->getPointerElementType();
   llvm::Value *invokeFnPtrPtr =
     IGF.Builder.CreateStructGEP(blockStructTy, castBlockPtr, 3);
   Address invokeFnPtrAddr(invokeFnPtrPtr, IGF.IGM.getPointerAlignment());

@@ -1057,7 +1057,7 @@ llvm::Constant *IRGenModule::getObjCEmptyCachePtr() {
   if (ObjCInterop) {
     // struct objc_cache _objc_empty_cache;
     ObjCEmptyCachePtr = Module.getOrInsertGlobal("_objc_empty_cache",
-                                                 OpaquePtrTy->getElementType());
+                                                 OpaquePtrTy->getPointerElementType());
     ApplyIRLinkage(IRLinkage::ExternalImport)
         .to(cast<llvm::GlobalVariable>(ObjCEmptyCachePtr));
   } else {

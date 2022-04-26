@@ -2221,7 +2221,7 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo, StringRef name,
 }
 
 static bool isPointerTo(llvm::Type *ptrTy, llvm::Type *objTy) {
-  return cast<llvm::PointerType>(ptrTy)->getElementType() == objTy;
+  return cast<llvm::PointerType>(ptrTy)->getPointerElementType() == objTy;
 }
 
 /// Get or create an LLVM function with these linkage rules.
@@ -3349,7 +3349,7 @@ llvm::Constant *IRGenModule::getOrCreateGOTEquivalent(llvm::Constant *global,
 static llvm::Constant *getElementBitCast(llvm::Constant *ptr,
                                          llvm::Type *newEltType) {
   auto ptrType = cast<llvm::PointerType>(ptr->getType());
-  if (ptrType->getElementType() == newEltType) {
+  if (ptrType->getPointerElementType() == newEltType) {
     return ptr;
   } else {
     auto newPtrType = newEltType->getPointerTo(ptrType->getAddressSpace());
@@ -4566,7 +4566,7 @@ llvm::GlobalValue *IRGenModule::defineAlias(LinkEntity entity,
   LinkInfo link = LinkInfo::get(*this, entity, ForDefinition);
   auto *ptrTy = cast<llvm::PointerType>(definition->getType());
   auto *alias = llvm::GlobalAlias::create(
-      ptrTy->getElementType(), ptrTy->getAddressSpace(), link.getLinkage(),
+      ptrTy->getPointerElementType(), ptrTy->getAddressSpace(), link.getLinkage(),
       link.getName(), definition, &Module);
   ApplyIRLinkage({link.getLinkage(), link.getVisibility(), link.getDLLStorage()})
       .to(alias);

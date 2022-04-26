@@ -291,7 +291,7 @@ getOrCreateValueWitnessTablePtrTy(IRGenModule &IGM, llvm::PointerType *&cache,
 }
 
 llvm::StructType *IRGenModule::getValueWitnessTableTy() {
-  return cast<llvm::StructType>(getValueWitnessTablePtrTy()->getElementType());
+  return cast<llvm::StructType>(getValueWitnessTablePtrTy()->getPointerElementType());
 }
 llvm::PointerType *IRGenModule::getValueWitnessTablePtrTy() {
   return getOrCreateValueWitnessTablePtrTy(*this, ValueWitnessTablePtrTy,
@@ -300,7 +300,7 @@ llvm::PointerType *IRGenModule::getValueWitnessTablePtrTy() {
 
 llvm::StructType *IRGenModule::getEnumValueWitnessTableTy() {
   return cast<llvm::StructType>(getEnumValueWitnessTablePtrTy()
-           ->getElementType());
+           ->getPointerElementType());
 }
 llvm::PointerType *IRGenModule::getEnumValueWitnessTablePtrTy() {
   return getOrCreateValueWitnessTablePtrTy(*this, EnumValueWitnessTablePtrTy,

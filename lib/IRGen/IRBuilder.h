@@ -156,7 +156,7 @@ public:
   Address CreateStructGEP(Address address, unsigned index, Size offset,
                           const llvm::Twine &name = "") {
     llvm::Value *addr = CreateStructGEP(
-        address.getType()->getElementType(), address.getAddress(),
+        address.getType()->getPointerElementType(), address.getAddress(),
         index, name);
     return Address(addr, address.getAlignment().alignmentAtOffset(offset));
   }
@@ -172,7 +172,7 @@ public:
   Address CreateConstArrayGEP(Address base, unsigned index, Size eltSize,
                               const llvm::Twine &name = "") {
     auto addr = CreateConstInBoundsGEP1_32(
-        base.getType()->getElementType(), base.getAddress(), index, name);
+        base.getType()->getPointerElementType(), base.getAddress(), index, name);
     return Address(addr,
                    base.getAlignment().alignmentAtOffset(eltSize * index));
   }
@@ -181,7 +181,7 @@ public:
   Address CreateConstByteArrayGEP(Address base, Size offset,
                                   const llvm::Twine &name = "") {
     auto addr = CreateConstInBoundsGEP1_32(
-        base.getType()->getElementType(), base.getAddress(), offset.getValue(),
+        base.getType()->getPointerElementType(), base.getAddress(), offset.getValue(),
         name);
     return Address(addr, base.getAlignment().alignmentAtOffset(offset));
   }
@@ -199,7 +199,7 @@ public:
                                const llvm::Twine &name = "") {
     // Do nothing if the type doesn't change.
     auto origPtrType = address.getType();
-    if (origPtrType->getElementType() == type) return address;
+    if (origPtrType->getPointerElementType() == type) return address;
 
     // Otherwise, cast to a pointer to the correct type.
     auto ptrType = type->getPointerTo(origPtrType->getAddressSpace());

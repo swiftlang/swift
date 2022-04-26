@@ -595,7 +595,7 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
     auto element = fieldInfo.second;
     Address memberAddr = element.project(IGF, baseAddr, None);
     // We may need to bitcast the address if the field is of a generic type.
-    if (memberAddr.getType()->getElementType() != fieldTI.getStorageType())
+    if (memberAddr.getType()->getPointerElementType() != fieldTI.getStorageType())
       memberAddr = IGF.Builder.CreateBitCast(memberAddr,
                                      fieldTI.getStorageType()->getPointerTo());
     return OwnedAddress(memberAddr, base);
