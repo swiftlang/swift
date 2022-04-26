@@ -852,12 +852,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     // and that library clients will generally raise deployment targets as the
     // library evolves so the min inlining version should be the deployment
     // target by default.
-    unsigned major, minor, patch;
-    if (triple.isMacOSX())
-      triple.getMacOSXVersion(major, minor, patch);
-    else
-      triple.getOSVersion(major, minor, patch);
-    return llvm::VersionTuple(major, minor, patch);
+    if (triple.isMacOSX()) {
+      llvm::VersionTuple OSVersion;
+      triple.getMacOSXVersion(OSVersion);
+      return OSVersion;
+    }
+    return triple.getOSVersion();
   };
 
   Opts.MinimumInliningTargetVersion =
@@ -2365,9 +2365,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     // silently override "auto" to "never" when back-deploying. This approach
     // sacrifices async backtraces when back-deploying but prevents crashes in
     // older tools that cannot handle the async frame bit in the frame pointer.
-    unsigned major, minor, micro;
-    Triple.getWatchOSVersion(major, minor, micro);
-    if (major < 8)
+    llvm::VersionTuple OSVersion = Triple.getWatchOSVersion();
+    if (OSVersion.getMajor() < 8)
       Opts.SwiftAsyncFramePointer = SwiftAsyncFramePointerKind::Never;
   }
 
