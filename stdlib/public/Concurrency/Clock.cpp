@@ -121,7 +121,7 @@ switch (clock_id) {
       clock_getres(CLOCK_MONOTONIC_RAW, &continuous);
       *seconds = continuous.tv_sec;
       *nanoseconds = continuous.tv_nsec;
-#elif defined(__OpenBSD__) && HAS_TIME;
+#elif defined(__OpenBSD__) && HAS_TIME
       struct timespec continuous;
       clock_getres(CLOCK_MONOTONIC, &continuous);
       *seconds = continuous.tv_sec;

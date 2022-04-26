@@ -234,12 +234,12 @@ struct __swift_job_source {
 
 static void _swift_run_job_leeway(struct __swift_job_source *jobSource) {
   dispatch_source_t source = jobSource->source;
+  dispatch_release(source);
   Job *job = jobSource->job;
   auto task = dyn_cast<AsyncTask>(job);
   assert(task && "provided job must be a task");
   _swift_task_dealloc_specific(task, jobSource);
   __swift_run_job(job);
-  dispatch_release(source);
 }
 
 #if defined(__i386__) || defined(__x86_64__) || !defined(__APPLE__)
@@ -252,7 +252,7 @@ static void _swift_run_job_leeway(struct __swift_job_source *jobSource) {
 // x86 currently implements mach time in nanoseconds
 // this is NOT likely to change
 static inline uint64_t
-time_nano2mach(uint64_t nsec) {
+platform_time(uint64_t nsec) {
   return nsec;
 }
 #else
@@ -261,7 +261,7 @@ time_nano2mach(uint64_t nsec) {
 #if defined(__arm__) || defined(__arm64__)
 // Apple arm platforms currently use a fixed mach timebase of 125/3 (24 MHz)
 static inline uint64_t
-time_nano2mach(uint64_t nsec) {
+platform_time(uint64_t nsec) {
   if (!nsec) {
     return nsec;
   }
@@ -280,7 +280,7 @@ time_nano2mach(uint64_t nsec) {
 
 static inline dispatch_time_t
 clock_and_value_to_time(int clock, long long deadline) {
-  uint64_t value = time_nano2mach((uint64_t)deadline);
+  uint64_t value = platform_time((uint64_t)deadline);
   if (value >= DISPATCH_TIME_MAX_VALUE) {
     return DISPATCH_TIME_FOREVER;
   }
@@ -300,8 +300,7 @@ static void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
                                                      long long tnsec,
                                                      int clock, Job *job) {
   assert(job && "no job provided");
-  auto task = dyn_cast<AsyncTask>(job);
-  assert(task && "provided job must be a task");
+  auto task = cast<AsyncTask>(job);
 
   JobPriority priority = job->getPriority();
 
@@ -312,9 +311,7 @@ static void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
 
   uint64_t deadline = sec * NSEC_PER_SEC + nsec;
   dispatch_time_t when = clock_and_value_to_time(clock, deadline);
-  dispatch_function_t dispatchFunction = 
-    (dispatch_function_t)&_swift_run_job_leeway;
-
+  
   if (tnsec != -1) {
     uint64_t leeway = tsec * NSEC_PER_SEC + tnsec;
 
@@ -331,12 +328,13 @@ static void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
     jobSource->source = source;
 
     dispatch_set_context(source, jobSource);
-    dispatch_source_set_event_handler_f(source, dispatchFunction);
+    dispatch_source_set_event_handler_f(source, 
+      (dispatch_function_t)&_swift_run_job_leeway);
 
     dispatch_activate(source);
   } else {
-    dispatchFunction = &__swift_run_job;
-    dispatch_after_f(when, queue, (void *)job, dispatchFunction);
+    dispatch_after_f(when, queue, (void *)job, 
+      (dispatch_function_t)&__swift_run_job);
   }
 }
 
