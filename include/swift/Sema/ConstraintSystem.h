@@ -5120,9 +5120,9 @@ private:
                  TypeMatchOptions flags,
                  ConstraintLocatorBuilder locator);
 
-  /// Simplify a closure body element constraint by generating required
+  /// Simplify a syntactic element constraint by generating required
   /// constraints to represent the given element in constraint system.
-  SolutionKind simplifyClosureBodyElementConstraint(
+  SolutionKind simplifySyntacticElementConstraint(
       ASTNode element, ContextualTypeInfo context, bool isDiscarded,
       TypeMatchOptions flags, ConstraintLocatorBuilder locator);
 

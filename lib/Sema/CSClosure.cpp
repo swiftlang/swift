@@ -213,7 +213,7 @@ static void createConjunction(ConstraintSystem &cs,
     if (isIsolated)
       element.walk(paramCollector);
 
-    constraints.push_back(Constraint::createClosureBodyElement(
+    constraints.push_back(Constraint::createSyntacticElement(
         cs, element, context, elementLoc, isDiscarded));
   }
 
@@ -264,7 +264,7 @@ public:
 
   void visitPattern(Pattern *pattern, ContextualTypeInfo context) {
     auto parentElement =
-        locator->getLastElementAs<LocatorPathElt::ClosureBodyElement>();
+        locator->getLastElementAs<LocatorPathElt::SyntacticElement>();
 
     if (!parentElement) {
       hadError = true;
@@ -486,7 +486,7 @@ private:
   void visitPatternBinding(PatternBindingDecl *patternBinding,
                            SmallVectorImpl<ElementInfo> &patterns) {
     auto *baseLoc = cs.getConstraintLocator(
-        locator, LocatorPathElt::ClosureBodyElement(patternBinding));
+        locator, LocatorPathElt::SyntacticElement(patternBinding));
 
     for (unsigned index : range(patternBinding->getNumPatternEntries())) {
       auto *pattern = TypeChecker::resolvePattern(
@@ -742,7 +742,7 @@ private:
         {makeElement(
             errorExpr,
             cs.getConstraintLocator(
-                locator, LocatorPathElt::ClosureBodyElement(errorExpr)),
+                locator, LocatorPathElt::SyntacticElement(errorExpr)),
             {errType, CTP_ThrowStmt})},
         locator);
   }
@@ -790,7 +790,7 @@ private:
            "Unsupported statement: Switch");
 
     auto *switchLoc = cs.getConstraintLocator(
-        locator, LocatorPathElt::ClosureBodyElement(switchStmt));
+        locator, LocatorPathElt::SyntacticElement(switchStmt));
 
     SmallVector<ElementInfo, 4> elements;
     {
@@ -816,7 +816,7 @@ private:
            "Unsupported statement: DoCatch");
 
     auto *doLoc = cs.getConstraintLocator(
-        locator, LocatorPathElt::ClosureBodyElement(doStmt));
+        locator, LocatorPathElt::SyntacticElement(doStmt));
 
     SmallVector<ElementInfo, 4> elements;
 
@@ -839,7 +839,7 @@ private:
 
     {
       auto parent =
-          locator->castLastElementTo<LocatorPathElt::ClosureBodyElement>()
+          locator->castLastElementTo<LocatorPathElt::SyntacticElement>()
               .getElement();
 
       if (parent.isStmt(StmtKind::Switch)) {
@@ -856,7 +856,7 @@ private:
     bindSwitchCasePatternVars(closure, caseStmt);
 
     auto *caseLoc = cs.getConstraintLocator(
-        locator, LocatorPathElt::ClosureBodyElement(caseStmt));
+        locator, LocatorPathElt::SyntacticElement(caseStmt));
 
     SmallVector<ElementInfo, 4> elements;
     for (auto &caseLabelItem : caseStmt->getMutableCaseLabelItems()) {
@@ -875,7 +875,7 @@ private:
 
       if (isChildOf(StmtKind::Case)) {
         auto *caseStmt = cast<CaseStmt>(
-            locator->castLastElementTo<LocatorPathElt::ClosureBodyElement>()
+            locator->castLastElementTo<LocatorPathElt::SyntacticElement>()
                 .asStmt());
 
         for (auto caseBodyVar : caseStmt->getCaseBodyVariablesOrEmptyArray()) {
@@ -901,7 +901,7 @@ private:
         elements.push_back(makeElement(
             element,
             cs.getConstraintLocator(
-                locator, LocatorPathElt::ClosureBodyElement(element)),
+                locator, LocatorPathElt::SyntacticElement(element)),
             /*contextualInfo=*/{}, isDiscarded));
       }
 
@@ -998,7 +998,7 @@ private:
       return false;
 
     auto parentElt =
-        locator->getLastElementAs<LocatorPathElt::ClosureBodyElement>();
+        locator->getLastElementAs<LocatorPathElt::SyntacticElement>();
     return parentElt ? parentElt->getElement().isStmt(kind) : false;
   }
 };
@@ -1067,14 +1067,14 @@ bool isConditionOfStmt(ConstraintLocatorBuilder locator) {
   if (path.empty())
     return false;
 
-  if (auto closureElt = path.back().getAs<LocatorPathElt::ClosureBodyElement>())
+  if (auto closureElt = path.back().getAs<LocatorPathElt::SyntacticElement>())
     return closureElt->getElement().dyn_cast<Stmt *>();
 
   return false;
 }
 
 ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyClosureBodyElementConstraint(
+ConstraintSystem::simplifySyntacticElementConstraint(
     ASTNode element, ContextualTypeInfo context, bool isDiscarded,
     TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
   auto *closure = castToExpr<ClosureExpr>(locator.getAnchor());
@@ -1711,10 +1711,10 @@ void ConjunctionElement::findReferencedVariables(
   auto referencedVars = Element->getTypeVariables();
   typeVars.insert(referencedVars.begin(), referencedVars.end());
 
-  if (Element->getKind() != ConstraintKind::ClosureBodyElement)
+  if (Element->getKind() != ConstraintKind::SyntacticElement)
     return;
 
-  ASTNode element = Element->getClosureElement();
+  ASTNode element = Element->getSyntacticElement();
   auto *locator = Element->getLocator();
 
   TypeVariableRefFinder refFinder(cs, locator->getAnchor(), typeVars);
