@@ -2096,28 +2096,6 @@ synthesizeMainBody(AbstractFunctionDecl *fn, void *arg) {
   return std::make_pair(body, /*typechecked=*/false);
 }
 
-static FuncDecl *resolveMainFunctionDecl(DeclContext *declContext,
-                                         ResolvedMemberResult &resolution,
-                                         ASTContext &ctx) {
-  // Choose the best overload if it's a main function
-  if (resolution.hasBestOverload()) {
-    ValueDecl *best = resolution.getBestOverload();
-    if (FuncDecl *func = dyn_cast<FuncDecl>(best)) {
-      if (func->isMainTypeMainMethod()) {
-        return func;
-      }
-    }
-  }
-  // Look for the most highly-ranked main-function candidate
-  for (ValueDecl *candidate : resolution.getMemberDecls(Viable)) {
-    if (FuncDecl *func = dyn_cast<FuncDecl>(candidate)) {
-      if (func->isMainTypeMainMethod())
-        return func;
-    }
-  }
-  return nullptr;
-}
-
 FuncDecl *
 SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
                                         Decl *D) const {
@@ -2171,11 +2149,85 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
   // mainType.main() from the entry point, and that would require fully
   // type-checking the call to mainType.main().
 
-  auto resolution = resolveValueMember(
-      *declContext, nominal->getInterfaceType(), context.Id_main,
-      constraints::ConstraintSystemFlags::IgnoreAsyncSyncMismatch);
-  FuncDecl *mainFunction =
-      resolveMainFunctionDecl(declContext, resolution, context);
+  constraints::ConstraintSystem CS(
+      declContext, constraints::ConstraintSystemFlags::IgnoreAsyncSyncMismatch);
+  constraints::ConstraintLocator *locator = CS.getConstraintLocator({});
+  // Allowed main function types
+  // `() -> Void`
+  // `() async -> Void`
+  // `() throws -> Void`
+  // `() async throws -> Void`
+  // `@MainActor () -> Void`
+  // `@MainActor () async -> Void`
+  // `@MainActor () throws -> Void`
+  // `@MainActor () async throws -> Void`
+  {
+    llvm::SmallVector<Type, 8> mainTypes = {
+
+        FunctionType::get(/*params*/ {}, context.TheEmptyTupleType,
+                          ASTExtInfo()),
+        FunctionType::get(
+            /*params*/ {}, context.TheEmptyTupleType,
+            ASTExtInfoBuilder().withAsync().build()),
+
+        FunctionType::get(/*params*/ {}, context.TheEmptyTupleType,
+                          ASTExtInfoBuilder().withThrows().build()),
+
+        FunctionType::get(
+            /*params*/ {}, context.TheEmptyTupleType,
+            ASTExtInfoBuilder().withAsync().withThrows().build())};
+
+    Type mainActor = context.getMainActorType();
+    if (mainActor) {
+      mainTypes.push_back(FunctionType::get(
+          /*params*/ {}, context.TheEmptyTupleType,
+          ASTExtInfoBuilder().withGlobalActor(mainActor).build()));
+      mainTypes.push_back(FunctionType::get(
+          /*params*/ {}, context.TheEmptyTupleType,
+          ASTExtInfoBuilder().withAsync().withGlobalActor(mainActor).build()));
+      mainTypes.push_back(FunctionType::get(
+          /*params*/ {}, context.TheEmptyTupleType,
+          ASTExtInfoBuilder().withThrows().withGlobalActor(mainActor).build()));
+      mainTypes.push_back(FunctionType::get(/*params*/ {},
+                                            context.TheEmptyTupleType,
+                                            ASTExtInfoBuilder()
+                                                .withAsync()
+                                                .withThrows()
+                                                .withGlobalActor(mainActor)
+                                                .build()));
+    }
+
+    llvm::SmallVector<constraints::Constraint *, 4> mainTypeConstraints;
+    for (const Type &mainType : mainTypes) {
+      constraints::Constraint *fnConstraint =
+          constraints::Constraint::createMember(
+              CS, constraints::ConstraintKind::ValueMember,
+              nominal->getInterfaceType(), mainType,
+              DeclNameRef(context.Id_main), declContext,
+              FunctionRefKind::SingleApply, locator);
+      mainTypeConstraints.push_back(fnConstraint);
+    }
+
+    CS.addDisjunctionConstraint(mainTypeConstraints, locator);
+  }
+
+  FuncDecl *mainFunction = nullptr;
+  llvm::SmallVector<constraints::Solution, 4> candidates;
+
+  if (!CS.solve(candidates, FreeTypeVariableBinding::Disallow)) {
+    if (candidates.size() != 1) {
+      context.Diags.diagnose(nominal->getLoc(), diag::ambiguous_decl_ref,
+                             DeclNameRef(context.Id_main));
+      // TODO: CS.diagnoseAmbiguity doesn't report anything because the types
+      // are different. It would be good to get notes on the decls causing the
+      // ambiguity.
+      attr->setInvalid();
+      return nullptr;
+    }
+    mainFunction = dyn_cast<FuncDecl>(
+        candidates[0].overloadChoices[locator].choice.getDecl());
+  }
+
   if (!mainFunction) {
     const bool hasAsyncSupport =
         AvailabilityContext::forDeploymentTarget(context).isContainedIn(
