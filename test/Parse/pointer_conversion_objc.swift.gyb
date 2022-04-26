@@ -72,5 +72,5 @@ func autoreleasingPointerArguments(p: UnsafeMutablePointer<Int>,
   // expected-note@-1 {{arguments to generic parameter 'Pointee' ('[C]' and 'C') are expected to be equal}}
   takesAutoreleasingPointer(&dd) // expected-error{{cannot convert value of type 'AutoreleasingUnsafeMutablePointer<[D]>' to expected argument type 'AutoreleasingUnsafeMutablePointer<C>'}}
   // expected-note@-1 {{arguments to generic parameter 'Pointee' ('[D]' and 'C') are expected to be equal}}
-  let _: AutoreleasingUnsafeMutablePointer<C> = &c // expected-error {{use of extraneous '&'}}
+  let _: AutoreleasingUnsafeMutablePointer<C> = &c // expected-error {{'&' may only be used to pass an argument to inout parameter}}
 }
