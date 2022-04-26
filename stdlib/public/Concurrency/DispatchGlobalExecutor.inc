@@ -24,21 +24,9 @@
 
 #if SWIFT_CONCURRENCY_ENABLE_DISPATCH
 #include <dispatch/dispatch.h>
-#if __has_include(<dispatch/private.h>)
-#include <dispatch/private.h>
-#else
-DISPATCH_ENUM(dispatch_clockid, uintptr_t,
-  DISPATCH_CLOCKID_UPTIME = 1,
-  DISPATCH_CLOCKID_MONOTONIC = 2,
-  DISPATCH_CLOCKID_WALLTIME = 3,
-  DISPATCH_CLOCKID_REALTIME = 3,
-);
-#endif
-
 #if !defined(_WIN32)
 #include <dlfcn.h>
 #endif
-
 #endif
 
 // Ensure that Job's layout is compatible with what Dispatch expects.
@@ -244,10 +232,12 @@ struct __swift_job_source {
   Job *job;
 };
 
-static void __swift_run_job_leeway(struct __swift_job_source *jobSource) {
+static void _swift_run_job_leeway(struct __swift_job_source *jobSource) {
   dispatch_source_t source = jobSource->source;
   Job *job = jobSource->job;
-  free(jobSource);
+  auto task = dyn_cast<AsyncTask>(job);
+  assert(task && "provided job must be a task");
+  _swift_task_dealloc_specific(task, jobSource);
   __swift_run_job(job);
   dispatch_release(source);
 }
@@ -310,6 +300,9 @@ static void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
                                                      long long tnsec,
                                                      int clock, Job *job) {
   assert(job && "no job provided");
+  auto task = dyn_cast<AsyncTask>(job);
+  assert(task && "provided job must be a task");
+
   JobPriority priority = job->getPriority();
 
   auto queue = getGlobalQueue(priority);
@@ -317,37 +310,33 @@ static void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
   job->SchedulerPrivate[Job::DispatchQueueIndex] =
       DISPATCH_QUEUE_GLOBAL_EXECUTOR;
 
-  dispatch_clockid_t dispatchClock;
-  if (clock == swift_clock_id_continuous) {
-    dispatchClock = DISPATCH_CLOCKID_MONOTONIC;
-  } else {
-    dispatchClock = DISPATCH_CLOCKID_UPTIME;
-  }
   uint64_t deadline = sec * NSEC_PER_SEC + nsec;
   dispatch_time_t when = clock_and_value_to_time(clock, deadline);
-  
+  dispatch_function_t dispatchFunction = 
+    (dispatch_function_t)&_swift_run_job_leeway;
+
   if (tnsec != -1) {
     uint64_t leeway = tsec * NSEC_PER_SEC + tnsec;
 
     dispatch_source_t source = 
       dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, queue);
+    dispatch_source_set_timer(source, when, DISPATCH_TIME_FOREVER, leeway);
+
+    size_t sz = sizeof(struct __swift_job_source);
     
     struct __swift_job_source *jobSource = 
-      (struct __swift_job_source *)malloc(sizeof(struct __swift_job_source));
+        (struct __swift_job_source *)_swift_task_alloc_specific(task, sz);
+    
     jobSource->job = job;
     jobSource->source = source;
 
     dispatch_set_context(source, jobSource);
-    dispatch_source_set_timer(source, when, 
-                              DISPATCH_TIME_FOREVER, leeway);
-    dispatch_source_set_event_handler_f(source, 
-                                  (dispatch_function_t)&__swift_run_job_leeway);
-    
+    dispatch_source_set_event_handler_f(source, dispatchFunction);
+
     dispatch_activate(source);
   } else {
-    dispatch_function_t dispatchFunction = &__swift_run_job;
-    void *dispatchContext = job;
-    dispatch_after_f(when, queue, dispatchContext, dispatchFunction);
+    dispatchFunction = &__swift_run_job;
+    dispatch_after_f(when, queue, (void *)job, dispatchFunction);
   }
 }
 
