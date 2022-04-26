@@ -68,7 +68,7 @@ void swift_get_time(
     case swift_clock_id_suspending: {
 #if defined(__linux__) && HAS_TIME
       struct timespec suspending;
-      clock_gettime(CLOCK_MONOTONIC_RAW, &suspending);
+      clock_gettime(CLOCK_MONOTONIC, &suspending);
       *seconds = suspending.tv_sec;
       *nanoseconds = suspending.tv_nsec;
 #elif defined(__APPLE__) && HAS_TIME
