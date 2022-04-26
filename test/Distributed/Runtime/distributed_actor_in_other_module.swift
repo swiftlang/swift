@@ -15,6 +15,8 @@
 // FIXME(distributed): Distributed actors currently have some issues on windows, isRemote always returns false. rdar://82593574
 // UNSUPPORTED: windows
 
+// REQUIRES: rdar92277324
+
 import Distributed
 import EchoActorModule
 import FakeDistributedActorSystems
