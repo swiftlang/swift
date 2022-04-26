@@ -194,6 +194,10 @@ private:
       RemoteRef<const TargetContextDescriptor<Runtime>>;
   using OwnedContextDescriptorRef = MemoryReader::ReadBytesResult;
 
+  using ShapeRef =
+      RemoteRef<const TargetExtendedExistentialTypeShape<Runtime>>;
+  using OwnedShapeRef = MemoryReader::ReadBytesResult;
+
   /// A reference to a context descriptor that may be in an unloaded image.
   class ParentContextDescriptorRef {
     bool IsResolved;
@@ -263,6 +267,7 @@ private:
       return !isResolved() || getResolved();
     }
   };
+
   /// A cache of read nominal type descriptors, keyed by the address of the
   /// nominal type descriptor.
   std::unordered_map<StoredPointer, OwnedContextDescriptorRef>
@@ -270,6 +275,10 @@ private:
 
   using OwnedProtocolDescriptorRef =
     std::unique_ptr<const TargetProtocolDescriptor<Runtime>, delete_with_free>;
+  /// A cache of read extended existential shape metadata, keyed by the
+  /// address of the shape metadata.
+  std::unordered_map<StoredPointer, OwnedShapeRef>
+    ShapeCache;
 
   enum class IsaEncodingKind {
     /// We haven't checked yet.
@@ -1011,7 +1020,62 @@ public:
     return ParentContextDescriptorRef(
           readContextDescriptor(address.getResolvedAddress().getAddressData()));
   }
-  
+
+  ShapeRef
+  readShape(StoredPointer address) {
+    if (address == 0)
+      return nullptr;
+
+    auto cached = ShapeCache.find(address);
+    if (cached != ShapeCache.end())
+      return ShapeRef(address,
+        reinterpret_cast<const TargetExtendedExistentialTypeShape<Runtime> *>(
+            cached->second.get()));
+
+    ExtendedExistentialTypeShapeFlags flags;
+    if (!Reader->readBytes(RemoteAddress(address), (uint8_t*)&flags,
+                           sizeof(flags)))
+      return nullptr;
+
+    // Read the size of the requirement signature.
+    uint64_t reqSigGenericSize = 0;
+    uint64_t genericHeaderSize = sizeof(GenericContextDescriptorHeader);
+    {
+      GenericContextDescriptorHeader header;
+      auto headerAddr = address + sizeof(flags);
+
+      if (!Reader->readBytes(RemoteAddress(headerAddr),
+                             (uint8_t*)&header, sizeof(header)))
+        return nullptr;
+
+      reqSigGenericSize = reqSigGenericSize
+        + (header.NumParams + 3u & ~3u)
+        + header.NumRequirements
+          * sizeof(TargetGenericRequirementDescriptor<Runtime>);
+    }
+    uint64_t typeExprSize = flags.hasTypeExpression() ? sizeof(StoredPointer) : 0;
+    uint64_t suggestedVWSize = flags.hasSuggestedValueWitnesses() ? sizeof(StoredPointer) : 0;
+
+    uint64_t size = sizeof(ExtendedExistentialTypeShapeFlags) +
+                    sizeof(TargetRelativeDirectPointer<Runtime, const char,
+                                                       /*nullable*/ false>) +
+                    genericHeaderSize + typeExprSize + suggestedVWSize +
+                    reqSigGenericSize;
+    if (size > MaxMetadataSize)
+      return nullptr;
+    auto readResult = Reader->readBytes(RemoteAddress(address), size);
+    if (!readResult)
+      return nullptr;
+
+    auto descriptor =
+        reinterpret_cast<const TargetExtendedExistentialTypeShape<Runtime> *>(
+            readResult.get());
+
+    ShapeCache.insert(
+        std::make_pair(address, std::move(readResult)));
+    return ShapeRef(address, descriptor);
+  }
+
   /// Given the address of a context descriptor, attempt to read it.
   ContextDescriptorRef
   readContextDescriptor(StoredPointer address) {
