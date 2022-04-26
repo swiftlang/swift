@@ -124,8 +124,8 @@ char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
     if (szBufferSize == 0) {
       swift::fatalError(0,
                         "Fatal error: Could not retrieve commandline "
-                        "arguments: %u\n",
-                        GetLastError());
+                        "argument %d: %lu\n",
+                        i, GetLastError());
       return nullptr;
     }
 
@@ -133,8 +133,9 @@ char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
         calloc(static_cast<size_t>(szBufferSize), sizeof(char)));
     if (buffer == nullptr) {
       swift::fatalError(0,
-                        "Fatal error: Could not allocate space for commandline"
-                        "arguments");
+                        "Fatal error: Could not allocate space for commandline "
+                        "argument %d: %d\n",
+                        i, errno);
       return nullptr;
     }
 
@@ -142,7 +143,8 @@ char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
                              buffer, szBufferSize, nullptr, nullptr)) {
       swift::fatalError(0,
                         "Fatal error: Conversion to UTF-8 failed for "
-                        "commandline arguments");
+                        "commandline argument %d: %lu\n",
+                        i, GetLastError());
       return nullptr;
     }
 
