@@ -95,7 +95,7 @@ if #available(iOS 9.0, *) {
       // expected-note@-1 {{add 'if #available' version check}}
 }
 
-// Multiple unavailable references in a single statement
+// Multiple potentially unavailable references in a single statement
 
 let ignored4: (Int, Int) = (globalFuncAvailableOn10_51(), globalFuncAvailableOn10_52()) // expected-error {{'globalFuncAvailableOn10_51()' is only available in macOS 10.51 or newer}}  expected-error {{'globalFuncAvailableOn10_52()' is only available in macOS 10.52 or newer}}
     // expected-note@-1 2{{add 'if #available' version check}}
@@ -120,9 +120,9 @@ overloadedFunction()
 overloadedFunction(0) // expected-error {{'overloadedFunction' is only available in macOS 10.51 or newer}}
     // expected-note@-1 {{add 'if #available' version check}}
 
-// Unavailable methods
+// Potentially unavailable methods
 
-class ClassWithUnavailableMethod {
+class ClassWithPotentiallyUnavailableMethod {
     // expected-note@-1 {{add @available attribute to enclosing class}}
 
   @available(OSX, introduced: 10.9)
@@ -143,7 +143,7 @@ class ClassWithUnavailableMethod {
   }
 }
 
-func callUnavailableMethods(_ o: ClassWithUnavailableMethod) {
+func callPotentiallyUnavailableMethods(_ o: ClassWithPotentiallyUnavailableMethod) {
       // expected-note@-1 2{{add @available attribute to enclosing global function}}
 
   let m10_9 = o.methAvailableOn10_9
@@ -159,7 +159,7 @@ func callUnavailableMethods(_ o: ClassWithUnavailableMethod) {
       // expected-note@-1 {{add 'if #available' version check}}
 }
 
-func callUnavailableMethodsViaIUO(_ o: ClassWithUnavailableMethod!) {
+func callPotentiallyUnavailableMethodsViaIUO(_ o: ClassWithPotentiallyUnavailableMethod!) {
       // expected-note@-1 2{{add @available attribute to enclosing global function}}
 
   let m10_9 = o.methAvailableOn10_9
@@ -176,19 +176,19 @@ func callUnavailableMethodsViaIUO(_ o: ClassWithUnavailableMethod!) {
       // expected-note@-1 {{add 'if #available' version check}}
 }
 
-func callUnavailableClassMethod() {
+func callPotentiallyUnavailableClassMethod() {
       // expected-note@-1 2{{add @available attribute to enclosing global function}}
 
-  ClassWithUnavailableMethod.classMethAvailableOn10_51() // expected-error {{'classMethAvailableOn10_51()' is only available in macOS 10.51 or newer}}
+  ClassWithPotentiallyUnavailableMethod.classMethAvailableOn10_51() // expected-error {{'classMethAvailableOn10_51()' is only available in macOS 10.51 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
   
-  let m10_51 = ClassWithUnavailableMethod.classMethAvailableOn10_51 // expected-error {{'classMethAvailableOn10_51()' is only available in macOS 10.51 or newer}}
+  let m10_51 = ClassWithPotentiallyUnavailableMethod.classMethAvailableOn10_51 // expected-error {{'classMethAvailableOn10_51()' is only available in macOS 10.51 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
 
   m10_51()
 }
 
-class SubClassWithUnavailableMethod : ClassWithUnavailableMethod {
+class SubClassWithPotentiallyUnavailableMethod : ClassWithPotentiallyUnavailableMethod {
         // expected-note@-1 {{add @available attribute to enclosing class}}
   func someMethod() {
         // expected-note@-1 {{add @available attribute to enclosing instance method}}
@@ -199,7 +199,7 @@ class SubClassWithUnavailableMethod : ClassWithUnavailableMethod {
   }
 }
 
-class SubClassOverridingUnavailableMethod : ClassWithUnavailableMethod {
+class SubClassOverridingPotentiallyUnavailableMethod : ClassWithPotentiallyUnavailableMethod {
         // expected-note@-1 2{{add @available attribute to enclosing class}}
 
   override func methAvailableOn10_51() {
@@ -223,7 +223,7 @@ class SubClassOverridingUnavailableMethod : ClassWithUnavailableMethod {
   }
 }
 
-class ClassWithUnavailableOverloadedMethod {
+class ClassWithPotentiallyUnavailableOverloadedMethod {
   @available(OSX, introduced: 10.9)
   func overloadedMethod() {}
 
@@ -231,7 +231,7 @@ class ClassWithUnavailableOverloadedMethod {
   func overloadedMethod(_ on1010: Int) {}
 }
 
-func callUnavailableOverloadedMethod(_ o: ClassWithUnavailableOverloadedMethod) {
+func callPotentiallyUnavailableOverloadedMethod(_ o: ClassWithPotentiallyUnavailableOverloadedMethod) {
       // expected-note@-1 {{add @available attribute to enclosing global function}}
 
   o.overloadedMethod()
@@ -241,7 +241,7 @@ func callUnavailableOverloadedMethod(_ o: ClassWithUnavailableOverloadedMethod) 
 
 // Initializers
 
-class ClassWithUnavailableInitializer {
+class ClassWithPotentiallyUnavailableInitializer {
     // expected-note@-1 {{add @available attribute to enclosing class}}
 
   @available(OSX, introduced: 10.9)
@@ -263,20 +263,20 @@ class ClassWithUnavailableInitializer {
   }
 }
 
-func callUnavailableInitializer() {
+func callPotentiallyUnavailableInitializer() {
       // expected-note@-1 2{{add @available attribute to enclosing global function}}
 
-  _ = ClassWithUnavailableInitializer()
-  _ = ClassWithUnavailableInitializer(5) // expected-error {{'init(_:)' is only available in macOS 10.51 or newer}}
+  _ = ClassWithPotentiallyUnavailableInitializer()
+  _ = ClassWithPotentiallyUnavailableInitializer(5) // expected-error {{'init(_:)' is only available in macOS 10.51 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
   
-  let i = ClassWithUnavailableInitializer.self 
+  let i = ClassWithPotentiallyUnavailableInitializer.self
   _ = i.init()
   _ = i.init(5) // expected-error {{'init(_:)' is only available in macOS 10.51 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
 }
 
-class SuperWithWithUnavailableInitializer {
+class SuperWithWithPotentiallyUnavailableInitializer {
   @available(OSX, introduced: 10.9)
   init() {  }
   
@@ -284,7 +284,7 @@ class SuperWithWithUnavailableInitializer {
   init(_ val: Int) {  }
 }
 
-class SubOfClassWithUnavailableInitializer : SuperWithWithUnavailableInitializer {
+class SubOfClassWithPotentiallyUnavailableInitializer : SuperWithWithPotentiallyUnavailableInitializer {
     // expected-note@-1 {{add @available attribute to enclosing class}}
 
   override init(_ val: Int) {
@@ -306,7 +306,7 @@ class SubOfClassWithUnavailableInitializer : SuperWithWithUnavailableInitializer
 
 // Properties
 
-class ClassWithUnavailableProperties {
+class ClassWithPotentiallyUnavailableProperties {
     // expected-note@-1 4{{add @available attribute to enclosing class}}
 
   var nonLazyAvailableOn10_9Stored: Int = 9
@@ -319,7 +319,7 @@ class ClassWithUnavailableProperties {
 
   // Make sure that we don't emit a Fix-It to mark a stored property as potentially unavailable.
   // We don't support potentially unavailable stored properties yet.
-  var storedPropertyOfUnavailableType: ClassAvailableOn10_51? = nil // expected-error {{'ClassAvailableOn10_51' is only available in macOS 10.51 or newer}}
+  var storedPropertyOfPotentiallyUnavailableType: ClassAvailableOn10_51? = nil // expected-error {{'ClassAvailableOn10_51' is only available in macOS 10.51 or newer}}
 
   @available(OSX, introduced: 10.9)
   lazy var availableOn10_9Stored: Int = 9
@@ -390,19 +390,19 @@ class ClassWithUnavailableProperties {
     }
   }
   
-  var propWithSetterOnlyAvailableOn10_51ForNestedMemberRef : ClassWithUnavailableProperties {
+  var propWithSetterOnlyAvailableOn10_51ForNestedMemberRef : ClassWithPotentiallyUnavailableProperties {
     get {
-      return ClassWithUnavailableProperties()
+      return ClassWithPotentiallyUnavailableProperties()
     }
     @available(OSX, introduced: 10.51)
     set(newVal) {
     }
   }
   
-  var propWithGetterOnlyAvailableOn10_51ForNestedMemberRef : ClassWithUnavailableProperties {
+  var propWithGetterOnlyAvailableOn10_51ForNestedMemberRef : ClassWithPotentiallyUnavailableProperties {
     @available(OSX, introduced: 10.51)
     get {
-      return ClassWithUnavailableProperties()
+      return ClassWithPotentiallyUnavailableProperties()
     }
     set(newVal) {
     }
@@ -420,7 +420,7 @@ class ClassWithReferencesInInitializers {
   lazy var lazyPropWithInitializer10_52: Int = globalFuncAvailableOn10_52() // expected-error {{'globalFuncAvailableOn10_52()' is only available in macOS 10.52 or newer}}
 }
 
-func accessUnavailableProperties(_ o: ClassWithUnavailableProperties) {
+func accessPotentiallyUnavailableProperties(_ o: ClassWithPotentiallyUnavailableProperties) {
       // expected-note@-1 17{{add @available attribute to enclosing global function}}
   // Stored properties
   let _: Int = o.availableOn10_9Stored
@@ -544,9 +544,9 @@ enum CompassPoint {
   @available(OSX, introduced: 10.52)
   case WithAvailableByEnumElementPayload1(p : EnumIntroducedOn10_52), WithAvailableByEnumElementPayload2(p : EnumIntroducedOn10_52)
 
-  case WithUnavailablePayload(p : EnumIntroducedOn10_52) // expected-error {{'EnumIntroducedOn10_52' is only available in macOS 10.52 or newer}}
+  case WithPotentiallyUnavailablePayload(p : EnumIntroducedOn10_52) // expected-error {{'EnumIntroducedOn10_52' is only available in macOS 10.52 or newer}}
 
-  case WithUnavailablePayload1(p : EnumIntroducedOn10_52), WithUnavailablePayload2(p : EnumIntroducedOn10_52) // expected-error 2{{'EnumIntroducedOn10_52' is only available in macOS 10.52 or newer}}
+  case WithPotentiallyUnavailablePayload1(p : EnumIntroducedOn10_52), WithPotentiallyUnavailablePayload2(p : EnumIntroducedOn10_52) // expected-error 2{{'EnumIntroducedOn10_52' is only available in macOS 10.52 or newer}}
 }
 
 @available(OSX, introduced: 10.52)
@@ -577,12 +577,12 @@ func useEnums() {
       case .West: // We do not expect an error here
         markUsed("W")
 
-      case .WithUnavailablePayload(_):
-        markUsed("WithUnavailablePayload")
-      case .WithUnavailablePayload1(_):
-        markUsed("WithUnavailablePayload1")
-      case .WithUnavailablePayload2(_):
-        markUsed("WithUnavailablePayload2")
+      case .WithPotentiallyUnavailablePayload(_):
+        markUsed("WithPotentiallyUnavailablePayload")
+      case .WithPotentiallyUnavailablePayload1(_):
+        markUsed("WithPotentiallyUnavailablePayload1")
+      case .WithPotentiallyUnavailablePayload2(_):
+        markUsed("WithPotentiallyUnavailablePayload2")
 
       case .WithAvailableByEnumPayload(_):
         markUsed("WithAvailableByEnumPayload")
@@ -650,7 +650,7 @@ func classAvailability() {
   let _ = o10_51.someProp 
 }
 
-func castingUnavailableClass(_ o : AnyObject) {
+func castingPotentiallyUnavailableClass(_ o : AnyObject) {
       // expected-note@-1 3{{add @available attribute to enclosing global function}}
   let _ = o as! ClassAvailableOn10_51 // expected-error {{'ClassAvailableOn10_51' is only available in macOS 10.51 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
@@ -709,31 +709,30 @@ func classViaTypeParameter() {
 
 }
 
-// Unavailable class used in declarations
+// Potentially unavailable class used in declarations
 
-class ClassWithDeclarationsOfUnavailableClasses {
+class ClassWithDeclarationsOfPotentiallyUnavailableClasses {
       // expected-note@-1 5{{add @available attribute to enclosing class}}
 
   @available(OSX, introduced: 10.51)
   init() {}
 
-  var propertyOfUnavailableType: ClassAvailableOn10_51 // expected-error {{'ClassAvailableOn10_51' is only available in macOS 10.51 or newer}}
+  var propertyOfPotentiallyUnavailableType: ClassAvailableOn10_51 // expected-error {{'ClassAvailableOn10_51' is only available in macOS 10.51 or newer}}
   
   @available(OSX, introduced: 10.51)
-  static var unavailableStaticPropertyOfUnavailableType: ClassAvailableOn10_51 = ClassAvailableOn10_51()
+  static var potentiallyUnavailableStaticPropertyOfPotentiallyUnavailableType: ClassAvailableOn10_51 = ClassAvailableOn10_51()
 
   @available(OSX, introduced: 10.51)
-  static var unavailableStaticPropertyOfOptionalUnavailableType: ClassAvailableOn10_51?
+  static var potentiallyUnavailableStaticPropertyOfOptionalPotentiallyUnavailableType: ClassAvailableOn10_51?
 
-  func methodWithUnavailableParameterType(_ o : ClassAvailableOn10_51) { // expected-error {{'ClassAvailableOn10_51' is only available in macOS 10.51 or newer}}
+  func methodWithPotentiallyUnavailableParameterType(_ o : ClassAvailableOn10_51) { // expected-error {{'ClassAvailableOn10_51' is only available in macOS 10.51 or newer}}
       // expected-note@-1 {{add @available attribute to enclosing instance method}}
   }
   
   @available(OSX, introduced: 10.51)
-  func unavailableMethodWithUnavailableParameterType(_ o : ClassAvailableOn10_51) {
-  }
+  func potentiallyUnavailableMethodWithPotentiallyUnavailableParameterType(_ o : ClassAvailableOn10_51) {}
   
-  func methodWithUnavailableReturnType() -> ClassAvailableOn10_51 { // expected-error {{'ClassAvailableOn10_51' is only available in macOS 10.51 or newer}}
+  func methodWithPotentiallyUnavailableReturnType() -> ClassAvailableOn10_51 { // expected-error {{'ClassAvailableOn10_51' is only available in macOS 10.51 or newer}}
       // expected-note@-1 2{{add @available attribute to enclosing instance method}}
 
     return ClassAvailableOn10_51() // expected-error {{'ClassAvailableOn10_51' is only available in macOS 10.51 or newer}}
@@ -741,34 +740,34 @@ class ClassWithDeclarationsOfUnavailableClasses {
   }
   
   @available(OSX, introduced: 10.51)
-  func unavailableMethodWithUnavailableReturnType() -> ClassAvailableOn10_51 {
+  func potentiallyUnavailableMethodWithPotentiallyUnavailableReturnType() -> ClassAvailableOn10_51 {
     return ClassAvailableOn10_51()
   }
 
-  func methodWithUnavailableLocalDeclaration() {
+  func methodWithPotentiallyUnavailableLocalDeclaration() {
       // expected-note@-1 {{add @available attribute to enclosing instance method}}
-    let _ : ClassAvailableOn10_51 = methodWithUnavailableReturnType() // expected-error {{'ClassAvailableOn10_51' is only available in macOS 10.51 or newer}}
+    let _ : ClassAvailableOn10_51 = methodWithPotentiallyUnavailableReturnType() // expected-error {{'ClassAvailableOn10_51' is only available in macOS 10.51 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
   }
   
   @available(OSX, introduced: 10.51)
-  func unavailableMethodWithUnavailableLocalDeclaration() {
-    let _ : ClassAvailableOn10_51 = methodWithUnavailableReturnType()
+  func potentiallyUnavailableMethodWithPotentiallyUnavailableLocalDeclaration() {
+    let _ : ClassAvailableOn10_51 = methodWithPotentiallyUnavailableReturnType()
   }
 }
 
-func referToUnavailableStaticProperty() {
+func referToPotentiallyUnavailableStaticProperty() {
       // expected-note@-1 {{add @available attribute to enclosing global function}}
-  let _ = ClassWithDeclarationsOfUnavailableClasses.unavailableStaticPropertyOfUnavailableType // expected-error {{'unavailableStaticPropertyOfUnavailableType' is only available in macOS 10.51 or newer}}
+  let _ = ClassWithDeclarationsOfPotentiallyUnavailableClasses.potentiallyUnavailableStaticPropertyOfPotentiallyUnavailableType // expected-error {{'potentiallyUnavailableStaticPropertyOfPotentiallyUnavailableType' is only available in macOS 10.51 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
 }
 
-class ClassExtendingUnavailableClass : ClassAvailableOn10_51 { // expected-error {{'ClassAvailableOn10_51' is only available in macOS 10.51 or newer}}
+class ClassExtendingPotentiallyUnavailableClass : ClassAvailableOn10_51 { // expected-error {{'ClassAvailableOn10_51' is only available in macOS 10.51 or newer}}
     // expected-note@-1 {{add @available attribute to enclosing class}}
 }
 
 @available(OSX, introduced: 10.51)
-class UnavailableClassExtendingUnavailableClass : ClassAvailableOn10_51 {
+class PotentiallyUnavailableClassExtendingPotentiallyUnavailableClass : ClassAvailableOn10_51 {
 }
 
 // Method availability is contravariant
@@ -885,7 +884,7 @@ class SubclassAvailableOn10_9OfClassAvailableOn10_51 : ClassAvailableOn10_51 { /
 class ClassAvailableOn10_9AdoptingProtocolAvailableOn10_51 : ProtocolAvailableOn10_51 {
 }
 
-func castToUnavailableProtocol() {
+func castToPotentiallyUnavailableProtocol() {
       // expected-note@-1 2{{add @available attribute to enclosing global function}}
   let o: ClassAvailableOn10_9AdoptingProtocolAvailableOn10_51 = ClassAvailableOn10_9AdoptingProtocolAvailableOn10_51()
 
@@ -967,7 +966,7 @@ extension ClassToExtend { // expected-note {{enclosing scope here}}
   func extensionMethod10_9() { }
 }
 
-func useUnavailableExtension() {
+func usePotentiallyUnavailableExtension() {
       // expected-note@-1 3{{add @available attribute to enclosing global function}}
   let o = ClassToExtend()
 
@@ -1318,10 +1317,10 @@ extension ClassToExtend {
 
 enum EnumForFixit {
       // expected-note@-1 2{{add @available attribute to enclosing enum}} {{1-1=@available(macOS 10.51, *)\n}}
-  case CaseWithUnavailablePayload(p: ClassAvailableOn10_51)
+  case CaseWithPotentiallyUnavailablePayload(p: ClassAvailableOn10_51)
       // expected-error@-1 {{'ClassAvailableOn10_51' is only available in macOS 10.51 or newer}}
 
-  case CaseWithUnavailablePayload2(p: ClassAvailableOn10_51), WithoutPayload
+  case CaseWithPotentiallyUnavailablePayload2(p: ClassAvailableOn10_51), WithoutPayload
       // expected-error@-1 {{'ClassAvailableOn10_51' is only available in macOS 10.51 or newer}}
       
 }
@@ -1354,17 +1353,17 @@ func testForFixitWithNestedMemberRefExpr() {
 
 // Protocol Conformances
 
-protocol ProtocolWithRequirementMentioningUnavailable {
+protocol ProtocolWithRequirementMentioningPotentiallyUnavailable {
       // expected-note@-1 2{{add @available attribute to enclosing protocol}}
-  func hasUnavailableParameter(_ p: ClassAvailableOn10_51) // expected-error * {{'ClassAvailableOn10_51' is only available in macOS 10.51 or newer}}
+  func hasPotentiallyUnavailableParameter(_ p: ClassAvailableOn10_51) // expected-error * {{'ClassAvailableOn10_51' is only available in macOS 10.51 or newer}}
       // expected-note@-1 * {{add @available attribute to enclosing instance method}}
       
 
-  func hasUnavailableReturn() -> ClassAvailableOn10_51 // expected-error * {{'ClassAvailableOn10_51' is only available in macOS 10.51 or newer}}
+  func hasPotentiallyUnavailableReturn() -> ClassAvailableOn10_51 // expected-error * {{'ClassAvailableOn10_51' is only available in macOS 10.51 or newer}}
       // expected-note@-1 * {{add @available attribute to enclosing instance method}}
 
   @available(OSX 10.51, *)
-  func hasUnavailableWithAnnotation(_ p: ClassAvailableOn10_51) -> ClassAvailableOn10_51
+  func hasPotentiallyUnavailableWithAnnotation(_ p: ClassAvailableOn10_51) -> ClassAvailableOn10_51
 }
 
 protocol HasMethodF {
@@ -1390,12 +1389,12 @@ class SuperHasMethodF {
     func f(_ p: Int) { } // expected-note {{'f' declared here}}
 }
 
-class TriesToConformWithUnavailableFunctionInSuperClass : SuperHasMethodF, HasMethodF { // expected-error {{protocol 'HasMethodF' requires 'f' to be available in macOS 10.50.0 and newer}}
+class TriesToConformWithPotentiallyUnavailableFunctionInSuperClass : SuperHasMethodF, HasMethodF { // expected-error {{protocol 'HasMethodF' requires 'f' to be available in macOS 10.50.0 and newer}}
   // The conformance here is generating an error on f in the super class.
 }
 
 @available(OSX, introduced: 10.51)
-class ConformsWithUnavailableFunctionInSuperClass : SuperHasMethodF, HasMethodF {
+class ConformsWithPotentiallyUnavailableFunctionInSuperClass : SuperHasMethodF, HasMethodF {
   // Limiting this class to only be available on 10.51 and newer means that
   // the witness in SuperHasMethodF is safe for the requirement on HasMethodF.
   // in order for this class to be referenced we must be running on 10.51 or
@@ -1438,7 +1437,7 @@ protocol HasMethodFOn10_51 {
   func f(_ p: Int)
 }
 
-class ConformsToUnavailableProtocolWithUnavailableWitness : HasMethodFOn10_51 {
+class ConformsToPotentiallyUnavailableProtocolWithPotentiallyUnavailableWitness : HasMethodFOn10_51 {
   @available(OSX, introduced: 10.51)
   func f(_ p: Int) { }
 }
@@ -1495,23 +1494,23 @@ class TestAvailabilityAffectsWitnessCandidacy : HasMethodF {
   func f<T>(_ p: T) { }
 }
 
-protocol HasUnavailableMethodF {
+protocol HasPotentiallyUnavailableMethodF {
   @available(OSX, introduced: 10.51)
   func f(_ p: String)
 }
 
-class ConformsWithUnavailableFunction : HasUnavailableMethodF {
+class ConformsWithPotentiallyUnavailableFunction : HasPotentiallyUnavailableMethodF {
   @available(OSX, introduced: 10.9)
   func f(_ p: String) { }
 }
 
-func useUnavailableProtocolMethod(_ h: HasUnavailableMethodF) {
+func usePotentiallyUnavailableProtocolMethod(_ h: HasPotentiallyUnavailableMethodF) {
       // expected-note@-1 {{add @available attribute to enclosing global function}}
   h.f("Foo") // expected-error {{'f' is only available in macOS 10.51 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
 }
 
-func useUnavailableProtocolMethod<H : HasUnavailableMethodF> (_ h: H) {
+func usePotentiallyUnavailableProtocolMethod<H : HasPotentiallyUnavailableMethodF> (_ h: H) {
       // expected-note@-1 {{add @available attribute to enclosing global function}}
   h.f("Foo") // expected-error {{'f' is only available in macOS 10.51 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
