@@ -86,12 +86,6 @@ swift::ImplicitGenericParamDescriptors[MaxNumImplicitGenericParamDescriptors] = 
 };
 static_assert(MaxNumImplicitGenericParamDescriptors == 64, "length mismatch");
 
-template <>
-const GenericParamDescriptor *
-swift::targetImplicitGenericParamDescriptors<InProcess>() {
-  return ImplicitGenericParamDescriptors;
-}
-
 static ClassMetadata *
 _swift_relocateClassMetadata(const ClassDescriptor *description,
                              const ResilientClassMetadataPattern *pattern);

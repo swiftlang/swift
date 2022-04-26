@@ -929,6 +929,85 @@ public:
       TypeCache[MetadataAddress] = BuiltExist;
       return BuiltExist;
     }
+    case MetadataKind::ExtendedExistential: {
+      auto Exist = cast<TargetExtendedExistentialTypeMetadata<Runtime>>(Meta);
+
+      // Read the shape for this existential.
+      StoredPointer shapeAddress = stripSignedPointer(Exist->Shape);
+      ShapeRef Shape = readShape(shapeAddress);
+      if (!Shape)
+        return BuiltType();
+
+      const unsigned shapeArgumentCount
+          = Shape->getGenSigArgumentLayoutSizeInWords();
+      // Pull out the arguments to the generalization signature.
+      assert(Shape->hasGeneralizationSignature());
+      std::vector<BuiltType> builtArgs;
+      for (unsigned i = 0; i < shapeArgumentCount; ++i) {
+        auto remoteArg = Exist->getGeneralizationArguments()[i];
+        auto builtArg = readTypeFromMetadata(remoteArg);
+        if (!builtArg)
+          return BuiltType();
+        builtArgs.push_back(builtArg);
+      }
+
+      // Pull out the existential type from the mangled type name.
+      Demangler dem;
+      auto mangledExistentialAddr =
+          resolveRelativeField(Shape, Shape->ExistentialType);
+      auto node = readMangledName(RemoteAddress(mangledExistentialAddr),
+                                  MangledNameKind::Type, dem);
+      if (!node)
+        return BuiltType();
+
+      BuiltType builtProto = decodeMangledType(node).getType();
+      if (!builtProto)
+        return BuiltType();
+
+      // Build up a substitution map for the generalized signature.
+      BuiltGenericSignature sig =
+          decodeRuntimeGenericSignature(Shape,
+                                        Shape->getGeneralizationSignature())
+              .getType();
+      if (!sig)
+        return BuiltType();
+
+      BuiltSubstitutionMap subst =
+          Builder.createSubstitutionMap(sig, builtArgs);
+      if (subst.empty())
+        return BuiltType();
+
+      builtProto = Builder.subst(builtProto, subst);
+      if (!builtProto)
+        return BuiltType();
+
+      // Read the type expression to build up any remaining layers of
+      // existential metatype.
+      if (Shape->Flags.hasTypeExpression()) {
+        Demangler dem;
+
+        // Read the mangled name.
+        auto mangledContextName = Shape->getTypeExpression();
+        auto mangledNameAddress =
+            resolveRelativeField(Shape, mangledContextName->name);
+        auto node = readMangledName(RemoteAddress(mangledNameAddress),
+                                    MangledNameKind::Type, dem);
+        if (!node)
+          return BuiltType();
+
+        while (node->getKind() == Demangle::Node::Kind::Type &&
+               node->getNumChildren() &&
+               node->getChild(0)->getKind() == Demangle::Node::Kind::Metatype &&
+               node->getChild(0)->getNumChildren()) {
+          builtProto = Builder.createExistentialMetatypeType(builtProto);
+          node = node->getChild(0)->getChild(0);
+        }
+      }
+
+      TypeCache[MetadataAddress] = builtProto;
+      return builtProto;
+    }
+
     case MetadataKind::Metatype: {
       auto Metatype = cast<TargetMetatypeMetadata<Runtime>>(Meta);
       auto Instance = readTypeFromMetadata(Metatype->InstanceType);
@@ -1044,7 +1123,7 @@ public:
         break;
       }
       case GenericRequirementKind::Protocol: {
-        /// Resolver to turn a protocol reference into a protocol declaration.
+        /// Resolver to turn a protocol reference into an existential type.
         struct ProtocolReferenceResolver {
           using Result = BuiltType;
 
@@ -1895,6 +1974,8 @@ protected:
       }
       case MetadataKind::ExistentialMetatype:
         return _readMetadata<TargetExistentialMetatypeMetadata>(address);
+      case MetadataKind::ExtendedExistential:
+        return _readMetadata<TargetExtendedExistentialTypeMetadata>(address);
       case MetadataKind::ForeignClass:
         return _readMetadata<TargetForeignClassMetadata>(address);
       case MetadataKind::Function: {
