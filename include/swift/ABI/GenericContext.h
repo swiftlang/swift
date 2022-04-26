@@ -191,8 +191,27 @@ using GenericRequirementDescriptor =
 extern const GenericParamDescriptor
 ImplicitGenericParamDescriptors[MaxNumImplicitGenericParamDescriptors];
 
+inline const GenericParamDescriptor *
+externalTargetImplicitGenericParamDescriptors() {
+  static const GenericParamDescriptor
+      buffer[MaxNumImplicitGenericParamDescriptors] = {
+#define D GenericParamDescriptor::implicit()
+          D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D,
+          D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D,
+          D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D
+#undef D
+      };
+  return buffer;
+}
+
 template <class Runtime>
-const GenericParamDescriptor *targetImplicitGenericParamDescriptors();
+const GenericParamDescriptor *targetImplicitGenericParamDescriptors() {
+  return externalTargetImplicitGenericParamDescriptors();
+}
+template <>
+inline const GenericParamDescriptor *targetImplicitGenericParamDescriptors<InProcess>() {
+  return ImplicitGenericParamDescriptors;
+}
 
 /// A runtime description of a generic signature.
 template<typename Runtime>
