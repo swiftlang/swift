@@ -1646,6 +1646,10 @@ bool SILInstruction::maySuspend() const {
   // await_async_continuation always suspends the current task.
   if (isa<AwaitAsyncContinuationInst>(this))
     return true;
+
+  // hop_to_executor also may cause a suspension
+  if (isa<HopToExecutorInst>(this))
+    return true;
   
   // Fully applying an async function may suspend the caller.
   if (auto applySite = FullApplySite::isa(const_cast<SILInstruction*>(this))) {
