@@ -323,7 +323,7 @@ static void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
     dispatch_source_set_timer(source, when, DISPATCH_TIME_FOREVER, leeway);
 
     size_t sz = sizeof(struct __swift_job_source);
-    
+
     struct __swift_job_source *jobSource = 
         (struct __swift_job_source *)_swift_task_alloc_specific(task, sz);
     
