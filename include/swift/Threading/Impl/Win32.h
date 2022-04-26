@@ -21,6 +21,10 @@
 #define NOMINMAX
 #include <windows.h>
 
+// <windows.h> defines some unhelpful macros
+#undef Yield
+#undef ERROR
+
 #include <atomic>
 
 namespace swift {
