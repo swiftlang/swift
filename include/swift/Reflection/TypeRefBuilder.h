@@ -1378,7 +1378,7 @@ public:
 
     // The Fields section has gathered info on types that includes their mangled
     // names. Use that to build a dictionary from a type's demangled name to its
-    // mangeled name
+    // mangled name
     std::unordered_map<std::string, std::string> typeNameToManglingMap;
     for (const auto &section : ReflectionInfos) {
       for (auto descriptor : section.Field) {

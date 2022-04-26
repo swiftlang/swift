@@ -182,7 +182,7 @@ if (NOT BOOTSTRAPPING_MODE)
   add_library(swiftCompilerModules ALIAS swiftCompilerStub)
 
 else()
-  # Note: "Swift" is not added intentinally here, because it would break
+  # Note: "Swift" is not added intentionally here, because it would break
   # the bootstrapping build in case no swift toolchain is installed on the host.
   project(SwiftInTheCompiler LANGUAGES C CXX)
 
@@ -251,3 +251,23 @@ else()
 
 endif()
 
+# Configure 'SwiftCompilerModules' SwiftPM package. The 'Package.swift' will
+# be created at '${build_dir}/SwiftCompilerSources/Package.swift' and can be
+# built with 'swift-build'.
+# Note that this SwiftPM package itself is just for development purposes, and
+# is not actually used for the compiler building. 
+set(swiftcompiler_source_dir_name "_Sources")
+configure_file(Package.swift.in
+  "${CMAKE_CURRENT_BINARY_DIR}/Package.swift" @ONLY)
+# SwiftPM requires all sources are inside the directory of 'Package.swift'.
+# Create symlinks to the actual source directories.
+execute_process(COMMAND
+  "${CMAKE_COMMAND}" -E create_symlink
+  "${CMAKE_CURRENT_SOURCE_DIR}/Sources"
+  "${CMAKE_CURRENT_BINARY_DIR}/${swiftcompiler_source_dir_name}")
+if(SWIFT_BUILD_REGEX_PARSER_IN_COMPILER)
+  execute_process(COMMAND
+    "${CMAKE_COMMAND}" -E create_symlink
+    "${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}/Sources/_RegexParser"
+    "${CMAKE_CURRENT_BINARY_DIR}/_RegexParser_Sources")
+endif()

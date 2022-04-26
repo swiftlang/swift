@@ -651,9 +651,19 @@ class ModuleInterfaceLoaderImpl {
 
   std::pair<std::string, std::string> getCompiledModuleCandidates() {
     std::pair<std::string, std::string> result;
-    // Keep track of whether we should attempt to load a .swiftmodule adjacent
-    // to the .swiftinterface.
+    // Should we attempt to load a swiftmodule adjacent to the swiftinterface?
     bool shouldLoadAdjacentModule = true;
+
+    // Don't use the adjacent swiftmodule for frameworks from the public
+    // Frameworks folder of the SDK.
+    SmallString<128> publicFrameworksPath;
+    llvm::sys::path::append(publicFrameworksPath,
+                            ctx.SearchPathOpts.getSDKPath(),
+                            "System", "Library", "Frameworks");
+    if (!ctx.SearchPathOpts.getSDKPath().empty() &&
+        modulePath.startswith(publicFrameworksPath)) {
+      shouldLoadAdjacentModule = false;
+    }
 
     switch (loadMode) {
     case ModuleLoadingMode::OnlyInterface:

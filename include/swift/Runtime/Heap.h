@@ -29,7 +29,7 @@
 namespace swift {
 namespace {
 // This is C++17 and newer, so we simply re-define it.  Since the codebase is
-// C++14, asume that DR1558 is accounted for and that unused parameters in alias
+// C++14, assume that DR1558 is accounted for and that unused parameters in alias
 // templates are guaranteed to ensure SFINAE and are not ignored.
 template <typename ...>
 using void_t = void;
@@ -91,7 +91,7 @@ struct aligned_alloc<Alignment_, true> {
 
 #if defined(_WIN32)
   // FIXME: why is this even needed?  This is not permitted as per the C++
-  // standrd new.delete.placement (§17.6.3.4).
+  // standard new.delete.placement (§17.6.3.4).
   [[nodiscard]] void *operator new(std::size_t size, void *where) noexcept {
     return ::operator new(size, where);
   }

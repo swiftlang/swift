@@ -1,4 +1,4 @@
-//===--- PassRegistration.swift - Register optimzation passes -------------===//
+//===--- PassRegistration.swift - Register optimization passes -------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -12,19 +12,13 @@
 
 import SIL
 import OptimizerBridging
-
-#if canImport(_CompilerRegexParser)
-import _CompilerRegexParser
-#endif
+import Parse
 
 @_cdecl("initializeSwiftModules")
 public func initializeSwiftModules() {
   registerSILClasses()
   registerSwiftPasses()
-
-  #if canImport(_CompilerRegexParser)
   registerRegexParser()
-  #endif
 }
 
 private func registerPass(

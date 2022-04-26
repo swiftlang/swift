@@ -13,6 +13,8 @@
 // rdar://90373022
 // UNSUPPORTED: OS=watchos
 
+// REQUIRES: rdar92277324
+
 import Distributed
 
 distributed actor Worker {

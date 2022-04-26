@@ -242,16 +242,19 @@ baz(/,/)
 // expected-error@-2 {{missing argument for parameter #2 in call}}
 baz((/), /)
 
+func bazbaz(_ x: (Int, Int) -> Int, _ y: Int) {}
+bazbaz(/, 0)
+
 func qux<T>(_ x: (Int, Int) -> Int, _ y: T) -> Int { 0 }
 do {
   _ = qux(/, 1) / 2
-  // expected-error@-1 {{cannot parse regular expression: closing ')' does not balance any groups openings}}
-  // expected-error@-2 {{expected ',' separator}}
+  // expected-error@-1:15 {{cannot parse regular expression: closing ')' does not balance any groups openings}}
+  // expected-error@-2:19 {{expected ',' separator}}
 }
 do {
   _ = qux(/, "(") / 2
   // expected-error@-1 {{cannot convert value of type 'Regex<(Substring, Substring)>' to expected argument type '(Int, Int) -> Int'}}
-  // expected-error@-2 {{expected ',' separator}}
+  // expected-error@-2:21 {{expected ',' separator}}
 }
 _ = qux(/, 1) // this comment tests to make sure we don't try and end the regex on the starting '/' of '//'.
 

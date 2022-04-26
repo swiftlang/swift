@@ -20,7 +20,7 @@ Example:
 
 Use `Benchmark_Driver -h` for help on available commands and options.
 
-class `BenchmarkDriver` runs performance tests and impements the `run` COMMAND.
+class `BenchmarkDriver` runs performance tests and implements the `run` COMMAND.
 class `BenchmarkDoctor` analyzes performance tests, implements `check` COMMAND.
 
 """
@@ -544,7 +544,7 @@ class BenchmarkDoctor(object):
             caveat = "" if setup == 0 else " (excluding the setup overhead)"
             log("'%s' execution took at least %d μs%s.", name, runtime, caveat)
 
-            def factor(base):  # suitable divisior that's integer power of base
+            def factor(base):  # suitable divisor that's integer power of base
                 return int(
                     pow(base, math.ceil(math.log(runtime / float(threshold), base)))
                 )
@@ -718,7 +718,7 @@ class BenchmarkDoctor(object):
         return measurements
 
     def analyze(self, benchmark_measurements):
-        """Analyze whether benchmark fullfills all requirtements."""
+        """Analyze whether benchmark fulfills all requirements."""
         self.log.debug("Analyzing %s", benchmark_measurements["name"])
         for rule in self.requirements:
             rule(benchmark_measurements)
