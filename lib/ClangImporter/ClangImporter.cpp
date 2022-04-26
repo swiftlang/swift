@@ -1276,7 +1276,9 @@ ClangImporter::create(ASTContext &ctx,
   // callbacks are still being added, and (b) the logic to parse them has
   // changed.
   clang::Parser::DeclGroupPtrTy parsed;
-  while (!importer->Impl.Parser->ParseTopLevelDecl(parsed)) {
+  clang::Sema::ModuleImportState importState =
+      clang::Sema::ModuleImportState::NotACXX20Module;
+  while (!importer->Impl.Parser->ParseTopLevelDecl(parsed, importState)) {
     for (auto *D : parsed.get()) {
       importer->Impl.addBridgeHeaderTopLevelDecls(D);
 
@@ -1434,7 +1436,9 @@ bool ClangImporter::Implementation::importHeader(
   };
 
   clang::Parser::DeclGroupPtrTy parsed;
-  while (!Parser->ParseTopLevelDecl(parsed)) {
+  clang::Sema::ModuleImportState importState =
+      clang::Sema::ModuleImportState::NotACXX20Module;
+  while (!Parser->ParseTopLevelDecl(parsed, importState)) {
     if (parsed)
       handleParsed(parsed.get());
     for (auto additionalParsedGroup : consumer.getAdditionalParsedDecls())
