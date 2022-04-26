@@ -181,11 +181,14 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   case llvm::Triple::Ananas:
   case llvm::Triple::CloudABI:
   case llvm::Triple::DragonFly:
+  case llvm::Triple::DriverKit:
   case llvm::Triple::Emscripten:
   case llvm::Triple::Fuchsia:
   case llvm::Triple::KFreeBSD:
   case llvm::Triple::Lv2:
   case llvm::Triple::NetBSD:
+  case llvm::Triple::PS5:
+  case llvm::Triple::ShaderModel:
   case llvm::Triple::Solaris:
   case llvm::Triple::Minix:
   case llvm::Triple::RTEMS:
