@@ -159,8 +159,8 @@ func testInOut(_ arg: inout Int) {
 }
 
 // Don't infer inout types.
-var ir = &i // expected-error {{use of extraneous '&'}}
-var ir2 = ((&i)) // expected-error {{use of extraneous '&'}}
+var ir = &i // expected-error {{'&' may only be used to pass an argument to inout parameter}}
+var ir2 = ((&i)) // expected-error {{'&' may only be used to pass an argument to inout parameter}}
 
 // <rdar://problem/17133089>
 func takeArrayRef(_ x: inout Array<String>) { }
@@ -279,10 +279,10 @@ func look_through_parens_when_checking_inout() {
   func modifyPoint(source: inout Point) {}
 
   var point = Point(x: 0, y: 0)
-  modifyPoint((&point)) // expected-error {{use of extraneous '&}} {{16-17=(}} {{15-16=&}}
-  modifyPoint(((&point))) // expected-error {{use of extraneous '&}} {{17-18=(}} {{15-16=&}}
-  modifyPoint(source: (&point)) // expected-error {{use of extraneous '&}} {{24-25=(}} {{23-24=&}}
-  modifyPoint(source: ((&point))) // expected-error {{use of extraneous '&}} {{25-26=(}} {{23-24=&}}
-  modifyPoint((&point), 0) // expected-error {{use of extraneous '&}} {{16-17=(}} {{15-16=&}}
-  modifyPoint((&point), msg: "") // expected-error {{use of extraneous '&}} {{16-17=(}} {{15-16=&}}
+  modifyPoint((&point)) // expected-error {{'&' may only be used to pass an argument to inout parameter}} {{16-17=(}} {{15-16=&}}
+  modifyPoint(((&point))) // expected-error {{'&' may only be used to pass an argument to inout parameter}} {{17-18=(}} {{15-16=&}}
+  modifyPoint(source: (&point)) // expected-error {{'&' may only be used to pass an argument to inout parameter}} {{24-25=(}} {{23-24=&}}
+  modifyPoint(source: ((&point))) // expected-error {{'&' may only be used to pass an argument to inout parameter}} {{25-26=(}} {{23-24=&}}
+  modifyPoint((&point), 0) // expected-error {{'&' may only be used to pass an argument to inout parameter}} {{16-17=(}} {{15-16=&}}
+  modifyPoint((&point), msg: "") // expected-error {{'&' may only be used to pass an argument to inout parameter}} {{16-17=(}} {{15-16=&}}
 }
