@@ -280,8 +280,16 @@ usesExtendedExistentialMetadata(CanExistentialMetatypeType type) {
 
   // The only existential types that don't currently use ExistentialType
   // are Any and AnyObject, which don't use extended metadata.
-  if (usesExtendedExistentialMetadata(cur))
+  if (usesExtendedExistentialMetadata(cur)) {
+    // HACK: The AST for an existential metatype of a (parameterized) protocol
+    // still directly wraps the existential type as its instance, which means
+    // we need to reconstitute the enclosing ExistentialType.
+    assert(cur->isExistentialType());
+    if (!cur->is<ExistentialType>()) {
+      cur = ExistentialType::get(cur)->getCanonicalType();
+    }
     return std::make_pair(cast<ExistentialType>(cur), depth);
+  }
   return None;
 }
 
