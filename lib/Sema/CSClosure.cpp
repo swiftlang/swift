@@ -1124,12 +1124,12 @@ ConstraintSystem::simplifySyntacticElementConstraint(
 namespace {
 
 /// Statement visitor that applies constraints for a given closure body.
-class ClosureConstraintApplication
-    : public StmtVisitor<ClosureConstraintApplication, ASTNode> {
-  friend StmtVisitor<ClosureConstraintApplication, ASTNode>;
+class SyntacticElementSolutionApplication
+    : public StmtVisitor<SyntacticElementSolutionApplication, ASTNode> {
+  friend StmtVisitor<SyntacticElementSolutionApplication, ASTNode>;
 
   Solution &solution;
-  ClosureExpr *closure;
+  AnyFunctionRef context;
   Type resultType;
   RewriteTargetFn rewriteTarget;
   bool isSingleExpression;
@@ -1141,19 +1141,19 @@ public:
   /// Whether an error was encountered while generating constraints.
   bool hadError = false;
 
-  ClosureConstraintApplication(
-      Solution &solution, ClosureExpr *closure, Type resultType,
-      RewriteTargetFn rewriteTarget)
-    : solution(solution), closure(closure), resultType(resultType),
-      rewriteTarget(rewriteTarget),
-      isSingleExpression(closure->hasSingleExpressionBody()) { }
+  SyntacticElementSolutionApplication(Solution &solution,
+                                      AnyFunctionRef context, Type resultType,
+                                      RewriteTargetFn rewriteTarget)
+      : solution(solution), context(context), resultType(resultType),
+        rewriteTarget(rewriteTarget),
+        isSingleExpression(context.hasSingleExpressionBody()) {}
 
 private:
   /// Rewrite an expression without any particularly special context.
   Expr *rewriteExpr(Expr *expr) {
-    auto result = rewriteTarget(
-      SolutionApplicationTarget(expr, closure, CTP_Unused, Type(),
-                                /*isDiscarded=*/false));
+    auto result = rewriteTarget(SolutionApplicationTarget(
+        expr, context.getAsDeclContext(), CTP_Unused, Type(),
+        /*isDiscarded=*/false));
     if (result)
       return result->getAsExpr();
 
@@ -1193,11 +1193,11 @@ private:
   }
 
   ASTNode visitBreakStmt(BreakStmt *breakStmt) {
+    auto *DC = context.getAsDeclContext();
     if (auto target = findBreakOrContinueStmtTarget(
-            closure->getASTContext(), closure->getParentSourceFile(),
-            breakStmt->getLoc(), breakStmt->getTargetName(),
-            breakStmt->getTargetLoc(),
-            /*isContinue=*/false, closure)) {
+            DC->getASTContext(), DC->getParentSourceFile(), breakStmt->getLoc(),
+            breakStmt->getTargetName(), breakStmt->getTargetLoc(),
+            /*isContinue=*/false, context.getAsDeclContext())) {
       breakStmt->setTarget(target);
     }
 
@@ -1205,10 +1205,12 @@ private:
   }
 
   ASTNode visitContinueStmt(ContinueStmt *continueStmt) {
+    auto *DC = context.getAsDeclContext();
     if (auto target = findBreakOrContinueStmtTarget(
-            closure->getASTContext(), closure->getParentSourceFile(),
+            DC->getASTContext(), DC->getParentSourceFile(),
             continueStmt->getLoc(), continueStmt->getTargetName(),
-            continueStmt->getTargetLoc(), /*isContinue=*/true, closure)) {
+            continueStmt->getTargetLoc(), /*isContinue=*/true,
+            context.getAsDeclContext())) {
       continueStmt->setTarget(target);
     }
 
@@ -1216,7 +1218,7 @@ private:
   }
 
   ASTNode visitFallthroughStmt(FallthroughStmt *fallthroughStmt) {
-    if (checkFallthroughStmt(closure, fallthroughStmt))
+    if (checkFallthroughStmt(context.getAsDeclContext(), fallthroughStmt))
       hadError = true;
     return fallthroughStmt;
   }
@@ -1225,7 +1227,7 @@ private:
     TypeChecker::typeCheckDecl(deferStmt->getTempDecl());
 
     Expr *theCall = deferStmt->getCallExpr();
-    TypeChecker::typeCheckExpression(theCall, closure);
+    TypeChecker::typeCheckExpression(theCall, context.getAsDeclContext());
     deferStmt->setCallExpr(theCall);
 
     return deferStmt;
@@ -1233,8 +1235,8 @@ private:
 
   ASTNode visitIfStmt(IfStmt *ifStmt) {
     // Rewrite the condition.
-    if (auto condition = rewriteTarget(
-            SolutionApplicationTarget(ifStmt->getCond(), closure)))
+    if (auto condition = rewriteTarget(SolutionApplicationTarget(
+            ifStmt->getCond(), context.getAsDeclContext())))
       ifStmt->setCond(*condition->getAsStmtCondition());
     else
       hadError = true;
@@ -1249,8 +1251,8 @@ private:
   }
 
   ASTNode visitGuardStmt(GuardStmt *guardStmt) {
-    if (auto condition = rewriteTarget(
-            SolutionApplicationTarget(guardStmt->getCond(), closure)))
+    if (auto condition = rewriteTarget(SolutionApplicationTarget(
+            guardStmt->getCond(), context.getAsDeclContext())))
       guardStmt->setCond(*condition->getAsStmtCondition());
     else
       hadError = true;
@@ -1261,8 +1263,8 @@ private:
   }
 
   ASTNode visitWhileStmt(WhileStmt *whileStmt) {
-    if (auto condition = rewriteTarget(
-          SolutionApplicationTarget(whileStmt->getCond(), closure)))
+    if (auto condition = rewriteTarget(SolutionApplicationTarget(
+            whileStmt->getCond(), context.getAsDeclContext())))
       whileStmt->setCond(*condition->getAsStmtCondition());
     else
       hadError = true;
@@ -1336,7 +1338,8 @@ private:
 
     // Check to see if the sequence expr is throwing (in async context),
     // if so require the stmt to have a `try`.
-    hadError |= diagnoseUnhandledThrowsInAsyncContext(closure, forEachStmt);
+    hadError |= diagnoseUnhandledThrowsInAsyncContext(
+        context.getAsDeclContext(), forEachStmt);
 
     return forEachStmt;
   }
@@ -1371,8 +1374,8 @@ private:
       }
     }
 
-    TypeChecker::checkSwitchExhaustiveness(switchStmt, closure,
-                                           limitExhaustivityChecks);
+    TypeChecker::checkSwitchExhaustiveness(
+        switchStmt, context.getAsDeclContext(), limitExhaustivityChecks);
 
     return switchStmt;
   }
@@ -1392,7 +1395,8 @@ private:
   ASTNode visitCaseStmt(CaseStmt *caseStmt) {
     // Translate the patterns and guard expressions for each case label item.
     for (auto &caseItem : caseStmt->getMutableCaseLabelItems()) {
-      SolutionApplicationTarget caseTarget(&caseItem, closure);
+      SolutionApplicationTarget caseTarget(&caseItem,
+                                           context.getAsDeclContext());
       if (!rewriteTarget(caseTarget)) {
         hadError = true;
       }
@@ -1420,7 +1424,7 @@ private:
     if (!braceStmt->empty()) {
       if (auto stmt = braceStmt->getLastElement().dyn_cast<Stmt *>()) {
         if (auto deferStmt = dyn_cast<DeferStmt>(stmt)) {
-          auto &diags = closure->getASTContext().Diags;
+          auto &diags = cs.getASTContext().Diags;
           diags
               .diagnose(deferStmt->getStartLoc(), diag::defer_stmt_at_block_end)
               .fixItReplace(deferStmt->getStartLoc(), "do");
@@ -1462,7 +1466,8 @@ private:
     // of the body if there is none. This wasn't needed before SE-0326
     // because result type was (incorrectly) inferred as `Void` due to
     // the body being skipped.
-    if (!closure->hasSingleExpressionBody() &&
+    auto *closure = context.getAbstractClosureExpr();
+    if (closure && !closure->hasSingleExpressionBody() &&
         closure->getBody() == braceStmt) {
       if (resultType->getOptionalObjectType() &&
           resultType->lookThroughAllOptionalTypes()->isVoid() &&
@@ -1475,8 +1480,8 @@ private:
   }
 
   ASTNode addImplicitVoidReturn(BraceStmt *braceStmt) {
-    auto &ctx = closure->getASTContext();
     auto &cs = solution.getConstraintSystem();
+    auto &ctx = cs.getASTContext();
 
     auto *resultExpr = getVoidExpr(ctx);
     cs.cacheExprTypes(resultExpr);
@@ -1488,8 +1493,8 @@ private:
     // to it, to make sure that optional injection happens required
     // number of times.
     {
-      SolutionApplicationTarget target(resultExpr, closure, CTP_ReturnStmt,
-                                       resultType,
+      SolutionApplicationTarget target(resultExpr, context.getAsDeclContext(),
+                                       CTP_ReturnStmt, resultType,
                                        /*isDiscarded=*/false);
       cs.setSolutionApplicationTarget(returnStmt, target);
 
@@ -1554,7 +1559,7 @@ private:
     }
 
     SolutionApplicationTarget resultTarget(
-        resultExpr, closure,
+        resultExpr, context.getAsDeclContext(),
         mode == convertToResult ? CTP_ReturnStmt : CTP_Unused,
         mode == convertToResult ? resultType : Type(),
         /*isDiscarded=*/false);
@@ -1601,7 +1606,7 @@ private:
 public:
   /// Apply solution to the closure and return updated body.
   ASTNode apply() {
-    auto body = visit(closure->getBody());
+    auto body = visit(context.getBody());
 
     // Since local functions can capture variables that are declared
     // after them, let's type-check them after all of the pattern
@@ -1612,7 +1617,6 @@ public:
     return body;
   }
 };
-
 }
 
 SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
@@ -1705,7 +1709,7 @@ bool ConstraintSystem::applySolutionToBody(Solution &solution,
   llvm::SaveAndRestore<DeclContext *> savedDC(currentDC, closure);
 
   auto closureType = cs.getType(closure)->castTo<FunctionType>();
-  ClosureConstraintApplication application(
+  SyntacticElementSolutionApplication application(
       solution, closure, closureType->getResult(), rewriteTarget);
   auto body = application.apply();
 
