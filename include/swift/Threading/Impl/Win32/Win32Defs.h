@@ -1,0 +1,71 @@
+//==--- Win32Defs.h - Windows API definitions ------------------ -*-C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2022 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// We cannot include <windows.h> from the Threading headers because they get
+// included all over the place and <windows.h> defines a large number of
+// obnoxious macros.  Instead, this header declares *just* what we need.
+//
+// If you need <windows.h> in a file, please make sure to include it *before*
+// this file, or you'll get errors about RTL_SRWLOCK.
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef SWIFT_THREADING_IMPL_WIN32_DEFS_H
+#define SWIFT_THREADING_IMPL_WIN32_DEFS_H
+
+#define DECLSPEC_IMPORT __declspec(dllimport)
+#define WINBASEAPI      DECLSPEC_IMPORT
+#define WINAPI          __stdcall
+#define NTAPI           __stdcall
+
+// <windows.h> #defines VOID rather than typedefing it(!)  Changing that
+// to use a typedef instead isn't problematic later on, so let's do that.
+#undef VOID
+
+typedef void          VOID, *PVOID;
+typedef unsigned char BYTE;
+typedef BYTE          BOOLEAN;
+typedef int           BOOL;
+typedef unsigned long DWORD;
+
+typedef VOID (NTAPI* PFLS_CALLBACK_FUNCTION)(PVOID lpFlsData);
+
+// We can't define this struct if <winnt.h> already did so
+#ifndef _WINNT_
+struct _RTL_SRWLOCK {
+  PVOID Ptr;
+};
+#endif // _WINNT_
+
+typedef struct _RTL_SRWLOCK RTL_SRWLOCK, *PRTL_SRWLOCK;
+typedef RTL_SRWLOCK         SRWLOCK, *PSRWLOCK;
+
+// These have to be #defines, to avoid problems with <windows.h>
+#define RTL_SRWLOCK_INIT   {0}
+#define SRWLOCK_INIT       RTL_SRWLOCK_INIT
+#define FLS_OUT_OF_INDEXES ((DWORD)0xFFFFFFFF)
+
+extern "C" {
+  WINBASEAPI DWORD WINAPI   GetCurrentThreadId(VOID);
+
+  WINBASEAPI VOID WINAPI    InitializeSRWLock(PSRWLOCK SRWLock);
+  WINBASEAPI VOID WINAPI    ReleaseSRWLockExclusive(PSRWLOCK SRWLock);
+  WINBASEAPI VOID WINAPI    AcquireSRWLockExclusive(PSRWLOCK SRWLock);
+  WINBASEAPI BOOLEAN WINAPI TryAcquireSRWLockExclusive(PSRWLOCK SRWLock);
+
+  WINBASEAPI DWORD WINAPI FlsAlloc(PFLS_CALLBACK_FUNCTION lpCallback);
+  WINBASEAPI PVOID WINAPI FlsGetValue(DWORD dwFlsIndex);
+  WINBASEAPI BOOL WINAPI  FlsSetValue(DWORD dwFlsIndex, PVOID lpFlsData);
+  WINBASEAPI BOOL WINAPI  FlsFree(DWORD dwFlsIndex);
+}
+
+#endif // SWIFT_THREADING_IMPL_WIN32_DEFS_H
