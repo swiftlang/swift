@@ -183,7 +183,7 @@ func mapSome<S: Sequence, C: RangeReplaceableCollection>(
     var result = C()
     for x in source {
         if let y = transform(x) {
-            result.append(y)
+            result.append(_move(y))
         }
     }
     return result
