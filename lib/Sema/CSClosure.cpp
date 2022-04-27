@@ -50,8 +50,32 @@ public:
 
   std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
     if (auto *DRE = dyn_cast<DeclRefExpr>(expr)) {
-      if (auto type = CS.getTypeIfAvailable(DRE->getDecl()))
+      auto *decl = DRE->getDecl();
+
+      if (auto type = CS.getTypeIfAvailable(DRE->getDecl())) {
+        // If this is not one of the closure parameters which
+        // is inferrable from the body, let's replace type
+        // variables with errors to avoid bringing external
+        // information to the element component.
+        if (type->hasTypeVariable() && !isa<ParamDecl>(decl)) {
+          // If there are type variables left in the simplified version,
+          // it means that this is an invalid external declaration
+          // relative to this element's context.
+          if (CS.simplifyType(type)->hasTypeVariable()) {
+            auto transformedTy = type.transform([&](Type type) {
+              if (auto *typeVar = type->getAs<TypeVariableType>()) {
+                return ErrorType::get(CS.getASTContext());
+              }
+              return type;
+            });
+
+            CS.setType(decl, transformedTy);
+            return {true, expr};
+          }
+        }
+
         inferVariables(type);
+      }
     }
 
     return {true, expr};
