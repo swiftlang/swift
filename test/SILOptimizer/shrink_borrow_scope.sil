@@ -1,5 +1,7 @@
 // RUN: %target-sil-opt -copy-propagation -enable-sil-verify-all %s | %FileCheck %s
 
+sil_stage canonical
+
 import Builtin
 import Swift
 

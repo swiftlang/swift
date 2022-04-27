@@ -1,5 +1,7 @@
 // RUN: %target-sil-opt -enable-sil-verify-all -enable-lexical-lifetimes %s -mem2reg | %FileCheck %s
 
+sil_stage canonical
+
 import Builtin
 import Swift
 
