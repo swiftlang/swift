@@ -5,6 +5,30 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
 ## Swift 5.7
 
+* [SE-0349][]:
+
+  Loading data from raw memory represented by `UnsafeRawPointer`,
+  `UnsafeRawBufferPointer` and their mutable counterparts now supports unaligned
+  accesses. This previously required a workaround involving an intermediate
+  copy:
+
+  ```swift
+  let result = unalignedData.withUnsafeBytes { buffer -> UInt32 in
+    var storage = UInt32.zero
+    withUnsafeMutableBytes(of: &storage) {
+      $0.copyBytes(from: buffer.prefix(MemoryLayout<UInt32>.size))
+    }
+    return storage
+  }
+  ```
+  Now:
+  ```swift
+  let result = unalignedData.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
+  ```
+  Additionally, the counterpart `storeBytes(of:toByteOffset:as:)` had its
+  alignment restriction lifted, so that storing to arbitrary offsets of raw
+  memory can now succeed.
+
 * References to `optional` methods on a protocol metatype, as well as references to dynamically looked up methods on the `AnyObject` metatype are now supported. These references always have the type of a function that accepts a single argument and returns an optional value of function type:
 
   ```swift
@@ -9203,6 +9227,7 @@ Swift 1.0
 [SE-0345]: <https://github.com/apple/swift-evolution/blob/main/proposals/0345-if-let-shorthand.md>
 [SE-0326]: <https://github.com/apple/swift-evolution/blob/main/proposals/0326-extending-multi-statement-closure-inference.md>
 [SE-0347]: <https://github.com/apple/swift-evolution/blob/main/proposals/0347-type-inference-from-default-exprs.md>
+[SE-0349]: <https://github.com/apple/swift-evolution/blob/main/proposals/0349-unaligned-loads-and-stores.md>
 [SE-0352]: <https://github.com/apple/swift-evolution/blob/main/proposals/0352-implicit-open-existentials.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>
