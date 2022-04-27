@@ -195,9 +195,9 @@ func testSlowServerFromMain(slowServer: SlowServer) async throws {
   // CHECK: await_async_continuation [[CONT]] {{.*}}, resume [[RESUME:bb[0-9]+]]
   // CHECK: [[RESUME]]:
   // CHECK: [[RESULT:%.*]] = load [trivial] [[RESUME_BUF]]
+  // CHECK: hop_to_executor %6 : $MainActor
   // CHECK: fix_lifetime [[COPY]]
   // CHECK: destroy_value [[COPY]]
-  // CHECK: hop_to_executor %6 : $MainActor
   // CHECK: dealloc_stack [[RESUME_BUF]]
   let _: Int = await slowServer.doSomethingSlow("mail")
 }
