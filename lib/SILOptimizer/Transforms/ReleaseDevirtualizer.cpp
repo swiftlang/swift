@@ -70,6 +70,8 @@ void ReleaseDevirtualizer::run() {
   SILFunction *F = getFunction();
   RCIA = PM->getAnalysis<RCIdentityAnalysis>()->get(F);
 
+  SmallPtrSet<SILValue, 8> devirtualizedDestroys;
+
   bool Changed = false;
   for (SILBasicBlock &BB : *F) {
 
@@ -83,7 +85,10 @@ void ReleaseDevirtualizer::run() {
         // these we know that they don't have associated objects, which are
         // _not_ released by the deinit method.
         if (auto *elti = dyn_cast<DeallocStackRefInst>(&I)) {
-          Changed |= devirtualizeReleaseOfObject(LastRelease, elti);
+            if (devirtualizeReleaseOfObject(LastRelease, elti)) {
+                devirtualizedDestroys.insert(elti->getOperand());
+                Changed = true;
+            }
           LastRelease = nullptr;
           continue;
         }
@@ -97,6 +102,21 @@ void ReleaseDevirtualizer::run() {
       }
     }
   }
+
+    SmallVector<SILInstruction *, 4> toRemove;
+    for (auto alloc : devirtualizedDestroys) {
+        for (auto use : alloc->getUses()) {
+            auto user = use->getUser();
+            if (isa<ReleaseValueInst>(user) || isa<StrongReleaseInst>(user) ||
+                isa<RetainValueInst>(user) || isa<StrongRetainInst>(user)) {
+                toRemove.push_back(user);
+            }
+        }
+    }
+    
+    for (auto inst : toRemove)
+        inst->eraseFromParent();
+  
   if (Changed) {
     invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
   }
