@@ -2629,6 +2629,10 @@ bool importer::shouldSuppressDeclImport(const clang::Decl *decl) {
     return false;
   }
 
+  if (isa<clang::BuiltinTemplateDecl>(decl)) {
+    return true;
+  }
+
   return false;
 }
 
