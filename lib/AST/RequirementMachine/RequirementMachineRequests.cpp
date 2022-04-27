@@ -787,9 +787,11 @@ InferredGenericSignatureRequestRQM::evaluate(
   // types and such.
   for (auto sourcePair : inferenceSources) {
     auto *typeRepr = sourcePair.getTypeRepr();
-    auto loc = typeRepr ? typeRepr->getStartLoc() : SourceLoc();
+    auto typeLoc = typeRepr ? typeRepr->getStartLoc() : SourceLoc();
+    if (loc.isInvalid())
+      loc = typeLoc;
 
-    inferRequirements(sourcePair.getType(), loc, moduleForInference,
+    inferRequirements(sourcePair.getType(), typeLoc, moduleForInference,
                       requirements);
   }
 
