@@ -35,6 +35,7 @@
 #include "swift/Threading/Once.h"
 #include "swift/Threading/Mutex.h"
 #include "swift/Threading/ThreadLocalStorage.h"
+#include "swift/Threading/Thread.h"
 #include "swift/ABI/Task.h"
 #include "swift/ABI/Actor.h"
 #include "swift/Basic/ListMerger.h"
@@ -65,21 +66,6 @@
 
 #if defined(__ELF__)
 #include <sys/syscall.h>
-#endif
-
-#if defined(_POSIX_THREADS)
-#include <pthread.h>
-
-// Only use __has_include since HAVE_PTHREAD_NP_H is not provided.
-#if __has_include(<pthread_np.h>)
-#include <pthread_np.h>
-#endif
-#endif
-
-#if defined(_WIN32)
-#include <io.h>
-#include <handleapi.h>
-#include <processthreadsapi.h>
 #endif
 
 #if SWIFT_OBJC_INTEROP
@@ -278,29 +264,13 @@ static ExecutorRef swift_task_getCurrentExecutorImpl() {
   return result;
 }
 
-#if defined(_WIN32)
-static HANDLE __initialPthread = INVALID_HANDLE_VALUE;
-#endif
-
 /// Determine whether we are currently executing on the main thread
 /// independently of whether we know that we are on the main actor.
 static bool isExecutingOnMainThread() {
 #if SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY
   return true;
-#elif defined(__linux__)
-  return syscall(SYS_gettid) == getpid();
-#elif defined(_WIN32)
-  if (__initialPthread == INVALID_HANDLE_VALUE) {
-    DuplicateHandle(GetCurrentProcess(), GetCurrentThread(),
-                    GetCurrentProcess(), &__initialPthread, 0, FALSE,
-                    DUPLICATE_SAME_ACCESS);
-  }
-
-  return __initialPthread == GetCurrentThread();
-#elif defined(__wasi__)
-  return true;
 #else
-  return pthread_main_np() == 1;
+  return Thread::onMainThread();
 #endif
 }
 
