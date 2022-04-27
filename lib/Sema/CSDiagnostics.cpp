@@ -8152,21 +8152,10 @@ bool MissingExplicitExistentialCoercion::diagnoseAsError() {
 }
 
 bool MissingExplicitExistentialCoercion::diagnoseAsNote() {
-  auto selectedOverload = getCalleeOverloadChoiceIfAvailable(getLocator());
-  if (!selectedOverload)
-    return false;
-
-  const auto &choice = selectedOverload->choice;
-
-  if (auto *decl = choice.getDeclOrNull()) {
-    auto diagnostic = emitDiagnosticAt(
-        decl, diag::candidate_result_requires_explicit_coercion,
-        ErasedResultType);
-    fixIt(diagnostic);
-    return true;
-  }
-
-  return false;
+  auto diagnostic = emitDiagnostic(
+      diag::candidate_result_requires_explicit_coercion, ErasedResultType);
+  fixIt(diagnostic);
+  return true;
 }
 
 void MissingExplicitExistentialCoercion::fixIt(

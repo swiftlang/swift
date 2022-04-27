@@ -233,7 +233,6 @@ func testExplicitCoercionRequirement(v: any B, otherV: any B & D) {
   func getComplex<T: B>(_: T) -> ([(x: (a: T.C, b: Int), y: Int)], [Int: T.C]) { fatalError() }
 
   func overloaded<T: B>(_: T) -> (x: Int, y: T.C) { fatalError() }
-  // expected-note@-1 {{inferred result type '(x: Int, y: any P)' requires explicit coercion due to loss of generic requirements}} {{251:20-20=as (x: Int, y: any P)}}
   func overloaded<T: P>(_: T) -> Int { 42 }
   // expected-note@-1 {{candidate requires that 'any B' conform to 'P' (requirement specified as 'T' : 'P')}}
 
@@ -249,6 +248,7 @@ func testExplicitCoercionRequirement(v: any B, otherV: any B & D) {
   _ = getComplex(v) as ([(x: (a: any P, b: Int), y: Int)], [Int : any P]) // Ok
 
   _ = overloaded(v) // expected-error {{no exact matches in call to local function 'overloaded'}}
+  // expected-note@-1 {{inferred result type '(x: Int, y: any P)' requires explicit coercion due to loss of generic requirements}} {{20-20=as (x: Int, y: any P)}}
 
   func acceptsAny<T>(_: T) {}
 
