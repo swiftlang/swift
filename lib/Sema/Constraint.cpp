@@ -112,8 +112,8 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::KeyPathApplication:
     llvm_unreachable("Key path constraint takes three types");
 
-  case ConstraintKind::ClosureBodyElement:
-    llvm_unreachable("Closure body element constraint should use create()");
+  case ConstraintKind::SyntacticElement:
+    llvm_unreachable("Syntactic element constraint should use create()");
   }
 
   std::uninitialized_copy(typeVars.begin(), typeVars.end(),
@@ -161,7 +161,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
   case ConstraintKind::DefaultClosureType:
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::PropertyWrapper:
-  case ConstraintKind::ClosureBodyElement:
+  case ConstraintKind::SyntacticElement:
   case ConstraintKind::BindTupleOfFunctionParams:
     llvm_unreachable("Wrong constructor");
 
@@ -260,12 +260,12 @@ Constraint::Constraint(ConstraintKind kind, ConstraintFix *fix, Type first,
 Constraint::Constraint(ASTNode node, ContextualTypeInfo context,
                        bool isDiscarded, ConstraintLocator *locator,
                        SmallPtrSetImpl<TypeVariableType *> &typeVars)
-    : Kind(ConstraintKind::ClosureBodyElement), TheFix(nullptr),
+    : Kind(ConstraintKind::SyntacticElement), TheFix(nullptr),
       HasRestriction(false), IsActive(false), IsDisabled(false),
       IsDisabledForPerformance(false), RememberChoice(false), IsFavored(false),
       IsIsolated(false),
-      NumTypeVariables(typeVars.size()), ClosureElement{node, context,
-                                                        isDiscarded},
+      NumTypeVariables(typeVars.size()), SyntacticElement{node, context,
+                                                          isDiscarded},
       Locator(locator) {
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
 }
@@ -343,9 +343,9 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
     return create(cs, getKind(), getFirstType(), getSecondType(), getThirdType(),
                   getLocator());
 
-  case ConstraintKind::ClosureBodyElement:
-    return createClosureBodyElement(cs, getClosureElement(), getLocator(),
-                                    isDiscardedElement());
+  case ConstraintKind::SyntacticElement:
+    return createSyntacticElement(cs, getSyntacticElement(), getLocator(),
+                                  isDiscardedElement());
   }
 
   llvm_unreachable("Unhandled ConstraintKind in switch.");
@@ -387,9 +387,9 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
     return;
   }
 
-  if (Kind == ConstraintKind::ClosureBodyElement) {
+  if (Kind == ConstraintKind::SyntacticElement) {
     auto *locator = getLocator();
-    auto element = getClosureElement();
+    auto element = getSyntacticElement();
 
     if (auto patternBindingElt =
             locator
@@ -399,8 +399,8 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
       Out << patternBindingElt->getIndex() << " : ";
       patternBinding->getPattern(patternBindingElt->getIndex())->dump(Out);
     } else {
-      Out << "closure body element ";
-      getClosureElement().dump(Out);
+      Out << "syntactic element ";
+      element.dump(Out);
     }
 
     return;
@@ -529,8 +529,8 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
     llvm_unreachable("disjunction handled above");
   case ConstraintKind::Conjunction:
     llvm_unreachable("conjunction handled above");
-  case ConstraintKind::ClosureBodyElement:
-    llvm_unreachable("closure body element handled above");
+  case ConstraintKind::SyntacticElement:
+    llvm_unreachable("syntactic element handled above");
   }
 
   if (!skipSecond)
@@ -702,7 +702,7 @@ gatherReferencedTypeVars(Constraint *constraint,
 
     break;
 
-  case ConstraintKind::ClosureBodyElement:
+  case ConstraintKind::SyntacticElement:
     typeVars.insert(constraint->getTypeVariables().begin(),
                     constraint->getTypeVariables().end());
     break;
@@ -1027,19 +1027,19 @@ Constraint *Constraint::createApplicableFunction(
   return constraint;
 }
 
-Constraint *Constraint::createClosureBodyElement(ConstraintSystem &cs,
-                                                 ASTNode node,
-                                                 ConstraintLocator *locator,
-                                                 bool isDiscarded) {
-  return createClosureBodyElement(cs, node, ContextualTypeInfo(), locator,
-                                  isDiscarded);
+Constraint *Constraint::createSyntacticElement(ConstraintSystem &cs,
+                                               ASTNode node,
+                                               ConstraintLocator *locator,
+                                               bool isDiscarded) {
+  return createSyntacticElement(cs, node, ContextualTypeInfo(), locator,
+                                isDiscarded);
 }
 
-Constraint *Constraint::createClosureBodyElement(ConstraintSystem &cs,
-                                                 ASTNode node,
-                                                 ContextualTypeInfo context,
-                                                 ConstraintLocator *locator,
-                                                 bool isDiscarded) {
+Constraint *Constraint::createSyntacticElement(ConstraintSystem &cs,
+                                               ASTNode node,
+                                               ContextualTypeInfo context,
+                                               ConstraintLocator *locator,
+                                               bool isDiscarded) {
   SmallPtrSet<TypeVariableType *, 4> typeVars;
   unsigned size = totalSizeToAlloc<TypeVariableType *>(typeVars.size());
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
