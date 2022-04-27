@@ -1329,6 +1329,9 @@ class HeapObjectSideTableEntry {
 #endif
   { }
 
+  void *operator new(size_t) = delete;
+  void operator delete(void *) = delete;
+
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Winvalid-offsetof"
   static ptrdiff_t refCountsOffset() {
@@ -1455,7 +1458,7 @@ class HeapObjectSideTableEntry {
     // Weak ref count is now zero. Delete the side table entry.
     // FREED -> DEAD
     assert(refCounts.getUnownedCount() == 0);
-    delete this;
+    swift_cxx_deleteObject(this);
   }
 
   void decrementWeakNonAtomic() {
@@ -1468,7 +1471,7 @@ class HeapObjectSideTableEntry {
     // Weak ref count is now zero. Delete the side table entry.
     // FREED -> DEAD
     assert(refCounts.getUnownedCount() == 0);
-    delete this;
+    swift_cxx_deleteObject(this);
   }
 
   uint32_t getWeakCount() const {
