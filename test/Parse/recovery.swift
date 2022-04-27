@@ -816,7 +816,7 @@ func test23550816(ss: [String], s: String) {
 // <rdar://problem/23719432> [practicalswift] Compiler crashes on &(Int:_)
 func test23719432() {
   var x = 42
-  &(Int:x) // expected-error {{use of extraneous '&'}}
+    &(Int:x) // expected-error {{'&' may only be used to pass an argument to inout parameter}}
 }
 
 // <rdar://problem/19911096> QoI: terrible recovery when using '·' for an operator
