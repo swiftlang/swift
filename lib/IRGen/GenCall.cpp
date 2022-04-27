@@ -933,8 +933,8 @@ namespace {
       case clang::Type::Pipe:
         llvm_unreachable("OpenCL type in ABI lowering?");
 
-      case clang::Type::ExtInt:
-        llvm_unreachable("ExtInt type in ABI lowering?");
+      case clang::Type::BitInt:
+        llvm_unreachable("BitInt type in ABI lowering?");
 
       case clang::Type::ConstantMatrix: {
         llvm_unreachable("ConstantMatrix type in ABI lowering?");
