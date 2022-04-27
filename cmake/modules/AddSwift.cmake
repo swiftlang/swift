@@ -707,7 +707,7 @@ function(add_swift_host_tool executable)
       if(BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
         # Add in the toolchain directory so we can grab compatibility libraries
         get_filename_component(TOOLCHAIN_BIN_DIR ${SWIFT_EXEC_FOR_SWIFT_MODULES} DIRECTORY)
-        get_filename_component(TOOLCHAIN_LIB_DIR "${TOOLCHAIN_BIN_DIR}/../lib/swift/macosx" ABSOLUTE)
+        get_filename_component(TOOLCHAIN_LIB_DIR "${TOOLCHAIN_BIN_DIR}/../lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}" ABSOLUTE)
         target_link_directories(${executable} PUBLIC ${TOOLCHAIN_LIB_DIR})
 
         # Add the SDK directory for the host platform.
