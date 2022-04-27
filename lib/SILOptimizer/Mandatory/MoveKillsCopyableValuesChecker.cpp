@@ -133,10 +133,22 @@ bool CheckerLivenessInfo::compute() {
         break;
       case OperandOwnership::Borrow: {
         if (auto *bbi = dyn_cast<BeginBorrowInst>(user)) {
-          // Only add borrows to liveness if the borrow isn't lexical. If it is
-          // a lexical borrow, we have created an entirely new source level
-          // binding that should be tracked separately.
-          if (!bbi->isLexical()) {
+          // If we have a lexical begin_borrow, we are going to check its uses
+          // separately and emit diagnostics for it. So we just need to add the
+          // liveness of the begin_borrow.
+          //
+          // NOTE: We know that semantically the use lexical lifetime must have
+          // a separate lifetime from the base lexical lifetime that we are
+          // processing. We do not want to include those uses as transitive uses
+          // of our base lexical lifetime. We just want to treat the formation
+          // of the new variable as a use. Thus we only include the begin_borrow
+          // itself as the use.
+          if (bbi->isLexical()) {
+            liveness.updateForUse(bbi, false /*lifetime ending*/);
+          } else {
+            // Otherwise, try to update liveness for a borrowing operand
+            // use. This will make it so that we add the end_borrows of the
+            // liveness use. If we have a reborrow here, we will bail.
             bool failed = !liveness.updateForBorrowingOperand(use);
             if (failed)
               return false;
@@ -351,24 +363,32 @@ bool MoveKillsCopyableValuesChecker::check() {
   SmallSetVector<SILValue, 32> valuesToCheck;
 
   for (auto *arg : fn->getEntryBlock()->getSILFunctionArguments()) {
-    if (arg->getOwnershipKind() == OwnershipKind::Owned)
+    if (arg->getOwnershipKind() == OwnershipKind::Owned) {
+      LLVM_DEBUG(llvm::dbgs() << "Found owned arg to check: " << *arg);
       valuesToCheck.insert(arg);
+    }
   }
 
   for (auto &block : *fn) {
     for (auto &ii : block) {
       if (auto *bbi = dyn_cast<BeginBorrowInst>(&ii)) {
-        if (bbi->isLexical())
+        if (bbi->isLexical()) {
+          LLVM_DEBUG(llvm::dbgs()
+                     << "Found lexical lifetime to check: " << *bbi);
           valuesToCheck.insert(bbi);
+        }
         continue;
       }
     }
   }
 
-  if (valuesToCheck.empty())
+  if (valuesToCheck.empty()) {
+    LLVM_DEBUG(llvm::dbgs() << "No values to check! Exiting early!\n");
     return false;
+  }
 
-  LLVM_DEBUG(llvm::dbgs() << "Visiting Function: " << fn->getName() << "\n");
+  LLVM_DEBUG(llvm::dbgs()
+             << "Found at least one value to check, performing checking.\n");
   auto valuesToProcess =
       llvm::makeArrayRef(valuesToCheck.begin(), valuesToCheck.end());
   auto &mod = fn->getModule();
@@ -474,6 +494,9 @@ class MoveKillsCopyableValuesCheckerPass : public SILFunctionTransform {
 
     assert(fn->getModule().getStage() == SILStage::Raw &&
            "Should only run on Raw SIL");
+
+    LLVM_DEBUG(llvm::dbgs() << "*** Checking moved values in fn: "
+                            << getFunction()->getName() << '\n');
 
     MoveKillsCopyableValuesChecker checker(getFunction());
 
