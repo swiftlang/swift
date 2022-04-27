@@ -222,11 +222,11 @@ let combineDoubleDigits = {
 // first, the lazy version of checksum calculation
 let lazychecksum = { (ccnum: String) -> Bool in
     ccnum.lazy
-    |> reverse
-    |> { mapSome($0, charToInt) }
-    |> { mapEveryN($0, 2, double) }
-    |> { map($0, combineDoubleDigits) }
-    |> sum
+    |> { reverse($0) }
+    |> { mapSome($0, { charToInt($0) }) }
+    |> { mapEveryN($0, 2, {double($0) }) }
+    |> { map($0, { combineDoubleDigits($0) }) }
+    |> {sum($0)}
     |> isMultipleOf(10)
 }
 
