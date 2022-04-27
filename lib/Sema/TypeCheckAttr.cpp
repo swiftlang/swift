@@ -2148,10 +2148,11 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
   // usual type-checking.  The alternative would be to directly call
   // mainType.main() from the entry point, and that would require fully
   // type-checking the call to mainType.main().
-
-  constraints::ConstraintSystem CS(
-      declContext, constraints::ConstraintSystemFlags::IgnoreAsyncSyncMismatch);
-  constraints::ConstraintLocator *locator = CS.getConstraintLocator({});
+  using namespace constraints;
+  ConstraintSystem CS(declContext,
+                      ConstraintSystemFlags::IgnoreAsyncSyncMismatch);
+  ConstraintLocator *locator =
+      CS.getConstraintLocator({}, ConstraintLocator::Member);
   // Allowed main function types
   // `() -> Void`
   // `() async -> Void`
@@ -2196,31 +2197,35 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
                                                 .withGlobalActor(mainActor)
                                                 .build()));
     }
-
-    llvm::SmallVector<constraints::Constraint *, 4> mainTypeConstraints;
-    for (const Type &mainType : mainTypes) {
-      constraints::Constraint *fnConstraint =
-          constraints::Constraint::createMember(
-              CS, constraints::ConstraintKind::ValueMember,
-              nominal->getInterfaceType(), mainType,
-              DeclNameRef(context.Id_main), declContext,
-              FunctionRefKind::SingleApply, locator);
-      mainTypeConstraints.push_back(fnConstraint);
+    TypeVariableType *mainType =
+        CS.createTypeVariable(locator, /*options=*/0);
+    llvm::SmallVector<Constraint *, 4> typeEqualityConstraints;
+    typeEqualityConstraints.reserve(mainTypes.size());
+    for (const Type &candidateMainType : mainTypes) {
+      typeEqualityConstraints.push_back(
+          Constraint::create(CS, ConstraintKind::Equal, Type(mainType),
+                             candidateMainType, locator));
     }
 
-    CS.addDisjunctionConstraint(mainTypeConstraints, locator);
+    CS.addDisjunctionConstraint(typeEqualityConstraints, locator);
+    CS.addValueMemberConstraint(
+        nominal->getInterfaceType(), DeclNameRef(context.Id_main),
+        Type(mainType), declContext, FunctionRefKind::SingleApply, {}, locator);
   }
 
   FuncDecl *mainFunction = nullptr;
-  llvm::SmallVector<constraints::Solution, 4> candidates;
+  llvm::SmallVector<Solution, 4> candidates;
 
   if (!CS.solve(candidates, FreeTypeVariableBinding::Disallow)) {
+    // We can't use CS.diagnoseAmbiguity directly since the locator is empty
+    // Sticking the main type decl `D` in results in an assert due to a
+    // unsimplifiable locator anchor since it appears to be looking for an
+    // expression, which we don't have.
+    // (locator could not be simplified to anchor)
+    // TODO: emit notes for each of the ambiguous candidates
     if (candidates.size() != 1) {
       context.Diags.diagnose(nominal->getLoc(), diag::ambiguous_decl_ref,
                              DeclNameRef(context.Id_main));
-      // TODO: CS.diagnoseAmbiguity doesn't report anything because the types
-      // are different. It would be good to get notes on the decls causing the
-      // ambiguity.
       attr->setInvalid();
       return nullptr;
     }
