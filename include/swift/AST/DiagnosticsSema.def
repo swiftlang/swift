@@ -1965,6 +1965,9 @@ NOTE(non_sendable_nominal,none,
 NOTE(add_nominal_sendable_conformance,none,
      "consider making %0 %1 conform to the 'Sendable' protocol",
      (DescriptiveDeclKind, DeclName))
+NOTE(add_generic_parameter_sendable_conformance,none,
+     "consider making generic parameter %0 conform to the 'Sendable' protocol",
+     (Type))
 REMARK(add_predates_concurrency_import,none,
      "add '@preconcurrency' to %select{suppress|treat}0 "
      "'Sendable'-related %select{warnings|errors}0 from module %1"
@@ -4569,6 +4572,12 @@ ERROR(concurrent_access_of_inout_param,none,
       (DeclName))
 ERROR(non_sendable_capture,none,
       "capture of %1 with non-sendable type %0 in a `@Sendable` closure",
+      (Type, DeclName))
+ERROR(implicit_async_let_non_sendable_capture,none,
+      "capture of %1 with non-sendable type %0 in 'async let' binding",
+      (Type, DeclName))
+ERROR(implicit_non_sendable_capture,none,
+      "implicit capture of %1 requires that %0 conforms to `Sendable`",
       (Type, DeclName))
 
 NOTE(actor_isolated_sync_func,none,
