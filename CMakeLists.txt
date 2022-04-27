@@ -203,7 +203,7 @@ option(SWIFT_TOOLS_LD64_LTO_CODEGEN_ONLY_FOR_SUPPORTING_TARGETS
     debugging Swift)"
     FALSE)
 
-option(BOOTSTRAPPING_MODE [=[
+option(SWIFT_BOOTSTRAPPING_MODE [=[
 How to build the swift compiler modules. Possible values are
     OFF:           build without swift modules
     HOSTTOOLS:     build with a pre-installed toolchain
@@ -633,21 +633,21 @@ set(SWIFT_LIBRARY_OUTPUT_INTDIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib")
 if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
   set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
   set(SWIFT_EXEC_FOR_SWIFT_MODULES "${CMAKE_Swift_COMPILER}")
-elseif(BOOTSTRAPPING_MODE MATCHES "BOOTSTRAPPING.*")
+elseif(SWIFT_BOOTSTRAPPING_MODE MATCHES "BOOTSTRAPPING.*")
   # If cross-compiling, we don't have to bootstrap. We can just use the previously
   # built native swiftc to build the swift compiler modules.
   message(STATUS "Building swift modules with previously built tools instead of bootstrapping")
   set(SWIFT_EXEC_FOR_SWIFT_MODULES "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc")
-  if(BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
-    set(BOOTSTRAPPING_MODE "CROSSCOMPILE-WITH-HOSTLIBS")
-  elseif(BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING")
-    set(BOOTSTRAPPING_MODE "CROSSCOMPILE")
+  if(SWIFT_BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
+    set(SWIFT_BOOTSTRAPPING_MODE "CROSSCOMPILE-WITH-HOSTLIBS")
+  elseif(SWIFT_BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING")
+    set(SWIFT_BOOTSTRAPPING_MODE "CROSSCOMPILE")
   else()
-    set(BOOTSTRAPPING_MODE "HOSTTOOLS")
+    set(SWIFT_BOOTSTRAPPING_MODE "HOSTTOOLS")
   endif()
 endif()
 
-if(BOOTSTRAPPING_MODE MATCHES "HOSTTOOLS|.*-WITH-HOSTLIBS")
+if(SWIFT_BOOTSTRAPPING_MODE MATCHES "HOSTTOOLS|.*-WITH-HOSTLIBS")
   if(SWIFT_ENABLE_ARRAY_COW_CHECKS)
     message(STATUS "array COW checks disabled when building the swift modules with host libraries")
     set(SWIFT_ENABLE_ARRAY_COW_CHECKS FALSE)
@@ -1020,7 +1020,7 @@ if(SWIFT_INCLUDE_TOOLS)
   message(STATUS "  Build type:     ${CMAKE_BUILD_TYPE}")
   message(STATUS "  Assertions:     ${LLVM_ENABLE_ASSERTIONS}")
   message(STATUS "  LTO:            ${SWIFT_TOOLS_ENABLE_LTO}")
-  message(STATUS "  Bootstrapping:  ${BOOTSTRAPPING_MODE}")
+  message(STATUS "  Bootstrapping:  ${SWIFT_BOOTSTRAPPING_MODE}")
   message(STATUS "")
 else()
   message(STATUS "Not building host Swift tools")

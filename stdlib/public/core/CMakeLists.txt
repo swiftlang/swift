@@ -327,7 +327,7 @@ set(swiftCore_common_options
 set(swiftCore_common_dependencies
     copy_shim_headers "${SWIFTLIB_DIR}/shims" ${GROUP_INFO_JSON_FILE})
 
-if(${BOOTSTRAPPING_MODE} STREQUAL "BOOTSTRAPPING")
+if(${SWIFT_BOOTSTRAPPING_MODE} STREQUAL "BOOTSTRAPPING")
 
   set(b0_deps symlink-headers-bootstrapping0)
   set(b1_deps symlink-headers-bootstrapping1)
