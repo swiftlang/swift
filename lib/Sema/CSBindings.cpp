@@ -1385,7 +1385,7 @@ void PotentialBindings::infer(Constraint *constraint) {
   case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::OpenedExistentialOf:
   case ConstraintKind::KeyPath:
-  case ConstraintKind::ClosureBodyElement:
+  case ConstraintKind::SyntacticElement:
   case ConstraintKind::Conjunction:
   case ConstraintKind::BindTupleOfFunctionParams:
     // Constraints from which we can't do anything.
