@@ -777,21 +777,6 @@ function set_build_options_for_host() {
             ;;
     esac
 
-
-    # We don't currently support building compiler-rt for cross-compile targets.
-    # It's not clear that's useful anyway.
-    if [[ $(is_cross_tools_host "${host}") ]] ; then
-      llvm_cmake_options+=(
-          -DLLVM_TOOL_COMPILER_RT_BUILD:BOOL=FALSE
-          -DLLVM_BUILD_EXTERNAL_COMPILER_RT:BOOL=FALSE
-      )
-    else
-      llvm_cmake_options+=(
-          -DLLVM_TOOL_COMPILER_RT_BUILD:BOOL="$(false_true ${SKIP_BUILD_COMPILER_RT})"
-          -DLLVM_BUILD_EXTERNAL_COMPILER_RT:BOOL="$(false_true ${SKIP_BUILD_COMPILER_RT})"
-      )
-    fi
-
     # If we are asked to not generate test targets for LLVM and or Swift,
     # disable as many LLVM tools as we can. This improves compile time when
     # compiling with LTO.
@@ -1803,9 +1788,12 @@ for host in "${ALL_HOSTS[@]}"; do
                 )
 
                 llvm_enable_projects=("clang")
+                llvm_enable_runtimes=("")
 
                 if [[ ! "${SKIP_BUILD_COMPILER_RT}" && ! $(is_cross_tools_host ${host}) ]]; then
-                    llvm_enable_projects+=("compiler-rt")
+                    llvm_enable_runtimes+=("compiler-rt")
+                    build_targets=("${build_targets[@]}"
+                                    runtimes)
                 fi
 
                 if [[ ! "${SKIP_BUILD_CLANG_TOOLS_EXTRA}" ]]; then
@@ -1818,6 +1806,7 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 cmake_options+=(
                     -DLLVM_ENABLE_PROJECTS="$(join ";" ${llvm_enable_projects[@]})"
+                    -DLLVM_ENABLE_RUNTIMES="$(join ";" ${llvm_enable_runtimes[@]})"
                 )
 
                 # NOTE: This is not a dead option! It is relied upon for certain
