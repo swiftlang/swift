@@ -143,7 +143,7 @@ extension String {
 let stringToInt = freeMemberFunc(String.toInt)
 // if only Character also had a toInt method
 let charToString = { (c: Character) -> String in String(c) }
-let charToInt = { (c: Character) -> Int in stringToInt(charToString(c)) }
+let charToInt = { (c: Character) -> Int? in stringToInt(charToString(c)) }
 
 func sum<S: Sequence>(_ nums: S)->S.Element where S.Element: FixedWidthInteger {
     return nums.reduce(0,+)
