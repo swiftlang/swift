@@ -93,7 +93,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::PlaceholderType:
   case ConstraintLocator::ImplicitConversion:
   case ConstraintLocator::ImplicitDynamicMemberSubscript:
-  case ConstraintLocator::ClosureBodyElement:
+  case ConstraintLocator::SyntacticElement:
   case ConstraintLocator::PackType:
   case ConstraintLocator::PackElement:
   case ConstraintLocator::PatternBindingElement:
@@ -554,10 +554,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
       out << "placeholder type";
       break;
 
-    case ConstraintLocator::ClosureBodyElement:
+    case ConstraintLocator::SyntacticElement:
       // TODO: Would be great to print a kind of element this is e.g.
       //       "if", "for each", "switch" etc.
-      out << "closure body element";
+      out << "syntactic element";
       break;
 
     case ConstraintLocator::ImplicitDynamicMemberSubscript:

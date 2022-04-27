@@ -5079,8 +5079,8 @@ void constraints::simplifyLocator(ASTNode &anchor,
       continue;
     }
 
-    case ConstraintLocator::ClosureBodyElement: {
-      auto bodyElt = path[0].castTo<LocatorPathElt::ClosureBodyElement>();
+    case ConstraintLocator::SyntacticElement: {
+      auto bodyElt = path[0].castTo<LocatorPathElt::SyntacticElement>();
       anchor = bodyElt.getElement();
       path = path.slice(1);
       continue;
