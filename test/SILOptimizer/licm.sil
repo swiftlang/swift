@@ -8,6 +8,13 @@ sil_stage canonical
 import Builtin
 import Swift
 
+class Storage {
+  init()
+}
+
+// globalArray
+sil_global @globalArray : $Storage
+
 // CHECK-LABEL: @memset
 
 // CHECK: bb0
@@ -1397,3 +1404,71 @@ bb6:
   return %15 : $()
 }
 
+struct UInt64 {
+  @_hasStorage var _value: Builtin.Int64 { get set }
+  init(_value: Builtin.Int64)
+}
+
+public struct UInt64Wrapper {
+  @_hasStorage public var rawValue: UInt64 { get set }
+  private init(_ rawValue: UInt64)
+  public init()
+}
+
+// rdar://92191909 (LICM assertion: isSubObjectProjection(), MemAccessUtils.h, line 1069)
+//
+// projectLoadValue needs to rematerialize a loaded value within the
+// loop using projections and the loop-invariant address is an
+// index_addr.
+//
+// The store inside the loop is deleted, and the load is hoisted such
+// that it now loads the UInt64Wrapper instead of Builtin.Int64
+// CHECK-LABEL: sil @testTailProjection : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK:   [[A:%.*]] = index_addr %4 : $*UInt64Wrapper, %1 : $Builtin.Word
+// CHECK:   store %{{.*}} to [[A]] : $*UInt64Wrapper
+// CHECK:   load %5 : $*UInt64Wrapper
+// CHECK:   br bb1
+// CHECK: bb1(%{{.*}} : $Builtin.Int64, %{{.*}} : $UInt64Wrapper, [[PHI:%.*]] : $UInt64Wrapper):
+// CHECK:   cond_br undef, bb3, bb2
+// CHECK: bb2:
+// CHECK-NOT: (load|store)
+// CHECK:   struct_extract [[PHI]] : $UInt64Wrapper, #UInt64Wrapper.rawValue
+// CHECK:   struct_extract
+// CHECK:   struct $UInt64
+// CHECK:   struct $UInt64Wrapper
+// CHECK-NOT: (load|store)
+// CHECK:   br bb1
+// CHECK: bb3:
+// CHECK:   store [[PHI]] to [[A]] : $*UInt64Wrapper
+// CHECK-LABEL: } // end sil function 'testTailProjection'
+sil @testTailProjection : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 0
+  %1 = integer_literal $Builtin.Word, 1
+  %2 = integer_literal $Builtin.Word, 2
+  %3 = alloc_ref [tail_elems $UInt64Wrapper * %2 : $Builtin.Word] $Storage
+  %4 = ref_tail_addr %3 : $Storage, $UInt64Wrapper
+  %5 = index_addr %4 : $*UInt64Wrapper, %1 : $Builtin.Word
+  %6 = struct $UInt64 (%0 : $Builtin.Int64)
+  %7 = struct $UInt64Wrapper (%6 : $UInt64)
+  store %7 to %5 : $*UInt64Wrapper
+  %9 = load %5 : $*UInt64Wrapper
+  br bb1(%0 : $Builtin.Int64, %9 : $UInt64Wrapper)
+
+bb1(%11 : $Builtin.Int64, %12 : $UInt64Wrapper):
+  cond_br undef, bb3, bb2
+
+bb2:
+  %14 = struct_element_addr %5 : $*UInt64Wrapper, #UInt64Wrapper.rawValue
+  %15 = struct_element_addr %14 : $*UInt64, #UInt64._value
+  %16 = load %15 : $*Builtin.Int64
+  %17 = struct $UInt64 (%16 : $Builtin.Int64)
+  %18 = struct $UInt64Wrapper (%17 : $UInt64)
+  store %18 to %5 : $*UInt64Wrapper
+  br bb1(%16 : $Builtin.Int64, %18 : $UInt64Wrapper)
+
+bb3:
+  %21 = tuple ()
+  return %21 : $()
+}
