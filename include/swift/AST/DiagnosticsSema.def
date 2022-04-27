@@ -4527,8 +4527,8 @@ ERROR(actor_inheritance,none,
       (bool))
 
 ERROR(actor_protocol_illegal_inheritance,none,
-      "non-actor type %0 cannot conform to the 'Actor' protocol",
-      (DeclName))
+      "non-actor type %0 cannot conform to the %1 protocol",
+      (DeclName, DeclName))
 ERROR(distributed_actor_conformance_missing_system_type,none,
       "distributed actor %0 does not declare ActorSystem it can be used with.",
       (DeclName))

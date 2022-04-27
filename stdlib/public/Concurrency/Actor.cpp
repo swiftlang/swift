@@ -1105,7 +1105,7 @@ static void traceJobQueue(DefaultActorImpl *actor, Job *first) {
 static SWIFT_ATTRIBUTE_ALWAYS_INLINE void traceActorStateTransition(DefaultActorImpl *actor,
     ActiveActorStatus oldState, ActiveActorStatus newState) {
 
-  SWIFT_TASK_DEBUG_LOG("Actor %p transitioned from %#x to %#x (%s)\n", actor,
+  SWIFT_TASK_DEBUG_LOG("Actor %p transitioned from %#x to %#x (%s)", actor,
                        oldState.getOpaqueFlags(), newState.getOpaqueFlags(),
                        __FUNCTION__);
   newState.traceStateChanged(actor);

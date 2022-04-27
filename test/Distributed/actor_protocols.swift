@@ -14,8 +14,9 @@ typealias DefaultDistributedActorSystem = FakeActorSystem
 actor A: Actor {} // ok
 
 class C: Actor, UnsafeSendable {
-  // expected-error@-1{{non-actor type 'C' cannot conform to the 'Actor' protocol}} {{1-6=actor}}
-  // expected-warning@-2{{'UnsafeSendable' is deprecated: Use @unchecked Sendable instead}}
+  // expected-error@-1{{non-actor type 'C' cannot conform to the 'AnyActor' protocol}} {{1-6=actor}}
+  // expected-error@-2{{non-actor type 'C' cannot conform to the 'Actor' protocol}} {{1-6=actor}}
+  // expected-warning@-3{{'UnsafeSendable' is deprecated: Use @unchecked Sendable instead}}
   nonisolated var unownedExecutor: UnownedSerialExecutor {
     fatalError()
   }
@@ -43,10 +44,10 @@ distributed actor DA: DistributedActor {
   typealias ActorSystem = FakeActorSystem
 }
 
-// FIXME(distributed): error reporting is a bit whacky here; needs cleanup
-// expected-error@+2{{actor type 'A2' cannot conform to the 'DistributedActor' protocol. Isolation rules of these actor types are not interchangeable.}}
-// expected-error@+1{{actor type 'A2' cannot conform to the 'DistributedActor' protocol. Isolation rules of these actor types are not interchangeable.}}
 actor A2: DistributedActor {
+// FIXME(distributed): error reporting is a bit whacky here; needs cleanup
+// expected-error@-2{{actor type 'A2' cannot conform to the 'DistributedActor' protocol. Isolation rules of these actor types are not interchangeable.}}
+// expected-error@-3{{actor type 'A2' cannot conform to the 'DistributedActor' protocol. Isolation rules of these actor types are not interchangeable.}}
   nonisolated var id: ID {
     fatalError()
   }
@@ -63,8 +64,9 @@ actor A2: DistributedActor {
   }
 }
 
-// expected-error@+1{{non-distributed actor type 'C2' cannot conform to the 'DistributedActor' protocol}}
-final class C2: DistributedActor {
+final class DA2: DistributedActor {
+// expected-error@-1{{non-actor type 'DA2' cannot conform to the 'AnyActor' protocol}}
+// expected-error@-2{{non-distributed actor type 'DA2' cannot conform to the 'DistributedActor' protocol}}
   nonisolated var id: ID {
     fatalError()
   }
@@ -86,3 +88,19 @@ struct S2: DistributedActor {
   // expected-error@-3{{type 'S2' does not conform to protocol 'Identifiable'}}
 }
 
+// ==== -----------------------------------------------------------------------
+
+actor A3: AnyActor {} // ok
+distributed actor DA3: AnyActor {} // ok
+
+class C3: AnyActor, @unchecked Sendable {
+  // expected-error@-1{{non-actor type 'C3' cannot conform to the 'AnyActor' protocol}} {{1-6=actor}}
+}
+
+struct S3: AnyActor {
+  // expected-error@-1{{non-class type 'S3' cannot conform to class protocol 'AnyActor'}}
+}
+
+enum E3: AnyActor {
+  // expected-error@-1{{non-class type 'E3' cannot conform to class protocol 'AnyActor'}}
+}
