@@ -25,11 +25,15 @@ namespace swift {
 
 /// Identifies a thread
 class Thread {
+public:
+  using Id = threading_impl::thread_id;
+
 private:
-  threading_impl::thread_id id_;
+  Id id_;
 
 public:
   Thread() {}
+  explicit Thread(Id platformId) : id_(platformId) {}
   Thread(const Thread& other) : id_(other.id_) {}
   Thread(Thread&& other) : id_(std::move(other.id_)) {}
 
@@ -42,6 +46,9 @@ public:
     id_ = other.id_;
     return *this;
   }
+
+  /// Returns the platform specific thread ID
+  Id platformThreadId() const { return id_; }
 
   /// Returns the currently executing thread
   static Thread current() {
