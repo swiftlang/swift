@@ -110,7 +110,14 @@ FailureDiagnostic::emitDiagnosticAt(ArgTypes &&... Args) const {
 
 Expr *FailureDiagnostic::findParentExpr(const Expr *subExpr) const {
   auto &cs = getConstraintSystem();
-  return cs.getParentExpr(const_cast<Expr *>(subExpr));
+  if (auto *expr = cs.getParentExpr(const_cast<Expr *>(subExpr))) {
+    // If parent is an implicit `~=` - ignore it, because it's generated
+    // to ease solution application in correct cases.
+    return expr->isImplicit() && isPatternMatchingOperator(expr) ? nullptr
+                                                                 : expr;
+  }
+
+  return nullptr;
 }
 
 ArgumentList *
@@ -486,7 +493,9 @@ bool MissingConformanceFailure::diagnoseAsError() {
   // diagnostic.
   if (isPatternMatchingOperator(anchor)) {
     auto *expr = castToExpr(anchor);
-    if (auto *binaryOp = dyn_cast_or_null<BinaryExpr>(findParentExpr(expr))) {
+    auto &cs = getConstraintSystem();
+
+    if (auto *binaryOp = dyn_cast_or_null<BinaryExpr>(cs.getParentExpr(expr))) {
       auto *caseExpr = binaryOp->getLHS();
 
       llvm::SmallPtrSet<Expr *, 4> anchors;
@@ -498,7 +507,6 @@ bool MissingConformanceFailure::diagnoseAsError() {
       }
 
       bool hasFix = false;
-      auto &cs = getConstraintSystem();
       cs.forEachExpr(caseExpr, [&](Expr *expr) -> Expr * {
         hasFix |= anchors.count(expr);
         return hasFix ? nullptr : expr;

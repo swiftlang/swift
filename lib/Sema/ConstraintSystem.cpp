@@ -5566,6 +5566,9 @@ static bool isOperator(Expr *expr, StringRef expectedName) {
 }
 
 Optional<Identifier> constraints::getOperatorName(Expr *expr) {
+  if (auto *apply = dyn_cast<ApplyExpr>(expr))
+    return getOperatorName(apply->getFn());
+
   ValueDecl *choice = nullptr;
   if (auto *ODRE = dyn_cast_or_null<OverloadedDeclRefExpr>(expr)) {
     choice = ODRE->getDecls().front();
