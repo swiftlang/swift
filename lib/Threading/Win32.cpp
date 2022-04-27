@@ -16,6 +16,10 @@
 
 #if SWIFT_THREADING_WIN32
 
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+
 #include "swift/Threading/Errors.h"
 #include "swift/Threading/Impl/Win32.h"
 
