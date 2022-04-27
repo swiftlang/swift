@@ -17,6 +17,13 @@
 #ifndef SWIFT_CONCURRENCY_TASKPRIVATE_H
 #define SWIFT_CONCURRENCY_TASKPRIVATE_H
 
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#define VC_EXTRA_LEAN
+#define NOMINMAX
+#include <Windows.h>
+#endif
+
 #include "Error.h"
 #include "Tracing.h"
 #include "swift/ABI/Metadata.h"
@@ -35,12 +42,6 @@
 
 #if HAVE_PTHREAD_H
 #include <pthread.h>
-#endif
-#if defined(_WIN32)
-#define WIN32_LEAN_AND_MEAN
-#define VC_EXTRA_LEAN
-#define NOMINMAX
-#include <Windows.h>
 #endif
 
 namespace swift {

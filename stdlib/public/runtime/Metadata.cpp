@@ -14,6 +14,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+// Avoid defining macro max(), min() which conflict with std::max(), std::min()
+#define NOMINMAX
+#include <windows.h>
+#endif
+
 #include "swift/Runtime/Metadata.h"
 #include "MetadataCache.h"
 #include "swift/Basic/Lazy.h"
@@ -37,12 +44,6 @@
 #include <new>
 #include <unordered_set>
 #include <vector>
-#if defined(_WIN32)
-#define WIN32_LEAN_AND_MEAN
-// Avoid defining macro max(), min() which conflict with std::max(), std::min()
-#define NOMINMAX
-#include <windows.h>
-#endif
 #if SWIFT_PTRAUTH
 #include <ptrauth.h>
 #endif
