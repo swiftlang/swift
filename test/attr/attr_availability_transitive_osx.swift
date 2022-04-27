@@ -110,11 +110,42 @@ extension Outer {
 }
 
 @available(OSX, unavailable)
-struct NotOnOSX {
+struct NotOnOSX { // expected-note {{'NotOnOSX' has been explicitly marked unavailable here}}
   var osx_init_osx = osx() // OK
   lazy var osx_lazy_osx = osx() // OK
   var osx_init_multi1_osx = osx(), osx_init_multi2_osx = osx() // OK
   var (osx_init_deconstruct1_osx, osx_init_deconstruct2_osx) = osx_pair() // OK
   var (_, osx_init_deconstruct2_only_osx) = osx_pair() // OK
   var (osx_init_deconstruct1_only_osx, _) = osx_pair() // OK
+}
+
+@available(OSX, unavailable)
+extension NotOnOSX {
+  func osx_call_osx() {
+    osx() // OK
+  }
+
+  func osx_call_osx_extension() {
+    osx_extension() // OK; osx_extension is only unavailable if -application-extension is passed.
+  }
+}
+
+@available(OSXApplicationExtension, unavailable)
+extension NotOnOSX { } // expected-error {{'NotOnOSX' is unavailable in macOS}}
+
+@available(OSXApplicationExtension, unavailable)
+struct NotOnOSXApplicationExtension { }
+
+@available(OSX, unavailable)
+extension NotOnOSXApplicationExtension { } // OK; NotOnOSXApplicationExtension is only unavailable if -application-extension is passed.
+
+@available(OSXApplicationExtension, unavailable)
+extension NotOnOSXApplicationExtension {
+  func osx_call_osx() {
+    osx() // expected-error {{'osx()' is unavailable in macOS}}
+  }
+
+  func osx_call_osx_extension() {
+    osx_extension() // OK
+  }
 }
