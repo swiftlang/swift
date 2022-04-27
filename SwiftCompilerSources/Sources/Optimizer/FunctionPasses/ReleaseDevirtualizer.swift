@@ -32,6 +32,8 @@ import SIL
 /// in the deinit method).
 let releaseDevirtualizerPass = FunctionPass(
   name: "release-devirtualizer", { function, context in
+    var allocs = [AllocRefInstBase]()
+    
     for block in function.blocks {
       // The last `release_value`` or `strong_release`` instruction before the
       // deallocation.
@@ -44,9 +46,11 @@ let releaseDevirtualizerPass = FunctionPass(
           // _not_ released by the deinit method.
           if let deallocStackRef = instruction as? DeallocStackRefInst {
             if !context.continueWithNextSubpassRun(for: release) {
-              return
+              return // Question: should this be continue?
             }
-            tryDevirtualizeReleaseOfObject(context, release, deallocStackRef)
+            if let alloc = tryDevirtualizeReleaseOfObject(context, release, deallocStackRef) {
+                allocs.append(alloc)
+            }
             lastRelease = nil
             continue
           }
@@ -63,6 +67,21 @@ let releaseDevirtualizerPass = FunctionPass(
             }
         }
       }
+      
+      var toRemove = [Instruction]()
+      for alloc in allocs {
+        for use in alloc.uses {
+          let user = use.instruction
+          if user is ReleaseValueInst || user is StrongReleaseInst || 
+            user is RetainValueInst || user is StrongRetainInst {
+            toRemove.append(user)
+          }
+        }
+      }
+      
+      for inst in toRemove { 
+        context.erase(instruction: inst) 
+      }
     }
   }
 )
@@ -72,7 +91,7 @@ private func tryDevirtualizeReleaseOfObject(
   _ context: PassContext,
   _ release: RefCountingInst,
   _ deallocStackRef: DeallocStackRefInst
-) {
+) -> AllocRefInstBase? {
   let allocRefInstruction = deallocStackRef.allocRef
   var root = release.operands[0].value
   while let newRoot = stripRCIdentityPreservingInsts(root) {
@@ -80,13 +99,13 @@ private func tryDevirtualizeReleaseOfObject(
   }
 
   if root != allocRefInstruction {
-    return
+    return nil
   }
 
   let type = allocRefInstruction.type
 
   guard let dealloc = context.calleeAnalysis.getDestructor(ofExactType: type) else {
-    return
+    return nil
   }
 
   let builder = Builder(at: release, location: release.location, context)
@@ -107,6 +126,8 @@ private func tryDevirtualizeReleaseOfObject(
   let substitutionMap = context.getContextSubstitutionMap(for: type)
   builder.createApply(function: functionRef, substitutionMap, arguments: [object])
   context.erase(instruction: release)
+  
+  return allocRefInstruction
 }
 
 private func stripRCIdentityPreservingInsts(_ value: Value) -> Value? {
