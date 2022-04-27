@@ -3512,7 +3512,8 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
       std::rotate(thunkIndirectResults.begin(), thunkIndirectResults.end() - 1,
                   thunkIndirectResults.end());
     }
-    std::rotate(toResults.begin(), toResults.end() - 1, toResults.end());
+    if (!toParameters[0].isIndirectMutating())
+      std::rotate(toResults.begin(), toResults.end() - 1, toResults.end());
   }
   if (reorderSelf && linearMapKind == AutoDiffLinearMapKind::Differential &&
       thunkArguments.size() > 1) {
@@ -3623,7 +3624,8 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
 
   // Handle self reordering.
   // For pullbacks: rotate direct results if self is direct.
-  if (reorderSelf && linearMapKind == AutoDiffLinearMapKind::Pullback) {
+  if (reorderSelf && linearMapKind == AutoDiffLinearMapKind::Pullback &&
+      !toParameters[0].isIndirectMutating()) {
     auto fromSelfResult = fromConv.getResults().front();
     auto toSelfResult = toConv.getResults().back();
     assert(fromSelfResult.getInterfaceType() ==
