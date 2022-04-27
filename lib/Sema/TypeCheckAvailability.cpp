@@ -3924,11 +3924,14 @@ static bool declNeedsExplicitAvailability(const Decl *decl) {
       decl->isImplicit())
     return false;
 
+  // Skip unavailable decls.
+  if (AvailableAttr::isUnavailable(decl))
+    return false;
+
   // Warn on decls without an introduction version.
   auto &ctx = decl->getASTContext();
   auto safeRangeUnderApprox = AvailabilityInference::availableRange(decl, ctx);
-  return !safeRangeUnderApprox.getOSVersion().hasLowerEndpoint() &&
-         !decl->getAttrs().isUnavailable(ctx);
+  return !safeRangeUnderApprox.getOSVersion().hasLowerEndpoint();
 }
 
 void swift::checkExplicitAvailability(Decl *decl) {
