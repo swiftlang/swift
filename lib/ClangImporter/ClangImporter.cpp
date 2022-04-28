@@ -104,7 +104,7 @@ namespace {
                             StringRef FileName,
                             bool IsAngled,
                             clang::CharSourceRange FilenameRange,
-                            const clang::FileEntry *File,
+                            Optional<clang::FileEntryRef> File,
                             StringRef SearchPath,
                             StringRef RelativePath,
                             const clang::Module *Imported,
@@ -282,14 +282,14 @@ private:
                           StringRef FileName,
                           bool IsAngled,
                           clang::CharSourceRange FilenameRange,
-                          const clang::FileEntry *File,
+                          Optional<clang::FileEntryRef> File,
                           StringRef SearchPath,
                           StringRef RelativePath,
                           const clang::Module *Imported,
                           clang::SrcMgr::CharacteristicKind FileType) override{
     if (!Imported) {
       if (File)
-        Impl.BridgeHeaderFiles.insert(File);
+        Impl.BridgeHeaderFiles.insert(*File);
       return;
     }
     // Synthesize identifier locations.
@@ -2930,16 +2930,18 @@ void ClangImporter::lookupBridgingHeaderDecls(
 bool ClangImporter::lookupDeclsFromHeader(StringRef Filename,
                               llvm::function_ref<bool(ClangNode)> filter,
                               llvm::function_ref<void(Decl*)> receiver) const {
-  auto File = getClangPreprocessor().getFileManager().getFile(Filename);
-  if (!File)
+  llvm::Expected<clang::FileEntryRef> ExpectedFile =
+      getClangPreprocessor().getFileManager().getFileRef(Filename);
+  if (!ExpectedFile)
     return true;
+  clang::FileEntryRef File = *ExpectedFile;
 
   auto &ClangCtx = getClangASTContext();
   auto &ClangSM = ClangCtx.getSourceManager();
   auto &ClangPP = getClangPreprocessor();
 
   // Look up the header in the includes of the bridging header.
-  if (Impl.BridgeHeaderFiles.count(*File)) {
+  if (Impl.BridgeHeaderFiles.count(File)) {
     auto headerFilter = [&](ClangNode ClangN) -> bool {
       if (ClangN.isNull())
         return false;
@@ -2948,7 +2950,9 @@ bool ClangImporter::lookupDeclsFromHeader(StringRef Filename,
       if (ClangLoc.isInvalid())
         return false;
 
-      if (ClangSM.getFileEntryForID(ClangSM.getFileID(ClangLoc)) != *File)
+      Optional<clang::FileEntryRef> LocRef =
+          ClangSM.getFileEntryRefForID(ClangSM.getFileID(ClangLoc));
+      if (!LocRef || *LocRef != File)
         return false;
 
       return filter(ClangN);
@@ -2958,7 +2962,7 @@ bool ClangImporter::lookupDeclsFromHeader(StringRef Filename,
     return false;
   }
 
-  clang::FileID FID = ClangSM.translateFile(*File);
+  clang::FileID FID = ClangSM.translateFile(File);
   if (FID.isInvalid())
     return false;
 
