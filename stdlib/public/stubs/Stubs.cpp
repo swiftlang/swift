@@ -562,23 +562,23 @@ __swift_bool _swift_stdlib_getCurrentStackBounds(__swift_uintptr_t *outBegin,
 
 #elif SWIFT_THREADING_WIN32
 
-# if _WIN32_WINNT >= 0x0602
+#if _WIN32_WINNT >= 0x0602
   ULONG_PTR lowLimit = 0;
   ULONG_PTR highLimit = 0;
   GetCurrentThreadStackLimits(&lowLimit, &highLimit);
   *outBegin = lowLimit;
   *outEnd = highLimit;
   return true;
-# else
+#else
   // Need _WIN32_WINNT to be 0x0602 or higher to use
   // GetCurrentThreadStackLimits().  We could use VirtualQuery() instead,
   // and give it the address of a page we know is on the stack?
   return false;
-# endif
+#endif
 
 #elif SWIFT_THREADING_PTHREADS || SWIFT_THREADING_LINUX
 
-# if defined(__OpenBSD__)
+#if defined(__OpenBSD__)
   stack_t sinfo;
   if (pthread_stackseg_np(pthread_self(), &sinfo) != 0) {
     return false;
@@ -587,18 +587,18 @@ __swift_bool _swift_stdlib_getCurrentStackBounds(__swift_uintptr_t *outBegin,
   *outBegin = (uintptr_t)sinfo.ss_sp - sinfo.ss_size;
   *outEnd = (uintptr_t)sinfo.ss_sp;
   return true;
-# elif defined(__FreeBSD__) || defined(__ANDROID__) || defined(__linux__)
+#elif defined(__FreeBSD__) || defined(__ANDROID__) || defined(__linux__)
   pthread_attr_t attr;
 
-#   if defined(__FreeBSD__)
+#if defined(__FreeBSD__)
   if (0 != pthread_attr_init(&attr) || 0 != pthread_attr_get_np(pthread_self(), &attr)) {
     return false;
   }
-#   else
+#else
   if (0 != pthread_getattr_np(pthread_self(), &attr)) {
     return false;
   }
-#   endif
+#endif
 
   void *begin = nullptr;
   size_t size = 0;
@@ -609,10 +609,10 @@ __swift_bool _swift_stdlib_getCurrentStackBounds(__swift_uintptr_t *outBegin,
 
   pthread_attr_destroy(&attr);
   return success;
-# else
-#   warning Please teach _swift_stdlib_getCurrentStackBounds() about your platform
+#else
+#warning Please teach _swift_stdlib_getCurrentStackBounds() about your platform
   return false;
-# endif
+#endif
 
 #else
 # error Unknown threading package selected; please teach _swift_stdlib_getCurrentStackBounds() what to do.

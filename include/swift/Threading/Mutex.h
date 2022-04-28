@@ -29,7 +29,8 @@ namespace swift {
 
 /// Compile time adjusted stack based object that locks/unlocks the supplied
 /// Mutex type. Use the provided typedefs instead of this directly.
-template <typename T, bool Inverted> class ScopedLockT {
+template <typename T, bool Inverted>
+class ScopedLockT {
   ScopedLockT() = delete;
   ScopedLockT(const ScopedLockT &) = delete;
   ScopedLockT &operator=(const ScopedLockT &) = delete;

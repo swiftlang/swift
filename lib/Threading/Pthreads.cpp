@@ -16,8 +16,8 @@
 
 #if SWIFT_THREADING_PTHREADS
 
-#include "swift/Threading/Errors.h"
 #include "swift/Threading/Impl/Pthreads.h"
+#include "swift/Threading/Errors.h"
 
 namespace {
 
@@ -27,6 +27,7 @@ namespace {
 class MainThreadRememberer {
 private:
   pthread_t mainThread_;
+
 public:
   MainThreadRememberer() { mainThread_ = pthread_self(); }
 
@@ -34,25 +35,22 @@ public:
 };
 
 MainThreadRememberer rememberer;
-pthread_mutex_t      onceMutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t       onceCond = PTHREAD_COND_INITIALIZER;
+pthread_mutex_t onceMutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t onceCond = PTHREAD_COND_INITIALIZER;
 
 #pragma clang diagnostic pop
 
-}
+} // namespace
 
 using namespace swift;
 using namespace threading_impl;
 
-bool
-swift::threading_impl::thread_is_main() {
+bool swift::threading_impl::thread_is_main() {
   return pthread_equal(pthread_self(), rememberer.main_thread());
 }
 
-void
-swift::threading_impl::once_slow(once_t &predicate,
-                                 void (*fn)(void *),
-                                 void *context) {
+void swift::threading_impl::once_slow(once_t &predicate, void (*fn)(void *),
+                                      void *context) {
   std::int64_t zero = 0;
   if (predicate.compare_exchange_strong(zero, (std::int64_t)1,
                                         std::memory_order_relaxed,

@@ -19,27 +19,24 @@
 #define SWIFT_THREADING_IMPL_H
 
 // Try to autodetect if we aren't told what to do
-#if !SWIFT_THREADING_NONE && \
-    !SWIFT_THREADING_DARWIN && \
-    !SWIFT_THREADING_LINUX && \
-    !SWIFT_THREADING_PTHREADS && \
-    !SWIFT_THREADING_C11 && \
-    !SWIFT_THREADING_WIN32
-  #ifdef __APPLE__
-    #define SWIFT_THREADING_DARWIN 1
-  #elif defined(__linux__)
-    #define SWIFT_THREADING_LINUX 1
-  #elif defined(_WIN32)
-    #define SWIFT_THREADING_WIN32 1
-  #elif defined(__wasi__)
-    #define SWIFT_THREADING_NONE 1
-  #elif __has_include(<threads.h>)
-    #define SWIFT_THREADING_C11 1
-  #elif __has_include(<pthread.h>)
-    #define SWIFT_THREADING_PTHREADS 1
-  #else
-    #error Unable to autodetect threading package.  Please define SWIFT_THREADING_x as appropriate for your platform.
-  #endif
+#if !SWIFT_THREADING_NONE && !SWIFT_THREADING_DARWIN &&                        \
+    !SWIFT_THREADING_LINUX && !SWIFT_THREADING_PTHREADS &&                     \
+    !SWIFT_THREADING_C11 && !SWIFT_THREADING_WIN32
+#ifdef __APPLE__
+#define SWIFT_THREADING_DARWIN 1
+#elif defined(__linux__)
+#define SWIFT_THREADING_LINUX 1
+#elif defined(_WIN32)
+#define SWIFT_THREADING_WIN32 1
+#elif defined(__wasi__)
+#define SWIFT_THREADING_NONE 1
+#elif __has_include(<threads.h>)
+#define SWIFT_THREADING_C11 1
+#elif __has_include(<pthread.h>)
+#define SWIFT_THREADING_PTHREADS 1
+#else
+#error Unable to autodetect threading package.  Please define SWIFT_THREADING_x as appropriate for your platform.
+#endif
 #endif
 
 #if SWIFT_THREADING_NONE

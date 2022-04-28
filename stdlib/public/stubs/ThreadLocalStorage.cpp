@@ -13,8 +13,8 @@
 #include <cstring>
 
 #include "SwiftShims/ThreadLocalStorage.h"
-#include "swift/Threading/ThreadLocalStorage.h"
 #include "swift/Runtime/Debug.h"
+#include "swift/Threading/ThreadLocalStorage.h"
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 void _stdlib_destroyTLS(void *);
@@ -40,9 +40,8 @@ _swift_stdlib_threadLocalStorageGet(void) {
     return value;
 
   static swift::once_t token;
-  swift::tls_init_once(token, SWIFT_STDLIB_TLS_KEY, [](void *pointer) {
-    _stdlib_destroyTLS(pointer);
-  });
+  swift::tls_init_once(token, SWIFT_STDLIB_TLS_KEY,
+                       [](void *pointer) { _stdlib_destroyTLS(pointer); });
 
   value = _stdlib_createTLS();
   swift::tls_set(SWIFT_STDLIB_TLS_KEY, value);
@@ -54,9 +53,8 @@ _swift_stdlib_threadLocalStorageGet(void) {
   static swift::tls_key key;
   static swift::once_t token;
 
-  swift::tls_alloc_once(token, key, [](void *pointer) {
-    _stdlib_destroyTLS(pointer);
-  });
+  swift::tls_alloc_once(token, key,
+                        [](void *pointer) { _stdlib_destroyTLS(pointer); });
 
   void *value = swift::tls_get(key);
   if (!value) {
@@ -66,5 +64,4 @@ _swift_stdlib_threadLocalStorageGet(void) {
   return value;
 
 #endif
-
 }

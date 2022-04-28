@@ -1,4 +1,5 @@
-//===--- ThreadLocalStorage.h - Thread-local storage interface. --*- C++ -*-===//
+//===--- ThreadLocalStorage.h - Thread-local storage interface. --*- C++
+//-*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -15,9 +16,9 @@
 
 #include <type_traits>
 
+#include "Errors.h"
 #include "Impl.h"
 #include "Once.h"
-#include "Errors.h"
 
 namespace swift {
 
@@ -32,12 +33,19 @@ using threading_impl::tls_init;
 
 /// tls_init_once() - Initialize TLS, once only
 inline void tls_init_once(once_t &token, tls_key key, tls_dtor dtor) {
-  const struct tls_init_info { tls_key &k; tls_dtor d; } info = { key, dtor };
-  once(token, [](void *ctx) {
-    const struct tls_init_info *pinfo = static_cast<const struct tls_init_info *>(ctx);
-    if (!tls_init(pinfo->k, pinfo->d))
-      swift::threading::fatal("tls_init_once() failed to set destructor");
-  }, (void *)&info);
+  const struct tls_init_info {
+    tls_key &k;
+    tls_dtor d;
+  } info = {key, dtor};
+  once(
+      token,
+      [](void *ctx) {
+        const struct tls_init_info *pinfo =
+            static_cast<const struct tls_init_info *>(ctx);
+        if (!tls_init(pinfo->k, pinfo->d))
+          swift::threading::fatal("tls_init_once() failed to set destructor");
+      },
+      (void *)&info);
 }
 #endif // SWIFT_THREADING_USE_RESERVED_TLS_KEYS
 
@@ -47,12 +55,19 @@ using threading_impl::tls_set;
 
 /// tls_alloc_once() - Allocate TLS key, once only
 inline void tls_alloc_once(once_t &token, tls_key &key, tls_dtor dtor) {
-  const struct tls_init_info { tls_key &k; tls_dtor d; } info = { key, dtor };
-  once(token, [](void *ctx) {
-    const struct tls_init_info *pinfo = static_cast<const struct tls_init_info *>(ctx);
-    if (!tls_alloc(pinfo->k, pinfo->d))
-      swift::threading::fatal("tls_alloc_once() failed to allocate key");
-  }, (void *)&info);
+  const struct tls_init_info {
+    tls_key &k;
+    tls_dtor d;
+  } info = {key, dtor};
+  once(
+      token,
+      [](void *ctx) {
+        const struct tls_init_info *pinfo =
+            static_cast<const struct tls_init_info *>(ctx);
+        if (!tls_alloc(pinfo->k, pinfo->d))
+          swift::threading::fatal("tls_alloc_once() failed to allocate key");
+      },
+      (void *)&info);
 }
 #endif // !SWIFT_THREADING_NONE
 
@@ -103,15 +118,18 @@ public:
 class ThreadLocalKey {
   // We rely on the zero-initialization of objects with static storage
   // duration.
-  once_t  onceFlag;
+  once_t onceFlag;
   tls_key key;
 
 public:
   threading_impl::tls_key getKey() {
-    once(onceFlag, [](void *ctx) {
-        tls_key *pkey = reinterpret_cast<tls_key *>(ctx);
-        tls_alloc(*pkey, nullptr);
-    }, &key);
+    once(
+        onceFlag,
+        [](void *ctx) {
+          tls_key *pkey = reinterpret_cast<tls_key *>(ctx);
+          tls_alloc(*pkey, nullptr);
+        },
+        &key);
     return key;
   }
 };
@@ -162,15 +180,14 @@ public:
 /// type must be equivalent to a bitwise zero-initialization, and the
 /// type must be small and trivially copyable and destructible.
 #if SWIFT_THREAD_LOCAL
-#define SWIFT_THREAD_LOCAL_TYPE(TYPE, KEY) \
+#define SWIFT_THREAD_LOCAL_TYPE(TYPE, KEY)                                     \
   SWIFT_THREAD_LOCAL swift::ThreadLocal<TYPE>
 #elif SWIFT_THREADING_USE_RESERVED_TLS_KEYS
-#define SWIFT_THREAD_LOCAL_TYPE(TYPE, KEY) \
+#define SWIFT_THREAD_LOCAL_TYPE(TYPE, KEY)                                     \
   swift::ThreadLocal<TYPE, swift::ConstantThreadLocalKey<KEY>>
 #else
-#define SWIFT_THREAD_LOCAL_TYPE(TYPE, KEY) \
+#define SWIFT_THREAD_LOCAL_TYPE(TYPE, KEY)                                     \
   swift::ThreadLocal<TYPE, swift::ThreadLocalKey>
 #endif
-
 
 #endif // SWIFT_THREADING_THREADLOCALSTORAGE_H

@@ -16,14 +16,15 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Runtime/Casting.h"
-#include "../SwiftShims/RuntimeShims.h"
-#include "../SwiftShims/GlobalObjects.h"
 #include "../CompatibilityOverride/CompatibilityOverride.h"
+#include "../SwiftShims/GlobalObjects.h"
+#include "../SwiftShims/RuntimeShims.h"
 #include "ErrorObject.h"
 #include "ExistentialMetadataImpl.h"
 #include "Private.h"
 #include "SwiftHashableSupport.h"
 #include "swift/Basic/Lazy.h"
+#include "swift/Basic/Unreachable.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Debug.h"
@@ -32,7 +33,6 @@
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Threading/Mutex.h"
-#include "swift/Basic/Unreachable.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerIntPair.h"
 #if SWIFT_OBJC_INTEROP

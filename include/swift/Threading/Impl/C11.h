@@ -17,32 +17,31 @@
 #ifndef SWIFT_THREADING_IMPL_C11_H
 #define SWIFT_THREADING_IMPL_C11_H
 
-#include <threads.h>
 #include <stdatomic.h>
+#include <threads.h>
 
 namespace swift {
 namespace threading_impl {
 
-#define SWIFT_C11THREADS_CHECK(expr)                                    \
-do {                                                                    \
-  int res_ = (expr);                                                    \
-  if (res_ != thrd_success)                                             \
-    swift::threading::fatal(#expr " failed with error %d\n", res_);     \
-} while (0)
+#define SWIFT_C11THREADS_CHECK(expr)                                           \
+  do {                                                                         \
+    int res_ = (expr);                                                         \
+    if (res_ != thrd_success)                                                  \
+      swift::threading::fatal(#expr " failed with error %d\n", res_);          \
+  } while (0)
 
-#define SWIFT_C11THREADS_RETURN_TRUE_OR_FALSE(expr)                     \
-do {                                                                    \
-  int res_ = (expr);                                                    \
-  switch (res_) {                                                       \
-  case thrd_success:                                                    \
-    return true;                                                        \
-  case thrd_busy:                                                       \
-    return false;                                                       \
-  default:                                                              \
-    swift::threading::fatal(#expr " failed with error (%d)\n", res_);   \
-  }                                                                     \
-} while (0)
-
+#define SWIFT_C11THREADS_RETURN_TRUE_OR_FALSE(expr)                            \
+  do {                                                                         \
+    int res_ = (expr);                                                         \
+    switch (res_) {                                                            \
+    case thrd_success:                                                         \
+      return true;                                                             \
+    case thrd_busy:                                                            \
+      return false;                                                            \
+    default:                                                                   \
+      swift::threading::fatal(#expr " failed with error (%d)\n", res_);        \
+    }                                                                          \
+  } while (0)
 
 // .. Thread related things ..................................................
 
@@ -58,7 +57,7 @@ inline bool threads_same(thread_id a, thread_id b) {
 
 using mutex_handle = ::mtx_t;
 
-inline void mutex_init(mutex_handle &handle, bool checked=false) {
+inline void mutex_init(mutex_handle &handle, bool checked = false) {
   SWIFT_C11THREADS_CHECK(::mtx_init(&handle), ::mtx_plain);
 }
 inline void mutex_destroy(mutex_handle &handle) {
@@ -83,8 +82,8 @@ inline void mutex_unsafe_unlock(mutex_handle &handle) {
 }
 
 struct lazy_mutex_handle {
-  ::mtx_t      mutex;
-  ::atomic_int once;    // -1 = initialized, 0 = uninitialized, 1 = initializing
+  ::mtx_t mutex;
+  ::atomic_int once; // -1 = initialized, 0 = uninitialized, 1 = initializing
 };
 
 inline constexpr lazy_mutex_handle lazy_mutex_initializer() {
@@ -95,9 +94,7 @@ inline void lazy_mutex_init(lazy_mutex_handle &handle) {
   if (::atomic_load_explicit(&handle.once, ::memory_order_acquire) < 0)
     return;
 
-  if (::atomic_compare_exchange_strong_explicit(&handle.once,
-                                                &(int){ 0 },
-                                                1,
+  if (::atomic_compare_exchange_strong_explicit(&handle.once, &(int){0}, 1,
                                                 ::memory_order_relaxed,
                                                 ::memory_order_relaxed)) {
     SWIFT_C11THREADS_CHECK(::mtx_init(&handle.mutex, ::mtx_plain));
@@ -164,13 +161,9 @@ inline bool tls_alloc(tls_key &key, tls_dtor dtor) {
   return ::tss_create(&key, dtor) == thrd_success;
 }
 
-inline void *tls_get(tls_key key) {
-  return ::tss_get(key);
-}
+inline void *tls_get(tls_key key) { return ::tss_get(key); }
 
-inline void tls_set(tls_key key, void *ptr) {
-  ::tss_set(key, ptr);
-}
+inline void tls_set(tls_key key, void *ptr) { ::tss_set(key, ptr); }
 
 } // namespace threading_impl
 

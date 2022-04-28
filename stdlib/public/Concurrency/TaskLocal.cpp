@@ -10,17 +10,17 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/ABI/TaskLocal.h"
 #include "../CompatibilityOverride/CompatibilityOverride.h"
+#include "TaskPrivate.h"
+#include "swift/ABI/Actor.h"
+#include "swift/ABI/Metadata.h"
+#include "swift/ABI/Task.h"
 #include "swift/Runtime/Atomic.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Threading/ThreadLocalStorage.h"
-#include "swift/ABI/TaskLocal.h"
-#include "swift/ABI/Task.h"
-#include "swift/ABI/Actor.h"
-#include "swift/ABI/Metadata.h"
 #include "llvm/ADT/PointerIntPair.h"
-#include "TaskPrivate.h"
 #include <new>
 #include <set>
 
@@ -64,9 +64,8 @@ public:
 };
 
 /// Define the thread-locals.
-SWIFT_THREAD_LOCAL_TYPE(
-    Pointer<TaskLocal::Storage>,
-    SWIFT_CONCURRENCY_FALLBACK_TASK_LOCAL_STORAGE_KEY)
+SWIFT_THREAD_LOCAL_TYPE(Pointer<TaskLocal::Storage>,
+                        SWIFT_CONCURRENCY_FALLBACK_TASK_LOCAL_STORAGE_KEY)
 FallbackTaskLocalStorage::Value;
 
 // ==== ABI --------------------------------------------------------------------

@@ -29,10 +29,10 @@ extern swift::once_t initializeToken;
 #include "../../../stdlib/public/runtime/EnvironmentVariables.def"
 
 // Define getter functions.
-#define VARIABLE(name, type, defaultValue, help)        \
-  inline type name() {                                  \
-    swift::once(initializeToken, initialize, nullptr);  \
-    return name ## _variable;                           \
+#define VARIABLE(name, type, defaultValue, help)                               \
+  inline type name() {                                                         \
+    swift::once(initializeToken, initialize, nullptr);                         \
+    return name##_variable;                                                    \
   }
 #include "../../../stdlib/public/runtime/EnvironmentVariables.def"
 

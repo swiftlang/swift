@@ -15,11 +15,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/ADT/DenseMap.h"
 #include "RuntimeInvocationsTracking.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Threading/Mutex.h"
+#include "llvm/ADT/DenseMap.h"
 
 #if defined(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS)
 

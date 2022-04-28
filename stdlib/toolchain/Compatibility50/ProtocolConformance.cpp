@@ -17,8 +17,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "Overrides.h"
 #include "../../public/runtime/Private.h"
+#include "Overrides.h"
 #include "swift/Threading/Once.h"
 #include <dlfcn.h>
 #include <mach-o/dyld.h>

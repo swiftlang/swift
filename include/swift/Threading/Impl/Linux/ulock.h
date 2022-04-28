@@ -26,9 +26,9 @@
 // various GCC/Clang extensions here.
 
 #include <linux/futex.h>
+#include <sys/syscall.h>
 #include <sys/time.h>
 #include <sys/types.h>
-#include <sys/syscall.h>
 #include <unistd.h>
 
 #include <atomic>
@@ -40,8 +40,8 @@ namespace linux {
 
 typedef std::int32_t ulock_t;
 
-#define ULOCK_INITIALIZER       0
-#define ulock_fastpath(x)       __builtin_expect((x), true)
+#define ULOCK_INITIALIZER 0
+#define ulock_fastpath(x) __builtin_expect((x), true)
 
 inline int ulock_get_tid(void) {
   static __thread int tid;
@@ -51,18 +51,16 @@ inline int ulock_get_tid(void) {
 }
 
 inline int ulock_futex(ulock_t *lock, int op) {
-  return syscall(SYS_futex, lock, op | FUTEX_PRIVATE_FLAG,
-                 0, nullptr, nullptr, 0);
+  return syscall(SYS_futex, lock, op | FUTEX_PRIVATE_FLAG, 0, nullptr, nullptr,
+                 0);
 }
 
 inline void ulock_lock(ulock_t *lock) {
   const ulock_t tid = ulock_get_tid();
   do {
     ulock_t zero = 0;
-    if (ulock_fastpath(__atomic_compare_exchange_n(lock, &zero,
-                                                   tid, true,
-                                                   __ATOMIC_ACQUIRE,
-                                                   __ATOMIC_RELAXED)))
+    if (ulock_fastpath(__atomic_compare_exchange_n(
+            lock, &zero, tid, true, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED)))
       return;
 
   } while (ulock_futex(lock, FUTEX_LOCK_PI) != 0);
@@ -70,9 +68,8 @@ inline void ulock_lock(ulock_t *lock) {
 
 inline bool ulock_trylock(ulock_t *lock) {
   ulock_t zero = 0;
-  if (ulock_fastpath(__atomic_compare_exchange_n(lock, &zero,
-                                                 ulock_get_tid(), true,
-                                                 __ATOMIC_ACQUIRE,
+  if (ulock_fastpath(__atomic_compare_exchange_n(lock, &zero, ulock_get_tid(),
+                                                 true, __ATOMIC_ACQUIRE,
                                                  __ATOMIC_RELAXED)))
     return true;
 
@@ -83,10 +80,8 @@ inline void ulock_unlock(ulock_t *lock) {
   const ulock_t tid = ulock_get_tid();
   do {
     ulock_t expected = tid;
-    if (ulock_fastpath(__atomic_compare_exchange_n(lock, &expected,
-                                                   0, true,
-                                                   __ATOMIC_RELEASE,
-                                                   __ATOMIC_RELAXED)))
+    if (ulock_fastpath(__atomic_compare_exchange_n(
+            lock, &expected, 0, true, __ATOMIC_RELEASE, __ATOMIC_RELAXED)))
       return;
 
   } while (ulock_futex(lock, FUTEX_UNLOCK_PI) != 0);

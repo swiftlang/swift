@@ -39,8 +39,7 @@ extern "C" char *swift_getFunctionReplacement50(char **ReplFnPtr, char *CurrFn) 
   if (RawReplFn == CurrFn)
     return nullptr;
 
-  auto origKey =
-    (uintptr_t)swift::tls_get(SWIFT_COMPATIBILITY_50_TLS_KEY);
+  auto origKey = (uintptr_t)swift::tls_get(SWIFT_COMPATIBILITY_50_TLS_KEY);
   if ((origKey & 0x1) != 0) {
     auto mask = ((uintptr_t)-1) < 1;
     auto resetKey = origKey & mask;
@@ -57,8 +56,7 @@ extern "C" char *swift_getOrigOfReplaceable50(char **OrigFnPtr) {
     return swift_getOrigOfReplaceable(OrigFnPtr);
 
   char *OrigFn = *OrigFnPtr;
-  auto origKey =
-    (uintptr_t)swift::tls_get(SWIFT_COMPATIBILITY_50_TLS_KEY);
+  auto origKey = (uintptr_t)swift::tls_get(SWIFT_COMPATIBILITY_50_TLS_KEY);
   auto newKey = origKey | 0x1;
   swift::tls_set(SWIFT_COMPATIBILITY_50_TLS_KEY, (void *)newKey);
   return OrigFn;

@@ -16,8 +16,8 @@
 
 #if SWIFT_THREADING_C11
 
-#include "swift/Threading/Errors.h"
 #include "swift/Threading/Impl/C11.h"
+#include "swift/Threading/Errors.h"
 
 namespace {
 
@@ -27,8 +27,8 @@ namespace {
 class C11ThreadingHelper {
 private:
   thrd_t mainThread_;
-  mut_t  onceMutex_;
-  cnd_t  onceCond_;
+  mut_t onceMutex_;
+  cnd_t onceCond_;
 
 public:
   C11ThreadingHelper() {
@@ -39,15 +39,9 @@ public:
 
   thrd_t main_thread() const { return mainThread_; }
 
-  void once_lock() {
-    SWIFT_C11THREADS_CHECK(mtx_lock(&onceMutex_));
-  }
-  void once_unlock() {
-    SWIFT_C11THREADS_CHECK(mtx_unlock(&onceMutex_));
-  }
-  void once_broadcast() {
-    SWIFT_C11THREADS_CHECK(cnd_broadcast(&onceCond_));
-  }
+  void once_lock() { SWIFT_C11THREADS_CHECK(mtx_lock(&onceMutex_)); }
+  void once_unlock() { SWIFT_C11THREADS_CHECK(mtx_unlock(&onceMutex_)); }
+  void once_broadcast() { SWIFT_C11THREADS_CHECK(cnd_broadcast(&onceCond_)); }
   void once_wait() {
     SWIFT_C11THREADS_CHECK(mtx_lock(&onceMutex_));
     SWIFT_C11THREADS_CHECK(cnd_wait(&onceCond_, &onceMutex_));
@@ -59,23 +53,18 @@ C11ThreadingHelper helper;
 
 #pragma clang diagnostic pop
 
-}
+} // namespace
 
 using namespace swift;
 using namespace threading_impl;
 
-bool
-swift::threading_impl::thread_is_main() {
+bool swift::threading_impl::thread_is_main() {
   return thrd_equal(thrd_current(), helper.main_thread());
 }
 
-void
-swift::threading_impl::once_slow(once_t &predicate,
-                                 void (*fn)(void *),
-                                 void *context) {
-  if (::atomic_compare_exchange_strong_explicit(&predicate,
-                                                &(int){ 0 },
-                                                1,
+void swift::threading_impl::once_slow(once_t &predicate, void (*fn)(void *),
+                                      void *context) {
+  if (::atomic_compare_exchange_strong_explicit(&predicate, &(int){0}, 1,
                                                 ::memory_order_relaxed,
                                                 ::memory_order_relaxed)) {
     fn(context);

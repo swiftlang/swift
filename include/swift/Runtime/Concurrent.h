@@ -11,17 +11,17 @@
 //===----------------------------------------------------------------------===//
 #ifndef SWIFT_RUNTIME_CONCURRENTUTILS_H
 #define SWIFT_RUNTIME_CONCURRENTUTILS_H
-#include <iterator>
-#include <algorithm>
-#include <atomic>
-#include <functional>
-#include <stdint.h>
-#include <vector>
-#include "llvm/ADT/Hashing.h"
-#include "llvm/Support/Allocator.h"
 #include "Atomic.h"
 #include "Debug.h"
 #include "swift/Threading/Mutex.h"
+#include "llvm/ADT/Hashing.h"
+#include "llvm/Support/Allocator.h"
+#include <algorithm>
+#include <atomic>
+#include <functional>
+#include <iterator>
+#include <stdint.h>
+#include <vector>
 
 #if defined(__FreeBSD__) || defined(__CYGWIN__) || defined(__HAIKU__)
 #include <stdio.h>
