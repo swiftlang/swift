@@ -129,7 +129,12 @@ public:
   /// Return this Version struct as the appropriate version string for APINotes.
   std::string asAPINotesVersionString() const;
 
-  /// Parse a version in the form used by the _compiler_version \#if condition.
+  /// Parse a version in the form used by the _compiler_version(string-literal)
+  /// \#if condition.
+  ///
+  /// \note This is \em only used for the string literal version, so it includes
+  /// backwards-compatibility logic to convert it to something that can be
+  /// compared with a modern SWIFT_COMPILER_VERSION.
   static Optional<Version> parseCompilerVersionString(StringRef VersionString,
                                                       SourceLoc Loc,
                                                       DiagnosticEngine *Diags);
