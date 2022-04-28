@@ -15,8 +15,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "irgensil"
-
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/IRGenOptions.h"
@@ -92,6 +90,8 @@
 #include "MetadataRequest.h"
 #include "NativeConventionSchema.h"
 #include "ReferenceTypeInfo.h"
+
+#define DEBUG_TYPE "irgensil"
 
 using namespace swift;
 using namespace irgen;
