@@ -2907,11 +2907,6 @@ bool ConstraintSystem::isAsynchronousContext(DeclContext *dc) {
         FunctionType::ExtInfo()).isAsync();
   }
 
-  if (Options.contains(
-          ConstraintSystemFlags::ConsiderNominalTypeContextsAsync) &&
-      isa<NominalTypeDecl>(dc))
-    return true;
-
   return false;
 }
 
@@ -3316,7 +3311,8 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     // If we're choosing an asynchronous declaration within a synchronous
     // context, or vice-versa, increase the async/async mismatch score.
     if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-      if (!func->hasPolymorphicEffect(EffectKind::Async) &&
+      if (!Options.contains(ConstraintSystemFlags::IgnoreAsyncSyncMismatch) &&
+          !func->hasPolymorphicEffect(EffectKind::Async) &&
           func->isAsyncContext() != isAsynchronousContext(useDC)) {
         increaseScore(
             func->isAsyncContext() ? SK_AsyncInSyncMismatch : SK_SyncInAsync);

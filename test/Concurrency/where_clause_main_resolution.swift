@@ -1,9 +1,6 @@
 // RUN: %target-swift-frontend -disable-availability-checking -D CONFIG1 -dump-ast -parse-as-library %s | %FileCheck %s --check-prefixes=CHECK,CHECK-CONFIG1
-// RUN: %target-swift-frontend -disable-availability-checking -D CONFIG1 -dump-ast -parse-as-library -async-main %s | %FileCheck %s --check-prefixes=CHECK,CHECK-CONFIG1-ASYNC
 // RUN: %target-swift-frontend -disable-availability-checking -D CONFIG2 -dump-ast -parse-as-library %s | %FileCheck %s --check-prefixes=CHECK,CHECK-CONFIG2
-// RUN: %target-swift-frontend -disable-availability-checking -D CONFIG2 -dump-ast -parse-as-library -async-main %s | %FileCheck %s --check-prefixes=CHECK,CHECK-CONFIG2-ASYNC
 // RUN: %target-swift-frontend -disable-availability-checking -D CONFIG3 -dump-ast -parse-as-library %s | %FileCheck %s --check-prefixes=CHECK,CHECK-CONFIG3
-// RUN: %target-swift-frontend -disable-availability-checking -D CONFIG3 -dump-ast -parse-as-library -async-main %s | %FileCheck %s --check-prefixes=CHECK,CHECK-CONFIG3-ASYNC
 
 // REQUIRES: concurrency
 
@@ -21,40 +18,31 @@ protocol App {
 // CHECK: (source_file "[[SOURCE_FILE:[^"]+]]"
 // CHECK: (extension_decl range={{\[}}[[SOURCE_FILE]]:{{[0-9]+}}:{{[0-9]+}} - line:{{[0-9]+}}:{{[0-9]+}}{{\]}} App where
 // CHECK: (extension_decl range={{\[}}[[SOURCE_FILE]]:{{[0-9]+}}:{{[0-9]+}} - line:{{[0-9]+}}:{{[0-9]+}}{{\]}} App where
+// CHECK: (extension_decl range={{\[}}[[SOURCE_FILE]]:{{[0-9]+}}:{{[0-9]+}} - line:{{[0-9]+}}:{{[0-9]+}}{{\]}} App where
 // CHECK: (extension_decl range={{\[}}[[SOURCE_FILE]]:{{[0-9]+}}:{{[0-9]+}} - line:{{[0-9]+}}:{{[0-9]+}}{{\]}}
 // CHECK-NOT: where
 // CHECK-NEXT: (func_decl range={{\[}}[[SOURCE_FILE]]:[[DEFAULT_ASYNCHRONOUS_MAIN_LINE:[0-9]+]]:{{[0-9]+}} - line:{{[0-9]+}}:{{[0-9]+}}{{\]}} "main()"
 // CHECK-SAME: interface type='<Self where Self : App> (Self.Type) -> () async -> ()'
-// CHECK: (func_decl range={{\[}}[[SOURCE_FILE]]:[[DEFAULT_SYNCHRONOUS_MAIN_LINE:[0-9]+]]:{{[0-9]+}} - line:{{[0-9]+}}:{{[0-9]+}}{{\]}} "main()"
-// CHECK-SAME: interface type='<Self where Self : App> (Self.Type) -> () -> ()'
-
 
 extension App where Configuration == Config1 {
 // CHECK-CONFIG1: (func_decl implicit "$main()" interface type='(MainType.Type) -> () -> ()'
 // CHECK-CONFIG1: [[SOURCE_FILE]]:[[# @LINE+1 ]]
     static func main() { }
-
-// CHECK-CONFIG1-ASYNC: (func_decl implicit "$main()" interface type='(MainType.Type) -> () async -> ()'
-// CHECK-CONFIG1-ASYNC: [[SOURCE_FILE]]:[[DEFAULT_ASYNCHRONOUS_MAIN_LINE]]
 }
 
 extension App where Configuration == Config2 {
-// CHECK-CONFIG2: (func_decl implicit "$main()" interface type='(MainType.Type) -> () -> ()'
-// CHECK-CONFIG2: [[SOURCE_FILE]]:[[DEFAULT_SYNCHRONOUS_MAIN_LINE]]
-
-// CHECK-CONFIG2-ASYNC: (func_decl implicit "$main()" interface type='(MainType.Type) -> () async -> ()'
-// CHECK-CONFIG2-ASYNC: [[SOURCE_FILE]]:[[# @LINE+1 ]]
+// CHECK-CONFIG2: (func_decl implicit "$main()" interface type='(MainType.Type) -> () async -> ()'
+// CHECK-CONFIG2: [[SOURCE_FILE]]:[[# @LINE+1 ]]
     static func main() async { }
 }
 
-extension App {
+extension App where Configuration == Config3 {
 // CHECK-CONFIG3-ASYNC: (func_decl implicit "$main()" interface type='(MainType.Type) -> () async -> ()'
-// CHECK-CONFIG3-ASYNC: [[SOURCE_FILE]]:[[# @LINE+1 ]]
-    static func main() async { }
+// CHECK-CONFIG3-ASYNC: [[SOURCE_FILE]]:[[DEFAULT_ASYNCHRONOUS_MAIN_LINE]]
+}
 
-// CHECK-CONFIG3: (func_decl implicit "$main()" interface type='(MainType.Type) -> () -> ()'
-// CHECK-CONFIG3: [[SOURCE_FILE]]:[[# @LINE+1 ]]
-    static func main() { }
+extension App {
+    static func main() async { }
 }
 
 @main

@@ -8,14 +8,14 @@ protocol Runnable {
 protocol OtherThing {
 }
 
-extension Runnable where Self : OtherThing { // expected-note{{where 'Self' = 'EntryPoint'}}
+extension Runnable where Self : OtherThing {
     static func main() {
         let it = Self.init()
         it.run()
     }
 }
 
-@main // expected-error{{referencing static method 'main()' on 'Runnable' requires that 'EntryPoint' conform to 'OtherThing'}}
+@main //expected-error{{'EntryPoint' is annotated with @main and must provide a main static function}}
 struct EntryPoint : Runnable {
   func run() {
   }
