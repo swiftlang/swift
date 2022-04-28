@@ -930,6 +930,7 @@ namespace {
     SUGAR_TYPE(SubstTemplateTypeParm)
     SUGAR_TYPE(Elaborated)
     SUGAR_TYPE(Using)
+    SUGAR_TYPE(BTFTagAttributed)
 
     ImportResult VisitDecayedType(const clang::DecayedType *type) {
       clang::ASTContext &clangCtx = Impl.getClangASTContext();
