@@ -4,6 +4,10 @@
 // RUN: %FileCheck %s --input-file %t/EmitWhileBuilding.symbols.json --check-prefix BASE
 // RUN: %FileCheck %s --input-file %t/EmitWhileBuilding@Swift.symbols.json --check-prefix EXTENSION
 
+// RUN: %target-swift-symbolgraph-extract -sdk %clang-importer-sdk -module-name EmitWhileBuilding -F %t -output-dir %t -pretty-print -v
+// RUN: %FileCheck %s --input-file %t/EmitWhileBuilding.symbols.json --check-prefix BASE
+// RUN: %FileCheck %s --input-file %t/EmitWhileBuilding@Swift.symbols.json --check-prefix EXTENSION
+
 // REQUIRES: objc_interop
 
 // ensure that the symbol `String.Foo.bar` does not appear in the base module's symbol graph
