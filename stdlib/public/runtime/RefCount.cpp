@@ -97,7 +97,7 @@ HeapObjectSideTableEntry* RefCounts<InlineRefCountBits>::allocateSideTable(bool 
   // Preflight passed. Allocate a side table.
   
   // FIXME: custom side table allocator
-  HeapObjectSideTableEntry *side = new HeapObjectSideTableEntry(getHeapObject());
+  auto side = swift_cxx_newObject<HeapObjectSideTableEntry>(getHeapObject());
   
   auto newbits = InlineRefCountBits(side);
   
@@ -106,7 +106,7 @@ HeapObjectSideTableEntry* RefCounts<InlineRefCountBits>::allocateSideTable(bool 
       // Already have a side table. Return it and delete ours.
       // Read before delete to streamline barriers.
       auto result = oldbits.getSideTable();
-      delete side;
+      swift_cxx_deleteObject(side);
       return result;
     }
     else if (failIfDeiniting && oldbits.getIsDeiniting()) {
