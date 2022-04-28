@@ -1298,12 +1298,21 @@ Optional<std::vector<Solution>> ConstraintSystem::solve(
       maybeProduceFallbackDiagnostic(target);
       return None;
 
-    case SolutionResult::TooComplex:
-      getASTContext().Diags.diagnose(
-          target.getLoc(), diag::expression_too_complex)
-            .highlight(target.getSourceRange());
+    case SolutionResult::TooComplex: {
+      auto affectedRange = solution.getTooComplexAt();
+
+      // If affected range is unknown, let's use whole
+      // target.
+      if (!affectedRange)
+        affectedRange = target.getSourceRange();
+
+      getASTContext()
+          .Diags.diagnose(affectedRange->Start, diag::expression_too_complex)
+          .highlight(*affectedRange);
+
       solution.markAsDiagnosed();
       return None;
+    }
 
     case SolutionResult::Ambiguous:
       // If salvaging produced an ambiguous result, it has already been
@@ -1374,8 +1383,8 @@ ConstraintSystem::solveImpl(SolutionApplicationTarget &target,
   SmallVector<Solution, 4> solutions;
   solve(solutions, allowFreeTypeVariables);
 
-  if (getExpressionTooComplex(solutions))
-    return SolutionResult::forTooComplex();
+  if (isTooComplex(solutions))
+    return SolutionResult::forTooComplex(getTooComplexRange());
 
   switch (solutions.size()) {
   case 0:
@@ -1415,7 +1424,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
   filterSolutions(solutions);
 
   // We fail if there is no solution or the expression was too complex.
-  return solutions.empty() || getExpressionTooComplex(solutions);
+  return solutions.empty() || isTooComplex(solutions);
 }
 
 void ConstraintSystem::solveImpl(SmallVectorImpl<Solution> &solutions) {
