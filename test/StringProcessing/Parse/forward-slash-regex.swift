@@ -169,8 +169,6 @@ _ = 0 . / 1 / 2 // expected-error {{expected member name following '.'}}
 
 switch "" {
 case /x/:
-  // expected-error@-1 {{expression pattern of type 'Regex<Substring>' cannot match values of type 'String'}}
-  // expected-note@-2 {{overloads for '~=' exist with these partially matching parameter lists: (Substring, String)}}
   break
 case _ where /x /:
   // expected-error@-1 {{cannot convert value of type 'Regex<Substring>' to expected condition type 'Bool'}}
