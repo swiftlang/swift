@@ -25,17 +25,26 @@ func testSlowServing(p: SlowServing) async throws {
     // CHECK: hop_to_executor [[GENERIC_EXECUTOR]] :
     let _: String = await p.requestString()
 
-    // CHECK: objc_method {{.*}} $@convention(objc_method) <τ_0_0 where τ_0_0 : SlowServing> (@convention(block) (Optional<NSString>, Optional<NSError>) -> (), τ_0_0) -> ()
-    // CHECK: hop_to_executor [[GENERIC_EXECUTOR]] :
-    let _: String = try await p.tryRequestString()
-
     // CHECK: objc_method {{.*}} $@convention(objc_method) <τ_0_0 where τ_0_0 : SlowServing> (@convention(block) (Int, NSString) -> (), τ_0_0) -> ()
     // CHECK: hop_to_executor [[GENERIC_EXECUTOR]] :
     let _: (Int, String) = await p.requestIntAndString()
 
     // CHECK: objc_method {{.*}} $@convention(objc_method) <τ_0_0 where τ_0_0 : SlowServing> (@convention(block) (Int, Optional<NSString>, Optional<NSError>) -> (), τ_0_0) -> ()
     // CHECK: hop_to_executor [[GENERIC_EXECUTOR]] :
+    // CHECK:      builtin "willThrow"
+    // CHECK-NEXT: hop_to_executor [[GENERIC_EXECUTOR]] :
     let _: (Int, String) = try await p.tryRequestIntAndString()
+}
+
+// CHECK-LABEL: sil {{.*}}@{{.*}}20testSlowServingAgain
+func testSlowServingAgain(p: SlowServing) async throws {
+  // CHECK: [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+  // CHECK: hop_to_executor [[GENERIC_EXECUTOR]] :
+  // CHECK: objc_method {{.*}} $@convention(objc_method) <τ_0_0 where τ_0_0 : SlowServing> (@convention(block) (Optional<NSString>, Optional<NSError>) -> (), τ_0_0) -> ()
+  // CHECK: hop_to_executor [[GENERIC_EXECUTOR]] :
+  // CHECK:      builtin "willThrow"
+  // CHECK-NEXT: hop_to_executor [[GENERIC_EXECUTOR]] :
+  let _: String = try await p.tryRequestString()
 }
 
 class SlowSwiftServer: NSObject, SlowServing {
