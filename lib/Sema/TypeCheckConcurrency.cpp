@@ -3380,7 +3380,8 @@ getActorIsolationForMainFuncDecl(FuncDecl *fnDecl) {
   if (!declContext)
     return {};
   const bool isMainDeclContext =
-      declContext->getAttrs().hasAttribute<MainTypeAttr>();
+      declContext->getAttrs().hasAttribute<MainTypeAttr>(
+          /*allow invalid*/ true);
 
   ASTContext &ctx = fnDecl->getASTContext();
 

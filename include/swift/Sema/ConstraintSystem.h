@@ -1537,7 +1537,7 @@ enum class ConstraintSystemFlags {
   /// Note that this flag is automatically applied to all constraint systems,
   /// when \c DebugConstraintSolver is set in \c TypeCheckerOptions. It can be
   /// automatically enabled for select constraint solving attempts by setting
-  /// \c DebugConstraintSolverAttempt. Finally, it can also be automatically 
+  /// \c DebugConstraintSolverAttempt. Finally, it can also be automatically
   /// enabled for a pre-configured set of expressions on line numbers by setting
   /// \c DebugConstraintSolverOnLines.
   DebugConstraints = 0x10,
@@ -1562,9 +1562,8 @@ enum class ConstraintSystemFlags {
   /// `__attribute__((ns_consumed))`.
   UseClangFunctionTypes = 0x80,
 
-  /// When set, nominal typedecl contexts are asynchronous contexts.
-  /// This is set while searching for the main function
-  ConsiderNominalTypeContextsAsync = 0x100,
+  /// When set, ignore async/sync mismatches
+  IgnoreAsyncSyncMismatch = 0x100,
 };
 
 /// Options that affect the constraint system as a whole.
