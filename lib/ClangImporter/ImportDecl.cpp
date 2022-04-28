@@ -8768,12 +8768,13 @@ SourceFile &ClangImporter::Implementation::getClangSwiftAttrSourceFile(
 }
 
 bool swift::importer::isMainActorAttr(const clang::SwiftAttrAttr *swiftAttr) {
-  if (swiftAttr->getAttribute() == "@MainActor" ||
-      swiftAttr->getAttribute() == "@UIActor") {
-    return true;
-  }
+  return swiftAttr->getAttribute() == "@MainActor" ||
+         swiftAttr->getAttribute() == "@UIActor";
+}
 
-  return false;
+bool swift::importer::isMutabilityAttr(const clang::SwiftAttrAttr *swiftAttr) {
+  return swiftAttr->getAttribute() == "mutating" ||
+         swiftAttr->getAttribute() == "nonmutating";
 }
 
 void
@@ -8792,7 +8793,8 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
     if (maybeDefinition.getValue())
       ClangDecl = cast<clang::NamedDecl>(maybeDefinition.getValue());
 
-  Optional<const clang::SwiftAttrAttr *> SeenMainActorAttr;
+  Optional<const clang::SwiftAttrAttr *> seenMainActorAttr;
+  Optional<const clang::SwiftAttrAttr *> seenMutabilityAttr;
   PatternBindingInitializer *initContext = nullptr;
 
   auto importAttrsFromDecl = [&](const clang::NamedDecl *ClangDecl) {
@@ -8803,13 +8805,13 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
       // FIXME: Hard-code @MainActor and @UIActor, because we don't have a
       // point at which to do name lookup for imported entities.
       if (isMainActorAttr(swiftAttr)) {
-        if (SeenMainActorAttr) {
+        if (seenMainActorAttr) {
           // Cannot add main actor annotation twice. We'll keep the first
           // one and raise a warning about the duplicate.
           HeaderLoc attrLoc(swiftAttr->getLocation());
           diagnose(attrLoc, diag::import_multiple_mainactor_attr,
                    swiftAttr->getAttribute(),
-                   SeenMainActorAttr.getValue()->getAttribute());
+                   seenMainActorAttr.getValue()->getAttribute());
           continue;
         }
 
@@ -8817,10 +8819,47 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
           auto typeExpr = TypeExpr::createImplicit(mainActorType, SwiftContext);
           auto attr = CustomAttr::create(SwiftContext, SourceLoc(), typeExpr);
           MappedDecl->getAttrs().add(attr);
-          SeenMainActorAttr = swiftAttr;
+          seenMainActorAttr = swiftAttr;
         }
 
         continue;
+      }
+
+      if (isMutabilityAttr(swiftAttr)) {
+
+        // Check if 'nonmutating' attr is applicable
+        if (swiftAttr->getAttribute() == "nonmutating") {
+          if (auto *method = dyn_cast<clang::CXXMethodDecl>(ClangDecl)) {
+            if (!method->isConst()) {
+              diagnose(HeaderLoc(swiftAttr->getLocation()),
+                       diag::nonmutating_without_const);
+            }
+            if (!method->getParent()->hasMutableFields()) {
+              diagnose(HeaderLoc(swiftAttr->getLocation()),
+                       diag::nonmutating_without_mutable_fields);
+            }
+          }
+        }
+
+        // Check for contradicting mutability attr
+        if (seenMutabilityAttr) {
+          StringRef seenAttribute =
+              seenMutabilityAttr.getValue()->getAttribute();
+          if ((seenAttribute == "nonmutating" &&
+               swiftAttr->getAttribute() == "mutating") ||
+              (seenAttribute == "mutating" &&
+               swiftAttr->getAttribute() == "nonmutating")) {
+            const clang::SwiftAttrAttr *nonmutatingAttr =
+                seenAttribute == "nonmutating" ? seenMutabilityAttr.getValue()
+                                               : swiftAttr;
+
+            diagnose(HeaderLoc(nonmutatingAttr->getLocation()),
+                     diag::contradicting_mutation_attrs);
+            continue;
+          }
+        }
+
+        seenMutabilityAttr = swiftAttr;
       }
 
       // Hard-code @actorIndependent, until Objective-C clients start
