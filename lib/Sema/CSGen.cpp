@@ -4417,11 +4417,10 @@ getMemberDecls(InterestedMemberKind Kind) {
   llvm_unreachable("unhandled kind");
 }
 
-ResolvedMemberResult
-swift::resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name,
-                          ConstraintSystemOptions Options) {
+ResolvedMemberResult swift::resolveValueMember(DeclContext &DC, Type BaseTy,
+                                               DeclName Name) {
   ResolvedMemberResult Result;
-  ConstraintSystem CS(&DC, Options);
+  ConstraintSystem CS(&DC, None);
 
   // Look up all members of BaseTy with the given Name.
   MemberLookupResult LookupResult = CS.performMemberLookup(
