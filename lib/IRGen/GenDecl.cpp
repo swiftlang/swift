@@ -1015,7 +1015,9 @@ std::string IRGenModule::GetObjCSectionName(StringRef Section,
   assert(Section.substr(0, 2) == "__" && "expected the name to begin with __");
 
   switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::DXContainer:
   case llvm::Triple::GOFF:
+  case llvm::Triple::SPIRV:
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("must know the object file format");
   case llvm::Triple::MachO:
@@ -1036,7 +1038,9 @@ std::string IRGenModule::GetObjCSectionName(StringRef Section,
 void IRGenModule::SetCStringLiteralSection(llvm::GlobalVariable *GV,
                                            ObjCLabelType Type) {
   switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::DXContainer:
   case llvm::Triple::GOFF:
+  case llvm::Triple::SPIRV:
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("must know the object file format");
   case llvm::Triple::MachO:
@@ -1643,7 +1647,9 @@ void IRGenerator::noteUseOfOpaqueTypeDescriptor(OpaqueTypeDecl *opaque) {
 static std::string getDynamicReplacementSection(IRGenModule &IGM) {
   std::string sectionName;
   switch (IGM.TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::DXContainer:
   case llvm::Triple::GOFF:
+  case llvm::Triple::SPIRV:
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("Don't know how to emit field records table for "
                      "the selected object format.");
@@ -1665,7 +1671,9 @@ static std::string getDynamicReplacementSection(IRGenModule &IGM) {
 static std::string getDynamicReplacementSomeSection(IRGenModule &IGM) {
   std::string sectionName;
   switch (IGM.TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::DXContainer:
   case llvm::Triple::GOFF:
+  case llvm::Triple::SPIRV:
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("Don't know how to emit field records table for "
                      "the selected object format.");
@@ -2035,7 +2043,9 @@ void IRGenModule::emitVTableStubs() {
 static std::string getEntryPointSection(IRGenModule &IGM) {
   std::string sectionName;
   switch (IGM.TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::DXContainer:
   case llvm::Triple::GOFF:
+  case llvm::Triple::SPIRV:
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("Don't know how to emit field records table for "
                      "the selected object format.");
@@ -3870,7 +3880,9 @@ llvm::Constant *IRGenModule::emitSwiftProtocols(bool asContiguousArray) {
 
   StringRef sectionName;
   switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::DXContainer:
   case llvm::Triple::GOFF:
+  case llvm::Triple::SPIRV:
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("Don't know how to emit protocols for "
                      "the selected object format.");
@@ -3968,7 +3980,9 @@ llvm::Constant *IRGenModule::emitProtocolConformances(bool asContiguousArray) {
 
   StringRef sectionName;
   switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::DXContainer:
   case llvm::Triple::GOFF:
+  case llvm::Triple::SPIRV:
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("Don't know how to emit protocol conformances for "
                      "the selected object format.");
@@ -4067,7 +4081,9 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords(bool asContiguousArray) {
   case llvm::Triple::COFF:
     sectionName = ".sw5tymd$B";
     break;
+  case llvm::Triple::DXContainer:
   case llvm::Triple::GOFF:
+  case llvm::Triple::SPIRV:
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("Don't know how to emit type metadata table for "
                      "the selected object format.");
@@ -4166,7 +4182,9 @@ void IRGenModule::emitAccessibleFunctions() {
 
   StringRef sectionName;
   switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::DXContainer:
   case llvm::Triple::GOFF:
+  case llvm::Triple::SPIRV:
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("Don't know how to emit accessible functions for "
                      "the selected object format.");

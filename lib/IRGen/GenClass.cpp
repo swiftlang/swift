@@ -2246,7 +2246,9 @@ namespace {
       case llvm::Triple::Wasm:
         var->setSection(".data");
         break;
+      case llvm::Triple::DXContainer:
       case llvm::Triple::GOFF:
+      case llvm::Triple::SPIRV:
       case llvm::Triple::UnknownObjectFormat:
         llvm_unreachable("Don't know how to emit private global constants for "
                          "the selected object format.");
