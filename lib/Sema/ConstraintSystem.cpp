@@ -56,6 +56,22 @@ ExpressionTimer::ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS,
       PrintDebugTiming(CS.getASTContext().TypeCheckerOpts.DebugTimeExpressions),
       PrintWarning(true) {}
 
+SourceRange ExpressionTimer::getAffectedRange() const {
+  ASTNode anchor;
+
+  if (auto *locator = Anchor.dyn_cast<ConstraintLocator *>()) {
+    anchor = simplifyLocatorToAnchor(locator);
+    // If locator couldn't be simplified down to a single AST
+    // element, let's use its root.
+    if (!anchor)
+      anchor = locator->getAnchor();
+  } else {
+    anchor = Anchor.get<Expr *>();
+  }
+
+  return anchor.getSourceRange();
+}
+
 ExpressionTimer::~ExpressionTimer() {
   auto elapsed = getElapsedProcessTimeInFractionalSeconds();
   unsigned elapsedMS = static_cast<unsigned>(elapsed * 1000);
@@ -81,22 +97,13 @@ ExpressionTimer::~ExpressionTimer() {
   if (WarnLimit == 0 || elapsedMS < WarnLimit)
     return;
 
-  ASTNode anchor;
-  if (auto *locator = Anchor.dyn_cast<ConstraintLocator *>()) {
-    anchor = simplifyLocatorToAnchor(locator);
-    // If locator couldn't be simplified down to a single AST
-    // element, let's warn about its root.
-    if (!anchor)
-      anchor = locator->getAnchor();
-  } else {
-    anchor = Anchor.get<Expr *>();
-  }
+  auto sourceRange = getAffectedRange();
 
-  if (anchor.getStartLoc().isValid()) {
+  if (sourceRange.Start.isValid()) {
     Context.Diags
-        .diagnose(anchor.getStartLoc(), diag::debug_long_expression, elapsedMS,
+        .diagnose(sourceRange.Start, diag::debug_long_expression, elapsedMS,
                   WarnLimit)
-        .highlight(anchor.getSourceRange());
+        .highlight(sourceRange);
   }
 }
 
@@ -3776,8 +3783,8 @@ SolutionResult ConstraintSystem::salvage() {
     // Fall through to produce diagnostics.
   }
 
-  if (getExpressionTooComplex(viable))
-    return SolutionResult::forTooComplex();
+  if (isTooComplex(viable))
+    return SolutionResult::forTooComplex(getTooComplexRange());
 
   // Could not produce a specific diagnostic; punt to the client.
   return SolutionResult::forUndiagnosedError();

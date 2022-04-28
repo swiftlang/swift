@@ -9106,6 +9106,12 @@ SolutionResult SolutionResult::forAmbiguous(
   return result;
 }
 
+SolutionResult SolutionResult::forTooComplex(Optional<SourceRange> affected) {
+  SolutionResult result(Kind::TooComplex);
+  result.TooComplexAt = affected;
+  return result;
+}
+
 SolutionResult::~SolutionResult() {
   assert((!requiresDiagnostic() || emittedDiagnostic) &&
          "SolutionResult was destroyed without emitting a diagnostic");
