@@ -1883,7 +1883,16 @@ namespace {
 
     MetadataResponse visitProtocolType(CanProtocolType type,
                                        DynamicMetadataRequest request) {
-      llvm_unreachable("constraint type should be wrapped in existential type");
+      assert(false && "constraint type should be wrapped in existential type");
+
+      CanExistentialType existential(
+          ExistentialType::get(type)->castTo<ExistentialType>());
+
+      if (auto metatype = tryGetLocal(existential, request))
+        return metatype;
+
+      auto metadata = emitExistentialTypeMetadata(existential);
+      return setLocal(type, MetadataResponse::forComplete(metadata));
     }
 
     MetadataResponse
@@ -1892,7 +1901,16 @@ namespace {
       if (type->isAny() || type->isAnyObject())
         return emitSingletonExistentialTypeMetadata(type);
 
-      llvm_unreachable("constraint type should be wrapped in existential type");
+      assert(false && "constraint type should be wrapped in existential type");
+
+      CanExistentialType existential(
+          ExistentialType::get(type)->castTo<ExistentialType>());
+
+      if (auto metatype = tryGetLocal(existential, request))
+        return metatype;
+
+      auto metadata = emitExistentialTypeMetadata(existential);
+      return setLocal(type, MetadataResponse::forComplete(metadata));
     }
 
     MetadataResponse
