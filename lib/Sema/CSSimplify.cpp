@@ -8967,7 +8967,8 @@ static bool inferEnumMemberThroughTildeEqualsOperator(
     }
   }
 
-  cs.generateConstraints(target, FreeTypeVariableBinding::Disallow);
+  if (cs.generateConstraints(target, FreeTypeVariableBinding::Disallow))
+    return true;
 
   // Sub-expression associated with expression pattern is the enum element
   // access which needs to be connected to the provided element type.
