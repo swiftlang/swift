@@ -546,19 +546,6 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
     break;
   }
   case tok::oper_prefix: {
-    // Check to see if we can split a prefix operator containing `/`, e.g `!/`,
-    // which might be a prefix operator on a regex literal.
-    if (Context.LangOpts.EnableBareSlashRegexLiterals) {
-      auto slashIdx = Tok.getText().find("/");
-      if (slashIdx != StringRef::npos) {
-        auto prefix = Tok.getText().take_front(slashIdx);
-        if (!prefix.empty()) {
-          Operator = makeExprOperator({Tok.getKind(), prefix});
-          consumeStartingCharacterOfCurrentToken(Tok.getKind(), prefix.size());
-          break;
-        }
-      }
-    }
     Operator = parseExprOperator();
     break;
   }
@@ -880,45 +867,65 @@ static DeclRefKind getDeclRefKindForOperator(tok kind) {
   }
 }
 
-UnresolvedDeclRefExpr *Parser::makeExprOperator(const Token &Tok) {
-  assert(Tok.isAnyOperator());
-  DeclRefKind refKind = getDeclRefKindForOperator(Tok.getKind());
-  SourceLoc loc = Tok.getLoc();
-  DeclNameRef name(Context.getIdentifier(Tok.getText()));
-  // Bypass local lookup.
-  return new (Context) UnresolvedDeclRefExpr(name, refKind, DeclNameLoc(loc));
-}
-
 /// parseExprOperator - Parse an operator reference expression.  These
 /// are not "proper" expressions; they can only appear in binary/unary
 /// operators.
 UnresolvedDeclRefExpr *Parser::parseExprOperator() {
-  auto *op = makeExprOperator(Tok);
+  assert(Tok.isAnyOperator());
+  DeclRefKind refKind = getDeclRefKindForOperator(Tok.getKind());
+  SourceLoc loc = Tok.getLoc();
+  DeclNameRef name(Context.getIdentifier(Tok.getText()));
   consumeToken();
-  return op;
+  // Bypass local lookup.
+  return new (Context) UnresolvedDeclRefExpr(name, refKind, DeclNameLoc(loc));
 }
 
 void Parser::tryLexRegexLiteral(bool mustBeRegex) {
   if (!Context.LangOpts.EnableBareSlashRegexLiterals)
     return;
 
-  // Check to see if we have the start of a regex literal `/.../`.
+  // Check to see if we have a regex literal `/.../`, optionally with a prefix
+  // operator e.g `!/.../`.
   switch (Tok.getKind()) {
   case tok::oper_prefix:
   case tok::oper_binary_spaced:
   case tok::oper_binary_unspaced: {
-    if (!Tok.getText().startswith("/"))
+    // Check to see if we have an operator containing '/'.
+    auto slashIdx = Tok.getText().find("/");
+    if (slashIdx == StringRef::npos)
       break;
 
-    // Try re-lex as a `/.../` regex literal.
-    auto state = getParserPosition().LS;
-    L->tryLexForwardSlashRegexLiteralFrom(state, mustBeRegex);
+    CancellableBacktrackingScope backtrack(*this);
+    {
+      Optional<Lexer::ForwardSlashRegexRAII> regexScope;
+      regexScope.emplace(*L, mustBeRegex);
 
-    // Discard the current token, which will be replaced by the re-lexed token,
-    // which may or may not be a regex literal token.
-    discardToken();
+      // Try re-lex as a `/.../` regex literal, this will split an operator if
+      // necessary.
+      L->restoreState(getParserPosition().LS, /*enableDiagnostics*/ true);
 
-    assert(Tok.getText().startswith("/"));
+      // If we didn't split a prefix operator, reset the regex lexing scope.
+      // Otherwise, we want to keep it in place for the next token.
+      auto didSplit = L->peekNextToken().getLength() == slashIdx;
+      if (!didSplit)
+        regexScope.reset();
+
+      // Discard the current token, which will be replaced by the re-lexed
+      // token, which will either be a regex literal token, a prefix operator,
+      // or the original unchanged token.
+      discardToken();
+
+      // If we split a prefix operator from the regex literal, and are not sure
+      // whether this should be a regex, backtrack if we didn't end up lexing a
+      // regex literal.
+      if (didSplit && !mustBeRegex &&
+          !L->peekNextToken().is(tok::regex_literal)) {
+        return;
+      }
+
+      // Otherwise, accept the result.
+      backtrack.cancelBacktrack();
+    }
     break;
   }
   default:
