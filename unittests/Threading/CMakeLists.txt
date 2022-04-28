@@ -10,3 +10,7 @@ target_link_libraries(SwiftThreadingTests
   swiftThreading${SWIFT_PRIMARY_VARIANT_SUFFIX}
   swiftCore${SWIFT_PRIMARY_VARIANT_SUFFIX}
   )
+
+if(CMAKE_SYSTEM_NAME STREQUAL Windows)
+  target_link_libraries(SwiftThreadingTests PRIVATE Synchronization)
+endif()
