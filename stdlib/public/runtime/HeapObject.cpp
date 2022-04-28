@@ -174,11 +174,14 @@ swift::swift_initStaticObject(HeapMetadata const *metadata,
   // refcount to 1 while another thread already incremented it - and would
   // decrement it to 0 afterwards.
   InitStaticObjectContext Ctx = { object, metadata };
-  swift::once(*token, [](void *OpaqueCtx) {
-    InitStaticObjectContext *Ctx = (InitStaticObjectContext *)OpaqueCtx;
-    Ctx->object->metadata = Ctx->metadata;
-    Ctx->object->refCounts.initImmortal();
-  }, &Ctx);
+  swift::once(
+      *token,
+      [](void *OpaqueCtx) {
+        InitStaticObjectContext *Ctx = (InitStaticObjectContext *)OpaqueCtx;
+        Ctx->object->metadata = Ctx->metadata;
+        Ctx->object->refCounts.initImmortal();
+      },
+      &Ctx);
 
   return object;
 }

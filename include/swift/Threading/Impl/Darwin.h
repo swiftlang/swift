@@ -17,9 +17,9 @@
 #ifndef SWIFT_THREADING_IMPL_DARWIN_H
 #define SWIFT_THREADING_IMPL_DARWIN_H
 
-#include <pthread.h>
-#include <os/lock.h>
 #include <dispatch/dispatch.h>
+#include <os/lock.h>
+#include <pthread.h>
 
 #include "swift/Threading/Errors.h"
 
@@ -42,14 +42,12 @@ inline bool threads_same(thread_id a, thread_id b) {
 
 using mutex_handle = ::os_unfair_lock;
 
-inline void mutex_init(mutex_handle &handle, bool checked=false) {
+inline void mutex_init(mutex_handle &handle, bool checked = false) {
   handle = OS_UNFAIR_LOCK_INIT;
 }
-inline void mutex_destroy(mutex_handle &handle) { }
+inline void mutex_destroy(mutex_handle &handle) {}
 
-inline void mutex_lock(mutex_handle &handle) {
-  ::os_unfair_lock_lock(&handle);
-}
+inline void mutex_lock(mutex_handle &handle) { ::os_unfair_lock_lock(&handle); }
 inline void mutex_unlock(mutex_handle &handle) {
   ::os_unfair_lock_unlock(&handle);
 }
@@ -70,7 +68,7 @@ using lazy_mutex_handle = ::os_unfair_lock;
 inline constexpr lazy_mutex_handle lazy_mutex_initializer() {
   return OS_UNFAIR_LOCK_INIT;
 }
-inline void lazy_mutex_destroy(lazy_mutex_handle &handle) { }
+inline void lazy_mutex_destroy(lazy_mutex_handle &handle) {}
 
 inline void lazy_mutex_lock(lazy_mutex_handle &handle) {
   ::os_unfair_lock_lock(&handle);
@@ -118,29 +116,29 @@ inline void once_impl(once_t &predicate, void (*fn)(void *), void *context) {
 
 extern "C" {
 
-  extern int pthread_key_init_np(int, void (*)(void *));
+extern int pthread_key_init_np(int, void (*)(void *));
 
-  inline bool _pthread_has_direct_tsd() { return false; }
-  inline void *_pthread_getspecific_direct(pthread_key_t k) {
-    return pthread_getspecific(k);
-  }
-  inline void _pthread_setspecific_direct(pthread_key_t k, void *v) {
-    pthread_setspecific(k, v);
-  }
-
+inline bool _pthread_has_direct_tsd() { return false; }
+inline void *_pthread_getspecific_direct(pthread_key_t k) {
+  return pthread_getspecific(k);
+}
+inline void _pthread_setspecific_direct(pthread_key_t k, void *v) {
+  pthread_setspecific(k, v);
+}
 }
 #endif
 
-#define SWIFT_RUNTIME_TLS_KEY                             __PTK_FRAMEWORK_SWIFT_KEY0
-#define SWIFT_STDLIB_TLS_KEY                              __PTK_FRAMEWORK_SWIFT_KEY1
-#define SWIFT_COMPATIBILITY_50_TLS_KEY                    __PTK_FRAMEWORK_SWIFT_KEY2
-#define SWIFT_CONCURRENCY_TASK_KEY                        __PTK_FRAMEWORK_SWIFT_KEY3
-#define SWIFT_CONCURRENCY_EXECUTOR_TRACKING_INFO_KEY      __PTK_FRAMEWORK_SWIFT_KEY4
-#define SWIFT_CONCURRENCY_FALLBACK_TASK_LOCAL_STORAGE_KEY __PTK_FRAMEWORK_SWIFT_KEY5
-#define SWIFT_RESERVED_TLS_KEY_6                          __PTK_FRAMEWORK_SWIFT_KEY6
-#define SWIFT_RESERVED_TLS_KEY_7                          __PTK_FRAMEWORK_SWIFT_KEY7
-#define SWIFT_RESERVED_TLS_KEY_8                          __PTK_FRAMEWORK_SWIFT_KEY8
-#define SWIFT_RESERVED_TLS_KEY_9                          __PTK_FRAMEWORK_SWIFT_KEY9
+#define SWIFT_RUNTIME_TLS_KEY __PTK_FRAMEWORK_SWIFT_KEY0
+#define SWIFT_STDLIB_TLS_KEY __PTK_FRAMEWORK_SWIFT_KEY1
+#define SWIFT_COMPATIBILITY_50_TLS_KEY __PTK_FRAMEWORK_SWIFT_KEY2
+#define SWIFT_CONCURRENCY_TASK_KEY __PTK_FRAMEWORK_SWIFT_KEY3
+#define SWIFT_CONCURRENCY_EXECUTOR_TRACKING_INFO_KEY __PTK_FRAMEWORK_SWIFT_KEY4
+#define SWIFT_CONCURRENCY_FALLBACK_TASK_LOCAL_STORAGE_KEY                      \
+  __PTK_FRAMEWORK_SWIFT_KEY5
+#define SWIFT_RESERVED_TLS_KEY_6 __PTK_FRAMEWORK_SWIFT_KEY6
+#define SWIFT_RESERVED_TLS_KEY_7 __PTK_FRAMEWORK_SWIFT_KEY7
+#define SWIFT_RESERVED_TLS_KEY_8 __PTK_FRAMEWORK_SWIFT_KEY8
+#define SWIFT_RESERVED_TLS_KEY_9 __PTK_FRAMEWORK_SWIFT_KEY9
 
 #define SWIFT_TLS_DECLARE_DTOR(name) void name(void *)
 

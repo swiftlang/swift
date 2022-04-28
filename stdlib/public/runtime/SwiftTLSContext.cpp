@@ -23,15 +23,15 @@ SwiftTLSContext &SwiftTLSContext::get() {
 #if SWIFT_THREADING_USE_RESERVED_TLS_KEYS
 
   // If we have reserved keys, use those
-  SwiftTLSContext *ctx
-    = static_cast<SwiftTLSContext *>(swift::tls_get(SWIFT_RUNTIME_TLS_KEY));
+  SwiftTLSContext *ctx =
+      static_cast<SwiftTLSContext *>(swift::tls_get(SWIFT_RUNTIME_TLS_KEY));
   if (ctx)
     return *ctx;
 
   static swift::once_t token;
   swift::tls_init_once(token, SWIFT_RUNTIME_TLS_KEY, [](void *pointer) {
     delete static_cast<SwiftTLSContext *>(pointer);
-   });
+  });
 
   ctx = new SwiftTLSContext();
   swift::tls_set(SWIFT_RUNTIME_TLS_KEY, ctx);
@@ -54,8 +54,8 @@ SwiftTLSContext &SwiftTLSContext::get() {
     delete static_cast<SwiftTLSContext *>(pointer);
   });
 
-  SwiftTLSContext *ctx
-    = static_cast<SwiftTLSContext *>(swift::tls_get(runtimeKey));
+  SwiftTLSContext *ctx =
+      static_cast<SwiftTLSContext *>(swift::tls_get(runtimeKey));
   if (ctx)
     return *ctx;
 
@@ -64,5 +64,4 @@ SwiftTLSContext &SwiftTLSContext::get() {
   return *ctx;
 
 #endif
-
 }

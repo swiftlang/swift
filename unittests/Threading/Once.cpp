@@ -22,12 +22,15 @@ using namespace swift;
 // Check that swift::once calls the function, with the correct argument
 TEST(OnceTest, once_calls_function) {
   static swift::once_t predicate;
-  bool                 wasCalled = false;
+  bool wasCalled = false;
 
-  swift::once(predicate, [](void *ctx) {
-    bool *pWasCalled = static_cast<bool *>(ctx);
-    *pWasCalled = true;
-  }, &wasCalled);
+  swift::once(
+      predicate,
+      [](void *ctx) {
+        bool *pWasCalled = static_cast<bool *>(ctx);
+        *pWasCalled = true;
+      },
+      &wasCalled);
 
   ASSERT_TRUE(wasCalled);
 }
@@ -35,7 +38,7 @@ TEST(OnceTest, once_calls_function) {
 // Check that calling swift::once twice only calls the function once
 TEST(OnceTest, once_calls_only_once) {
   static swift::once_t predicate;
-  unsigned             callCount = 0;
+  unsigned callCount = 0;
 
   void (*fn)(void *) = [](void *ctx) {
     unsigned *pCallCount = static_cast<unsigned *>(ctx);
@@ -57,15 +60,13 @@ TEST(OnceTest, once_threaded) {
 
   for (unsigned tries = 0; tries < 1000; ++tries) {
     swift::once_t predicate;
-    unsigned      callCount = 0;
+    unsigned callCount = 0;
 
     // We're being naughty here; swift::once_t is supposed to be global/static,
     // but since we know what we're doing, this should be OK.
     std::memset(&predicate, 0, sizeof(predicate));
 
-    threadedExecute(16, [&](int) {
-      swift::once(predicate, fn, &callCount);
-    });
+    threadedExecute(16, [&](int) { swift::once(predicate, fn, &callCount); });
 
     ASSERT_EQ(1u, callCount);
   }

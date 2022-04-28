@@ -26,10 +26,11 @@ using once_t = threading_impl::once_t;
 /// Runs the given function with the given context argument exactly once.
 /// The predicate argument must refer to a global or static variable of static
 /// extent of type swift::once_t.
-inline void once(once_t &predicate, void (*fn)(void *), void *context=nullptr) {
+inline void once(once_t &predicate, void (*fn)(void *),
+                 void *context = nullptr) {
   threading_impl::once_impl(predicate, fn, context);
 }
 
-}
+} // namespace swift
 
 #endif // SWIFT_THREADING_ONCE_H

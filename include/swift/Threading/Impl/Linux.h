@@ -17,8 +17,8 @@
 #ifndef SWIFT_THREADING_IMPL_LINUX_H
 #define SWIFT_THREADING_IMPL_LINUX_H
 
-#include <pthread.h>
 #include <errno.h>
+#include <pthread.h>
 
 #include <atomic>
 
@@ -29,25 +29,25 @@
 namespace swift {
 namespace threading_impl {
 
-#define SWIFT_LINUXTHREADS_CHECK(expr)                                  \
-do {                                                                    \
-  int res_ = (expr);                                                    \
-  if (res_ != 0)                                                        \
-    swift::threading::fatal(#expr " failed with error %d\n", res_);     \
-} while (0)
+#define SWIFT_LINUXTHREADS_CHECK(expr)                                         \
+  do {                                                                         \
+    int res_ = (expr);                                                         \
+    if (res_ != 0)                                                             \
+      swift::threading::fatal(#expr " failed with error %d\n", res_);          \
+  } while (0)
 
-#define SWIFT_LINUXTHREADS_RETURN_TRUE_OR_FALSE(expr)                   \
-do {                                                                    \
-  int res_ = (expr);                                                    \
-  switch (res_) {                                                       \
-  case 0:                                                               \
-    return true;                                                        \
-  case EBUSY:                                                           \
-    return false;                                                       \
-  default:                                                              \
-    swift::threading::fatal(#expr " failed with error (%d)\n", res_);   \
-  }                                                                     \
-} while (0)
+#define SWIFT_LINUXTHREADS_RETURN_TRUE_OR_FALSE(expr)                          \
+  do {                                                                         \
+    int res_ = (expr);                                                         \
+    switch (res_) {                                                            \
+    case 0:                                                                    \
+      return true;                                                             \
+    case EBUSY:                                                                \
+      return false;                                                            \
+    default:                                                                   \
+      swift::threading::fatal(#expr " failed with error (%d)\n", res_);        \
+    }                                                                          \
+  } while (0)
 
 // .. Thread related things ..................................................
 
@@ -65,14 +65,14 @@ inline bool threads_same(thread_id a, thread_id b) {
 
 using mutex_handle = ::pthread_mutex_t;
 
-inline void mutex_init(mutex_handle &handle, bool checked=false) {
+inline void mutex_init(mutex_handle &handle, bool checked = false) {
   if (!checked) {
     handle = PTHREAD_MUTEX_INITIALIZER;
   } else {
     ::pthread_mutexattr_t attr;
     SWIFT_LINUXTHREADS_CHECK(::pthread_mutexattr_init(&attr));
-    SWIFT_LINUXTHREADS_CHECK(::pthread_mutexattr_settype(&attr,
-                                                     PTHREAD_MUTEX_ERRORCHECK));
+    SWIFT_LINUXTHREADS_CHECK(
+        ::pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK));
     SWIFT_LINUXTHREADS_CHECK(::pthread_mutex_init(&handle, &attr));
     SWIFT_LINUXTHREADS_CHECK(::pthread_mutexattr_destroy(&attr));
   }
@@ -130,7 +130,7 @@ inline void lazy_mutex_unsafe_unlock(lazy_mutex_handle &handle) {
 
 struct once_t {
   std::atomic<std::int32_t> flag;
-  linux::ulock_t            lock;
+  linux::ulock_t lock;
 };
 
 void once_slow(once_t &predicate, void (*fn)(void *), void *context);
@@ -156,9 +156,7 @@ inline bool tls_alloc(tls_key &key, tls_dtor dtor) {
   return pthread_key_create(&key, dtor) == 0;
 }
 
-inline void *tls_get(tls_key key) {
-  return pthread_getspecific(key);
-}
+inline void *tls_get(tls_key key) { return pthread_getspecific(key); }
 
 inline void tls_set(tls_key key, void *value) {
   pthread_setspecific(key, value);

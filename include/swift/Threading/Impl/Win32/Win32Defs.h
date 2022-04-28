@@ -23,42 +23,43 @@
 #define SWIFT_THREADING_IMPL_WIN32_DEFS_H
 
 #define DECLSPEC_IMPORT __declspec(dllimport)
-#define WINBASEAPI      DECLSPEC_IMPORT
-#define WINAPI          __stdcall
-#define NTAPI           __stdcall
+#define WINBASEAPI DECLSPEC_IMPORT
+#define WINAPI __stdcall
+#define NTAPI __stdcall
 
 // <windows.h> #defines VOID rather than typedefing it(!)  Changing that
 // to use a typedef instead isn't problematic later on, so let's do that.
 #undef VOID
 
-typedef void          VOID, *PVOID;
+typedef void VOID, *PVOID;
 typedef unsigned char BYTE;
-typedef BYTE          BOOLEAN;
-typedef int           BOOL;
+typedef BYTE BOOLEAN;
+typedef int BOOL;
 typedef unsigned long DWORD;
 
-typedef VOID (NTAPI* PFLS_CALLBACK_FUNCTION)(PVOID lpFlsData);
+typedef VOID(NTAPI *PFLS_CALLBACK_FUNCTION)(PVOID lpFlsData);
 
 typedef struct _RTL_SRWLOCK *PRTL_SRWLOCK;
 typedef PRTL_SRWLOCK PSRWLOCK;
 
 // These have to be #defines, to avoid problems with <windows.h>
-#define RTL_SRWLOCK_INIT   {0}
-#define SRWLOCK_INIT       RTL_SRWLOCK_INIT
+#define RTL_SRWLOCK_INIT                                                       \
+  { 0 }
+#define SRWLOCK_INIT RTL_SRWLOCK_INIT
 #define FLS_OUT_OF_INDEXES ((DWORD)0xFFFFFFFF)
 
 extern "C" {
-  WINBASEAPI DWORD WINAPI   GetCurrentThreadId(VOID);
+WINBASEAPI DWORD WINAPI GetCurrentThreadId(VOID);
 
-  WINBASEAPI VOID WINAPI    InitializeSRWLock(PSRWLOCK SRWLock);
-  WINBASEAPI VOID WINAPI    ReleaseSRWLockExclusive(PSRWLOCK SRWLock);
-  WINBASEAPI VOID WINAPI    AcquireSRWLockExclusive(PSRWLOCK SRWLock);
-  WINBASEAPI BOOLEAN WINAPI TryAcquireSRWLockExclusive(PSRWLOCK SRWLock);
+WINBASEAPI VOID WINAPI InitializeSRWLock(PSRWLOCK SRWLock);
+WINBASEAPI VOID WINAPI ReleaseSRWLockExclusive(PSRWLOCK SRWLock);
+WINBASEAPI VOID WINAPI AcquireSRWLockExclusive(PSRWLOCK SRWLock);
+WINBASEAPI BOOLEAN WINAPI TryAcquireSRWLockExclusive(PSRWLOCK SRWLock);
 
-  WINBASEAPI DWORD WINAPI FlsAlloc(PFLS_CALLBACK_FUNCTION lpCallback);
-  WINBASEAPI PVOID WINAPI FlsGetValue(DWORD dwFlsIndex);
-  WINBASEAPI BOOL WINAPI  FlsSetValue(DWORD dwFlsIndex, PVOID lpFlsData);
-  WINBASEAPI BOOL WINAPI  FlsFree(DWORD dwFlsIndex);
+WINBASEAPI DWORD WINAPI FlsAlloc(PFLS_CALLBACK_FUNCTION lpCallback);
+WINBASEAPI PVOID WINAPI FlsGetValue(DWORD dwFlsIndex);
+WINBASEAPI BOOL WINAPI FlsSetValue(DWORD dwFlsIndex, PVOID lpFlsData);
+WINBASEAPI BOOL WINAPI FlsFree(DWORD dwFlsIndex);
 }
 
 namespace swift {
@@ -85,7 +86,7 @@ inline BOOLEAN TryAcquireSRWLockExclusive(PSWIFT_SRWLOCK SRWLock) {
   return ::TryAcquireSRWLockExclusive(reinterpret_cast<PSRWLOCK>(SRWLock));
 }
 
-}
-}
+} // namespace threading_impl
+} // namespace swift
 
 #endif // SWIFT_THREADING_IMPL_WIN32_DEFS_H

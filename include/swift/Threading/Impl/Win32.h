@@ -36,10 +36,10 @@ inline bool threads_same(thread_id a, thread_id b) { return a == b; }
 
 using mutex_handle = SWIFT_SRWLOCK;
 
-inline void mutex_init(mutex_handle &handle, bool checked=false) {
+inline void mutex_init(mutex_handle &handle, bool checked = false) {
   handle = SRWLOCK_INIT;
 }
-inline void mutex_destroy(mutex_handle &handle) { }
+inline void mutex_destroy(mutex_handle &handle) {}
 
 inline void mutex_lock(mutex_handle &handle) {
   AcquireSRWLockExclusive(&handle);
@@ -64,7 +64,7 @@ using lazy_mutex_handle = SWIFT_SRWLOCK;
 inline constexpr lazy_mutex_handle lazy_mutex_initializer() {
   return SRWLOCK_INIT;
 }
-inline void lazy_mutex_destroy(lazy_mutex_handle &handle) { }
+inline void lazy_mutex_destroy(lazy_mutex_handle &handle) {}
 
 inline void lazy_mutex_lock(lazy_mutex_handle &handle) {
   AcquireSRWLockExclusive(&handle);
@@ -100,11 +100,11 @@ inline void once_impl(once_t &predicate, void (*fn)(void *), void *context) {
 // .. Thread local storage ...................................................
 
 #ifdef __clang__
-# if __has_feature(cxx_thread_local)
-#   define SWIFT_THREAD_LOCAL thread_local
-# endif
+#if __has_feature(cxx_thread_local)
+#define SWIFT_THREAD_LOCAL thread_local
+#endif
 #elif __cplusplus >= 201103L
-# define SWIFT_THREAD_LOCAL thread_local
+#define SWIFT_THREAD_LOCAL thread_local
 #endif
 
 #define SWIFT_TLS_DECLARE_DTOR(name) void NTAPI name(void *)
@@ -117,13 +117,9 @@ inline bool tls_alloc(tls_key &key, tls_dtor dtor) {
   return key != FLS_OUT_OF_INDEXES;
 }
 
-inline void *tls_get(tls_key key) {
-  return ::FlsGetValue(key);
-}
+inline void *tls_get(tls_key key) { return ::FlsGetValue(key); }
 
-inline void tls_set(tls_key key, void *value) {
-  ::FlsSetValue(key, value);
-}
+inline void tls_set(tls_key key, void *value) { ::FlsSetValue(key, value); }
 
 } // namespace threading_impl
 

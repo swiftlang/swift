@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "Private.h"
 #include "swift/Threading/Once.h"
+#include "Private.h"
 #include "swift/Runtime/Debug.h"
 #include <type_traits>
 

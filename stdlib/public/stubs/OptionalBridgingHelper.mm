@@ -18,9 +18,9 @@
 #include "swift/Runtime/ObjCBridge.h"
 #include "swift/Runtime/Portability.h"
 #include "swift/Threading/Mutex.h"
-#include <vector>
-#import <Foundation/Foundation.h>
 #import <CoreFoundation/CoreFoundation.h>
+#import <Foundation/Foundation.h>
+#include <vector>
 
 using namespace swift;
 

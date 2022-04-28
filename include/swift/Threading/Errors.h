@@ -29,7 +29,7 @@ SWIFT_ATTRIBUTE_NORETURN
 SWIFT_FORMAT(1, 2)
 void fatal(const char *msg, ...);
 
-}
-}
+} // namespace threading
+} // namespace swift
 
 #endif // SWIFT_THREADING_ERRORS_H

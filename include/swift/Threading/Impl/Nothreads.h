@@ -32,25 +32,25 @@ inline bool threads_same(thread_id a, thread_id b) { return a == b; }
 
 using mutex_handle = unsigned;
 
-inline void mutex_init(mutex_handle &handle, bool checked=false) {}
-inline void mutex_destroy(mutex_handle &handle) { }
-inline void mutex_lock(mutex_handle &handle) { }
-inline void mutex_unlock(mutex_handle &handle) { }
+inline void mutex_init(mutex_handle &handle, bool checked = false) {}
+inline void mutex_destroy(mutex_handle &handle) {}
+inline void mutex_lock(mutex_handle &handle) {}
+inline void mutex_unlock(mutex_handle &handle) {}
 inline bool mutex_try_lock(mutex_handle &handle) { return true; }
 
-inline void mutex_unsafe_lock(mutex_handle &handle) { }
-inline void mutex_unsafe_unlock(mutex_handle &handle) { }
+inline void mutex_unsafe_lock(mutex_handle &handle) {}
+inline void mutex_unsafe_unlock(mutex_handle &handle) {}
 
 using lazy_mutex_handle = unsigned;
 
 inline constexpr lazy_mutex_handle lazy_mutex_initializer() { return 0; }
-inline void lazy_mutex_destroy(lazy_mutex_handle &handle) { }
-inline void lazy_mutex_lock(lazy_mutex_handle &handle) { }
-inline void lazy_mutex_unlock(lazy_mutex_handle &handle) { }
+inline void lazy_mutex_destroy(lazy_mutex_handle &handle) {}
+inline void lazy_mutex_lock(lazy_mutex_handle &handle) {}
+inline void lazy_mutex_unlock(lazy_mutex_handle &handle) {}
 inline bool lazy_mutex_try_lock(lazy_mutex_handle &handle) { return true; }
 
-inline void lazy_mutex_unsafe_lock(lazy_mutex_handle &handle) { }
-inline void lazy_mutex_unsafe_unlock(lazy_mutex_handle &handle) { }
+inline void lazy_mutex_unsafe_lock(lazy_mutex_handle &handle) {}
+inline void lazy_mutex_unsafe_unlock(lazy_mutex_handle &handle) {}
 
 // .. Once ...................................................................
 

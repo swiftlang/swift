@@ -21,17 +21,17 @@
 #include <windows.h>
 #endif
 
-#include "swift/Runtime/Metadata.h"
 #include "MetadataCache.h"
+#include "swift/ABI/TypeIdentity.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Demangling/Demangler.h"
-#include "swift/ABI/TypeIdentity.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/ExistentialContainer.h"
 #include "swift/Runtime/HeapObject.h"
+#include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Once.h"
 #include "swift/Runtime/Portability.h"
 #include "swift/Strings.h"
@@ -3150,10 +3150,13 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
 
   // Register our custom implementation of class_getImageName.
   static swift::once_t onceToken;
-  swift::once(onceToken, [](void *unused) {
-    (void)unused;
-    setUpObjCRuntimeGetImageNameFromClass();
-  }, nullptr);
+  swift::once(
+      onceToken,
+      [](void *unused) {
+        (void)unused;
+        setUpObjCRuntimeGetImageNameFromClass();
+      },
+      nullptr);
 #endif
 
   // Copy field offsets, generic arguments and (if necessary) vtable entries

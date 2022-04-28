@@ -23,19 +23,11 @@ size_t _swift_async_stream_lock_size() {
   return words;
 }
 
-extern "C"
-void _swift_async_stream_lock_init(Mutex &lock) {
+extern "C" void _swift_async_stream_lock_init(Mutex &lock) {
   new (&lock) Mutex();
 }
 
-extern "C"
-void _swift_async_stream_lock_lock(Mutex &lock) {
-  lock.lock();
-}
+extern "C" void _swift_async_stream_lock_lock(Mutex &lock) { lock.lock(); }
 
-extern "C"
-void _swift_async_stream_lock_unlock(Mutex &lock) {
-  lock.unlock();
-}
-
+extern "C" void _swift_async_stream_lock_unlock(Mutex &lock) { lock.unlock(); }
 }

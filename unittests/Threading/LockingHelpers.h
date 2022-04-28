@@ -16,7 +16,8 @@
 #include "ThreadingHelpers.h"
 
 // Test that a Mutex object can be locked and unlocked from a single thread
-template <typename M> void basicLockable(M &mutex) {
+template <typename M>
+void basicLockable(M &mutex) {
   // We can lock, unlock, lock and unlock an unlocked lock
   mutex.lock();
   mutex.unlock();
@@ -25,7 +26,8 @@ template <typename M> void basicLockable(M &mutex) {
 }
 
 // Test that a Mutex object's try_lock() method works.
-template <typename M> void tryLockable(M &mutex) {
+template <typename M>
+void tryLockable(M &mutex) {
   bool ret;
 
   // We can lock an unlocked lock
@@ -40,7 +42,8 @@ template <typename M> void tryLockable(M &mutex) {
 }
 
 // Test that a Mutex object can be locked and unlocked
-template <typename M> void basicLockableThreaded(M &mutex) {
+template <typename M>
+void basicLockableThreaded(M &mutex) {
   int count1 = 0;
   int count2 = 0;
 
@@ -59,7 +62,8 @@ template <typename M> void basicLockableThreaded(M &mutex) {
 }
 
 // More extensive tests
-template <typename M> void lockableThreaded(M &mutex) {
+template <typename M>
+void lockableThreaded(M &mutex) {
   mutex.lock();
   threadedExecute(5, [&](int) { ASSERT_FALSE(mutex.try_lock()); });
   mutex.unlock();
@@ -88,7 +92,8 @@ template <typename M> void lockableThreaded(M &mutex) {
 }
 
 // Test a scoped lock implementation
-template <typename SL, typename M> void scopedLockThreaded(M &mutex) {
+template <typename SL, typename M>
+void scopedLockThreaded(M &mutex) {
   int count1 = 0;
   int count2 = 0;
 
@@ -130,7 +135,8 @@ void scopedUnlockUnderScopedLockThreaded(M &mutex) {
 }
 
 // Test a critical section
-template <typename M> void criticalSectionThreaded(M &mutex) {
+template <typename M>
+void criticalSectionThreaded(M &mutex) {
   int count1 = 0;
   int count2 = 0;
 

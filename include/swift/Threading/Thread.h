@@ -34,15 +34,15 @@ private:
 public:
   Thread() {}
   explicit Thread(Id platformId) : id_(platformId) {}
-  Thread(const Thread& other) : id_(other.id_) {}
-  Thread(Thread&& other) : id_(std::move(other.id_)) {}
+  Thread(const Thread &other) : id_(other.id_) {}
+  Thread(Thread &&other) : id_(std::move(other.id_)) {}
 
-  Thread& operator=(const Thread& other) {
+  Thread &operator=(const Thread &other) {
     id_ = other.id_;
     return *this;
   }
 
-  Thread& operator=(Thread&& other) {
+  Thread &operator=(Thread &&other) {
     id_ = other.id_;
     return *this;
   }
@@ -56,15 +56,13 @@ public:
   }
 
   /// Returns true iff executed on the main thread
-  static bool onMainThread() {
-    return threading_impl::thread_is_main();
-  }
+  static bool onMainThread() { return threading_impl::thread_is_main(); }
 
   /// Returns true if the two Thread values are equal
-  bool operator==(const Thread& other) const {
+  bool operator==(const Thread &other) const {
     return threading_impl::threads_same(id_, other.id_);
   }
-  bool operator!=(const Thread& other) const {
+  bool operator!=(const Thread &other) const {
     return !threading_impl::threads_same(id_, other.id_);
   }
 };

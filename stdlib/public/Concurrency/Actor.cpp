@@ -20,18 +20,18 @@
 #include <new>
 
 #include "../CompatibilityOverride/CompatibilityOverride.h"
-#include "swift/Runtime/Atomic.h"
-#include "swift/Runtime/AccessibleFunction.h"
-#include "swift/Runtime/Casting.h"
-#include "swift/Runtime/DispatchShims.h"
-#include "swift/Threading/Once.h"
-#include "swift/Threading/Mutex.h"
-#include "swift/Threading/ThreadLocalStorage.h"
-#include "swift/Threading/Thread.h"
-#include "swift/ABI/Task.h"
 #include "swift/ABI/Actor.h"
+#include "swift/ABI/Task.h"
 #include "swift/Basic/ListMerger.h"
 #include "swift/Concurrency/Actor.h"
+#include "swift/Runtime/AccessibleFunction.h"
+#include "swift/Runtime/Atomic.h"
+#include "swift/Runtime/Casting.h"
+#include "swift/Runtime/DispatchShims.h"
+#include "swift/Threading/Mutex.h"
+#include "swift/Threading/Once.h"
+#include "swift/Threading/Thread.h"
+#include "swift/Threading/ThreadLocalStorage.h"
 #ifdef SWIFT_CONCURRENCY_BACK_DEPLOYMENT
 // All platforms where we care about back deployment have a known
 // configurations.
@@ -107,9 +107,9 @@ class ExecutorTrackingInfo {
   /// the right executor. It would make sense for that to be a
   /// separate thread-local variable (or whatever is most efficient
   /// on the target platform).
-  static SWIFT_THREAD_LOCAL_TYPE(
-      Pointer<ExecutorTrackingInfo>,
-      SWIFT_CONCURRENCY_EXECUTOR_TRACKING_INFO_KEY) ActiveInfoInThread;
+  static SWIFT_THREAD_LOCAL_TYPE(Pointer<ExecutorTrackingInfo>,
+                                 SWIFT_CONCURRENCY_EXECUTOR_TRACKING_INFO_KEY)
+      ActiveInfoInThread;
 
   /// The active executor.
   ExecutorRef ActiveExecutor = ExecutorRef::generic();
@@ -184,13 +184,11 @@ public:
 };
 
 /// Define the thread-locals.
-SWIFT_THREAD_LOCAL_TYPE(
-  Pointer<AsyncTask>,
-  SWIFT_CONCURRENCY_TASK_KEY) ActiveTask::Value;
+SWIFT_THREAD_LOCAL_TYPE(Pointer<AsyncTask>, SWIFT_CONCURRENCY_TASK_KEY)
+ActiveTask::Value;
 
-SWIFT_THREAD_LOCAL_TYPE(
-  Pointer<ExecutorTrackingInfo>,
-  SWIFT_CONCURRENCY_EXECUTOR_TRACKING_INFO_KEY)
+SWIFT_THREAD_LOCAL_TYPE(Pointer<ExecutorTrackingInfo>,
+                        SWIFT_CONCURRENCY_EXECUTOR_TRACKING_INFO_KEY)
 ExecutorTrackingInfo::ActiveInfoInThread;
 
 } // end anonymous namespace

@@ -33,11 +33,11 @@
 #include <stdarg.h>
 
 #include "ImageInspection.h"
+#include "swift/Demangling/Demangle.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Portability.h"
 #include "swift/Threading/Errors.h"
 #include "swift/Threading/Mutex.h"
-#include "swift/Demangling/Demangle.h"
 #include "llvm/ADT/StringRef.h"
 
 #if defined(_MSC_VER)
