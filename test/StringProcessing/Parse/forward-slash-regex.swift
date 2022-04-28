@@ -6,13 +6,26 @@ prefix operator /  // expected-error {{prefix operator may not contain '/'}}
 prefix operator ^/ // expected-error {{prefix operator may not contain '/'}}
 prefix operator /^/ // expected-error {{prefix operator may not contain '/'}}
 
+prefix operator !!
+prefix func !! <T>(_ x: T) -> T { x }
+
+prefix operator ^^
+prefix func ^^ <T>(_ x: T) -> T { x }
+
 precedencegroup P {
   associativity: left
 }
 
-// Fine.
+// The divisions in the body of the below operators make sure we don't try and
+// consider them to be ending delimiters of a regex.
 infix operator /^/ : P
-func /^/ (lhs: Int, rhs: Int) -> Int { 0 }
+func /^/ (lhs: Int, rhs: Int) -> Int { 1 / 2 }
+
+infix operator /^ : P
+func /^ (lhs: Int, rhs: Int) -> Int { 1 / 2 }
+
+infix operator ^^/ : P
+func ^^/ (lhs: Int, rhs: Int) -> Int { 1 / 2 }
 
 let i = 0 /^/ 1/^/3
 
@@ -40,6 +53,21 @@ _ = /x
 
 _ = !/x/
 // expected-error@-1 {{cannot convert value of type 'Regex<Substring>' to expected argument type 'Bool'}}
+
+_ = (!/x/)
+// expected-error@-1 {{cannot convert value of type 'Regex<Substring>' to expected argument type 'Bool'}}
+
+_ = !/ /
+// expected-error@-1 {{unary operator cannot be separated from its operand}}
+// expected-error@-2 {{cannot find operator '!/' in scope}}
+// expected-error@-3 {{unterminated regex literal}}
+
+_ = !!/x/
+_ = (!!/x/)
+
+_ = /^)
+// expected-error@-1 {{unterminated regex literal}}
+// expected-error@-2 {{closing ')' does not balance any groups openings}}
 
 _ = /x/! // expected-error {{cannot force unwrap value of non-optional type 'Regex<Substring>'}}
 _ = /x/ + /y/ // expected-error {{binary operator '+' cannot be applied to two 'Regex<Substring>' operands}}
@@ -233,7 +261,7 @@ _ = /x/*comment*/
 // expected-error@-1 {{unterminated regex literal}}
 
 // These become regex literals, unless surrounded in parens.
-func baz(_ x: (Int, Int) -> Int, _ y: (Int, Int) -> Int) {} // expected-note 2{{'baz' declared here}}
+func baz(_ x: (Int, Int) -> Int, _ y: (Int, Int) -> Int) {} // expected-note 3{{'baz' declared here}}
 baz(/, /)
 // expected-error@-1 {{cannot convert value of type 'Regex<Substring>' to expected argument type '(Int, Int) -> Int'}}
 // expected-error@-2 {{missing argument for parameter #2 in call}}
@@ -241,6 +269,24 @@ baz(/,/)
 // expected-error@-1 {{cannot convert value of type 'Regex<Substring>' to expected argument type '(Int, Int) -> Int'}}
 // expected-error@-2 {{missing argument for parameter #2 in call}}
 baz((/), /)
+
+baz(/^, /)
+// expected-error@-1 {{cannot convert value of type 'Regex<Substring>' to expected argument type '(Int, Int) -> Int'}}
+// expected-error@-2 {{missing argument for parameter #2 in call}}
+
+do {
+  baz((/^), /)
+  // expected-error@-1 {{closing ')' does not balance any groups openings}}
+  // expected-note@-2 {{to match this opening '('}}
+} // expected-error {{expected ')' in expression list}}
+
+// TODO: Should we do prefix operator splitting here?
+baz(^^/, /)
+baz((^^/), /)
+
+func bazbaz(_ x: (Int, Int) -> Int, _ y: Int) {}
+bazbaz(/, 0)
+bazbaz(^^/, 0)
 
 func qux<T>(_ x: (Int, Int) -> Int, _ y: T) -> Int { 0 }
 do {
@@ -254,6 +300,23 @@ do {
   // expected-error@-2 {{expected ',' separator}}
 }
 _ = qux(/, 1) // this comment tests to make sure we don't try and end the regex on the starting '/' of '//'.
+_ = qux(/, 1) /* same thing with a block comment */
+
+func quxqux(_ x: (Int, Int) -> Int) {}
+quxqux(/^/) // expected-error {{cannot convert value of type 'Regex<Substring>' to expected argument type '(Int, Int) -> Int'}}
+quxqux((/^/)) // expected-error {{cannot convert value of type 'Regex<Substring>' to expected argument type '(Int, Int) -> Int'}}
+quxqux({ $0 /^/ $1 })
+
+// FIXME: We should be able to do operator splitting here and form `!(/^/)`.
+quxqux(!/^/) // expected-error {{unary operators must not be juxtaposed; parenthesize inner expression}}
+
+quxqux(/^)
+
+do {
+  quxqux(/^) / 1
+  // expected-error@-1 {{closing ')' does not balance any groups openings}}
+  // expected-error@-2 {{expected ',' separator}}
+}
 
 let arr: [Double] = [2, 3, 4]
 _ = arr.reduce(1, /) / 3
@@ -281,3 +344,15 @@ _ = /0oG/
 _ = /"/
 _ = /'/
 _ = /<#placeholder#>/
+
+_ = ^^/0xG/
+_ = ^^/0oG/
+_ = ^^/"/
+_ = ^^/'/
+_ = ^^/<#placeholder#>/
+
+_ = (^^/0xG/)
+_ = (^^/0oG/)
+_ = (^^/"/)
+_ = (^^/'/)
+_ = (^^/<#placeholder#>/)
