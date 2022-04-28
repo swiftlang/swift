@@ -21,7 +21,6 @@
 
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/SourceLoc.h"
-#include "swift/Basic/OptionSet.h"
 #include <memory>
 #include <tuple>
 
@@ -51,8 +50,6 @@ namespace swift {
   class ConstraintSystem;
   class Solution;
   class SolutionApplicationTarget;
-  enum class ConstraintSystemFlags;
-  using ConstraintSystemOptions = OptionSet<ConstraintSystemFlags>;
   }
 
   /// Typecheck binding initializer at \p bindingIndex.
@@ -96,9 +93,8 @@ namespace swift {
   /// Unlike other member lookup functions, \c swift::resolveValueMember()
   /// should be used when you want to look up declarations with the same name as
   /// one you already have.
-  ResolvedMemberResult
-  resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name,
-                     constraints::ConstraintSystemOptions Options = {});
+  ResolvedMemberResult resolveValueMember(DeclContext &DC, Type BaseTy,
+                                          DeclName Name);
 
   /// Given a type and an extension to the original type decl of that type,
   /// decide if the extension has been applied, i.e. if the requirements of the
