@@ -55,11 +55,6 @@ public:
     return Thread(threading_impl::thread_get_current());
   }
 
-  /// Returns the main thread in this program
-  static Thread main() {
-    return Thread(threading_impl::thread_get_main());
-  }
-
   /// Returns true iff executed on the main thread
   static bool onMainThread() {
     return threading_impl::thread_is_main();

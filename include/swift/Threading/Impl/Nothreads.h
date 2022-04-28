@@ -25,7 +25,6 @@ namespace threading_impl {
 using thread_id = unsigned;
 
 inline thread_id thread_get_current() { return 0; }
-inline thread_id thread_get_main() { return 0; }
 inline bool thread_is_main() { return true; }
 inline bool threads_same(thread_id a, thread_id b) { return a == b; }
 

@@ -55,7 +55,6 @@ using thread_id = ::pthread_t;
 
 inline thread_id thread_get_current() { return ::pthread_self(); }
 
-thread_id thread_get_main();
 bool thread_is_main();
 
 inline bool threads_same(thread_id a, thread_id b) {

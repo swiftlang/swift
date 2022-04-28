@@ -49,7 +49,6 @@ do {                                                                    \
 using thread_id = ::thrd_t;
 
 inline thread_id thread_get_current() { return ::thrd_current(); }
-thread_id thread_get_main();
 bool thread_is_main();
 inline bool threads_same(thread_id a, thread_id b) {
   return ::thrd_equal(a, b);
