@@ -64,15 +64,23 @@ extension Unicode {
       if _fastPath(scalar.value < fastUpperbound) {
         // CCC = 0, NFC_QC = Yes, NFD_QC = Yes
         rawValue = 0
-      } else {
-        rawValue = _swift_stdlib_getNormData(scalar.value)
+        return
+      }
 
-        // Because we don't store precomposed hangul in our NFD_QC data, these
-        // will return true for NFD_QC when in fact they are not.
-        if (0xAC00 ... 0xD7A3).contains(scalar.value) {
-          // NFD_QC = false
-          rawValue |= 0x1
-        }
+      // CJK COMPATIBILITY IDEOGRAPH
+      if (0xF900 ... 0xFA0D).contains(scalar.value) {
+        // CCC = 0, NFC_QC = No, NFD_QC = No
+        rawValue = 0x3
+        return
+      }
+
+      rawValue = _swift_stdlib_getNormData(scalar.value)
+
+      // Because we don't store precomposed hangul in our NFD_QC data, these
+      // will return true for NFD_QC when in fact they are not.
+      if (0xAC00 ... 0xD7A3).contains(scalar.value) {
+        // NFD_QC = No
+        rawValue |= 0x1
       }
     }
 
