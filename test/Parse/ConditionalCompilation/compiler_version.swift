@@ -7,7 +7,7 @@
   asdf asdf asdf asdf
 #endif
 
-#if _compiler_version("10.*.10.10")
+#if _compiler_version("600.*.10.10")
 
 #if os(iOS)
   let z = 1
@@ -48,7 +48,10 @@
   let thisWillStillParseBecauseConfigIsError = 1
 #endif
 
-#if _compiler_version("700.0.100") // expected-warning {{the second version component is not used for comparison}}
+#if _compiler_version("700.0.100") // expected-warning {{the second version component is not used for comparison in legacy compiler versions}} {{28-29=*}}
+#endif
+
+#if _compiler_version("5.7.100") // expected-warning {{the second version component is not used for comparison in legacy compiler versions; are you trying to encode a new Swift compiler version for compatibility with legacy compilers?}} {{24-27=5007.*}}
 #endif
 
 #if _compiler_version("700.*.1.1.1.1") // expected-error {{version must not have more than five components}}
@@ -64,4 +67,15 @@
 #endif
 
 #if _compiler_version("700.*.1.1.1000") // expected-error {{version component out of range: must be in [0, 999]}}
+#endif
+
+// New style _compiler_version()
+#if _compiler_version(<4.0)
+  // This shouldn't emit any diagnostics.
+  asdf asdf asdf asdf
+#endif
+
+#if !_compiler_version(>=4.3.2.1.0)
+  // This shouldn't emit any diagnostics.
+  asdf asdf asdf asdf
 #endif
