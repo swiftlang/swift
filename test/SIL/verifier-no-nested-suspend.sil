@@ -1,0 +1,26 @@
+// RUN: not --crash %target-sil-opt %s 2>&1 | %FileCheck %s
+// REQUIRES: asserts
+
+// CHECK: cannot suspend async task while unawaited continuation is active
+
+sil_stage raw
+
+import Builtin
+import Swift
+import SwiftShims
+import _Concurrency
+
+// hello(_:)
+sil hidden [ossa] @$s4main5helloyS2bYaF : $@convention(thin) @async (Bool) -> Bool {
+bb0(%0 : $Bool):
+  debug_value %0 : $Bool, let, name "b", argno 1
+  %2 = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+  %22 = alloc_stack $Bool
+  %27 = get_async_continuation_addr Bool, %22 : $*Bool
+  hop_to_executor %2 : $Optional<Builtin.Executor> // <- the bad nested suspension
+  await_async_continuation %27 : $Builtin.RawUnsafeContinuation, resume bb1
+
+bb1:
+  dealloc_stack %22 : $*Bool
+  return %0 : $Bool
+}

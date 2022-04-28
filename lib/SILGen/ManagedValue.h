@@ -280,7 +280,7 @@ public:
 
   /// Returns an unmanaged copy of this value.
   /// WARNING: Callers of this API should manage the cleanup of this value!
-  ManagedValue unmanagedCopy(SILGenFunction &SGF, SILLocation loc) const;
+  SILValue unmanagedCopy(SILGenFunction &SGF, SILLocation loc) const;
 
   /// Emit a copy of this value with independent ownership into the current
   /// formal evaluation scope.
