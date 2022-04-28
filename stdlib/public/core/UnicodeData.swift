@@ -67,6 +67,13 @@ extension Unicode {
         return
       }
 
+      // CJK Ideographs
+      if (0x4E00 ... 0x9FFF).contains(scalar.value) {
+        // CCC = 0, NFC_QC = Yes, NFD_QC = Yes
+        rawValue = 0
+        return
+      }
+
       // CJK COMPATIBILITY IDEOGRAPH
       if (0xF900 ... 0xFA0D).contains(scalar.value) {
         // CCC = 0, NFC_QC = No, NFD_QC = No
