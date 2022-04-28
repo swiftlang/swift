@@ -2551,7 +2551,7 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
   auto archetypeVisitor = [&](CanType t) {
     if (auto archetypeTy = dyn_cast<ArchetypeType>(t)) {
       if (auto opened = dyn_cast<OpenedArchetypeType>(archetypeTy)) {
-        const auto root = cast<OpenedArchetypeType>(CanType(opened->getRoot()));
+        const auto root = opened.getRoot();
         assert((openedExistential == CanArchetypeType() ||
                 openedExistential == root) &&
                "one too many open existentials");

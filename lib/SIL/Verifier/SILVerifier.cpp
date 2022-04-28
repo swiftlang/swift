@@ -1469,10 +1469,8 @@ public:
               "Operand is of an ArchetypeType that does not exist in the "
               "Caller's generic param list.");
       if (auto OpenedA = getOpenedArchetypeOf(A)) {
-        const auto root =
-            cast<OpenedArchetypeType>(CanType(OpenedA->getRoot()));
         auto *openingInst =
-            F->getModule().getRootOpenedArchetypeDefInst(root, F);
+            F->getModule().getRootOpenedArchetypeDefInst(OpenedA.getRoot(), F);
         require(I == nullptr || openingInst == I ||
                     properlyDominates(openingInst, I),
                 "Use of an opened archetype should be dominated by a "
@@ -1605,7 +1603,7 @@ public:
         require(isArchetypeValidInFunction(A, AI->getFunction()),
                 "Archetype to be substituted must be valid in function.");
 
-        const auto root = cast<OpenedArchetypeType>(CanType(A->getRoot()));
+        const auto root = A.getRoot();
 
         // Collect all root opened archetypes used in the substitutions list.
         FoundRootOpenedArchetypes.insert(root);
@@ -4074,10 +4072,8 @@ public:
     Ty.visit([&](CanType t) {
       SILValue Def;
       if (const auto archetypeTy = dyn_cast<OpenedArchetypeType>(t)) {
-        const auto root =
-            cast<OpenedArchetypeType>(CanType(archetypeTy->getRoot()));
-        Def = I->getModule().getRootOpenedArchetypeDefInst(root,
-                                                           I->getFunction());
+        Def = I->getModule().getRootOpenedArchetypeDefInst(
+            archetypeTy.getRoot(), I->getFunction());
         require(Def, "Root opened archetype should be registered in SILModule");
       } else if (t->hasDynamicSelfType()) {
         require(I->getFunction()->hasSelfParam() ||

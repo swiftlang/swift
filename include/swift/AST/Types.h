@@ -5878,6 +5878,9 @@ private:
                       LayoutConstraint layout);
 };
 BEGIN_CAN_TYPE_WRAPPER(OpenedArchetypeType, ArchetypeType)
+  CanOpenedArchetypeType getRoot() const {
+    return CanOpenedArchetypeType(getPointer()->getRoot());
+  }
 END_CAN_TYPE_WRAPPER(OpenedArchetypeType, ArchetypeType)
 
 /// An archetype that represents an opaque element of a type sequence in context.
