@@ -39,15 +39,8 @@ typedef unsigned long DWORD;
 
 typedef VOID (NTAPI* PFLS_CALLBACK_FUNCTION)(PVOID lpFlsData);
 
-// We can't define this struct if <winnt.h> already did so
-#ifndef _WINNT_
-struct _RTL_SRWLOCK {
-  PVOID Ptr;
-};
-#endif // _WINNT_
-
-typedef struct _RTL_SRWLOCK RTL_SRWLOCK, *PRTL_SRWLOCK;
-typedef RTL_SRWLOCK         SRWLOCK, *PSRWLOCK;
+typedef struct _RTL_SRWLOCK *PRTL_SRWLOCK;
+typedef PRTL_SRWLOCK PSRWLOCK;
 
 // These have to be #defines, to avoid problems with <windows.h>
 #define RTL_SRWLOCK_INIT   {0}
@@ -66,6 +59,33 @@ extern "C" {
   WINBASEAPI PVOID WINAPI FlsGetValue(DWORD dwFlsIndex);
   WINBASEAPI BOOL WINAPI  FlsSetValue(DWORD dwFlsIndex, PVOID lpFlsData);
   WINBASEAPI BOOL WINAPI  FlsFree(DWORD dwFlsIndex);
+}
+
+namespace swift {
+namespace threading_impl {
+
+// We do this because we can't declare _RTL_SRWLOCK here in case someone
+// later includes <windows.h>
+struct SWIFT_SRWLOCK {
+  PVOID Ptr;
+};
+
+typedef SWIFT_SRWLOCK *PSWIFT_SRWLOCK;
+
+inline VOID InitializeSRWLock(PSWIFT_SRWLOCK SRWLock) {
+  ::InitializeSRWLock(reinterpret_cast<PSRWLOCK>(SRWLock));
+}
+inline VOID ReleaseSRWLockExclusive(PSWIFT_SRWLOCK SRWLock) {
+  ::ReleaseSRWLockExclusive(reinterpret_cast<PSRWLOCK>(SRWLock));
+}
+inline VOID AcquireSRWLockExclusive(PSWIFT_SRWLOCK SRWLock) {
+  ::AcquireSRWLockExclusive(reinterpret_cast<PSRWLOCK>(SRWLock));
+}
+inline BOOLEAN TryAcquireSRWLockExclusive(PSWIFT_SRWLOCK SRWLock) {
+  return ::TryAcquireSRWLockExclusive(reinterpret_cast<PSRWLOCK>(SRWLock));
+}
+
+}
 }
 
 #endif // SWIFT_THREADING_IMPL_WIN32_DEFS_H
