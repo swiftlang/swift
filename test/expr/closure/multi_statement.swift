@@ -316,3 +316,16 @@ func test_wrapped_var_without_initializer() {
     var v;
   }
 }
+
+// rdar://92366212 - crash in ConstraintSystem::getType
+func test_unknown_refs_in_tilde_operator() {
+  enum E {
+  }
+
+  let _: (E) -> Void = {
+    if case .test(unknown) = $0 {
+      // expected-error@-1 {{type 'E' has no member 'test'}}
+      // expected-error@-2 2 {{cannot find 'unknown' in scope}}
+    }
+  }
+}
