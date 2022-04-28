@@ -19,14 +19,6 @@
 #include <atomic>
 #include <new>
 
-#ifdef _WIN32
-// On Windows, an include below triggers an indirect include of minwindef.h
-// which contains a definition of the `max` macro, generating an error in our
-// use of std::max in this file. This define prevents those macros from being
-// defined.
-#define NOMINMAX
-#endif
-
 #include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "swift/Runtime/Atomic.h"
 #include "swift/Runtime/AccessibleFunction.h"
@@ -66,6 +58,10 @@
 
 #if defined(__ELF__)
 #include <sys/syscall.h>
+#endif
+
+#if defined(_WIN32)
+#include <io.h>
 #endif
 
 #if SWIFT_OBJC_INTEROP
