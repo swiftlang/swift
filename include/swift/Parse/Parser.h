@@ -1757,7 +1757,6 @@ public:
   ParserResult<Expr>
   parseExprPoundCodeCompletion(Optional<StmtKind> ParentKind);
 
-  UnresolvedDeclRefExpr *makeExprOperator(const Token &opToken);
   UnresolvedDeclRefExpr *parseExprOperator();
 
   /// Try re-lex a '/' operator character as a regex literal. This should be
