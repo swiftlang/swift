@@ -2089,9 +2089,6 @@ bool Lexer::tryLexRegexLiteral(const char *TokStart) {
 }
 
 void Lexer::tryLexForwardSlashRegexLiteralFrom(State S, bool mustBeRegex) {
-  if (!LangOpts.EnableBareSlashRegexLiterals)
-    return;
-
   // Try re-lex with forward slash enabled.
   llvm::SaveAndRestore<LexerForwardSlashRegexMode> RegexLexingScope(
       ForwardSlashRegexMode, mustBeRegex
