@@ -2271,7 +2271,7 @@ llvm::Function *irgen::createFunction(IRGenModule &IGM,
                   linkInfo.getDLLStorage()})
       .to(fn, linkInfo.isForDefinition());
 
-  llvm::AttrBuilder initialAttrs;
+  llvm::AttrBuilder initialAttrs(IGM.getLLVMContext());
   IGM.constructInitialFnAttributes(initialAttrs, FuncOptMode);
   // Merge initialAttrs with attrs.
   auto updatedAttrs = signature.getAttributes().addFnAttributes(
@@ -3116,7 +3116,7 @@ llvm::Constant *swift::irgen::emitCXXConstructorThunkIfNeeded(
 
   thunk->setCallingConv(llvm::CallingConv::C);
 
-  llvm::AttrBuilder attrBuilder;
+  llvm::AttrBuilder attrBuilder(IGM.getLLVMContext());
   IGM.constructInitialFnAttributes(attrBuilder);
   attrBuilder.addAttribute(llvm::Attribute::AlwaysInline);
   llvm::AttributeList attr = signature.getAttributes().addFnAttributes(

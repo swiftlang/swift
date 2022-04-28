@@ -939,9 +939,9 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
         && !::useDllStorage(llvm::Triple(Module.getTargetTriple())))
       fn->setLinkage(llvm::GlobalValue::ExternalWeakLinkage);
 
-    llvm::AttrBuilder buildFnAttr;
-    llvm::AttrBuilder buildRetAttr;
-    llvm::AttrBuilder buildFirstParamAttr;
+    llvm::AttrBuilder buildFnAttr(Module.getContext());
+    llvm::AttrBuilder buildRetAttr(Module.getContext());
+    llvm::AttrBuilder buildFirstParamAttr(Module.getContext());
 
     for (auto Attr : attrs) {
       if (isReturnAttribute(Attr))
@@ -1208,7 +1208,7 @@ void IRGenModule::setHasNoFramePointer(llvm::AttrBuilder &Attrs) {
 }
 
 void IRGenModule::setHasNoFramePointer(llvm::Function *F) {
-  llvm::AttrBuilder b;
+  llvm::AttrBuilder b(getLLVMContext());
   setHasNoFramePointer(b);
   F->addFnAttrs(b);
 }
@@ -1232,7 +1232,7 @@ void IRGenModule::constructInitialFnAttributes(llvm::AttrBuilder &Attrs,
 }
 
 llvm::AttributeList IRGenModule::constructInitialAttributes() {
-  llvm::AttrBuilder b;
+  llvm::AttrBuilder b(getLLVMContext());
   constructInitialFnAttributes(b);
   return llvm::AttributeList().addFnAttributes(getLLVMContext(), b);
 }
