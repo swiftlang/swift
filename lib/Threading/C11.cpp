@@ -64,14 +64,9 @@ C11ThreadingHelper helper;
 using namespace swift;
 using namespace threading_impl;
 
-thread_id
-swift::threading_impl::thread_get_main() {
-  return helper.main_thread();
-}
-
 bool
 swift::threading_impl::thread_is_main() {
-  return thrd_equal(thrd_current(), thread_get_main());
+  return thrd_equal(thrd_current(), helper.main_thread());
 }
 
 void

@@ -52,14 +52,9 @@ CONDITION_VARIABLE onceCond = CONDITION_VARIABLE_INIT;
 using namespace swift;
 using namespace threading_impl;
 
-thread_id
-swift::threading_impl::thread_get_main() {
-  return rememberer.main_thread();
-}
-
 bool
 swift::threading_impl::thread_is_main() {
-  return ::GetCurrentThreadId() == thread_get_main();
+  return ::GetCurrentThreadId() == rememberer.main_thread();
 }
 
 void

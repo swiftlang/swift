@@ -44,14 +44,9 @@ pthread_cond_t       onceCond = PTHREAD_COND_INITIALIZER;
 using namespace swift;
 using namespace threading_impl;
 
-thread_id
-swift::threading_impl::thread_get_main() {
-  return rememberer.main_thread();
-}
-
 bool
 swift::threading_impl::thread_is_main() {
-  return pthread_equal(pthread_self(), thread_get_main());
+  return pthread_equal(pthread_self(), rememberer.main_thread());
 }
 
 void

@@ -29,7 +29,6 @@ namespace threading_impl {
 using thread_id = ::DWORD;
 
 inline thread_id thread_get_current() { return ::GetCurrentThreadId(); }
-thread_id thread_get_main();
 bool thread_is_main();
 inline bool threads_same(thread_id a, thread_id b) { return a == b; }
 
