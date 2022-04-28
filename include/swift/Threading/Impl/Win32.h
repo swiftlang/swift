@@ -35,7 +35,7 @@ inline bool threads_same(thread_id a, thread_id b) { return a == b; }
 
 // .. Mutex support ..........................................................
 
-using mutex_handle = ::SRWLOCK;
+using mutex_handle = SWIFT_SRWLOCK;
 
 inline void mutex_init(mutex_handle &handle, bool checked=false) {
   handle = SRWLOCK_INIT;
@@ -43,23 +43,23 @@ inline void mutex_init(mutex_handle &handle, bool checked=false) {
 inline void mutex_destroy(mutex_handle &handle) { }
 
 inline void mutex_lock(mutex_handle &handle) {
-  ::AcquireSRWLockExclusive(&handle);
+  AcquireSRWLockExclusive(&handle);
 }
 inline void mutex_unlock(mutex_handle &handle) {
-  ::ReleaseSRWLockExclusive(&handle);
+  ReleaseSRWLockExclusive(&handle);
 }
 inline bool mutex_try_lock(mutex_handle &handle) {
-  return !!::TryAcquireSRWLockExclusive(&handle);
+  return !!TryAcquireSRWLockExclusive(&handle);
 }
 
 inline void mutex_unsafe_lock(mutex_handle &handle) {
-  ::AcquireSRWLockExclusive(&handle);
+  AcquireSRWLockExclusive(&handle);
 }
 inline void mutex_unsafe_unlock(mutex_handle &handle) {
-  ::ReleaseSRWLockExclusive(&handle);
+  ReleaseSRWLockExclusive(&handle);
 }
 
-using lazy_mutex_handle = ::SRWLOCK;
+using lazy_mutex_handle = SWIFT_SRWLOCK;
 
 // We don't need to be lazy here because Win32 has SRWLOCK_INIT.
 inline constexpr lazy_mutex_handle lazy_mutex_initializer() {
@@ -68,20 +68,20 @@ inline constexpr lazy_mutex_handle lazy_mutex_initializer() {
 inline void lazy_mutex_destroy(lazy_mutex_handle &handle) { }
 
 inline void lazy_mutex_lock(lazy_mutex_handle &handle) {
-  ::AcquireSRWLockExclusive(&handle);
+  AcquireSRWLockExclusive(&handle);
 }
 inline void lazy_mutex_unlock(lazy_mutex_handle &handle) {
-  ::ReleaseSRWLockExclusive(&handle);
+  ReleaseSRWLockExclusive(&handle);
 }
 inline bool lazy_mutex_try_lock(lazy_mutex_handle &handle) {
-  return !!::TryAcquireSRWLockExclusive(&handle);
+  return !!TryAcquireSRWLockExclusive(&handle);
 }
 
 inline void lazy_mutex_unsafe_lock(lazy_mutex_handle &handle) {
-  ::AcquireSRWLockExclusive(&handle);
+  AcquireSRWLockExclusive(&handle);
 }
 inline void lazy_mutex_unsafe_unlock(lazy_mutex_handle &handle) {
-  ::ReleaseSRWLockExclusive(&handle);
+  ReleaseSRWLockExclusive(&handle);
 }
 
 // .. Once ...................................................................
