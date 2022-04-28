@@ -36,8 +36,6 @@
 
 #if defined(_WIN32)
 #include <io.h>
-#include <handleapi.h>
-#include <processthreadsapi.h>
 #endif
 
 using namespace swift;
