@@ -48,3 +48,7 @@ target_link_libraries(SwiftBasicTests
   clangBasic
   LLVMTestingSupport
   )
+
+if(SWIFT_HOST_VARIANT STREQUAL windows)
+  target_link_libraries(SwiftBasicTests PRIVATE Synchronization)
+endif()
