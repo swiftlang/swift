@@ -2922,6 +2922,21 @@ public:
     printRec(E->getBody(), E->getVar()->getDeclContext()->getASTContext());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
+
+  void visitTypeJoinExpr(TypeJoinExpr *E) {
+    printCommon(E, "type_join_expr");
+
+    PrintWithColorRAII(OS, DeclColor) << " var=";
+    printRec(E->getVar());
+    OS << '\n';
+
+    for (auto *member : E->getElements()) {
+      printRec(member);
+      OS << '\n';
+    }
+
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
 };
 
 } // end anonymous namespace

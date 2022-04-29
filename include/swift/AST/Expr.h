@@ -357,6 +357,11 @@ protected:
     : NumPadBits,
     NumElements : 32
   );
+
+  SWIFT_INLINE_BITFIELD_FULL(TypeJoinExpr, Expr, 32,
+    : NumPadBits,
+    NumElements : 32
+  );
   } Bits;
 
 private:
@@ -5924,6 +5929,55 @@ public:
   }
 
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Pack; }
+};
+
+class TypeJoinExpr final : public Expr,
+                           private llvm::TrailingObjects<TypeJoinExpr, Expr *> {
+  friend TrailingObjects;
+
+  DeclRefExpr *Var;
+
+  size_t numTrailingObjects() const {
+    return getNumElements();
+  }
+
+  MutableArrayRef<Expr *> getMutableElements() {
+    return { getTrailingObjects<Expr *>(), getNumElements() };
+  }
+
+  TypeJoinExpr(DeclRefExpr *var, ArrayRef<Expr *> elements);
+
+public:
+  static TypeJoinExpr *create(ASTContext &ctx, DeclRefExpr *var,
+                              ArrayRef<Expr *> exprs);
+
+  SourceLoc getLoc() const { return SourceLoc(); }
+  SourceRange getSourceRange() const { return SourceRange(); }
+
+  DeclRefExpr *getVar() const { return Var; }
+
+  void setVar(DeclRefExpr *var) {
+    assert(var && "cannot set variable reference to null");
+    Var = var;
+  }
+
+  ArrayRef<Expr *> getElements() const {
+    return { getTrailingObjects<Expr *>(), getNumElements() };
+  }
+
+  Expr *getElement(unsigned i) const {
+    return getElements()[i];
+  }
+
+  void setElement(unsigned i, Expr *E) {
+    getMutableElements()[i] = E;
+  }
+
+  unsigned getNumElements() const { return Bits.TypeJoinExpr.NumElements; }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::TypeJoin;
+  }
 };
 
 inline bool Expr::isInfixOperator() const {
