@@ -3524,6 +3524,26 @@ namespace {
       return tv;
     }
 
+    Type visitTypeJoinExpr(TypeJoinExpr *expr) {
+      auto *locator = CS.getConstraintLocator(expr);
+      SmallVector<std::pair<Type, ConstraintLocator *>, 4> elements;
+      elements.reserve(expr->getNumElements());
+
+      for (auto *element : expr->getElements()) {
+        elements.emplace_back(CS.getType(element),
+                              CS.getConstraintLocator(element));
+      }
+
+      auto resultTy = CS.getType(expr->getVar());
+      // The type of a join expression is obtained by performing
+      // a "join-meet" operation on deduced types of its elements
+      // and the underlying variable.
+      auto joinedTy = CS.addJoinConstraint(locator, elements);
+
+      CS.addConstraint(ConstraintKind::Equal, resultTy, joinedTy, locator);
+      return resultTy;
+    }
+
     static bool isTriggerFallbackDiagnosticBuiltin(UnresolvedDotExpr *UDE,
                                                    ASTContext &Context) {
       auto *DRE = dyn_cast<DeclRefExpr>(UDE->getBase());

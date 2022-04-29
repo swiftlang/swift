@@ -5224,6 +5224,10 @@ namespace {
       return E;
     }
 
+    Expr *visitTypeJoinExpr(TypeJoinExpr *E) {
+      llvm_unreachable("already type-checked?");
+    }
+
     /// Interface for ExprWalker
     void walkToExprPre(Expr *expr) {
       // If we have an apply, make a note of its callee locator prior to
