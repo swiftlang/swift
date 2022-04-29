@@ -1,6 +1,11 @@
+// This test aims to show that no preference is given to either the async or
+// sync main function. The most specific, valid, main function will be
+// selected if one exists. If two main functions could exist, the usage is
+// ambiguous.
+
 // async main is nested deeper in protocols than sync, use sync
 // sync main is nested deeper in protocols than async, use async
-// async and sync are same level, use async
+// async and sync are same level, error
 
 // REQUIRES: concurrency
 
@@ -10,23 +15,17 @@
 // BOTH:         MainProtocol has both sync and async main
 // INHERIT_SYNC: main type directly conforms to synchronous main protocol
 
-// | async flag | has async main | has sync main | both | inherits sync | nested async | Result     | Run                                                                                                                                                       |
-// |            |                |               |      |               |              | Error      | RUN: not %target-swift-frontend -disable-availability-checking -DNO_ASYNC -DNO_SYNC  -parse-as-library -typecheck -dump-ast %s 2>&1                       | %FileCheck %s --check-prefix=CHECK-IS-ERROR
-// |            | x              |               |      |               |              | Async Main | RUN: %target-swift-frontend -disable-availability-checking -DNO_SYNC -parse-as-library -typecheck -dump-ast %s                                            | %FileCheck %s --check-prefix=CHECK-IS-ASYNC
-// | x          |                | x             |      |               |              | Sync Main  | RUN: %target-swift-frontend -disable-availability-checking -DNO_ASYNC -async-main -parse-as-library -typecheck -dump-ast %s                               | %FileCheck %s --check-prefix=CHECK-IS-SYNC
-// | x          | x              | x             |      |               |              | Async Main | RUN: %target-swift-frontend -disable-availability-checking -async-main -parse-as-library -typecheck -dump-ast %s                                          | %FileCheck %s --check-prefix=CHECK-IS-ASYNC
-// |            | x              | x             |      |               |              | Sync Main  | RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -typecheck -dump-ast %s                                                      | %FileCheck %s --check-prefix=CHECK-IS-SYNC
-// |            | x              | x             |      |               | x            | Async Main | RUN: %target-swift-frontend -disable-availability-checking -DASYNC_NESTED -parse-as-library -typecheck -dump-ast %s                                       | %FileCheck %s --check-prefix=CHECK-IS-ASYNC
-// |            | x              | x             |      | x             | x            | Sync Main  | RUN: %target-swift-frontend -disable-availability-checking -DINHERIT_SYNC -DASYNC_NESTED -parse-as-library -typecheck -dump-ast %s                        | %FileCheck %s --check-prefix=CHECK-IS-SYNC
-// | x          | x              | x             |      | x             | x            | Async Main | RUN: %target-swift-frontend -disable-availability-checking -DINHERIT_SYNC -DASYNC_NESTED -async-main -parse-as-library -typecheck -dump-ast %s            | %FileCheck %s --check-prefix=CHECK-IS-ASYNC
-// | x          |                | x             |      | x             | x            | Sync Main  | RUN: %target-swift-frontend -disable-availability-checking -DNO_ASYNC -DINHERIT_SYNC -DASYNC_NESTED -async-main -parse-as-library -typecheck -dump-ast %s | %FileCheck %s --check-prefix=CHECK-IS-SYNC
-// |            |                | x             | x    |               |              | Sync Main  | RUN: %target-swift-frontend -disable-availability-checking -DBOTH -DNO_ASYNC -parse-as-library -typecheck -dump-ast %s                                    | %FileCheck %s --check-prefix=CHECK-IS-SYNC
-// | x          |                | x             | x    |               |              | Async Main | RUN: %target-swift-frontend -disable-availability-checking -DBOTH -DNO_ASYNC -async-main -parse-as-library -typecheck -dump-ast %s                        | %FileCheck %s --check-prefix=CHECK-IS-ASYNC
-
-// tldr;
-// If async flag is set, will pick an asynchronous main function if one is available and related. If none exist, will fall back on synchronous main.
-// If async flag is not set, will pick a asynchronous main function if one is available and related. If none exist, will fall back on an asynchronous main
-// If neither are available; error
+// | has async main | has sync main | both | inherits sync | nested async | Result |                         | Run                                                                                                                                          |
+// |                |               |      |               |              | Error  | No main                 | RUN: not %target-swift-frontend -disable-availability-checking -DNO_SYNC -DNO_ASYNC -parse-as-library -typecheck -dump-ast %s 2>&1           | %FileCheck %s --check-prefix=CHECK-IS-ERROR1
+// | x              | x             | x    | x             |              | Error  | Ambiguous main in MainP | RUN: not %target-swift-frontend -disable-availability-checking -DBOTH -DINHERIT_SYNC -parse-as-library -typecheck -dump-ast %s 2>&1          | %FileCheck %s --check-prefix=CHECK-IS-ERROR2
+// |                | x             | x    | x             |              | Error  | Ambiguous main in MainP | RUN: not %target-swift-frontend -disable-availability-checking -DBOTH -DINHERIT_SYNC -parse-as-library -typecheck -dump-ast %s 2>&1          | %FileCheck %s --check-prefix=CHECK-IS-ERROR2
+// | x              | x             | x    |               |              | Async  | Directly selected       | RUN: %target-swift-frontend -disable-availability-checking -DBOTH -parse-as-library -typecheck -dump-ast %s                                  | %FileCheck %s --check-prefix=CHECK-IS-ASYNC
+// | x              | x             |      |               |              | Async  | Directly selected       | RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -typecheck -dump-ast %s                                         | %FileCheck %s --check-prefix=CHECK-IS-ASYNC
+// |                | x             |      |               |              | Sync   | Indirectly selected     | RUN: %target-swift-frontend -disable-availability-checking -DNO_ASYNC -parse-as-library -typecheck -dump-ast %s                              | %FileCheck %s --check-prefix=CHECK-IS-SYNC
+// | x              | x             |      | x             | x            | Sync   | Directly selected       | RUN: %target-swift-frontend -disable-availability-checking -DINHERIT_SYNC -DASYNC_NESTED -parse-as-library -typecheck -dump-ast %s           | %FileCheck %s --check-prefix=CHECK-IS-SYNC
+// | x              |               |      | x             | x            | Async  | Indirectly selected     | RUN: %target-swift-frontend -disable-availability-checking -DNO_SYNC -DINHERIT_SYNC -DASYNC_NESTED -parse-as-library -typecheck -dump-ast %s | %FileCheck %s --check-prefix=CHECK-IS-ASYNC
+// | x              |               |      | x             |              | Error  | Unrelated async main    | RUN: not %target-swift-frontend -disable-availability-checking -DNO_SYNC -DINHERIT_SYNC -parse-as-library -typecheck -dump-ast %s 2>&1       | %FileCheck %s --check-prefix=CHECK-IS-ERROR1
+// |                | x             |      |               | x            | Error  | Unrelated sync main     | RUN: not %target-swift-frontend -disable-availability-checking -DNO_ASYNC -DASYNC_NESTED -parse-as-library -typecheck -dump-ast %s  2>&1     | %FileCheck %s --check-prefix=CHECK-IS-ERROR1
 
 #if ASYNC_NESTED
 protocol AsyncMainProtocol { }
@@ -71,4 +70,5 @@ extension MainProtocol {
 // CHECK-IS-ASYNC: (func_decl implicit "$main()" interface type='(MyMain.Type) -> () async -> ()'
 // CHECK-IS-ASYNC:       (declref_expr implicit type='(MyMain.Type) -> () async -> ()'
 
-// CHECK-IS-ERROR: error: 'MyMain' is annotated with @main and must provide a main static function of type {{\(\) -> Void or \(\) throws -> Void|\(\) -> Void, \(\) throws -> Void, \(\) async -> Void, or \(\) async throws -> Void}}
+// CHECK-IS-ERROR1: error: 'MyMain' is annotated with @main and must provide a main static function of type {{\(\) -> Void or \(\) throws -> Void|\(\) -> Void, \(\) throws -> Void, \(\) async -> Void, or \(\) async throws -> Void}}
+// CHECK-IS-ERROR2: error: ambiguous use of 'main'
