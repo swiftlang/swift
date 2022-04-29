@@ -590,7 +590,7 @@ mapFrontendInvocationToAction(const CompilerInvocation &Invocation) {
 
 static DetailedTaskDescription
 constructDetailedTaskDescription(const CompilerInvocation &Invocation,
-                                 const InputFile &PrimaryInput,
+                                 ArrayRef<InputFile> PrimaryInputs,
                                  ArrayRef<const char *> Args) {
   // Command line and arguments
   std::string Executable = Invocation.getFrontendOptions().MainExecutablePath;
@@ -604,24 +604,30 @@ constructDetailedTaskDescription(const CompilerInvocation &Invocation,
     CommandLine += std::string(" ") + A;
   }
 
-  // Primary Input only
-  Inputs.push_back(CommandInput(PrimaryInput.getFileName()));
+  // Primary Inputs
+  for (const auto &input : PrimaryInputs) {
+    Inputs.push_back(CommandInput(input.getFileName()));
+  }
 
-  // Output for this Primary
-  auto OutputFile = PrimaryInput.outputFilename();
-  Outputs.push_back(OutputPair(file_types::lookupTypeForExtension(
-                                   llvm::sys::path::extension(OutputFile)),
-                               OutputFile));
+  for (const auto &input : PrimaryInputs) {
+    // Main outputs
+    auto OutputFile = input.outputFilename();
+    if (!OutputFile.empty()) {
+      Outputs.push_back(OutputPair(file_types::lookupTypeForExtension(
+                                       llvm::sys::path::extension(OutputFile)),
+                                   OutputFile));
+    }
 
-  // Supplementary outputs
-  const auto &primarySpecificFiles = PrimaryInput.getPrimarySpecificPaths();
-  const auto &supplementaryOutputPaths =
-      primarySpecificFiles.SupplementaryOutputs;
-  supplementaryOutputPaths.forEachSetOutput([&](const std::string &output) {
-    Outputs.push_back(OutputPair(
-        file_types::lookupTypeForExtension(llvm::sys::path::extension(output)),
-        output));
-  });
+    // Supplementary outputs
+    const auto &primarySpecificFiles = input.getPrimarySpecificPaths();
+    const auto &supplementaryOutputPaths =
+        primarySpecificFiles.SupplementaryOutputs;
+    supplementaryOutputPaths.forEachSetOutput([&](const std::string &output) {
+      Outputs.push_back(OutputPair(file_types::lookupTypeForExtension(
+                                       llvm::sys::path::extension(output)),
+                                   output));
+    });
+  }
   return DetailedTaskDescription{Executable, Arguments, CommandLine, Inputs,
                                  Outputs};
 }
@@ -2125,15 +2131,26 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     // making sure it cannot collide with a real PID (always positive). Non-batch
     // compilation gets a real OS PID.
     int64_t Pid = IO.hasUniquePrimaryInput() ? OSPid : QUASI_PID_START;
-    IO.forEachPrimaryInputWithIndex([&](const InputFile &Input,
-                                        unsigned idx) -> bool {
-      emitBeganMessage(
-          llvm::errs(),
-          mapFrontendInvocationToAction(Invocation),
-          constructDetailedTaskDescription(Invocation, Input, Args), Pid - idx,
-          ProcInfo);
-      return false;
-    });
+
+    if (IO.hasPrimaryInputs()) {
+      IO.forEachPrimaryInputWithIndex([&](const InputFile &Input,
+                                          unsigned idx) -> bool {
+        ArrayRef<InputFile> Inputs(Input);
+        emitBeganMessage(llvm::errs(),
+                         mapFrontendInvocationToAction(Invocation),
+                         constructDetailedTaskDescription(Invocation,
+                                                          Inputs,
+                                                          Args), Pid - idx,
+                         ProcInfo);
+        return false;
+      });
+    } else {
+      // If no primary inputs are present, we are in WMO.
+      emitBeganMessage(llvm::errs(),
+                       mapFrontendInvocationToAction(Invocation),
+                       constructDetailedTaskDescription(Invocation, IO.getAllInputs(), Args),
+                       OSPid, ProcInfo);
+    }
   }
 
   int ReturnValue = 0;
@@ -2164,23 +2181,41 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     // making sure it cannot collide with a real PID (always positive). Non-batch
     // compilation gets a real OS PID.
     int64_t Pid = IO.hasUniquePrimaryInput() ? OSPid : QUASI_PID_START;
-    IO.forEachPrimaryInputWithIndex([&](const InputFile &Input,
-                                        unsigned idx) -> bool {
-      assert(FileSpecificDiagnostics.count(Input.getFileName()) != 0 &&
-             "Expected diagnostic collection for input.");
 
-      // Join all diagnostics produced for this file into a single output.
-      auto PrimaryDiags = FileSpecificDiagnostics.lookup(Input.getFileName());
+    if (IO.hasPrimaryInputs()) {
+      IO.forEachPrimaryInputWithIndex([&](const InputFile &Input,
+                                          unsigned idx) -> bool {
+        assert(FileSpecificDiagnostics.count(Input.getFileName()) != 0 &&
+               "Expected diagnostic collection for input.");
+
+        // Join all diagnostics produced for this file into a single output.
+        auto PrimaryDiags = FileSpecificDiagnostics.lookup(Input.getFileName());
+        const char *const Delim = "";
+        std::ostringstream JoinedDiags;
+        std::copy(PrimaryDiags.begin(), PrimaryDiags.end(),
+                  std::ostream_iterator<std::string>(JoinedDiags, Delim));
+
+        emitFinishedMessage(llvm::errs(),
+                            mapFrontendInvocationToAction(Invocation),
+                            JoinedDiags.str(), r, Pid - idx, ProcInfo);
+        return false;
+      });
+    } else {
+      // If no primary inputs are present, we are in WMO.
+      std::vector<std::string> AllDiagnostics;
+      for (const auto &FileDiagnostics : FileSpecificDiagnostics) {
+        AllDiagnostics.insert(AllDiagnostics.end(),
+                              FileDiagnostics.getValue().begin(),
+                              FileDiagnostics.getValue().end());
+      }
       const char *const Delim = "";
       std::ostringstream JoinedDiags;
-      std::copy(PrimaryDiags.begin(), PrimaryDiags.end(),
+      std::copy(AllDiagnostics.begin(), AllDiagnostics.end(),
                 std::ostream_iterator<std::string>(JoinedDiags, Delim));
-
       emitFinishedMessage(llvm::errs(),
                           mapFrontendInvocationToAction(Invocation),
-                          JoinedDiags.str(), r, Pid - idx, ProcInfo);
-      return false;
-    });
+                          JoinedDiags.str(), r, OSPid, ProcInfo);
+    }
   }
 
   return r;
