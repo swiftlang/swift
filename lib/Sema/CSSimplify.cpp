@@ -2189,7 +2189,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::DefaultClosureType:
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::PropertyWrapper:
-  case ConstraintKind::ClosureBodyElement:
+  case ConstraintKind::SyntacticElement:
   case ConstraintKind::BindTupleOfFunctionParams:
     llvm_unreachable("Not a conversion");
   }
@@ -2352,7 +2352,7 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
   case ConstraintKind::DefaultClosureType:
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::PropertyWrapper:
-  case ConstraintKind::ClosureBodyElement:
+  case ConstraintKind::SyntacticElement:
   case ConstraintKind::BindTupleOfFunctionParams:
     return true;
   }
@@ -2670,11 +2670,15 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   }
 
   /// Whether to downgrade to a concurrency warning.
-  auto isConcurrencyWarning = [&] {
-    if (contextRequiresStrictConcurrencyChecking(DC, GetClosureType{*this})
-        && !hasPreconcurrencyCallee(this, locator))
+  auto isConcurrencyWarning = [&](bool forSendable) {
+    // Except for Sendable warnings, don't downgrade to an error in strict
+    // contexts without a preconcurrency callee.
+    if (!forSendable &&
+        contextRequiresStrictConcurrencyChecking(DC, GetClosureType{*this}) &&
+        !hasPreconcurrencyCallee(this, locator))
       return false;
 
+    // We can only handle the downgrade for conversions.
     switch (kind) {
     case ConstraintKind::Conversion:
     case ConstraintKind::ArgumentConversion:
@@ -2694,7 +2698,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
       auto *fix = AddSendableAttribute::create(
           *this, func1, func2, getConstraintLocator(locator),
-          isConcurrencyWarning());
+          isConcurrencyWarning(true));
       if (recordFix(fix))
         return getTypeMatchFailure(locator);
     }
@@ -2729,7 +2733,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
       auto *fix = MarkGlobalActorFunction::create(
           *this, func1, func2, getConstraintLocator(locator),
-          isConcurrencyWarning());
+          isConcurrencyWarning(false));
 
       if (recordFix(fix))
         return getTypeMatchFailure(locator);
@@ -2796,7 +2800,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::DefaultClosureType:
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::PropertyWrapper:
-  case ConstraintKind::ClosureBodyElement:
+  case ConstraintKind::SyntacticElement:
   case ConstraintKind::BindTupleOfFunctionParams:
     llvm_unreachable("Not a relational constraint");
   }
@@ -6012,7 +6016,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::DefaultClosureType:
     case ConstraintKind::UnresolvedMemberChainBase:
     case ConstraintKind::PropertyWrapper:
-    case ConstraintKind::ClosureBodyElement:
+    case ConstraintKind::SyntacticElement:
     case ConstraintKind::BindTupleOfFunctionParams:
       llvm_unreachable("Not a relational constraint");
     }
@@ -13145,7 +13149,7 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::KeyPath:
   case ConstraintKind::KeyPathApplication:
   case ConstraintKind::DefaultClosureType:
-  case ConstraintKind::ClosureBodyElement:
+  case ConstraintKind::SyntacticElement:
     llvm_unreachable("Use the correct addConstraint()");
   }
 
@@ -13675,9 +13679,9 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
         constraint.getFirstType(), constraint.getSecondType(),
         /*flags=*/None, constraint.getLocator());
 
-  case ConstraintKind::ClosureBodyElement:
-    return simplifyClosureBodyElementConstraint(
-        constraint.getClosureElement(), constraint.getElementContext(),
+  case ConstraintKind::SyntacticElement:
+    return simplifySyntacticElementConstraint(
+        constraint.getSyntacticElement(), constraint.getElementContext(),
         constraint.isDiscardedElement(),
         /*flags=*/None, constraint.getLocator());
 

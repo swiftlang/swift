@@ -1012,11 +1012,11 @@ public:
   }
 };
 
-class LocatorPathElt::ClosureBodyElement final
+class LocatorPathElt::SyntacticElement final
     : public StoredPointerElement<void> {
 public:
-  ClosureBodyElement(ASTNode element)
-      : StoredPointerElement(PathElementKind::ClosureBodyElement,
+  SyntacticElement(ASTNode element)
+      : StoredPointerElement(PathElementKind::SyntacticElement,
                              element.getOpaqueValue()) {
     assert(element);
   }
@@ -1054,7 +1054,7 @@ public:
   }
 
   static bool classof(const LocatorPathElt *elt) {
-    return elt->getKind() == PathElementKind::ClosureBodyElement;
+    return elt->getKind() == PathElementKind::SyntacticElement;
   }
 };
 

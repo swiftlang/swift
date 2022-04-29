@@ -516,6 +516,8 @@ public:
 
   bool isCXXMethodMutating(const clang::CXXMethodDecl *method) override;
 
+  bool isAnnotatedWith(const clang::CXXMethodDecl *method, StringRef attr);
+
   /// Find the lookup table that corresponds to the given Clang module.
   ///
   /// \param clangModule The module, or null to indicate that we're talking

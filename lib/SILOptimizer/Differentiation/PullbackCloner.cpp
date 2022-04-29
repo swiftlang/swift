@@ -549,7 +549,7 @@ private:
     if (auto adjProj = getAdjointProjection(origBB, originalValue))
       return (bufferMap[{origBB, originalValue}] = adjProj);
 
-    LLVM_DEBUG(getADDebugStream() << "Creating new adjoint buffer for"
+    LLVM_DEBUG(getADDebugStream() << "Creating new adjoint buffer for "
                << originalValue
                << "in bb" << origBB->getDebugID() << '\n');
 
@@ -589,7 +589,8 @@ private:
     auto adjointBuffer = getAdjointBuffer(origBB, originalValue);
 
     LLVM_DEBUG(getADDebugStream() << "Adding"
-               << rhsAddress << "to adjoint of "
+               << rhsAddress << "to adjoint ("
+               << adjointBuffer << ") of "
                << originalValue
                << "in bb" << origBB->getDebugID() << '\n');
 
@@ -811,7 +812,8 @@ public:
 #endif
     SILInstructionVisitor::visit(inst);
     LLVM_DEBUG({
-      auto &s = llvm::dbgs() << "[ADJ] Emitted in pullback:\n";
+      auto &s = llvm::dbgs() << "[ADJ] Emitted in pullback (pb bb" <<
+        builder.getInsertionBB()->getDebugID() << "):\n";
       auto afterInsertion = builder.getInsertionPoint();
       for (auto it = ++beforeInsertion; it != afterInsertion; ++it)
         s << *it;
@@ -1645,7 +1647,7 @@ public:
   void
   visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *utedai) {
     auto *bb = utedai->getParent();
-    auto adjBuf = getAdjointBuffer(bb, utedai);
+    auto adjDest = getAdjointBuffer(bb, utedai);
     auto enumTy = utedai->getOperand()->getType();
     auto *optionalEnumDecl = getASTContext().getOptionalDecl();
     // Only `Optional`-typed operands are supported for now. Diagnose all other
@@ -1659,7 +1661,8 @@ public:
       errorOccurred = true;
       return;
     }
-    accumulateAdjointForOptional(bb, utedai->getOperand(), adjBuf);
+    accumulateAdjointForOptional(bb, utedai->getOperand(), adjDest);
+    builder.emitZeroIntoBuffer(utedai->getLoc(), adjDest, IsNotInitialization);
   }
 
 #define NOT_DIFFERENTIABLE(INST, DIAG) void visit##INST##Inst(INST##Inst *inst);
@@ -2473,6 +2476,10 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
   for (auto *bbArg : bb->getArguments()) {
     if (!getActivityInfo().isActive(bbArg, getConfig()))
       continue;
+    LLVM_DEBUG(getADDebugStream() << "Propagating adjoint value for active bb"
+               << bb->getDebugID() << " argument: "
+               << *bbArg);
+
     // Get predecessor terminator operands.
     SmallVector<std::pair<SILBasicBlock *, SILValue>, 4> incomingValues;
     bbArg->getSingleTerminatorOperands(incomingValues);

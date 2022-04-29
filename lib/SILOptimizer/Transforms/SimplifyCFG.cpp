@@ -1319,8 +1319,14 @@ TrampolineDest::TrampolineDest(SILBasicBlock *sourceBB,
       return;
     }
   }
+  SILBasicBlock *destBlock = targetBranch->getDestBB();
   newSourceBranchArgs.reserve(targetBranch->getArgs().size());
   for (SILValue branchArg : targetBranch->getArgs()) {
+    if (branchArg->getParentBlock() == destBlock) {
+      // This can happen if the involved blocks are part of an unreachable CFG
+      // cycle (dominance is not meaningful in such a case).
+      return;
+    }
     if (branchArg->getParentBlock() == targetBB) {
       auto *phi = dyn_cast<SILPhiArgument>(branchArg);
       if (!phi || !phi->isPhi()) {
@@ -1331,7 +1337,7 @@ TrampolineDest::TrampolineDest(SILBasicBlock *sourceBB,
     newSourceBranchArgs.push_back(branchArg);
   }
   // Setting destBB constructs a valid TrampolineDest.
-  destBB = targetBranch->getDestBB();
+  destBB = destBlock;
 }
 
 #ifndef NDEBUG

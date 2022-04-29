@@ -29,6 +29,19 @@ class PointerWrapper {
 
 enum OneOfThree { case one, two, three }
 
+final class Object {
+  init()
+}
+
+public struct ClassStorage {
+  var ref: C
+}
+public struct ClassWrapper {
+  var storage: ClassStorage
+}
+
+sil @returnUnmanagedC : $@convention(method) (@guaranteed C) -> @sil_unmanaged C
+
 sil [ossa] @callee_guaranteed: $@convention(thin) (@guaranteed C) -> ()
 sil [ossa] @get_owned_c : $@convention(thin) () -> (@owned C)
 sil [ossa] @callee_owned : $@convention(thin) (@owned C) -> ()
@@ -1014,6 +1027,71 @@ exit(%copy_1_2 : @owned $C, %borrow_in : @guaranteed $C, %copy_2_2 : @owned $C):
   end_borrow %borrow_in : $C
   destroy_value %copy_1_2 : $C
   return %copy_2_2 : $C
+}
+
+// Do not hoist the end_borrow (or destroy_value) of Storage above the
+// string_copy_unmanaged_value of the BridgeObject. Here, the initial
+// ref_to_unmanaged is hidden by a call.
+//
+// rdar://90909833 (Extend deinit barriers to handle conversion to strong reference)
+//
+// CHECK-LABEL: sil [ossa] @testCopyUnmanagedCall : $@convention(method) (@inout ClassWrapper) -> () {
+// CHECK:   [[STORAGE:%.*]] = load [take] %1 : $*ClassStorage
+// CHECK:   [[BORROW:%.*]] = begin_borrow [[STORAGE]] : $ClassStorage
+// CHECK:   [[CALL:%.*]] = apply %{{.*}} : $@convention(method) (@guaranteed C) -> @sil_unmanaged C
+// CHECK:   strong_copy_unmanaged_value [[CALL]] : $@sil_unmanaged C
+// CHECK:   end_borrow [[BORROW]] : $ClassStorage
+// CHECK:   destroy_value [[STORAGE]] : $ClassStorage
+// CHECK-LABEL: } // end sil function
+sil [ossa] @testCopyUnmanagedCall : $@convention(method) (@inout ClassWrapper) -> () {
+bb0(%0 : $*ClassWrapper):
+  %1 = struct_element_addr %0 : $*ClassWrapper, #ClassWrapper.storage
+  %2 = load [take] %1 : $*ClassStorage
+  %4 = begin_borrow %2 : $ClassStorage
+  %5 = struct_extract %4 : $ClassStorage, #ClassStorage.ref
+  %f = function_ref @returnUnmanagedC : $@convention(method) (@guaranteed C) -> @sil_unmanaged C
+  %call = apply %f(%5) : $@convention(method) (@guaranteed C) -> @sil_unmanaged C
+  %7 = strong_copy_unmanaged_value %call : $@sil_unmanaged C
+  end_borrow %4 : $ClassStorage
+  destroy_value %2 : $ClassStorage
+  %10 = struct $ClassStorage (%7 : $C)
+  %11 = struct $ClassWrapper (%10 : $ClassStorage)
+  store %11 to [init] %0 : $*ClassWrapper
+  %23 = tuple ()
+  return %23 : $()
+}
+
+// Do not hoist the end_borrow (or destroy_value) of Storage above the
+// string_copy_unmanaged_value of the BridgeObject. Here, the initial
+// ref_to_unmanaged is hidden by a call.
+//
+// rdar://90909833 (Extend deinit barriers to handle conversion to strong reference)
+//
+// The inlined case was already handled because the ref_to_unmanaged
+// was considered a pointer escape. But in the future, this might not be considered a pointer escape.
+//
+// CHECK-LABEL: sil [ossa] @testCopyUnmanagedInlined : $@convention(method) (@inout ClassWrapper) -> () {
+// CHECK:   [[STORAGE:%.*]] = load [take] %1 : $*ClassStorage
+// CHECK:   [[BORROW:%.*]] = begin_borrow [[STORAGE]] : $ClassStorage
+// CHECK:   strong_copy_unmanaged_value
+// CHECK:   end_borrow [[BORROW]] : $ClassStorage
+// CHECK:   destroy_value [[STORAGE]] : $ClassStorage
+// CHECK-LABEL: } // end sil function
+sil [ossa] @testCopyUnmanagedInlined : $@convention(method) (@inout ClassWrapper) -> () {
+bb0(%0 : $*ClassWrapper):
+  %1 = struct_element_addr %0 : $*ClassWrapper, #ClassWrapper.storage
+  %2 = load [take] %1 : $*ClassStorage
+  %4 = begin_borrow %2 : $ClassStorage
+  %5 = struct_extract %4 : $ClassStorage, #ClassStorage.ref
+  %6 = ref_to_unmanaged %5 : $C to $@sil_unmanaged C
+  %7 = strong_copy_unmanaged_value %6 : $@sil_unmanaged C
+  end_borrow %4 : $ClassStorage
+  destroy_value %2 : $ClassStorage
+  %10 = struct $ClassStorage (%7 : $C)
+  %11 = struct $ClassWrapper (%10 : $ClassStorage)
+  store %11 to [init] %0 : $*ClassWrapper
+  %23 = tuple ()
+  return %23 : $()
 }
 
 // =============================================================================
