@@ -10,9 +10,6 @@
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib
 
-// rdar://75365575 (Failing to start atos external symbolizer)
-// UNSUPPORTED: OS=watchos
-
 // REQUIRES: rdar76542113
 
 var globalCounterValue = 0
