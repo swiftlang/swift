@@ -1,6 +1,11 @@
 // RUN: %target-run-simple-swift(-Xfrontend -enable-parameterized-existential-types)
 // REQUIRES: executable_test
 
+// This test requires the new existential shape metadata accessors which are 
+// not available in on-device runtimes, or in the back-deployment runtime.
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
 import StdlibUnittest
 
 var ParameterizedProtocolsTestSuite = TestSuite("ParameterizedProtocols")

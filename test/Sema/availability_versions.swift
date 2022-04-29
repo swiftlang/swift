@@ -547,6 +547,9 @@ enum CompassPoint {
   case WithPotentiallyUnavailablePayload(p : EnumIntroducedOn10_52) // expected-error {{'EnumIntroducedOn10_52' is only available in macOS 10.52 or newer}}
 
   case WithPotentiallyUnavailablePayload1(p : EnumIntroducedOn10_52), WithPotentiallyUnavailablePayload2(p : EnumIntroducedOn10_52) // expected-error 2{{'EnumIntroducedOn10_52' is only available in macOS 10.52 or newer}}
+  
+  @available(OSX, unavailable)
+  case WithPotentiallyUnavailablePayload3(p : EnumIntroducedOn10_52)
 }
 
 @available(OSX, introduced: 10.52)
@@ -712,7 +715,7 @@ func classViaTypeParameter() {
 // Potentially unavailable class used in declarations
 
 class ClassWithDeclarationsOfPotentiallyUnavailableClasses {
-      // expected-note@-1 5{{add @available attribute to enclosing class}}
+      // expected-note@-1 6{{add @available attribute to enclosing class}}
 
   @available(OSX, introduced: 10.51)
   init() {}
@@ -738,9 +741,18 @@ class ClassWithDeclarationsOfPotentiallyUnavailableClasses {
     return ClassAvailableOn10_51() // expected-error {{'ClassAvailableOn10_51' is only available in macOS 10.51 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
   }
+
+  @available(OSX, unavailable)
+  func unavailableMethodWithPotentiallyUnavailableParameterType(_ o : ClassAvailableOn10_51) {}
   
   @available(OSX, introduced: 10.51)
   func potentiallyUnavailableMethodWithPotentiallyUnavailableReturnType() -> ClassAvailableOn10_51 {
+    return ClassAvailableOn10_51()
+  }
+  
+  @available(OSX, unavailable)
+  func unavailableMethodWithPotentiallyUnavailableReturnType() -> ClassAvailableOn10_51 {
+    guard #available(OSX 10.51, *) else { fatalError() }
     return ClassAvailableOn10_51()
   }
 
@@ -753,6 +765,12 @@ class ClassWithDeclarationsOfPotentiallyUnavailableClasses {
   @available(OSX, introduced: 10.51)
   func potentiallyUnavailableMethodWithPotentiallyUnavailableLocalDeclaration() {
     let _ : ClassAvailableOn10_51 = methodWithPotentiallyUnavailableReturnType()
+  }
+  
+  @available(OSX, unavailable)
+  func unavailableMethodWithPotentiallyUnavailableLocalDeclaration() {
+    let _ : ClassAvailableOn10_51 = methodWithPotentiallyUnavailableReturnType() // expected-error {{'ClassAvailableOn10_51' is only available in macOS 10.51 or newer}}
+      // expected-note@-1 {{add 'if #available' version check}}
   }
 }
 
@@ -768,6 +786,10 @@ class ClassExtendingPotentiallyUnavailableClass : ClassAvailableOn10_51 { // exp
 
 @available(OSX, introduced: 10.51)
 class PotentiallyUnavailableClassExtendingPotentiallyUnavailableClass : ClassAvailableOn10_51 {
+}
+
+@available(OSX, unavailable)
+class UnavailableClassExtendingPotentiallyUnavailableClass : ClassAvailableOn10_51 {
 }
 
 // Method availability is contravariant
@@ -857,6 +879,17 @@ class SubWithLargerMemberAvailability : SuperWithLimitedMemberAvailability {
   }
 }
 
+@available(OSX, unavailable)
+class UnavailableSubWithLargerMemberAvailability : SuperWithLimitedMemberAvailability {
+  override func someMethod() {
+  }
+  
+  override var someProperty: Int {
+    get { return 5 }
+    set(newVal) {}
+  }
+}
+
 // Inheritance and availability
 
 @available(OSX, introduced: 10.51)
@@ -875,8 +908,16 @@ protocol ProtocolAvailableOn10_9InheritingFromProtocolAvailableOn10_51 : Protoco
 protocol ProtocolAvailableOn10_51InheritingFromProtocolAvailableOn10_9 : ProtocolAvailableOn10_9 {
 }
 
+@available(OSX, unavailable)
+protocol UnavailableProtocolInheritingFromProtocolAvailableOn10_51 : ProtocolAvailableOn10_51 {
+}
+
 @available(OSX, introduced: 10.9)
 class SubclassAvailableOn10_9OfClassAvailableOn10_51 : ClassAvailableOn10_51 { // expected-error {{'ClassAvailableOn10_51' is only available in macOS 10.51 or newer}}
+}
+
+@available(OSX, unavailable)
+class UnavailableSubclassOfClassAvailableOn10_51 : ClassAvailableOn10_51 {
 }
 
 // We allow nominal types to conform to protocols that are less available than the types themselves.
@@ -896,7 +937,7 @@ func castToPotentiallyUnavailableProtocol() {
 }
 
 @available(OSX, introduced: 10.9)
-class SubclassAvailableOn10_9OfClassAvailableOn10_51AlsoAdoptingProtocolAvailableOn10_51 : ClassAvailableOn10_51 { // expected-error {{'ClassAvailableOn10_51' is only available in macOS 10.51 or newer}}
+class SubclassAvailableOn10_9OfClassAvailableOn10_51AlsoAdoptingProtocolAvailableOn10_51 : ClassAvailableOn10_51, ProtocolAvailableOn10_51 { // expected-error {{'ClassAvailableOn10_51' is only available in macOS 10.51 or newer}}
 }
 
 class SomeGenericClass<T> { }
@@ -905,26 +946,47 @@ class SomeGenericClass<T> { }
 class SubclassAvailableOn10_9OfSomeGenericClassOfProtocolAvailableOn10_51 : SomeGenericClass<ProtocolAvailableOn10_51> { // expected-error {{'ProtocolAvailableOn10_51' is only available in macOS 10.51 or newer}}
 }
 
+@available(OSX, unavailable)
+class UnavailableSubclassOfSomeGenericClassOfProtocolAvailableOn10_51 : SomeGenericClass<ProtocolAvailableOn10_51> {
+}
+
 func GenericWhereClause<T>(_ t: T) where T: ProtocolAvailableOn10_51 { // expected-error * {{'ProtocolAvailableOn10_51' is only available in macOS 10.51 or newer}}
       // expected-note@-1 * {{add @available attribute to enclosing global function}}
+}
+
+@available(OSX, unavailable)
+func UnavailableGenericWhereClause<T>(_ t: T) where T: ProtocolAvailableOn10_51 {
 }
 
 func GenericSignature<T : ProtocolAvailableOn10_51>(_ t: T) { // expected-error * {{'ProtocolAvailableOn10_51' is only available in macOS 10.51 or newer}}
       // expected-note@-1 * {{add @available attribute to enclosing global function}}
 }
 
+@available(OSX, unavailable)
+func UnavailableGenericSignature<T : ProtocolAvailableOn10_51>(_ t: T) {
+}
+
 struct GenericType<T> { // expected-note {{add @available attribute to enclosing generic struct}}
   func nonGenericWhereClause() where T : ProtocolAvailableOn10_51 {} // expected-error {{'ProtocolAvailableOn10_51' is only available in macOS 10.51 or newer}}
   // expected-note@-1 {{add @available attribute to enclosing instance method}}
+  
+  @available(OSX, unavailable)
+  func unavailableNonGenericWhereClause() where T : ProtocolAvailableOn10_51 {}
 
   struct NestedType where T : ProtocolAvailableOn10_51 {} // expected-error {{'ProtocolAvailableOn10_51' is only available in macOS 10.51 or newer}}
   // expected-note@-1 2{{add @available attribute to enclosing struct}}
+  
+  @available(OSX, unavailable)
+  struct UnavailableNestedType where T : ProtocolAvailableOn10_51 {}
 }
 
 // Extensions
 
 extension ClassAvailableOn10_51 { } // expected-error {{'ClassAvailableOn10_51' is only available in macOS 10.51 or newer}}
     // expected-note@-1 {{add @available attribute to enclosing extension}}
+
+@available(OSX, unavailable)
+extension ClassAvailableOn10_51 { }
 
 @available(OSX, introduced: 10.51)
 extension ClassAvailableOn10_51 {
@@ -957,7 +1019,6 @@ extension ClassToExtend {
 // We allow protocol extensions for protocols that are less available than the
 // conforming class.
 extension ClassToExtend : ProtocolAvailableOn10_51 {
-
 }
 
 @available(OSX, introduced: 10.51)

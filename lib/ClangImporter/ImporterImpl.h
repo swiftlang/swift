@@ -1849,6 +1849,9 @@ public:
 /// actor.
 bool isMainActorAttr(const clang::SwiftAttrAttr *swiftAttr);
 
+/// Determines whether the given swift_attr controls mutability
+bool isMutabilityAttr(const clang::SwiftAttrAttr *swiftAttr);
+
 /// Apply an attribute to a function type.
 static inline Type applyToFunctionType(
     Type type, llvm::function_ref<ASTExtInfo(ASTExtInfo)> transform) {

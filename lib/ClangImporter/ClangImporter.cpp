@@ -2676,6 +2676,10 @@ bool importer::shouldSuppressDeclImport(const clang::Decl *decl) {
     return false;
   }
 
+  if (isa<clang::BuiltinTemplateDecl>(decl)) {
+    return true;
+  }
+
   return false;
 }
 
@@ -5699,18 +5703,20 @@ ClangImporter::getCXXFunctionTemplateSpecialization(SubstitutionMap subst,
 
 bool ClangImporter::isCXXMethodMutating(const clang::CXXMethodDecl *method) {
   return isa<clang::CXXConstructorDecl>(method) || !method->isConst() ||
-         // method->getParent()->hasMutableFields() ||
-         // FIXME(rdar://91961524): figure out a way to handle mutable fields
-         // without breaking classes from the C++ standard library (e.g.
-         // `std::string` which has a mutable member in old libstdc++ version
-         // used on CentOS 7)
-         (method->hasAttrs() &&
-          llvm::any_of(method->getAttrs(), [](clang::Attr *a) {
-            if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(a)) {
-              return swiftAttr->getAttribute() == "mutating";
-            }
-            return false;
-          }));
+         (method->getParent()->hasMutableFields() &&
+          !isAnnotatedWith(method, "nonmutating")) ||
+         isAnnotatedWith(method, "mutating");
+}
+
+bool ClangImporter::isAnnotatedWith(const clang::CXXMethodDecl *method,
+                                    StringRef attr) {
+  return method->hasAttrs() &&
+         llvm::any_of(method->getAttrs(), [attr](clang::Attr *a) {
+           if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(a)) {
+             return swiftAttr->getAttribute() == attr;
+           }
+           return false;
+         });
 }
 
 SwiftLookupTable *

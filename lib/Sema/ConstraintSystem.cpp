@@ -56,6 +56,22 @@ ExpressionTimer::ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS,
       PrintDebugTiming(CS.getASTContext().TypeCheckerOpts.DebugTimeExpressions),
       PrintWarning(true) {}
 
+SourceRange ExpressionTimer::getAffectedRange() const {
+  ASTNode anchor;
+
+  if (auto *locator = Anchor.dyn_cast<ConstraintLocator *>()) {
+    anchor = simplifyLocatorToAnchor(locator);
+    // If locator couldn't be simplified down to a single AST
+    // element, let's use its root.
+    if (!anchor)
+      anchor = locator->getAnchor();
+  } else {
+    anchor = Anchor.get<Expr *>();
+  }
+
+  return anchor.getSourceRange();
+}
+
 ExpressionTimer::~ExpressionTimer() {
   auto elapsed = getElapsedProcessTimeInFractionalSeconds();
   unsigned elapsedMS = static_cast<unsigned>(elapsed * 1000);
@@ -81,22 +97,13 @@ ExpressionTimer::~ExpressionTimer() {
   if (WarnLimit == 0 || elapsedMS < WarnLimit)
     return;
 
-  ASTNode anchor;
-  if (auto *locator = Anchor.dyn_cast<ConstraintLocator *>()) {
-    anchor = simplifyLocatorToAnchor(locator);
-    // If locator couldn't be simplified down to a single AST
-    // element, let's warn about its root.
-    if (!anchor)
-      anchor = locator->getAnchor();
-  } else {
-    anchor = Anchor.get<Expr *>();
-  }
+  auto sourceRange = getAffectedRange();
 
-  if (anchor.getStartLoc().isValid()) {
+  if (sourceRange.Start.isValid()) {
     Context.Diags
-        .diagnose(anchor.getStartLoc(), diag::debug_long_expression, elapsedMS,
+        .diagnose(sourceRange.Start, diag::debug_long_expression, elapsedMS,
                   WarnLimit)
-        .highlight(anchor.getSourceRange());
+        .highlight(sourceRange);
   }
 }
 
@@ -2900,11 +2907,6 @@ bool ConstraintSystem::isAsynchronousContext(DeclContext *dc) {
         FunctionType::ExtInfo()).isAsync();
   }
 
-  if (Options.contains(
-          ConstraintSystemFlags::ConsiderNominalTypeContextsAsync) &&
-      isa<NominalTypeDecl>(dc))
-    return true;
-
   return false;
 }
 
@@ -3309,7 +3311,8 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     // If we're choosing an asynchronous declaration within a synchronous
     // context, or vice-versa, increase the async/async mismatch score.
     if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-      if (!func->hasPolymorphicEffect(EffectKind::Async) &&
+      if (!Options.contains(ConstraintSystemFlags::IgnoreAsyncSyncMismatch) &&
+          !func->hasPolymorphicEffect(EffectKind::Async) &&
           func->isAsyncContext() != isAsynchronousContext(useDC)) {
         increaseScore(
             func->isAsyncContext() ? SK_AsyncInSyncMismatch : SK_SyncInAsync);
@@ -3776,8 +3779,8 @@ SolutionResult ConstraintSystem::salvage() {
     // Fall through to produce diagnostics.
   }
 
-  if (getExpressionTooComplex(viable))
-    return SolutionResult::forTooComplex();
+  if (isTooComplex(viable))
+    return SolutionResult::forTooComplex(getTooComplexRange());
 
   // Could not produce a specific diagnostic; punt to the client.
   return SolutionResult::forUndiagnosedError();
@@ -5079,8 +5082,8 @@ void constraints::simplifyLocator(ASTNode &anchor,
       continue;
     }
 
-    case ConstraintLocator::ClosureBodyElement: {
-      auto bodyElt = path[0].castTo<LocatorPathElt::ClosureBodyElement>();
+    case ConstraintLocator::SyntacticElement: {
+      auto bodyElt = path[0].castTo<LocatorPathElt::SyntacticElement>();
       anchor = bodyElt.getElement();
       path = path.slice(1);
       continue;
@@ -6263,7 +6266,7 @@ void ConstraintSystem::diagnoseFailureFor(SolutionApplicationTarget target) {
 bool ConstraintSystem::isDeclUnavailable(const Decl *D,
                                          ConstraintLocator *locator) const {
   // First check whether this declaration is universally unavailable.
-  if (D->getAttrs().isUnavailable(getASTContext()))
+  if (AvailableAttr::isUnavailable(D))
     return true;
 
   return TypeChecker::isDeclarationUnavailable(D, DC, [&] {
