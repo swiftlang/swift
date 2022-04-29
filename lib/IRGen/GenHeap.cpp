@@ -534,6 +534,9 @@ llvm::Value *IRGenFunction::emitUnmanagedAlloc(const HeapLayout &layout,
                                                const llvm::Twine &name,
                                            llvm::Constant *captureDescriptor,
                                            const HeapNonFixedOffsets *offsets) {
+  if (layout.isKnownEmpty())
+    return IGM.RefCountedNull;
+
   llvm::Value *metadata = layout.getPrivateMetadata(IGM, captureDescriptor);
   llvm::Value *size, *alignMask;
   if (offsets) {
