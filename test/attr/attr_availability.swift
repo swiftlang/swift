@@ -615,6 +615,33 @@ func testFactoryMethods() {
   Int.factory2(other: 1) // expected-error {{'factory2(other:)' has been replaced by 'Int.init(other:)'}} {{3-15=Int}}
 }
 
+class DeprecatedInitBase {
+  @available(*, deprecated, renamed: "init(new:)")
+  init(old: Int) {}
+
+  init(new: Int) {}
+
+  convenience init(testSelf: Int) {
+    // https://github.com/apple/swift/issues/57354
+    // The fix-it should not remove `.init`
+    self.init(old: testSelf) // expected-warning {{'init(old:)' is deprecated: replaced by 'init(new:)'}} expected-note {{use 'init(new:)' instead}} {{15-18=new}}
+  }
+
+  init(testSuper: Int) {}
+}
+
+class DeprecatedInitSub1: DeprecatedInitBase {
+  override init(testSuper: Int) {
+    // https://github.com/apple/swift/issues/57354
+    // The fix-it should not remove `.init`
+    super.init(old: testSuper) // expected-warning {{'init(old:)' is deprecated: replaced by 'init(new:)'}} expected-note {{use 'init(new:)' instead}} {{16-19=new}}
+  }
+}
+
+class DeprecatedInitSub2: DeprecatedInitBase { }
+
+_ = DeprecatedInitSub2(old: 0) // expected-warning {{'init(old:)' is deprecated}}
+
 class Base {
   @available(*, unavailable)
   func bad() {} // expected-note {{here}}
@@ -1072,14 +1099,6 @@ struct UnavailableAccessors {
     other[alsoUnavailable: 0] += 1 // expected-error {{'subscript(alsoUnavailable:)' is unavailable: bad subscript!}} {{none}}
   }
 }
-
-class BaseDeprecatedInit {
-  @available(*, deprecated) init(bad: Int) { }
-}
-
-class SubInheritedDeprecatedInit: BaseDeprecatedInit { }
-
-_ = SubInheritedDeprecatedInit(bad: 0) // expected-warning {{'init(bad:)' is deprecated}}
 
 // https://github.com/apple/swift/issues/51149
 // Should produce no warnings.
