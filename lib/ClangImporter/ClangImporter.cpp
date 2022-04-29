@@ -4330,9 +4330,15 @@ ClangDirectLookupRequest::evaluate(Evaluator &evaluator,
   if (auto spec = dyn_cast<clang::ClassTemplateSpecializationDecl>(clangDecl))
     return lookupInClassTemplateSpecialization(ctx, spec, desc.name);
 
-  auto *clangModule =
-      getClangOwningModule(clangDecl, clangDecl->getASTContext());
-  auto *lookupTable = ctx.getClangModuleLoader()->findLookupTable(clangModule);
+  SwiftLookupTable *lookupTable = nullptr;
+  if (isa<clang::NamespaceDecl>(clangDecl)) {
+    // DeclContext of a namespace imported into Swift is the __ObjC module.
+    lookupTable = ctx.getClangModuleLoader()->findLookupTable(nullptr);
+  } else {
+    auto *clangModule =
+        getClangOwningModule(clangDecl, clangDecl->getASTContext());
+    lookupTable = ctx.getClangModuleLoader()->findLookupTable(clangModule);
+  }
 
   auto foundDecls = lookupTable->lookup(
       SerializedSwiftName(desc.name.getBaseName()), EffectiveClangContext());
