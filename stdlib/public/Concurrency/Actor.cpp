@@ -232,7 +232,9 @@ void swift::runJobInEstablishedExecutorContext(Job *job) {
     // it afterwards.
     task->flagAsRunning();
 
+    auto traceHandle = concurrency::trace::job_run_begin(job);
     task->runInFullyEstablishedContext();
+    concurrency::trace::job_run_end(traceHandle);
 
     assert(ActiveTask::get() == nullptr &&
            "active task wasn't cleared before suspending?");
@@ -1505,12 +1507,10 @@ static void swift_job_runImpl(Job *job, ExecutorRef executor) {
   if (!executor.isGeneric()) trackingInfo.disallowSwitching();
 
   trackingInfo.enterAndShadow(executor);
-  auto traceHandle = concurrency::trace::job_run_begin(job, &executor);
 
   SWIFT_TASK_DEBUG_LOG("job %p", job);
   runJobInEstablishedExecutorContext(job);
 
-  concurrency::trace::job_run_end(&executor, traceHandle);
   trackingInfo.leave();
 
   // Give up the current executor if this is a switching context
