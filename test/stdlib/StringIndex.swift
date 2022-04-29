@@ -180,39 +180,39 @@ suite.test("CustomDebugStringConvertible/native") {
   }
 
   check(string, [
-      "String.Index(offset: 0[any], aligned: character)",
-      "String.Index(offset: 1[utf8], aligned: character, stride: 8)",
-      "String.Index(offset: 9[utf8], aligned: character, stride: 1)",
-      "String.Index(offset: 10[utf8], aligned: character)",
+      "String.Index(offset: 0, encoding: any, aligned: character)",
+      "String.Index(offset: 1, encoding: utf8, aligned: character, stride: 8)",
+      "String.Index(offset: 9, encoding: utf8, aligned: character, stride: 1)",
+      "String.Index(offset: 10, encoding: utf8, aligned: character)",
     ])
   check(string.unicodeScalars, [
-      "String.Index(offset: 0[any], aligned: character)",
-      "String.Index(offset: 1[utf8], aligned: scalar)",
-      "String.Index(offset: 5[utf8], aligned: scalar)",
-      "String.Index(offset: 9[utf8], aligned: scalar)",
-      "String.Index(offset: 10[utf8], aligned: character)",
+      "String.Index(offset: 0, encoding: any, aligned: character)",
+      "String.Index(offset: 1, encoding: utf8, aligned: scalar)",
+      "String.Index(offset: 5, encoding: utf8, aligned: scalar)",
+      "String.Index(offset: 9, encoding: utf8, aligned: scalar)",
+      "String.Index(offset: 10, encoding: utf8, aligned: character)",
     ])
   check(string.utf8, [
-      "String.Index(offset: 0[any], aligned: character)",
-      "String.Index(offset: 1[utf8])",
-      "String.Index(offset: 2[utf8])",
-      "String.Index(offset: 3[utf8])",
-      "String.Index(offset: 4[utf8])",
-      "String.Index(offset: 5[utf8])",
-      "String.Index(offset: 6[utf8])",
-      "String.Index(offset: 7[utf8])",
-      "String.Index(offset: 8[utf8])",
-      "String.Index(offset: 9[utf8])",
-      "String.Index(offset: 10[utf8], aligned: character)",
+      "String.Index(offset: 0, encoding: any, aligned: character)",
+      "String.Index(offset: 1, encoding: utf8)",
+      "String.Index(offset: 2, encoding: utf8)",
+      "String.Index(offset: 3, encoding: utf8)",
+      "String.Index(offset: 4, encoding: utf8)",
+      "String.Index(offset: 5, encoding: utf8)",
+      "String.Index(offset: 6, encoding: utf8)",
+      "String.Index(offset: 7, encoding: utf8)",
+      "String.Index(offset: 8, encoding: utf8)",
+      "String.Index(offset: 9, encoding: utf8)",
+      "String.Index(offset: 10, encoding: utf8, aligned: character)",
     ])
   check(string.utf16, [
-      "String.Index(offset: 0[any], aligned: character)",
-      "String.Index(offset: 1[utf8], aligned: scalar)",
-      "String.Index(offset: 1[utf8]+1)",
-      "String.Index(offset: 5[utf8], aligned: scalar)",
-      "String.Index(offset: 5[utf8]+1)",
-      "String.Index(offset: 9[utf8], aligned: scalar)",
-      "String.Index(offset: 10[utf8], aligned: character)",
+      "String.Index(offset: 0, encoding: any, aligned: character)",
+      "String.Index(offset: 1, encoding: utf8, aligned: scalar)",
+      "String.Index(offset: 1, encoding: utf8, transcodedOffset: 1)",
+      "String.Index(offset: 5, encoding: utf8, aligned: scalar)",
+      "String.Index(offset: 5, encoding: utf8, transcodedOffset: 1)",
+      "String.Index(offset: 9, encoding: utf8, aligned: scalar)",
+      "String.Index(offset: 10, encoding: utf8, aligned: character)",
     ])
 }
 
@@ -243,39 +243,39 @@ suite.test("CustomDebugStringConvertible/bridged") {
   }
 
   check(string, [
-      "String.Index(offset: 0[any], aligned: character)",
-      "String.Index(offset: 1[utf16], aligned: character, stride: 4)",
-      "String.Index(offset: 5[utf16], aligned: character, stride: 1)",
-      "String.Index(offset: 6[utf16], aligned: character)",
+      "String.Index(offset: 0, encoding: any, aligned: character)",
+      "String.Index(offset: 1, encoding: utf16, aligned: character, stride: 4)",
+      "String.Index(offset: 5, encoding: utf16, aligned: character, stride: 1)",
+      "String.Index(offset: 6, encoding: utf16, aligned: character)",
     ])
   check(string.unicodeScalars, [
-      "String.Index(offset: 0[any], aligned: character)",
-      "String.Index(offset: 1[utf16], aligned: scalar)",
-      "String.Index(offset: 3[utf16], aligned: scalar)",
-      "String.Index(offset: 5[utf16], aligned: scalar)",
-      "String.Index(offset: 6[utf16], aligned: character)",
+      "String.Index(offset: 0, encoding: any, aligned: character)",
+      "String.Index(offset: 1, encoding: utf16, aligned: scalar)",
+      "String.Index(offset: 3, encoding: utf16, aligned: scalar)",
+      "String.Index(offset: 5, encoding: utf16, aligned: scalar)",
+      "String.Index(offset: 6, encoding: utf16, aligned: character)",
     ])
   check(string.utf8, [
-      "String.Index(offset: 0[any], aligned: character)",
-      "String.Index(offset: 1[utf16], aligned: scalar)",
-      "String.Index(offset: 1[utf16]+1)",
-      "String.Index(offset: 1[utf16]+2)",
-      "String.Index(offset: 1[utf16]+3)",
-      "String.Index(offset: 3[utf16], aligned: scalar)",
-      "String.Index(offset: 3[utf16]+1)",
-      "String.Index(offset: 3[utf16]+2)",
-      "String.Index(offset: 3[utf16]+3)",
-      "String.Index(offset: 5[utf16], aligned: scalar)",
-      "String.Index(offset: 6[utf16], aligned: character)",
+      "String.Index(offset: 0, encoding: any, aligned: character)",
+      "String.Index(offset: 1, encoding: utf16, aligned: scalar)",
+      "String.Index(offset: 1, encoding: utf16, transcodedOffset: 1)",
+      "String.Index(offset: 1, encoding: utf16, transcodedOffset: 2)",
+      "String.Index(offset: 1, encoding: utf16, transcodedOffset: 3)",
+      "String.Index(offset: 3, encoding: utf16, aligned: scalar)",
+      "String.Index(offset: 3, encoding: utf16, transcodedOffset: 1)",
+      "String.Index(offset: 3, encoding: utf16, transcodedOffset: 2)",
+      "String.Index(offset: 3, encoding: utf16, transcodedOffset: 3)",
+      "String.Index(offset: 5, encoding: utf16, aligned: scalar)",
+      "String.Index(offset: 6, encoding: utf16, aligned: character)",
     ])
   check(string.utf16, [
-      "String.Index(offset: 0[any], aligned: character)",
-      "String.Index(offset: 1[utf16])",
-      "String.Index(offset: 2[utf16])",
-      "String.Index(offset: 3[utf16])",
-      "String.Index(offset: 4[utf16])",
-      "String.Index(offset: 5[utf16])",
-      "String.Index(offset: 6[utf16], aligned: character)",
+      "String.Index(offset: 0, encoding: any, aligned: character)",
+      "String.Index(offset: 1, encoding: utf16)",
+      "String.Index(offset: 2, encoding: utf16)",
+      "String.Index(offset: 3, encoding: utf16)",
+      "String.Index(offset: 4, encoding: utf16)",
+      "String.Index(offset: 5, encoding: utf16)",
+      "String.Index(offset: 6, encoding: utf16, aligned: character)",
     ])
 }
 #endif

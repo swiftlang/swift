@@ -528,7 +528,7 @@ extension String.Index: CustomStringConvertible {
   @inline(never)
   public var description: String {
     // For the regular `description`, we just print the offset value along with
-    // its encoding and the transcoded offset, in a compact form: `23[utf8]+1`.
+    // its encoding and the transcoded offset, in a compact form: `23.utf8+1`.
     //
     // This is intended to expose crucial positioning information in a form that
     // remains relatively readable even when part of a larger printout, e.g., as
@@ -547,7 +547,11 @@ extension String.Index: CustomDebugStringConvertible {
   @inline(never)
   public var debugDescription: String {
     var d = "String.Index("
-    d += "offset: \(self.description)"
+    d += "offset: \(_encodedOffset)"
+    d += ", encoding: \(_encodingDescription)"
+    if transcodedOffset != 0 {
+      d += ", transcodedOffset: \(transcodedOffset)"
+    }
     if _isCharacterAligned {
       d += ", aligned: character"
     } else if _isScalarAligned {
