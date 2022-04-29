@@ -558,7 +558,7 @@ __swift_bool _swift_stdlib_getCurrentStackBounds(__swift_uintptr_t *outBegin,
 
 #elif SWIFT_THREADING_C11
   // We don't know any way to do this for C11 threads
-  return false
+  return false;
 
 #elif SWIFT_THREADING_WIN32
 

@@ -22,12 +22,12 @@
 namespace {
 
 #pragma clang diagnostic push
-#pragma GCC diagnostic ignored "-Wglobal-constructors"
+#pragma clang diagnostic ignored "-Wglobal-constructors"
 
 class C11ThreadingHelper {
 private:
   thrd_t mainThread_;
-  mut_t onceMutex_;
+  mtx_t onceMutex_;
   cnd_t onceCond_;
 
 public:
@@ -64,12 +64,13 @@ bool swift::threading_impl::thread_is_main() {
 
 void swift::threading_impl::once_slow(once_t &predicate, void (*fn)(void *),
                                       void *context) {
-  if (::atomic_compare_exchange_strong_explicit(&predicate, &(int){0}, 1,
-                                                ::memory_order_relaxed,
-                                                ::memory_order_relaxed)) {
+  std::int64_t zero = 0;
+  if (std::atomic_compare_exchange_strong_explicit(&predicate, &zero, 1,
+                                                   std::memory_order_relaxed,
+                                                   std::memory_order_relaxed)) {
     fn(context);
 
-    ::atomic_store_explicit(&predicate, -1, ::memory_order_release);
+    std::atomic_store_explicit(&predicate, -1, std::memory_order_release);
 
     helper.once_lock();
     helper.once_unlock();
@@ -78,7 +79,8 @@ void swift::threading_impl::once_slow(once_t &predicate, void (*fn)(void *),
   }
 
   helper.once_lock();
-  while (::atomic_load_explicit(&predicate, memory_order_acquire) >= 0) {
+  while (std::atomic_load_explicit(&predicate, std::memory_order_acquire) >=
+         0) {
     helper.once_wait();
   }
   helper.once_unlock();

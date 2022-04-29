@@ -14,14 +14,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/ABI/AsyncLet.h"
+#include "swift/Runtime/Concurrency.h"
+
 #include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "Debug.h"
 #include "TaskPrivate.h"
+
+#include "swift/ABI/AsyncLet.h"
 #include "swift/ABI/Metadata.h"
 #include "swift/ABI/Task.h"
 #include "swift/ABI/TaskOptions.h"
-#include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/Heap.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Threading/Mutex.h"
