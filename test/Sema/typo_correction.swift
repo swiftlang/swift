@@ -100,10 +100,9 @@ func takesSomeClassArchetype<T : SomeClass>(_ t: T) {
 }
 
 // Typo correction of unqualified lookup from generic context.
+func match1() {}
+// expected-note@-1 {{'match1' declared here}}
 struct Generic<T> { // expected-note {{'T' declared as parameter to type 'Generic'}}
-  func match1() {}
-  // expected-note@-1 {{'match1' declared here}}
-
   class Inner {
     func doStuff() {
       match0()
@@ -119,8 +118,6 @@ protocol P { // expected-note {{'P' previously declared here}}
 }
 
 protocol P {} // expected-error {{invalid redeclaration of 'P'}}
-// expected-note@-1 2{{did you mean 'P'?}}
-// expected-note@-2 {{'P' declared here}}
 
 func hasTypo() {
   _ = P.a.a // expected-error {{type 'Generic<T>' has no member 'a'}}
@@ -143,7 +140,7 @@ enum Foo {
   case flashing // expected-note {{'flashing' declared here}}
 }
 
-func foo(_ a: Foo) { // expected-note {{'foo' declared here}}
+func foo(_ a: Foo) {
 }
 
 func bar() {

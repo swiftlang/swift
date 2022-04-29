@@ -172,16 +172,148 @@ void UsableFilteringDeclConsumer::foundDecl(ValueDecl *D,
 
   switch (reason) {
   case DeclVisibilityKind::LocalVariable:
-    // Skip if Loc is before the found decl, unless its a TypeDecl (whose use
-    // before its declaration is still allowed)
-    if (!isa<TypeDecl>(D) && !SM.isBeforeInBuffer(D->getLoc(), Loc))
+  case DeclVisibilityKind::FunctionParameter:
+    // Skip if Loc is before the found decl if the decl is a var/let decl.
+    // Type and func decls can be referenced before its declaration, or from
+    // within nested type decls.
+    if (isa<VarDecl>(D)) {
+      if (reason == DeclVisibilityKind::LocalVariable) {
+        // Workaround for fast-completion. A loc in the current context might be
+        // in a loc
+        auto tmpLoc = Loc;
+        if (D->getDeclContext() != DC) {
+          if (auto *contextD = DC->getAsDecl())
+            tmpLoc = contextD->getStartLoc();
+        }
+        if (!SM.isBeforeInBuffer(D->getLoc(), Loc))
+          return;
+      }
+
+      // A type context cannot close over values defined in outer type contexts.
+      if (D->getDeclContext()->getInnermostTypeContext() != typeContext)
+        return;
+    }
+    break;
+
+  case DeclVisibilityKind::MemberOfOutsideNominal:
+    // A type context cannot close over members of outer type contexts, except
+    // for type decls.
+    if (!isa<TypeDecl>(D) && !D->isStatic())
       return;
     break;
-  default:
-    // The rest of the file is currently skipped, so no need to check
-    // decl location for VisibleAtTopLevel. Other visibility kinds are always
-    // usable
+
+  case DeclVisibilityKind::MemberOfCurrentNominal:
+  case DeclVisibilityKind::MemberOfSuper:
+  case DeclVisibilityKind::MemberOfProtocolConformedToByCurrentNominal:
+  case DeclVisibilityKind::MemberOfProtocolDerivedByCurrentNominal:
+  case DeclVisibilityKind::DynamicLookup:
+    // Members on 'Self' including inherited/derived ones are always usable.
     break;
+
+  case DeclVisibilityKind::GenericParameter:
+    // Generic params are type decls and are always usable from nested context.
+    break;
+
+  case DeclVisibilityKind::VisibleAtTopLevel:
+    // The rest of the file is currently skipped, so no need to check
+    // decl location for VisibleAtTopLevel.
+    break;
+  }
+
+  // Filter out shadowed decls. Do this for only usable values even though
+  // unusable values actually can shadow outer values, because compilers might
+  // be able to diagnose it with fix-it to add the qualification. E.g.
+  //   func foo(global: T) {}
+  //   struct Outer {
+  //     func foo(outer: T) {}
+  //     func test() {
+  //       struct Inner {
+  //         func test() {
+  //           <HERE>
+  //         }
+  //       }
+  //     }
+  //   }
+  // In this case 'foo(global:)' is shadowed by 'foo(outer:)', but 'foo(outer:)'
+  // is _not_ usable because it's outside the current type context, whereas
+  // 'foo(global:)' is still usable with 'ModuleName.' qualification.
+  // FIXME: (for code completion,) If a global value or a static type member is
+  // shadowd, we should suggest it with prefix (e.g. 'ModuleName.value').
+  auto inserted = SeenNames.insert({D->getBaseName(), {D, reason}});
+  if (!inserted.second) {
+    auto shadowingReason = inserted.first->second.second;
+    auto *shadowingD = inserted.first->second.first;
+
+    // A type decl cannot have overloads, and shadows everything outside the
+    // scope.
+    if (isa<TypeDecl>(shadowingD))
+      return;
+
+    switch (shadowingReason) {
+    case DeclVisibilityKind::LocalVariable:
+    case DeclVisibilityKind::FunctionParameter:
+      // Local func and var/let with a conflicting name.
+      //   func foo() {
+      //     func value(arg: Int) {}
+      //     var value = ""
+      //   }
+      // In this case, 'var value' wins, regardless of their source order.
+      // So, for confilicting local values in the same decl context, even if the
+      // 'var value' is reported after 'func value', don't shadow it, but we
+      // shadow everything with the name after that.
+      if (reason == DeclVisibilityKind::LocalVariable &&
+          isa<VarDecl>(D) && !isa<VarDecl>(shadowingD) &&
+          shadowingD->getDeclContext() == D->getDeclContext()) {
+        // Replace the shadowing decl so we shadow subsequent conflicting decls.
+        inserted.first->second = {D, reason};
+        break;
+      }
+
+      // Otherwise, a local value shadows everything outside the scope.
+      return;
+
+    case DeclVisibilityKind::GenericParameter:
+      // A Generic parameter is a type name. It shadows everything outside the
+      // generic context.
+      return;
+
+    case DeclVisibilityKind::MemberOfCurrentNominal:
+    case DeclVisibilityKind::MemberOfSuper:
+    case DeclVisibilityKind::MemberOfProtocolConformedToByCurrentNominal:
+    case DeclVisibilityKind::MemberOfProtocolDerivedByCurrentNominal:
+    case DeclVisibilityKind::DynamicLookup:
+      switch (reason) {
+      case DeclVisibilityKind::MemberOfCurrentNominal:
+      case DeclVisibilityKind::MemberOfSuper:
+      case DeclVisibilityKind::MemberOfProtocolConformedToByCurrentNominal:
+      case DeclVisibilityKind::MemberOfProtocolDerivedByCurrentNominal:
+      case DeclVisibilityKind::DynamicLookup:
+        // Members on the current type context don't shadow members with the
+        // same base name on the current type contxt. They are overloads.
+        break;
+      default:
+        // Members of a type context shadows values/types outside.
+        return;
+      }
+      break;
+
+    case DeclVisibilityKind::MemberOfOutsideNominal:
+      // For static values, it's unclear _which_ type context (i.e. this type,
+      // super classes, conforming protocols) this decl was found in. For now,
+      // consider all the outer nominals are the same.
+
+      if (reason == DeclVisibilityKind::MemberOfOutsideNominal)
+        break;
+
+      // Values outside the nominal are shadowed.
+      return;
+
+    case DeclVisibilityKind::VisibleAtTopLevel:
+      // Top level decls don't shadow anything.
+      // Well, that's not true. Decls in the current module shadows decls in
+      // the imported modules. But we don't care them here.
+      break;
+    }
   }
 
   ChainedConsumer.foundDecl(D, reason, dynamicLookupInfo);
