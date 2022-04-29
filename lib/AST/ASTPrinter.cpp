@@ -4555,6 +4555,9 @@ void PrintAST::visitPackExpr(PackExpr *expr) {
 void PrintAST::visitReifyPackExpr(ReifyPackExpr *expr) {
 }
 
+void PrintAST::visitTypeJoinExpr(TypeJoinExpr *expr) {
+}
+
 void PrintAST::visitAssignExpr(AssignExpr *expr) {
   visit(expr->getDest());
   Printer << " = ";
