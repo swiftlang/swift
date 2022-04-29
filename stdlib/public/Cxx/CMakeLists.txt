@@ -3,7 +3,6 @@ foreach(sdk ${SWIFT_SDKS})
   if(NOT "${sdk}" STREQUAL "LINUX" AND
       NOT "${sdk}" STREQUAL "FREEBSD" AND
       NOT "${sdk}" STREQUAL "OPENBSD" AND
-      NOT "${sdk}" STREQUAL "ANDROID" AND
       NOT "${sdk}" STREQUAL "CYGWIN" AND
       NOT "${sdk}" STREQUAL "HAIKU")
     continue()

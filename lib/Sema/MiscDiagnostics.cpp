@@ -3740,6 +3740,7 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
       case ExprKind::Array:
       case ExprKind::Dictionary:
       case ExprKind::InterpolatedStringLiteral:
+      case ExprKind::Closure:
         // If a trailing closure appears as a child of one of these types of
         // expression, don't diagnose it as there is no ambiguity.
         return {E->isImplicit(), E};
