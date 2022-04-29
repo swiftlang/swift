@@ -15,7 +15,7 @@ GENERIC_NODES = [
          element_name='GenericRequirement'),
 
     # generic-requirement ->
-    #     (same-type-requrement|conformance-requirement) ','?
+    #     (same-type-requirement|conformance-requirement) ','?
     Node('GenericRequirement', kind='Syntax',
          traits=['WithTrailingComma'],
          children=[
