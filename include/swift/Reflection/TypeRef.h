@@ -741,6 +741,37 @@ public:
   }
 };
 
+/// A representation of a dynamically-constructed generic signature.
+///
+/// \note This class is not a \c TypeRef.
+class GenericSignatureRef final {
+  std::vector<const GenericTypeParameterTypeRef *> Params;
+  std::vector<TypeRefRequirement> Requirements;
+
+public:
+  GenericSignatureRef(
+      llvm::ArrayRef<const GenericTypeParameterTypeRef *> Params,
+      llvm::ArrayRef<TypeRefRequirement> Requirements)
+      : Params(Params.begin(), Params.end()),
+        Requirements(Requirements.begin(), Requirements.end()) {}
+
+  template <typename Allocator>
+  static const GenericSignatureRef *
+  create(Allocator &A,
+         llvm::ArrayRef<const GenericTypeParameterTypeRef *> Params,
+         llvm::ArrayRef<TypeRefRequirement> Requirements) {
+    return A.template makeGenericSignatureRef(Params, Requirements);
+  }
+
+  const llvm::ArrayRef<const GenericTypeParameterTypeRef *> getParams() const {
+    return Params;
+  }
+
+  const llvm::ArrayRef<TypeRefRequirement> getRequirements() const {
+    return Requirements;
+  }
+};
+
 class ForeignClassTypeRef final : public TypeRef {
   std::string Name;
 
