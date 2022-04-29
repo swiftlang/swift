@@ -17,8 +17,11 @@
 #ifndef SWIFT_THREADING_IMPL_C11_H
 #define SWIFT_THREADING_IMPL_C11_H
 
-#include <stdatomic.h>
+#include <atomic>
+#include <cstdint>
 #include <threads.h>
+
+#include "swift/Threading/Errors.h"
 
 namespace swift {
 namespace threading_impl {
@@ -58,11 +61,9 @@ inline bool threads_same(thread_id a, thread_id b) {
 using mutex_handle = ::mtx_t;
 
 inline void mutex_init(mutex_handle &handle, bool checked = false) {
-  SWIFT_C11THREADS_CHECK(::mtx_init(&handle), ::mtx_plain);
+  SWIFT_C11THREADS_CHECK(::mtx_init(&handle, ::mtx_plain));
 }
-inline void mutex_destroy(mutex_handle &handle) {
-  SWIFT_C11THREADS_CHECK(::mtx_destroy(&handle));
-}
+inline void mutex_destroy(mutex_handle &handle) { ::mtx_destroy(&handle); }
 
 inline void mutex_lock(mutex_handle &handle) {
   SWIFT_C11THREADS_CHECK(::mtx_lock(&handle));
@@ -83,33 +84,38 @@ inline void mutex_unsafe_unlock(mutex_handle &handle) {
 
 struct lazy_mutex_handle {
   ::mtx_t mutex;
-  ::atomic_int once; // -1 = initialized, 0 = uninitialized, 1 = initializing
+  std::int32_t once; // -1 = initialized, 0 = uninitialized, 1 = initializing
 };
 
 inline constexpr lazy_mutex_handle lazy_mutex_initializer() {
-  return (lazy_mutex_handle){0};
+  return (lazy_mutex_handle){};
 }
 inline void lazy_mutex_init(lazy_mutex_handle &handle) {
   // Sadly, we can't use call_once() for this as it doesn't have a context
-  if (::atomic_load_explicit(&handle.once, ::memory_order_acquire) < 0)
+  if (std::atomic_load_explicit((std::atomic<std::int32_t> *)&handle.once,
+                                std::memory_order_acquire) < 0)
     return;
 
-  if (::atomic_compare_exchange_strong_explicit(&handle.once, &(int){0}, 1,
-                                                ::memory_order_relaxed,
-                                                ::memory_order_relaxed)) {
+  int zero = 0;
+  if (std::atomic_compare_exchange_strong_explicit(
+          (std::atomic<std::int32_t> *)&handle.once, &zero, 1,
+          std::memory_order_relaxed, std::memory_order_relaxed)) {
     SWIFT_C11THREADS_CHECK(::mtx_init(&handle.mutex, ::mtx_plain));
-    ::atomic_store_explicit(&handle.once, -1, ::memory_order_release);
+    std::atomic_store_explicit((std::atomic<std::int32_t> *)&handle.once, -1,
+                               std::memory_order_release);
     return;
   }
 
-  while (::atomic_load_explicit(&handle.once, memory_order_acquire) >= 0) {
+  while (std::atomic_load_explicit((std::atomic<std::int32_t> *)&handle.once,
+                                   std::memory_order_acquire) >= 0) {
     // Just spin; ::mtx_init() is very likely to be fast
   }
 }
 
 inline void lazy_mutex_destroy(lazy_mutex_handle &handle) {
-  if (::atomic_load_explicit(&handle.once, ::memory_order_acquire) < 0)
-    SWIFT_C11THREADS_CHECK(::mtx_destroy(&handle.mutex));
+  if (std::atomic_load_explicit((std::atomic<std::int32_t> *)&handle.once,
+                                std::memory_order_acquire) < 0)
+    ::mtx_destroy(&handle.mutex);
 }
 
 inline void lazy_mutex_lock(lazy_mutex_handle &handle) {
@@ -136,13 +142,13 @@ inline void lazy_mutex_unsafe_unlock(lazy_mutex_handle &handle) {
 
 // .. Once ...................................................................
 
-typedef ::atomic_int once_t;
+typedef std::atomic<std::int64_t> once_t;
 
 void once_slow(once_t &predicate, void (*fn)(void *), void *context);
 
 inline void once_impl(once_t &predicate, void (*fn)(void *), void *context) {
   // Sadly we can't use call_once() for this (no context)
-  if (::atomic_load_explicit(&predicate, ::memory_order_acquire) < 0)
+  if (std::atomic_load_explicit(&predicate, std::memory_order_acquire) < 0)
     return;
 
   once_slow(predicate, fn, context);
@@ -150,6 +156,10 @@ inline void once_impl(once_t &predicate, void (*fn)(void *), void *context) {
 
 // .. Thread local storage ...................................................
 
+// Get rid of this, because it causes clashes with TokenKinds.def
+#undef thread_local
+
+// We *can* use the C++ version though
 #if __cplusplus >= 201103L || __has_feature(cxx_thread_local)
 #define SWIFT_THREAD_LOCAL thread_local
 #endif

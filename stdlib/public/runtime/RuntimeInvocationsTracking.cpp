@@ -15,6 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <cstdint>
+
 #include "RuntimeInvocationsTracking.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/HeapObject.h"
@@ -32,7 +34,7 @@ namespace swift {
 // functions.
 struct RuntimeFunctionCountersState {
 #define FUNCTION_TO_TRACK(RT_FUNCTION)                                         \
-  uint32_t SWIFT_RT_FUNCTION_INVOCATION_COUNTER_NAME(RT_FUNCTION) = 0;
+  std::uint32_t SWIFT_RT_FUNCTION_INVOCATION_COUNTER_NAME(RT_FUNCTION) = 0;
 // Provide one counter per runtime function being tracked.
 #include "RuntimeInvocationsTracking.def"
 };
@@ -73,7 +75,7 @@ static const char *RuntimeFunctionNames[] {
 /// Define an enum where each enumerator corresponds to a runtime function being
 /// tracked. Their order is the same as the order of the counters in the
 /// RuntimeObjectState structure.
-enum RuntimeFunctionNamesIDs : uint32_t {
+enum RuntimeFunctionNamesIDs : std::uint32_t {
 /// Defines names of enum cases for each function being tracked.
 #define FUNCTION_TO_TRACK(RT_FUNCTION) RT_FUNCTION_ID(RT_FUNCTION),
 #include "RuntimeInvocationsTracking.def"
@@ -87,10 +89,10 @@ static RuntimeFunctionCountersUpdateHandler
 /// The offsets of the runtime function counters being tracked inside the
 /// RuntimeObjectState structure. The array is indexed by
 /// the enumerators from RuntimeFunctionNamesIDs.
-static uint16_t RuntimeFunctionCountersOffsets[] = {
+static std::uint16_t RuntimeFunctionCountersOffsets[] = {
 /// Define offset for each function being tracked.
 #define FUNCTION_TO_TRACK(RT_FUNCTION)                                         \
-  (sizeof(uint16_t) * (unsigned)RT_FUNCTION_ID(RT_FUNCTION)),
+  (sizeof(std::uint16_t) * (unsigned)RT_FUNCTION_ID(RT_FUNCTION)),
 #include "RuntimeInvocationsTracking.def"
 };
 
@@ -169,17 +171,17 @@ const char **_swift_getRuntimeFunctionNames() {
 /// Return the offsets of the runtime function counters being tracked.
 /// Their order is the same as the order of the counters in the
 /// RuntimeObjectState structure.
-const uint16_t *_swift_getRuntimeFunctionCountersOffsets() {
+const std::uint16_t *_swift_getRuntimeFunctionCountersOffsets() {
   return RuntimeFunctionCountersOffsets;
 }
 
 /// Return the number of runtime functions being tracked.
-uint64_t _swift_getNumRuntimeFunctionCounters() {
+std::uint64_t _swift_getNumRuntimeFunctionCounters() {
   return ID_LastRuntimeFunctionName;
 }
 
 static void _swift_dumpRuntimeCounters(RuntimeFunctionCountersState *State) {
-  uint32_t tmp;
+  std::uint32_t tmp;
 /// Define how to dump the counter for a given runtime function.
 #define FUNCTION_TO_TRACK(RT_FUNCTION)                                         \
   tmp = State->SWIFT_RT_FUNCTION_INVOCATION_COUNTER_NAME(RT_FUNCTION);         \

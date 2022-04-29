@@ -86,20 +86,18 @@ inline void tls_alloc_once(once_t &token, tls_key &key, tls_dtor dtor) {
 
 // A wrapper class for thread-local storage.
 //
-// - On platforms that report SWIFT_RUNTIME_SUPPORTS_THREAD_LOCAL
-//   above, an object of this type is declared with
-//   SWIFT_RUNTIME_ATTRIBUTE_THREAD_LOCAL.  This makes the object
+// - On platforms that define SWIFT_THREAD_LOCAL, an object of this type
+//   is declared with SWIFT_THREAD_LOCAL.  This makes the object
 //   itself thread-local, and no internal support is required.
 //
 //   Note that this includes platforms that don't support threading,
-//   for which SWIFT_RUNTIME_ATTRIBUTE_THREAD_LOCAL is empty;
-//   thread-local declarations then create an ordinary global.
+//   for which SWIFT_THREAD_LOCAL is empty; thread-local declarations
+//   then create an ordinary global.
 //
-// - On platforms that don't report SWIFT_RUNTIME_SUPPORTS_THREAD_LOCAL,
-//   we have to simulate thread-local storage.  Fortunately, all of
-//   these platforms (at least for now) support pthread_getspecific
-//   or similar.
-#if SWIFT_THREAD_LOCAL
+// - On platforms that don't define SWIFT_THREAD_LOCAL, we have to simulate
+//   thread-local storage.  Fortunately, all of these platforms (at least
+//   for now) support pthread_getspecific or similar.
+#ifdef SWIFT_THREAD_LOCAL
 template <class T>
 class ThreadLocal {
   VALIDATE_THREAD_LOCAL_TYPE(T)
@@ -179,7 +177,7 @@ public:
 /// Because of the fallback path, the default-initialization of the
 /// type must be equivalent to a bitwise zero-initialization, and the
 /// type must be small and trivially copyable and destructible.
-#if SWIFT_THREAD_LOCAL
+#ifdef SWIFT_THREAD_LOCAL
 #define SWIFT_THREAD_LOCAL_TYPE(TYPE, KEY)                                     \
   SWIFT_THREAD_LOCAL swift::ThreadLocal<TYPE>
 #elif SWIFT_THREADING_USE_RESERVED_TLS_KEYS
