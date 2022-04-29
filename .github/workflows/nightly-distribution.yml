@@ -23,6 +23,9 @@ jobs:
           - branch: "swiftwasm-release/5.6"
             channel: "5.6"
             targets: "amazonlinux2_x86_64 ubuntu18.04_x86_64 ubuntu20.04_x86_64 ubuntu20.04_aarch64 macos_x86_64 macos_arm64"
+          - branch: "swiftwasm-release/5.7"
+            channel: "5.7"
+            targets: "amazonlinux2_x86_64 ubuntu18.04_x86_64 ubuntu20.04_x86_64 ubuntu20.04_aarch64 macos_x86_64 macos_arm64"
     steps:
       - uses: actions/checkout@v1
       - name: Setup keychain
