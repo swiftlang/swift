@@ -836,7 +836,11 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   // be is the final hop.  Store a signed null instead.
   initialContext->Parent = nullptr;
 
-  concurrency::trace::task_create(task, parent, group, asyncLet);
+  concurrency::trace::task_create(
+      task, parent, group, asyncLet,
+      static_cast<uint8_t>(task->Flags.getPriority()),
+      task->Flags.task_isChildTask(), task->Flags.task_isFuture(),
+      task->Flags.task_isGroupChildTask(), task->Flags.task_isAsyncLetTask());
 
   // Attach to the group, if needed.
   if (group) {
