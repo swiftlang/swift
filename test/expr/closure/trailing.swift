@@ -475,3 +475,13 @@ func rdar85343171() {
   // Okay, as trailing closure is nested in argument list.
   if foo(bar {}) {}
 }
+
+// rdar://92521618 - Spurious warning on trailing closure nested within a
+// closure initializer.
+
+func rdar92521618() {
+  func foo(_ fn: () -> Void) -> Int? { 0 }
+
+  if let _ = { foo {} }() {}
+  guard let _ = { foo {} }() else { return }
+}
