@@ -564,3 +564,27 @@ extension String.Index: CustomDebugStringConvertible {
     return d
   }
 }
+
+@available(SwiftStdlib 5.7, *)
+extension String.Index: CustomReflectable {
+  @available(SwiftStdlib 5.7, *)
+  @inline(never)
+  public var customMirror: Mirror {
+    var children: [(label: String?, value: Any)] = []
+    children.reserveCapacity(5)
+    children.append(("_encodedOffset", _encodedOffset))
+    children.append(("_encoding", _encodingDescription))
+    if transcodedOffset > 0 {
+      children.append(("_transcodedOffset", transcodedOffset))
+    }
+    if _isCharacterAligned {
+      children.append(("_aligned", "character"))
+    } else if _isScalarAligned {
+      children.append(("_aligned", "scalar"))
+    }
+    if let stride = characterStride {
+      children.append(("_characterStride", stride))
+    }
+    return Mirror(self, children: children, displayStyle: .struct)
+  }
+}
