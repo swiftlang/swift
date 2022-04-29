@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift -O
+// RUN: %target-run-simple-swift(-O)
 
 // rdar://92418090
 
