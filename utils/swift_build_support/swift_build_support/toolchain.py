@@ -209,8 +209,20 @@ class Haiku(GenericUnix):
 
 
 class Custom(Toolchain):
-    def __init__(self, path):
+    def __init__(self, path, fallback=False):
+        """Use a custom location to search for build tools rooted at `path`.
+        If `fallback` is True, this will fallback to using the host system tools
+        from the path if the necessary tool is not found in the path.
+
+        Note: build-script handles setting the correct tools instead of using a
+        toolchain file passed to cmake. This is allows us to get around the
+        toolchain file generated and specified by build-script in the
+        build-products. Setting a customized toolchain file for the given
+        toolchain would be a more customary way to configure cross-compile
+        builds in CMake.
+        """
         self.base_path = path
+        self.fallback = fallback
 
     def find_tool(self, *names):
         names = set(names)
@@ -218,12 +230,17 @@ class Custom(Toolchain):
             candidates = set(filenames) & names
             if candidates:
                 return os.path.join(dirpath, next(iter(candidates)))
+        if self.fallback:
+            for name in names:
+                path = which(name)
+                if path is not None:
+                    return path
 
 
 def host_toolchain(**kwargs):
     native_toolchain_path = kwargs.pop('custom_native_toolchain', None)
     if native_toolchain_path is not None:
-        return Custom(native_toolchain_path)
+        return Custom(native_toolchain_path, True)
     sys = platform.system()
     if sys == 'Darwin':
         return MacOSX(kwargs.pop('xcrun_toolchain', 'default'))
