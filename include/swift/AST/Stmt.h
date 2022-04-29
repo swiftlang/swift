@@ -159,6 +159,12 @@ public:
                            SourceLoc rbloc,
                            Optional<bool> implicit = None);
 
+  static BraceStmt *createImplicit(ASTContext &ctx,
+                                   ArrayRef<ASTNode> elements) {
+    return create(ctx, /*lbloc=*/SourceLoc(), elements, /*rbloc=*/SourceLoc(),
+                  /*implicit=*/true);
+  }
+
   SourceLoc getLBraceLoc() const { return LBLoc; }
   SourceLoc getRBraceLoc() const { return RBLoc; }
 
@@ -551,6 +557,9 @@ public:
     : LabeledStmt(StmtKind::Do, getDefaultImplicitFlag(implicit, doLoc),
                   labelInfo),
       DoLoc(doLoc), Body(body) {}
+
+  static DoStmt *createImplicit(ASTContext &C, LabeledStmtInfo labelInfo,
+                                ArrayRef<ASTNode> body);
 
   SourceLoc getDoLoc() const { return DoLoc; }
   
@@ -1001,6 +1010,11 @@ public:
 
   unsigned getNumCaseLabelItems() const { return Bits.CaseStmt.NumPatterns; }
 
+  FallthroughStmt *getFallthroughStmt() const {
+    return hasFallthroughDest() ? *getTrailingObjects<FallthroughStmt *>()
+                                : nullptr;
+  }
+
   NullablePtr<CaseStmt> getFallthroughDest() const {
     return const_cast<CaseStmt &>(*this).getFallthroughDest();
   }
@@ -1029,6 +1043,8 @@ public:
     return getLoc();
   }
   SourceLoc getEndLoc() const { return getBody()->getEndLoc(); }
+
+  SourceLoc getItemTerminatorLoc() const { return ItemTerminatorLoc; }
 
   SourceRange getLabelItemsRange() const {
     switch (ParentKind) {
