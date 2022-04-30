@@ -162,7 +162,7 @@ ATTRIBUTE_NODES = [
                    description='The label of the argument'),
              Child('Colon', kind='ColonToken',
                    description='The colon separating the label and the value'),
-             Child('Delcname', kind='DeclName',
+             Child('Declname', kind='DeclName',
                    description='The value for this argument'),
              Child('TrailingComma', kind='CommaToken',
                    is_optional=True, description='''
@@ -236,7 +236,7 @@ ATTRIBUTE_NODES = [
     # objc-selector-piece -> identifier? ':'?
     Node('ObjCSelectorPiece', kind='Syntax',
          description='''
-         A piece of an Objective-C selector. Either consisiting of just an
+         A piece of an Objective-C selector. Either consisting of just an
          identifier for a nullary selector, an identifier and a colon for a
          labeled argument or just a colon for an unlabeled argument
          ''',

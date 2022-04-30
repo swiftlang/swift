@@ -15,14 +15,14 @@ import AST
 import Basic
 
 #if canImport(_CompilerRegexParser)
-import _CompilerRegexParser
+@_spi(CompilerInterface) import _CompilerRegexParser
 
 public func registerRegexParser() {
   Parser_registerRegexLiteralParsingFn(_RegexLiteralParsingFn)
   Parser_registerRegexLiteralLexingFn(_RegexLiteralLexingFn)
 }
 
-/// Bridging between C++ lexer and _CompilerRegexParser.lexRegex()
+/// Bridging between C++ lexer and swiftCompilerLexRegexLiteral.
 ///
 /// Attempt to lex a regex literal string.
 ///
@@ -50,47 +50,29 @@ private func _RegexLiteralLexingFn(
 ) -> /*CompletelyErroneous*/ CBool {
   let inputPtr = curPtrPtr.pointee
 
-  do {
-    let (_, _, endPtr) = try lexRegex(start: inputPtr, end: bufferEndPtr)
-    curPtrPtr.pointee = endPtr.assumingMemoryBound(to: CChar.self)
+  guard let (resumePtr, error) = swiftCompilerLexRegexLiteral(
+    start: inputPtr, bufferEnd: bufferEndPtr, mustBeRegex: mustBeRegex
+  ) else {
+    // Not a regex literal, fallback without advancing the pointer.
     return false
-  } catch let error as DelimiterLexError {
-    if !mustBeRegex {
-      // This token can be something else. Let the client fallback.
-      return false;
-    }
-    if error.kind == .unknownDelimiter {
-      // An unknown delimiter should be recovered from, as we may want to try
-      // lex something else.
-      return false
-    }
-
-    if let diagEngine = DiagnosticEngine(bridged: bridgedDiagnosticEngine) {
-      // Emit diagnostic.
-      let startLoc = SourceLoc(
-        locationInFile: UnsafeRawPointer(inputPtr).assumingMemoryBound(to: UInt8.self))!
-      diagEngine.diagnose(startLoc, .regex_literal_parsing_error, "\(error)")
-    }
-
-    // Advance the current pointer.
-    curPtrPtr.pointee = error.resumePtr.assumingMemoryBound(to: CChar.self)
-
-    switch error.kind {
-    case .unterminated, .multilineClosingNotOnNewline:
-      // These can be recovered from.
-      return false
-    case .unprintableASCII, .invalidUTF8:
-      // We don't currently have good recovery behavior for these.
-      return true
-    case .unknownDelimiter:
-      fatalError("Already handled")
-    }
-  } catch {
-    fatalError("Should be a DelimiterLexError")
   }
+
+  // Advance the current pointer.
+  curPtrPtr.pointee = resumePtr.assumingMemoryBound(to: CChar.self)
+
+  if let error = error {
+    // Emit diagnostic if diagnostics are enabled.
+    if let diagEngine = DiagnosticEngine(bridged: bridgedDiagnosticEngine) {
+      let startLoc = SourceLoc(
+        locationInFile: error.location.assumingMemoryBound(to: UInt8.self))!
+      diagEngine.diagnose(startLoc, .regex_literal_parsing_error, error.message)
+    }
+    return error.completelyErroneous
+  }
+  return false
 }
 
-/// Bridging between C++ parser and _CompilerRegexParser.parseWithDelimiters()
+/// Bridging between C++ parser and swiftCompilerParseRegexLiteral.
 ///
 /// - Parameters:
 ///   - inputPtr: A null-terminated C string.
@@ -103,6 +85,8 @@ private func _RegexLiteralLexingFn(
 ///     greater than or equal to `strlen(inputPtr)`.
 ///   - bridgedDiagnosticBaseLoc: Source location of the start of the literal
 ///   - bridgedDiagnosticEngine: Diagnostic engine to emit diagnostics.
+///
+/// - Returns: `true` if there was a parse error, `false` otherwise.
 public func _RegexLiteralParsingFn(
   _ inputPtr: UnsafePointer<CChar>,
   _ versionOut: UnsafeMutablePointer<CUnsignedInt>,
@@ -111,30 +95,27 @@ public func _RegexLiteralParsingFn(
   _ bridgedDiagnosticBaseLoc: BridgedSourceLoc,
   _ bridgedDiagnosticEngine: BridgedDiagnosticEngine
 ) -> Bool {
-  versionOut.pointee = currentRegexLiteralFormatVersion
-
   let str = String(cString: inputPtr)
+  let captureBuffer = UnsafeMutableRawBufferPointer(
+    start: captureStructureOut, count: Int(captureStructureSize))
   do {
-    let ast = try parseWithDelimiters(str)
-    // Serialize the capture structure for later type inference.
-    assert(captureStructureSize >= str.utf8.count)
-    let buffer = UnsafeMutableRawBufferPointer(
-        start: captureStructureOut, count: Int(captureStructureSize))
-    ast.captureStructure.encode(to: buffer)
-    return false;
-  } catch {
+    // FIXME: We need to plumb through the 'regexToEmit' result to the caller.
+    // For now, it is the same as the input.
+    let (_, version) = try swiftCompilerParseRegexLiteral(
+      str, captureBufferOut: captureBuffer)
+    versionOut.pointee = CUnsignedInt(version)
+    return false
+  } catch let error as CompilerParseError {
     var diagLoc = SourceLoc(bridged: bridgedDiagnosticBaseLoc)
     let diagEngine = DiagnosticEngine(bridged: bridgedDiagnosticEngine)
-    if let _diagLoc = diagLoc,
-       let locatedError = error as? LocatedErrorProtocol {
-      let offset = str.utf8.distance(from: str.startIndex,
-                                     to: locatedError.location.start)
+    if let _diagLoc = diagLoc, let errorLoc = error.location {
+      let offset = str.utf8.distance(from: str.startIndex, to: errorLoc)
       diagLoc = _diagLoc.advanced(by: offset)
     }
-    diagEngine.diagnose(
-      diagLoc, .regex_literal_parsing_error,
-      "cannot parse regular expression: \(String(describing: error))")
+    diagEngine.diagnose(diagLoc, .regex_literal_parsing_error, error.message)
     return true
+  } catch {
+    fatalError("Expected CompilerParseError")
   }
 }
 

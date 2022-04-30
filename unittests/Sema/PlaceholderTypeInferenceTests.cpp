@@ -36,7 +36,9 @@ TEST_F(SemaTest, TestPlaceholderInferenceForArrayLiteral) {
 
   ConstraintSystem cs(DC, ConstraintSystemOptions());
   cs.setContextualType(arrayExpr, {arrayRepr, arrayTy}, CTP_Initialization);
-  cs.generateConstraints(target, FreeTypeVariableBinding::Disallow);
+  auto failed = cs.generateConstraints(target, FreeTypeVariableBinding::Disallow);
+  ASSERT_FALSE(failed);
+
   SmallVector<Solution, 2> solutions;
   cs.solve(solutions);
 
@@ -75,7 +77,9 @@ TEST_F(SemaTest, TestPlaceholderInferenceForDictionaryLiteral) {
 
   ConstraintSystem cs(DC, ConstraintSystemOptions());
   cs.setContextualType(dictExpr, {dictRepr, dictTy}, CTP_Initialization);
-  cs.generateConstraints(target, FreeTypeVariableBinding::Disallow);
+  auto failed = cs.generateConstraints(target, FreeTypeVariableBinding::Disallow);
+  ASSERT_FALSE(failed);
+
   SmallVector<Solution, 2> solutions;
   cs.solve(solutions);
 

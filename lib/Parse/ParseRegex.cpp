@@ -43,7 +43,7 @@ ParserResult<Expr> Parser::parseExprRegexLiteral() {
 
   // Let the Swift library parse the contents, returning an error, or null if
   // successful.
-  unsigned version;
+  unsigned version = 0;
   auto capturesBuf = Context.AllocateUninitialized<uint8_t>(
       RegexLiteralExpr::getCaptureStructureSerializationAllocationSize(
           regexText.size()));
@@ -57,6 +57,7 @@ ParserResult<Expr> Parser::parseExprRegexLiteral() {
   if (hadError) {
     return makeParserResult(new (Context) ErrorExpr(loc));
   }
+  assert(version >= 1);
   return makeParserResult(RegexLiteralExpr::createParsed(
       Context, loc, regexText, version, capturesBuf));
 }

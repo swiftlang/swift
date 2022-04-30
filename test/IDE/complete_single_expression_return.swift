@@ -137,9 +137,9 @@ struct TestSingleExprClosureGlobal {
     }()
   }
 // TestSingleExprClosureGlobal: Begin completions
-// TestSingleExprClosureGlobal-DAG: Decl[InstanceMethod]/OutNominal:   str()[#String#];
-// TestSingleExprClosureGlobal-DAG: Decl[InstanceMethod]/OutNominal/TypeRelation[Convertible]: int()[#Int#];
-// TestSingleExprClosureGlobal-DAG: Decl[InstanceMethod]/OutNominal: void()[#Void#];
+// TestSingleExprClosureGlobal-DAG: Decl[InstanceMethod]/CurrNominal:   str()[#String#];
+// TestSingleExprClosureGlobal-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: int()[#Int#];
+// TestSingleExprClosureGlobal-DAG: Decl[InstanceMethod]/CurrNominal: void()[#Void#];
 // TestSingleExprClosureGlobal: End completions
 }
 
@@ -155,9 +155,9 @@ struct TestNonSingleExprClosureGlobal {
     }()
   }
 // TestNonSingleExprClosureGlobal: Begin completions
-// TestNonSingleExprClosureGlobal-DAG: Decl[InstanceMethod]/OutNominal: str()[#String#];
-// TestNonSingleExprClosureGlobal-DAG: Decl[InstanceMethod]/OutNominal: int()[#Int#];
-// TestNonSingleExprClosureGlobal-DAG: Decl[InstanceMethod]/OutNominal: void()[#Void#];
+// TestNonSingleExprClosureGlobal-DAG: Decl[InstanceMethod]/CurrNominal: str()[#String#];
+// TestNonSingleExprClosureGlobal-DAG: Decl[InstanceMethod]/CurrNominal: int()[#Int#];
+// TestNonSingleExprClosureGlobal-DAG: Decl[InstanceMethod]/CurrNominal: void()[#Void#];
 // TestNonSingleExprClosureGlobal: End completions
 }
 
