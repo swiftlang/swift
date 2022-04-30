@@ -42,6 +42,8 @@ typealias OtherAndP2 = Other & P2
 
 protocol P3 : class {}
 
+protocol P4 {}
+
 struct Unrelated {}
 
 //
@@ -69,6 +71,18 @@ func alreadyConforms(_: P3 & AnyObject) {} // expected-error {{invalid redeclara
 
 func alreadyConformsMeta(_: P3.Type) {} // expected-note {{'alreadyConformsMeta' previously declared here}}
 func alreadyConformsMeta(_: (P3 & AnyObject).Type) {} // expected-error {{invalid redeclaration of 'alreadyConformsMeta'}}
+
+func notARedeclaration(_: P4) {}
+func notARedeclaration(_: P4 & AnyObject) {}
+
+do {
+  class C: P4 {}
+  struct S<T: P4> {
+    // Don't crash when computing minimal compositions inside a generic context.
+    func redeclaration(_: C & P4) {} // expected-note {{'redeclaration' previously declared here}}
+    func redeclaration(_: C & P4) {} // expected-error {{invalid redeclaration of 'redeclaration'}}
+  }
+}
 
 // SE-0156 stipulates that a composition can contain multiple classes, as long
 // as they are all the same.

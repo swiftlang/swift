@@ -4146,6 +4146,12 @@ CanType ProtocolCompositionType::getMinimalCanonicalType(
   if (superclass)
     MinimalMembers.insert(MinimalMembers.begin(), superclass->getCanonicalType());
 
+  // If we are left with a single member and no layout constraint, the member
+  // is the minimal type. Also, note that a protocol composition cannot be
+  // constructed with a single member unless there is a layout constraint.
+  if (MinimalMembers.size() == 1 && !MinimalHasExplicitAnyObject)
+    return CanType(MinimalMembers.front());
+
   // The resulting composition is necessarily canonical.
   return CanType(build(Ctx, MinimalMembers, MinimalHasExplicitAnyObject));
 }
