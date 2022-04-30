@@ -93,7 +93,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   in places that would previously fail because `any` types do not conform
   to their protocols. For example:
 
-  ```
+  ```swift
   protocol P {
     associatedtype A
     func getA() -> A
