@@ -77,7 +77,7 @@ using namespace metadataimpl;
 // GenericParamDescriptor is a single byte, so while it's difficult to
 // imagine needing even a quarter this many generic params, there's very
 // little harm in doing it.
-const GenericParamDescriptor
+constexpr GenericParamDescriptor
 swift::ImplicitGenericParamDescriptors[MaxNumImplicitGenericParamDescriptors] = {
 #define D GenericParamDescriptor::implicit()
   D,D,D,D, D,D,D,D, D,D,D,D, D,D,D,D, D,D,D,D, D,D,D,D, D,D,D,D, D,D,D,D,
@@ -378,7 +378,7 @@ namespace {
   class GenericMetadataCache :
     public MetadataCache<GenericCacheEntry, GenericMetadataCacheTag> {
   public:
-    GenericSignatureLayout<InProcess> SigLayout;
+    GenericSignatureLayout SigLayout;
 
     GenericMetadataCache(const TargetGenericContext<InProcess> &genericContext)
       : SigLayout(genericContext.getGenericSignature()) {
@@ -4364,8 +4364,7 @@ ExtendedExistentialTypeCacheEntry::getOrCreateVWT(Key key) {
   auto sigSizeInWords = shape->ReqSigHeader.getArgumentLayoutSizeInWords();
 
 #ifndef NDEBUG
-  auto layout =
-      GenericSignatureLayout<InProcess>(shape->getRequirementSignature());
+  auto layout = GenericSignatureLayout(shape->getRequirementSignature());
   assert(layout.NumKeyParameters == shape->ReqSigHeader.NumParams &&
          "requirement signature for existential includes a "
          "redundant parameter?");

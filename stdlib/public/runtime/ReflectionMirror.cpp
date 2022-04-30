@@ -1076,8 +1076,6 @@ const char *swift_OpaqueSummary(const Metadata *T) {
       return "(Heap Generic Local Variable)";
     case MetadataKind::ErrorObject:
       return "(ErrorType Object)";
-    case MetadataKind::ExtendedExistential:
-      return "(Extended Existential)";
     default:
       return "(Unknown)";
   }

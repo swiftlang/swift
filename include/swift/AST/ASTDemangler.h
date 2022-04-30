@@ -59,11 +59,6 @@ public:
   using BuiltType = swift::Type;
   using BuiltTypeDecl = swift::GenericTypeDecl *; // nominal or type alias
   using BuiltProtocolDecl = swift::ProtocolDecl *;
-  using BuiltGenericSignature = swift::GenericSignature;
-  using BuiltGenericTypeParam = swift::GenericTypeParamType *;
-  using BuiltRequirement = swift::Requirement;
-  using BuiltSubstitutionMap = swift::SubstitutionMap;
-
   explicit ASTBuilder(ASTContext &ctx) : Ctx(ctx) {}
 
   ASTContext &getASTContext() { return Ctx; }
@@ -117,8 +112,6 @@ public:
                                      bool isClassBound,
                                      bool forRequirement = true);
 
-  Type createProtocolTypeFromDecl(ProtocolDecl *protocol);
-
   Type createParameterizedProtocolType(Type base, ArrayRef<Type> args);
 
   Type createExistentialMetatypeType(Type instance,
@@ -141,6 +134,7 @@ public:
   Type createSILBoxType(Type base);
   using BuiltSILBoxField = llvm::PointerIntPair<Type, 1>;
   using BuiltSubstitution = std::pair<Type, Type>;
+  using BuiltRequirement = swift::Requirement;
   using BuiltLayoutConstraint = swift::LayoutConstraint;
   Type createSILBoxTypeWithLayout(ArrayRef<BuiltSILBoxField> Fields,
                                   ArrayRef<BuiltSubstitution> Substitutions,
@@ -172,15 +166,6 @@ public:
   Type createDictionaryType(Type key, Type value);
 
   Type createParenType(Type base);
-
-  BuiltGenericSignature
-  createGenericSignature(ArrayRef<BuiltType> params,
-                         ArrayRef<BuiltRequirement> requirements);
-
-  BuiltSubstitutionMap createSubstitutionMap(BuiltGenericSignature sig,
-                                             ArrayRef<BuiltType> replacements);
-
-  Type subst(Type subject, const BuiltSubstitutionMap &Subs) const;
 
   LayoutConstraint getLayoutConstraint(LayoutConstraintKind kind);
   LayoutConstraint getLayoutConstraintWithSizeAlign(LayoutConstraintKind kind,
