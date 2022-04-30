@@ -760,7 +760,7 @@ public:
   create(Allocator &A,
          llvm::ArrayRef<const GenericTypeParameterTypeRef *> Params,
          llvm::ArrayRef<TypeRefRequirement> Requirements) {
-    return A.template makeGenericSignatureRef(Params, Requirements);
+    return A.makeGenericSignatureRef(Params, Requirements);
   }
 
   const llvm::ArrayRef<const GenericTypeParameterTypeRef *> getParams() const {
