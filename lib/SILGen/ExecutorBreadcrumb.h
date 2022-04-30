@@ -10,6 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef SWIFT_SILGEN_EXECUTORBREADCRUMB_H
+#define SWIFT_SILGEN_EXECUTORBREADCRUMB_H
+
 #include "swift/SIL/SILValue.h"
 
 namespace swift {
@@ -46,3 +49,5 @@ public:
 
 } // namespace Lowering
 } // namespace swift
+
+#endif
