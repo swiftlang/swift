@@ -498,6 +498,7 @@ class ForeignAsyncInitializationPlan final : public ResultPlan {
   SILType opaqueResumeType;
   SILValue resumeBuf;
   SILValue continuation;
+  ExecutorBreadcrumb breadcrumb;
   
 public:
   ForeignAsyncInitializationPlan(SILGenFunction &SGF, SILLocation loc,
@@ -596,6 +597,10 @@ public:
     return ManagedValue::forUnmanaged(block);
   }
 
+  void deferExecutorBreadcrumb(ExecutorBreadcrumb &&breadcrumb) override {
+    this->breadcrumb = breadcrumb;
+  }
+
   RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
                 ArrayRef<ManagedValue> &directResults,
                 SILValue bridgedForeignError) override {
@@ -691,6 +696,7 @@ public:
     // Propagate an error if we have one.
     if (errorBlock) {
       SGF.B.emitBlock(errorBlock);
+      breadcrumb.emit(SGF, loc);
       
       Scope errorScope(SGF, loc);
 
@@ -702,6 +708,7 @@ public:
     }
     
     SGF.B.emitBlock(resumeBlock);
+    breadcrumb.emit(SGF, loc);
     
     // The incoming value is the maximally-abstracted result type of the
     // continuation. Move it out of the resume buffer and reabstract it if
@@ -769,6 +776,10 @@ public:
                                 ManagedValue::forLValue(errorTemp),
                                 /*TODO: enforcement*/ None,
                                 AbstractionPattern(errorType), errorType);
+  }
+
+  void deferExecutorBreadcrumb(ExecutorBreadcrumb &&breadcrumb) override {
+    subPlan->deferExecutorBreadcrumb(std::move(breadcrumb));
   }
 
   RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
