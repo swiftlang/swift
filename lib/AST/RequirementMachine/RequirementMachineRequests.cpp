@@ -287,6 +287,8 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
     rewriteCtx.finishComputingRequirementSignatures(proto);
   };
 
+  SmallVector<RequirementError, 4> errors;
+
   // Collect user-written requirements from the protocols in this connected
   // component.
   llvm::DenseMap<const ProtocolDecl *,
@@ -297,6 +299,20 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
       requirements.push_back(req);
     for (auto req : proto->getTypeAliasRequirements())
       requirements.push_back({req, SourceLoc(), /*inferred=*/false});
+
+    // Preprocess requirements to eliminate conformances on type parameters
+    // which are made concrete.
+    if (ctx.LangOpts.EnableRequirementMachineConcreteContraction) {
+      SmallVector<StructuralRequirement, 4> contractedRequirements;
+
+      bool debug = rewriteCtx.getDebugOptions()
+                             .contains(DebugFlags::ConcreteContraction);
+
+      if (performConcreteContraction(requirements, contractedRequirements,
+                                     errors, debug)) {
+        std::swap(contractedRequirements, requirements);
+      }
+    }
   }
 
   if (rewriteCtx.getDebugOptions().contains(DebugFlags::Timers)) {
@@ -409,7 +425,6 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
     // Diagnose redundant requirements and conflicting requirements.
     if (ctx.LangOpts.RequirementMachineProtocolSignatures ==
         RequirementMachineMode::Enabled) {
-      SmallVector<RequirementError, 4> errors;
       machine->computeRequirementDiagnostics(errors, proto->getLoc());
       diagnoseRequirementErrors(ctx, errors,
                                 AllowConcreteTypePolicy::NestedAssocTypes);
