@@ -58,7 +58,7 @@ struct TargetGenericContextDescriptorHeader {
   /// Key arguments include generic parameters and conformance
   /// requirements which are part of the identity of the context.
   ///
-  /// The key area of the argument layout considers of a sequence
+  /// The key area of the argument layout consists of a sequence
   /// of type metadata pointers (in the same order as the parameter
   /// descriptors, for those parameters which satisfy hasKeyArgument())
   /// followed by a sequence of witness table pointers (in the same
@@ -191,25 +191,48 @@ using GenericRequirementDescriptor =
 extern const GenericParamDescriptor
 ImplicitGenericParamDescriptors[MaxNumImplicitGenericParamDescriptors];
 
+inline const GenericParamDescriptor *
+externalTargetImplicitGenericParamDescriptors() {
+  static const GenericParamDescriptor
+      buffer[MaxNumImplicitGenericParamDescriptors] = {
+#define D GenericParamDescriptor::implicit()
+          D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D,
+          D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D,
+          D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D, D
+#undef D
+      };
+  return buffer;
+}
+
+template <class Runtime>
+const GenericParamDescriptor *targetImplicitGenericParamDescriptors() {
+  return externalTargetImplicitGenericParamDescriptors();
+}
+template <>
+inline const GenericParamDescriptor *targetImplicitGenericParamDescriptors<InProcess>() {
+  return ImplicitGenericParamDescriptors;
+}
+
 /// A runtime description of a generic signature.
+template<typename Runtime>
 class RuntimeGenericSignature {
-  GenericContextDescriptorHeader Header;
+  TargetGenericContextDescriptorHeader<Runtime> Header;
   const GenericParamDescriptor *Params;
-  const GenericRequirementDescriptor *Requirements;
+  const TargetGenericRequirementDescriptor<Runtime> *Requirements;
 public:
   RuntimeGenericSignature()
     : Header{0, 0, 0, 0}, Params(nullptr), Requirements(nullptr) {}
 
-  RuntimeGenericSignature(const GenericContextDescriptorHeader &header,
+  RuntimeGenericSignature(const TargetGenericContextDescriptorHeader<Runtime> &header,
                           const GenericParamDescriptor *params,
-                          const GenericRequirementDescriptor *requirements)
+                          const TargetGenericRequirementDescriptor<Runtime> *requirements)
     : Header(header), Params(params), Requirements(requirements) {}
 
   llvm::ArrayRef<GenericParamDescriptor> getParams() const {
     return llvm::makeArrayRef(Params, Header.NumParams);
   }
 
-  llvm::ArrayRef<GenericRequirementDescriptor> getRequirements() const {
+  llvm::ArrayRef<TargetGenericRequirementDescriptor<Runtime>> getRequirements() const {
     return llvm::makeArrayRef(Requirements, Header.NumRequirements);
   }
 
@@ -375,8 +398,8 @@ public:
              * sizeof(StoredPointer);
   }
 
-  RuntimeGenericSignature getGenericSignature() const {
-    if (!asSelf()->isGeneric()) return RuntimeGenericSignature();
+  RuntimeGenericSignature<Runtime> getGenericSignature() const {
+    if (!asSelf()->isGeneric()) return RuntimeGenericSignature<Runtime>();
     return {getGenericContextHeader(),
             getGenericParams().data(),
             getGenericRequirements().data()};
