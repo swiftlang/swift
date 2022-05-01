@@ -251,8 +251,11 @@ bool CrossModuleOptimization::canSerializeInstruction(SILInstruction *inst,
     // In conservative mode we don't want to turn non-public functions into
     // public functions, because that can increase code size. E.g. if the
     // function is completely inlined afterwards.
-    if (conservative && !hasPublicVisibility(callee->getLinkage()))
+    // Also, when emitting TBD files, we cannot introduce a new public symbol.
+    if ((conservative || M.getOptions().emitTBD) &&
+        !hasPublicVisibility(callee->getLinkage())) {
       return false;
+    }
 
     // Recursivly walk down the call graph.
     if (canSerializeFunction(callee, canSerializeFlags, maxDepth - 1))
@@ -270,8 +273,10 @@ bool CrossModuleOptimization::canSerializeInstruction(SILInstruction *inst,
   }
   if (auto *GAI = dyn_cast<GlobalAddrInst>(inst)) {
     SILGlobalVariable *global = GAI->getReferencedGlobal();
-    if (conservative && !hasPublicVisibility(global->getLinkage()))
+    if ((conservative || M.getOptions().emitTBD) &&
+        !hasPublicVisibility(global->getLinkage())) {
       return false;
+    }
     return true;
   }
   if (auto *KPI = dyn_cast<KeyPathInst>(inst)) {
@@ -491,7 +496,6 @@ void CrossModuleOptimization::serializeInstruction(SILInstruction *inst,
     }
     if (!hasPublicVisibility(global->getLinkage())) {
       global->setLinkage(SILLinkage::Public);
-      M.addPublicCMOSymbol(global->getName());
     }
     return;
   }
@@ -534,7 +538,6 @@ void CrossModuleOptimization::makeFunctionUsableFromInline(SILFunction *function
   if (!isAvailableExternally(function->getLinkage()) &&
       function->getLinkage() != SILLinkage::Public) {
     function->setLinkage(SILLinkage::Public);
-    M.addPublicCMOSymbol(function->getName());
   }
 }
 
@@ -610,9 +613,20 @@ class CrossModuleOptimizationPass: public SILModuleTransform {
       return;
     if (!M.isWholeModule())
       return;
+      
+    bool conservative = false;
+    switch (M.getOptions().CMOMode) {
+      case swift::CrossModuleOptimizationMode::Off:
+        return;
+      case swift::CrossModuleOptimizationMode::Default:
+        conservative = true;
+        break;
+      case swift::CrossModuleOptimizationMode::Aggressive:
+        conservative = false;
+        break;
+    }
 
-    CrossModuleOptimization CMO(M,
-      /*conservative*/ !M.getOptions().CrossModuleOptimization);
+    CrossModuleOptimization CMO(M, conservative);
     CMO.serializeFunctionsInModule();
   }
 };

@@ -50,13 +50,8 @@ class TBDGenDescriptor final {
   FileOrModule Input;
   TBDGenOptions Opts;
 
-  /// Symbols (e.g. function names) which are made public by the
-  /// CrossModuleOptimization pass and therefore must be included in the TBD file.
-  TBDSymbolSetPtr publicCMOSymbols;
-
-  TBDGenDescriptor(FileOrModule input, const TBDGenOptions &opts,
-                   TBDSymbolSetPtr publicCMOSymbols)
-      : Input(input), Opts(opts), publicCMOSymbols(publicCMOSymbols) {
+  TBDGenDescriptor(FileOrModule input, const TBDGenOptions &opts)
+      : Input(input), Opts(opts) {
     assert(input);
   }
 
@@ -78,21 +73,17 @@ public:
   const StringRef getDataLayoutString() const;
   const llvm::Triple &getTarget() const;
 
-  TBDSymbolSetPtr getPublicCMOSymbols() const { return publicCMOSymbols; }
-
   bool operator==(const TBDGenDescriptor &other) const;
   bool operator!=(const TBDGenDescriptor &other) const {
     return !(*this == other);
   }
 
-  static TBDGenDescriptor forFile(FileUnit *file, const TBDGenOptions &opts,
-                                  TBDSymbolSetPtr publicCMOSymbols) {
-    return TBDGenDescriptor(file, opts, publicCMOSymbols);
+  static TBDGenDescriptor forFile(FileUnit *file, const TBDGenOptions &opts) {
+    return TBDGenDescriptor(file, opts);
   }
 
-  static TBDGenDescriptor forModule(ModuleDecl *M, const TBDGenOptions &opts,
-                                    TBDSymbolSetPtr publicCMOSymbols) {
-    return TBDGenDescriptor(M, opts, publicCMOSymbols);
+  static TBDGenDescriptor forModule(ModuleDecl *M, const TBDGenOptions &opts) {
+    return TBDGenDescriptor(M, opts);
   }
 };
 
@@ -163,9 +154,6 @@ public:
     /// A symbol used to customize linker behavior, introduced by TBDGen.
     LinkerDirective,
 
-    /// A symbol which was made public by the CrossModuleOptimization pass.
-    CrossModuleOptimization,
-
     /// A symbol with an unknown origin.
     // FIXME: This should be eliminated.
     Unknown
@@ -185,8 +173,7 @@ private:
     irEntity = entity;
   }
   explicit SymbolSource(Kind kind) : kind(kind) {
-    assert(kind == Kind::LinkerDirective || kind == Kind::Unknown ||
-           kind == Kind::CrossModuleOptimization);
+    assert(kind == Kind::LinkerDirective || kind == Kind::Unknown);
   }
 
 public:
@@ -199,19 +186,12 @@ public:
   static SymbolSource forLinkerDirective() {
     return SymbolSource{Kind::LinkerDirective};
   }
-  static SymbolSource forCrossModuleOptimization() {
-    return SymbolSource{Kind::CrossModuleOptimization};
-  }
   static SymbolSource forUnknown() {
     return SymbolSource{Kind::Unknown};
   }
 
   bool isLinkerDirective() const {
     return kind == Kind::LinkerDirective;
-  }
-
-  bool isFromCrossModuleOptimization() const {
-    return kind == Kind::CrossModuleOptimization;
   }
 
   SILDeclRef getSILDeclRef() const {
