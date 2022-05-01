@@ -42,7 +42,7 @@ static std::vector<StringRef> sortSymbols(llvm::StringSet<> &symbols) {
 }
 
 bool swift::writeTBD(ModuleDecl *M, StringRef OutputFilename,
-                     const TBDGenOptions &Opts, TBDSymbolSetPtr publicCMOSymbols) {
+                     const TBDGenOptions &Opts) {
   std::error_code EC;
   llvm::raw_fd_ostream OS(OutputFilename, EC, llvm::sys::fs::OF_None);
   if (EC) {
@@ -51,7 +51,7 @@ bool swift::writeTBD(ModuleDecl *M, StringRef OutputFilename,
     return true;
   }
 
-  writeTBDFile(M, OS, Opts, publicCMOSymbols);
+  writeTBDFile(M, OS, Opts);
 
   return false;
 }
@@ -152,10 +152,8 @@ static bool validateSymbols(DiagnosticEngine &diags,
 bool swift::validateTBD(ModuleDecl *M,
                         const llvm::Module &IRModule,
                         const TBDGenOptions &opts,
-                        TBDSymbolSetPtr publicCMOSymbols,
                         bool diagnoseExtraSymbolsInTBD) {
-  auto symbols = getPublicSymbols(TBDGenDescriptor::forModule(M, opts,
-                                  publicCMOSymbols));
+  auto symbols = getPublicSymbols(TBDGenDescriptor::forModule(M, opts));
   return validateSymbols(M->getASTContext().Diags, symbols, IRModule,
                          diagnoseExtraSymbolsInTBD);
 }
@@ -163,10 +161,8 @@ bool swift::validateTBD(ModuleDecl *M,
 bool swift::validateTBD(FileUnit *file,
                         const llvm::Module &IRModule,
                         const TBDGenOptions &opts,
-                        TBDSymbolSetPtr publicCMOSymbols,
                         bool diagnoseExtraSymbolsInTBD) {
-  auto symbols = getPublicSymbols(TBDGenDescriptor::forFile(file, opts,
-                                  publicCMOSymbols));
+  auto symbols = getPublicSymbols(TBDGenDescriptor::forFile(file, opts));
   return validateSymbols(file->getParentModule()->getASTContext().Diags,
                          symbols, IRModule, diagnoseExtraSymbolsInTBD);
 }

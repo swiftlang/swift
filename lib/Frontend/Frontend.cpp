@@ -1330,8 +1330,6 @@ bool CompilerInstance::performSILProcessing(SILModule *silModule) {
 
   performSILOptimizations(Invocation, silModule);
 
-  publicCMOSymbols = silModule->getPublicCMOSymbols();
-
   if (auto *stats = getStatsReporter())
     countStatsPostSILOpt(*stats, *silModule);
 
