@@ -4115,7 +4115,6 @@ CanType ProtocolCompositionType::getMinimalCanonicalType(
     return Reqs.front().getSecondType()->getCanonicalType();
   }
 
-  Type superclass;
   llvm::SmallVector<Type, 2> MinimalMembers;
   bool MinimalHasExplicitAnyObject = false;
   auto ifaceTy = Sig.getGenericParams().back();
@@ -4126,10 +4125,6 @@ CanType ProtocolCompositionType::getMinimalCanonicalType(
 
     switch (Req.getKind()) {
     case RequirementKind::Superclass:
-      assert((!superclass || superclass->isEqual(Req.getSecondType()))
-             && "Multiple distinct superclass constraints!");
-      superclass = Req.getSecondType();
-      break;
     case RequirementKind::Conformance:
       MinimalMembers.push_back(Req.getSecondType());
       break;
@@ -4141,10 +4136,16 @@ CanType ProtocolCompositionType::getMinimalCanonicalType(
     }
   }
 
-  // Ensure superclass bounds appear first regardless of their order among
-  // the signature's requirements.
-  if (superclass)
-    MinimalMembers.insert(MinimalMembers.begin(), superclass->getCanonicalType());
+  // A superclass constraint is always retained and must appear first in the
+  // members list.
+  assert(Composition->getMembers().front()->getClassOrBoundGenericClass() ==
+         MinimalMembers.front()->getClassOrBoundGenericClass());
+
+  // If we are left with a single member and no layout constraint, the member
+  // is the minimal type. Also, note that a protocol composition cannot be
+  // constructed with a single member unless there is a layout constraint.
+  if (MinimalMembers.size() == 1 && !MinimalHasExplicitAnyObject)
+    return CanType(MinimalMembers.front());
 
   // The resulting composition is necessarily canonical.
   return CanType(build(Ctx, MinimalMembers, MinimalHasExplicitAnyObject));
