@@ -1,9 +1,9 @@
 
 // RUN: %empty-directory(%t) 
 
-// RUN: %target-build-swift -O -wmo -parse-as-library -emit-module -emit-module-path=%t/Submodule.swiftmodule -module-name=Submodule %S/Inputs/cross-module/default-submodule.swift -c -o %t/submodule.o
-// RUN: %target-build-swift -O -wmo -parse-as-library -emit-module -emit-module-path=%t/Module.swiftmodule -module-name=Module -I%t -I%S/Inputs/cross-module %S/Inputs/cross-module/default-module.swift -c -o %t/module.o
-// RUN: %target-build-swift -O -wmo -parse-as-library -emit-tbd -emit-tbd-path %t/ModuleTBD.tbd -emit-module -emit-module-path=%t/ModuleTBD.swiftmodule -module-name=ModuleTBD -I%t -I%S/Inputs/cross-module %S/Inputs/cross-module/default-module.swift -c -o %t/moduletbd.o
+// RUN: %target-build-swift -O -wmo -Xfrontend -enable-default-cmo -parse-as-library -emit-module -emit-module-path=%t/Submodule.swiftmodule -module-name=Submodule %S/Inputs/cross-module/default-submodule.swift -c -o %t/submodule.o
+// RUN: %target-build-swift -O -wmo -Xfrontend -enable-default-cmo -parse-as-library -emit-module -emit-module-path=%t/Module.swiftmodule -module-name=Module -I%t -I%S/Inputs/cross-module %S/Inputs/cross-module/default-module.swift -c -o %t/module.o
+// RUN: %target-build-swift -O -wmo -Xfrontend -enable-default-cmo -parse-as-library -emit-tbd -emit-tbd-path %t/ModuleTBD.tbd -emit-module -emit-module-path=%t/ModuleTBD.swiftmodule -module-name=ModuleTBD -I%t -I%S/Inputs/cross-module %S/Inputs/cross-module/default-module.swift -c -o %t/moduletbd.o
 
 // RUN: %target-build-swift -O -wmo -module-name=Main -I%t %s -emit-sil | %FileCheck %s
 
