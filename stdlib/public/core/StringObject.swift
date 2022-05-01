@@ -1098,6 +1098,38 @@ extension _StringObject {
 #endif
   }
 
+  @inlinable
+  @inline(__always)
+  internal init(immortal bufferPtr: UnsafeBufferPointer<UInt8>, flags: UInt64) {
+    let countAndFlags = CountAndFlags(
+      count: bufferPtr.count,
+      isASCII: flags & 0x1 != 0,
+      isNFC: flags & (0x1 << 1) != 0,
+      isNativelyStored: false,
+      isTailAllocated: true
+    )
+
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
+    self.init(
+      variant: .immortal(start: bufferPtr.baseAddress._unsafelyUnwrappedUnchecked),
+      discriminator: Nibbles.largeImmortal(),
+      countAndFlags: countAndFlags
+    )
+#else
+    var biasedAddress = UInt(
+      bitPattern: bufferPtr.baseAddress._unsafelyUnwrappedUnchecked
+    )
+
+    biasedAddress &-= _StringObject.nativeBias
+
+    self.init(
+      pointerBits: UInt64(truncatingIfNeeded: biasedAddress),
+      discriminator: Nibbles.largeImmortal(),
+      countAndFlags: countAndFlags
+    )
+#endif
+  }
+
   @inline(__always)
   internal init(_ storage: __StringStorage) {
 #if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)

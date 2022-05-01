@@ -435,6 +435,24 @@ public protocol _ExpressibleByBuiltinExtendedGraphemeClusterLiteral
     _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
     utf8CodeUnitCount: Builtin.Word,
     isASCII: Builtin.Int1)
+
+  @available(SwiftStdlib 9999, *)
+  init(
+    _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
+    length: Builtin.Word,
+    flags: Builtin.Int64
+  )
+}
+
+extension _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
+  @available(SwiftStdlib 9999, *)
+  init(
+    _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
+    length: Builtin.Word,
+    flags: Builtin.Int64
+  ) {
+    fatalError("Default begc init")
+  }
 }
 
 /// A type that can be initialized with a string literal containing a single
@@ -492,6 +510,24 @@ public protocol _ExpressibleByBuiltinStringLiteral
     _builtinStringLiteral start: Builtin.RawPointer,
     utf8CodeUnitCount: Builtin.Word,
     isASCII: Builtin.Int1)
+
+  @available(SwiftStdlib 9999, *)
+  init(
+    _builtinStringLiteral start: Builtin.RawPointer,
+    length: Builtin.Word,
+    flags: Builtin.Int64
+  )
+}
+
+extension _ExpressibleByBuiltinStringLiteral {
+  @available(SwiftStdlib 9999, *)
+  init(
+    _builtinStringLiteral start: Builtin.RawPointer,
+    length: Builtin.Word,
+    flags: Builtin.Int64
+  ) {
+    fatalError("Default builtin string init")
+  }
 }
 
 /// A type that can be initialized with a string literal.

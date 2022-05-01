@@ -1678,7 +1678,6 @@ static PreparedArguments emitStringLiteralArgs(SILGenFunction &SGF, SILLocation 
                                            StringRef Str, SGFContext C,
                                         StringLiteralExpr::Encoding encoding) {
   uint64_t Length;
-  bool isASCII = SGF.getASTContext().isASCIIString(Str);
   StringLiteralInst::Encoding instEncoding;
   switch (encoding) {
   case StringLiteralExpr::UTF8:
@@ -1707,14 +1706,15 @@ static PreparedArguments emitStringLiteralArgs(SILGenFunction &SGF, SILLocation 
   auto WordTy = SILType::getBuiltinWordType(SGF.getASTContext());
   auto *lengthInst = SGF.B.createIntegerLiteral(E, WordTy, Length);
 
-  // The 'isascii' bit is lowered as an integer_literal.
-  auto Int1Ty = SILType::getBuiltinIntegerType(1, SGF.getASTContext());
-  auto *isASCIIInst = SGF.B.createIntegerLiteral(E, Int1Ty, isASCII);
+  // The flags are lowered as an integer_literal.
+  auto flags = SGF.getASTContext().getStringFlags(Str);
+  auto int64Ty = SILType::getBuiltinIntegerType(64, SGF.getASTContext());
+  auto *flagsInst = SGF.B.createIntegerLiteral(E, int64Ty, flags);
 
   ManagedValue EltsArray[] = {
     ManagedValue::forUnmanaged(string),
     ManagedValue::forUnmanaged(lengthInst),
-    ManagedValue::forUnmanaged(isASCIIInst)
+    ManagedValue::forUnmanaged(flagsInst)
   };
 
   AnyFunctionType::Param TypeEltsArray[] = {

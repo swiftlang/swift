@@ -66,6 +66,8 @@
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Compiler.h"
 #include <algorithm>
+#include <codecvt>
+#include <locale>
 #include <memory>
 
 #include "RequirementMachine/RewriteContext.h"
@@ -1176,8 +1178,8 @@ ASTContext::getStringBuiltinInitDecl(NominalTypeDecl *stringDecl) const {
   auto fn = [&](ASTContext &ctx) {
     return DeclName(ctx, DeclBaseName::createConstructor(),
                     { Id_builtinStringLiteral,
-                      getIdentifier("utf8CodeUnitCount"),
-                      getIdentifier("isASCII") });
+                      getIdentifier("length"),
+                      getIdentifier("flags") });
   };
 
   auto builtinProtocolKind =
@@ -5601,11 +5603,62 @@ llvm::LLVMContext &ASTContext::getIntrinsicScratchContext() const {
 #endif
 }
 
-bool ASTContext::isASCIIString(StringRef s) const {
-  for (unsigned char c : s) {
-    if (c > 127) {
+static bool isASCIIString(StringRef string) {
+  for (auto c : string) {
+    if (c > 0x7F) {
       return false;
     }
   }
+
   return true;
+}
+
+// FIXME: This isn't a final yes/no, this only implements some known NFC code
+// ranges that cover many cases of Unicode.
+static bool isNFCString(StringRef string) {
+  if (string.empty()) {
+    return true;
+  }
+
+  std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> utf32Conv;
+  std::u32string scalars = utf32Conv.from_bytes(string.data());
+
+  for (auto scalar : scalars) {
+    // ASCII and some latiny scalars (768 scalars).
+    if (scalar < 0x300) {
+      continue;
+    }
+
+    // This covers 52,770 scalars which includes all of the CJK Ideographs,
+    // Hiragana, Katakana, precomposed Hangul, and others.
+    if (scalar > 0x2ADC && scalar < 0xF900) {
+      if (scalar != 0x3099 && scalar != 0x309A) {
+        continue;
+      }
+    }
+
+    return false;
+  }
+
+  return true;
+}
+
+uint64_t ASTContext::getStringFlags(StringRef string) const {
+  // isASCII = 0x1 << 0
+  // isNFC = 0x1 << 1
+  uint64_t flags = 0;
+
+  if (isASCIIString(string)) {
+    flags |= 0x1;
+
+    // If our string is ASCII, then it's also NFC.
+    flags |= (0x1 << 1);
+    return flags;
+  }
+
+  if (isNFCString(string)) {
+    flags |= (0x1 << 1);
+  }
+
+  return flags;
 }

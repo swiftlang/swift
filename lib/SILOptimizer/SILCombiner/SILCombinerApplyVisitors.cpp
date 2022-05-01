@@ -444,8 +444,8 @@ bool SILCombiner::tryOptimizeKeypathKVCString(ApplyInst *AI,
                                                 SILType::getBuiltinWordType(C),
                                                 objcString.size());
     auto isAscii = Builder.createIntegerLiteral(AI->getLoc(),
-                                          SILType::getBuiltinIntegerType(1, C),
-                                          C.isASCIIString(objcString));
+                                          SILType::getBuiltinIntegerType(64, C),
+                                          C.getStringFlags(objcString));
     auto metaTy =
       CanMetatypeType::get(objTy.getASTType(), MetatypeRepresentation::Thin);
     auto self = Builder.createMetatype(AI->getLoc(),

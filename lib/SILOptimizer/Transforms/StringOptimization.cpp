@@ -706,8 +706,8 @@ ApplyInst *StringOptimization::createStringInit(StringRef str,
                     literal->getCodeUnitCount());
 
   auto *isAscii = builder.createIntegerLiteral(loc,
-                    SILType::getBuiltinIntegerType(1, ctxt),
-                    intmax_t(ctxt.isASCIIString(str)));
+                    SILType::getBuiltinIntegerType(64, ctxt),
+                    intmax_t(ctxt.getStringFlags(str)));
 
   SILType stringMetaType = SILType::getPrimitiveObjectType(
     CanType(MetatypeType::get(stringType.getASTType(),

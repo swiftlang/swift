@@ -1357,10 +1357,10 @@ public:
 
   /// Retrieve the IRGen specific SIL passes.
   SILTransformCtors getIRGenSILTransforms() const;
-  
-  /// Check whether a given string would be considered "pure ASCII" by the
-  /// standard library's String implementation.
-  bool isASCIIString(StringRef s) const;
+
+  /// Get the string flags from a literal to be able to determine if a string
+  // is ASCII and/or NFC for the standard library.
+  uint64_t getStringFlags(StringRef string) const;
 
   /// Retrieve the name of to be used for the entry point, either main or an
   /// alternative specified via the -entry-point-function-name frontend flag.

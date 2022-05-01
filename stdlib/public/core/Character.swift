@@ -143,6 +143,22 @@ extension Character :
       isASCII: isASCII))
   }
 
+  @inlinable
+  @inline(__always)
+  @_effects(readonly)
+  @available(SwiftStdlib 9999, *)
+  public init(
+    _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
+    length: Builtin.Word,
+    flags: Builtin.Int64
+  ) {
+    self.init(unchecked: String(
+      _builtinExtendedGraphemeClusterLiteral: start,
+      length: length,
+      flags: flags
+    ))
+  }
+
   /// Creates a character with the specified value.
   ///
   /// Do not call this initializer directly. It is used by the compiler when

@@ -55,6 +55,12 @@ extension _StringGuts {
     self.init(_StringObject(immortal: bufPtr, isASCII: isASCII))
   }
 
+  @inlinable
+  @inline(__always)
+  internal init(_ bufferPtr: UnsafeBufferPointer<UInt8>, flags: UInt64) {
+    self.init(_StringObject(immortal: bufferPtr, flags: flags))
+  }
+
   @inline(__always)
   internal init(_ storage: __StringStorage) {
     self.init(_StringObject(storage))

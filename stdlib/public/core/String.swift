@@ -625,7 +625,7 @@ extension String: _ExpressibleByBuiltinUnicodeScalarLiteral {
 
 extension String: _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
   @inlinable @inline(__always)
-  @_effects(readonly) @_semantics("string.makeUTF8")
+  @_effects(readonly) //@_semantics("string.makeUTF8")
   public init(
     _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
     utf8CodeUnitCount: Builtin.Word,
@@ -636,11 +636,24 @@ extension String: _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
       utf8CodeUnitCount: utf8CodeUnitCount,
       isASCII: isASCII)
   }
+
+  @inlinable
+  @inline(__always)
+  @_effects(readonly)
+  @_semantics("string.makeUTF8")
+  @available(SwiftStdlib 9999, *)
+  public init(
+    _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
+    length: Builtin.Word,
+    flags: Builtin.Int64
+  ) {
+    self.init(_builtinStringLiteral: start, length: length, flags: flags)
+  }
 }
 
 extension String: _ExpressibleByBuiltinStringLiteral {
   @inlinable @inline(__always)
-  @_effects(readonly) @_semantics("string.makeUTF8")
+  @_effects(readonly) //@_semantics("string.makeUTF8")
   public init(
     _builtinStringLiteral start: Builtin.RawPointer,
     utf8CodeUnitCount: Builtin.Word,
@@ -654,6 +667,28 @@ extension String: _ExpressibleByBuiltinStringLiteral {
       return
     }
     self.init(_StringGuts(bufPtr, isASCII: Bool(isASCII)))
+  }
+
+  @inlinable
+  @inline(__always)
+  @_effects(readonly)
+  @available(SwiftStdlib 9999, *)
+  public init(
+    _builtinStringLiteral start: Builtin.RawPointer,
+    length: Builtin.Word,
+    flags: Builtin.Int64
+  ) {
+    let bufferPtr = UnsafeBufferPointer(
+      start: UnsafeRawPointer(start).assumingMemoryBound(to: UInt8.self),
+      count: Int(length)
+    )
+
+    if let smol = _SmallString(bufferPtr) {
+      self = String(_StringGuts(smol))
+      return
+    }
+
+    self.init(_StringGuts(bufferPtr, flags: UInt64(flags)))
   }
 }
 

@@ -233,7 +233,6 @@ extension StaticString: ExpressibleByUnicodeScalarLiteral {
 }
 
 extension StaticString: _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
-
   @_effects(readonly)
   @_transparent
   public init(
@@ -246,6 +245,17 @@ extension StaticString: _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
       utf8CodeUnitCount: utf8CodeUnitCount,
       isASCII: isASCII
     )
+  }
+
+  @_effects(readonly)
+  @_transparent
+  @available(SwiftStdlib 9999, *)
+  public init(
+    _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
+    length: Builtin.Word,
+    flags: Builtin.Int64
+  ) {
+    self.init(_builtinStringLiteral: start, length: length, flags: flags)
   }
 }
 
@@ -276,6 +286,21 @@ extension StaticString: _ExpressibleByBuiltinStringLiteral {
       _start: start,
       utf8CodeUnitCount: utf8CodeUnitCount,
       isASCII: isASCII)
+  }
+
+  @_effects(readonly)
+  @_transparent
+  @available(SwiftStdlib 9999, *)
+  public init(
+    _builtinStringLiteral start: Builtin.RawPointer,
+    length: Builtin.Word,
+    flags: Builtin.Int64
+  ) {
+    self = StaticString(
+      _start: start,
+      utf8CodeUnitCount: length,
+      isASCII: true._value
+    )
   }
 }
 

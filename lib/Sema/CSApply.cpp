@@ -2645,8 +2645,8 @@ namespace {
         builtinLiteralFuncName =
             DeclName(ctx, DeclBaseName::createConstructor(),
                      {ctx.Id_builtinStringLiteral,
-                      ctx.getIdentifier("utf8CodeUnitCount"),
-                      ctx.getIdentifier("isASCII")});
+                      ctx.getIdentifier("length"),
+                      ctx.getIdentifier("flags")});
         if (stringLiteral)
           stringLiteral->setEncoding(StringLiteralExpr::UTF8);
         else
@@ -2661,8 +2661,8 @@ namespace {
         builtinLiteralFuncName =
             DeclName(ctx, DeclBaseName::createConstructor(),
                      {ctx.Id_builtinExtendedGraphemeClusterLiteral,
-                      ctx.getIdentifier("utf8CodeUnitCount"),
-                      ctx.getIdentifier("isASCII")});
+                      ctx.getIdentifier("length"),
+                      ctx.getIdentifier("flags")});
 
         builtinProtocol = TypeChecker::getProtocol(
             cs.getASTContext(), expr->getLoc(),
