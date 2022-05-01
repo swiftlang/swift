@@ -436,7 +436,6 @@ class CompilerInstance {
   std::unique_ptr<ASTContext> Context;
   std::unique_ptr<Lowering::TypeConverter> TheSILTypes;
   std::unique_ptr<DiagnosticVerifier> DiagVerifier;
-  TBDSymbolSetPtr publicCMOSymbols;
 
   /// A cache describing the set of inter-module dependencies that have been queried.
   /// Null if not present.
@@ -587,10 +586,6 @@ public:
   /// If a code completion buffer has been set, returns the corresponding source
   /// file.
   SourceFile *getCodeCompletionFile() const;
-
-  /// Return the symbols (e.g. function names) which are made public by the
-  /// CrossModuleOptimization pass and therefore must be included in the TBD file.
-  TBDSymbolSetPtr getPublicCMOSymbols() const { return publicCMOSymbols; }
 
 private:
   /// Set up the file system by loading and validating all VFS overlay YAML

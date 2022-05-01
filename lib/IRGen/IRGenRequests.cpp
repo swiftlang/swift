@@ -81,13 +81,11 @@ ModuleDecl *IRGenDescriptor::getParentModule() const {
 }
 
 TBDGenDescriptor IRGenDescriptor::getTBDGenDescriptor() const {
-  TBDSymbolSetPtr cmoSymbolSet = (SILMod ? SILMod->getPublicCMOSymbols()
-                                         : nullptr);
   if (auto *file = Ctx.dyn_cast<FileUnit *>()) {
-    return TBDGenDescriptor::forFile(file, TBDOpts, cmoSymbolSet);
+    return TBDGenDescriptor::forFile(file, TBDOpts);
   } else {
     auto *M = Ctx.get<ModuleDecl *>();
-    return TBDGenDescriptor::forModule(M, TBDOpts, cmoSymbolSet);
+    return TBDGenDescriptor::forModule(M, TBDOpts);
   }
 }
 
