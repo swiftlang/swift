@@ -1432,7 +1432,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     if (auto *VD = dyn_cast<VarDecl>(D)) {
       for (auto *Item: getRelatedDiffItems(VD)) {
         if (auto *CD = dyn_cast<CommonDiffItem>(Item)) {
-          // If the overriden property has been renamed, we should rename
+          // If the overridden property has been renamed, we should rename
           // this property decl as well.
           if (CD->isRename() && VD->getNameLoc().isValid()) {
             Editor.replaceToken(VD->getNameLoc(), CD->getNewName());
