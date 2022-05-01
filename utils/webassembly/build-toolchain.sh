@@ -34,6 +34,7 @@ case $(uname -s) in
 esac
 
 BUILD_HOST_TOOLCHAIN=1
+TOOLCHAIN_CHANNEL=${TOOLCHAIN_CHANNEL:-DEVELOPMENT}
 
 while [ $# -ne 0 ]; do
   case "$1" in
@@ -51,9 +52,9 @@ done
 YEAR=$(date +"%Y")
 MONTH=$(date +"%m")
 DAY=$(date +"%d")
-TOOLCHAIN_NAME="swift-wasm-DEVELOPMENT-SNAPSHOT-${YEAR}-${MONTH}-${DAY}-a"
+TOOLCHAIN_NAME="swift-wasm-${TOOLCHAIN_CHANNEL}-SNAPSHOT-${YEAR}-${MONTH}-${DAY}-a"
 
-PACKAGE_ARTIFACT="$SOURCE_PATH/swift-wasm-DEVELOPMENT-SNAPSHOT-${OS_SUFFIX}.tar.gz"
+PACKAGE_ARTIFACT="$SOURCE_PATH/swift-wasm-${TOOLCHAIN_CHANNEL}-SNAPSHOT-${OS_SUFFIX}.tar.gz"
 
 HOST_TOOLCHAIN_DESTDIR=$SOURCE_PATH/host-toolchain-sdk
 DIST_TOOLCHAIN_DESTDIR=$SOURCE_PATH/dist-toolchain-sdk
@@ -163,11 +164,15 @@ embed_wasi_sysroot() {
   rm "$DIST_TOOLCHAIN_SDK/usr/lib/swift_static/wasi/wasm32/wasi.modulemap.bak"
 }
 
+swift_version() {
+  cat "$SOURCE_PATH/swift/CMakeLists.txt" | grep 'set(SWIFT_VERSION ' | sed -E 's/set\(SWIFT_VERSION "(.+)"\)/\1/'
+}
+
 create_darwin_info_plist() {
   echo "-- Create Info.plist --"
   PLISTBUDDY_BIN="/usr/libexec/PlistBuddy"
 
-  DARWIN_TOOLCHAIN_VERSION="5.5.${YEAR}${MONTH}${DAY}"
+  DARWIN_TOOLCHAIN_VERSION="$(swift_version).${YEAR}${MONTH}${DAY}"
   BUNDLE_PREFIX="org.swiftwasm"
   DARWIN_TOOLCHAIN_BUNDLE_IDENTIFIER="${BUNDLE_PREFIX}.${YEAR}${MONTH}${DAY}"
   DARWIN_TOOLCHAIN_DISPLAY_NAME_SHORT="Swift for WebAssembly Snapshot"
