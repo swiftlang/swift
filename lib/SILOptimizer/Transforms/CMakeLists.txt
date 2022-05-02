@@ -39,7 +39,6 @@ target_sources(swiftSILOptimizer PRIVATE
   SimplifyCFG.cpp
   Sink.cpp
   SpeculativeDevirtualizer.cpp
-  StackPromotion.cpp
   StringOptimization.cpp
   TempLValueOpt.cpp
   TempRValueElimination.cpp

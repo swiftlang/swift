@@ -396,7 +396,7 @@ PASS(SplitAllCriticalEdges, "split-critical-edges",
      "Split all Critical Edges in the SIL CFG")
 PASS(SplitNonCondBrCriticalEdges, "split-non-cond_br-critical-edges",
      "Split all Critical Edges not from SIL cond_br")
-PASS(StackPromotion, "stack-promotion",
+SWIFT_FUNCTION_PASS(StackPromotion, "stack-promotion",
      "Stack Promotion of Class Objects")
 PASS(StripDebugInfo, "strip-debug-info",
      "Strip Debug Information")
