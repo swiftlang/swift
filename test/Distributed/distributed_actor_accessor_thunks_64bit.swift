@@ -221,7 +221,7 @@ public distributed actor MyOtherActor {
 // CHECK-NEXT: [[THUNK_ASYNC_CONTEXT:%.*]] = call swiftcc i8* @swift_task_alloc(i64 [[CONTEXT_SIZE_64]])
 // CHECK: [[THUNK_CONTEXT_PTR:%.*]] = bitcast i8* [[THUNK_ASYNC_CONTEXT]] to %swift.context*
 
-/// Call distributed thunk with exploaded string value
+/// Call distributed thunk with exploded string value
 
 // CHECK: [[THUNK_RESULT:%.*]] = call { i8*, i64, %swift.error* } (i32, i8*, i8*, ...) @llvm.coro.suspend.async.sl_p0i8i64p0s_swift.errorss(
 // CHECK-SAME: i8* bitcast (void (%swift.context*, i64, %swift.bridge*, %T27distributed_actor_accessors7MyActorC*)* @"$s27distributed_actor_accessors7MyActorC7simple3ySiSSYaKFTE" to i8*),

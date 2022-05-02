@@ -234,7 +234,7 @@ public distributed actor MyOtherActor {
 // CHECK: [[STR_ARG_FLAGS_PTR:%.*]] = getelementptr inbounds { i32, i32, i32 }, { i32, i32, i32 }* %temp-coercion.coerced, i32 0, i32 2
 // CHECK: [[STR_ARG_FLAGS:%.*]] = load i32, i32* [[STR_ARG_FLAGS_PTR]]
 
-/// Call distributed thunk with exploaded string value
+/// Call distributed thunk with exploded string value
 
 // CHECK: [[THUNK_CONTEXT_PTR:%.*]] = bitcast i8* [[THUNK_ASYNC_CONTEXT]] to %swift.context*
 
