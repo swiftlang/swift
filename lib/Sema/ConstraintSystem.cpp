@@ -894,6 +894,18 @@ Type ConstraintSystem::replaceInferableTypesWithTypeVars(
               TVO_CanBindToNoEscape | TVO_PrefersSubtypeBinding |
                   TVO_CanBindToHole);
         }
+
+        if (auto *var = placeholderTy->getOriginator().dyn_cast<VarDecl *>()) {
+          if (var->getName().hasDollarPrefix()) {
+            auto *repr =
+                new (type->getASTContext()) PlaceholderTypeRepr(var->getLoc());
+            return createTypeVariable(
+                getConstraintLocator(locator,
+                                     LocatorPathElt::PlaceholderType(repr)),
+                TVO_CanBindToNoEscape | TVO_PrefersSubtypeBinding |
+                    TVO_CanBindToHole);
+          }
+        }
       }
 
       return type;

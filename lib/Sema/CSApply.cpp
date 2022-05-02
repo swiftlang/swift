@@ -9045,12 +9045,23 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
 
     return target;
   } else if (auto *pattern = target.getAsUninitializedVar()) {
+    TypeResolutionOptions options(TypeResolverContext::PatternBindingDecl);
+
     auto contextualPattern = target.getContextualPattern();
     auto patternType = target.getTypeOfUninitializedVar();
+    auto *PB = target.getPatternBindingOfUninitializedVar();
+
+    // If this is a placeholder variable, let's override its type with
+    // inferred one.
+    if (auto *var = PB->getSingleVar()) {
+      if (var->getName().hasDollarPrefix() && patternType->hasPlaceholder()) {
+        patternType = solution.getResolvedType(var);
+        options |= TypeResolutionFlags::OverrideType;
+      }
+    }
 
     if (auto coercedPattern = TypeChecker::coercePatternToType(
-            contextualPattern, patternType,
-            TypeResolverContext::PatternBindingDecl)) {
+            contextualPattern, patternType, options)) {
       auto resultTarget = target;
       resultTarget.setPattern(coercedPattern);
       return resultTarget;
