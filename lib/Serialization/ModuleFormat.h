@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 687; // RefAdHocRequirementFunction info in SILFunctionLayout
+const uint16_t SWIFTMODULE_VERSION_MINOR = 688; // SILBoxType extensions
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1166,6 +1166,7 @@ namespace decls_block {
   using SILLayoutLayout = BCRecordLayout<
     SIL_LAYOUT,
     GenericSignatureIDField,    // generic signature
+    BCFixed<1>,                 // captures generic env
     BCVBR<8>,                   // number of fields
     BCArray<TypeIDWithBitField> // field types with mutability
   >;

@@ -461,11 +461,11 @@ public:
     locationStorage = loc.storage;
   }
 
-  /// Return the next instruction or nullptr if this is the last instruction in
-  /// its block.
+  /// Return the previous instruction, or nullptr if this is the first
+  /// instruction in its block.
   SILInstruction *getPreviousInstruction();
 
-  /// Return the previous instruction or nullptr if this is the first
+  /// Return the next instruction, or nullptr if this is the final
   /// instruction in its block.
   SILInstruction *getNextInstruction();
 
@@ -2289,30 +2289,38 @@ public:
 class AllocBoxInst final
     : public InstructionBaseWithTrailingOperands<
                                            SILInstructionKind::AllocBoxInst,
-                                           AllocBoxInst, AllocationInst, char> {
+                                           AllocBoxInst, AllocationInst, char>
+{
   friend SILBuilder;
 
   TailAllocatedDebugVariable VarInfo;
 
-  bool dynamicLifetime = false;
+  unsigned HasDynamicLifetime : 1;
+  unsigned Reflection : 1;
 
   AllocBoxInst(SILDebugLocation DebugLoc, CanSILBoxType BoxType,
                ArrayRef<SILValue> TypeDependentOperands, SILFunction &F,
-               Optional<SILDebugVariable> Var, bool hasDynamicLifetime);
+               Optional<SILDebugVariable> Var, bool hasDynamicLifetime,
+               bool reflection = false);
 
   static AllocBoxInst *create(SILDebugLocation Loc, CanSILBoxType boxType,
                               SILFunction &F,
                               Optional<SILDebugVariable> Var,
-                              bool hasDynamicLifetime);
+                              bool hasDynamicLifetime,
+                              bool reflection = false);
 
 public:
   CanSILBoxType getBoxType() const {
     return getType().castTo<SILBoxType>();
   }
 
-  void setDynamicLifetime() { dynamicLifetime = true; }
-  bool hasDynamicLifetime() const { return dynamicLifetime; }
+  void setDynamicLifetime() { HasDynamicLifetime = true; }
+  bool hasDynamicLifetime() const { return HasDynamicLifetime; }
 
+  /// True if the box should be emitted with reflection metadata for its
+  /// contents.
+  bool emitReflectionMetadata() const { return Reflection; }
+  
   // Return the type of the memory stored in the alloc_box.
   SILType getAddressType() const;
 

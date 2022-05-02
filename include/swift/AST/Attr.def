@@ -84,6 +84,7 @@ TYPE_ATTR(pseudogeneric)
 TYPE_ATTR(yields)
 TYPE_ATTR(yield_once)
 TYPE_ATTR(yield_many)
+TYPE_ATTR(captures_generics)
 
 // SIL metatype attributes.
 TYPE_ATTR(thin)
