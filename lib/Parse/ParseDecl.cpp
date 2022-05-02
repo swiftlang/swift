@@ -3871,6 +3871,8 @@ bool Parser::parseDeclModifierList(DeclAttributes &Attributes,
       if (Kind == DAK_Count)
         break;
 
+      Tok.setKind(tok::contextual_keyword);
+
       if (Kind == DAK_Actor) {
         // If the next token is a startOfSwiftDecl, we are part of the modifier
         // list and should consume the actor token (e.g, actor public class Foo)
