@@ -3,6 +3,7 @@
 // RUN: %target-swift-frontend -module-name=main -DMAIN %s -I%t -O -emit-sil | %FileCheck %s
 
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
+// REQUIRES: swift_in_compiler
 
 #if MODULE
 

@@ -499,6 +499,8 @@ extension _ArrayBuffer {
 
   @inline(never)
   @inlinable // @specializable
+  @_effects(notEscaping self.value**)
+  @_effects(escaping self.value**.class*.value** => return.value**)
   internal func _getElementSlowPath(_ i: Int) -> AnyObject {
     _internalInvariant(
       _isClassOrObjCExistential(Element.self),
