@@ -8971,7 +8971,8 @@ static bool inferEnumMemberThroughTildeEqualsOperator(
     }
   }
 
-  cs.generateConstraints(target, FreeTypeVariableBinding::Disallow);
+  if (cs.generateConstraints(target, FreeTypeVariableBinding::Disallow))
+    return true;
 
   // Sub-expression associated with expression pattern is the enum element
   // access which needs to be connected to the provided element type.
@@ -9907,8 +9908,9 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
       }
 
       if (!paramDecl->getName().hasDollarPrefix()) {
-        generateWrappedPropertyTypeConstraints(paramDecl, backingType,
-                                               param.getParameterType());
+        if (generateWrappedPropertyTypeConstraints(paramDecl, backingType,
+                                                   param.getParameterType()))
+          return false;
       }
 
       auto result = applyPropertyWrapperToParameter(backingType, param.getParameterType(),
