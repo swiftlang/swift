@@ -3465,8 +3465,11 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
               if (!req)
                 return getTypeMatchFailure(locator);
 
-              if (type1->isPlaceholder() ||
-                  req->getRequirementKind() == RequirementKind::Superclass)
+              // Superclass constraints are never satisfied by existentials,
+              // even those that contain the superclass a la `any C & P`.
+              if (!type1->isExistentialType() &&
+                  (type1->isPlaceholder() ||
+                  req->getRequirementKind() == RequirementKind::Superclass))
                 return getTypeMatchSuccess();
 
               auto *fix = fixRequirementFailure(*this, type1, type2, locator);
