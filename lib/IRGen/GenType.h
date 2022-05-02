@@ -305,6 +305,10 @@ public:
 /// If a type is visibly a singleton aggregate (a tuple with one element, a
 /// struct with one field, or an enum with a single payload case), return the
 /// type of its field, which it is guaranteed to have identical layout to.
+///
+/// This can use more concrete type layout information than
+/// SILType::getSingletonAggregateFieldType, because we have full access to the
+/// LLVM-level layout of types in IRGen.
 SILType getSingletonAggregateFieldType(IRGenModule &IGM,
                                        SILType t,
                                        ResilienceExpansion expansion);

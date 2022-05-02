@@ -427,7 +427,13 @@ public:
 
   /// True if the given type has at least the size and alignment of a native
   /// pointer.
-  bool isPointerSizeAndAligned();
+  bool isPointerSizeAndAligned(SILModule &M,
+                               ResilienceExpansion expansion) const;
+
+  /// True if the layout of the given type consists of a single native Swift-
+  /// refcounted object reference, possibly nullable.
+  bool isSingleSwiftRefcounted(SILModule &M,
+                               ResilienceExpansion expansion) const;
 
   /// True if `operTy` can be cast by single-reference value into `resultTy`.
   static bool canRefCast(SILType operTy, SILType resultTy, SILModule &M);
@@ -613,6 +619,12 @@ public:
   llvm::hash_code getHashCode() const {
     return llvm::hash_combine(*this);
   }
+  
+  /// If a type is visibly a singleton aggregate (a tuple with one element, a
+  /// struct with one field, or an enum with a single payload case), return the
+  /// type of its field, which it is guaranteed to have identical layout to.
+  SILType getSingletonAggregateFieldType(SILModule &M,
+                                         ResilienceExpansion expansion) const;
 
   //
   // Accessors for types used in SIL instructions:

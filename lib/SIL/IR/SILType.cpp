@@ -174,7 +174,8 @@ std::string SILType::getAsString() const {
   return OS.str();
 }
 
-bool SILType::isPointerSizeAndAligned() {
+bool SILType::isPointerSizeAndAligned(SILModule &M,
+                                      ResilienceExpansion expansion) const {
   auto &C = getASTContext();
   if (isHeapObjectReferenceType()
       || getASTType()->isEqual(C.TheRawPointerType)) {
@@ -183,7 +184,84 @@ bool SILType::isPointerSizeAndAligned() {
   if (auto intTy = dyn_cast<BuiltinIntegerType>(getASTType()))
     return intTy->getWidth().isPointerWidth();
 
+  if (auto underlyingField = getSingletonAggregateFieldType(M, expansion)) {
+    return underlyingField.isPointerSizeAndAligned(M, expansion);
+  }
+  
   return false;
+}
+
+static bool isSingleSwiftRefcounted(SILModule &M,
+                                    SILType SILTy,
+                                    ResilienceExpansion expansion,
+                                    bool didUnwrapOptional) {
+  auto &C = M.getASTContext();
+  
+  // Unwrap one layer of optionality.
+  // TODO: Or more generally, any fragile enum with a single payload and single
+  // no-payload case.
+  if (!didUnwrapOptional) {
+    if (auto objectTy = SILTy.getOptionalObjectType()) {
+      return ::isSingleSwiftRefcounted(M, objectTy, expansion, true);
+    }
+  }
+
+  // Unwrap singleton aggregates.
+  if (auto underlyingField = SILTy.getSingletonAggregateFieldType(M, expansion)) {
+    return ::isSingleSwiftRefcounted(M, underlyingField, expansion,
+                                     didUnwrapOptional);
+  }
+  
+  auto Ty = SILTy.getASTType();
+  
+  // Easy cases: Builtin.NativeObject and boxes are always Swift-refcounted.
+  if (Ty == C.TheNativeObjectType)
+    return true;
+  if (isa<SILBoxType>(Ty))
+    return true;
+  
+  // Is the type a Swift-refcounted class?
+  // For a generic type, consider its superclass constraint, if any.
+  auto ClassTy = Ty;
+  if (auto archety = dyn_cast<ArchetypeType>(Ty)) {
+    if (auto superclass = Ty->getSuperclass()) {
+      ClassTy = superclass->getCanonicalType();
+    }
+  }
+  // For an existential type, consider its superclass constraint, if it carries
+  // no witness tables.
+  if (Ty->isAnyExistentialType()) {
+    auto layout = Ty->getExistentialLayout();
+    // Must be no protocol constraints that aren't @objc or @_marker.
+    if (layout.containsNonObjCProtocol) {
+      for (auto proto : layout.getProtocols()) {
+        if (!proto->isObjC() && !proto->isMarkerProtocol()) {
+          return false;
+        }
+      }
+    }
+    
+    // The Error existential has its own special layout.
+    if (layout.isErrorExistential()) {
+      return false;
+    }
+    
+    // We can look at the superclass constraint, if any, to see if it's
+    // Swift-refcounted.
+    if (!layout.getSuperclass()) {
+      return false;
+    }
+    ClassTy = layout.getSuperclass()->getCanonicalType();
+  }
+  
+  // TODO: Does the base class we found have fully native Swift ancestry,
+  // so we can use Swift native refcounting on it?
+  return false;
+}
+
+bool SILType::isSingleSwiftRefcounted(SILModule &M,
+                                      ResilienceExpansion expansion) const {
+  return ::isSingleSwiftRefcounted(M, *this, expansion, false);
 }
 
 // Reference cast from representations with single pointer low bits.
@@ -765,4 +843,80 @@ SILType SILType::getSILBoxFieldType(const SILFunction *f, unsigned field) {
     return SILType();
   return ::getSILBoxFieldType(f->getTypeExpansionContext(), boxTy,
                               f->getModule().Types, field);
+}
+
+SILType
+SILType::getSingletonAggregateFieldType(SILModule &M,
+                                        ResilienceExpansion expansion) const {
+  if (auto tuple = getAs<TupleType>()) {
+    if (tuple->getNumElements() == 1) {
+      return getTupleElementType(0);
+    }
+  }
+
+  if (auto structDecl = getStructOrBoundGenericStruct()) {
+    // If the struct has to be accessed resiliently from this resilience domain,
+    // we can't assume anything about its layout.
+    if (structDecl->isResilient(M.getSwiftModule(), expansion)) {
+      return SILType();
+    }
+
+    // C ABI wackiness may cause a single-field struct to have different layout
+    // from its field.
+    if (structDecl->hasUnreferenceableStorage()
+        || structDecl->hasClangNode()) {
+      return SILType();
+    }
+
+    // A single-field struct with custom alignment has different layout from its
+    // field.
+    if (structDecl->getAttrs().hasAttribute<AlignmentAttr>()) {
+      return SILType();
+    }
+
+    // If there's only one stored property, we have the layout of its field.
+    auto allFields = structDecl->getStoredProperties();
+    
+    if (allFields.size() == 1) {
+      auto fieldTy = getFieldType(
+          allFields[0], M,
+          TypeExpansionContext(expansion, M.getSwiftModule(),
+                               M.isWholeModule()));
+      if (!M.isTypeABIAccessible(fieldTy,
+                       TypeExpansionContext::maximalResilienceExpansionOnly())){
+        return SILType();
+      }
+      return fieldTy;
+    }
+
+    return SILType();
+  }
+
+  if (auto enumDecl = getEnumOrBoundGenericEnum()) {
+    // If the enum has to be accessed resiliently from this resilience domain,
+    // we can't assume anything about its layout.
+    if (enumDecl->isResilient(M.getSwiftModule(), expansion)) {
+      return SILType();
+    }
+
+    auto allCases = enumDecl->getAllElements();
+    
+    auto theCase = allCases.begin();
+    if (!allCases.empty() && std::next(theCase) == allCases.end()
+        && (*theCase)->hasAssociatedValues()) {
+      auto enumEltTy = getEnumElementType(
+          *theCase, M,
+          TypeExpansionContext(expansion, M.getSwiftModule(),
+                               M.isWholeModule()));
+      if (!M.isTypeABIAccessible(enumEltTy,
+                       TypeExpansionContext::maximalResilienceExpansionOnly())){
+        return SILType();
+      }
+      return enumEltTy;
+    }
+
+    return SILType();
+  }
+
+  return SILType();
 }

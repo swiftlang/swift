@@ -179,7 +179,8 @@ public:
         layoutSubs.getGenericSignature().getCanonicalSignature();
     auto boxLayout =
         SILLayout::get(SGF.getASTContext(), layoutSig,
-                       SILField(layoutTy->getCanonicalType(layoutSig), true));
+                       SILField(layoutTy->getCanonicalType(layoutSig), true),
+                       /*captures generics*/ false);
 
     resultBox = SGF.B.createAllocBox(loc,
       SILBoxType::get(SGF.getASTContext(),
