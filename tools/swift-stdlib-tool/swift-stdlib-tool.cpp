@@ -723,6 +723,11 @@ std::string filename(std::string path) {
   return basename_r(pathCstr, filename) ? filename : pathCstr;
 }
 
+bool directory_exists(const std::string &path) {
+  struct stat st;
+  return stat(path.c_str(), &st) == 0 && S_ISDIR(st.st_mode);
+}
+
 // This executable's own path.
 std::string self_executable = []() -> std::string {
   char path[MAXPATHLEN] = {0};
@@ -1108,6 +1113,11 @@ int main(int argc, const char *argv[]) {
     // src_dirs is set but platform is not.
     // Pick platform from any src_dirs's name.
     platform = filename(src_dirs.front());
+  }
+
+  for (const auto &src_dir : src_dirs) {
+    if (!directory_exists(src_dir))
+      fail("Source directory does not exist: %s", src_dir.c_str());
   }
 
   // Add the platform to unsigned_dst_dir if it is not already present.
