@@ -1508,7 +1508,10 @@ class FixedBoxTypeInfoBase : public BoxTypeInfo {
 public:
   FixedBoxTypeInfoBase(IRGenModule &IGM, HeapLayout &&layout)
     : BoxTypeInfo(IGM), layout(std::move(layout))
-  {}
+  {
+    // Empty layouts should always use EmptyBoxTypeInfo instead
+    assert(!layout.isKnownEmpty());
+  }
 
   OwnedAddress
   allocate(IRGenFunction &IGF, SILType boxedType, GenericEnvironment *env,
