@@ -1400,6 +1400,11 @@ void swift::visitProductLeafAccessPathNodes(
         worklist.push_back({silType.getTupleElementType(index), elementNode});
       }
     } else if (auto *decl = silType.getStructOrBoundGenericStruct()) {
+      if (decl->isResilient(tec.getContext()->getParentModule(),
+                            tec.getResilienceExpansion())) {
+        visitor(AccessPath::PathNode(node), silType);
+        continue;
+      }
       unsigned index = 0;
       for (auto *field : decl->getStoredProperties()) {
         auto *fieldNode = node->getChild(index);
