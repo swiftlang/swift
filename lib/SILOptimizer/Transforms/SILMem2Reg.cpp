@@ -651,7 +651,7 @@ StoreInst *StackAllocationPromoter::promoteAllocationInBlock(
                "store [assign] to the stack location should have been "
                "transformed to a store [init]");
         LLVM_DEBUG(llvm::dbgs()
-                   << "*** Removing redundant store: " << lastStoreInst->value);
+                   << "*** Removing redundant store: " << *lastStoreInst->value);
         ++NumInstRemoved;
         prepareForDeletion(lastStoreInst->value, instructionsToDelete);
       }
@@ -746,7 +746,7 @@ StoreInst *StackAllocationPromoter::promoteAllocationInBlock(
            "store [assign] to the stack location should have been "
            "transformed to a store [init]");
     LLVM_DEBUG(llvm::dbgs() << "*** Finished promotion. Last store: "
-                            << lastStoreInst->value);
+                            << *lastStoreInst->value);
     return lastStoreInst->value;
   }
 
@@ -887,11 +887,11 @@ void StackAllocationPromoter::fixPhiPredBlock(BlockSetVector &phiBlocks,
                                               SILBasicBlock *destBlock,
                                               SILBasicBlock *predBlock) {
   TermInst *ti = predBlock->getTerminator();
-  LLVM_DEBUG(llvm::dbgs() << "*** Fixing the terminator " << ti << ".\n");
+  LLVM_DEBUG(llvm::dbgs() << "*** Fixing the terminator " << *ti << ".\n");
 
   LiveValues def = getEffectiveLiveOutValues(phiBlocks, predBlock);
 
-  LLVM_DEBUG(llvm::dbgs() << "*** Found the definition: " << *def.copy);
+  LLVM_DEBUG(llvm::dbgs() << "*** Found the definition: " << def.replacement(asi));
 
   llvm::SmallVector<SILValue> vals;
   vals.push_back(def.stored);
@@ -1748,9 +1748,8 @@ bool MemoryToRegisters::promoteSingleAllocation(AllocStackInst *alloc) {
 
   // Remove write-only AllocStacks.
   if (isWriteOnlyAllocation(alloc) && !shouldAddLexicalLifetime(alloc)) {
-    deleter.forceDeleteWithUsers(alloc);
-
     LLVM_DEBUG(llvm::dbgs() << "*** Deleting store-only AllocStack: "<< *alloc);
+    deleter.forceDeleteWithUsers(alloc);
     return true;
   }
 
