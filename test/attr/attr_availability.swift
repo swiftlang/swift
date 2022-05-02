@@ -628,6 +628,15 @@ class DeprecatedInitBase {
   }
 
   init(testSuper: Int) {}
+
+  @available(*, deprecated, renamed: "init(new:)")
+  @available(*, deprecated, renamed: "init(new:)")
+  init(multipleEqualAvailabilityAttributes: Int) {}
+
+  @available(*, deprecated, renamed: "init(old:)")
+  @available(*, deprecated, renamed: "init(testSuper:)")
+  @available(*, deprecated, renamed: "init(new:)")
+  init(multipleUnequalAvailabilityAttributes: Int) {}
 }
 
 class DeprecatedInitSub1: DeprecatedInitBase {
@@ -640,7 +649,27 @@ class DeprecatedInitSub1: DeprecatedInitBase {
 
 class DeprecatedInitSub2: DeprecatedInitBase { }
 
-_ = DeprecatedInitSub2(old: 0) // expected-warning {{'init(old:)' is deprecated}}
+_ = DeprecatedInitBase(old: 0) // expected-warning {{'init(old:)' is deprecated: replaced by 'init(new:)'}} expected-note {{use 'init(new:)' instead}} {{24-27=new}}
+_ = DeprecatedInitBase.init(old: 0) // expected-warning {{'init(old:)' is deprecated: replaced by 'init(new:)'}} expected-note {{use 'init(new:)' instead}} {{29-32=new}}
+let _: DeprecatedInitBase = .init(old: 0) // expected-warning {{'init(old:)' is deprecated: replaced by 'init(new:)'}} expected-note {{use 'init(new:)' instead}} {{35-38=new}}
+_ = DeprecatedInitSub2(old: 0) // expected-warning {{'init(old:)' is deprecated: replaced by 'init(new:)'}} expected-note {{use 'init(new:)' instead}} {{24-27=new}}
+_ = DeprecatedInitSub2.init(old: 0) // expected-warning {{'init(old:)' is deprecated: replaced by 'init(new:)'}} expected-note {{use 'init(new:)' instead}} {{29-32=new}}
+let _: DeprecatedInitSub2 = .init(old: 0) // expected-warning {{'init(old:)' is deprecated: replaced by 'init(new:)'}} expected-note {{use 'init(new:)' instead}} {{35-38=new}}
+
+_ = DeprecatedInitBase(multipleEqualAvailabilityAttributes: 0) // expected-warning {{'init(multipleEqualAvailabilityAttributes:)' is deprecated: replaced by 'init(new:)'}} expected-note {{use 'init(new:)' instead}} {{24-59=new}}
+_ = DeprecatedInitBase.init(multipleEqualAvailabilityAttributes: 0) // expected-warning {{'init(multipleEqualAvailabilityAttributes:)' is deprecated: replaced by 'init(new:)'}} expected-note {{use 'init(new:)' instead}} {{29-64=new}}
+let _: DeprecatedInitBase = .init(multipleEqualAvailabilityAttributes: 0) // expected-warning {{'init(multipleEqualAvailabilityAttributes:)' is deprecated: replaced by 'init(new:)'}} expected-note {{use 'init(new:)' instead}} {{35-70=new}}
+_ = DeprecatedInitSub2(multipleEqualAvailabilityAttributes: 0) // expected-warning {{'init(multipleEqualAvailabilityAttributes:)' is deprecated: replaced by 'init(new:)'}} expected-note {{use 'init(new:)' instead}} {{24-59=new}}
+_ = DeprecatedInitSub2.init(multipleEqualAvailabilityAttributes: 0) // expected-warning {{'init(multipleEqualAvailabilityAttributes:)' is deprecated: replaced by 'init(new:)'}} expected-note {{use 'init(new:)' instead}} {{29-64=new}}
+let _: DeprecatedInitSub2 = .init(multipleEqualAvailabilityAttributes: 0) // expected-warning {{'init(multipleEqualAvailabilityAttributes:)' is deprecated: replaced by 'init(new:)'}} expected-note {{use 'init(new:)' instead}} {{35-70=new}}
+
+_ = DeprecatedInitBase(multipleUnequalAvailabilityAttributes: 0) // expected-warning {{'init(multipleUnequalAvailabilityAttributes:)' is deprecated: replaced by 'init(new:)'}} expected-note {{use 'init(new:)' instead}} {{24-61=new}}
+_ = DeprecatedInitBase.init(multipleUnequalAvailabilityAttributes: 0) // expected-warning {{'init(multipleUnequalAvailabilityAttributes:)' is deprecated: replaced by 'init(new:)'}} expected-note {{use 'init(new:)' instead}} {{29-66=new}}
+let _: DeprecatedInitBase = .init(multipleUnequalAvailabilityAttributes: 0) // expected-warning {{'init(multipleUnequalAvailabilityAttributes:)' is deprecated: replaced by 'init(new:)'}} expected-note {{use 'init(new:)' instead}} {{35-72=new}}
+_ = DeprecatedInitSub2(multipleUnequalAvailabilityAttributes: 0) // expected-warning {{'init(multipleUnequalAvailabilityAttributes:)' is deprecated}} expected-note {{use 'init(new:)' instead}} {{24-61=new}}
+_ = DeprecatedInitSub2.init(multipleUnequalAvailabilityAttributes: 0) // expected-warning {{'init(multipleUnequalAvailabilityAttributes:)' is deprecated}} expected-note {{use 'init(new:)' instead}} {{29-66=new}}
+let _: DeprecatedInitSub2 = .init(multipleUnequalAvailabilityAttributes: 0) // expected-warning {{'init(multipleUnequalAvailabilityAttributes:)' is deprecated}} expected-note {{use 'init(new:)' instead}} {{35-72=new}}
+
 
 class Base {
   @available(*, unavailable)

@@ -14,14 +14,14 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Availability.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/Types.h"
-#include "swift/AST/Availability.h"
 #include "swift/AST/PlatformKind.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeWalker.h"
+#include "swift/AST/Types.h"
 #include <map>
 
 using namespace swift;
@@ -96,10 +96,12 @@ static void mergeWithInferredAvailability(const AvailableAttr *Attr,
 
 /// Create an implicit availability attribute for the given platform
 /// and with the inferred availability.
-static AvailableAttr *
-createAvailableAttr(PlatformKind Platform,
-                       const InferredAvailability &Inferred,
-                       ASTContext &Context) {
+static AvailableAttr *createAvailableAttr(PlatformKind Platform,
+                                          const InferredAvailability &Inferred,
+                                          StringRef Message, 
+                                          StringRef Rename,
+                                          ValueDecl *RenameDecl,
+                                          ASTContext &Context) {
 
   llvm::VersionTuple Introduced =
       Inferred.Introduced.value_or(llvm::VersionTuple());
@@ -108,20 +110,26 @@ createAvailableAttr(PlatformKind Platform,
   llvm::VersionTuple Obsoleted =
       Inferred.Obsoleted.value_or(llvm::VersionTuple());
 
-  return new (Context) AvailableAttr(
-      SourceLoc(), SourceRange(), Platform,
-      /*Message=*/StringRef(),
-      /*Rename=*/StringRef(), /*RenameDecl=*/nullptr,
-        Introduced, /*IntroducedRange=*/SourceRange(),
-        Deprecated, /*DeprecatedRange=*/SourceRange(),
-        Obsoleted, /*ObsoletedRange=*/SourceRange(),
-      Inferred.PlatformAgnostic, /*Implicit=*/true,
-      Inferred.IsSPI);
+  return new (Context)
+      AvailableAttr(SourceLoc(), SourceRange(), Platform,
+                    Message, Rename, RenameDecl,
+                    Introduced, /*IntroducedRange=*/SourceRange(),
+                    Deprecated, /*DeprecatedRange=*/SourceRange(),
+                    Obsoleted, /*ObsoletedRange=*/SourceRange(),
+                    Inferred.PlatformAgnostic, /*Implicit=*/true,
+                    Inferred.IsSPI);
 }
 
 void AvailabilityInference::applyInferredAvailableAttrs(
     Decl *ToDecl, ArrayRef<const Decl *> InferredFromDecls,
     ASTContext &Context) {
+
+  // Let the new AvailabilityAttr inherit the message and rename.
+  // The first encountered message / rename will win; this matches the 
+  // behaviour of diagnostics for 'non-inherited' AvailabilityAttrs.
+  StringRef Message;
+  StringRef Rename;
+  ValueDecl *RenameDecl = nullptr;
 
   // Iterate over the declarations and infer required availability on
   // a per-platform basis.
@@ -133,6 +141,14 @@ void AvailabilityInference::applyInferredAvailableAttrs(
         continue;
 
       mergeWithInferredAvailability(AvAttr, Inferred[AvAttr->Platform]);
+
+      if (Message.empty() && !AvAttr->Message.empty())
+        Message = AvAttr->Message;
+
+      if (Rename.empty() && !AvAttr->Rename.empty()) {
+        Rename = AvAttr->Rename;
+        RenameDecl = AvAttr->RenameDecl;
+      }
     }
   }
 
@@ -140,7 +156,9 @@ void AvailabilityInference::applyInferredAvailableAttrs(
   // to ToDecl.
   DeclAttributes &Attrs = ToDecl->getAttrs();
   for (auto &Pair : Inferred) {
-    auto *Attr = createAvailableAttr(Pair.first, Pair.second, Context);
+    auto *Attr = createAvailableAttr(Pair.first, Pair.second, Message,
+                                     Rename, RenameDecl, Context);
+
     Attrs.add(Attr);
   }
 }
