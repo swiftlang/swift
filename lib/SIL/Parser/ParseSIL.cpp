@@ -2772,8 +2772,19 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   switch (Opcode) {
   case SILInstructionKind::AllocBoxInst: {
     bool hasDynamicLifetime = false;
-    if (parseSILOptional(hasDynamicLifetime, *this, "dynamic_lifetime"))
-      return true;
+    bool hasReflection = false;
+    StringRef attrName;
+    SourceLoc attrLoc;
+    while (parseSILOptional(attrName, attrLoc, *this)) {
+      if (attrName.equals("dynamic_lifetime")) {
+        hasDynamicLifetime = true;
+      } else if (attrName.equals("reflection")) {
+        hasReflection = true;
+      } else {
+        P.diagnose(attrLoc, diag::sil_invalid_attribute_for_expected, attrName,
+                   "dynamic_lifetime or reflection");
+      }
+    }
 
     SILType Ty;
     if (parseSILType(Ty))

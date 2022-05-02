@@ -5105,7 +5105,9 @@ case TypeKind::Id:
       return *this;
     boxTy = SILBoxType::get(Ptr->getASTContext(),
                             SILLayout::get(Ptr->getASTContext(),
-                                           l->getGenericSignature(), newFields),
+                                           l->getGenericSignature(),
+                                           newFields,
+                                           l->capturesGenericEnvironment()),
                             boxTy->getSubstitutions());
     return boxTy;
   }
