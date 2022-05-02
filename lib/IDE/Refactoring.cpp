@@ -440,11 +440,6 @@ public:
         HandleLabels = Resolved.LabelType != LabelRangeType::None;
         break;
       }
-    } else if (Resolved.LabelType != LabelRangeType::None &&
-               !Config.IsNonProtocolType &&
-               // FIXME: Workaround for enum case labels until we support them
-               Config.Usage != NameUsage::Definition) {
-      return RegionType::Mismatch;
     }
 
     if (HandleLabels) {
