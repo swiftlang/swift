@@ -93,7 +93,7 @@ def main():
         print('Test case "%s" of %s FAILed' % (test_case, test_file),
               file=sys.stderr)
         print('Parsing the swift file failed:\n', file=sys.stderr)
-        print(e.output, file=sys.stderr)
+        print(e.output.decode('UTF-8'), file=sys.stderr)
         sys.exit(1)
 
     # Check if the two syntax trees are the same
