@@ -1116,17 +1116,39 @@ bool isConditionOfStmt(ConstraintLocatorBuilder locator) {
 
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifySyntacticElementConstraint(
-    ASTNode element, ContextualTypeInfo context, bool isDiscarded,
+    ASTNode element, ContextualTypeInfo contextInfo, bool isDiscarded,
     TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
-  auto *closure = castToExpr<ClosureExpr>(locator.getAnchor());
 
-  SyntacticElementConstraintGenerator generator(
-      *this, closure, getClosureType(closure)->getResult(),
-      getConstraintLocator(locator));
+  DeclContext *context;
+  Type resultType;
+
+  auto anchor = locator.getAnchor();
+
+  if (auto *closure = getAsExpr<ClosureExpr>(anchor)) {
+    context = closure;
+    resultType = getClosureType(closure)->getResult();
+  } else if (auto *fn = getAsDecl<AbstractFunctionDecl>(anchor)) {
+    context = fn;
+    resultType = AnyFunctionRef(fn).getBodyResultType();
+  } else {
+    return SolutionKind::Error;
+  }
+
+  AnyFunctionRef fn = AnyFunctionRef::fromFunctionDeclContext(context);
+
+  // If this element belongs to a result builder, let's use its result type.
+  {
+    auto transform = resultBuilderTransformed.find(fn);
+    if (transform != resultBuilderTransformed.end())
+      resultType = transform->second.bodyResultType;
+  }
+
+  SyntacticElementConstraintGenerator generator(*this, fn, resultType,
+                                                getConstraintLocator(locator));
 
   if (auto *expr = element.dyn_cast<Expr *>()) {
-    SolutionApplicationTarget target(expr, closure, context.purpose,
-                                     context.getType(), isDiscarded);
+    SolutionApplicationTarget target(expr, context, contextInfo.purpose,
+                                     contextInfo.getType(), isDiscarded);
 
     if (generateConstraints(target, FreeTypeVariableBinding::Disallow))
       return SolutionKind::Error;
@@ -1136,12 +1158,12 @@ ConstraintSystem::simplifySyntacticElementConstraint(
   } else if (auto *stmt = element.dyn_cast<Stmt *>()) {
     generator.visit(stmt);
   } else if (auto *cond = element.dyn_cast<StmtConditionElement *>()) {
-    if (generateConstraints({*cond}, closure))
+    if (generateConstraints({*cond}, context))
       return SolutionKind::Error;
   } else if (auto *pattern = element.dyn_cast<Pattern *>()) {
-    generator.visitPattern(pattern, context);
+    generator.visitPattern(pattern, contextInfo);
   } else if (auto *caseItem = element.dyn_cast<CaseLabelItem *>()) {
-    generator.visitCaseItem(caseItem, context);
+    generator.visitCaseItem(caseItem, contextInfo);
   } else {
     generator.visit(element.get<Decl *>());
   }
