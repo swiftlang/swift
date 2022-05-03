@@ -598,8 +598,9 @@ public:
     return ManagedValue::forUnmanaged(block);
   }
 
-  void deferExecutorBreadcrumb(ExecutorBreadcrumb &&breadcrumb) override {
-    this->breadcrumb = breadcrumb;
+  void deferExecutorBreadcrumb(ExecutorBreadcrumb &&crumb) override {
+    assert(!breadcrumb.needsEmit() && "overwriting an existing breadcrumb?");
+    breadcrumb = std::move(crumb);
   }
 
   RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
