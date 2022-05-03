@@ -329,3 +329,22 @@ func test_unknown_refs_in_tilde_operator() {
     }
   }
 }
+
+// Type finder should not walk into inner closures, otherwise
+// it would be able to find `return 42` and bring result type
+// into scope while solving for pattern binding `x`.
+func test_type_finder_doesnt_walk_into_inner_closures() {
+  func test<T>(fn: () -> T) -> T { fn() }
+
+  _ = test { // Ok
+    let x = test {
+      42
+    }
+
+    let _ = test {
+      test { "" }
+    }
+
+    return x
+  }
+}
