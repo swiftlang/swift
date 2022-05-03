@@ -49,6 +49,10 @@ public:
       : CS(cs), Parent(parent), ReferencedVars(referencedVars) {}
 
   std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+    // Don't walk into into inner closures.
+    if (isa<ClosureExpr>(expr))
+      return {false, expr};
+
     if (auto *DRE = dyn_cast<DeclRefExpr>(expr)) {
       auto *decl = DRE->getDecl();
 
