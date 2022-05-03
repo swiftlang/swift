@@ -204,10 +204,38 @@ const USRBasedType *USRBasedType::fromType(Type Ty, USRBasedTypeArena &Arena) {
           Conformance->getProtocol()->getDeclaredInterfaceType(), Arena));
     }
   }
-  Type Superclass = Ty->getSuperclass();
+
+  // You would think that superclass + conformances form a DAG. You are wrong!
+  // We can achieve a circular supertype hierarcy with
+  //
+  // protocol Proto : Class {}
+  // class Class : Proto {}
+  //
+  // USRBasedType is not set up for this. Serialization of code completion
+  // results from global modules can't handle cycles in the supertype hierarchy
+  // because it writes the DAG leaf to root(s) and needs to know the type
+  // offsets. To get consistent results independent of where we start
+  // constructing USRBasedTypes, ignore superclasses of protocols. If we kept
+  // track of already visited types, we would get different results depending on
+  // whether we start constructing the USRBasedType hierarchy from Proto or
+  // Class.
+  // Ignoring superclasses of protocols is safe to do because USRBasedType is an
+  // under-approximation anyway.
+
+  /// If `Ty` is a class type and has a superclass, return that. In all other
+  /// cases, return null.
+  auto getSuperclass = [](Type Ty) -> Type {
+    if (isa_and_nonnull<ClassDecl>(Ty->getAnyNominal())) {
+      return Ty->getSuperclass();
+    } else {
+      return Type();
+    }
+  };
+
+  Type Superclass = getSuperclass(Ty);
   while (Superclass) {
     Supertypes.push_back(USRBasedType::fromType(Superclass, Arena));
-    Superclass = Superclass->getSuperclass();
+    Superclass = getSuperclass(Superclass);
   }
 
   assert(llvm::all_of(Supertypes, [&USR](const USRBasedType *Ty) {
