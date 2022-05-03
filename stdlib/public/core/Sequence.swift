@@ -174,7 +174,7 @@
 ///     // Prints "3..."
 ///     // Prints "2..."
 ///     // Prints "1..."
-public protocol IteratorProtocol {
+public protocol IteratorProtocol<Element> {
   /// The type of element traversed by the iterator.
   associatedtype Element
 
