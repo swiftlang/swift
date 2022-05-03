@@ -647,6 +647,10 @@ T *getAsPattern(ASTNode node) {
   return nullptr;
 }
 
+template <typename T = Stmt> T *castToStmt(ASTNode node) {
+  return cast<T>(node.get<Stmt *>());
+}
+
 SourceLoc getLoc(ASTNode node);
 SourceRange getSourceRange(ASTNode node);
 
@@ -5656,14 +5660,14 @@ public:
   ///
   ///
   /// \param solution The solution to apply.
-  /// \param closure The closure to which the solution is being applied.
+  /// \param fn The function or closure to which the solution is being applied.
   /// \param currentDC The declaration context in which transformations
   /// will be applied.
   /// \param rewriteTarget Function that performs a rewrite of any
   /// solution application target within the context.
   ///
   /// \returns true if solution cannot be applied.
-  bool applySolutionToBody(Solution &solution, ClosureExpr *closure,
+  bool applySolutionToBody(Solution &solution, AnyFunctionRef fn,
                            DeclContext *&currentDC,
                            std::function<Optional<SolutionApplicationTarget>(
                                SolutionApplicationTarget)>
