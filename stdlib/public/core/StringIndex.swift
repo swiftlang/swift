@@ -565,6 +565,7 @@ extension String.Index: CustomDebugStringConvertible {
   }
 }
 
+#if SWIFT_ENABLE_REFLECTION
 @available(SwiftStdlib 5.7, *)
 extension String.Index: CustomReflectable {
   @available(SwiftStdlib 5.7, *)
@@ -572,7 +573,7 @@ extension String.Index: CustomReflectable {
   public var customMirror: Mirror {
     var children: [(label: String?, value: Any)] = []
     children.reserveCapacity(5)
-    children.append(("_encodedOffset", _encodedOffset))
+    children.append(("_offset", _encodedOffset))
     children.append(("_encoding", _encodingDescription))
     if transcodedOffset > 0 {
       children.append(("_transcodedOffset", transcodedOffset))
@@ -583,8 +584,9 @@ extension String.Index: CustomReflectable {
       children.append(("_aligned", "scalar"))
     }
     if let stride = characterStride {
-      children.append(("_characterStride", stride))
+      children.append(("_stride", stride))
     }
     return Mirror(self, children: children, displayStyle: .struct)
   }
 }
+#endif
