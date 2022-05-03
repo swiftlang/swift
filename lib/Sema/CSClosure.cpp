@@ -1750,25 +1750,40 @@ SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
 }
 
 bool ConstraintSystem::applySolutionToBody(Solution &solution,
-                                           ClosureExpr *closure,
+                                           AnyFunctionRef fn,
                                            DeclContext *&currentDC,
                                            RewriteTargetFn rewriteTarget) {
-  auto &cs = solution.getConstraintSystem();
   // Enter the context of the function before performing any additional
   // transformations.
-  llvm::SaveAndRestore<DeclContext *> savedDC(currentDC, closure);
+  llvm::SaveAndRestore<DeclContext *> savedDC(currentDC, fn.getAsDeclContext());
 
-  auto closureType = cs.getType(closure)->castTo<FunctionType>();
-  SyntacticElementSolutionApplication application(
-      solution, closure, closureType->getResult(), rewriteTarget);
+  Type resultTy;
+
+  if (auto transform = solution.getAppliedBuilderTransform(fn)) {
+    resultTy = solution.simplifyType(transform->bodyResultType);
+  } else if (auto *closure =
+                 getAsExpr<ClosureExpr>(fn.getAbstractClosureExpr())) {
+    resultTy =
+        solution.getResolvedType(closure)->castTo<FunctionType>()->getResult();
+  } else {
+    resultTy = fn.getBodyResultType();
+  }
+
+  SyntacticElementSolutionApplication application(solution, fn, resultTy,
+                                                  rewriteTarget);
+
   auto body = application.apply();
 
   if (!body || application.hadError)
     return true;
 
-  closure->setBody(cast<BraceStmt>(body.get<Stmt *>()),
-                   closure->hasSingleExpressionBody());
-  closure->setBodyState(ClosureExpr::BodyState::TypeCheckedWithSignature);
+  fn.setTypecheckedBody(castToStmt<BraceStmt>(body),
+                        fn.hasSingleExpressionBody());
+
+  if (auto *closure = getAsExpr<ClosureExpr>(fn.getAbstractClosureExpr())) {
+    closure->setBodyState(ClosureExpr::BodyState::TypeCheckedWithSignature);
+  }
+
   return false;
 }
 
