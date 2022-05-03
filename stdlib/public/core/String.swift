@@ -945,6 +945,24 @@ extension _StringGutsSlice {
     return true
   }
 
+  internal var _isNFCQC: Bool {
+    var isNFCQC = true
+    var prevCCC: UInt8 = 0
+
+    if _guts.isFastUTF8 {
+      _fastNFCCheck(&isNFCQC, &prevCCC)
+    } else {
+      for scalar in String(_guts).unicodeScalars {
+        if !_isScalarNFCQC(scalar, &prevCCC) {
+          isNFCQC = false
+          break
+        }
+      }
+    }
+
+    return isNFCQC
+  }
+
   internal func _withNFCCodeUnits(_ f: (UInt8) throws -> Void) rethrows {
     // Fast path: If we're already NFC (or ASCII), then we don't need to do
     // anything at all.
@@ -953,15 +971,10 @@ extension _StringGutsSlice {
       return
     }
 
-    var isNFCQC = true
-    var prevCCC: UInt8 = 0
-
     if _guts.isFastUTF8 {
-      _fastNFCCheck(&isNFCQC, &prevCCC)
-
       // Because we have access to the fastUTF8, we can go through that instead
       // of accessing the UTF8 view on String.
-      if isNFCQC {
+      if _isNFCQC {
         try _guts.withFastUTF8 {
           for byte in $0 {
             try f(byte)
@@ -971,14 +984,7 @@ extension _StringGutsSlice {
         return
       }
     } else {
-      for scalar in String(_guts).unicodeScalars {
-        if !_isScalarNFCQC(scalar, &prevCCC) {
-          isNFCQC = false
-          break
-        }
-      }
-
-      if isNFCQC {
+      if _isNFCQC {
         for byte in String(_guts).utf8 {
           try f(byte)
         }
