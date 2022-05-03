@@ -286,7 +286,7 @@ endif()
 list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-enable-experimental-concise-pound-file")
 
 # FIXME: Hello, we don't already have this??
-list(APPEND swift_stdlib_compile_flags "-enable-parameterized-existential-types")
+list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-enable-parameterized-existential-types")
 
 if(SWIFT_CHECK_ESSENTIAL_STDLIB)
   add_swift_target_library(swift_stdlib_essential ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE
