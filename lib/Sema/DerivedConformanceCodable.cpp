@@ -73,7 +73,7 @@ static Identifier getVarNameForCoding(VarDecl *var,
 
 /// Compute the Identifier for the CodingKey of an enum case
 static Identifier caseCodingKeysIdentifier(const ASTContext &C,
-                                         EnumElementDecl *elt) {
+                                           EnumElementDecl *elt) {
   llvm::SmallString<16> scratch;
   camel_case::appendSentenceCase(scratch, elt->getBaseIdentifier().str());
   scratch += C.Id_CodingKeys.str();
@@ -306,9 +306,9 @@ static EnumDecl *validateCodingKeysType(const DerivedConformance &derived,
 /// \param varDecls The \c var decls to validate against.
 /// \param codingKeysTypeDecl The \c CodingKeys enum decl to validate.
 static bool validateCodingKeysEnum(const DerivedConformance &derived,
-                               llvm::SmallMapVector<Identifier, VarDecl *, 8> varDecls,
-                               TypeDecl *codingKeysTypeDecl,
-                               DelayedNotes &delayedNotes) {
+                                   llvm::SmallMapVector<Identifier, VarDecl *, 8> varDecls,
+                                   TypeDecl *codingKeysTypeDecl,
+                                   DelayedNotes &delayedNotes) {
   auto *codingKeysDecl = validateCodingKeysType(
       derived, codingKeysTypeDecl, delayedNotes);
   if (!codingKeysDecl)
@@ -942,7 +942,7 @@ createEnumSwitch(ASTContext &C, DeclContext *DC, Expr *expr, EnumDecl *enumDecl,
 
     if (createSubpattern) {
       subpattern = DerivedConformance::enumElementPayloadSubpattern(
-          elt, 'a', DC, payloadVars, /* useLabels */ true);
+          elt, '_', DC, payloadVars, /* useLabels */ true);
 
       auto hasBoundDecls = !payloadVars.empty();
       if (hasBoundDecls) {
@@ -1979,9 +1979,9 @@ static bool canSynthesize(DerivedConformance &derived, ValueDecl *requirement,
       if (!caseNames.insert(elementDecl->getBaseIdentifier())) {
         delayedNotes.push_back([=] {
           elementDecl->diagnose(diag::codable_enum_duplicate_case_name_here,
-                               derived.getProtocolType(),
-                               derived.Nominal->getDeclaredType(),
-                               elementDecl->getBaseIdentifier());
+                                derived.getProtocolType(),
+                                derived.Nominal->getDeclaredType(),
+                                elementDecl->getBaseIdentifier());
         });
         allValid = false;
         duplicate = true;
@@ -1989,40 +1989,31 @@ static bool canSynthesize(DerivedConformance &derived, ValueDecl *requirement,
 
       if (elementDecl->hasAssociatedValues()) {
         llvm::SmallMapVector<Identifier, ParamDecl *, 4> params;
-        llvm::SmallMapVector<Identifier, ParamDecl *, 4> params2;
         for (auto entry : llvm::enumerate(*elementDecl->getParameterList())) {
           auto *paramDecl = entry.value();
           Identifier paramIdentifier = getVarNameForCoding(paramDecl);
-          Identifier paramIdentifier2 = getVarNameForCoding(paramDecl);
           bool generatedName = false;
           if (paramIdentifier.empty()) {
             paramIdentifier = derived.Context.getIdentifier("_" + std::to_string(entry.index()));
-            paramIdentifier2 = derived.Context.getIdentifier("a" + std::to_string(entry.index()));
             generatedName = true;
           }
           auto inserted = params.insert(std::make_pair(paramIdentifier, paramDecl));
-          auto inserted2 = params2.insert(std::make_pair(paramIdentifier2, paramDecl));
-          if (!inserted.second || !inserted2.second) {
+          if (!inserted.second) {
             // duplicate identifier found
             auto userDefinedParam = paramDecl;
             if (generatedName) {
               // at most we have one user defined and one generated identifier
               // with this name, so if this is the generated, the other one
               // must be the user defined
-              if (!inserted.second) {
-                userDefinedParam = inserted.first->second;
-              } else /* (!inserted2.second) */ {
-                userDefinedParam = inserted2.first->second;
-                paramIdentifier = paramIdentifier2;
-              }
+              userDefinedParam = inserted.first->second;
             }
 
             delayedNotes.push_back([=] {
               userDefinedParam->diagnose(diag::codable_enum_duplicate_parameter_name_here,
-                                    derived.getProtocolType(),
-                                    derived.Nominal->getDeclaredType(),
-                                    paramIdentifier,
-                                    elementDecl->getBaseIdentifier());
+                                         derived.getProtocolType(),
+                                         derived.Nominal->getDeclaredType(),
+                                         paramIdentifier,
+                                         elementDecl->getBaseIdentifier());
             });
             allValid = false;
           }

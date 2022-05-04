@@ -12,27 +12,15 @@ enum Foo: Codable {
 
 // Original set of crashers detected from PR-39825:
 
-// expected-error @+2 {{type 'Foo2' does not conform to protocol 'Decodable'}}
-// expected-error @+1 {{type 'Foo2' does not conform to protocol 'Encodable'}}
 enum Foo2: Codable {
-  // expected-note @+2 {{cannot automatically synthesize 'Decodable' for 'Foo2' because user defined parameter name 'a0' in 'foo' conflicts with automatically generated parameter name}}
-  // expected-note @+1 {{cannot automatically synthesize 'Encodable' for 'Foo2' because user defined parameter name 'a0' in 'foo' conflicts with automatically generated parameter name}}
   case foo(Int, a0: String)
 }
 
-// expected-error @+2 {{type 'Foo3' does not conform to protocol 'Decodable'}}
-// expected-error @+1 {{type 'Foo3' does not conform to protocol 'Encodable'}}
 enum Foo3: Codable {
-  // expected-note @+2 {{cannot automatically synthesize 'Decodable' for 'Foo3' because user defined parameter name 'a2' in 'foo' conflicts with automatically generated parameter name}}
-  // expected-note @+1 {{cannot automatically synthesize 'Encodable' for 'Foo3' because user defined parameter name 'a2' in 'foo' conflicts with automatically generated parameter name}}
   case foo(Int, String, String, a2: String)
 }
 
-// expected-error @+2 {{type 'Foo4' does not conform to protocol 'Decodable'}}
-// expected-error @+1 {{type 'Foo4' does not conform to protocol 'Encodable'}}
 enum Foo4: Codable {
-  // expected-note @+2 {{cannot automatically synthesize 'Decodable' for 'Foo4' because user defined parameter name 'a2' in 'foo' conflicts with automatically generated parameter name}}
-  // expected-note @+1 {{cannot automatically synthesize 'Encodable' for 'Foo4' because user defined parameter name 'a2' in 'foo' conflicts with automatically generated parameter name}}
   case foo(String, String, String, a2: String)
 }
 
@@ -64,11 +52,7 @@ enum Foo10: Codable {
   case foo(Int, _a0: String)
 }
 
-// expected-error @+2 {{type 'Foo11' does not conform to protocol 'Decodable'}}
-// expected-error @+1 {{type 'Foo11' does not conform to protocol 'Encodable'}}
 enum Foo11: Codable {
-  // expected-note @+2 {{cannot automatically synthesize 'Decodable' for 'Foo11' because user defined parameter name 'a1' in 'foo' conflicts with automatically generated parameter name}}
-  // expected-note @+1 {{cannot automatically synthesize 'Encodable' for 'Foo11' because user defined parameter name 'a1' in 'foo' conflicts with automatically generated parameter name}}
   case foo(a1: Int, String)
 }
 

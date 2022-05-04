@@ -41,11 +41,11 @@ enum Payload: Codable {
     var container = encoder.container(keyedBy: Payload.CodingKeys.self)
 
     switch self {
-    case .plain(let a0):
+    case .plain(let _0):
 
       var nestedContainer = container.nestedContainer(keyedBy: Payload.PlainCodingKeys.self, forKey: Payload.CodingKeys.plain)
 
-      try nestedContainer.encode(a0, forKey: Payload.PlainCodingKeys._0)
+      try nestedContainer.encode(_0, forKey: Payload.PlainCodingKeys._0)
       case .pair(let key, let value):
 
       var nestedContainer = container.nestedContainer(keyedBy: Payload.PairCodingKeys.self, forKey: Payload.CodingKeys.pair)
