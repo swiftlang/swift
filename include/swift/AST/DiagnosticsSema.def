@@ -5589,6 +5589,11 @@ ERROR(availability_concurrency_only_version_newer, none,
       "concurrency is only available in %0 %1 or newer",
       (StringRef, llvm::VersionTuple))
 
+ERROR(availability_parameterized_protocol_only_version_newer, none,
+      "runtime support for parameterized protocol types is only available in "
+      "%0 %1 or newer",
+      (StringRef, llvm::VersionTuple))
+
 NOTE(availability_guard_with_version_check, none,
      "add 'if #available' version check", ())
 
