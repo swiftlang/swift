@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-availability-checking -emit-ir -enable-parameterized-existential-types %s
+// RUN: not %target-swift-frontend -disable-availability-checking -emit-ir -enable-parameterized-existential-types %s
 
 protocol P<X, Y> {
   associatedtype X : P
