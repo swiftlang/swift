@@ -16,8 +16,8 @@ import StdlibUnittest
 var testSuite = TestSuite("ObjectiveCClosureEscape")
 
 
-public func couldActuallyEscape(_ closure: @escaping () -> (), _ villian: DangerousEscaper) {
-  villian.mightBeNaughty(closure)
+public func couldActuallyEscape(_ closure: @escaping () -> (), _ villain: DangerousEscaper) {
+  villain.mightBeNaughty(closure)
 }
 
 class Harmless : DangerousEscaper {
