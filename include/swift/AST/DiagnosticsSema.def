@@ -5049,6 +5049,9 @@ ERROR(unable_to_parse_c_function_type,none,
 ERROR(unsupported_opaque_type,none,
       "'some' types are only permitted in properties, subscripts, and functions", ())
 
+ERROR(unsupported_opaque_type_in_existential,none,
+      "'some' types cannot be used in constraints on existential types", ())
+
 ERROR(opaque_type_unsupported_pattern,none,
       "'some' type can only be declared on a single property declaration", ())
 

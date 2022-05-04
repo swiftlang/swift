@@ -61,6 +61,12 @@ enum class TypeResolutionFlags : uint16_t {
 
   /// Make internal @usableFromInline and @inlinable decls visible.
   AllowUsableFromInline = 1 << 8,
+
+  /// Forbid \c some types from resolving as opaque types.
+  ///
+  /// Needed to enforce that \c any P<some Q> does not resolve to a
+  /// parameterized existential with an opaque type constraint.
+  DisallowOpaqueTypes = 1 << 9,
 };
 
 /// Type resolution contexts that require special handling.
