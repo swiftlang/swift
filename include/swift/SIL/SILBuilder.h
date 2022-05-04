@@ -420,14 +420,15 @@ public:
 
   AllocBoxInst *createAllocBox(SILLocation Loc, CanSILBoxType BoxType,
                                Optional<SILDebugVariable> Var = None,
-                               bool hasDynamicLifetime = false) {
+                               bool hasDynamicLifetime = false,
+                               bool reflection = false) {
     llvm::SmallString<4> Name;
     Loc.markAsPrologue();
     assert((!dyn_cast_or_null<VarDecl>(Loc.getAsASTNode<Decl>()) || Var) &&
            "location is a VarDecl, but SILDebugVariable is empty");
     return insert(AllocBoxInst::create(getSILDebugLocation(Loc), BoxType, *F,
                                        substituteAnonymousArgs(Name, Var, Loc),
-                                       hasDynamicLifetime));
+                                       hasDynamicLifetime, reflection));
   }
 
   AllocExistentialBoxInst *

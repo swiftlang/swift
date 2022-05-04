@@ -13,7 +13,7 @@ swift-inspect can be built using [swift-package-manager](https://github.com/appl
 In order to build on Windows, some additional parameters must be passed to the build tool to locate the necessary libraries.
 
 ~~~
-swift build -Xcc -I%DEVELOPER_DIR%\Toolchains\unknown-Asserts-development.xctoolchain\usr\include\swift\SwiftRemoteMirror -Xlinker %DEVELOPER_DIR%\Toolchains\unknown-Asserts-development.xctoolchain\usr\lib\swift\windows\x86_64\swiftRemoteMirror.lib
+swift build -Xcc -I%SDKROOT%\usr\include\swift\SwiftRemoteMirror -Xlinker %SDKROOT%\usr\lib\swift\windows\x86_64\swiftRemoteMirror.lib
 ~~~
 
 ### Using
