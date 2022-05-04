@@ -9029,11 +9029,9 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
 
     // If this is a placeholder variable, let's override its type with
     // inferred one.
-    if (auto *var = PB->getSingleVar()) {
-      if (var->getName().hasDollarPrefix() && patternType->hasPlaceholder()) {
-        patternType = solution.getResolvedType(var);
-        options |= TypeResolutionFlags::OverrideType;
-      }
+    if (isPlaceholderVar(PB)) {
+      patternType = solution.getResolvedType(PB->getSingleVar());
+      options |= TypeResolutionFlags::OverrideType;
     }
 
     if (auto coercedPattern = TypeChecker::coercePatternToType(

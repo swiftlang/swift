@@ -6399,6 +6399,13 @@ bool isOperatorDisjunction(Constraint *disjunction);
 /// or nested declarations).
 ASTNode findAsyncNode(ClosureExpr *closure);
 
+/// Check whether the given binding represents a placeholder variable that
+/// has to get its type inferred at a first use site.
+///
+/// \returns The currently assigned type if it's a placeholder,
+/// empty type otherwise.
+Type isPlaceholderVar(PatternBindingDecl *PB);
+
 } // end namespace constraints
 
 template<typename ...Args>
