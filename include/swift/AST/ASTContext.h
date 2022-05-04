@@ -868,6 +868,10 @@ public:
   /// swift_isUniquelyReferenced functions.
   AvailabilityContext getObjCIsUniquelyReferencedAvailability();
 
+  /// Get the runtime availability of metadata manipulation runtime functions
+  /// for extended existential types.
+  AvailabilityContext getParameterizedExistentialRuntimeAvailability();
+
   /// Get the runtime availability of features introduced in the Swift 5.2
   /// compiler for the target platform.
   AvailabilityContext getSwift52Availability();
