@@ -4,6 +4,8 @@
 // Make sure we do not emit availability errors or warnings when -disable-availability-checking is passed
 // RUN: not %target-swift-frontend -target %target-cpu-apple-macosx10.50 -typecheck -disable-objc-attr-requires-foundation-module -enable-parameterized-existential-types -disable-availability-checking %s 2>&1 | %FileCheck %s '--implicit-check-not=error:'
 
+// REQUIRES: OS=macosx
+
 func hedge() {
   struct Value {}
   
