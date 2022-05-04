@@ -62,3 +62,11 @@ func saturation(_ dry: any Sponge, _ wet: any Sponge<Int, Int>) {
   _ = wet as any Sponge<String, String> // expected-error {{'any Sponge<Int, Int>' is not convertible to 'any Sponge<String, String>'}}
   // expected-note@-1 {{did you mean to use 'as!' to force downcast?}}
 }
+
+protocol Pair<X, Y> where Self.X == Self.Y {
+  associatedtype X
+  associatedtype Y
+}
+
+func splay(_ x: some Pair<Int, String>) -> (Int, String) { fatalError() }
+// expected-error@-1 {{no type for 'some Pair<Int, String>.X' can satisfy both 'some Pair<Int, String>.X == String' and 'some Pair<Int, String>.X == Int'}}
