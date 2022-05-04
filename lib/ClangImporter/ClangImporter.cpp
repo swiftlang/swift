@@ -5661,10 +5661,20 @@ ClangImporter::getCXXFunctionTemplateSpecialization(SubstitutionMap subst,
 }
 
 bool ClangImporter::isCXXMethodMutating(const clang::CXXMethodDecl *method) {
-  return isa<clang::CXXConstructorDecl>(method) || !method->isConst() ||
-         (method->getParent()->hasMutableFields() &&
-          !isAnnotatedWith(method, "nonmutating")) ||
-         isAnnotatedWith(method, "mutating");
+  if (isa<clang::CXXConstructorDecl>(method) || !method->isConst())
+    return true;
+  if (isAnnotatedWith(method, "mutating"))
+    return true;
+  if (method->getParent()->hasMutableFields()) {
+    if (isAnnotatedWith(method, "nonmutating"))
+      return false;
+    // FIXME(rdar://91961524): figure out a way to handle mutable fields
+    // without breaking classes from the C++ standard library (e.g.
+    // `std::string` which has a mutable member in old libstdc++ version used on
+    // CentOS 7)
+    return false;
+  }
+  return false;
 }
 
 bool ClangImporter::isAnnotatedWith(const clang::CXXMethodDecl *method,
