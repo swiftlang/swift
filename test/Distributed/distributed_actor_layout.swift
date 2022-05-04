@@ -12,8 +12,6 @@ import FakeDistributedActorSystems
 @available(SwiftStdlib 5.7, *)
 typealias DefaultDistributedActorSystem = FakeActorSystem
 
-class MyClass { }
-
 // Ensure that the actor layout is (metadata pointer, default actor, id, system,
 // <user fields>)
 
@@ -23,12 +21,27 @@ protocol HasActorSystem {
 
 extension MyActor: HasActorSystem { }
 
-// CHECK: %T27distributed_actor_accessors7MyActorC = type <{ %swift.refcounted, %swift.defaultactor, %T27FakeDistributedActorSystems0C7AddressV, %T27FakeDistributedActorSystems0aC6SystemV, %T27distributed_actor_accessors7MyClassC* }>
+// CHECK: %T27distributed_actor_accessors7MyActorC = type <{ %swift.refcounted, %swift.defaultactor, %T27FakeDistributedActorSystems0C7AddressV, %T27FakeDistributedActorSystems0aC6SystemV, %TSS }>
 @available(SwiftStdlib 5.7, *)
 public distributed actor MyActor {
-  var field: MyClass = MyClass()
+  var field: String = ""
 
   init(actorSystem: FakeActorSystem) {
+    self.actorSystem = actorSystem
+  }
+}
+
+// CHECK: %T27distributed_actor_accessors10MyActorIntC = type <{ %swift.refcounted, %swift.defaultactor }>
+//
+// This does not have the concrete fields in the IR type because the LocalTestingDistributedActorSystem
+// is declared in Distributed, which means that it is compiled with library evolution turned on,
+// which causes the type to be laid out at runtime.
+@available(SwiftStdlib 5.7, *)
+public distributed actor MyActorInt {
+  public typealias ActorSystem = LocalTestingDistributedActorSystem
+  var field: String = ""
+
+  init(actorSystem: LocalTestingDistributedActorSystem) {
     self.actorSystem = actorSystem
   }
 }
