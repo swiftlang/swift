@@ -1714,6 +1714,26 @@ static ManagedValue convertFunctionRepresentation(SILGenFunction &SGF,
   llvm_unreachable("bad representation");
 }
 
+// Ideally our prolog/epilog emission would be able to handle all possible
+// reabstractions and conversions. Until then, this returns true if a closure
+// literal of type `literalType` can be directly emitted by SILGen as
+// `convertedType`.
+static bool canPeepholeLiteralClosureConversion(Type literalType,
+                                                Type convertedType) {
+  auto literalFnType = literalType->getAs<FunctionType>();
+  auto convertedFnType = convertedType->getAs<FunctionType>();
+  
+  if (!literalFnType || !convertedFnType)
+    return false;
+  
+  // Does the conversion only add `throws`?
+  if (literalFnType->isEqual(convertedFnType->getWithoutThrowing())) {
+    return true;
+  }
+  
+  return false;
+}
+
 RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
                                                   SGFContext C)
 {
@@ -1746,6 +1766,38 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
                                          });
     }
     return RValue(SGF, e, result);
+  }
+  
+  // If the function being converted is a closure literal, then the only use
+  // of the closure should be as the destination type of the conversion. Rather
+  // than emit the closure as is and convert it, see if we can emit the closure
+  // directly as the desired type.
+  //
+  // TODO: Move this up when we can emit closures directly with C calling
+  // convention.
+  auto subExpr = e->getSubExpr()->getSemanticsProvidingExpr();
+  if (isa<AbstractClosureExpr>(subExpr)
+      && canPeepholeLiteralClosureConversion(subExpr->getType(),
+                                             e->getType())) {
+    // If we're emitting into a context with a preferred abstraction pattern
+    // already, carry that along.
+    auto origType = C.getAbstractionPattern();
+    // If not, use the conversion type as the desired abstraction pattern.
+    if (!origType) {
+      origType = AbstractionPattern(e->getType()->getCanonicalType());
+    }
+    
+    auto substType = subExpr->getType()->getCanonicalType();
+    
+    auto conversion = Conversion::getSubstToOrig(*origType, substType,
+                                      SGF.getLoweredType(*origType, substType));
+    ConvertingInitialization convertingInit(conversion, SGFContext());
+    auto closure = SGF.emitRValue(subExpr,
+                                  SGFContext(&convertingInit))
+      .getAsSingleValue(SGF, e);
+    closure = SGF.emitSubstToOrigValue(e, closure, *origType, substType);
+
+    return RValue(SGF, e, closure);
   }
   
   // Handle a reference to a "thin" native Swift function that only changes
