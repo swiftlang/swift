@@ -909,7 +909,7 @@ do {
   x = (x,(3,y)).1.1
 }
 
-// SR-3439 subscript with pound exprssions.
+// SR-3439 subscript with pound expressions.
 Sr3439: do {
   class B {
     init() {}
