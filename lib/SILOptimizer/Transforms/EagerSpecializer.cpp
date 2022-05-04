@@ -853,6 +853,14 @@ void EagerSpecializerTransform::run() {
         assert(success);
       }
       onlyCreatePrespecializations = true;
+    } else if (targetFunc->getLinkage() == SILLinkage::Shared) {
+      // We have `shared` linkage if we deserialize a public serialized
+      // function.
+      // That means we are loading it from another module. In this case, we
+      // don't want to create a pre-specialization.
+      SpecializedFuncs.push_back(nullptr);
+      ReInfoVec.emplace_back(ReabstractionInfo());
+      continue;
     }
     ReInfoVec.emplace_back(FuncBuilder.getModule().getSwiftModule(),
                            FuncBuilder.getModule().isWholeModule(), targetFunc,
