@@ -1881,28 +1881,36 @@ void TypeChecker::checkConcurrencyAvailability(SourceRange ReferenceRange,
   }
 }
 
-void TypeChecker::diagnosePotentialUnavailability(
+bool TypeChecker::diagnosePotentialUnavailability(
     const ValueDecl *D, SourceRange ReferenceRange,
     const DeclContext *ReferenceDC,
-    const UnavailabilityReason &Reason) {
+    const UnavailabilityReason &Reason,
+    bool WarnBeforeDeploymentTarget) {
   ASTContext &Context = ReferenceDC->getASTContext();
 
+  bool AsError = true;
   auto RequiredRange = Reason.getRequiredOSVersionRange();
   {
-    auto Err =
-      Context.Diags.diagnose(
-               ReferenceRange.Start, diag::availability_decl_only_version_newer,
-               D->getName(), prettyPlatformString(targetPlatform(Context.LangOpts)),
-               Reason.getRequiredOSVersionRange().getLowerEndpoint());
+    if (WarnBeforeDeploymentTarget &&
+        !RequiredRange.isContainedIn(
+            AvailabilityContext::forDeploymentTarget(Context).getOSVersion()))
+      AsError = false;
+
+    auto Diag = Context.Diags.diagnose(
+        ReferenceRange.Start,
+        AsError ? diag::availability_decl_only_version_newer
+                : diag::availability_decl_only_version_newer_warn,
+        D->getName(), prettyPlatformString(targetPlatform(Context.LangOpts)),
+        Reason.getRequiredOSVersionRange().getLowerEndpoint());
 
     // Direct a fixit to the error if an existing guard is nearly-correct
-    if (fixAvailabilityByNarrowingNearbyVersionCheck(ReferenceRange,
-                                                     ReferenceDC,
-                                                     RequiredRange, Context, Err))
-      return;
+    if (fixAvailabilityByNarrowingNearbyVersionCheck(
+            ReferenceRange, ReferenceDC, RequiredRange, Context, Diag))
+      return AsError;
   }
 
   fixAvailability(ReferenceRange, ReferenceDC, RequiredRange, Context);
+  return AsError;
 }
 
 void TypeChecker::diagnosePotentialAccessorUnavailability(
@@ -3406,21 +3414,26 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
 
   // Diagnose (and possibly signal) for potential unavailability
   auto maybeUnavail = TypeChecker::checkDeclarationAvailability(D, Where);
-  if (maybeUnavail.hasValue()) {
-    auto *DC = Where.getDeclContext();
+  if (!maybeUnavail.hasValue())
+    return false;
 
-    if (accessor) {
-      bool forInout = Flags.contains(DeclAvailabilityFlag::ForInout);
-      TypeChecker::diagnosePotentialAccessorUnavailability(accessor, R, DC,
-                                                           maybeUnavail.getValue(),
-                                                           forInout);
-    } else {
-      TypeChecker::diagnosePotentialUnavailability(D, R, DC, maybeUnavail.getValue());
-    }
-    if (!Flags.contains(DeclAvailabilityFlag::ContinueOnPotentialUnavailability))
-      return true;
+  auto *DC = Where.getDeclContext();
+
+  if (accessor) {
+    bool forInout = Flags.contains(DeclAvailabilityFlag::ForInout);
+    TypeChecker::diagnosePotentialAccessorUnavailability(
+        accessor, R, DC, maybeUnavail.getValue(), forInout);
+  } else {
+    bool downgradeBeforeDeploymentTarget = Flags.contains(
+        DeclAvailabilityFlag::
+            WarnForPotentialUnavailabilityBeforeDeploymentTarget);
+    if (!TypeChecker::diagnosePotentialUnavailability(
+            D, R, DC, maybeUnavail.getValue(), downgradeBeforeDeploymentTarget))
+      return false;
   }
-  return false;
+
+  return !Flags.contains(
+      DeclAvailabilityFlag::ContinueOnPotentialUnavailability);
 }
 
 /// Return true if the specified type looks like an integer of floating point
