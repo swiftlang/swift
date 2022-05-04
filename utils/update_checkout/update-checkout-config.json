@@ -88,7 +88,7 @@
             "repos": {
                 "llvm-project": "stable/20211026",
                 "swift": "swiftwasm",
-                "cmark": "main",
+                "cmark": "gfm",
                 "llbuild": "main",
                 "swift-tools-support-core": "main",
                 "swiftpm": "main",
