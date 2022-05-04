@@ -1,4 +1,4 @@
-//===--- SourceLoc.swift - SourceLoc bridiging utilities ------------------===//
+//===--- SourceLoc.swift - SourceLoc bridging utilities ------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

@@ -126,7 +126,7 @@ protected:
   /// Appends a mangled identifier string.
   void appendIdentifier(StringRef ident);
 
-  // NOTE: the addSubsitution functions perform the value computation before
+  // NOTE: the addSubstitution functions perform the value computation before
   // the assignment because there is no sequence point synchronising the
   // computation of the value before the insertion of the new key, resulting in
   // the computed value being off-by-one causing an undecoration failure during
