@@ -394,6 +394,11 @@ AvailabilityContext ASTContext::getObjCIsUniquelyReferencedAvailability() {
   return getSwift56Availability();
 }
 
+AvailabilityContext
+ASTContext::getParameterizedExistentialRuntimeAvailability() {
+  return getSwift57Availability();
+}
+
 AvailabilityContext ASTContext::getSwift52Availability() {
   auto target = LangOpts.Target;
 
