@@ -464,10 +464,12 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
     return false;
   }
 
-  // --- Check parameter: invocation InvocationEncoder
-  // FIXME: NOT INOUT, but we crash today if not
+  // --- Check parameter: invocation: inout InvocationEncoder
   auto invocationParam = params->get(2);
   if (invocationParam->getArgumentName() != C.Id_invocation) {
+    return false;
+  }
+  if (!invocationParam->isInOut()) {
     return false;
   }
 
