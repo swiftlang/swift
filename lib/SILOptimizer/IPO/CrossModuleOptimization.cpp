@@ -70,7 +70,8 @@ public:
 
 private:
   bool canSerializeFunction(SILFunction *function,
-                    FunctionFlags &canSerializeFlags, int maxDepth);
+                    FunctionFlags &canSerializeFlags, int maxDepth,
+                    bool isCallToFunction);
 
   bool canSerializeInstruction(SILInstruction *inst,
                     FunctionFlags &canSerializeFlags, int maxDepth);
@@ -163,7 +164,8 @@ void CrossModuleOptimization::serializeFunctionsInModule() {
   // Start with public functions.
   for (SILFunction &F : M) {
     if (F.getLinkage() == SILLinkage::Public) {
-      if (canSerializeFunction(&F, canSerializeFlags, /*maxDepth*/ 64))
+      if (canSerializeFunction(&F, canSerializeFlags, /*maxDepth*/ 64,
+                               /*isCallToFunction*/false))
         serializeFunction(&F, canSerializeFlags);
     }
   }
@@ -176,7 +178,8 @@ void CrossModuleOptimization::serializeFunctionsInModule() {
 bool CrossModuleOptimization::canSerializeFunction(
                                SILFunction *function,
                                FunctionFlags &canSerializeFlags,
-                               int maxDepth) {
+                               int maxDepth,
+                               bool isCallToFunction) {
   auto iter = canSerializeFlags.find(function);
   
   // Avoid infinite recursion in case it's a cycle in the call graph.
@@ -201,11 +204,11 @@ bool CrossModuleOptimization::canSerializeFunction(
 
   // If someone adds specialization attributes to a function, it's probably the
   // developer's intention that the function is _not_ serialized.
-  if (!function->getSpecializeAttrs().empty())
+  if (!function->getSpecializeAttrs().empty() && !isCallToFunction)
     return false;
 
   // Do the same check for the specializations of such functions.
-  if (function->isSpecialization()) {
+  if (function->isSpecialization() && !isCallToFunction) {
     const SILFunction *parent = function->getSpecializationInfo()->getParent();
     if (!parent->getSpecializeAttrs().empty())
       return false;
@@ -258,7 +261,8 @@ bool CrossModuleOptimization::canSerializeInstruction(SILInstruction *inst,
     }
 
     // Recursivly walk down the call graph.
-    if (canSerializeFunction(callee, canSerializeFlags, maxDepth - 1))
+    if (canSerializeFunction(callee, canSerializeFlags, maxDepth - 1,
+                             /*isCallToFunction*/ true))
       return true;
 
     // In case a public/internal/private function cannot be serialized, it's
