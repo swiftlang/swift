@@ -2551,7 +2551,7 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
         if (index != 0)
           Printer << ", ";
         // Limit the number of printed generic parameters. In practice this
-        // it will never be exceeded. The limit is only imporant for malformed
+        // it will never be exceeded. The limit is only important for malformed
         // symbols where count can be really huge.
         if (index >= 128) {
           Printer << "...";
