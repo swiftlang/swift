@@ -70,11 +70,10 @@ func test2() {
 }
 
 // CHECK-LABEL: sil hidden @$s8rethrows5test3yyF : $@convention(thin) () -> () {
-// CHECK:       [[CLOSURE:%.*]] = function_ref @$s8rethrows5test3yyFSiyXEfU_ : $@convention(thin) () -> Int
+// CHECK:       [[CLOSURE:%.*]] = function_ref @$s8rethrows5test3yyFSiyXEfU_ :
 // CHECK:       [[T0:%.*]] = thin_to_thick_function [[CLOSURE]]
-// CHECK:       [[T1:%.*]] = convert_function [[T0]] : $@noescape @callee_guaranteed () -> Int to $@noescape @callee_guaranteed () -> (Int, @error Error)
-// CHECK:       [[RETHROWER:%.*]] = function_ref @$s8rethrows9rethroweryS2iyKXEKF : $@convention(thin) (@noescape @callee_guaranteed () -> (Int, @error Error)) -> (Int, @error Error)
-// CHECK:       try_apply [[RETHROWER]]([[T1]]) : $@convention(thin) (@noescape @callee_guaranteed () -> (Int, @error Error)) -> (Int, @error Error), normal [[NORMAL:bb1]], error [[ERROR:bb2]]
+// CHECK:       [[RETHROWER:%.*]] = function_ref @$s8rethrows9rethroweryS2iyKXEKF :
+// CHECK:       try_apply [[RETHROWER]]([[T0]])
 // CHECK:     [[NORMAL]]({{%.*}} : $Int):
 // CHECK-NEXT:  [[RESULT:%.*]] = tuple ()
 // CHECK-NEXT:  return [[RESULT]]
