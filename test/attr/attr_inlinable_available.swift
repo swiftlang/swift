@@ -608,23 +608,30 @@ extension BetweenTargets {
   fileprivate func fileprivateFunc1() {}
 }
 
-// expected-error@+1 {{'BetweenTargets' is only available in}} expected-note@+1 {{add @available attribute to enclosing extension}}
+// expected-warning@+1 {{'BetweenTargets' is only available in}} expected-note@+1 {{add @available attribute to enclosing extension}}
 extension BetweenTargets {
   public func publicFunc1() {}
 }
 
-// expected-error@+1 {{'BetweenTargets' is only available in}} expected-note@+1 {{add @available attribute to enclosing extension}}
+// expected-warning@+1 {{'BetweenTargets' is only available in}} expected-note@+1 {{add @available attribute to enclosing extension}}
 extension BetweenTargets {
   @usableFromInline
   internal func usableFromInlineFunc1() {}
 }
 
-// expected-error@+1 {{'BetweenTargets' is only available in}} expected-note@+1 {{add @available attribute to enclosing extension}}
+// expected-warning@+1 {{'BetweenTargets' is only available in}} expected-note@+1 {{add @available attribute to enclosing extension}}
 extension BetweenTargets {
   internal func internalFunc2() {}
   private func privateFunc2() {}
   fileprivate func fileprivateFunc2() {}
   public func publicFunc2() {}
+}
+
+// An extension with more availability than BetweenTargets.
+// expected-error@+2 {{'BetweenTargets' is only available in}}
+@available(macOS 10.10, iOS 8.0, tvOS 9.0, watchOS 2.0, *)
+extension BetweenTargets {
+  public func publicFunc3() {}
 }
 
 // Same availability as BetweenTargets but internal instead of public.
@@ -669,7 +676,7 @@ public protocol PublicProto {}
 extension NoAvailable: PublicProto {}
 extension BeforeInliningTarget: PublicProto {}
 extension AtInliningTarget: PublicProto {}
-extension BetweenTargets: PublicProto {} // expected-error {{'BetweenTargets' is only available in}} expected-note {{add @available attribute to enclosing extension}}
+extension BetweenTargets: PublicProto {} // expected-warning {{'BetweenTargets' is only available in}} expected-note {{add @available attribute to enclosing extension}}
 extension AtDeploymentTarget: PublicProto {} // expected-error {{'AtDeploymentTarget' is only available in}} expected-note {{add @available attribute to enclosing extension}}
 extension AfterDeploymentTarget: PublicProto {} // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add @available attribute to enclosing extension}}
 
