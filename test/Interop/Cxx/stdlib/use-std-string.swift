@@ -5,8 +5,6 @@
 // Enable this everywhere once we have a solution for modularizing other C++ stdlibs: rdar://87654514
 // REQUIRES: OS=macosx || OS=linux-gnu
 
-// REQUIRES: rdar92621793
-
 import StdlibUnittest
 import StdString
 #if os(Linux)
