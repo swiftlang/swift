@@ -310,4 +310,13 @@ struct StructWithSendableContents {
 SENDABLE id StructWithSendableContentsGetSendableComputed(struct StructWithSendableContents contents)
   __attribute__((swift_name("getter:StructWithSendableContents.sendableComputed(self:)")));
 
+@interface CostcoManager : NSObject
++ (instancetype)sharedManager;
+- (void)isCustomerEnrolledInExecutiveProgram:(NSObject *)customer completion:(void(^)(BOOL enrolled))completion;
+@end
+
+@interface Person : NSObject
++ (void)getAsCustomer:(void(^_Nonnull)(NSObject *device))completion;
+@end
+
 #pragma clang assume_nonnull end
