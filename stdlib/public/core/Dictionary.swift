@@ -1672,37 +1672,50 @@ internal struct _DictionaryAnyHashableBox<Key: Hashable, Value: Hashable>
 }
 
 extension Collection {
-  // Utility method for KV collections that wish to implement
-  // CustomStringConvertible and CustomDebugStringConvertible using a bracketed
-  // list of elements.
-  // FIXME: Doesn't use the withTypeName argument yet
+  /// Utility method for key-value collections that wish to implement
+  /// `CustomStringConvertible` and `CustomDebugStringConvertible` using a
+  /// bracketed list of elements, like a dictionary literal.
+  ///
+  /// - Parameter type: Currently unused.
+  /// - Parameter debug: If true, print elements using their debug-style
+  ///     descriptions. Otherwise use a regular string conversion.
   internal func _makeKeyValuePairDescription<K, V>(
     withTypeName type: String? = nil,
     usingDebugDescriptions debug: Bool = false
   ) -> String where Element == (key: K, value: V) {
+    // FIXME: Doesn't use the withTypeName argument yet
 #if !SWIFT_STDLIB_STATIC_PRINT
     if self.isEmpty {
       return "[:]"
     }
+
+    let printKey: (K, inout String) -> Void
+    if debug {
+      printKey = { debugPrint($0, terminator: "", to: &$1) }
+    } else if _needsQuotingInDescriptionLists(K.self) {
+      printKey = { $1 += "\($0)".debugDescription }
+    } else {
+      printKey = { print($0, terminator: "", to: &$1) }
+    }
+
+    let printValue: (V, inout String) -> Void
+    if debug {
+      printValue = { debugPrint($0, terminator: "", to: &$1) }
+    } else if _needsQuotingInDescriptionLists(V.self) {
+      printValue = { $1 += "\($0)".debugDescription }
+    } else {
+      printValue = { print($0, terminator: "", to: &$1) }
+    }
+
     var result = "["
-    var first = true
+    var prefix = ""
     for (k, v) in self {
-      if first {
-        first = false
-      } else {
-        result += ", "
-      }
-      if debug {
-        debugPrint(k, terminator: "", to: &result)
-      } else {
-        print(k, terminator: "", to: &result)
-      }
+      result += prefix
+      prefix = ", "
+
+      printKey(k, &result)
       result += ": "
-      if debug {
-        debugPrint(v, terminator: "", to: &result)
-      } else {
-        print(v, terminator: "", to: &result)
-      }
+      printValue(v, &result)
     }
     result += "]"
     return result

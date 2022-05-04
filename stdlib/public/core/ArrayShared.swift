@@ -94,10 +94,33 @@ func _finalizeUninitializedArray<Element>(
 }
 #endif
 
+#if !SWIFT_STDLIB_STATIC_PRINT
+/// Return true if `type` is a type whose `description` prints raw string
+/// data, otherwise return false.
+///
+/// This is used to determine if item descriptions need to be quoted/escaped
+/// when printed as part of a collection description. Otherwise stray commas in
+/// element values could lead to confusing output.
+internal func _needsQuotingInDescriptionLists<T>(_ type: T.Type) -> Bool {
+  if (
+    T.self == String.self
+    || T.self == Substring.self
+    || T.self == Character.self
+    || T.self == Unicode.Scalar.self
+    || T.self == String.UnicodeScalarView.self
+    || T.self == String.UTF8View.self
+    || T.self == String.UTF16View.self
+  ) {
+    return true
+  }
+  return false
+}
+#endif
+
 extension Collection {
   /// Utility method for collections that wish to implement
   /// `CustomStringConvertible` and `CustomDebugStringConvertible` using a
-  /// bracketed list of elements, like an array.
+  /// bracketed list of elements, like an array literal.
   ///
   /// - Parameter type: If non-nil, wrap the generated description in an
   ///     emulated initializer invocation for the specified type name.
@@ -108,6 +131,15 @@ extension Collection {
     usingDebugDescriptions debug: Bool = false
   ) -> String {
 #if !SWIFT_STDLIB_STATIC_PRINT
+    let printElement: (Element, inout String) -> Void
+    if debug {
+      printElement = { debugPrint($0, terminator: "", to: &$1) }
+    } else if _needsQuotingInDescriptionLists(Element.self) {
+      printElement = { $1 += "\($0)".debugDescription }
+    } else {
+      printElement = { print($0, terminator: "", to: &$1) }
+    }
+
     var result = ""
     if let type = type {
       result += "\(type)(["
@@ -115,18 +147,11 @@ extension Collection {
       result += "["
     }
 
-    var first = true
+    var prefix = ""
     for item in self {
-      if first {
-        first = false
-      } else {
-        result += ", "
-      }
-      if debug {
-        debugPrint(item, terminator: "", to: &result)
-      } else {
-        print(item, terminator: "", to: &result)
-      }
+      result += prefix
+      prefix = ", "
+      printElement(item, &result)
     }
     result += type != nil ? "])" : "]"
     return result
