@@ -1,5 +1,4 @@
-//===--- ThreadLocalStorage.h - Thread-local storage interface. --*- C++
-//-*-===//
+//===--- ThreadLocalStorage.h - Thread-local storage interface. -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -19,23 +18,25 @@
 #include "Errors.h"
 #include "Impl.h"
 #include "Once.h"
+#include "TLSKeys.h"
 
 namespace swift {
 
 // -- Low-level TLS functions -------------------------------------------------
 
 #if !SWIFT_THREADING_NONE
-using tls_key = threading_impl::tls_key;
-using tls_dtor = threading_impl::tls_dtor;
+using tls_key_t = threading_impl::tls_key_t;
+using tls_dtor_t = threading_impl::tls_dtor_t;
 
 #if SWIFT_THREADING_USE_RESERVED_TLS_KEYS
+using threading_impl::tls_get_key;
 using threading_impl::tls_init;
 
 /// tls_init_once() - Initialize TLS, once only
-inline void tls_init_once(once_t &token, tls_key key, tls_dtor dtor) {
+inline void tls_init_once(once_t &token, tls_key_t key, tls_dtor_t dtor) {
   const struct tls_init_info {
-    tls_key &k;
-    tls_dtor d;
+    tls_key_t &k;
+    tls_dtor_t d;
   } info = {key, dtor};
   once(
       token,
@@ -47,6 +48,10 @@ inline void tls_init_once(once_t &token, tls_key key, tls_dtor dtor) {
       },
       (void *)&info);
 }
+
+inline void tls_init_once(once_t &token, tls_key key, tls_dtor_t dtor) {
+  tls_init_once(token, tls_get_key(key), dtor);
+}
 #endif // SWIFT_THREADING_USE_RESERVED_TLS_KEYS
 
 using threading_impl::tls_alloc;
@@ -54,10 +59,10 @@ using threading_impl::tls_get;
 using threading_impl::tls_set;
 
 /// tls_alloc_once() - Allocate TLS key, once only
-inline void tls_alloc_once(once_t &token, tls_key &key, tls_dtor dtor) {
+inline void tls_alloc_once(once_t &token, tls_key_t &key, tls_dtor_t dtor) {
   const struct tls_init_info {
-    tls_key &k;
-    tls_dtor d;
+    tls_key_t &k;
+    tls_dtor_t d;
   } info = {key, dtor};
   once(
       token,
@@ -117,14 +122,14 @@ class ThreadLocalKey {
   // We rely on the zero-initialization of objects with static storage
   // duration.
   once_t onceFlag;
-  tls_key key;
+  tls_key_t key;
 
 public:
-  threading_impl::tls_key getKey() {
+  threading_impl::tls_key_t getKey() {
     once(
         onceFlag,
         [](void *ctx) {
-          tls_key *pkey = reinterpret_cast<tls_key *>(ctx);
+          tls_key_t *pkey = reinterpret_cast<tls_key_t *>(ctx);
           tls_alloc(*pkey, nullptr);
         },
         &key);
@@ -132,13 +137,15 @@ public:
   }
 };
 
+#if SWIFT_THREADING_USE_RESERVED_TLS_KEYS
 // A type representing a constant TLS key, for use on platforms
 // that provide reserved keys.
 template <tls_key constantKey>
 class ConstantThreadLocalKey {
 public:
-  tls_key getKey() { return constantKey; }
+  tls_key_t getKey() { return tls_get_key(constantKey); }
 };
+#endif
 
 template <class T, class Key>
 class ThreadLocal {
@@ -172,7 +179,7 @@ public:
 ///
 /// For example
 ///
-///   static SWIFT_THREAD_LOCAL_TYPE(int, SWIFT_RESERVED_TLS_KEY_9) frobble;
+///   static SWIFT_THREAD_LOCAL_TYPE(int, SWIFT_RESERVED_TLS_KEY_T_9) frobble;
 ///
 /// Because of the fallback path, the default-initialization of the
 /// type must be equivalent to a bitwise zero-initialization, and the

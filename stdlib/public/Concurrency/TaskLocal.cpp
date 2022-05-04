@@ -54,9 +54,8 @@ template <class T> struct Pointer {
 
 /// THIS IS RUNTIME INTERNAL AND NOT ABI.
 class FallbackTaskLocalStorage {
-  static SWIFT_THREAD_LOCAL_TYPE(
-      Pointer<TaskLocal::Storage>,
-      SWIFT_CONCURRENCY_FALLBACK_TASK_LOCAL_STORAGE_KEY) Value;
+  static SWIFT_THREAD_LOCAL_TYPE(Pointer<TaskLocal::Storage>,
+                                 tls_key::concurrency_fallback) Value;
 
 public:
   static void set(TaskLocal::Storage *task) { Value.set(task); }
@@ -65,7 +64,7 @@ public:
 
 /// Define the thread-locals.
 SWIFT_THREAD_LOCAL_TYPE(Pointer<TaskLocal::Storage>,
-                        SWIFT_CONCURRENCY_FALLBACK_TASK_LOCAL_STORAGE_KEY)
+                        tls_key::concurrency_fallback)
 FallbackTaskLocalStorage::Value;
 
 // ==== ABI --------------------------------------------------------------------

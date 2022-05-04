@@ -35,22 +35,22 @@ _swift_stdlib_threadLocalStorageGet(void) {
 #elif SWIFT_THREADING_USE_RESERVED_TLS_KEYS
 
   // If we have reserved keys, use those
-  void *value = swift::tls_get(SWIFT_STDLIB_TLS_KEY);
+  void *value = swift::tls_get(swift::tls_key::stdlib);
   if (value)
     return value;
 
   static swift::once_t token;
-  swift::tls_init_once(token, SWIFT_STDLIB_TLS_KEY,
+  swift::tls_init_once(token, swift::tls_key::stdlib,
                        [](void *pointer) { _stdlib_destroyTLS(pointer); });
 
   value = _stdlib_createTLS();
-  swift::tls_set(SWIFT_STDLIB_TLS_KEY, value);
+  swift::tls_set(swift::tls_key::stdlib, value);
   return value;
 
 #else // Threaded, but not using reserved keys
 
   // Register a key and use it
-  static swift::tls_key key;
+  static swift::tls_key_t key;
   static swift::once_t token;
 
   swift::tls_alloc_once(token, key,

@@ -145,16 +145,16 @@ inline void once_impl(once_t &predicate, void (*fn)(void *), void *context) {
 #define SWIFT_THREAD_LOCAL thread_local
 #endif
 
-using tls_key = pthread_key_t;
-using tls_dtor = void (*)(void *);
+using tls_key_t = pthread_key_t;
+using tls_dtor_t = void (*)(void *);
 
-inline bool tls_alloc(tls_key &key, tls_dtor dtor) {
+inline bool tls_alloc(tls_key_t &key, tls_dtor_t dtor) {
   return pthread_key_create(&key, dtor) == 0;
 }
 
-inline void *tls_get(tls_key key) { return pthread_getspecific(key); }
+inline void *tls_get(tls_key_t key) { return pthread_getspecific(key); }
 
-inline void tls_set(tls_key key, void *value) {
+inline void tls_set(tls_key_t key, void *value) {
   pthread_setspecific(key, value);
 }
 

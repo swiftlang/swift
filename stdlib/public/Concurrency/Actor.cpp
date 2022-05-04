@@ -108,7 +108,7 @@ class ExecutorTrackingInfo {
   /// separate thread-local variable (or whatever is most efficient
   /// on the target platform).
   static SWIFT_THREAD_LOCAL_TYPE(Pointer<ExecutorTrackingInfo>,
-                                 SWIFT_CONCURRENCY_EXECUTOR_TRACKING_INFO_KEY)
+                                 tls_key::concurrency_executor_tracking_info)
       ActiveInfoInThread;
 
   /// The active executor.
@@ -176,7 +176,7 @@ class ActiveTask {
   /// A thread-local variable pointing to the active tracking
   /// information about the current thread, if any.
   static SWIFT_THREAD_LOCAL_TYPE(Pointer<AsyncTask>,
-                                 SWIFT_CONCURRENCY_TASK_KEY) Value;
+                                 tls_key::concurrency_task) Value;
 
 public:
   static void set(AsyncTask *task) { Value.set(task); }
@@ -184,11 +184,11 @@ public:
 };
 
 /// Define the thread-locals.
-SWIFT_THREAD_LOCAL_TYPE(Pointer<AsyncTask>, SWIFT_CONCURRENCY_TASK_KEY)
+SWIFT_THREAD_LOCAL_TYPE(Pointer<AsyncTask>, tls_key::concurrency_task)
 ActiveTask::Value;
 
 SWIFT_THREAD_LOCAL_TYPE(Pointer<ExecutorTrackingInfo>,
-                        SWIFT_CONCURRENCY_EXECUTOR_TRACKING_INFO_KEY)
+                        tls_key::concurrency_executor_tracking_info)
 ExecutorTrackingInfo::ActiveInfoInThread;
 
 } // end anonymous namespace

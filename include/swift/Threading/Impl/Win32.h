@@ -109,17 +109,17 @@ inline void once_impl(once_t &predicate, void (*fn)(void *), void *context) {
 
 #define SWIFT_TLS_DECLARE_DTOR(name) void NTAPI name(void *)
 
-using tls_key = ::DWORD;
-using tls_dtor = ::PFLS_CALLBACK_FUNCTION;
+using tls_key_t = ::DWORD;
+using tls_dtor_t = ::PFLS_CALLBACK_FUNCTION;
 
-inline bool tls_alloc(tls_key &key, tls_dtor dtor) {
+inline bool tls_alloc(tls_key_t &key, tls_dtor_t dtor) {
   key = ::FlsAlloc(dtor);
   return key != FLS_OUT_OF_INDEXES;
 }
 
-inline void *tls_get(tls_key key) { return ::FlsGetValue(key); }
+inline void *tls_get(tls_key_t key) { return ::FlsGetValue(key); }
 
-inline void tls_set(tls_key key, void *value) { ::FlsSetValue(key, value); }
+inline void tls_set(tls_key_t key, void *value) { ::FlsSetValue(key, value); }
 
 } // namespace threading_impl
 
