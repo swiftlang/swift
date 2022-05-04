@@ -161,7 +161,6 @@ static void emitActorSystemInit(SILGenFunction &SGF,
 
   auto *dc = ctor->getDeclContext();
   auto classDecl = dc->getSelfClassDecl();
-  auto &C = ctor->getASTContext();
 
   // By construction, automatically generated distributed actor ctors have
   // exactly one ActorSystem-conforming argument to the constructor,
@@ -301,7 +300,6 @@ void SILGenFunction::emitDistributedActorReady(
   // Only designated initializers get the lifecycle handling injected
   assert(ctor->isDesignatedInit());
 
-  auto &C = ctor->getASTContext();
   auto *dc = ctor->getDeclContext();
   auto classDecl = dc->getSelfClassDecl();
 

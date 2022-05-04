@@ -5374,10 +5374,17 @@ std::string ASTContext::getEntryPointFunctionName() const {
 
 SILLayout *SILLayout::get(ASTContext &C,
                           CanGenericSignature Generics,
-                          ArrayRef<SILField> Fields) {
+                          ArrayRef<SILField> Fields,
+                          bool CapturesGenericEnvironment) {
+  // The "captures generic environment" flag is meaningless if there are
+  // no generic arguments to capture.
+  if (!Generics || Generics->areAllParamsConcrete()) {
+    CapturesGenericEnvironment = false;
+  }
+  
   // Profile the layout parameters.
   llvm::FoldingSetNodeID id;
-  Profile(id, Generics, Fields);
+  Profile(id, Generics, Fields, CapturesGenericEnvironment);
   
   // Return an existing layout if there is one.
   void *insertPos;
@@ -5390,7 +5397,8 @@ SILLayout *SILLayout::get(ASTContext &C,
   void *memory = C.Allocate(totalSizeToAlloc<SILField>(Fields.size()),
                             alignof(SILLayout));
   
-  auto newLayout = ::new (memory) SILLayout(Generics, Fields);
+  auto newLayout = ::new (memory) SILLayout(Generics, Fields,
+                                            CapturesGenericEnvironment);
   Layouts.InsertNode(newLayout, insertPos);
   return newLayout;
 }
@@ -5423,7 +5431,8 @@ CanSILBoxType SILBoxType::get(CanType boxedType) {
   auto genericParam = singleGenericParamSignature.getGenericParams()[0];
   auto layout = SILLayout::get(ctx, singleGenericParamSignature,
                                SILField(CanType(genericParam),
-                                        /*mutable*/ true));
+                                        /*mutable*/ true),
+                               /*captures generic env*/ false);
 
   auto subMap =
     SubstitutionMap::get(

@@ -825,9 +825,16 @@ SILPassPipelinePlan::getIRGenPreparePassPipeline(const SILOptions &Options) {
   SILPassPipelinePlan P(Options);
   P.startPipeline("IRGen Preparation");
   // Insert SIL passes to run during IRGen.
+  /*
+  // Simplify partial_apply instructions by expanding box construction into
+  // component operations.
+  P.addPartialApplySimplification();
+   */
   // Hoist generic alloc_stack instructions to the entry block to enable better
   // llvm-ir generation for dynamic alloca instructions.
   P.addAllocStackHoisting();
+  // Change large loadable types to be passed indirectly across function
+  // boundaries as required by the ABI.
   P.addLoadableByAddress();
 
   return P;

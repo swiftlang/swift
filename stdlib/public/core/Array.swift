@@ -325,6 +325,7 @@ extension Array {
   /// inout violation in user code.
   @inlinable
   @_semantics("array.props.isNativeTypeChecked")
+  @_effects(notEscaping self.**)
   public // @testable
   func _hoistableIsNativeTypeChecked() -> Bool {
    return _buffer.arrayPropertyIsNativeTypeChecked
@@ -332,18 +333,21 @@ extension Array {
 
   @inlinable
   @_semantics("array.get_count")
+  @_effects(notEscaping self.**)
   internal func _getCount() -> Int {
     return _buffer.immutableCount
   }
 
   @inlinable
   @_semantics("array.get_capacity")
+  @_effects(notEscaping self.**)
   internal func _getCapacity() -> Int {
     return _buffer.immutableCapacity
   }
 
   @inlinable
   @_semantics("array.make_mutable")
+  @_effects(notEscaping self.**)
   internal mutating func _makeMutableAndUnique() {
     if _slowPath(!_buffer.beginCOWMutation()) {
       _buffer = _buffer._consumeAndCreateNew()
@@ -356,6 +360,7 @@ extension Array {
   /// to `_makeMutableAndUnique`.
   @_alwaysEmitIntoClient
   @_semantics("array.end_mutation")
+  @_effects(notEscaping self.**)
   internal mutating func _endMutation() {
     _buffer.endCOWMutation()
   }
@@ -375,6 +380,7 @@ extension Array {
   /// `0 ≤ index < count`.
   @inlinable
   @_semantics("array.check_subscript")
+  @_effects(notEscaping self.**)
   public // @testable
   func _checkSubscript(
     _ index: Int, wasNativeTypeChecked: Bool
@@ -394,6 +400,7 @@ extension Array {
   /// - Precondition: The buffer must be uniquely referenced and native.
   @_alwaysEmitIntoClient
   @_semantics("array.check_subscript")
+  @_effects(notEscaping self.**)
   internal func _checkSubscript_mutating(_ index: Int) {
     _buffer._checkValidSubscriptMutating(index)
   }
@@ -401,12 +408,15 @@ extension Array {
   /// Check that the specified `index` is valid, i.e. `0 ≤ index ≤ count`.
   @inlinable
   @_semantics("array.check_index")
+  @_effects(notEscaping self.**)
   internal func _checkIndex(_ index: Int) {
     _precondition(index <= endIndex, "Array index is out of range")
     _precondition(index >= startIndex, "Negative Array index is out of range")
   }
 
   @_semantics("array.get_element")
+  @_effects(notEscaping self.value**)
+  @_effects(escaping self.value**.class*.value** -> return.value**)
   @inlinable // FIXME(inline-always)
   @inline(__always)
   public // @testable
@@ -946,6 +956,9 @@ extension Array: RangeReplaceableCollection {
   /// - Precondition: `storage is _ContiguousArrayStorage`.
   @inlinable
   @_semantics("array.uninitialized")
+  @_effects(escaping storage => return.0.value**)
+  @_effects(escaping storage.class*.value** => return.0.value**.class*.value**)
+  @_effects(escaping storage.class*.value** => return.1.value**)
   internal static func _adoptStorage(
     _ storage: __owned _ContiguousArrayStorage<Element>, count: Int
   ) -> (Array, UnsafeMutablePointer<Element>) {
@@ -1041,6 +1054,7 @@ extension Array: RangeReplaceableCollection {
   /// - Complexity: O(*n*), where *n* is the number of elements in the array.
   @inlinable
   @_semantics("array.mutate_unknown")
+  @_effects(notEscaping self.**)
   public mutating func reserveCapacity(_ minimumCapacity: Int) {
     _reserveCapacityImpl(minimumCapacity: minimumCapacity,
                          growForAppend: false)
@@ -1098,6 +1112,7 @@ extension Array: RangeReplaceableCollection {
 
   @inlinable
   @_semantics("array.make_mutable")
+  @_effects(notEscaping self.**)
   internal mutating func _makeUniqueAndReserveCapacityIfNotUnique() {
     if _slowPath(!_buffer.beginCOWMutation()) {
       _createNewBuffer(bufferIsUnique: false,
@@ -1108,6 +1123,7 @@ extension Array: RangeReplaceableCollection {
 
   @inlinable
   @_semantics("array.mutate_unknown")
+  @_effects(notEscaping self.**)
   internal mutating func _reserveCapacityAssumingUniqueBuffer(oldCount: Int) {
     // Due to make_mutable hoisting the situation can arise where we hoist
     // _makeMutableAndUnique out of loop and use it to replace
@@ -1130,6 +1146,7 @@ extension Array: RangeReplaceableCollection {
 
   @inlinable
   @_semantics("array.mutate_unknown")
+  @_effects(notEscaping self.**)
   internal mutating func _appendElementAssumeUniqueAndCapacity(
     _ oldCount: Int,
     newElement: __owned Element
@@ -1164,6 +1181,7 @@ extension Array: RangeReplaceableCollection {
   ///   same array.
   @inlinable
   @_semantics("array.append_element")
+  @_effects(notEscaping self.value**)
   public mutating func append(_ newElement: __owned Element) {
     // Separating uniqueness check and capacity check allows hoisting the
     // uniqueness check out of a loop.
@@ -1192,6 +1210,7 @@ extension Array: RangeReplaceableCollection {
   ///   array.
   @inlinable
   @_semantics("array.append_contentsOf")
+  @_effects(notEscaping self.value**)
   public mutating func append<S: Sequence>(contentsOf newElements: __owned S)
     where S.Element == Element {
 
@@ -1257,6 +1276,7 @@ extension Array: RangeReplaceableCollection {
 
   @inlinable
   @_semantics("array.reserve_capacity_for_append")
+  @_effects(notEscaping self.**)
   internal mutating func reserveCapacityForAppend(newElementsCount: Int) {
     // Ensure uniqueness, mutability, and sufficient storage.  Note that
     // for consistency, we need unique self even if newElements is empty.
@@ -1267,6 +1287,8 @@ extension Array: RangeReplaceableCollection {
 
   @inlinable
   @_semantics("array.mutate_unknown")
+  @_effects(notEscaping self.value**)
+  @_effects(escaping self.value**.class*.value** -> return.value**)
   public mutating func _customRemoveLast() -> Element? {
     _makeMutableAndUnique()
     let newCount = _buffer.mutableCount - 1
@@ -1296,6 +1318,8 @@ extension Array: RangeReplaceableCollection {
   @inlinable
   @discardableResult
   @_semantics("array.mutate_unknown")
+  @_effects(notEscaping self.value**)
+  @_effects(escaping self.value**.class*.value** -> return.value**)
   public mutating func remove(at index: Int) -> Element {
     _makeMutableAndUnique()
     let currentCount = _buffer.mutableCount
@@ -1595,6 +1619,7 @@ extension Array {
   ///   method's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @_semantics("array.withUnsafeMutableBufferPointer")
+  @_effects(notEscaping self.value**)
   @inlinable // FIXME(inline-always)
   @inline(__always) // Performance: This method should get inlined into the
   // caller such that we can combine the partial apply with the apply in this
@@ -1693,6 +1718,8 @@ extension Array {
   ///   equivalent to `append(contentsOf:)`.
   @inlinable
   @_semantics("array.mutate_unknown")
+  @_effects(notEscaping self.value**)
+  @_effects(notEscaping self.value**.class*.value**)
   public mutating func replaceSubrange<C>(
     _ subrange: Range<Int>,
     with newElements: __owned C

@@ -31,8 +31,8 @@ func testSlowServing(p: SlowServing) async throws {
 
     // CHECK: objc_method {{.*}} $@convention(objc_method) <τ_0_0 where τ_0_0 : SlowServing> (@convention(block) (Int, Optional<NSString>, Optional<NSError>) -> (), τ_0_0) -> ()
     // CHECK: hop_to_executor [[GENERIC_EXECUTOR]] :
-    // CHECK:      builtin "willThrow"
-    // CHECK-NEXT: hop_to_executor [[GENERIC_EXECUTOR]] :
+    // CHECK: hop_to_executor [[GENERIC_EXECUTOR]] :
+    // CHECK-NEXT:      builtin "willThrow"
     let _: (Int, String) = try await p.tryRequestIntAndString()
 }
 
@@ -42,8 +42,8 @@ func testSlowServingAgain(p: SlowServing) async throws {
   // CHECK: hop_to_executor [[GENERIC_EXECUTOR]] :
   // CHECK: objc_method {{.*}} $@convention(objc_method) <τ_0_0 where τ_0_0 : SlowServing> (@convention(block) (Optional<NSString>, Optional<NSError>) -> (), τ_0_0) -> ()
   // CHECK: hop_to_executor [[GENERIC_EXECUTOR]] :
-  // CHECK:      builtin "willThrow"
-  // CHECK-NEXT: hop_to_executor [[GENERIC_EXECUTOR]] :
+  // CHECK: hop_to_executor [[GENERIC_EXECUTOR]] :
+  // CHECK-NEXT:      builtin "willThrow"
   let _: String = try await p.tryRequestString()
 }
 
