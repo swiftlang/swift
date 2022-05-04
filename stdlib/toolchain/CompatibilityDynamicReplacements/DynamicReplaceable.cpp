@@ -29,7 +29,7 @@ namespace {
 // unavoidable in the general case, so turn off the warning just for this line.
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wglobal-constructors"
-SWIFT_THREAD_LOCAL_TYPE(uintptr_t, SWIFT_COMPATIBILITY_50_TLS_KEY) compat50Key;
+SWIFT_THREAD_LOCAL_TYPE(uintptr_t, tls_key::compatibility50) compat50Key;
 #pragma clang diagnostic pop
 
 } // namespace

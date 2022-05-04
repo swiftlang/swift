@@ -128,43 +128,58 @@ inline void _pthread_setspecific_direct(pthread_key_t k, void *v) {
 }
 #endif
 
-#define SWIFT_RUNTIME_TLS_KEY __PTK_FRAMEWORK_SWIFT_KEY0
-#define SWIFT_STDLIB_TLS_KEY __PTK_FRAMEWORK_SWIFT_KEY1
-#define SWIFT_COMPATIBILITY_50_TLS_KEY __PTK_FRAMEWORK_SWIFT_KEY2
-#define SWIFT_CONCURRENCY_TASK_KEY __PTK_FRAMEWORK_SWIFT_KEY3
-#define SWIFT_CONCURRENCY_EXECUTOR_TRACKING_INFO_KEY __PTK_FRAMEWORK_SWIFT_KEY4
-#define SWIFT_CONCURRENCY_FALLBACK_TASK_LOCAL_STORAGE_KEY                      \
-  __PTK_FRAMEWORK_SWIFT_KEY5
-#define SWIFT_RESERVED_TLS_KEY_6 __PTK_FRAMEWORK_SWIFT_KEY6
-#define SWIFT_RESERVED_TLS_KEY_7 __PTK_FRAMEWORK_SWIFT_KEY7
-#define SWIFT_RESERVED_TLS_KEY_8 __PTK_FRAMEWORK_SWIFT_KEY8
-#define SWIFT_RESERVED_TLS_KEY_9 __PTK_FRAMEWORK_SWIFT_KEY9
-
 #define SWIFT_TLS_DECLARE_DTOR(name) void name(void *)
 
-using tls_key = pthread_key_t;
-using tls_dtor = void (*)(void *);
+using tls_key_t = pthread_key_t;
+using tls_dtor_t = void (*)(void *);
 
-inline bool tls_init(tls_key key, tls_dtor dtor) {
+inline tls_key_t tls_get_key(tls_key k) {
+  switch (k) {
+  case tls_key::runtime:
+    return __PTK_FRAMEWORK_SWIFT_KEY0;
+  case tls_key::stdlib:
+    return __PTK_FRAMEWORK_SWIFT_KEY1;
+  case tls_key::compatibility50:
+    return __PTK_FRAMEWORK_SWIFT_KEY2;
+  case tls_key::concurrency_task:
+    return __PTK_FRAMEWORK_SWIFT_KEY3;
+  case tls_key::concurrency_executor_tracking_info:
+    return __PTK_FRAMEWORK_SWIFT_KEY4;
+  case tls_key::concurrency_fallback:
+    return __PTK_FRAMEWORK_SWIFT_KEY5;
+  }
+}
+
+inline bool tls_init(tls_key_t key, tls_dtor_t dtor) {
   return pthread_key_init_np(key, dtor) == 0;
 }
 
-inline bool tls_alloc(tls_key &key, tls_dtor dtor) {
+inline bool tls_init(tls_key key, tls_dtor_t dtor) {
+  return tls_init(tls_get_key(key), dtor);
+}
+
+inline bool tls_alloc(tls_key_t &key, tls_dtor_t dtor) {
   return pthread_key_create(&key, dtor) == 0;
 }
 
-inline void *tls_get(tls_key key) {
+inline void *tls_get(tls_key_t key) {
   if (_pthread_has_direct_tsd())
     return _pthread_getspecific_direct(key);
   else
     return pthread_getspecific(key);
 }
 
-inline void tls_set(tls_key key, void *value) {
+inline void *tls_get(tls_key key) { return tls_get(tls_get_key(key)); }
+
+inline void tls_set(tls_key_t key, void *value) {
   if (_pthread_has_direct_tsd())
     _pthread_setspecific_direct(key, value);
   else
     pthread_setspecific(key, value);
+}
+
+inline void tls_set(tls_key key, void *value) {
+  tls_set(tls_get_key(key), value);
 }
 
 } // namespace threading_impl

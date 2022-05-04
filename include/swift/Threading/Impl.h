@@ -18,6 +18,8 @@
 #ifndef SWIFT_THREADING_IMPL_H
 #define SWIFT_THREADING_IMPL_H
 
+#include "TLSKeys.h"
+
 // Try to autodetect if we aren't told what to do
 #if !SWIFT_THREADING_NONE && !SWIFT_THREADING_DARWIN &&                        \
     !SWIFT_THREADING_LINUX && !SWIFT_THREADING_PTHREADS &&                     \
