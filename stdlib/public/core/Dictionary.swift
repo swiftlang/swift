@@ -1397,11 +1397,12 @@ extension Dictionary {
     }
 
     public var description: String {
-      return _makeCollectionDescription()
+      _makeCollectionDescription()
     }
 
     public var debugDescription: String {
-      return _makeCollectionDescription(withTypeName: "Dictionary.Keys")
+      _makeCollectionDescription(
+        withTypeName: "Dictionary.Keys", usingDebugDescriptions: true)
     }
   }
 
@@ -1479,11 +1480,12 @@ extension Dictionary {
     }
 
     public var description: String {
-      return _makeCollectionDescription()
+      _makeCollectionDescription()
     }
 
     public var debugDescription: String {
-      return _makeCollectionDescription(withTypeName: "Dictionary.Values")
+      _makeCollectionDescription(
+        withTypeName: "Dictionary.Values", usingDebugDescriptions: true)
     }
 
     @inlinable
@@ -1675,13 +1677,13 @@ extension Collection {
   // list of elements.
   // FIXME: Doesn't use the withTypeName argument yet
   internal func _makeKeyValuePairDescription<K, V>(
-    withTypeName type: String? = nil
+    withTypeName type: String? = nil,
+    usingDebugDescriptions debug: Bool = false
   ) -> String where Element == (key: K, value: V) {
 #if !SWIFT_STDLIB_STATIC_PRINT
     if self.isEmpty {
       return "[:]"
     }
-    
     var result = "["
     var first = true
     for (k, v) in self {
@@ -1690,9 +1692,17 @@ extension Collection {
       } else {
         result += ", "
       }
-      debugPrint(k, terminator: "", to: &result)
+      if debug {
+        debugPrint(k, terminator: "", to: &result)
+      } else {
+        print(k, terminator: "", to: &result)
+      }
       result += ": "
-      debugPrint(v, terminator: "", to: &result)
+      if debug {
+        debugPrint(v, terminator: "", to: &result)
+      } else {
+        print(v, terminator: "", to: &result)
+      }
     }
     result += "]"
     return result
@@ -1705,13 +1715,13 @@ extension Collection {
 extension Dictionary: CustomStringConvertible, CustomDebugStringConvertible {
   /// A string that represents the contents of the dictionary.
   public var description: String {
-    return _makeKeyValuePairDescription()
+    _makeKeyValuePairDescription()
   }
 
   /// A string that represents the contents of the dictionary, suitable for
   /// debugging.
   public var debugDescription: String {
-    return _makeKeyValuePairDescription()
+    _makeKeyValuePairDescription(usingDebugDescriptions: true)
   }
 }
 

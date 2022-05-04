@@ -128,7 +128,7 @@ extension KeyValuePairs: RandomAccessCollection {
 extension KeyValuePairs: CustomStringConvertible {
   /// A string that represents the contents of the dictionary.
   public var description: String {
-    return _makeKeyValuePairDescription()
+    _makeKeyValuePairDescription()
   }
 }
 
@@ -136,7 +136,7 @@ extension KeyValuePairs: CustomDebugStringConvertible {
   /// A string that represents the contents of the dictionary, suitable for
   /// debugging.
   public var debugDescription: String {
-    return _makeKeyValuePairDescription()
+    _makeKeyValuePairDescription(usingDebugDescriptions: true)
   }
 }
 

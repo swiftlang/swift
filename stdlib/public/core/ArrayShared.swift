@@ -94,12 +94,18 @@ func _finalizeUninitializedArray<Element>(
 }
 #endif
 
-extension Collection {  
-  // Utility method for collections that wish to implement
-  // CustomStringConvertible and CustomDebugStringConvertible using a bracketed
-  // list of elements, like an array.
+extension Collection {
+  /// Utility method for collections that wish to implement
+  /// `CustomStringConvertible` and `CustomDebugStringConvertible` using a
+  /// bracketed list of elements, like an array.
+  ///
+  /// - Parameter type: If non-nil, wrap the generated description in an
+  ///     emulated initializer invocation for the specified type name.
+  /// - Parameter debug: If true, print elements using their debug-style
+  ///     descriptions. Otherwise use a regular string conversion.
   internal func _makeCollectionDescription(
-    withTypeName type: String? = nil
+    withTypeName type: String? = nil,
+    usingDebugDescriptions debug: Bool = false
   ) -> String {
 #if !SWIFT_STDLIB_STATIC_PRINT
     var result = ""
@@ -116,7 +122,11 @@ extension Collection {
       } else {
         result += ", "
       }
-      debugPrint(item, terminator: "", to: &result)
+      if debug {
+        debugPrint(item, terminator: "", to: &result)
+      } else {
+        print(item, terminator: "", to: &result)
+      }
     }
     result += type != nil ? "])" : "]"
     return result
