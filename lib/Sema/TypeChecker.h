@@ -1072,15 +1072,17 @@ checkConformanceAvailability(const RootProtocolConformance *Conf,
 /// expression or statement.
 void checkIgnoredExpr(Expr *E);
 
-// Emits a diagnostic, if necessary, for a reference to a declaration
-// that is potentially unavailable at the given source location.
-void diagnosePotentialUnavailability(const ValueDecl *D,
+// Emits a diagnostic for a reference to a declaration that is potentially
+// unavailable at the given source location. Returns true if an error diagnostic
+// was emitted.
+bool diagnosePotentialUnavailability(const ValueDecl *D,
                                      SourceRange ReferenceRange,
                                      const DeclContext *ReferenceDC,
-                                     const UnavailabilityReason &Reason);
+                                     const UnavailabilityReason &Reason,
+                                     bool WarnBeforeDeploymentTarget);
 
-// Emits a diagnostic, if necessary, for a reference to a declaration
-// that is potentially unavailable at the given source location.
+// Emits a diagnostic for a protocol conformance that is potentially
+// unavailable at the given source location.
 void diagnosePotentialUnavailability(const RootProtocolConformance *rootConf,
                                      const ExtensionDecl *ext,
                                      SourceLoc loc,
