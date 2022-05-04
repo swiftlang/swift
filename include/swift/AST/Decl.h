@@ -6266,7 +6266,8 @@ private:
 
 public:
   /// Get all derivative function configurations.
-  ArrayRef<AutoDiffConfig> getDerivativeFunctionConfigurations();
+  ArrayRef<AutoDiffConfig>
+  getDerivativeFunctionConfigurations(bool NonPrimaryLookup = true);
 
   /// Add the given derivative function configuration.
   void addDerivativeFunctionConfiguration(const AutoDiffConfig &config);

@@ -8311,7 +8311,7 @@ void AbstractFunctionDecl::prepareDerivativeFunctionConfigurations() {
 }
 
 ArrayRef<AutoDiffConfig>
-AbstractFunctionDecl::getDerivativeFunctionConfigurations() {
+AbstractFunctionDecl::getDerivativeFunctionConfigurations(bool NonPrimaryLookup) {
   prepareDerivativeFunctionConfigurations();
 
   // Resolve derivative function configurations from `@differentiable`
@@ -8357,9 +8357,12 @@ AbstractFunctionDecl::getDerivativeFunctionConfigurations() {
   };
 
   // Load derivative configurations from @derivative attributes defined in
-  // non-primary sources
-  DerivativeFinder finder(this);
-  getParent()->walkContext(finder);
+  // non-primary sources. Note that it might trigger lookup cycles if called
+  // from inside Sema stages
+  if (NonPrimaryLookup) {
+    DerivativeFinder finder(this);
+    getParent()->walkContext(finder);
+  }
 
   return DerivativeFunctionConfigs->getArrayRef();
 }
