@@ -134,6 +134,7 @@ EXPECTED_DEFAULTS = {
     'cross_compile_append_host_target_to_destdir': True,
     'cross_compile_deps_path': None,
     'cross_compile_hosts': [],
+    'custom_native_toolchain': None,
     'darwin_deployment_version_ios':
         defaults.DARWIN_DEPLOYMENT_VERSION_IOS,
     'darwin_deployment_version_osx':
@@ -718,6 +719,7 @@ EXPECTED_OPTIONS = [
     PathOption('--install-symroot'),
     PathOption('--install-destdir'),
     EnableOption('--install-all'),
+    PathOption('--custom-native-toolchain'),
     PathOption('--native-clang-tools-path'),
     PathOption('--native-llvm-tools-path'),
     PathOption('--native-swift-tools-path'),

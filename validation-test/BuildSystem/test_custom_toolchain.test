@@ -1,0 +1,13 @@
+# RUN: %empty-directory(%t)
+# RUN: mkdir -p %t
+# RUN: touch %t/cmake %t/clang %t/clang++ %t/ninja %t/swiftc
+# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --skip-build --skip-early-swift-driver --custom-native-toolchain %t --cmark --static-curl --swiftpm 2>&1 | %FileCheck %s
+
+# Check cmark (cmake build-script product)
+
+# CHECK-LABEL: --- Building cmark ---
+# CHECK: [[$CUSTOM_TOOLCHAIN_PATH:BUILD_DIR/validation-test-[^/]*/BuildSystem/Output/test_custom_toolchain.test.tmp/]]cmake
+# CHECK-SAME: -DCMAKE_C_COMPILER:PATH=[[$CUSTOM_TOOLCHAIN_PATH]]clang
+# CHECK-SAME: -DCMAKE_CXX_COMPILER:PATH=[[$CUSTOM_TOOLCHAIN_PATH]]clang++
+# CHECK-SAME: -DCMAKE_Swift_COMPILER:PATH=[[$CUSTOM_TOOLCHAIN_PATH]]swiftc
+# CHECK-SAME: -DCMAKE_MAKE_PROGRAM=[[$CUSTOM_TOOLCHAIN_PATH]]ninja
