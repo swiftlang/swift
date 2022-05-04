@@ -34,7 +34,7 @@ _ = ()
 
 public func launchToday(fc: FinalCountdown) {
   // Check if the setter is not transparent and therefore does not try to
-  // reference the hidden offet variable symbol in the module.
+  // reference the hidden offset variable symbol in the module.
   fc.count = 27
 }
 
