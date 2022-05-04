@@ -877,7 +877,7 @@ public:
   //
   // Using Objective-C runtime, KVO can modify object behavior without needing
   // to modify the object's code. This is done by dynamically creating an
-  // artificial subclass of the the object's type.
+  // artificial subclass of the object's type.
   //
   // The isa pointer of the observed object is swapped out to point to
   // the artificial subclass, which has the following properties:

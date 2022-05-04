@@ -1033,13 +1033,13 @@ private:
       auto parentOffsetAddress = detail::applyRelativeOffset(
           (const char *)contextDescriptorAddress,
           (int32_t)contextDescriptor->getParentOffset());
-      auto parentOfsetBytes = OpaqueByteReader(
+      auto parentOffsetBytes = OpaqueByteReader(
           remote::RemoteAddress(parentOffsetAddress), sizeof(uint32_t));
-      if (!parentOfsetBytes.get()) {
+      if (!parentOffsetBytes.get()) {
         Error = "Failed to parent offset in a type descriptor.";
         return llvm::None;
       }
-      auto parentFieldOffset = (const int32_t *)parentOfsetBytes.get();
+      auto parentFieldOffset = (const int32_t *)parentOffsetBytes.get();
       auto parentTargetAddress = detail::applyRelativeOffset(
           (const char *)parentOffsetAddress, *parentFieldOffset);
 
@@ -1128,13 +1128,13 @@ private:
       auto typeNameOffsetAddress =
           detail::applyRelativeOffset((const char *)typeDescriptorAddress,
                                       (int32_t)typeDescriptor->getNameOffset());
-      auto typeNameOfsetBytes = OpaqueByteReader(
+      auto typeNameOffsetBytes = OpaqueByteReader(
           remote::RemoteAddress(typeNameOffsetAddress), sizeof(uint32_t));
-      if (!typeNameOfsetBytes.get()) {
+      if (!typeNameOffsetBytes.get()) {
         Error = "Failed to read type name offset in a type descriptor.";
         return llvm::None;
       }
-      auto typeNameOffset = (const uint32_t *)typeNameOfsetBytes.get();
+      auto typeNameOffset = (const uint32_t *)typeNameOffsetBytes.get();
       auto typeNameAddress = detail::applyRelativeOffset(
           (const char *)typeNameOffsetAddress, (int32_t)*typeNameOffset);
       std::string typeName;
@@ -1149,15 +1149,15 @@ private:
       auto parentNameOffsetAddress = detail::applyRelativeOffset(
           (const char *)moduleDescriptorAddress,
           (int32_t)moduleDescriptor->getNameOffset());
-      auto parentNameOfsetBytes = OpaqueByteReader(
+      auto parentNameOffsetBytes = OpaqueByteReader(
           remote::RemoteAddress(parentNameOffsetAddress), sizeof(uint32_t));
-      if (!parentNameOfsetBytes.get()) {
+      if (!parentNameOffsetBytes.get()) {
         Error = "Failed to read parent name offset in a module descriptor.";
         return llvm::None;
       }
-      auto parentNameOfset = (const uint32_t *)parentNameOfsetBytes.get();
+      auto parentNameOffset = (const uint32_t *)parentNameOffsetBytes.get();
       auto parentNameAddress = detail::applyRelativeOffset(
-          (const char *)parentNameOffsetAddress, (int32_t)*parentNameOfset);
+          (const char *)parentNameOffsetAddress, (int32_t)*parentNameOffset);
       std::string parentName;
       OpaqueStringReader(remote::RemoteAddress(parentNameAddress), parentName);
       return parentName;
@@ -1183,13 +1183,13 @@ private:
       auto protocolNameOffsetAddress = detail::applyRelativeOffset(
           (const char *)protocolDescriptorAddress,
           (int32_t)protocolDescriptor->getNameOffset());
-      auto protocolNameOfsetBytes = OpaqueByteReader(
+      auto protocolNameOffsetBytes = OpaqueByteReader(
           remote::RemoteAddress(protocolNameOffsetAddress), sizeof(uint32_t));
-      if (!protocolNameOfsetBytes.get()) {
+      if (!protocolNameOffsetBytes.get()) {
         Error = "Failed to read type name offset in a protocol descriptor.";
         return llvm::None;
       }
-      auto protocolNameOffset = (const uint32_t *)protocolNameOfsetBytes.get();
+      auto protocolNameOffset = (const uint32_t *)protocolNameOffsetBytes.get();
 
       // Using the offset above, compute the address of the name field itsel
       // and read it.
