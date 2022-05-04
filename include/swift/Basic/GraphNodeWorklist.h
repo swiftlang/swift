@@ -23,7 +23,7 @@
 /// also be used within hybrid worklist/recursive traversal by recording the
 /// size of the worklist at each level of recursion.
 ///
-/// The primary API has two methods: intialize() and pop(). Others are provided
+/// The primary API has two methods: initialize() and pop(). Others are provided
 /// for flexibility.
 template <typename T, unsigned SmallSize>
 struct GraphNodeWorklist {

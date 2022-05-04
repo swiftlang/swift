@@ -79,7 +79,7 @@ struct Tester {
     EXPECT_EQ(key.begin() + stdmapResult->first.size(), premapResult.second);
   }
 
-  // Perform a clear operation.  Tests that that actually clears out the map.
+  // Perform a clear operation.  Tests that the operation actually clears out the map.
   void clear() {
     StdMap.clear();
     PreMap.clear();
