@@ -141,7 +141,7 @@ public:
 
 /// Same as \c OwnedSyntaxRef but can be null. We don't use \c
 /// Optional<OwnedSyntaxRef<SyntaxRefType>>>, because then we couldn't access
-/// the underlying \c SytnaxRefType via the \c -> operator (the use of \c ->
+/// the underlying \c SyntaxRefType via the \c -> operator (the use of \c ->
 /// would access the \c OwnedSyntaxRef<SyntaxRefType> wrapped by \c Optional and
 /// not the \c SyntaxRefType wrapped by \c OwnedSyntaxRef.
 template <typename SyntaxRefType>
