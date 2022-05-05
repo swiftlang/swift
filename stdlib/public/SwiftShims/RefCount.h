@@ -626,9 +626,8 @@ class RefCountBitsT {
 
 typedef RefCountBitsT<RefCountIsInline> InlineRefCountBits;
 
-class alignas(2 * sizeof(void*)) SideTableRefCountBits
-    : public swift::aligned_alloc<2 * sizeof(void *)>,
-      public RefCountBitsT<RefCountNotInline> {
+class alignas(sizeof(void*) * 2) SideTableRefCountBits : public RefCountBitsT<RefCountNotInline>
+{
   uint32_t weakBits;
 
   public:
