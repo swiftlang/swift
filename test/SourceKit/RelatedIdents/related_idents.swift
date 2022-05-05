@@ -93,6 +93,18 @@ func closureCaptureWithExplicitName() {
   }
 }
 
+func shorthandIfLet(test: Int?) {
+  if let test {
+    print(test)
+  }
+}
+
+func ifLet(test: Int?) {
+  if let test = test {
+    print(test)
+  }
+}
+
 // RUN: %sourcekitd-test -req=related-idents -pos=6:17 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK1 %s
 // CHECK1: START RANGES
 // CHECK1-NEXT: 1:7 - 2
@@ -208,3 +220,26 @@ func closureCaptureWithExplicitName() {
 // CHECK14-NEXT: 91:20 - 4
 // CHECK14-NEXT: 92:11 - 4
 // CHECK14-NEXT: END RANGES
+
+// RUN: %sourcekitd-test -req=related-idents -pos=96:21 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK15 %s
+// RUN: %sourcekitd-test -req=related-idents -pos=97:10 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK15 %s
+// RUN: %sourcekitd-test -req=related-idents -pos=98:11 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK15 %s
+// CHECK15:      START RANGES
+// CHECK15-NEXT: 96:21 - 4
+// CHECK15-NEXT: 97:10 - 4
+// CHECK15-NEXT: 98:11 - 4
+// CHECK15-NEXT: END RANGES
+
+// RUN: %sourcekitd-test -req=related-idents -pos=102:12 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK16 %s
+// RUN: %sourcekitd-test -req=related-idents -pos=103:17 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK16 %s
+// CHECK16:      START RANGES
+// CHECK16-NEXT: 102:12 - 4
+// CHECK16-NEXT: 103:17 - 4
+// CHECK16-NEXT: END RANGES
+
+// RUN: %sourcekitd-test -req=related-idents -pos=103:10 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK17 %s
+// RUN: %sourcekitd-test -req=related-idents -pos=104:11 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK17 %s
+// CHECK17:      START RANGES
+// CHECK17-NEXT: 103:10 - 4
+// CHECK17-NEXT: 104:11 - 4
+// CHECK17-NEXT: END RANGES

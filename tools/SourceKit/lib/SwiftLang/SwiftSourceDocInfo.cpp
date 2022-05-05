@@ -2234,6 +2234,41 @@ private:
     return true;
   }
 
+  bool walkToStmtPre(Stmt *S) override {
+    if (Cancelled)
+      return false;
+
+    if (auto CondStmt = dyn_cast<LabeledConditionalStmt>(S)) {
+      for (const StmtConditionElement &Cond : CondStmt->getCond()) {
+        if (Cond.getKind() != StmtConditionElement::CK_PatternBinding) {
+          continue;
+        }
+        auto Init = dyn_cast<DeclRefExpr>(Cond.getInitializer());
+        if (!Init) {
+          continue;
+        }
+        auto ReferencedVar = dyn_cast_or_null<VarDecl>(Init->getDecl());
+        if (!ReferencedVar) {
+          continue;
+        }
+
+        Cond.getPattern()->forEachVariable([&](VarDecl *DeclaredVar) {
+          if (DeclaredVar->getLoc() != Init->getLoc()) {
+            return;
+          }
+          assert(DeclaredVar->getName() == ReferencedVar->getName());
+          if (DeclaredVar == Dcl) {
+            RelatedDecls.push_back(ReferencedVar);
+          }
+          if (ReferencedVar == Dcl) {
+            RelatedDecls.push_back(DeclaredVar);
+          }
+        });
+      }
+    }
+    return true;
+  }
+
   bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
     if (Cancelled)
       return false;
