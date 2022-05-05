@@ -333,6 +333,30 @@ static bool computeContainedByDeploymentTarget(TypeRefinementContext *TRC,
                   .isContainedIn(AvailabilityContext::forDeploymentTarget(ctx));
 }
 
+/// Returns true if the reference or any of its parents is an
+/// unconditional unavailable declaration for the same platform.
+static bool isInsideCompatibleUnavailableDeclaration(
+    const Decl *D, const ExportContext &where, const AvailableAttr *attr) {
+  auto referencedPlatform = where.getUnavailablePlatformKind();
+  if (!referencedPlatform)
+    return false;
+
+  if (!attr->isUnconditionallyUnavailable()) {
+    return false;
+  }
+
+  // Refuse calling unavailable functions from unavailable code,
+  // but allow the use of types.
+  PlatformKind platform = attr->Platform;
+  if (platform == PlatformKind::none && !isa<TypeDecl>(D) &&
+      !isa<ExtensionDecl>(D)) {
+    return false;
+  }
+
+  return (*referencedPlatform == platform ||
+          inheritsAvailabilityFromPlatform(platform, *referencedPlatform));
+}
+
 namespace {
 
 /// A class to walk the AST to build the type refinement context hierarchy.
@@ -1191,6 +1215,12 @@ bool TypeChecker::isDeclarationUnavailable(
 Optional<UnavailabilityReason>
 TypeChecker::checkDeclarationAvailability(const Decl *D,
                                           const ExportContext &Where) {
+  // Skip computing potential unavailability if the declaration is explicitly
+  // unavailable and the context is also unavailable.
+  if (const AvailableAttr *Attr = AvailableAttr::isUnavailable(D))
+    if (isInsideCompatibleUnavailableDeclaration(D, Where, Attr))
+      return None;
+
   if (isDeclarationUnavailable(D, Where.getDeclContext(), [&Where] {
         return Where.getAvailabilityContext();
       })) {
@@ -2011,33 +2041,6 @@ const AvailableAttr *TypeChecker::getDeprecated(const Decl *D) {
   }
 
   return nullptr;
-}
-
-/// Returns true if the reference or any of its parents is an
-/// unconditional unavailable declaration for the same platform.
-static bool isInsideCompatibleUnavailableDeclaration(
-    const Decl *D, const ExportContext &where,
-    const AvailableAttr *attr) {
-  auto referencedPlatform = where.getUnavailablePlatformKind();
-  if (!referencedPlatform)
-    return false;
-
-  if (!attr->isUnconditionallyUnavailable()) {
-    return false;
-  }
-
-  // Refuse calling unavailable functions from unavailable code,
-  // but allow the use of types.
-  PlatformKind platform = attr->Platform;
-  if (platform == PlatformKind::none &&
-      !isa<TypeDecl>(D) &&
-      !isa<ExtensionDecl>(D)) {
-    return false;
-  }
-
-  return (*referencedPlatform == platform ||
-          inheritsAvailabilityFromPlatform(platform,
-                                           *referencedPlatform));
 }
 
 static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
