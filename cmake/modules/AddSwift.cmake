@@ -718,7 +718,7 @@ function(add_swift_host_tool executable)
 
       elseif(BOOTSTRAPPING_MODE STREQUAL "CROSSCOMPILE-WITH-HOSTLIBS")
 
-        # Intentinally don't add the lib dir of the cross-compiled compiler, so that
+        # Intentionally don't add the lib dir of the cross-compiled compiler, so that
         # the stdlib is not picked up from there, but from the SDK.
         # This requires to explicitly add all the needed compatibility libraries. We
         # can take them from the current build.
@@ -785,7 +785,7 @@ function(add_swift_host_tool executable)
   elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD" AND ASHT_HAS_SWIFT_MODULES AND BOOTSTRAPPING_MODE)
     set(swiftrt "swiftImageRegistrationObject${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_OBJECT_FORMAT}-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}")
     if(${BOOTSTRAPPING_MODE} MATCHES "HOSTTOOLS|CROSSCOMPILE")
-      # At build time and and run time, link against the swift libraries in the
+      # At build time and run time, link against the swift libraries in the
       # installed host toolchain.
       get_filename_component(swift_bin_dir ${SWIFT_EXEC_FOR_SWIFT_MODULES} DIRECTORY)
       get_filename_component(swift_dir ${swift_bin_dir} DIRECTORY)
