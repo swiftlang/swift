@@ -47,6 +47,15 @@ public struct StructWithAssocType: ProtoWithAssocType {
 
 public func makeProtoWithAssocType() -> some ProtoWithAssocType { return StructWithAssocType() }
 
+@propertyWrapper
+public struct MyPropertyWrapper {
+  public var wrappedValue: String
+
+  public init(wrappedValue: String) {
+    self.wrappedValue = wrappedValue
+  }
+}
+
 // BEGIN test.swift
 
 import Lib
@@ -203,7 +212,7 @@ func protoWithAssocTypeInOpaqueContext() -> some ProtoWithAssocType {
 }
 
 // RUN: %empty-directory(%t/completion-cache)
-// RUN: %target-swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token PROTO_WITH_ASSOC_TYPE_GENERIC_RETURN_CONTEXT -completion-cache-path %t/completion-cache -I %t/ImportPath
+// RUN: %target-swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token PROTO_WITH_ASSOC_TYPE_GENERIC_RETURN_CONTEXT -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=PROTO_WITH_ASSOC_TYPE_GENERIC_RETURN_CONTEXT
 // Perform the same completion again, this time using the code completion cache
 // RUN: %target-swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token PROTO_WITH_ASSOC_TYPE_GENERIC_RETURN_CONTEXT -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=PROTO_WITH_ASSOC_TYPE_GENERIC_RETURN_CONTEXT
 func protoWithAssocTypeInGenericContext<T: ProtoWithAssocType>() -> T {
@@ -216,3 +225,17 @@ func protoWithAssocTypeInGenericContext<T: ProtoWithAssocType>() -> T {
 // PROTO_WITH_ASSOC_TYPE_GENERIC_RETURN_CONTEXT-DAG: Decl[Protocol]/OtherModule[Lib]/Flair[RareType]: ProtoWithAssocType[#ProtoWithAssocType#];
 // PROTO_WITH_ASSOC_TYPE_GENERIC_RETURN_CONTEXT: End completions
 
+
+// RUN: %empty-directory(%t/completion-cache)
+// RUN: %target-swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token PROPERTY_WRAPPER -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=PROPERTY_WRAPPER
+// Perform the same completion again, this time using the code completion cache
+// RUN: %target-swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token PROPERTY_WRAPPER -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=PROPERTY_WRAPPER
+
+struct TestPropertyWrapper {
+  @#^PROPERTY_WRAPPER^# var foo: String
+}
+
+// PROPERTY_WRAPPER: Begin completions
+// PROPERTY_WRAPPER-DAG: Decl[Struct]/OtherModule[Lib]/TypeRelation[Convertible]: MyPropertyWrapper[#MyPropertyWrapper#];
+// PROPERTY_WRAPPER-DAG: Decl[Struct]/OtherModule[Lib]: StructWithAssocType[#StructWithAssocType#];
+// PROPERTY_WRAPPER: End completions
