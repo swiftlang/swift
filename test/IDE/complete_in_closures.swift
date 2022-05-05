@@ -396,3 +396,23 @@ func testSignature() {
 
     // NOTE: For effects specifiers completion (e.g. '() <HERE> -> Void') see test/IDE/complete_concurrency_specifier.swift
 }
+
+func testClosureInPatternBindingInit() {
+  enum DragState {
+    case dragging(translation: Int, predictedLocation: Int)
+  }
+
+  func pnChanged(_ action: () -> Void) {}
+
+  func foo() {
+    var gestureViewState: DragState = .dragging(translation: 0, predictedLocation: 0)
+    let longPressDrag = pnChanged {
+      _ = 1
+      gestureViewState = .dragging(translation: 0, #^CLOSURE_IN_PATTERN_BINDING^#predictedLocation: 0)
+    }
+  }
+  // CLOSURE_IN_PATTERN_BINDING: Begin completions, 1 items
+  // CLOSURE_IN_PATTERN_BINDING-DAG: Pattern/Local/Flair[ArgLabels]:     {#predictedLocation: Int#}[#Int#];
+  // CLOSURE_IN_PATTERN_BINDING: End completion
+
+}
