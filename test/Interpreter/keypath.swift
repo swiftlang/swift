@@ -37,7 +37,7 @@ public class GenericController<U> {
   fileprivate let label = MyLabel()
 }
 
-public func generic_class_constrainted_keypath<U, V>(_ c: V) where V : GenericController<U> {
+public func generic_class_constrained_keypath<U, V>(_ c: V) where V : GenericController<U> {
   let kp = \V.label
   print(kp)
   print(c[keyPath: kp].text)
@@ -45,4 +45,4 @@ public func generic_class_constrainted_keypath<U, V>(_ c: V) where V : GenericCo
 
 // CHECK: Swift.KeyPath<main.GenericController<Swift.Int>, main.MyLabel>
 // CHECK: label
-generic_class_constrainted_keypath(GenericController(5))
+generic_class_constrained_keypath(GenericController(5))
