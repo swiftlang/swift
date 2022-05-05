@@ -40,6 +40,8 @@
 // NON_MIN: {'BetweenTargets' is only available in}
 
 
+// MARK: - Struct definitions
+
 /// Declaration with no availability annotation. Should be inferred as minimum
 /// inlining target.
 public struct NoAvailable {
@@ -70,6 +72,40 @@ public struct AtDeploymentTarget {
 public struct AfterDeploymentTarget {
   @usableFromInline internal init() {}
 }
+
+@available(macOS, unavailable)
+@available(iOS, unavailable)
+@available(tvOS, unavailable)
+@available(watchOS, unavailable)
+public struct Unavailable {
+  @usableFromInline internal init() {}
+}
+
+// MARK: - Protocol definitions
+
+public protocol NoAvailableProto {}
+
+@available(macOS 10.9, iOS 7.0, tvOS 8.0, watchOS 1.0, *)
+public protocol BeforeInliningTargetProto {}
+
+@available(macOS 10.10, iOS 8.0, tvOS 9.0, watchOS 2.0, *)
+public protocol AtInliningTargetProto {}
+
+@available(macOS 10.14.5, iOS 12.3, tvOS 12.3, watchOS 5.3, *)
+public protocol BetweenTargetsProto {}
+
+@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+public protocol AtDeploymentTargetProto {}
+
+@available(macOS 11, iOS 14, tvOS 14, watchOS 7, *)
+public protocol AfterDeploymentTargetProto {}
+
+@available(macOS, unavailable)
+@available(iOS, unavailable)
+@available(tvOS, unavailable)
+@available(watchOS, unavailable)
+public protocol UnavailableProto {}
+
 
 // MARK: - Internal functions
 
@@ -254,6 +290,61 @@ public func deployedUseAfterDeploymentTarget(
   _ = AfterDeploymentTarget()
 }
 
+@available(macOS, unavailable)
+@available(iOS, unavailable)
+@available(tvOS, unavailable)
+@available(watchOS, unavailable)
+public func alwaysUnavailable(
+  _: NoAvailable,
+  _: BeforeInliningTarget,
+  _: AtInliningTarget,
+  _: BetweenTargets,
+  _: AtDeploymentTarget,
+  _: AfterDeploymentTarget,
+  _: Unavailable
+) {
+  defer {
+    _ = AtDeploymentTarget()
+    _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
+  }
+  _ = NoAvailable()
+  _ = BeforeInliningTarget()
+  _ = AtInliningTarget()
+  _ = BetweenTargets()
+  _ = AtDeploymentTarget()
+  _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
+  _ = Unavailable()
+  
+  if #available(macOS 11, iOS 14, tvOS 14, watchOS 7, *) {
+    _ = AfterDeploymentTarget()
+  }
+}
+
+@_spi(Private)
+public func spiDeployedUseNoAvailable( // expected-note 5 {{add @available attribute}}
+  _: NoAvailable,
+  _: BeforeInliningTarget,
+  _: AtInliningTarget,
+  // FIXME: Next two should be accepted (SPI)
+  _: BetweenTargets, // expected-error {{'BetweenTargets' is only available in}}
+  _: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in}}
+  _: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in}}
+) {
+  defer {
+    _ = AtDeploymentTarget()
+    _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
+  }
+  _ = NoAvailable()
+  _ = BeforeInliningTarget()
+  _ = AtInliningTarget()
+  _ = BetweenTargets()
+  _ = AtDeploymentTarget()
+  _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
+
+  if #available(macOS 11, iOS 14, tvOS 14, watchOS 7, *) {
+    _ = AfterDeploymentTarget()
+  }
+}
 
 // MARK: - @inlinable functions
 
@@ -428,6 +519,72 @@ public func deployedUseAfterDeploymentTarget(
   _ = AfterDeploymentTarget()
 }
 
+@available(macOS, unavailable)
+@available(iOS, unavailable)
+@available(tvOS, unavailable)
+@available(watchOS, unavailable)
+@inlinable public func inlinedAlwaysUnavailable(
+  _: NoAvailable,
+  _: BeforeInliningTarget,
+  _: AtInliningTarget,
+  _: BetweenTargets,
+  _: AtDeploymentTarget,
+  _: AfterDeploymentTarget, // FIXME: Why isn't this diagnosed?
+  _: Unavailable
+) {
+  defer {
+    // FIXME: Should be allowed for compatibility (unavailable)
+    _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
+    _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
+  }
+  _ = NoAvailable()
+  _ = BeforeInliningTarget()
+  _ = AtInliningTarget()
+  // FIXME: Next two should be accepted for compatibility (unavailable)
+  _ = BetweenTargets() // expected-error {{'BetweenTargets' is only available in}} expected-note {{add 'if #available'}}
+  _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
+  _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
+  _ = Unavailable()
+
+  if #available(macOS 10.14.5, iOS 12.3, tvOS 12.3, watchOS 5.3, *) {
+    _ = BetweenTargets()
+  }
+  if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
+    _ = AtDeploymentTarget()
+  }
+  if #available(macOS 11, iOS 14, tvOS 14, watchOS 7, *) {
+    _ = AfterDeploymentTarget()
+  }
+}
+
+@_spi(Private)
+@inlinable public func spiInlinedUseNoAvailable( // expected-note 8 {{add @available attribute}}
+  _: NoAvailable,
+  _: BeforeInliningTarget,
+  _: AtInliningTarget,
+  // FIXME: Next two should be accepted (SPI)
+  _: BetweenTargets, // expected-error {{'BetweenTargets' is only available in}}
+  _: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in}}
+  _: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in}}
+) {
+  defer {
+    // FIXME: Should be allowed (SPI)
+    _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
+    _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
+  }
+  _ = NoAvailable()
+  _ = BeforeInliningTarget()
+  _ = AtInliningTarget()
+  // FIXME: Next two should be accepted (SPI)
+  _ = BetweenTargets() // expected-error {{'BetweenTargets' is only available in}} expected-note {{add 'if #available'}}
+  _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
+  _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
+
+  if #available(macOS 11, iOS 14, tvOS 14, watchOS 7, *) {
+    _ = AfterDeploymentTarget()
+  }
+}
+
 
 // MARK: - @_alwaysEmitIntoClient functions
 
@@ -514,7 +671,42 @@ public func defaultArgsUseNoAvailable( // expected-note 3 {{add @available attri
   _: Any = AfterDeploymentTarget.self // expected-error {{'AfterDeploymentTarget' is only available in}}
 ) {}
 
-public struct PublicStruct { // expected-note 7 {{add @available attribute}}
+@available(macOS, unavailable)
+@available(iOS, unavailable)
+@available(tvOS, unavailable)
+@available(watchOS, unavailable)
+public func defaultArgsUseUnavailable(
+  _: Any = NoAvailable.self,
+  _: Any = BeforeInliningTarget.self,
+  _: Any = AtInliningTarget.self,
+  // FIXME: Next two should be accepted for compatibility (unavailable)
+  _: Any = BetweenTargets.self, // expected-error {{'BetweenTargets' is only available in}}
+  _: Any = AtDeploymentTarget.self, // expected-error {{'AtDeploymentTarget' is only available in}}
+  _: Any = AfterDeploymentTarget.self, // expected-error {{'AfterDeploymentTarget' is only available in}}
+  _: Any = Unavailable.self
+) {}
+
+@_spi(Private)
+public func spiDefaultArgsUseNoAvailable( // expected-note 3 {{add @available attribute}}
+  _: Any = NoAvailable.self,
+  _: Any = BeforeInliningTarget.self,
+  _: Any = AtInliningTarget.self,
+  // FIXME: Next two should be accepted (SPI)
+  _: Any = BetweenTargets.self, // expected-error {{'BetweenTargets' is only available in}}
+  _: Any = AtDeploymentTarget.self, // expected-error {{'AtDeploymentTarget' is only available in}}
+  _: Any = AfterDeploymentTarget.self // expected-error {{'AfterDeploymentTarget' is only available in}}
+) {}
+
+@propertyWrapper
+public struct PropertyWrapper<T> {
+  public var wrappedValue: T
+
+  public init(_ value: T) {
+      self.wrappedValue = value
+  }
+}
+
+public struct PublicStruct { // expected-note 13 {{add @available attribute}}
   // Public declarations act like @inlinable.
   public var aPublic: NoAvailable
   public var bPublic: BeforeInliningTarget
@@ -522,14 +714,32 @@ public struct PublicStruct { // expected-note 7 {{add @available attribute}}
   public var dPublic: BetweenTargets // expected-error {{'BetweenTargets' is only available in}}
   public var ePublic: AtDeploymentTarget // expected-error {{'AtDeploymentTarget' is only available in}}
   public var fPublic: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in}}
+  
+  // The initializers of property wrappers are not inlined
+  @PropertyWrapper(NoAvailable()) public var aPublicWrapped: Any
+  @PropertyWrapper(BeforeInliningTarget()) public var bPublicWrapped: Any
+  @PropertyWrapper(AtInliningTarget()) public var cPublicWrapped: Any
+  // FIXME: The next two should not be diagnosed, the property wrapper inits are not inlined
+  @PropertyWrapper(BetweenTargets()) public var dPublicWrapped: Any // expected-error {{'BetweenTargets' is only available in}}
+  @PropertyWrapper(AtDeploymentTarget()) public var ePublicWrapped: Any // expected-error {{'AtDeploymentTarget' is only available in}}
+  @PropertyWrapper(AfterDeploymentTarget()) public var fPublicWrapped: Any // expected-error {{'AfterDeploymentTarget' is only available in}}
+
+  // Property initializers in resilient structs are non-inlinable.
+  public var aPublicInit: Any = NoAvailable()
+  public var bPublicInit: Any = BeforeInliningTarget()
+  public var cPublicInit: Any = AtInliningTarget()
+  // FIXME: The next two should not be diagnosed, the initializers are not inlined
+  public var dPublicInit: Any = BetweenTargets() // expected-error {{'BetweenTargets' is only available in}}
+  public var ePublicInit: Any = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in}}
+  public var fPublicInit: Any = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}}
 
   // Internal declarations act like non-inlinable.
-  var aInternal: NoAvailable
-  var bInternal: BeforeInliningTarget
-  var cInternal: AtInliningTarget
-  var dInternal: BetweenTargets
-  var eInternal: AtDeploymentTarget
-  var fInternal: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in}}
+  var aInternal: NoAvailable = .init()
+  var bInternal: BeforeInliningTarget = .init()
+  var cInternal: AtInliningTarget = .init()
+  var dInternal: BetweenTargets = .init()
+  var eInternal: AtDeploymentTarget = .init()
+  var fInternal: AfterDeploymentTarget = .init() // expected-error {{'AfterDeploymentTarget' is only available in}}
 
   @available(macOS 10.14.5, iOS 12.3, tvOS 12.3, watchOS 5.3, *)
   public internal(set) var internalSetter: Void {
@@ -555,7 +765,7 @@ public struct PublicStruct { // expected-note 7 {{add @available attribute}}
   }
 }
 
-@frozen public struct FrozenPublicStruct { // expected-note 6 {{add @available attribute}}
+@frozen public struct FrozenPublicStruct { // expected-note 12 {{add @available attribute}}
   // Public declarations act like @inlinable.
   public var aPublic: NoAvailable
   public var bPublic: BeforeInliningTarget
@@ -564,13 +774,86 @@ public struct PublicStruct { // expected-note 7 {{add @available attribute}}
   public var ePublic: AtDeploymentTarget // expected-error {{'AtDeploymentTarget' is only available in}}
   public var fPublic: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in}}
 
+  // Property initializers in frozen structs act like @inlinable.
+  public var aPublicInit: Any = NoAvailable()
+  public var bPublicInit: Any = BeforeInliningTarget()
+  public var cPublicInit: Any = AtInliningTarget()
+  public var dPublicInit: Any = BetweenTargets() // expected-error {{'BetweenTargets' is only available in}}
+  public var ePublicInit: Any = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in}}
+  public var fPublicInit: Any = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}}
+
   // Internal declarations act like @inlinable in a frozen struct.
-  var aInternal: NoAvailable
-  var bInternal: BeforeInliningTarget
-  var cInternal: AtInliningTarget
-  var dInternal: BetweenTargets // expected-error {{'BetweenTargets' is only available in}}
-  var eInternal: AtDeploymentTarget // expected-error {{'AtDeploymentTarget' is only available in}}
-  var fInternal: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in}}
+  var aInternal: NoAvailable = .init()
+  var bInternal: BeforeInliningTarget = .init()
+  var cInternal: AtInliningTarget = .init()
+  var dInternal: BetweenTargets = .init() // expected-error {{'BetweenTargets' is only available in}}
+  var eInternal: AtDeploymentTarget = .init() // expected-error {{'AtDeploymentTarget' is only available in}}
+  var fInternal: AfterDeploymentTarget = .init() // expected-error {{'AfterDeploymentTarget' is only available in}}
+  
+  @PropertyWrapper(NoAvailable()) var aInternalWrapped: Any
+  @PropertyWrapper(BeforeInliningTarget()) var bInternalWrapped: Any
+  @PropertyWrapper(AtInliningTarget()) var cInternalWrapped: Any
+  @PropertyWrapper(BetweenTargets()) var dInternalWrapped: Any // expected-error {{'BetweenTargets' is only available in}}
+  @PropertyWrapper(AtDeploymentTarget()) var eInternalWrapped: Any // expected-error {{'AtDeploymentTarget' is only available in}}
+  @PropertyWrapper(AfterDeploymentTarget()) var fInternalWrapped: Any // expected-error {{'AfterDeploymentTarget' is only available in}}
+}
+
+@available(macOS, unavailable)
+@available(iOS, unavailable)
+@available(tvOS, unavailable)
+@available(watchOS, unavailable)
+public struct UnavailablePublicStruct {
+  public var aPublic: NoAvailable
+  public var bPublic: BeforeInliningTarget
+  public var cPublic: AtInliningTarget
+  // FIXME: Next two should be accepted for compatibility (unavailable)
+  public var dPublic: BetweenTargets // expected-error {{'BetweenTargets' is only available in}}
+  public var ePublic: AtDeploymentTarget // expected-error {{'AtDeploymentTarget' is only available in}}
+  public var fPublic: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in}}
+  public var gPublic: Unavailable
+  
+  public var aPublicInit: Any = NoAvailable()
+  public var bPublicInit: Any = BeforeInliningTarget()
+  public var cPublicInit: Any = AtInliningTarget()
+  // FIXME: The next two should not be accepted, the default initializer is not inlined
+  public var dPublicInit: Any = BetweenTargets() // expected-error {{'BetweenTargets' is only available in}}
+  public var ePublicInit: Any = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in}}
+  public var fPublicInit: Any = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}}
+  public var gPublicInit: Any = Unavailable()
+
+  var aInternal: NoAvailable = .init()
+  var bInternal: BeforeInliningTarget = .init()
+  var cInternal: AtInliningTarget = .init()
+  var dInternal: BetweenTargets = .init()
+  var eInternal: AtDeploymentTarget = .init()
+  var fInternal: AfterDeploymentTarget = .init() // expected-error {{'AfterDeploymentTarget' is only available in}}
+  var gInternal: Unavailable = .init()
+}
+
+@_spi(Private)
+public struct SPIStruct { // expected-note 7 {{add @available attribute}}
+  public var aPublic: NoAvailable
+  public var bPublic: BeforeInliningTarget
+  public var cPublic: AtInliningTarget
+  // FIXME: Next two should be accepted (SPI)
+  public var dPublic: BetweenTargets // expected-error {{'BetweenTargets' is only available in}}
+  public var ePublic: AtDeploymentTarget // expected-error {{'AtDeploymentTarget' is only available in}}
+  public var fPublic: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in}}
+  
+  public var aPublicInit: Any = NoAvailable()
+  public var bPublicInit: Any = BeforeInliningTarget()
+  public var cPublicInit: Any = AtInliningTarget()
+  // FIXME: The next two should not be diagnosed, the initializers are not inlined
+  public var dPublicInit: Any = BetweenTargets() // expected-error {{'BetweenTargets' is only available in}}
+  public var ePublicInit: Any = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in}}
+  public var fPublicInit: Any = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}}
+
+  var aInternal: NoAvailable = .init()
+  var bInternal: BeforeInliningTarget = .init()
+  var cInternal: AtInliningTarget = .init()
+  var dInternal: BetweenTargets = .init()
+  var eInternal: AtDeploymentTarget = .init()
+  var fInternal: AfterDeploymentTarget = .init() // expected-error {{'AfterDeploymentTarget' is only available in}}
 }
 
 internal struct InternalStruct { // expected-note {{add @available attribute}}
@@ -634,6 +917,54 @@ extension BetweenTargets {
   public func publicFunc3() {}
 }
 
+// FIXME: Should be accepted (SPI)
+// expected-warning@+1 {{BetweenTargets' is only available in}} expected-note@+1 {{add @available attribute to enclosing extension}}
+extension BetweenTargets {
+  @_spi(Private)
+  public func spiFunc1() {}
+}
+
+// FIXME: Should be accepted (SPI)
+// expected-warning@+2 {{BetweenTargets' is only available in}} expected-note@+2 {{add @available attribute to enclosing extension}}
+@_spi(Private)
+extension BetweenTargets {
+  internal func internalFunc3() {}
+  private func privateFunc3() {}
+  fileprivate func fileprivateFunc3() {}
+  public func spiFunc2() {}
+}
+
+@available(macOS, unavailable)
+@available(iOS, unavailable)
+@available(tvOS, unavailable)
+@available(watchOS, unavailable)
+extension BetweenTargets {
+  public func inheritsUnavailable(
+    _: NoAvailable,
+    _: BeforeInliningTarget,
+    _: AtInliningTarget,
+    _: BetweenTargets,
+    _: AtDeploymentTarget,
+    _: AfterDeploymentTarget, // FIXME: Should be diagnosed
+    _: Unavailable
+  ) { }
+}
+
+// FIXME: Should be accepted (SPI)
+// expected-warning@+2 {{BetweenTargets' is only available in}}
+@_spi(Private)
+extension BetweenTargets { // expected-note 4 {{add @available attribute to enclosing extension}}
+  public func inheritsSPINoAvailable( // expected-note 3 {{add @available attribute to enclosing instance method}}
+    _: NoAvailable,
+    _: BeforeInliningTarget,
+    _: AtInliningTarget,
+    // FIXME: Next two should be accepted (SPI)
+    _: BetweenTargets, // expected-error {{'BetweenTargets' is only available in}}
+    _: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in}}
+    _: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in}}
+  ) { }
+}
+
 // Same availability as BetweenTargets but internal instead of public.
 @available(macOS 10.14.5, iOS 12.3, tvOS 12.3, watchOS 5.3, *)
 internal struct BetweenTargetsInternal {}
@@ -681,21 +1012,138 @@ extension AtDeploymentTarget: PublicProto {} // expected-error {{'AtDeploymentTa
 extension AfterDeploymentTarget: PublicProto {} // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add @available attribute to enclosing extension}}
 
 
+// MARK: - Associated types
+
+public protocol NoAvailableProtoWithAssoc { // expected-note 3 {{add @available attribute to enclosing protocol}}
+  associatedtype A: NoAvailableProto
+  associatedtype B: BeforeInliningTargetProto
+  associatedtype C: AtInliningTargetProto
+  associatedtype D: BetweenTargetsProto // expected-error {{'BetweenTargetsProto' is only available in}}
+  associatedtype E: AtDeploymentTargetProto // expected-error {{'AtDeploymentTargetProto' is only available in}}
+  associatedtype F: AfterDeploymentTargetProto // expected-error {{'AfterDeploymentTargetProto' is only available in}}
+}
+
+@available(macOS 10.9, iOS 7.0, tvOS 8.0, watchOS 1.0, *)
+public protocol BeforeInliningTargetProtoWithAssoc {
+  associatedtype A: NoAvailableProto
+  associatedtype B: BeforeInliningTargetProto
+  associatedtype C: AtInliningTargetProto
+  associatedtype D: BetweenTargetsProto // expected-error {{'BetweenTargetsProto' is only available in}}
+  associatedtype E: AtDeploymentTargetProto // expected-error {{'AtDeploymentTargetProto' is only available in}}
+  associatedtype F: AfterDeploymentTargetProto // expected-error {{'AfterDeploymentTargetProto' is only available in}}
+}
+
+@available(macOS 10.10, iOS 8.0, tvOS 9.0, watchOS 2.0, *)
+public protocol AtInliningTargetProtoWithAssoc {
+  associatedtype A: NoAvailableProto
+  associatedtype B: BeforeInliningTargetProto
+  associatedtype C: AtInliningTargetProto
+  associatedtype D: BetweenTargetsProto // expected-error {{'BetweenTargetsProto' is only available in}}
+  associatedtype E: AtDeploymentTargetProto // expected-error {{'AtDeploymentTargetProto' is only available in}}
+  associatedtype F: AfterDeploymentTargetProto // expected-error {{'AfterDeploymentTargetProto' is only available in}}
+}
+
+@available(macOS 10.14.5, iOS 12.3, tvOS 12.3, watchOS 5.3, *)
+public protocol BetweenTargetsProtoWithAssoc {
+  associatedtype A: NoAvailableProto
+  associatedtype B: BeforeInliningTargetProto
+  associatedtype C: AtInliningTargetProto
+  associatedtype D: BetweenTargetsProto
+  associatedtype E: AtDeploymentTargetProto // expected-error {{'AtDeploymentTargetProto' is only available in}}
+  associatedtype F: AfterDeploymentTargetProto // expected-error {{'AfterDeploymentTargetProto' is only available in}}
+}
+
+@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+public protocol AtDeploymentTargetProtoWithAssoc {
+  associatedtype A: NoAvailableProto
+  associatedtype B: BeforeInliningTargetProto
+  associatedtype C: AtInliningTargetProto
+  associatedtype D: BetweenTargetsProto
+  associatedtype E: AtDeploymentTargetProto
+  associatedtype F: AfterDeploymentTargetProto // expected-error {{'AfterDeploymentTargetProto' is only available in}}
+}
+
+@available(macOS 11, iOS 14, tvOS 14, watchOS 7, *)
+public protocol AfterDeploymentTargetProtoWithAssoc {
+  associatedtype A: NoAvailableProto
+  associatedtype B: BeforeInliningTargetProto
+  associatedtype C: AtInliningTargetProto
+  associatedtype D: BetweenTargetsProto
+  associatedtype E: AtDeploymentTargetProto
+  associatedtype F: AfterDeploymentTargetProto
+}
+
+@available(macOS, unavailable)
+@available(iOS, unavailable)
+@available(tvOS, unavailable)
+@available(watchOS, unavailable)
+public protocol UnavailableProtoWithAssoc {
+  associatedtype A: NoAvailableProto
+  associatedtype B: BeforeInliningTargetProto
+  associatedtype C: AtInliningTargetProto
+  // FIXME: Next two should be accepted for compatibility (unavailable)
+  associatedtype D: BetweenTargetsProto // expected-error {{'BetweenTargetsProto' is only available in}}
+  associatedtype E: AtDeploymentTargetProto // expected-error {{'AtDeploymentTargetProto' is only available in}}
+  associatedtype F: AfterDeploymentTargetProto // expected-error {{'AfterDeploymentTargetProto' is only available in}}
+  associatedtype G: UnavailableProto
+}
+
+@_spi(Private)
+public protocol SPINoAvailableProtoWithAssoc { // expected-note 3 {{add @available attribute to enclosing protocol}}
+  associatedtype A: NoAvailableProto
+  associatedtype B: BeforeInliningTargetProto
+  associatedtype C: AtInliningTargetProto
+  // FIXME: Next two should be accepted (SPI)
+  associatedtype D: BetweenTargetsProto // expected-error {{'BetweenTargetsProto' is only available in}}
+  associatedtype E: AtDeploymentTargetProto // expected-error {{'AtDeploymentTargetProto' is only available in}}
+  associatedtype F: AfterDeploymentTargetProto // expected-error {{'AfterDeploymentTargetProto' is only available in}}
+}
+
 // MARK: - Type aliases
 
-public typealias PublicNoAvailableAlias = NoAvailable
-public typealias PublicBeforeInliningTargetAlias = BeforeInliningTarget
-public typealias PublicAtInliningTargetAlias = AtInliningTarget
-public typealias PublicBetweenTargetsAlias = BetweenTargets // expected-error {{'BetweenTargets' is only available in}}
-public typealias PublicAtDeploymentTargetAlias = AtDeploymentTarget // expected-error {{'AtDeploymentTarget' is only available in}}
-public typealias PublicAfterDeploymentTargetAlias = AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in}}
+public enum PublicNoAvailableEnumWithTypeAliases { // expected-note 3 {{add @available attribute to enclosing enum}}
+  public typealias A = NoAvailable
+  public typealias B = BeforeInliningTarget
+  public typealias C = AtInliningTarget
+  public typealias D = BetweenTargets // expected-error {{'BetweenTargets' is only available in}} expected-note {{add @available attribute to enclosing type alias}}
+  public typealias E = AtDeploymentTarget // expected-error {{'AtDeploymentTarget' is only available in}} expected-note {{add @available attribute to enclosing type alias}}
+  public typealias F = AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add @available attribute to enclosing type alias}}
+}
 
-typealias InternalNoAvailableAlias = NoAvailable
-typealias InternalBeforeInliningTargetAlias = BeforeInliningTarget
-typealias InternalAtInliningTargetAlias = AtInliningTarget
-typealias InternalBetweenTargetsAlias = BetweenTargets
-typealias InternalAtDeploymentTargetAlias = AtDeploymentTarget
-typealias InternalAfterDeploymentTargetAlias = AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in}}
+@available(macOS, unavailable)
+@available(iOS, unavailable)
+@available(tvOS, unavailable)
+@available(watchOS, unavailable)
+public enum UnavailableEnumWithTypeAliases {
+  public typealias A = NoAvailable
+  public typealias B = BeforeInliningTarget
+  public typealias C = AtInliningTarget
+  // FIXME: Next two should be accepted for compatibility (unavailable)
+  public typealias D = BetweenTargets // expected-error {{'BetweenTargets' is only available in}} expected-note {{add @available attribute to enclosing type alias}}
+  public typealias E = AtDeploymentTarget // expected-error {{'AtDeploymentTarget' is only available in}} expected-note {{add @available attribute to enclosing type alias}}
+  public typealias F = AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add @available attribute to enclosing type alias}}
+  public typealias G = Unavailable
+}
+
+@_spi(Private)
+public enum SPIEnumWithTypeAliases { // expected-note 3 {{add @available attribute to enclosing enum}}
+  public typealias A = NoAvailable
+  public typealias B = BeforeInliningTarget
+  public typealias C = AtInliningTarget
+  // FIXME: Next two should be accepted (SPI)
+  public typealias D = BetweenTargets // expected-error {{'BetweenTargets' is only available in}} expected-note {{add @available attribute to enclosing type alias}}
+  public typealias E = AtDeploymentTarget // expected-error {{'AtDeploymentTarget' is only available in}} expected-note {{add @available attribute to enclosing type alias}}
+  public typealias F = AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add @available attribute to enclosing type alias}}
+}
+
+enum InternalNoAvailableEnumWithTypeAliases { // expected-note {{add @available attribute to enclosing enum}}
+  public typealias A = NoAvailable
+  public typealias B = BeforeInliningTarget
+  public typealias C = AtInliningTarget
+  public typealias D = BetweenTargets
+  public typealias E = AtDeploymentTarget
+  public typealias F = AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add @available attribute to enclosing type alias}}
+}
 
 
 // MARK: - Top-level code
