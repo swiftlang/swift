@@ -24,7 +24,6 @@
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/ExistentialContainer.h"
-#include "swift/Runtime/Heap.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/Once.h"
@@ -6158,15 +6157,9 @@ void swift::blockOnMetadataDependency(MetadataDependency root,
 #if !SWIFT_STDLIB_PASSTHROUGH_METADATA_ALLOCATOR
 
 namespace {
-  struct alignas(2 * sizeof(uintptr_t)) PoolRange
-      : swift::aligned_alloc<2 * sizeof(uintptr_t)> {
+  struct alignas(sizeof(uintptr_t) * 2) PoolRange {
     static constexpr uintptr_t PageSize = 16 * 1024;
     static constexpr uintptr_t MaxPoolAllocationSize = PageSize / 2;
-
-    constexpr PoolRange(char *Begin, size_t Remaining)
-        : Begin(Begin), Remaining(Remaining) {}
-
-    PoolRange() : Begin(nullptr), Remaining(0) {}
 
     /// The start of the allocation.
     char *Begin;
