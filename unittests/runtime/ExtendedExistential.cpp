@@ -1,4 +1,4 @@
-//===--- ExtendedExiential.cpp - Extended existential metadata unit tests -===//
+//===--- ExtendedExistential.cpp - Extended existential metadata unit tests -===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -398,7 +398,7 @@ TEST(TestExtendedExistential, overrideValueWitnesses) {
   EXPECT_EQ(vwtable0, &table);
 }
 
-TEST(TestExtendedExistential, defaultOpaqueValueWitnessses) {
+TEST(TestExtendedExistential, defaultOpaqueValueWitnesses) {
   auto shape0 = buildGlobalShape([]{
     return shape(
       shapeType(protocolType(P())),
@@ -441,7 +441,7 @@ TEST(TestExtendedExistential, defaultOpaqueValueWitnessses) {
   EXPECT_FALSE(vwtable2->isPOD());
 }
 
-TEST(TestExtendedExistential, defaultClassValueWitnessses) {
+TEST(TestExtendedExistential, defaultClassValueWitnesses) {
   auto shape0 = buildGlobalShape([]{
     return shape(
       special(SpecialKind::Class),
@@ -487,7 +487,7 @@ TEST(TestExtendedExistential, defaultClassValueWitnessses) {
   EXPECT_FALSE(vwtable2->isPOD());
 }
 
-TEST(TestExtendedExistential, defaultMetatypeValueWitnessses) {
+TEST(TestExtendedExistential, defaultMetatypeValueWitnesses) {
   auto shape0 = buildGlobalShape([]{
     return shape(
       special(SpecialKind::Metatype),
