@@ -10,12 +10,12 @@ import OtherModule
 
 extension Point {
   init(xx: Double, yy: Double) {
-    self.x = xx // expected-warning {{initializer for struct 'Point' must use "self.init(...)" or "self = ..." because it is not in module 'OtherModule'}}
+    self.x = xx // expected-warning {{initializer for struct 'Point' must use 'self.init(...)' or 'self = ...' because it is not in module 'OtherModule'}}
     self.y = yy
   }
 
   init(xx: Double) {
-    self.x = xx // expected-warning {{initializer for struct 'Point' must use "self.init(...)" or "self = ..." because it is not in module 'OtherModule'}}
+    self.x = xx // expected-warning {{initializer for struct 'Point' must use 'self.init(...)' or 'self = ...' because it is not in module 'OtherModule'}}
   } // expected-error {{return from initializer without initializing all stored properties}}
 
   init(xxx: Double, yyy: Double) {
@@ -35,7 +35,7 @@ extension Point {
   }
 
   init(other: Point, xx: Double) {
-    self.x = xx // expected-warning {{initializer for struct 'Point' must use "self.init(...)" or "self = ..." because it is not in module 'OtherModule'}}
+    self.x = xx // expected-warning {{initializer for struct 'Point' must use 'self.init(...)' or 'self = ...' because it is not in module 'OtherModule'}}
     self = other
   }
 
@@ -47,14 +47,14 @@ extension Point {
 
   init(other: Point, xx: Double, cond: Bool) {
     if cond { self = other }
-    self.x = xx // expected-warning {{initializer for struct 'Point' must use "self.init(...)" or "self = ..." on all paths because it is not in module 'OtherModule'}}
+    self.x = xx // expected-warning {{initializer for struct 'Point' must use 'self.init(...)' or 'self = ...' on all paths because it is not in module 'OtherModule'}}
     self.y = 0
   }
 }
 
 extension ImmutablePoint {
   init(xx: Double, yy: Double) {
-    self.x = xx // expected-warning {{initializer for struct 'ImmutablePoint' must use "self.init(...)" or "self = ..." because it is not in module 'OtherModule'}}
+    self.x = xx // expected-warning {{initializer for struct 'ImmutablePoint' must use 'self.init(...)' or 'self = ...' because it is not in module 'OtherModule'}}
     self.y = yy
   }
 
@@ -74,7 +74,7 @@ extension ImmutablePoint {
   }
 
   init(other: ImmutablePoint, xx: Double) {
-    self.x = xx // expected-warning {{initializer for struct 'ImmutablePoint' must use "self.init(...)" or "self = ..." because it is not in module 'OtherModule'}}
+    self.x = xx // expected-warning {{initializer for struct 'ImmutablePoint' must use 'self.init(...)' or 'self = ...' because it is not in module 'OtherModule'}}
     self = other // expected-error {{immutable value 'self.x' may only be initialized once}}
   }
 
@@ -93,7 +93,7 @@ extension ImmutablePoint {
 
 extension GenericPoint {
   init(xx: T, yy: T) {
-    self.x = xx // expected-warning {{initializer for struct 'GenericPoint<T>' must use "self.init(...)" or "self = ..." because it is not in module 'OtherModule'}}
+    self.x = xx // expected-warning {{initializer for struct 'GenericPoint<T>' must use 'self.init(...)' or 'self = ...' because it is not in module 'OtherModule'}}
     self.y = yy
   }
 
@@ -114,7 +114,7 @@ extension GenericPoint {
   }
 
   init(other: GenericPoint<T>, xx: T) {
-    self.x = xx // expected-warning {{initializer for struct 'GenericPoint<T>' must use "self.init(...)" or "self = ..." because it is not in module 'OtherModule'}}
+    self.x = xx // expected-warning {{initializer for struct 'GenericPoint<T>' must use 'self.init(...)' or 'self = ...' because it is not in module 'OtherModule'}}
     self = other
   }
 
@@ -126,14 +126,14 @@ extension GenericPoint {
 
   init(other: GenericPoint<T>, xx: T, cond: Bool) {
     if cond { self = other }
-    self.x = xx // expected-warning {{initializer for struct 'GenericPoint<T>' must use "self.init(...)" or "self = ..." on all paths because it is not in module 'OtherModule'}}
+    self.x = xx // expected-warning {{initializer for struct 'GenericPoint<T>' must use 'self.init(...)' or 'self = ...' on all paths because it is not in module 'OtherModule'}}
     self.y = xx
   }
 }
 
 extension GenericPoint where T == Double {
   init(xx: Double, yy: Double) {
-    self.x = xx // expected-warning {{initializer for struct 'GenericPoint<Double>' must use "self.init(...)" or "self = ..." because it is not in module 'OtherModule'}}
+    self.x = xx // expected-warning {{initializer for struct 'GenericPoint<Double>' must use 'self.init(...)' or 'self = ...' because it is not in module 'OtherModule'}}
     self.y = yy
   }
 
@@ -154,7 +154,7 @@ extension GenericPoint where T == Double {
   }
 
   init(other: GenericPoint<Double>, xx: Double) {
-    self.x = xx // expected-warning {{initializer for struct 'GenericPoint<Double>' must use "self.init(...)" or "self = ..." because it is not in module 'OtherModule'}}
+    self.x = xx // expected-warning {{initializer for struct 'GenericPoint<Double>' must use 'self.init(...)' or 'self = ...' because it is not in module 'OtherModule'}}
     self = other
   }
 
@@ -166,7 +166,7 @@ extension GenericPoint where T == Double {
 
   init(other: GenericPoint<Double>, xx: Double, cond: Bool) {
     if cond { self = other }
-    self.x = xx // expected-warning {{initializer for struct 'GenericPoint<Double>' must use "self.init(...)" or "self = ..." on all paths because it is not in module 'OtherModule'}}
+    self.x = xx // expected-warning {{initializer for struct 'GenericPoint<Double>' must use 'self.init(...)' or 'self = ...' on all paths because it is not in module 'OtherModule'}}
     self.y = 0
   }
 }
@@ -176,14 +176,14 @@ typealias MyGenericPoint<Q> = GenericPoint<Q>
 extension MyGenericPoint {
   // FIXME: Should preserve type sugar.
   init(myX: T, myY: T) {
-    self.x = myX // expected-warning {{initializer for struct 'GenericPoint<T>' must use "self.init(...)" or "self = ..." because it is not in module 'OtherModule'}}
+    self.x = myX // expected-warning {{initializer for struct 'GenericPoint<T>' must use 'self.init(...)' or 'self = ...' because it is not in module 'OtherModule'}}
     self.y = myY
   }
 }
 
 extension CPoint {
   init(xx: Double, yy: Double) {
-    self.x = xx // expected-warning {{initializer for struct 'CPoint' must use "self.init(...)" or "self = ..." because the struct was imported from C}} expected-note {{use "self.init()" to initialize the struct with zero values}} {{5-5=self.init()\n}}
+    self.x = xx // expected-warning {{initializer for struct 'CPoint' must use 'self.init(...)' or 'self = ...' because the struct was imported from C}} expected-note {{use 'self.init()' to initialize the struct with zero values}} {{5-5=self.init()\n}}
     self.y = yy
   }
 
@@ -204,7 +204,7 @@ extension CPoint {
   }
 
   init(other: CPoint, xx: Double) {
-    self.x = xx // expected-warning {{initializer for struct 'CPoint' must use "self.init(...)" or "self = ..." because the struct was imported from C}} expected-note {{use "self.init()" to initialize the struct with zero values}} {{5-5=self.init()\n}}
+    self.x = xx // expected-warning {{initializer for struct 'CPoint' must use 'self.init(...)' or 'self = ...' because the struct was imported from C}} expected-note {{use 'self.init()' to initialize the struct with zero values}} {{5-5=self.init()\n}}
     self = other
   }
 
@@ -216,7 +216,7 @@ extension CPoint {
 
   init(other: CPoint, xx: Double, cond: Bool) {
     if cond { self = other }
-    self.x = xx // expected-warning {{initializer for struct 'CPoint' must use "self.init(...)" or "self = ..." on all paths because the struct was imported from C}}
+    self.x = xx // expected-warning {{initializer for struct 'CPoint' must use 'self.init(...)' or 'self = ...' on all paths because the struct was imported from C}}
     self.y = 0
   }
 }
@@ -224,7 +224,7 @@ extension CPoint {
 
 extension NonnullWrapper {
   init(p: UnsafeMutableRawPointer) {
-    self.ptr = p // expected-warning {{initializer for struct 'NonnullWrapper' must use "self.init(...)" or "self = ..." because the struct was imported from C}}
+    self.ptr = p // expected-warning {{initializer for struct 'NonnullWrapper' must use 'self.init(...)' or 'self = ...' because the struct was imported from C}}
     // No suggestion for "self.init()" because this struct does not support a
     // zeroing initializer.
   }
@@ -265,10 +265,10 @@ extension Empty {
 
   init(other: Empty, cond: Bool) {
     if cond { self = other }
-  } // expected-warning {{initializer for struct 'Empty' must use "self.init(...)" or "self = ..." on all paths because it is not in module 'OtherModule'}}
+  } // expected-warning {{initializer for struct 'Empty' must use 'self.init(...)' or 'self = ...' on all paths because it is not in module 'OtherModule'}}
 
   init(xx: Double) {
-  } // expected-warning {{initializer for struct 'Empty' must use "self.init(...)" or "self = ..." because it is not in module 'OtherModule'}}
+  } // expected-warning {{initializer for struct 'Empty' must use 'self.init(...)' or 'self = ...' because it is not in module 'OtherModule'}}
 }
 
 extension GenericEmpty {
@@ -284,8 +284,8 @@ extension GenericEmpty {
 
   init(other: GenericEmpty<T>, cond: Bool) {
     if cond { self = other }
-  } // expected-warning {{initializer for struct 'GenericEmpty<T>' must use "self.init(...)" or "self = ..." on all paths because it is not in module 'OtherModule'}}
+  } // expected-warning {{initializer for struct 'GenericEmpty<T>' must use 'self.init(...)' or 'self = ...' on all paths because it is not in module 'OtherModule'}}
 
   init(xx: Double) {
-  } // expected-warning {{initializer for struct 'GenericEmpty<T>' must use "self.init(...)" or "self = ..." because it is not in module 'OtherModule'}}
+  } // expected-warning {{initializer for struct 'GenericEmpty<T>' must use 'self.init(...)' or 'self = ...' because it is not in module 'OtherModule'}}
 }

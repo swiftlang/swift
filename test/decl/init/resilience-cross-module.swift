@@ -16,7 +16,7 @@ import resilient_protocol
 extension Size {
   init(ww: Int, hh: Int) {
     self.w = ww
-    self.h = hh // expected-error {{'let' property 'h' may not be initialized directly; use "self.init(...)" or "self = ..." instead}}
+    self.h = hh // expected-error {{'let' property 'h' may not be initialized directly; use 'self.init(...)' or 'self = ...' instead}}
   }
 
   // This is OK

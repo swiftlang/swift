@@ -90,7 +90,7 @@ func testError() {
   let terr = getErr()
   switch (terr) { case .TENone, .TEOne, .TETwo: break }
   // EXHAUSTIVE: [[@LINE-1]]:{{.+}}: warning: switch covers known cases, but 'TestError.Code' may have additional unknown values
-  // EXHAUSTIVE: [[@LINE-2]]:{{.+}}: note: handle unknown values using "@unknown default"
+  // EXHAUSTIVE: [[@LINE-2]]:{{.+}}: note: handle unknown values using '@unknown default'
 
   switch (terr) { case .TENone, .TEOne: break }
   // EXHAUSTIVE: [[@LINE-1]]:{{.+}}: error: switch must be exhaustive

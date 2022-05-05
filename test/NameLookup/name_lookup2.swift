@@ -2,7 +2,7 @@
 
 // -verify-ignore-unknown is for
 // <unknown>:0: error: unexpected note produced: did you forget to set an SDK using -sdk or SDKROOT?
-// <unknown>:0: error: unexpected note produced: use "xcrun swiftc" to select the default macOS SDK installed with Xcode
+// <unknown>:0: error: unexpected note produced: use 'xcrun swiftc' to select the default macOS SDK installed with Xcode
 
 import Swift
 import nonexistentimport  // expected-error {{no such module 'nonexistentimport'}}

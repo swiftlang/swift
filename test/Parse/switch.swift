@@ -439,23 +439,23 @@ switch Whatever.Thing {
 }
 
 switch Whatever.Thing { // expected-warning {{switch must be exhaustive}} expected-note{{add missing case: '.Thing'}}
-@unknown case let value: // expected-error {{'@unknown' is only supported for catch-all cases ("case _")}}
+@unknown case let value: // expected-error {{'@unknown' is only supported for catch-all cases ('case _')}}
   _ = value
 }
 
 switch (Whatever.Thing, Whatever.Thing) { // expected-warning {{switch must be exhaustive}} expected-note{{add missing case: '(_, _)'}}
-@unknown case (_, _): // expected-error {{'@unknown' is only supported for catch-all cases ("case _")}}
+@unknown case (_, _): // expected-error {{'@unknown' is only supported for catch-all cases ('case _')}}
   break
 }
 
 switch Whatever.Thing { // expected-warning {{switch must be exhaustive}} expected-note{{add missing case: '.Thing'}}
-@unknown case is Whatever: // expected-error {{'@unknown' is only supported for catch-all cases ("case _")}}
+@unknown case is Whatever: // expected-error {{'@unknown' is only supported for catch-all cases ('case _')}}
   // expected-warning@-1 {{'is' test is always true}}
   break
 }
 
 switch Whatever.Thing { // expected-warning {{switch must be exhaustive}} expected-note{{add missing case: '.Thing'}}
-@unknown case .Thing: // expected-error {{'@unknown' is only supported for catch-all cases ("case _")}}
+@unknown case .Thing: // expected-error {{'@unknown' is only supported for catch-all cases ('case _')}}
   break
 }
 

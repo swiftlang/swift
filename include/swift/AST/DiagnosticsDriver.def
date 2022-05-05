@@ -84,7 +84,7 @@ WARNING(incremental_requires_output_file_map,none,
         "ignoring -incremental (currently requires an output file map)", ())
 WARNING(incremental_requires_build_record_entry,none,
         "ignoring -incremental; output file map has no master dependencies "
-        "entry (\"%0\" under \"\")", (StringRef))
+        "entry ('%0' under '')", (StringRef))
 
 WARNING(unable_to_open_incremental_comparison_log,none,
 "unable to open incremental comparison log file '%0'", (StringRef))

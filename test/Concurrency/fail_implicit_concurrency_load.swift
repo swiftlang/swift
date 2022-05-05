@@ -18,4 +18,4 @@
 
 // RUN: %target-swift-frontend -typecheck %s -explicit-swift-module-map-file %t/inputs/map.json -disable-implicit-swift-modules  -disable-availability-checking 2>&1 | %FileCheck %s
 import Swift
-// CHECK: warning: unable to perform implicit import of "_Concurrency" module: no such module found
+// CHECK: warning: unable to perform implicit import of '_Concurrency' module: no such module found
