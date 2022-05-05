@@ -39,7 +39,7 @@ private extension Target {
       .target(
         name: name,
         dependencies: dependencies,
-        path: path ?? "@swiftcompiler_source_dir_name@/\(name)",
+        path: path ?? "Sources/\(name)",
         exclude: ["CMakeLists.txt"],
         sources: sources,
         swiftSettings: defaultSwiftSettings + swiftSettings)
