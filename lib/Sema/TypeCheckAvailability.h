@@ -232,13 +232,14 @@ diagnoseConformanceAvailability(SourceLoc loc,
                                 Type replacementTy=Type(),
                                 bool useConformanceAvailabilityErrorsOption = false);
 
-bool
-diagnoseSubstitutionMapAvailability(SourceLoc loc,
-                                    SubstitutionMap subs,
-                                    const ExportContext &context,
-                                    Type depTy=Type(),
-                                    Type replacementTy=Type(),
-                                    bool useConformanceAvailabilityErrorsOption = false);
+bool diagnoseSubstitutionMapAvailability(
+    SourceLoc loc,
+    SubstitutionMap subs, 
+    const ExportContext &context,
+    Type depTy = Type(),
+    Type replacementTy = Type(),
+    bool useConformanceAvailabilityErrorsOption = false,
+    bool suppressParameterizationCheckForOptional = false);
 
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
@@ -274,6 +275,11 @@ bool diagnoseExplicitUnavailability(
     const ExtensionDecl *ext,
     const ExportContext &where,
     bool useConformanceAvailabilityErrorsOption = false);
+
+/// Diagnose uses of the runtime features of parameterized protools. Returns
+/// \c true if a diagnostic was emitted.
+bool diagnoseParameterizedProtocolAvailability(SourceRange loc,
+                                               const DeclContext *DC);
 
 /// Check if \p decl has a introduction version required by -require-explicit-availability
 void checkExplicitAvailability(Decl *decl);

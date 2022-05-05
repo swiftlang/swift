@@ -4919,6 +4919,17 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
   if (where.isImplicit())
     return;
 
+  Conformance->forEachTypeWitness([&](const AssociatedTypeDecl *assoc,
+                                      Type type, TypeDecl *typeDecl) -> bool {
+    // Make sure any associated type witnesses don't make reference to a
+    // parameterized existential type, or we're going to have trouble at
+    // runtime.
+    if (type->hasParameterizedExistential())
+      (void)diagnoseParameterizedProtocolAvailability(typeDecl->getLoc(),
+                                                      where.getDeclContext());
+    return false;
+  });
+
   for (auto req : proto->getRequirementSignature().getRequirements()) {
     if (req.getKind() == RequirementKind::Conformance) {
       auto depTy = req.getFirstType();
