@@ -874,30 +874,27 @@ private:
   }
 
   void visitReturnStmt(ReturnStmt *returnStmt) {
-    auto *closure =
-        dyn_cast_or_null<ClosureExpr>(context.getAbstractClosureExpr());
-
     // Single-expression closures are effectively a `return` statement,
     // so let's give them a special locator as to indicate that.
     // Return statements might not have a result if we have a closure whose
     // implicit returned value is coerced to Void.
-    if (closure && closure->hasSingleExpressionBody() &&
-        returnStmt->hasResult()) {
+    if (isInSingleExpressionClosure() && returnStmt->hasResult()) {
       auto *expr = returnStmt->getResult();
       assert(expr && "single expression closure without expression?");
 
-      expr = cs.generateConstraints(expr, closure,
+      expr = cs.generateConstraints(expr, context.getAsDeclContext(),
                                     /*isInputExpression=*/false);
       if (!expr) {
         hadError = true;
         return;
       }
 
-      cs.addConstraint(
-          ConstraintKind::Conversion, cs.getType(expr), resultType,
-          cs.getConstraintLocator(
-              closure, LocatorPathElt::ClosureBody(
-                           /*hasReturn=*/!returnStmt->isImplicit())));
+      cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
+                       getContextualResultType(),
+                       cs.getConstraintLocator(
+                           context.getAbstractClosureExpr(),
+                           LocatorPathElt::ClosureBody(
+                               /*hasReturn=*/!returnStmt->isImplicit())));
       return;
     }
 
@@ -921,14 +918,40 @@ private:
       return;
     }
 
-    cs.setContextualType(target.getAsExpr(), TypeLoc::withoutLoc(resultType),
+    cs.setContextualType(target.getAsExpr(),
+                         TypeLoc::withoutLoc(getContextualResultType()),
                          CTP_ReturnStmt);
     cs.setSolutionApplicationTarget(returnStmt, target);
   }
 
-  bool isSupportedMultiStatementClosure() const {
+  bool isInSingleExpressionClosure() {
+    if (!isExpr<ClosureExpr>(context.getAbstractClosureExpr()))
+      return false;
+
+    // Result builder transformed bodies are never single-expression.
+    if (cs.getAppliedResultBuilderTransform(context))
+      return false;
+
+    return context.hasSingleExpressionBody();
+  }
+
+  Type getContextualResultType() const {
+    if (auto transform = cs.getAppliedResultBuilderTransform(context))
+      return transform->bodyResultType;
+
     if (auto *closure =
-            dyn_cast_or_null<ClosureExpr>(context.getAbstractClosureExpr())) {
+            getAsExpr<ClosureExpr>(context.getAbstractClosureExpr()))
+      return cs.getClosureType(closure)->getResult();
+
+    return context.getBodyResultType();
+  }
+
+  bool isSupportedMultiStatementClosure() const {
+    if (cs.getAppliedResultBuilderTransform(context))
+      return true;
+
+    if (auto *closure =
+            getAsExpr<ClosureExpr>(context.getAbstractClosureExpr())) {
       return !closure->hasSingleExpressionBody() &&
              cs.participatesInInference(closure);
     }
