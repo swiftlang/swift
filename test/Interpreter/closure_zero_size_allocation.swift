@@ -1,5 +1,7 @@
 // RUN: %target-run-simple-swift(-O)
 
+// REQUIRES: executable_test
+
 // rdar://92418090
 
 protocol P {
