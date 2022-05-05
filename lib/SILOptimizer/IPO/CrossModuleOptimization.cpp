@@ -207,7 +207,9 @@ bool CrossModuleOptimization::canSerializeFunction(
   // Do the same check for the specializations of such functions.
   if (function->isSpecialization()) {
     const SILFunction *parent = function->getSpecializationInfo()->getParent();
-    if (!parent->getSpecializeAttrs().empty())
+    // Don't serialize exported (public) specializations.
+    if (!parent->getSpecializeAttrs().empty() &&
+        function->getLinkage() == SILLinkage::Public)
       return false;
   }
 
