@@ -106,7 +106,39 @@ extension Outer {
 
 @available(OSX, unavailable)
 extension Outer {
+  // expected-note@+1 {{'outer_osx_init_osx' has been explicitly marked unavailable here}}
   static var outer_osx_init_osx = osx() // OK
+  
+  // expected-note@+1 {{'osx_call_osx()' has been explicitly marked unavailable here}}
+  func osx_call_osx() {
+    osx() // OK
+  }
+
+  func osx_call_osx_extension() {
+    osx_extension() // OK; osx_extension is only unavailable if -application-extension is passed.
+  }
+  
+  func takes_and_returns_osx(_ x: NotOnOSX) -> NotOnOSX {
+    return x // OK
+  }
+  
+  // This @available should be ignored; inherited unavailability takes precedence
+  @available(OSX 999, *)
+  // expected-note@+1 {{'osx_more_available_but_still_unavailable_call_osx()' has been explicitly marked unavailable here}}
+  func osx_more_available_but_still_unavailable_call_osx() {
+    osx() // OK
+  }
+  
+  // rdar://92551870
+  func osx_call_osx_more_available_but_still_unavailable() {
+    osx_more_available_but_still_unavailable_call_osx() // OK
+  }
+}
+
+func takesOuter(_ o: Outer) {
+  _ = Outer.outer_osx_init_osx // expected-error {{'outer_osx_init_osx' is unavailable in macOS}}
+  o.osx_call_osx() // expected-error {{'osx_call_osx()' is unavailable in macOS}}
+  o.osx_more_available_but_still_unavailable_call_osx() // expected-error {{'osx_more_available_but_still_unavailable_call_osx()' is unavailable in macOS}}
 }
 
 @available(OSX, unavailable)
