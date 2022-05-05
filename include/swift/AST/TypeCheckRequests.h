@@ -2264,7 +2264,7 @@ public:
 class PatternBindingEntryRequest
     : public SimpleRequest<PatternBindingEntryRequest,
                            const PatternBindingEntry *(PatternBindingDecl *,
-                                                       unsigned),
+                                                       unsigned, bool),
                            RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2273,8 +2273,9 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  const PatternBindingEntry *
-  evaluate(Evaluator &evaluator, PatternBindingDecl *PBD, unsigned i) const;
+  const PatternBindingEntry *evaluate(Evaluator &evaluator,
+                                      PatternBindingDecl *PBD, unsigned i,
+                                      bool LeaveClosureBodiesUnchecked) const;
 
 public:
   // Separate caching.
