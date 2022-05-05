@@ -17,6 +17,7 @@ public struct Container {
     var arr = Array<Base>()
     arr.append(Base())
     print(arr)
+    dontBlockSerialization(arr)
     return t
   }
 
