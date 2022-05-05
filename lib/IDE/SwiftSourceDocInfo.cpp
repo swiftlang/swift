@@ -310,10 +310,12 @@ static Expr *extractNameExpr(Expr *Fn) {
 
 std::pair<bool, ArgumentList *>
 NameMatcher::walkToArgumentListPre(ArgumentList *ArgList) {
-  auto Labels = getCallArgLabelRanges(getSourceMgr(), ArgList,
-                                      LabelRangeEndAt::BeforeElemStart);
-  tryResolve(Parent, ArgList->getStartLoc(), LabelRangeType::CallArg,
+  if (!ArgList->isImplicit()) {
+    auto Labels = getCallArgLabelRanges(getSourceMgr(), ArgList,
+                                        LabelRangeEndAt::BeforeElemStart);
+    tryResolve(Parent, ArgList->getStartLoc(), LabelRangeType::CallArg,
              Labels.first, Labels.second);
+  }
   if (isDone())
     return {false, ArgList};
 
