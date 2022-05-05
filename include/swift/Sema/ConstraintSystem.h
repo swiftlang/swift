@@ -3734,6 +3734,14 @@ public:
     return known->second;
   }
 
+  Optional<AppliedBuilderTransform>
+  getAppliedResultBuilderTransform(AnyFunctionRef fn) const {
+    auto transformed = resultBuilderTransformed.find(fn);
+    if (transformed != resultBuilderTransformed.end())
+      return transformed->second;
+    return None;
+  }
+
   void setCaseLabelItemInfo(const CaseLabelItem *item, CaseLabelItemInfo info) {
     assert(item != nullptr);
     assert(caseLabelItems.count(item) == 0);
