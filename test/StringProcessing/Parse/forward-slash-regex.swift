@@ -6,13 +6,26 @@ prefix operator /  // expected-error {{prefix operator may not contain '/'}}
 prefix operator ^/ // expected-error {{prefix operator may not contain '/'}}
 prefix operator /^/ // expected-error {{prefix operator may not contain '/'}}
 
+prefix operator !!
+prefix func !! <T>(_ x: T) -> T { x }
+
+prefix operator ^^
+prefix func ^^ <T>(_ x: T) -> T { x }
+
 precedencegroup P {
   associativity: left
 }
 
-// Fine.
+// The divisions in the body of the below operators make sure we don't try and
+// consider them to be ending delimiters of a regex.
 infix operator /^/ : P
-func /^/ (lhs: Int, rhs: Int) -> Int { 0 }
+func /^/ (lhs: Int, rhs: Int) -> Int { 1 / 2 }
+
+infix operator /^ : P
+func /^ (lhs: Int, rhs: Int) -> Int { 1 / 2 }
+
+infix operator ^^/ : P
+func ^^/ (lhs: Int, rhs: Int) -> Int { 1 / 2 }
 
 let i = 0 /^/ 1/^/3
 
@@ -22,18 +35,23 @@ _ = /x/.self
 _ = /\//
 _ = /\\/
 
-// These unfortunately become infix `=/`. We could likely improve the diagnostic
-// though.
-let z=/0/
-// expected-error@-1 {{type annotation missing in pattern}}
-// expected-error@-2 {{consecutive statements on a line must be separated by ';'}}
-// expected-error@-3 {{expected expression after unary operator}}
-// expected-error@-4 {{cannot find operator '=/' in scope}}
-// expected-error@-5 {{'/' is not a postfix unary operator}}
-_=/0/
-// expected-error@-1 {{'_' can only appear in a pattern or on the left side of an assignment}}
-// expected-error@-2 {{cannot find operator '=/' in scope}}
-// expected-error@-3 {{'/' is not a postfix unary operator}}
+// This is just here to appease typo correction.
+let y = 0
+
+// These unfortunately become prefix `=` and infix `=/` respectively. We could
+// likely improve the diagnostic though.
+do {
+  let z=/0/
+  // expected-error@-1 {{type annotation missing in pattern}}
+  // expected-error@-2 {{consecutive statements on a line must be separated by ';'}}
+  // expected-error@-3 {{expected expression}}
+}
+do {
+  _=/0/
+  // expected-error@-1 {{'_' can only appear in a pattern or on the left side of an assignment}}
+  // expected-error@-2 {{cannot find operator '=/' in scope}}
+  // expected-error@-3 {{'/' is not a postfix unary operator}}
+}
 
 _ = /x
 // expected-error@-1 {{unterminated regex literal}}
@@ -41,13 +59,29 @@ _ = /x
 _ = !/x/
 // expected-error@-1 {{cannot convert value of type 'Regex<Substring>' to expected argument type 'Bool'}}
 
+_ = (!/x/)
+// expected-error@-1 {{cannot convert value of type 'Regex<Substring>' to expected argument type 'Bool'}}
+
+_ = !/ /
+// expected-error@-1 {{regex literal may not start with space; add backslash to escape}}
+// expected-error@-2 {{cannot convert value of type 'Regex<Substring>' to expected argument type 'Bool'}}
+
+_ = !!/ /
+// expected-error@-1 {{regex literal may not start with space; add backslash to escape}}
+
+_ = !!/x/
+_ = (!!/x/)
+
+_ = /^)
+// expected-error@-1 {{unterminated regex literal}}
+// expected-error@-2 {{closing ')' does not balance any groups openings}}
+
 _ = /x/! // expected-error {{cannot force unwrap value of non-optional type 'Regex<Substring>'}}
 _ = /x/ + /y/ // expected-error {{binary operator '+' cannot be applied to two 'Regex<Substring>' operands}}
 
 _ = /x/+/y/
 // expected-error@-1 {{cannot find operator '+/' in scope}}
 // expected-error@-2 {{'/' is not a postfix unary operator}}
-// expected-error@-3 {{cannot find 'y' in scope}}
 
 _ = /x/?.blah
 // expected-error@-1 {{cannot use optional chaining on non-optional value of type 'Regex<Substring>'}}
@@ -74,7 +108,6 @@ _ = /x/ ... /y/ // expected-error {{referencing operator function '...' on 'Comp
 _ = /x/.../y/
 // expected-error@-1 {{missing whitespace between '...' and '/' operators}}
 // expected-error@-2 {{'/' is not a postfix unary operator}}
-// expected-error@-3 {{cannot find 'y' in scope}}
 
 _ = /x /...
 // expected-error@-1 {{unary operator '...' cannot be applied to an operand of type 'Regex<Substring>'}}
@@ -92,12 +125,7 @@ func foo<T>(_ x: T, y: T) {}
 foo(/abc/, y: /abc /)
 
 func bar<T>(_ x: inout T) {}
-
-// TODO: We split this into a prefix '&', but inout is handled specially when
-// parsing an argument list. This shouldn't matter anyway, but we should at
-// least have a custom diagnostic.
-bar(&/x/)
-// expected-error@-1 {{'&' is not a prefix unary operator}}
+bar(&/x/) // expected-error {{cannot pass immutable value as inout argument: literals are not mutable}}
 
 struct S {
   subscript(x: Regex<Substring>) -> Void { () }
@@ -231,7 +259,7 @@ _ = /x/*comment*/
 // expected-error@-1 {{unterminated regex literal}}
 
 // These become regex literals, unless surrounded in parens.
-func baz(_ x: (Int, Int) -> Int, _ y: (Int, Int) -> Int) {} // expected-note 2{{'baz' declared here}}
+func baz(_ x: (Int, Int) -> Int, _ y: (Int, Int) -> Int) {} // expected-note 4{{'baz' declared here}}
 baz(/, /)
 // expected-error@-1 {{cannot convert value of type 'Regex<Substring>' to expected argument type '(Int, Int) -> Int'}}
 // expected-error@-2 {{missing argument for parameter #2 in call}}
@@ -240,8 +268,22 @@ baz(/,/)
 // expected-error@-2 {{missing argument for parameter #2 in call}}
 baz((/), /)
 
+baz(/^, /)
+// expected-error@-1 {{cannot convert value of type 'Regex<Substring>' to expected argument type '(Int, Int) -> Int'}}
+// expected-error@-2 {{missing argument for parameter #2 in call}}
+
+do {
+  baz((/^), /)
+  // expected-error@-1 {{closing ')' does not balance any groups openings}}
+  // expected-note@-2 {{to match this opening '('}}
+} // expected-error {{expected ')' in expression list}}
+
+baz(^^/, /) // expected-error {{missing argument for parameter #2 in call}}
+baz((^^/), /)
+
 func bazbaz(_ x: (Int, Int) -> Int, _ y: Int) {}
 bazbaz(/, 0)
+bazbaz(^^/, 0)
 
 func qux<T>(_ x: (Int, Int) -> Int, _ y: T) -> Int { 0 }
 do {
@@ -255,6 +297,24 @@ do {
   // expected-error@-2:21 {{expected ',' separator}}
 }
 _ = qux(/, 1) // this comment tests to make sure we don't try and end the regex on the starting '/' of '//'.
+_ = qux(/, 1) /* same thing with a block comment */
+
+func quxqux(_ x: (Int, Int) -> Int) {}
+quxqux(/^/) // expected-error {{cannot convert value of type 'Regex<Substring>' to expected argument type '(Int, Int) -> Int'}}
+quxqux((/^/)) // expected-error {{cannot convert value of type 'Regex<Substring>' to expected argument type '(Int, Int) -> Int'}}
+quxqux({ $0 /^/ $1 })
+
+quxqux(!/^/)
+// expected-error@-1 {{cannot convert value of type 'Bool' to expected argument type '(Int, Int) -> Int'}}
+// expected-error@-2 {{cannot convert value of type 'Regex<Substring>' to expected argument type 'Bool'}}
+
+quxqux(/^)
+
+do {
+  quxqux(/^) / 1
+  // expected-error@-1 {{closing ')' does not balance any groups openings}}
+  // expected-error@-2 {{expected ',' separator}}
+}
 
 let arr: [Double] = [2, 3, 4]
 _ = arr.reduce(1, /) / 3
@@ -282,3 +342,15 @@ _ = /0oG/
 _ = /"/
 _ = /'/
 _ = /<#placeholder#>/
+
+_ = ^^/0xG/
+_ = ^^/0oG/
+_ = ^^/"/
+_ = ^^/'/
+_ = ^^/<#placeholder#>/
+
+_ = (^^/0xG/)
+_ = (^^/0oG/)
+_ = (^^/"/)
+_ = (^^/'/)
+_ = (^^/<#placeholder#>/)
