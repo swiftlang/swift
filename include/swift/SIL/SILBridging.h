@@ -17,10 +17,7 @@
 #include "swift/Basic/BridgedSwiftObject.h"
 #include <stdbool.h>
 #include <stddef.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <string>
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
@@ -181,7 +178,7 @@ void PassContext_eraseInstruction(BridgedPassContext passContext,
                                   BridgedInstruction inst);
 
 BridgedStringRef SILFunction_getName(BridgedFunction function);
-BridgedStringRef SILFunction_debugDescription(BridgedFunction function);
+std::string SILFunction_debugDescription(BridgedFunction function);
 OptionalBridgedBasicBlock SILFunction_firstBlock(BridgedFunction function);
 OptionalBridgedBasicBlock SILFunction_lastBlock(BridgedFunction function);
 SwiftInt SILFunction_numIndirectResultArguments(BridgedFunction function);
@@ -192,12 +189,12 @@ BridgedType SILFunction_getSILResultType(BridgedFunction function);
 SwiftInt SILFunction_isSwift51RuntimeAvailable(BridgedFunction function);
 
 BridgedStringRef SILGlobalVariable_getName(BridgedGlobalVar global);
-BridgedStringRef SILGlobalVariable_debugDescription(BridgedGlobalVar global);
+std::string SILGlobalVariable_debugDescription(BridgedGlobalVar global);
 
 OptionalBridgedBasicBlock SILBasicBlock_next(BridgedBasicBlock block);
 OptionalBridgedBasicBlock SILBasicBlock_previous(BridgedBasicBlock block);
 BridgedFunction SILBasicBlock_getFunction(BridgedBasicBlock block);
-BridgedStringRef SILBasicBlock_debugDescription(BridgedBasicBlock block);
+std::string SILBasicBlock_debugDescription(BridgedBasicBlock block);
 OptionalBridgedInstruction SILBasicBlock_firstInst(BridgedBasicBlock block);
 OptionalBridgedInstruction SILBasicBlock_lastInst(BridgedBasicBlock block);
 SwiftInt SILBasicBlock_getNumArguments(BridgedBasicBlock block);
@@ -212,7 +209,7 @@ OptionalBridgedOperand Operand_nextUse(BridgedOperand);
 BridgedInstruction Operand_getUser(BridgedOperand);
 SwiftInt Operand_isTypeDependent(BridgedOperand);
 
-BridgedStringRef SILNode_debugDescription(BridgedNode node);
+std::string SILNode_debugDescription(BridgedNode node);
 BridgedFunction SILNode_getFunction(BridgedNode node);
 OptionalBridgedOperand SILValue_firstUse(BridgedValue value);
 BridgedType SILValue_getType(BridgedValue value);
@@ -320,9 +317,5 @@ BridgedInstruction SILBuilder_createApply(BridgedInstruction insertionPoint,
                                           BridgedValueArray arguments);
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
-
-#ifdef __cplusplus
-} // extern "C"
-#endif
 
 #endif

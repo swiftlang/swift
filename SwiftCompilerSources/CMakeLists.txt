@@ -89,13 +89,26 @@ function(add_swift_compiler_modules_library name)
 
   if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
     set(deployment_version "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
-    set(sdk_option "-sdk" "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
+    set(sdk_path "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
+    set(sdk_option "-sdk" "${sdk_path}")
     if(${BOOTSTRAPPING_MODE} STREQUAL "CROSSCOMPILE-WITH-HOSTLIBS")
       # Let the cross-compiled compile don't pick up the compiled stdlib by providing
       # an (almost) empty resource dir.
       # The compiler will instead pick up the stdlib from the SDK.
       get_filename_component(swift_exec_bin_dir ${ALS_SWIFT_EXEC} DIRECTORY)
       set(sdk_option ${sdk_option} "-resource-dir" "${swift_exec_bin_dir}/../bootstrapping0/lib/swift")
+    endif()
+    if(NOT EXISTS "${sdk_path}/usr/include/c++")
+      # Darwin SDKs in Xcode 12 or older do not include libc++, which prevents clang from finding libc++ when invoked
+      # from ClangImporter. This results in build errors. To workaround this, let's explicitly pass the path to libc++
+      # to clang.
+      message(WARNING "Building with an outdated Darwin SDK: libc++ missing from the ${SWIFT_HOST_VARIANT_SDK} SDK. Will use libc++ from the toolchain.")
+      get_filename_component(absolute_libcxx_path "${CMAKE_C_COMPILER}/../../include/c++/v1" REALPATH)
+      if (EXISTS "${absolute_libcxx_path}")
+        set(sdk_option ${sdk_option} "-Xcc" "-isystem" "-Xcc" "${absolute_libcxx_path}")
+      else()
+        message(ERROR "libc++ not found in the toolchain.")
+      endif()
     endif()
   elseif(${BOOTSTRAPPING_MODE} STREQUAL "CROSSCOMPILE")
     set(sdk_option "-sdk" "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
@@ -211,6 +224,10 @@ else()
       if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
         list(APPEND b0_deps swiftDarwin-bootstrapping0)
         list(APPEND b1_deps swiftDarwin-bootstrapping1)
+      endif()
+      if(${SWIFT_HOST_VARIANT_SDK} IN_LIST SWIFT_LIBSTDCXX_PLATFORMS)
+        list(APPEND b0_deps copy-libstdcxx-modulemap-bootstrapping0 copy-libstdcxx-header-bootstrapping0)
+        list(APPEND b1_deps copy-libstdcxx-modulemap-bootstrapping1 copy-libstdcxx-header-bootstrapping1)
       endif()
     endif()
     if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
