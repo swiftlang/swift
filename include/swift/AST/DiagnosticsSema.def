@@ -5032,6 +5032,9 @@ ERROR(unable_to_parse_c_function_type,none,
 ERROR(unsupported_opaque_type,none,
       "'some' types are only permitted in properties, subscripts, and functions", ())
 
+ERROR(unsupported_opaque_type_in_existential,none,
+      "'some' types cannot be used in constraints on existential types", ())
+
 ERROR(opaque_type_unsupported_pattern,none,
       "'some' type can only be declared on a single property declaration", ())
 
@@ -5591,6 +5594,11 @@ ERROR(availability_opaque_types_only_version_newer, none,
 
 ERROR(availability_concurrency_only_version_newer, none,
       "concurrency is only available in %0 %1 or newer",
+      (StringRef, llvm::VersionTuple))
+
+ERROR(availability_parameterized_protocol_only_version_newer, none,
+      "runtime support for parameterized protocol types is only available in "
+      "%0 %1 or newer",
       (StringRef, llvm::VersionTuple))
 
 NOTE(availability_guard_with_version_check, none,
