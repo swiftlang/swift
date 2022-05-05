@@ -565,10 +565,17 @@ public:
     void operator=(const SILBodyRAII&) = delete;
   };
 
-  /// Attempt to re-lex a regex literal with forward slashes `/.../` from a
-  /// given lexing state. If \p mustBeRegex is set to true, a regex literal will
-  /// always be lexed. Otherwise, it will not be lexed if it may be ambiguous.
-  void tryLexForwardSlashRegexLiteralFrom(State S, bool mustBeRegex);
+  /// A RAII object for switching the lexer into forward slash regex `/.../`
+  /// lexing mode.
+  class ForwardSlashRegexRAII final {
+    llvm::SaveAndRestore<LexerForwardSlashRegexMode> Scope;
+
+  public:
+    ForwardSlashRegexRAII(Lexer &L, bool MustBeRegex)
+        : Scope(L.ForwardSlashRegexMode,
+                MustBeRegex ? LexerForwardSlashRegexMode::Always
+                            : LexerForwardSlashRegexMode::Tentative) {}
+  };
 
 private:
   /// Nul character meaning kind.

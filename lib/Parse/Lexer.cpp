@@ -815,6 +815,13 @@ void Lexer::lexOperatorIdentifier() {
         rangeContainsPlaceholderEnd(CurPtr + 2, BufferEnd)) {
       break;
     }
+
+    // If we are lexing a `/.../` regex literal, we don't consider `/` to be an
+    // operator character.
+    if (ForwardSlashRegexMode != LexerForwardSlashRegexMode::None &&
+        *CurPtr == '/') {
+      break;
+    }
   } while (advanceIfValidContinuationOfOperator(CurPtr, BufferEnd));
 
   if (CurPtr-TokStart > 2) {
@@ -2078,18 +2085,6 @@ bool Lexer::tryLexRegexLiteral(const char *TokStart) {
   // We either had a successful lex, or something that was recoverable.
   formToken(tok::regex_literal, TokStart);
   return true;
-}
-
-void Lexer::tryLexForwardSlashRegexLiteralFrom(State S, bool mustBeRegex) {
-  if (!LangOpts.EnableBareSlashRegexLiterals)
-    return;
-
-  // Try re-lex with forward slash enabled.
-  llvm::SaveAndRestore<LexerForwardSlashRegexMode> RegexLexingScope(
-      ForwardSlashRegexMode, mustBeRegex
-                                 ? LexerForwardSlashRegexMode::Always
-                                 : LexerForwardSlashRegexMode::Tentative);
-  restoreState(S, /*enableDiagnostics*/ true);
 }
 
 /// lexEscapedIdentifier:
