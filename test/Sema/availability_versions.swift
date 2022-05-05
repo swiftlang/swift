@@ -1632,10 +1632,6 @@ func funcWithMultipleShortFormAnnotationsForTheSamePlatform() {
       // expected-note@-1 {{add 'if #available' version check}}
 }
 
-@available(OSX 10.9, *)
-@available(OSX, unavailable)
-func unavailableWins() { } // expected-note {{'unavailableWins()' has been explicitly marked unavailable here}}
-
 func useShortFormAvailable() {
   // expected-note@-1 4{{add @available attribute to enclosing global function}}
 
@@ -1654,6 +1650,34 @@ func useShortFormAvailable() {
 
   funcWithMultipleShortFormAnnotationsForTheSamePlatform() // expected-error {{'funcWithMultipleShortFormAnnotationsForTheSamePlatform()' is only available in macOS 10.53 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
+}
 
+// Unavailability takes precedence over availability and is inherited
+
+@available(OSX 10.9, *)
+@available(OSX, unavailable)
+func unavailableWins() { }
+    // expected-note@-1 {{'unavailableWins()' has been explicitly marked unavailable here}}
+
+struct HasUnavailableExtension {
+  @available(OSX, unavailable)
+  public func directlyUnavailable() { }
+      // expected-note@-1 {{'directlyUnavailable()' has been explicitly marked unavailable here}}
+}
+
+@available(OSX, unavailable)
+extension HasUnavailableExtension {
+  public func inheritsUnavailable() { }
+      // expected-note@-1 {{'inheritsUnavailable()' has been explicitly marked unavailable here}}
+
+  @available(OSX 10.9, *)
+  public func moreAvailableButStillUnavailable() { }
+      // expected-note@-1 {{'moreAvailableButStillUnavailable()' has been explicitly marked unavailable here}}
+}
+
+func useHasUnavailableExtension(_ s: HasUnavailableExtension) {
   unavailableWins() // expected-error {{'unavailableWins()' is unavailable}}
+  s.directlyUnavailable() // expected-error {{'directlyUnavailable()' is unavailable}}
+  s.inheritsUnavailable() // expected-error {{'inheritsUnavailable()' is unavailable in macOS}}
+  s.moreAvailableButStillUnavailable() // expected-error {{'moreAvailableButStillUnavailable()' is unavailable in macOS}}
 }
