@@ -671,11 +671,6 @@ static void addDeclKeywords(CodeCompletionResultSink &Sink, DeclContext *DC,
     case CodeCompletionKeywordKind::kw_enum:
     case CodeCompletionKeywordKind::kw_extension:
       return true;
-    case CodeCompletionKeywordKind::None:
-      if (DAK && *DAK == DeclAttrKind::DAK_Actor) {
-        return true;
-      }
-      break;
     default:
       break;
     }
@@ -782,12 +777,20 @@ static void addDeclKeywords(CodeCompletionResultSink &Sink, DeclContext *DC,
         DeclAttribute::isConcurrencyOnly(*DAK))
       return;
 
-    addKeyword(Sink, Name, Kind, /*TypeAnnotation=*/"", getFlair(Kind, DAK));
+    CodeCompletionFlair flair = getFlair(Kind, DAK);
+
+    // Special case for 'actor'. Get the same flair with 'kw_class'.
+    if (Kind == CodeCompletionKeywordKind::None && Name == "actor")
+      flair = getFlair(CodeCompletionKeywordKind::kw_class, None);
+
+    addKeyword(Sink, Name, Kind, /*TypeAnnotation=*/"", flair);
   };
 
 #define DECL_KEYWORD(kw)                                                       \
   AddDeclKeyword(#kw, CodeCompletionKeywordKind::kw_##kw, None);
 #include "swift/Syntax/TokenKinds.def"
+  // Manually add "actor" because it's a contextual keyword.
+  AddDeclKeyword("actor", CodeCompletionKeywordKind::None, None);
 
   // Context-sensitive keywords.
   auto AddCSKeyword = [&](StringRef Name, DeclAttrKind Kind) {
