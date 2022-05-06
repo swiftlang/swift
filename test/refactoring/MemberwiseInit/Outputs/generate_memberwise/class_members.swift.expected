@@ -45,10 +45,16 @@ enum Idea {
   var subject: String { fatalError() }
 }
 
+struct OnlyComputed {
+  lazy var idea: Idea = { fatalError() }()
+  var computed: String { "hi" }
+}
+
 @propertyWrapper
 struct MyWrapper {
   let wrappedValue: String
 }
+
 
 
 

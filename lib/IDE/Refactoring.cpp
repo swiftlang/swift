@@ -3160,8 +3160,6 @@ static void generateMemberwiseInit(SourceEditConsumer &EditConsumer,
                                    ArrayRef<MemberwiseParameter> memberVector,
                                    SourceLoc targetLocation) {
   
-  assert(!memberVector.empty());
-
   EditConsumer.accept(SM, targetLocation, "\ninternal init(");
   auto insertMember = [&SM](const MemberwiseParameter &memberData,
                             raw_ostream &OS, bool wantsSeparator) {
@@ -3197,12 +3195,10 @@ static void generateMemberwiseInit(SourceEditConsumer &EditConsumer,
   // Process the initial list of members, inserting commas as appropriate.
   std::string Buffer;
   llvm::raw_string_ostream OS(Buffer);
-  for (const auto &memberData : memberVector.drop_back()) {
-    insertMember(memberData, OS, /*wantsSeparator*/ true);
+  for (const auto &memberData : llvm::enumerate(memberVector)) {
+    bool wantsSeparator = (memberData.index() != memberVector.size() - 1);
+    insertMember(memberData.value(), OS, wantsSeparator);
   }
-
-  // Process the last (or perhaps, only) member.
-  insertMember(memberVector.back(), OS, /*wantsSeparator*/ false);
 
   // Synthesize the body.
   OS << ") {\n";
@@ -3269,10 +3265,6 @@ collectMembersForInit(const ResolvedCursorInfo &CursorInfo,
                               varDecl->getType(), defaultInit);
   }
 
-  if (memberVector.empty()) {
-    return SourceLoc();
-  }
-  
   return targetLocation;
 }
 
