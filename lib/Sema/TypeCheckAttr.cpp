@@ -1713,6 +1713,12 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
       diagnose(D->isImplicit() ? EnclosingDecl->getLoc() : attr->getLocation(),
                diag::availability_decl_more_than_enclosing,
                D->getDescriptiveKind());
+      if (D->isImplicit())
+        diagnose(EnclosingDecl->getLoc(),
+                 diag::availability_implicit_decl_here,
+                 D->getDescriptiveKind(),
+                 prettyPlatformString(targetPlatform(Ctx.LangOpts)),
+                 AttrRange.getOSVersion().getLowerEndpoint());
       diagnose(EnclosingDecl->getLoc(),
                diag::availability_decl_more_than_enclosing_enclosing_here,
                prettyPlatformString(targetPlatform(Ctx.LangOpts)),
