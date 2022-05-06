@@ -156,11 +156,18 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
       return error(status);
   }
 
+  // The loaded module was built with a compatible SDK if either:
+  // * it was the same SDK
+  // * or one who's name is a prefix of the clients' SDK name. This expects
+  // that a module built with macOS11 can be used with the macOS11.secret SDK.
+  // This is generally the case as SDKs with suffixes are a superset of the
+  // short SDK name equivalent. While this is accepted, this is still not a
+  // recommended configuration and may lead to unreadable swiftmodules.
   StringRef moduleSDK = Core->SDKName;
   StringRef clientSDK = ctx.LangOpts.SDKName;
   if (ctx.SearchPathOpts.EnableSameSDKCheck &&
       !moduleSDK.empty() && !clientSDK.empty() &&
-      moduleSDK != clientSDK) {
+      !clientSDK.startswith(moduleSDK)) {
     status = Status::SDKMismatch;
     return error(status);
   }
