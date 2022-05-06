@@ -886,6 +886,10 @@ struct AppliedBuilderTransform {
   /// converted. Opaque types should be unopened.
   Type bodyResultType;
 
+  /// The version of the original body with result builder applied
+  /// as AST transformation.
+  NullablePtr<BraceStmt> transformedBody;
+
   /// An expression whose value has been recorded for later use.
   struct RecordedExpr {
     /// The temporary value that captures the value of the expression, if
