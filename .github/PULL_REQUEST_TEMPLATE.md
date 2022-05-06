@@ -2,7 +2,7 @@
 Replace this paragraph with a description of your changes and rationale. Provide links to external references/discussions if appropriate.
 
 <!-- If this pull request resolves any bugs in the Swift bug tracker, provide a link: -->
-Resolves PR-NNNNN.
+Resolves #NNNNN.
 
 <!--
 Before merging this pull request, you must run the Swift continuous integration tests.
