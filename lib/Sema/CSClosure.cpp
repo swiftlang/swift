@@ -254,6 +254,16 @@ static void createConjunction(ConstraintSystem &cs,
     // reference a type variable representing closure type,
     // otherwise it would get disconnected from its contextual type.
     referencedVars.push_back(cs.getType(closure)->castTo<TypeVariableType>());
+
+    // If builder type is not yet fully resolved, conjunction should
+    // reference its variables otherwise it would get disconnected from
+    // required contextual constraints.
+    if (auto builder = cs.getAppliedResultBuilderTransform(closure)) {
+      SmallPtrSet<TypeVariableType *, 4> builderVars;
+      builder->builderType->getTypeVariables(builderVars);
+      referencedVars.append(builderVars.begin(), builderVars.end());
+    }
+
     // Body of the closure is always isolated from its context, only
     // its individual elements are allowed access to type information
     // from the outside e.g. parameters/result type.
