@@ -23,6 +23,7 @@ struct Place {
   let plusFour: Int?
   let callback: Callback
   @MyWrapper var wrapped: String
+  var `protocol`: String
 }
 
 protocol Thing {
