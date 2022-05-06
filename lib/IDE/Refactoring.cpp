@@ -3175,15 +3175,18 @@ static void generateMemberwiseInit(SourceEditConsumer &EditConsumer,
       OS << memberData.MemberType.getString();
     }
 
+    bool HasAddedDefault = false;
     if (auto *expr = memberData.DefaultExpr) {
-      if (isa<NilLiteralExpr>(expr)) {
-        OS << " = nil";
-      } else if (expr->getSourceRange().isValid()) {
+      if (expr->getSourceRange().isValid()) {
         auto range =
           Lexer::getCharSourceRangeFromSourceRange(
             SM, expr->getSourceRange());
         OS << " = " << SM.extractText(range);
+        HasAddedDefault = true;
       }
+    }
+    if (!HasAddedDefault && memberData.MemberType->isOptional()) {
+      OS << " = nil";
     }
 
     if (wantsSeparator) {
@@ -3234,26 +3237,38 @@ collectMembersForInit(const ResolvedCursorInfo &CursorInfo,
   if (!targetLocation.isValid())
     return SourceLoc();
 
-  for (auto varDecl : nominalDecl->getStoredProperties()) {
-    auto patternBinding = varDecl->getParentPatternBinding();
-    if (!patternBinding)
+  for (auto member : nominalDecl->getMembers()) {
+    auto varDecl = dyn_cast<VarDecl>(member);
+    if (!varDecl) {
       continue;
+    }
+    if (varDecl->getAttrs().hasAttribute<LazyAttr>()) {
+      // Exclude lazy members from the memberwise initializer. This is
+      // inconsistent with the implicitly synthesized memberwise initializer but
+      // we think it makes more sense because otherwise the lazy variable's
+      // initializer gets evaluated eagerly.
+      continue;
+    }
 
     if (!varDecl->isMemberwiseInitialized(/*preferDeclaredProperties=*/true)) {
       continue;
     }
 
+    auto patternBinding = varDecl->getParentPatternBinding();
+    if (!patternBinding)
+      continue;
+
     const auto i = patternBinding->getPatternEntryIndexForVarDecl(varDecl);
     Expr *defaultInit = nullptr;
     if (patternBinding->isExplicitlyInitialized(i) ||
         patternBinding->isDefaultInitializable()) {
-      defaultInit = varDecl->getParentInitializer();
+      defaultInit = patternBinding->getOriginalInit(i);
     }
 
     memberVector.emplace_back(varDecl->getName(),
                               varDecl->getType(), defaultInit);
   }
-  
+
   if (memberVector.empty()) {
     return SourceLoc();
   }
