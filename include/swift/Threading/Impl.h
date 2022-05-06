@@ -20,6 +20,18 @@
 
 #include "TLSKeys.h"
 
+namespace swift {
+namespace threading_impl {
+
+struct stack_bounds {
+  void *low;
+  void *high;
+};
+
+} // namespace swift
+} // namespace threading_impl
+
+
 // Try to autodetect if we aren't told what to do
 #if !SWIFT_THREADING_NONE && !SWIFT_THREADING_DARWIN &&                        \
     !SWIFT_THREADING_LINUX && !SWIFT_THREADING_PTHREADS &&                     \

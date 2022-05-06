@@ -27,6 +27,7 @@ namespace swift {
 class Thread {
 public:
   using Id = threading_impl::thread_id;
+  using StackBounds = threading_impl::stack_bounds;
 
 private:
   Id id_;
@@ -64,6 +65,11 @@ public:
   }
   bool operator!=(const Thread &other) const {
     return !threading_impl::threads_same(id_, other.id_);
+  }
+
+  // Retrieve the bounds of the current thread's stack
+  static StackBounds stackBounds() {
+    return threading_impl::thread_get_current_stack_bounds();
   }
 };
 

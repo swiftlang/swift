@@ -55,6 +55,10 @@ bool thread_is_main();
 inline bool threads_same(thread_id a, thread_id b) {
   return ::thrd_equal(a, b);
 }
+inline stack_bounds thread_get_current_stack_bounds() {
+  stack_bounds zero = { nullptr, nullptr };
+  return zero;
+}
 
 // .. Mutex support ..........................................................
 

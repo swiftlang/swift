@@ -97,4 +97,26 @@ void swift::threading_impl::once_slow(once_t &predicate, void (*fn)(void *),
 #endif
 }
 
+swift::threading_impl::stack_bounds
+swift::threading_impl::thread_get_current_stack_bounds() {
+#if _WIN32_WINNT >= 0x0602
+  ULONG_PTR lowLimit = 0;
+  ULONG_PTR highLimit = 0;
+
+  GetCurrentThreadStackLimits(&lowLimit, &highLimit);
+
+  stack_bounds result = { (void *)lowLimit, (void *)highLimit };
+#else
+  MEMORY_BASIC_INFORMATION mbi;
+  VirtualQuery(&mbi, &mbi, sizeof(mbi));
+
+  stack_bounds result = {
+    mbi.AllocationBase,
+    (char *)mbi.BaseAddress + mbi.RegionSize
+  };
+#endif
+
+  return result;
+}
+
 #endif // SWIFT_THREADING_WIN32
