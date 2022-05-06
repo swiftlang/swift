@@ -556,7 +556,7 @@ private:
   }
 
   void visitDecl(Decl *decl) {
-    if (isSupportedMultiStatementClosure()) {
+    if (!isInSingleExpressionClosure()) {
       if (auto patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
         if (locator->isLastElement<LocatorPathElt::PatternBindingElement>())
           visitPatternBindingElement(patternBinding);
@@ -585,23 +585,15 @@ private:
   }
 
   void visitBreakStmt(BreakStmt *breakStmt) {
-    assert(isSupportedMultiStatementClosure() &&
-           "Unsupported statement: Break");
   }
 
   void visitContinueStmt(ContinueStmt *continueStmt) {
-    assert(isSupportedMultiStatementClosure() &&
-           "Unsupported statement: Continue");
   }
 
   void visitDeferStmt(DeferStmt *deferStmt) {
-    assert(isSupportedMultiStatementClosure() &&
-           "Unsupported statement: Defer");
   }
 
   void visitFallthroughStmt(FallthroughStmt *fallthroughStmt) {
-    assert(isSupportedMultiStatementClosure() &&
-           "Unsupported statement: Fallthrough");
   }
 
   void visitStmtCondition(LabeledConditionalStmt *S,
@@ -614,9 +606,6 @@ private:
   }
 
   void visitIfStmt(IfStmt *ifStmt) {
-    assert(isSupportedMultiStatementClosure() &&
-           "Unsupported statement: If");
-
     SmallVector<ElementInfo, 4> elements;
 
     // Condition
@@ -640,9 +629,6 @@ private:
   }
 
   void visitGuardStmt(GuardStmt *guardStmt) {
-    assert(isSupportedMultiStatementClosure() &&
-           "Unsupported statement: Guard");
-
     SmallVector<ElementInfo, 4> elements;
 
     visitStmtCondition(guardStmt, elements, locator);
@@ -652,9 +638,6 @@ private:
   }
 
   void visitWhileStmt(WhileStmt *whileStmt) {
-    assert(isSupportedMultiStatementClosure() &&
-           "Unsupported statement: While");
-
     SmallVector<ElementInfo, 4> elements;
 
     visitStmtCondition(whileStmt, elements, locator);
@@ -664,16 +647,10 @@ private:
   }
 
   void visitDoStmt(DoStmt *doStmt) {
-    assert(isSupportedMultiStatementClosure() &&
-           "Unsupported statement: Do");
-
     visitBraceStmt(doStmt->getBody());
   }
 
   void visitRepeatWhileStmt(RepeatWhileStmt *repeatWhileStmt) {
-    assert(isSupportedMultiStatementClosure() &&
-           "Unsupported statement: RepeatWhile");
-
     createConjunction(cs,
                       {makeElement(repeatWhileStmt->getCond(),
                                    cs.getConstraintLocator(
@@ -684,9 +661,6 @@ private:
   }
 
   void visitPoundAssertStmt(PoundAssertStmt *poundAssertStmt) {
-    assert(isSupportedMultiStatementClosure() &&
-           "Unsupported statement: PoundAssert");
-
     createConjunction(cs,
                       {makeElement(poundAssertStmt->getCondition(),
                                    cs.getConstraintLocator(
@@ -696,9 +670,6 @@ private:
   }
 
   void visitThrowStmt(ThrowStmt *throwStmt) {
-    assert(isSupportedMultiStatementClosure() &&
-           "Unsupported statement: Throw");
-
     if (!cs.getASTContext().getErrorDecl()) {
       hadError = true;
       return;
@@ -718,9 +689,6 @@ private:
   }
 
   void visitForEachStmt(ForEachStmt *forEachStmt) {
-    assert(isSupportedMultiStatementClosure() &&
-           "Unsupported statement: ForEach");
-
     auto *stmtLoc = cs.getConstraintLocator(locator);
 
     SmallVector<ElementInfo, 4> elements;
@@ -738,9 +706,6 @@ private:
   }
 
   void visitSwitchStmt(SwitchStmt *switchStmt) {
-    assert(isSupportedMultiStatementClosure() &&
-           "Unsupported statement: Switch");
-
     auto *switchLoc = cs.getConstraintLocator(
         locator, LocatorPathElt::SyntacticElement(switchStmt));
 
@@ -765,9 +730,6 @@ private:
   }
 
   void visitDoCatchStmt(DoCatchStmt *doStmt) {
-    assert(isSupportedMultiStatementClosure() &&
-           "Unsupported statement: DoCatch");
-
     auto *doLoc = cs.getConstraintLocator(
         locator, LocatorPathElt::SyntacticElement(doStmt));
 
@@ -785,9 +747,6 @@ private:
   }
 
   void visitCaseStmt(CaseStmt *caseStmt) {
-    assert(isSupportedMultiStatementClosure() &&
-           "Unsupported statement: Case");
-
     Type contextualTy;
 
     {
@@ -821,56 +780,56 @@ private:
   }
 
   void visitBraceStmt(BraceStmt *braceStmt) {
-    if (isSupportedMultiStatementClosure()) {
-      auto &ctx = cs.getASTContext();
-
-      if (isChildOf(StmtKind::Case)) {
-        auto *caseStmt = cast<CaseStmt>(
-            locator->castLastElementTo<LocatorPathElt::SyntacticElement>()
-                .asStmt());
-
-        if (recordInferredSwitchCasePatternVars(caseStmt)) {
-          hadError = true;
-        }
-      }
-
-      SmallVector<ElementInfo, 4> elements;
-      for (auto element : braceStmt->getElements()) {
-        bool isDiscarded =
-            element.is<Expr *>() &&
-            (!ctx.LangOpts.Playground && !ctx.LangOpts.DebuggerSupport);
-
-        if (auto *decl = element.dyn_cast<Decl *>()) {
-          if (auto *PDB = dyn_cast<PatternBindingDecl>(decl)) {
-            visitPatternBinding(PDB, elements);
-            continue;
+    if (isInSingleExpressionClosure()) {
+      for (auto node : braceStmt->getElements()) {
+        if (auto expr = node.dyn_cast<Expr *>()) {
+          auto generatedExpr = cs.generateConstraints(
+            expr, context.getAsDeclContext(), /*isInputExpression=*/false);
+          if (!generatedExpr) {
+            hadError = true;
           }
+        } else if (auto stmt = node.dyn_cast<Stmt *>()) {
+          visit(stmt);
+        } else {
+          visitDecl(node.get<Decl *>());
         }
-
-        elements.push_back(makeElement(
-            element,
-            cs.getConstraintLocator(
-                locator, LocatorPathElt::SyntacticElement(element)),
-            /*contextualInfo=*/{}, isDiscarded));
       }
-
-      createConjunction(cs, elements, locator);
       return;
     }
 
-    for (auto node : braceStmt->getElements()) {
-      if (auto expr = node.dyn_cast<Expr *>()) {
-        auto generatedExpr = cs.generateConstraints(
-            expr, context.getAsDeclContext(), /*isInputExpression=*/false);
-        if (!generatedExpr) {
-          hadError = true;
-        }
-      } else if (auto stmt = node.dyn_cast<Stmt *>()) {
-        visit(stmt);
-      } else {
-        visitDecl(node.get<Decl *>());
+    auto &ctx = cs.getASTContext();
+
+    if (isChildOf(StmtKind::Case)) {
+      auto *caseStmt = cast<CaseStmt>(
+          locator->castLastElementTo<LocatorPathElt::SyntacticElement>()
+              .asStmt());
+
+      if (recordInferredSwitchCasePatternVars(caseStmt)) {
+        hadError = true;
       }
     }
+
+    SmallVector<ElementInfo, 4> elements;
+    for (auto element : braceStmt->getElements()) {
+      bool isDiscarded =
+          element.is<Expr *>() &&
+          (!ctx.LangOpts.Playground && !ctx.LangOpts.DebuggerSupport);
+
+      if (auto *decl = element.dyn_cast<Decl *>()) {
+        if (auto *PDB = dyn_cast<PatternBindingDecl>(decl)) {
+          visitPatternBinding(PDB, elements);
+          continue;
+        }
+      }
+
+      elements.push_back(
+          makeElement(element,
+                      cs.getConstraintLocator(
+                          locator, LocatorPathElt::SyntacticElement(element)),
+                      /*contextualInfo=*/{}, isDiscarded));
+    }
+
+    createConjunction(cs, elements, locator);
   }
 
   void visitReturnStmt(ReturnStmt *returnStmt) {
@@ -946,18 +905,6 @@ private:
       return cs.getClosureType(closure)->getResult();
 
     return context.getBodyResultType();
-  }
-
-  bool isSupportedMultiStatementClosure() const {
-    if (cs.getAppliedResultBuilderTransform(context))
-      return true;
-
-    if (auto *closure =
-            getAsExpr<ClosureExpr>(context.getAbstractClosureExpr())) {
-      return !closure->hasSingleExpressionBody() &&
-             cs.participatesInInference(closure);
-    }
-    return true;
   }
 
 #define UNSUPPORTED_STMT(STMT) void visit##STMT##Stmt(STMT##Stmt *) { \
