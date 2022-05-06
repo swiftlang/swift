@@ -249,7 +249,7 @@ void ClangImporter::recordModuleDependencies(
     // Add all args the non-path arguments required to be passed in, according
     // to the Clang scanner
     for (const auto &clangArg :
-         clangModuleDep.getAdditionalArgsWithoutModulePaths()) {
+         clangModuleDep.getCanonicalCommandLineWithoutModulePaths()) {
       swiftArgs.push_back("-Xcc");
       swiftArgs.push_back("-Xclang");
       swiftArgs.push_back("-Xcc");

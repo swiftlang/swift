@@ -14,8 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "debug-info"
-
 #include "IRGenDebugInfo.h"
 #include "GenOpaque.h"
 #include "GenStruct.h"
@@ -67,6 +65,8 @@
 #ifndef NDEBUG
 #include "swift/AST/ASTDemangler.h"
 #endif
+
+#define DEBUG_TYPE "debug-info"
 
 using namespace swift;
 using namespace irgen;

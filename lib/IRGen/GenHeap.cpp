@@ -755,7 +755,7 @@ void IRGenFunction::storeReferenceStorageExtraInhabitant(llvm::Value *index,
     switch (style) {                                                           \
     case ReferenceCounting::Native:                                            \
       return new Native##Name##ReferenceTypeInfo(                              \
-          valueType, IGM.Name##ReferencePtrTy->getElementType(),               \
+          valueType, IGM.Name##ReferencePtrTy->getPointerElementType(),        \
           IGM.getPointerSize(), IGM.getPointerAlignment(),                     \
           std::move(spareBits), isOptional);                                   \
     case ReferenceCounting::ObjC:                                              \
@@ -763,7 +763,7 @@ void IRGenFunction::storeReferenceStorageExtraInhabitant(llvm::Value *index,
     case ReferenceCounting::Block:                                             \
     case ReferenceCounting::Unknown:                                           \
       return new Unknown##Name##ReferenceTypeInfo(                             \
-          valueType, IGM.Name##ReferencePtrTy->getElementType(),               \
+          valueType, IGM.Name##ReferencePtrTy->getPointerElementType(),        \
           IGM.getPointerSize(), IGM.getPointerAlignment(),                     \
           std::move(spareBits), isOptional);                                   \
     case ReferenceCounting::Bridge:                                            \
@@ -1843,7 +1843,7 @@ static llvm::Value *emitLoadOfHeapMetadataRef(IRGenFunction &IGF,
     // mistyped.
     llvm::StructType *structTy =
       cast<llvm::StructType>(
-        cast<llvm::PointerType>(object->getType())->getElementType());
+        cast<llvm::PointerType>(object->getType())->getPointerElementType());
 
     llvm::Value *slot;
 

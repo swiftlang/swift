@@ -22,6 +22,7 @@
 #include "swift/ABI/KeyPath.h"
 #include "swift/ABI/ProtocolDispatchStrategy.h"
 #include "swift/AST/Ownership.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/FlagSet.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -531,8 +532,7 @@ public:
   }
 
 #ifndef NDEBUG
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
-                            "Only for use in the debugger");
+  SWIFT_DEBUG_DUMP;
 #endif
 };
 
