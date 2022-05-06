@@ -254,6 +254,23 @@ static void createConjunction(ConstraintSystem &cs,
     // reference a type variable representing closure type,
     // otherwise it would get disconnected from its contextual type.
     referencedVars.push_back(cs.getType(closure)->castTo<TypeVariableType>());
+
+    // Result builder could be generic but attribute allows its use
+    // in "unbound" form (i.e. `@Builder` where `Builder` is defined
+    // as `struct Builder<T>`). Generic parameters of such a result
+    // builder type are inferable from context, namely from `build*`
+    // calls injected by the transform, and are not always resolved at
+    // the time conjunction is created.
+    //
+    // Conjunction needs to reference all the type variables associated
+    // with result builder just like parameters and result type of
+    // the closure in order to stay connected to its context.
+    if (auto builder = cs.getAppliedResultBuilderTransform(closure)) {
+      SmallPtrSet<TypeVariableType *, 4> builderVars;
+      builder->builderType->getTypeVariables(builderVars);
+      referencedVars.append(builderVars.begin(), builderVars.end());
+    }
+
     // Body of the closure is always isolated from its context, only
     // its individual elements are allowed access to type information
     // from the outside e.g. parameters/result type.
