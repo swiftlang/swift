@@ -21,6 +21,20 @@
 using namespace swift;
 using namespace symbolgraphgen;
 
+namespace {
+
+/// Compare the two \c ModuleDecl instances to see whether they are the same.
+///
+/// Pass \c true to the \c ignoreUnderlying argument to consider two modules the same even if
+/// one is a Swift module and the other a non-Swift module. This allows a Swift module and its
+/// underlying Clang module to compare as equal.
+bool areModulesEqual(const ModuleDecl *lhs, const ModuleDecl *rhs, bool ignoreUnderlying = false) {
+  return lhs->getNameStr() == rhs->getNameStr()
+    && (ignoreUnderlying || lhs->isNonSwiftModule() == rhs->isNonSwiftModule());
+}
+
+} // anonymous namespace
+
 SymbolGraphASTWalker::SymbolGraphASTWalker(ModuleDecl &M,
                                            const SmallPtrSet<ModuleDecl *, 4> ExportedImportedModules,
                                            const SymbolGraphOptions &Options)
@@ -45,10 +59,10 @@ SymbolGraph *SymbolGraphASTWalker::getModuleSymbolGraph(const Decl *D) {
     }
   }
 
-  if (this->M.getNameStr().equals(M->getNameStr())) {
+  if (areModulesEqual(&this->M, M, true)) {
     return &MainGraph;
   } else if (MainGraph.DeclaringModule.hasValue() &&
-      MainGraph.DeclaringModule.getValue()->getNameStr().equals(M->getNameStr())) {
+             areModulesEqual(MainGraph.DeclaringModule.getValue(), M, true)) {
     // Cross-import overlay modules already appear as "extensions" of their declaring module; we
     // should put actual extensions of that module into the main graph
     return &MainGraph;
@@ -220,6 +234,6 @@ bool SymbolGraphASTWalker::isFromExportedImportedModule(const Decl* D) const {
     auto *M = D->getModuleContext();
     
     return llvm::any_of(ExportedImportedModules, [&M](const auto *MD) {
-        return M->getNameStr().equals(MD->getModuleContext()->getNameStr());
+        return areModulesEqual(M, MD->getModuleContext());
     });
 }

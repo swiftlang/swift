@@ -48,7 +48,7 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     )
 
   # The local stdlib implementation provides definitions of the swiftCore
-  # interfaes to avoid pulling in swiftCore itself.  Build the
+  # interfaces to avoid pulling in swiftCore itself.  Build the
   # SwiftRuntimeLongTests with swiftCore_EXPORTS to permit exporting the stdlib
   # interfaces.
   target_compile_definitions(SwiftRuntimeLongTests

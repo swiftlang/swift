@@ -90,7 +90,7 @@ function(remove_sdk_unsupported_archs name os sdk_path architectures_var)
       message(STATUS "Assuming ${name} SDK at ${sdk_path} supports architecture ${arch}")
       list(APPEND architectures ${arch})
     elseif(arch STREQUAL "i386" AND os STREQUAL "iphonesimulator")
-      # 32-bit iOS simulatoris not listed explicitly in SDK settings.
+      # 32-bit iOS simulator is not listed explicitly in SDK settings.
       message(STATUS "Assuming ${name} SDK at ${sdk_path} supports architecture ${arch}")
       list(APPEND architectures ${arch})
     else()

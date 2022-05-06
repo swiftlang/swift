@@ -85,7 +85,7 @@ void CacheImpl::setAndRetain(void *Key, void *Value, size_t Cost) {
     return;
   }
 
-  // If there is an existing entry, the the original key and the new key are ==.
+  // If there is an existing entry, the original key and the new key are ==.
   // Swap the new key into the map and destroy the original key.
   std::swap(Entry->first.Key, Key);
   DCache.CBs.keyDestroyCB(Key, nullptr);

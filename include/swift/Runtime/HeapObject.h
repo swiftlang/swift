@@ -20,6 +20,7 @@
 #include <cstddef>
 #include <cstdint>
 #include "swift/Runtime/Config.h"
+#include "swift/Runtime/Heap.h"
 
 #if SWIFT_OBJC_INTEROP
 #include <objc/objc.h>

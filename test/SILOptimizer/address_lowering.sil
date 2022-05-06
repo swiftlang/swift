@@ -1245,6 +1245,47 @@ bb3:
   return %31 : $()
 }
 
+sil @use_Any : $@convention(thin) (@in Any) -> ()
+
+// CHECK-LABEL:  sil [ossa] @test_checked_cast_br3 : $@convention(method) (@owned C) -> () {
+// CHECK: bb0(%0 : @owned $C):
+// CHECK:   [[DST:%.*]] = alloc_stack $Any
+// CHECK:   [[SRC_TMP:%.*]] = alloc_stack $C
+// CHECK:   store %0 to [init] [[SRC_TMP]] : $*C
+// CHECK:   checked_cast_addr_br take_on_success C in [[SRC_TMP]] : $*C to Any in [[DST]] : $*Any, bb2, bb1
+// CHECK: bb1:
+// CHECK:   [[LD:%.*]] = load [take] [[SRC_TMP]] : $*C
+// CHECK:   dealloc_stack [[SRC_TMP]] : $*C
+// CHECK:   destroy_value [[LD]] : $C
+// CHECK:   br bb3
+// CHECK: bb2:
+// CHECK:   dealloc_stack [[SRC_TMP]] : $*C
+// CHECK:   [[FUNC:%.*]] = function_ref @use_Any : $@convention(thin) (@in Any) -> ()
+// CHECK:   apply [[FUNC]]([[DST]]) : $@convention(thin) (@in Any) -> ()
+// CHECK:   br bb3
+// CHECK: bb3:
+// CHECK:   [[RES:%.*]] = tuple ()
+// CHECK:   dealloc_stack [[DST]] : $*Any
+// CHECK:   return [[RES]] : $()
+// CHECK: }
+sil [ossa] @test_checked_cast_br3 : $@convention(method) (@owned C) -> () {
+bb0(%0 : @owned $C):
+   checked_cast_br %0 : $C to Any, bb1, bb2
+
+bb1(%3 : @owned $Any):
+  %f = function_ref @use_Any : $@convention(thin) (@in Any) -> ()
+  %call = apply %f(%3) : $@convention(thin) (@in Any) -> ()
+  br bb3
+
+bb2(%4 : @owned $C):
+  destroy_value %4 : $C
+  br bb3
+
+bb3:
+  %31 = tuple ()
+  return %31 : $()
+}
+
 // CHECK-LABEL: sil hidden [ossa] @test_unchecked_bitwise_cast :
 // CHECK: bb0(%0 : $*U, %1 : $*T, %2 : $@thick U.Type):
 // CHECK:   [[STK:%.*]] = alloc_stack $T

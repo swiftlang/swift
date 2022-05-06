@@ -2453,7 +2453,8 @@ NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
     // and TypeCheckPattern handle the others. But that's all really gross.
     unsigned i = PBD->getPatternEntryIndexForVarDecl(VD);
     (void)evaluateOrDefault(evaluator,
-                            PatternBindingEntryRequest{PBD, i},
+                            PatternBindingEntryRequest{
+                                PBD, i, /*LeaveClosureBodiesUnchecked=*/false},
                             nullptr);
     if (PBD->isInvalid()) {
       VD->getParentPattern()->setType(ErrorType::get(Context));
