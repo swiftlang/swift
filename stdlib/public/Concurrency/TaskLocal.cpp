@@ -30,10 +30,6 @@
 #include <android/log.h>
 #endif
 
-#if HAVE_PTHREAD_H
-#include <pthread.h>
-#endif
-
 #if defined(_WIN32)
 #include <io.h>
 #endif
