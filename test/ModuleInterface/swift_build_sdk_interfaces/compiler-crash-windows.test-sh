@@ -1,4 +1,4 @@
-# This test is intentionally specialized on windows becauase not --crash behaves
+# This test is intentionally specialized on windows because not --crash behaves
 # differently there. The exit code from the crashing frontend invocations is
 # mapped to `-21` there, which lit's `not` along does not remap correctly.
 # See rdar://59397376
