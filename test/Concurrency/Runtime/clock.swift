@@ -50,7 +50,7 @@ var tests = TestSuite("Time")
       }
       // give a reasonable range of expected elapsed time
       expectGT(elapsed, .milliseconds(90))
-      expectLT(elapsed, .milliseconds(200))
+      expectLT(elapsed, .milliseconds(300))
     }
 
     tests.test("SuspendingClock sleep with tolerance") {
