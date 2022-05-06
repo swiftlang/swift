@@ -1710,9 +1710,13 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
 
   if (EnclosingDecl) {
     if (!AttrRange.isContainedIn(EnclosingAnnotatedRange.getValue())) {
-      diagnose(attr->getLocation(), diag::availability_decl_more_than_enclosing);
+      diagnose(D->isImplicit() ? EnclosingDecl->getLoc() : attr->getLocation(),
+               diag::availability_decl_more_than_enclosing,
+               D->getDescriptiveKind());
       diagnose(EnclosingDecl->getLoc(),
-               diag::availability_decl_more_than_enclosing_enclosing_here);
+               diag::availability_decl_more_than_enclosing_enclosing_here,
+               prettyPlatformString(targetPlatform(Ctx.LangOpts)),
+               EnclosingAnnotatedRange->getOSVersion().getLowerEndpoint());
     }
   }
 
