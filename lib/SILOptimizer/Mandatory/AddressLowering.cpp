@@ -1784,14 +1784,12 @@ void CallArgRewriter::rewriteIndirectArgument(Operand *operand) {
     });
   } else {
     auto borrow = argBuilder.emitBeginBorrowOperation(callLoc, argValue);
-    auto *storeInst =
-        argBuilder.emitStoreBorrowOperation(callLoc, borrow, allocInst);
+    argBuilder.emitStoreBorrowOperation(callLoc, borrow, allocInst);
 
     apply.insertAfterFullEvaluation([&](SILBuilder &callBuilder) {
-      if (auto *storeBorrow = dyn_cast<StoreBorrowInst>(storeInst)) {
-        callBuilder.emitEndBorrowOperation(callLoc, storeBorrow);
+      if (borrow != argValue) {
+        callBuilder.emitEndBorrowOperation(callLoc, borrow);
       }
-      callBuilder.emitEndBorrowOperation(callLoc, borrow);
       callBuilder.createDeallocStack(callLoc, allocInst);
     });
   }
