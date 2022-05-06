@@ -16,7 +16,7 @@
 
 #if SWIFT_THREADING_LINUX
 
-#include "swift/Threading/Impl/Linux.h"
+#include "swift/Threading/Impl.h"
 #include "swift/Threading/Errors.h"
 
 namespace {

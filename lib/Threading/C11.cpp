@@ -16,7 +16,7 @@
 
 #if SWIFT_THREADING_C11
 
-#include "swift/Threading/Impl/C11.h"
+#include "swift/Threading/Impl.h"
 #include "swift/Threading/Errors.h"
 
 namespace {
