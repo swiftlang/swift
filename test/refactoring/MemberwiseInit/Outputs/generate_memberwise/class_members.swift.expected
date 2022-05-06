@@ -1,5 +1,5 @@
 class Person {
-internal init(firstName: String? = nil, lastName: String? = nil, age: Int? = nil, planet: String = "Earth", solarSystem: String = "Milky Way", avgHeight: Int = 175, location: @escaping () -> Place = { fatalError() }, secondLocation: (() -> Place)? = nil, wrapped: String = "") {
+internal init(firstName: String? = nil, lastName: String? = nil, age: Int? = nil, planet: String = "Earth", solarSystem: String = "Milky Way", avgHeight: Int = 175, location: @escaping () -> Place = { fatalError() }, secondLocation: (() -> Place)? = nil, wrapped: String = "", didSet: String = "ds") {
 self.firstName = firstName
 self.lastName = lastName
 self.age = age
@@ -9,6 +9,7 @@ self.avgHeight = avgHeight
 self.location = location
 self.secondLocation = secondLocation
 self.wrapped = wrapped
+self.didSet = didSet
 }
 
   var firstName: String!
@@ -22,6 +23,13 @@ self.wrapped = wrapped
   var secondLocation: (() -> Place)!
   @MyWrapper var wrapped: String = ""
   var computed: String { "hi" }
+  var getSet: String {
+    get { "hi" }
+    set {}
+  }
+  var didSet: String = "ds" {
+    didSet { print("didSet") }
+  }
 }
 
 struct Place {

@@ -10,6 +10,13 @@ class Person {
   var secondLocation: (() -> Place)!
   @MyWrapper var wrapped: String = ""
   var computed: String { "hi" }
+  var getSet: String {
+    get { "hi" }
+    set {}
+  }
+  var didSet: String = "ds" {
+    didSet { print("didSet") }
+  }
 }
 
 struct Place {
