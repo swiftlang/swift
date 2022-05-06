@@ -29,7 +29,7 @@ namespace swift {
 // Never returns nil. The returned memory is uninitialized. 
 //
 // An "alignment mask" is just the alignment (a power of 2) minus 1.
-SWIFT_RETURNS_NONNULL SWIFT_RUNTIME_EXPORT
+SWIFT_RETURNS_NONNULL SWIFT_NODISCARD SWIFT_RUNTIME_EXPORT
 void *swift_slowAlloc(size_t bytes, size_t alignMask);
 
 // If the caller cannot promise to zero the object during destruction,
@@ -53,7 +53,7 @@ void swift_slowDealloc(void *ptr, size_t bytes, size_t alignMask);
 /// This function is capable of returning well-aligned memory even on platforms
 /// that do not implement the C++17 "over-aligned new" feature.
 template <typename T, typename... Args>
-SWIFT_RETURNS_NONNULL
+SWIFT_RETURNS_NONNULL SWIFT_NODISCARD
 static inline T *swift_cxx_newObject(Args &&... args) {
   auto result = reinterpret_cast<T *>(swift_slowAlloc(sizeof(T),
                                                       alignof(T) - 1));
