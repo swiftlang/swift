@@ -250,10 +250,9 @@ StoredPropertiesAndMissingMembersRequest::evaluate(Evaluator &evaluator,
 }
 
 /// Validate the \c entryNumber'th entry in \c binding.
-const PatternBindingEntry *
-PatternBindingEntryRequest::evaluate(Evaluator &eval,
-                                     PatternBindingDecl *binding,
-                                     unsigned entryNumber) const {
+const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
+    Evaluator &eval, PatternBindingDecl *binding, unsigned entryNumber,
+    bool LeaveClosureBodiesUnchecked) const {
   const auto &pbe = binding->getPatternList()[entryNumber];
   auto &Context = binding->getASTContext();
 
@@ -363,8 +362,12 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
   if (patternType->hasUnresolvedType() ||
       patternType->hasPlaceholder() ||
       patternType->hasUnboundGenericType()) {
-    if (TypeChecker::typeCheckPatternBinding(binding, entryNumber,
-                                             patternType)) {
+    TypeCheckExprOptions options;
+    if (LeaveClosureBodiesUnchecked) {
+      options |= TypeCheckExprFlags::LeaveClosureBodyUnchecked;
+    }
+    if (TypeChecker::typeCheckPatternBinding(binding, entryNumber, patternType,
+                                             options)) {
       binding->setInvalid();
       return &pbe;
     }

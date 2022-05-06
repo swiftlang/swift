@@ -1957,7 +1957,8 @@ bool PatternBindingDecl::isComputingPatternBindingEntry(
     const VarDecl *vd) const {
   unsigned i = getPatternEntryIndexForVarDecl(vd);
   return getASTContext().evaluator.hasActiveRequest(
-      PatternBindingEntryRequest{const_cast<PatternBindingDecl *>(this), i});
+      PatternBindingEntryRequest{const_cast<PatternBindingDecl *>(this), i,
+                                 /*LeaveClosureBodyUnchecked=*/false});
 }
 
 bool PatternBindingDecl::isExplicitlyInitialized(unsigned i) const {

@@ -2023,7 +2023,9 @@ public:
           PBD->isFullyValidated(i)
               ? &PBD->getPatternList()[i]
               : evaluateOrDefault(Ctx.evaluator,
-                                  PatternBindingEntryRequest{PBD, i}, nullptr);
+                                  PatternBindingEntryRequest{
+                                      PBD, i, LeaveClosureBodiesUnchecked},
+                                  nullptr);
       assert(entry && "No pattern binding entry?");
 
       const auto *Pat = PBD->getPattern(i);

@@ -266,7 +266,7 @@ SWIFT_REQUEST(TypeChecker, OverriddenDeclsRequest,
               llvm::TinyPtrVector<ValueDecl *>(ValueDecl *), SeparatelyCached,
               NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, PatternBindingEntryRequest,
-              const PatternBindingEntry *(PatternBindingDecl *, unsigned),
+              const PatternBindingEntry *(PatternBindingDecl *, unsigned, bool),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, PrimarySourceFilesRequest,
               ArrayRef<SourceFile *>(ModuleDecl *), Cached, NoLocationInfo)
