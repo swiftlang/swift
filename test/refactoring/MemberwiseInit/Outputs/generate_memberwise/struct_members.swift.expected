@@ -13,7 +13,7 @@ class Person {
 }
 
 struct Place {
-internal init(person: Person, street: String, apartment: Optional<String> = nil, city: String, state: String, postalCode: Int, plusFour: Int? = nil, callback: @escaping Place.Callback, wrapped: String) {
+internal init(person: Person, street: String, apartment: Optional<String> = nil, city: String, state: String, postalCode: Int, plusFour: Int? = nil, callback: @escaping Place.Callback, wrapped: String, `protocol`: String) {
 self.person = person
 self.street = street
 self.apartment = apartment
@@ -23,6 +23,7 @@ self.postalCode = postalCode
 self.plusFour = plusFour
 self.callback = callback
 self.wrapped = wrapped
+self.`protocol` = `protocol`
 }
 
   typealias Callback = () -> ()
@@ -35,6 +36,7 @@ self.wrapped = wrapped
   let plusFour: Int?
   let callback: Callback
   @MyWrapper var wrapped: String
+  var `protocol`: String
 }
 
 protocol Thing {

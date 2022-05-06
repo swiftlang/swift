@@ -23,6 +23,7 @@ struct Place {
   let plusFour: Int?
   let callback: Callback
   @MyWrapper var wrapped: String
+  var `protocol`: String
 }
 
 protocol Thing {
@@ -50,9 +51,9 @@ struct MyWrapper {
 // RUN: %refactor -memberwise-init -source-filename %s -pos=15:8 > %t.result/struct_members.swift
 // RUN: diff -u %S/Outputs/generate_memberwise/struct_members.swift.expected %t.result/struct_members.swift
 
-// RUN: %refactor -memberwise-init -source-filename %s -pos=36:8 > %t.result/only_computed_members.swift
+// RUN: %refactor -memberwise-init -source-filename %s -pos=37:8 > %t.result/only_computed_members.swift
 // RUN: diff -u %S/Outputs/generate_memberwise/only_computed_members.swift.expected %t.result/only_computed_members.swift
 
-// RUN: not %refactor -memberwise-init -source-filename %s -pos=24:10 > %t.result/protocol_members.swift
-// RUN: not %refactor -memberwise-init -source-filename %s -pos=28:6 > %t.result/enum_members.swift
+// RUN: not %refactor -memberwise-init -source-filename %s -pos=29:10 > %t.result/protocol_members.swift
+// RUN: not %refactor -memberwise-init -source-filename %s -pos=33:6 > %t.result/enum_members.swift
 

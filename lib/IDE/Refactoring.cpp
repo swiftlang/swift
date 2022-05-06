@@ -3147,12 +3147,12 @@ bool RefactoringActionLocalizeString::performChange() {
 }
 
 struct MemberwiseParameter {
-  Identifier Name;
+  CharSourceRange NameRange;
   Type MemberType;
   Expr *DefaultExpr;
 
-  MemberwiseParameter(Identifier name, Type type, Expr *initialExpr)
-      : Name(name), MemberType(type), DefaultExpr(initialExpr) {}
+  MemberwiseParameter(CharSourceRange nameRange, Type type, Expr *initialExpr)
+      : NameRange(nameRange), MemberType(type), DefaultExpr(initialExpr) {}
 };
 
 static void generateMemberwiseInit(SourceEditConsumer &EditConsumer,
@@ -3164,7 +3164,7 @@ static void generateMemberwiseInit(SourceEditConsumer &EditConsumer,
   auto insertMember = [&SM](const MemberwiseParameter &memberData,
                             raw_ostream &OS, bool wantsSeparator) {
     {
-      OS << memberData.Name << ": ";
+      OS << SM.extractText(memberData.NameRange) << ": ";
       // Unconditionally print '@escaping' if we print out a function type -
       // the assignments we generate below will escape this parameter.
       if (isa<AnyFunctionType>(memberData.MemberType->getCanonicalType())) {
@@ -3204,7 +3204,8 @@ static void generateMemberwiseInit(SourceEditConsumer &EditConsumer,
   OS << ") {\n";
   for (auto &member : memberVector) {
     // self.<property> = <property>
-    OS << "self." << member.Name << " = " << member.Name << "\n";
+    auto name = SM.extractText(member.NameRange);
+    OS << "self." << name << " = " << name << "\n";
   }
   OS << "}\n";
 
@@ -3232,6 +3233,8 @@ collectMembersForInit(const ResolvedCursorInfo &CursorInfo,
   SourceLoc targetLocation = bracesStart.getAdvancedLoc(1);
   if (!targetLocation.isValid())
     return SourceLoc();
+
+  SourceManager &SM = nominalDecl->getASTContext().SourceMgr;
 
   for (auto member : nominalDecl->getMembers()) {
     auto varDecl = dyn_cast<VarDecl>(member);
@@ -3261,8 +3264,9 @@ collectMembersForInit(const ResolvedCursorInfo &CursorInfo,
       defaultInit = patternBinding->getOriginalInit(i);
     }
 
-    memberVector.emplace_back(varDecl->getName(),
-                              varDecl->getType(), defaultInit);
+    auto NameRange =
+        Lexer::getCharSourceRangeFromSourceRange(SM, varDecl->getNameLoc());
+    memberVector.emplace_back(NameRange, varDecl->getType(), defaultInit);
   }
 
   return targetLocation;
