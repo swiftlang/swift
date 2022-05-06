@@ -6,7 +6,7 @@
 // CHECK: "onone-prespecializer" ]
 // CHECK: ---
 // CHECK: name:            Serialization
-// CHECK: passes:          [ "serialize-sil", "sil-onone-debuginfo-canonicalizer",
+// CHECK: passes:          [ "serialize-sil", "sil-moved-async-var-dbginfo-propagator",
 // CHECK-NEXT:               "ownership-model-eliminator" ]
 // CHECK: ---
 // CHECK: name:            Rest of Onone
