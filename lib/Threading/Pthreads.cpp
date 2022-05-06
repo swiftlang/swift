@@ -20,7 +20,7 @@
 #include <pthread_np.h>
 #endif
 
-#include "swift/Threading/Impl/Pthreads.h"
+#include "swift/Threading/Impl.h"
 #include "swift/Threading/Errors.h"
 
 namespace {

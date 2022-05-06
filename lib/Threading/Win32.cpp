@@ -21,7 +21,7 @@
 #include <windows.h>
 
 #include "swift/Threading/Errors.h"
-#include "swift/Threading/Impl/Win32.h"
+#include "swift/Threading/Impl.h"
 
 namespace {
 
