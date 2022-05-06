@@ -38,6 +38,19 @@ inline bool threads_same(thread_id a, thread_id b) {
   return ::pthread_equal(a, b);
 }
 
+inline stack_bounds thread_get_current_stack_bounds() {
+  stack_bounds result;
+  pthread_t thread = pthread_self();
+
+  // On Apple platforms, pthread_get_stackaddr_np() gets the address of the
+  // *end* of the stack (i.e. the highest address in stack space), *NOT* the
+  // address of the *base* of the stack (the lowest address).
+  result.high = pthread_get_stackaddr_np(thread);
+  result.low = (char *)result.high - pthread_get_stacksize_np(thread);
+
+  return result;
+}
+
 // .. Mutex support ..........................................................
 
 using mutex_handle = ::os_unfair_lock;
