@@ -546,6 +546,12 @@ void SpecifierTypeRepr::printImpl(ASTPrinter &Printer,
   case TypeReprKind::Owned:
     Printer.printKeyword("__owned", Opts, " ");
     break;
+  case TypeReprKind::Isolated:
+    Printer.printKeyword("isolated", Opts, " ");
+    break;
+  case TypeReprKind::CompileTimeConst:
+    Printer.printKeyword("_const", Opts, " ");
+    break;
   default:
     llvm_unreachable("unknown specifier type repr");
     break;
