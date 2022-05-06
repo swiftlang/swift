@@ -8,10 +8,12 @@ class Person {
   lazy var idea: Idea = { fatalError() }()
   var location: () -> Place = { fatalError() }
   var secondLocation: (() -> Place)!
+  @MyWrapper var wrapped: String = ""
+  var computed: String { "hi" }
 }
 
 struct Place {
-internal init(person: Person, street: String, apartment: Optional<String>, city: String, state: String, postalCode: Int, plusFour: Int?, callback: @escaping Place.Callback) {
+internal init(person: Person, street: String, apartment: Optional<String> = nil, city: String, state: String, postalCode: Int, plusFour: Int? = nil, callback: @escaping Place.Callback, wrapped: String) {
 self.person = person
 self.street = street
 self.apartment = apartment
@@ -20,6 +22,7 @@ self.state = state
 self.postalCode = postalCode
 self.plusFour = plusFour
 self.callback = callback
+self.wrapped = wrapped
 }
 
   typealias Callback = () -> ()
@@ -31,6 +34,7 @@ self.callback = callback
   let postalCode: Int
   let plusFour: Int?
   let callback: Callback
+  @MyWrapper var wrapped: String
 }
 
 protocol Thing {
@@ -39,6 +43,11 @@ protocol Thing {
 
 enum Idea {
   var subject: String { fatalError() }
+}
+
+@propertyWrapper
+struct MyWrapper {
+  let wrappedValue: String
 }
 
 
