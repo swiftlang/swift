@@ -2514,14 +2514,24 @@ bool RefactoringActionConvertToSwitchStmt::performChange() {
     SourceManager &SM;
 
     bool isFunctionNameAllowed(BinaryExpr *E) {
-      auto FunctionBody = dyn_cast<DotSyntaxCallExpr>(E->getFn())->getFn();
-      auto FunctionDeclaration = dyn_cast<DeclRefExpr>(FunctionBody)->getDecl();
-      const auto FunctionName = dyn_cast<FuncDecl>(FunctionDeclaration)
-          ->getBaseIdentifier().str();
-      return FunctionName == "~="
-      || FunctionName == "=="
-      || FunctionName == "__derived_enum_equals"
-      || FunctionName == "__derived_struct_equals";
+      Expr *Fn = E->getFn();
+      if (auto DotSyntaxCall = dyn_cast_or_null<DotSyntaxCallExpr>(Fn)) {
+        Fn = DotSyntaxCall->getFn();
+      }
+      DeclRefExpr *DeclRef = dyn_cast_or_null<DeclRefExpr>(Fn);
+      if (!DeclRef) {
+        return false;
+      }
+      auto FunctionDeclaration = dyn_cast_or_null<FuncDecl>(DeclRef->getDecl());
+      if (!FunctionDeclaration) {
+        return false;
+      }
+      auto &ASTCtx = FunctionDeclaration->getASTContext();
+      const auto FunctionName = FunctionDeclaration->getBaseIdentifier();
+      return FunctionName == ASTCtx.Id_MatchOperator ||
+             FunctionName == ASTCtx.Id_EqualsOperator ||
+             FunctionName == ASTCtx.Id_derived_enum_equals ||
+             FunctionName == ASTCtx.Id_derived_struct_equals;
     }
 
     void appendPattern(Expr *LHS, Expr *RHS) {
