@@ -2337,7 +2337,7 @@ different APIs across specializations of the same class. All instantiations of a
 generic type in Swift have the API described in the generic declaration (with
 type parameters substituted), plus applicable conditional extensions.
 
-C++ templates support non-type template parameters, template template
+C++ templates support non-type template parameters, template
 parameters, and parameter packs (variadic generics), all of which are not
 supported in Swift.
 
