@@ -270,7 +270,11 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
 
   IsTransparent_t IsTrans =
       constant.isTransparent() ? IsTransparent : IsNotTransparent;
+
   IsSerialized_t IsSer = constant.isSerialized();
+  // Don't create a [serialized] function after serialization has happened.
+  if (IsSer == IsSerialized && mod.isSerialized())
+    IsSer = IsNotSerialized;
 
   Inline_t inlineStrategy = InlineDefault;
   if (constant.isNoinline())

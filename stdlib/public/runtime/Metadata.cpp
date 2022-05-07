@@ -6313,7 +6313,8 @@ void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
       if (SWIFT_UNLIKELY(_swift_debug_metadataAllocationIterationEnabled))
         poolSize -= sizeof(PoolTrailer);
       allocatedNewPage = true;
-      allocation = new char[PoolRange::PageSize];
+      allocation = reinterpret_cast<char *>(swift_slowAlloc(PoolRange::PageSize,
+                                                            alignof(char) - 1));
       memsetScribble(allocation, PoolRange::PageSize);
 
       if (SWIFT_UNLIKELY(_swift_debug_metadataAllocationIterationEnabled)) {
@@ -6371,7 +6372,7 @@ void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
 
     // If it failed, go back to a neutral state and try again.
     if (allocatedNewPage) {
-      delete[] allocation;
+      swift_slowDealloc(allocation, PoolRange::PageSize, alignof(char) - 1);
     }
   }
 }

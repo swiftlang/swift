@@ -28,6 +28,7 @@
 
 // Bring in the definition of HeapObject 
 #include "../../../stdlib/public/SwiftShims/HeapObject.h"
+#include "../../../stdlib/public/SwiftShims/Visibility.h"
 
 namespace swift {
   
@@ -60,7 +61,7 @@ struct OpaqueValue;
 ///
 /// POSSIBILITIES: The argument order is fair game.  It may be useful
 /// to have a variant which guarantees zero-initialized memory.
-SWIFT_RUNTIME_EXPORT
+SWIFT_RETURNS_NONNULL SWIFT_RUNTIME_EXPORT
 HeapObject *swift_allocObject(HeapMetadata const *metadata,
                               size_t requiredSize,
                               size_t requiredAlignmentMask);
@@ -116,7 +117,7 @@ BoxPair swift_makeBoxUnique(OpaqueValue *buffer, Metadata const *type,
                                     size_t alignMask);
 
 /// Returns the address of a heap object representing all empty box types.
-SWIFT_RUNTIME_EXPORT
+SWIFT_RETURNS_NONNULL SWIFT_RUNTIME_EXPORT
 HeapObject* swift_allocEmptyBox();
 
 /// Atomically increments the retain count of an object.

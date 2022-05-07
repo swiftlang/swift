@@ -236,6 +236,13 @@
 #define SWIFT_NODISCARD
 #endif
 
+#if __has_cpp_attribute(gnu::returns_nonnull)
+#define SWIFT_RETURNS_NONNULL [[gnu::returns_nonnull]]
+#elif defined(_MSC_VER) && defined(_Ret_notnull_)
+#define SWIFT_RETURNS_NONNULL _Ret_notnull_
+#else
+#define SWIFT_RETURNS_NONNULL
+#endif
 
 /// Attributes for runtime-stdlib interfaces.
 /// Use these for C implementations that are imported into Swift via SwiftShims
