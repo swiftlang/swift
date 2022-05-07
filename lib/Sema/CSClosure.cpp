@@ -63,11 +63,13 @@ public:
       auto *decl = DRE->getDecl();
 
       if (auto type = CS.getTypeIfAvailable(DRE->getDecl())) {
+        auto &ctx = CS.getASTContext();
         // If this is not one of the closure parameters which
         // is inferrable from the body, let's replace type
         // variables with errors to avoid bringing external
         // information to the element component.
-        if (type->hasTypeVariable() && !isa<ParamDecl>(decl)) {
+        if (type->hasTypeVariable() &&
+            !(isa<ParamDecl>(decl) || decl->getName() == ctx.Id_builderSelf)) {
           // If there are type variables left in the simplified version,
           // it means that this is an invalid external declaration
           // relative to this element's context.
