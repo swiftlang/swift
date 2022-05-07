@@ -516,7 +516,7 @@ public:
     }
   }
 
-  SWIFT_RETURNS_NONNULL
+  SWIFT_RETURNS_NONNULL SWIFT_NODISCARD
   void *allocateMetadata(size_t size, size_t align);
 
   /// Gather the set of generic arguments that would be written in the

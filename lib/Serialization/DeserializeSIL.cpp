@@ -1346,7 +1346,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   ONEOPERAND_ONETYPE_INST(RefTo##Name) \
   ONEOPERAND_ONETYPE_INST(Name##ToRef)
 #include "swift/AST/ReferenceStorage.def"
-  ONEOPERAND_ONETYPE_INST(UncheckedRefCast)
   ONEOPERAND_ONETYPE_INST(UncheckedAddrCast)
   ONEOPERAND_ONETYPE_INST(UncheckedTrivialBitCast)
   ONEOPERAND_ONETYPE_INST(UncheckedBitwiseCast)
@@ -2668,6 +2667,17 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     ResultInst = Builder.createCheckedCastAddrBranch(
         Loc, consumption, src, srcFormalType, dest, targetFormalType, successBB,
         failureBB);
+    break;
+  }
+  case SILInstructionKind::UncheckedRefCastInst: {
+    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
+           "Layout should be OneTypeOneOperand.");
+    auto *urc = Builder.createUncheckedRefCast(Loc,
+        getLocalValue(ValID, getSILType(MF->getType(TyID2),
+                                        (SILValueCategory)TyCategory2, Fn)),
+        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
+    urc->setForwardingOwnershipKind(decodeValueOwnership(Attr));
+    ResultInst = urc;
     break;
   }
   case SILInstructionKind::UncheckedRefCastAddrInst: {
