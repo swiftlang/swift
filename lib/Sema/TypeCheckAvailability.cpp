@@ -543,10 +543,8 @@ private:
                                                     DeclInfo, ExplicitDeclInfo,
                                                     Range);
     else
-      NewTRC =
-          TypeRefinementContext::createForResilienceBoundary(Context, D,
-                                                             getCurrentTRC(),
-                                                             DeclInfo, Range);
+      NewTRC = TypeRefinementContext::createForAPIBoundary(
+          Context, D, getCurrentTRC(), DeclInfo, Range);
 
     // Possibly use this as an effective parent context later.
     recordEffectiveParentContext(D, NewTRC);
@@ -677,9 +675,8 @@ private:
         AvailabilityContext::forDeploymentTarget(Context);
     DeploymentTargetInfo.intersectWith(getCurrentTRC()->getAvailabilityInfo());
 
-    return TypeRefinementContext::createForResilienceBoundary(
-                                           Context, D, getCurrentTRC(),
-                                           DeploymentTargetInfo, range);
+    return TypeRefinementContext::createForAPIBoundary(
+        Context, D, getCurrentTRC(), DeploymentTargetInfo, range);
   }
 
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
