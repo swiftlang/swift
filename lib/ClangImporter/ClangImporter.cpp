@@ -2177,9 +2177,10 @@ bool PlatformAvailability::isPlatformRelevant(StringRef name) const {
     return name == "ios" || name == "ios_app_extension";
 
   case PlatformKind::macCatalyst:
+    return name == "ios" || name == "maccatalyst";
   case PlatformKind::macCatalystApplicationExtension:
-    // ClangImporter does not yet support macCatalyst.
-    return false;
+    return name == "ios" || name == "ios_app_extension" ||
+           name == "maccatalyst" || name == "maccatalyst_app_extension";
 
   case PlatformKind::tvOS:
     return name == "tvos";
