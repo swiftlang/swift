@@ -321,13 +321,12 @@ public func alwaysUnavailable(
 }
 
 @_spi(Private)
-public func spiDeployedUseNoAvailable( // expected-note 5 {{add @available attribute}}
+public func spiDeployedUseNoAvailable( // expected-note 3 {{add @available attribute}}
   _: NoAvailable,
   _: BeforeInliningTarget,
   _: AtInliningTarget,
-  // FIXME: Next two should be accepted (SPI)
-  _: BetweenTargets, // expected-error {{'BetweenTargets' is only available in}}
-  _: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in}}
+  _: BetweenTargets,
+  _: AtDeploymentTarget,
   _: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in}}
 ) {
   defer {
@@ -533,16 +532,14 @@ public func spiDeployedUseNoAvailable( // expected-note 5 {{add @available attri
   _: Unavailable
 ) {
   defer {
-    // FIXME: Should be allowed for compatibility (unavailable)
-    _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
+    _ = AtDeploymentTarget()
     _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
   }
   _ = NoAvailable()
   _ = BeforeInliningTarget()
   _ = AtInliningTarget()
-  // FIXME: Next two should be accepted for compatibility (unavailable)
-  _ = BetweenTargets() // expected-error {{'BetweenTargets' is only available in}} expected-note {{add 'if #available'}}
-  _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
+  _ = BetweenTargets()
+  _ = AtDeploymentTarget()
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
   _ = Unavailable()
 
@@ -558,26 +555,23 @@ public func spiDeployedUseNoAvailable( // expected-note 5 {{add @available attri
 }
 
 @_spi(Private)
-@inlinable public func spiInlinedUseNoAvailable( // expected-note 8 {{add @available attribute}}
+@inlinable public func spiInlinedUseNoAvailable( // expected-note 3 {{add @available attribute}}
   _: NoAvailable,
   _: BeforeInliningTarget,
   _: AtInliningTarget,
-  // FIXME: Next two should be accepted (SPI)
-  _: BetweenTargets, // expected-error {{'BetweenTargets' is only available in}}
-  _: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in}}
+  _: BetweenTargets,
+  _: AtDeploymentTarget,
   _: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in}}
 ) {
   defer {
-    // FIXME: Should be allowed (SPI)
-    _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
+    _ = AtDeploymentTarget()
     _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
   }
   _ = NoAvailable()
   _ = BeforeInliningTarget()
   _ = AtInliningTarget()
-  // FIXME: Next two should be accepted (SPI)
-  _ = BetweenTargets() // expected-error {{'BetweenTargets' is only available in}} expected-note {{add 'if #available'}}
-  _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
+  _ = BetweenTargets()
+  _ = AtDeploymentTarget()
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
 
   if #available(macOS 11, iOS 14, tvOS 14, watchOS 7, *) {
@@ -679,21 +673,19 @@ public func defaultArgsUseUnavailable(
   _: Any = NoAvailable.self,
   _: Any = BeforeInliningTarget.self,
   _: Any = AtInliningTarget.self,
-  // FIXME: Next two should be accepted for compatibility (unavailable)
-  _: Any = BetweenTargets.self, // expected-error {{'BetweenTargets' is only available in}}
-  _: Any = AtDeploymentTarget.self, // expected-error {{'AtDeploymentTarget' is only available in}}
+  _: Any = BetweenTargets.self,
+  _: Any = AtDeploymentTarget.self,
   _: Any = AfterDeploymentTarget.self, // expected-error {{'AfterDeploymentTarget' is only available in}}
   _: Any = Unavailable.self
 ) {}
 
 @_spi(Private)
-public func spiDefaultArgsUseNoAvailable( // expected-note 3 {{add @available attribute}}
+public func spiDefaultArgsUseNoAvailable( // expected-note 1 {{add @available attribute}}
   _: Any = NoAvailable.self,
   _: Any = BeforeInliningTarget.self,
   _: Any = AtInliningTarget.self,
-  // FIXME: Next two should be accepted (SPI)
-  _: Any = BetweenTargets.self, // expected-error {{'BetweenTargets' is only available in}}
-  _: Any = AtDeploymentTarget.self, // expected-error {{'AtDeploymentTarget' is only available in}}
+  _: Any = BetweenTargets.self,
+  _: Any = AtDeploymentTarget.self,
   _: Any = AfterDeploymentTarget.self // expected-error {{'AfterDeploymentTarget' is only available in}}
 ) {}
 
@@ -806,18 +798,16 @@ public struct UnavailablePublicStruct {
   public var aPublic: NoAvailable
   public var bPublic: BeforeInliningTarget
   public var cPublic: AtInliningTarget
-  // FIXME: Next two should be accepted for compatibility (unavailable)
-  public var dPublic: BetweenTargets // expected-error {{'BetweenTargets' is only available in}}
-  public var ePublic: AtDeploymentTarget // expected-error {{'AtDeploymentTarget' is only available in}}
+  public var dPublic: BetweenTargets
+  public var ePublic: AtDeploymentTarget
   public var fPublic: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in}}
   public var gPublic: Unavailable
   
   public var aPublicInit: Any = NoAvailable()
   public var bPublicInit: Any = BeforeInliningTarget()
   public var cPublicInit: Any = AtInliningTarget()
-  // FIXME: The next two should not be accepted, the default initializer is not inlined
-  public var dPublicInit: Any = BetweenTargets() // expected-error {{'BetweenTargets' is only available in}}
-  public var ePublicInit: Any = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in}}
+  public var dPublicInit: Any = BetweenTargets()
+  public var ePublicInit: Any = AtDeploymentTarget()
   public var fPublicInit: Any = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}}
   public var gPublicInit: Any = Unavailable()
 
@@ -831,21 +821,19 @@ public struct UnavailablePublicStruct {
 }
 
 @_spi(Private)
-public struct SPIStruct { // expected-note 7 {{add @available attribute}}
+public struct SPIStruct { // expected-note 3 {{add @available attribute}}
   public var aPublic: NoAvailable
   public var bPublic: BeforeInliningTarget
   public var cPublic: AtInliningTarget
-  // FIXME: Next two should be accepted (SPI)
-  public var dPublic: BetweenTargets // expected-error {{'BetweenTargets' is only available in}}
-  public var ePublic: AtDeploymentTarget // expected-error {{'AtDeploymentTarget' is only available in}}
+  public var dPublic: BetweenTargets
+  public var ePublic: AtDeploymentTarget
   public var fPublic: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in}}
   
   public var aPublicInit: Any = NoAvailable()
   public var bPublicInit: Any = BeforeInliningTarget()
   public var cPublicInit: Any = AtInliningTarget()
-  // FIXME: The next two should not be diagnosed, the initializers are not inlined
-  public var dPublicInit: Any = BetweenTargets() // expected-error {{'BetweenTargets' is only available in}}
-  public var ePublicInit: Any = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in}}
+  public var dPublicInit: Any = BetweenTargets()
+  public var ePublicInit: Any = AtDeploymentTarget()
   public var fPublicInit: Any = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}}
 
   var aInternal: NoAvailable = .init()
@@ -917,15 +905,13 @@ extension BetweenTargets {
   public func publicFunc3() {}
 }
 
-// FIXME: Should be accepted (SPI)
-// expected-warning@+1 {{BetweenTargets' is only available in}} expected-note@+1 {{add @available attribute to enclosing extension}}
+// FIXME: Can we prevent this warning when SPI members are the reason the extension is exported?
+// expected-warning@+1 {{'BetweenTargets' is only available in}} expected-note@+1 {{add @available attribute to enclosing extension}}
 extension BetweenTargets {
   @_spi(Private)
   public func spiFunc1() {}
 }
 
-// FIXME: Should be accepted (SPI)
-// expected-warning@+2 {{BetweenTargets' is only available in}} expected-note@+2 {{add @available attribute to enclosing extension}}
 @_spi(Private)
 extension BetweenTargets {
   internal func internalFunc3() {}
@@ -950,17 +936,14 @@ extension BetweenTargets {
   ) { }
 }
 
-// FIXME: Should be accepted (SPI)
-// expected-warning@+2 {{BetweenTargets' is only available in}}
 @_spi(Private)
-extension BetweenTargets { // expected-note 4 {{add @available attribute to enclosing extension}}
-  public func inheritsSPINoAvailable( // expected-note 3 {{add @available attribute to enclosing instance method}}
+extension BetweenTargets { // expected-note 1 {{add @available attribute to enclosing extension}}
+  public func inheritsSPINoAvailable( // expected-note 1 {{add @available attribute to enclosing instance method}}
     _: NoAvailable,
     _: BeforeInliningTarget,
     _: AtInliningTarget,
-    // FIXME: Next two should be accepted (SPI)
-    _: BetweenTargets, // expected-error {{'BetweenTargets' is only available in}}
-    _: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in}}
+    _: BetweenTargets,
+    _: AtDeploymentTarget,
     _: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in}}
   ) { }
 }
@@ -1081,21 +1064,19 @@ public protocol UnavailableProtoWithAssoc {
   associatedtype A: NoAvailableProto
   associatedtype B: BeforeInliningTargetProto
   associatedtype C: AtInliningTargetProto
-  // FIXME: Next two should be accepted for compatibility (unavailable)
-  associatedtype D: BetweenTargetsProto // expected-error {{'BetweenTargetsProto' is only available in}}
-  associatedtype E: AtDeploymentTargetProto // expected-error {{'AtDeploymentTargetProto' is only available in}}
+  associatedtype D: BetweenTargetsProto
+  associatedtype E: AtDeploymentTargetProto
   associatedtype F: AfterDeploymentTargetProto // expected-error {{'AfterDeploymentTargetProto' is only available in}}
   associatedtype G: UnavailableProto
 }
 
 @_spi(Private)
-public protocol SPINoAvailableProtoWithAssoc { // expected-note 3 {{add @available attribute to enclosing protocol}}
+public protocol SPINoAvailableProtoWithAssoc { // expected-note 1 {{add @available attribute to enclosing protocol}}
   associatedtype A: NoAvailableProto
   associatedtype B: BeforeInliningTargetProto
   associatedtype C: AtInliningTargetProto
-  // FIXME: Next two should be accepted (SPI)
-  associatedtype D: BetweenTargetsProto // expected-error {{'BetweenTargetsProto' is only available in}}
-  associatedtype E: AtDeploymentTargetProto // expected-error {{'AtDeploymentTargetProto' is only available in}}
+  associatedtype D: BetweenTargetsProto
+  associatedtype E: AtDeploymentTargetProto
   associatedtype F: AfterDeploymentTargetProto // expected-error {{'AfterDeploymentTargetProto' is only available in}}
 }
 
@@ -1118,21 +1099,19 @@ public enum UnavailableEnumWithTypeAliases {
   public typealias A = NoAvailable
   public typealias B = BeforeInliningTarget
   public typealias C = AtInliningTarget
-  // FIXME: Next two should be accepted for compatibility (unavailable)
-  public typealias D = BetweenTargets // expected-error {{'BetweenTargets' is only available in}} expected-note {{add @available attribute to enclosing type alias}}
-  public typealias E = AtDeploymentTarget // expected-error {{'AtDeploymentTarget' is only available in}} expected-note {{add @available attribute to enclosing type alias}}
+  public typealias D = BetweenTargets
+  public typealias E = AtDeploymentTarget
   public typealias F = AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add @available attribute to enclosing type alias}}
   public typealias G = Unavailable
 }
 
 @_spi(Private)
-public enum SPIEnumWithTypeAliases { // expected-note 3 {{add @available attribute to enclosing enum}}
+public enum SPIEnumWithTypeAliases { // expected-note 1 {{add @available attribute to enclosing enum}}
   public typealias A = NoAvailable
   public typealias B = BeforeInliningTarget
   public typealias C = AtInliningTarget
-  // FIXME: Next two should be accepted (SPI)
-  public typealias D = BetweenTargets // expected-error {{'BetweenTargets' is only available in}} expected-note {{add @available attribute to enclosing type alias}}
-  public typealias E = AtDeploymentTarget // expected-error {{'AtDeploymentTarget' is only available in}} expected-note {{add @available attribute to enclosing type alias}}
+  public typealias D = BetweenTargets
+  public typealias E = AtDeploymentTarget
   public typealias F = AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add @available attribute to enclosing type alias}}
 }
 
