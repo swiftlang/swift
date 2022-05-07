@@ -3147,6 +3147,9 @@ ParserResult<CustomAttr> Parser::parseCustomAttribute(
   auto *TE = new (Context) TypeExpr(type.get());
   auto *customAttr = CustomAttr::create(Context, atLoc, TE, initContext,
                                         argList);
+  if (status.hasCodeCompletion() && CodeCompletion) {
+    CodeCompletion->setCompletingInAttribute(customAttr);
+  }
   return makeParserResult(status, customAttr);
 }
 
