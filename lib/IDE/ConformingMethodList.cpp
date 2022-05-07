@@ -68,7 +68,8 @@ void ConformingMethodListCallbacks::doneParsing() {
   if (!ParsedExpr)
     return;
 
-  typeCheckContextAt(CurDeclContext, ParsedExpr->getLoc());
+  typeCheckContextAt(TypeCheckASTNodeAtLocContext::declContext(CurDeclContext),
+                     ParsedExpr->getLoc());
 
   Type T = ParsedExpr->getType();
 
