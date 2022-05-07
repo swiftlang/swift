@@ -1756,6 +1756,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     if (SI.getKind() == SILInstructionKind::ConvertFunctionInst) {
       if (cast<ConvertFunctionInst>(SI).withoutActuallyEscaping())
         attrs |= 0x01;
+    } else if (auto *refCast = dyn_cast<UncheckedRefCastInst>(&SI)) {
+      attrs = encodeValueOwnership(refCast->getOwnershipKind());
     }
     writeConversionLikeInstruction(cast<SingleValueInstruction>(&SI), attrs);
     break;
