@@ -938,7 +938,7 @@ be handled in Swift.
 
 While it is possible to [propagate C++ exceptions](#exceptions) thrown by normal
 member functions to Swift code, special member functions are different as they
-used used to implement value witnesses, which are called by the compiler
+used to implement value witnesses, which are called by the compiler
 implicitly. Therefore, either such exceptions have to be mapped to fatal errors
 (as we do for other unhandled C++ exceptions), or calls to such special member
 functions must be prevented statically.
