@@ -21,7 +21,7 @@ final public class Function : CustomStringConvertible, HasName {
   }
 
   final public var description: String {
-    var s = SILFunction_debugDescription(bridged)
+    let s = SILFunction_debugDescription(bridged)
     return String(cString: s.c_str())
   }
 
