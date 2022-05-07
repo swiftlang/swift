@@ -615,19 +615,19 @@ class ClassAvailableOn10_9 {
 }
 
 @available(OSX, introduced: 10.51)
-class ClassAvailableOn10_51 { // expected-note {{enclosing scope here}}
+class ClassAvailableOn10_51 { // expected-note {{enclosing scope requires availability of macOS 10.51 or newer}}
   func someMethod() {}
   class func someClassMethod() {
     let _ = ClassAvailableOn10_51()
   }
   var someProp : Int = 22
 
-  @available(OSX, introduced: 10.9) // expected-error {{declaration cannot be more available than enclosing scope}}
+  @available(OSX, introduced: 10.9) // expected-error {{instance method cannot be more available than enclosing scope}}
   func someMethodAvailableOn10_9() { }
 
   @available(OSX, introduced: 10.52)
-  var propWithGetter: Int { // expected-note{{enclosing scope here}}
-    @available(OSX, introduced: 10.51) // expected-error {{declaration cannot be more available than enclosing scope}}
+  var propWithGetter: Int { // expected-note{{enclosing scope requires availability of macOS 10.52 or newer}}
+    @available(OSX, introduced: 10.51) // expected-error {{getter cannot be more available than enclosing scope}}
     get { return 0 }
   }
 }
@@ -1022,8 +1022,8 @@ extension ClassToExtend : ProtocolAvailableOn10_51 {
 }
 
 @available(OSX, introduced: 10.51)
-extension ClassToExtend { // expected-note {{enclosing scope here}}
-  @available(OSX, introduced: 10.9) // expected-error {{declaration cannot be more available than enclosing scope}}
+extension ClassToExtend { // expected-note {{enclosing scope requires availability of macOS 10.51 or newer}}
+  @available(OSX, introduced: 10.9) // expected-error {{instance method cannot be more available than enclosing scope}}
   func extensionMethod10_9() { }
 }
 

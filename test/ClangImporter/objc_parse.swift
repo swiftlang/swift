@@ -315,7 +315,7 @@ func ivars(_ hive: Hive) {
   hive.queen.description() // expected-error{{value of type 'Hive' has no member 'queen'}}
 }
 
-class NSObjectable : NSObjectProtocol {
+class NSObjectable : NSObjectProtocol { // expected-error {{cannot declare conformance to 'NSObjectProtocol' in Swift; 'NSObjectable' should inherit 'NSObject' instead}}
   @objc var description : String { return "" }
   @objc(conformsToProtocol:) func conforms(to _: Protocol) -> Bool { return false }
   @objc(isKindOfClass:) func isKind(of aClass: AnyClass) -> Bool { return false }
