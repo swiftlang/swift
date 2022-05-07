@@ -40,7 +40,8 @@ public:
 
   void Reset() {}
 
-  SWIFT_RETURNS_NONNULL void *Allocate(size_t size, size_t alignment);
+  SWIFT_RETURNS_NONNULL SWIFT_NODISCARD
+  void *Allocate(size_t size, size_t alignment);
   using AllocatorBase<MetadataAllocator>::Allocate;
 
   void Deallocate(const void *Ptr, size_t size, size_t Alignment);
@@ -60,7 +61,8 @@ public:
 class MetadataAllocator {
 public:
   MetadataAllocator(uint16_t tag) {}
-  SWIFT_RETURNS_NONNULL void *Allocate(size_t size, size_t alignment) {
+  SWIFT_RETURNS_NONNULL SWIFT_NODISCARD
+  void *Allocate(size_t size, size_t alignment) {
     if (alignment < sizeof(void*)) alignment = sizeof(void*);
     void *ptr = nullptr;
     if (SWIFT_UNLIKELY(posix_memalign(&ptr, alignment, size) != 0 || !ptr)) {
