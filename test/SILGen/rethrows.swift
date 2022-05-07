@@ -27,8 +27,7 @@ func test0() throws {
 
 // CHECK-LABEL: sil hidden @$s8rethrows5test1yyKF : $@convention(thin) () -> @error Error {
 // CHECK:       [[CLOSURE:%.*]] = function_ref @$s8rethrows5test1yyKFSiyKXEfU_ : $@convention(thin) () -> (Int, @error Error)
-// CHECK:       [[CVT:%.*]] = convert_function [[CLOSURE]]
-// CHECK:       [[T0:%.*]] = thin_to_thick_function [[CVT]]
+// CHECK:       [[T0:%.*]] = thin_to_thick_function [[CLOSURE]]
 // CHECK:       [[RETHROWER:%.*]] = function_ref @$s8rethrows9rethroweryS2iyKXEKF : $@convention(thin) (@noescape @callee_guaranteed () -> (Int, @error Error)) -> (Int, @error Error)
 // CHECK:       try_apply [[RETHROWER]]([[T0]]) : $@convention(thin) (@noescape @callee_guaranteed () -> (Int, @error Error)) -> (Int, @error Error), normal [[NORMAL:bb1]], error [[ERROR:bb2]]
 // CHECK:     [[NORMAL]]({{%.*}} : $Int):
@@ -71,12 +70,10 @@ func test2() {
 }
 
 // CHECK-LABEL: sil hidden @$s8rethrows5test3yyF : $@convention(thin) () -> () {
-// CHECK:       [[CLOSURE:%.*]] = function_ref @$s8rethrows5test3yyFSiyXEfU_ : $@convention(thin) () -> Int
-// CHECK:       [[CVT:%.*]] = convert_function [[CLOSURE]] : $@convention(thin) () -> Int to $@convention(thin) @noescape () -> Int
-// CHECK:       [[T0:%.*]] = thin_to_thick_function [[CVT]]
-// CHECK:       [[T1:%.*]] = convert_function [[T0]] : $@noescape @callee_guaranteed () -> Int to $@noescape @callee_guaranteed () -> (Int, @error Error)
-// CHECK:       [[RETHROWER:%.*]] = function_ref @$s8rethrows9rethroweryS2iyKXEKF : $@convention(thin) (@noescape @callee_guaranteed () -> (Int, @error Error)) -> (Int, @error Error)
-// CHECK:       try_apply [[RETHROWER]]([[T1]]) : $@convention(thin) (@noescape @callee_guaranteed () -> (Int, @error Error)) -> (Int, @error Error), normal [[NORMAL:bb1]], error [[ERROR:bb2]]
+// CHECK:       [[CLOSURE:%.*]] = function_ref @$s8rethrows5test3yyFSiyXEfU_ :
+// CHECK:       [[T0:%.*]] = thin_to_thick_function [[CLOSURE]]
+// CHECK:       [[RETHROWER:%.*]] = function_ref @$s8rethrows9rethroweryS2iyKXEKF :
+// CHECK:       try_apply [[RETHROWER]]([[T0]])
 // CHECK:     [[NORMAL]]({{%.*}} : $Int):
 // CHECK-NEXT:  [[RESULT:%.*]] = tuple ()
 // CHECK-NEXT:  return [[RESULT]]

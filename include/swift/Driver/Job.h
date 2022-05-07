@@ -195,7 +195,7 @@ public:
   /// Assuming (and asserting) that there are one or more input pairs, associate
   /// an additional output named \p OutputFilename of type \p type with the
   /// first primary input. If the provided \p type is the primary output type,
-  /// overwrite the existing entry assocaited with the first primary input.
+  /// overwrite the existing entry associated with the first primary input.
   void setAdditionalOutputForType(file_types::ID type,
                                   StringRef OutputFilename);
 

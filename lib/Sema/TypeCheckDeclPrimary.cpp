@@ -857,7 +857,7 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
           }
 
           if (declToDiagnose) {
-            // Figure out if the the declaration we've redeclared is a
+            // Figure out if the declaration we've redeclared is a
             // synthesized witness for a protocol requirement.
             bool isProtocolRequirement = false;
             if (auto VD = dyn_cast<ValueDecl>(current->isImplicit() ? current
@@ -1065,8 +1065,10 @@ Expr *DefaultArgumentExprRequest::evaluate(Evaluator &evaluator,
 
 Type DefaultArgumentTypeRequest::evaluate(Evaluator &evaluator,
                                           ParamDecl *param) const {
-  if (auto expr = param->getTypeCheckedDefaultExpr())
-    return expr->getType();
+  if (auto *expr = param->getTypeCheckedDefaultExpr()) {
+    // If the request failed, let's not propagate ErrorType up.
+    return isa<ErrorExpr>(expr) ? Type() : expr->getType();
+  }
   return Type();
 }
 
@@ -1695,6 +1697,39 @@ static void diagnoseWrittenPlaceholderTypes(ASTContext &Ctx,
   }
 }
 
+/// Make sure that every protocol conformance requirement on 'Self' is
+/// directly stated in the protocol's inheritance clause.
+///
+/// This disallows protocol declarations where a conformance requirement on
+/// 'Self' is implied by some other requirement, such as this:
+///
+///    protocol Other { ... }
+///    protocol Foo { associatedtype A : Other }
+///    protocol Bar {
+///      associatedtype A : Foo where Self == A.A
+///    }
+///
+/// Since name lookup is upstream of generic signature computation, we
+/// want 'Other' to appear in the inheritance clause of 'Bar', so that
+/// name lookup on Bar can find members of Other.
+static void checkProtocolRefinementRequirements(ProtocolDecl *proto) {
+  auto requiredProtos = proto->getGenericSignature()->getRequiredProtocols(
+      proto->getSelfInterfaceType());
+
+  for (auto *otherProto : requiredProtos) {
+    // Every protocol 'P' has an implied requirement 'Self : P'; skip it.
+    if (otherProto == proto)
+      continue;
+
+    // GenericSignature::getRequiredProtocols() canonicalizes the protocol
+    // list by dropping protocols that are inherited by other protocols in
+    // the list. Any protocols that remain in the list other than 'proto'
+    // itself are implied by a conformance requirement on 'Self', but are
+    // not (transitively) inherited by 'proto'.
+    proto->diagnose(diag::missing_protocol_refinement, proto, otherProto);
+  }
+}
+
 namespace {
 class DeclChecker : public DeclVisitor<DeclChecker> {
 public:
@@ -1988,7 +2023,9 @@ public:
           PBD->isFullyValidated(i)
               ? &PBD->getPatternList()[i]
               : evaluateOrDefault(Ctx.evaluator,
-                                  PatternBindingEntryRequest{PBD, i}, nullptr);
+                                  PatternBindingEntryRequest{
+                                      PBD, i, LeaveClosureBodiesUnchecked},
+                                  nullptr);
       assert(entry && "No pattern binding entry?");
 
       const auto *Pat = PBD->getPattern(i);
@@ -2406,6 +2443,12 @@ public:
 
   /// Check that all stored properties have in-class initializers.
   void checkRequiredInClassInits(ClassDecl *cd) {
+    // Initializers may be omitted from property declarations in module
+    // interface files so don't diagnose in them.
+    SourceFile *sourceFile = cd->getDeclContext()->getParentSourceFile();
+    if (sourceFile && sourceFile->Kind == SourceFileKind::Interface)
+      return;
+
     ClassDecl *source = nullptr;
     for (auto member : cd->getMembers()) {
       auto pbd = dyn_cast<PatternBindingDecl>(member);
@@ -2648,13 +2691,17 @@ public:
     checkUnsupportedNestedType(PD);
 
     // Check for circular inheritance within the protocol.
-    (void)PD->hasCircularInheritedProtocols();
+    (void) PD->hasCircularInheritedProtocols();
 
     TypeChecker::checkDeclAttributes(PD);
 
-    // Explicity compute the requirement signature to detect errors.
+    // Check that all named primary associated types are valid.
+    if (!PD->getPrimaryAssociatedTypeNames().empty())
+      (void) PD->getPrimaryAssociatedTypes();
+
+    // Explicitly compute the requirement signature to detect errors.
     // Do this before visiting members, to avoid a request cycle if
-    // a member referenecs another declaration whose generic signature
+    // a member references another declaration whose generic signature
     // has a conformance requirement to this protocol.
     auto reqSig = PD->getRequirementSignature();
 
@@ -2665,6 +2712,11 @@ public:
     checkAccessControl(PD);
 
     checkInheritanceClause(PD);
+
+    if (PD->getASTContext().LangOpts.RequirementMachineProtocolSignatures
+        == RequirementMachineMode::Enabled) {
+      checkProtocolRefinementRequirements(PD);
+    }
 
     TypeChecker::checkDeclCircularity(PD);
     if (PD->isResilient())
@@ -2795,7 +2847,7 @@ public:
 
   /// FIXME: This is an egregious hack to turn off availability checking
   /// for specific functions that were missing availability in older versions
-  /// of existing libraries that we must nonethess still support.
+  /// of existing libraries that we must nonetheless still support.
   static bool hasHistoricallyWrongAvailability(FuncDecl *func) {
     return func->getName().isCompoundName("swift_deletedAsyncMethodError", { });
   }
@@ -3320,7 +3372,7 @@ void TypeChecker::checkParameterList(ParameterList *params,
     }
   }
 
-  // For source compatibilty, allow duplicate internal parameter names
+  // For source compatibility, allow duplicate internal parameter names
   // on protocol requirements.
   //
   // FIXME: Consider turning this into a warning or error if we do

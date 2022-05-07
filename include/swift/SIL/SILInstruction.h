@@ -119,13 +119,13 @@ StringRef getSILInstructionName(SILInstructionKind Kind);
 ///
 /// *NOTE* The reason why this does not store the size of the stored element is
 /// that just from the number of elements we can infer the size of each element
-/// due to the restricted problem space. Specificially:
+/// due to the restricted problem space. Specifically:
 ///
-/// 1. Size == 0 implies nothing is stored and thus element size is irrelevent.
+/// 1. Size == 0 implies nothing is stored and thus element size is irrelevant.
 /// 2. Size == 1 implies we either had a single value instruction or a multiple
 /// value instruction, but no matter what instruction we had, we are going to
 /// store the results at the same starting location so element size is
-/// irrelevent.
+/// irrelevant.
 /// 3. Size > 1 implies we must be storing multiple value instruction results
 /// implying that the size of each stored element must be
 /// sizeof(MultipleValueInstructionResult).
@@ -461,11 +461,11 @@ public:
     locationStorage = loc.storage;
   }
 
-  /// Return the next instruction or nullptr if this is the last instruction in
-  /// its block.
+  /// Return the previous instruction, or nullptr if this is the first
+  /// instruction in its block.
   SILInstruction *getPreviousInstruction();
 
-  /// Return the previous instruction or nullptr if this is the first
+  /// Return the next instruction, or nullptr if this is the final
   /// instruction in its block.
   SILInstruction *getNextInstruction();
 
@@ -854,7 +854,7 @@ public:
 };
 
 inline SILNode *SILInstruction::asSILNode() {
-  // Even if this insttruction is not a NonSingleValueInstruction, but a
+  // Even if this instruction is not a NonSingleValueInstruction, but a
   // SingleValueInstruction, the SILNode is at the same offset as in a
   // NonSingleValueInstruction. See the top-level comment of SILInstruction.
   SILNode *node = (NonSingleValueInstruction *)this;
@@ -1112,39 +1112,31 @@ public:
 /// initializes the kind field on our object is run before our constructor runs.
 class OwnershipForwardingMixin {
   ValueOwnershipKind ownershipKind;
-  bool directlyForwards;
+  bool preservesOwnershipFlag;
 
 protected:
   OwnershipForwardingMixin(SILInstructionKind kind,
                            ValueOwnershipKind ownershipKind,
-                           bool isDirectlyForwarding = true)
-      : ownershipKind(ownershipKind), directlyForwards(isDirectlyForwarding) {
+                           bool preservesOwnership = true)
+      : ownershipKind(ownershipKind),
+        preservesOwnershipFlag(preservesOwnership) {
     assert(isa(kind) && "Invalid subclass?!");
     assert(ownershipKind && "invalid forwarding ownership");
-    assert((directlyForwards || ownershipKind != OwnershipKind::Guaranteed) &&
+    assert((preservesOwnershipFlag
+            || ownershipKind != OwnershipKind::Guaranteed) &&
            "Non directly forwarding instructions can not forward guaranteed "
            "ownership");
   }
 
 public:
-  /// If an instruction is directly forwarding, then any operand op whose
-  /// ownership it forwards into a result r must have the property that op and r
-  /// are "rc identical". This means that they are representing the same set of
-  /// underlying lifetimes (plural b/c of aggregates).
+  /// A forwarding instruction preserved ownership if it has a
+  /// dynamically non-trivial result in which all references are forwarded from
+  /// the operand.
   ///
-  /// An instruction that is not directly forwarding, can not have guaranteed
-  /// ownership since without direct forwarding, there isn't necessarily any
-  /// connection in between the operand's lifetime and the value's lifetime.
-  ///
-  /// An example of this is checked_cast_br where when performing the following:
-  ///
-  ///   __SwiftValue(AnyHashable(Klass())) to OtherKlass()
-  ///
-  /// we will look through the __SwiftValue(AnyHashable(X)) any just cast Klass
-  /// to OtherKlass. This means that the result argument would no longer be
-  /// rc-identical to the operand and default case and thus we can not propagate
-  /// forward any form of guaranteed ownership.
-  bool isDirectlyForwarding() const { return directlyForwards; }
+  /// A cast can only forward guaranteed values if it preserves ownership. Such
+  /// casts cannot release any references within their operand's value and
+  /// cannot retain any references owned by their result.
+  bool preservesOwnership() const { return preservesOwnershipFlag; }
 
   /// Forwarding ownership is determined by the forwarding instruction's
   /// constant ownership attribute. If forwarding ownership is owned, then the
@@ -1160,7 +1152,7 @@ public:
     return ownershipKind;
   }
   void setForwardingOwnershipKind(ValueOwnershipKind newKind) {
-    assert((isDirectlyForwarding() || newKind != OwnershipKind::Guaranteed) &&
+    assert((preservesOwnership() || newKind != OwnershipKind::Guaranteed) &&
            "Non directly forwarding instructions can not forward guaranteed "
            "ownership");
     ownershipKind = newKind;
@@ -1382,7 +1374,7 @@ public:
   /// end of the specific subclass object.
   ///
   /// *NOTE* subclassDeltaOffset must be use only 5 bits. This gives us to
-  /// support subclasses up to 32 bytes in size. We can scavange up to 6 more
+  /// support subclasses up to 32 bytes in size. We can scavenge up to 6 more
   /// bits from ValueBase if this is not large enough.
   MultipleValueInstructionResult(unsigned index, SILType type,
                                  ValueOwnershipKind ownershipKind);
@@ -2285,7 +2277,7 @@ public:
     return getAllOperands().slice(getNumTailTypes() + 1);
   }
   // Is the deinit and the size of the dynamic type known to be equivalent to
-  // the the base type (i.e `this->getType()`).
+  // the base type (i.e `this->getType()`).
   bool isDynamicTypeDeinitAndSizeKnownEquivalentToBaseType() const;
 };
 
@@ -2297,30 +2289,38 @@ public:
 class AllocBoxInst final
     : public InstructionBaseWithTrailingOperands<
                                            SILInstructionKind::AllocBoxInst,
-                                           AllocBoxInst, AllocationInst, char> {
+                                           AllocBoxInst, AllocationInst, char>
+{
   friend SILBuilder;
 
   TailAllocatedDebugVariable VarInfo;
 
-  bool dynamicLifetime = false;
+  unsigned HasDynamicLifetime : 1;
+  unsigned Reflection : 1;
 
   AllocBoxInst(SILDebugLocation DebugLoc, CanSILBoxType BoxType,
                ArrayRef<SILValue> TypeDependentOperands, SILFunction &F,
-               Optional<SILDebugVariable> Var, bool hasDynamicLifetime);
+               Optional<SILDebugVariable> Var, bool hasDynamicLifetime,
+               bool reflection = false);
 
   static AllocBoxInst *create(SILDebugLocation Loc, CanSILBoxType boxType,
                               SILFunction &F,
                               Optional<SILDebugVariable> Var,
-                              bool hasDynamicLifetime);
+                              bool hasDynamicLifetime,
+                              bool reflection = false);
 
 public:
   CanSILBoxType getBoxType() const {
     return getType().castTo<SILBoxType>();
   }
 
-  void setDynamicLifetime() { dynamicLifetime = true; }
-  bool hasDynamicLifetime() const { return dynamicLifetime; }
+  void setDynamicLifetime() { HasDynamicLifetime = true; }
+  bool hasDynamicLifetime() const { return HasDynamicLifetime; }
 
+  /// True if the box should be emitted with reflection metadata for its
+  /// contents.
+  bool emitReflectionMetadata() const { return Reflection; }
+  
   // Return the type of the memory stored in the alloc_box.
   SILType getAddressType() const;
 
@@ -5883,7 +5883,7 @@ class SetDeallocatingInst
 
 /// ObjectInst - Represents a object value type.
 ///
-/// This instruction can only appear at the end of a gobal variable's
+/// This instruction can only appear at the end of a global variable's
 /// static initializer list.
 class ObjectInst final : public InstructionBaseWithTrailingOperands<
                              SILInstructionKind::ObjectInst, ObjectInst,
@@ -8083,9 +8083,9 @@ protected:
   OwnershipForwardingTermInst(SILInstructionKind kind,
                               SILDebugLocation debugLoc,
                               ValueOwnershipKind ownershipKind,
-                              bool isDirectlyForwarding = true)
+                              bool preservesOwnership = true)
       : TermInst(kind, debugLoc),
-        OwnershipForwardingMixin(kind, ownershipKind, isDirectlyForwarding) {
+        OwnershipForwardingMixin(kind, ownershipKind, preservesOwnership) {
     assert(classof(kind));
   }
 
@@ -9062,16 +9062,12 @@ class CheckedCastBranchInst final
                         SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB,
                         ProfileCounter Target1Count,
                         ProfileCounter Target2Count,
-                        ValueOwnershipKind forwardingOwnershipKind)
+                        ValueOwnershipKind forwardingOwnershipKind,
+                        bool preservesOwnership)
       : UnaryInstructionWithTypeDependentOperandsBase(
             DebugLoc, Operand, TypeDependentOperands, SuccessBB, FailureBB,
             Target1Count, Target2Count, forwardingOwnershipKind,
-            // We are always directly forwarding unless we are casting an
-            // AnyObject. This is b/c an AnyObject could contain a boxed
-            // AnyObject(Class()) that we unwrap as part of the cast. In such a
-            // case, we would return a different value and potentially end the
-            // lifetime of the operand value.
-            !Operand->getType().isAnyObject()),
+            preservesOwnership),
         DestLoweredTy(DestLoweredTy), DestFormalTy(DestFormalTy),
         IsExact(IsExact) {}
 
@@ -9321,7 +9317,7 @@ public:
   }
 };
 
-/// LinearFunctionInst - given a function, its derivative and traspose functions,
+/// LinearFunctionInst - given a function, its derivative and transpose functions,
 /// create an `@differentiable(_linear)` function that represents a bundle of these.
 class LinearFunctionInst final
     : public InstructionBaseWithTrailingOperands<
@@ -9524,7 +9520,7 @@ SILFunction *ApplyInstBase<Impl, Base, false>::getCalleeFunction() const {
   SILValue Callee = getCalleeOrigin();
 
   while (true) {
-    // Intentionally don't lookup throught dynamic_function_ref and
+    // Intentionally don't lookup through dynamic_function_ref and
     // previous_dynamic_function_ref as the target of those functions is not
     // statically known.
     if (auto *FRI = dyn_cast<FunctionRefInst>(Callee))

@@ -19,6 +19,7 @@
 #include "swift/Basic/AssertImplements.h"
 #include "swift/Basic/Unicode.h"
 #include "swift/Basic/type_traits.h"
+#include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILBuilder.h"
@@ -322,24 +323,27 @@ bool AllocRefDynamicInst::isDynamicTypeDeinitAndSizeKnownEquivalentToBaseType() 
 AllocBoxInst::AllocBoxInst(SILDebugLocation Loc, CanSILBoxType BoxType,
                            ArrayRef<SILValue> TypeDependentOperands,
                            SILFunction &F, Optional<SILDebugVariable> Var,
-                           bool hasDynamicLifetime)
+                           bool hasDynamicLifetime,
+                           bool reflection)
     : InstructionBaseWithTrailingOperands(
           TypeDependentOperands, Loc, SILType::getPrimitiveObjectType(BoxType)),
       VarInfo(Var, getTrailingObjects<char>()),
-      dynamicLifetime(hasDynamicLifetime) {}
+      HasDynamicLifetime(hasDynamicLifetime),
+      Reflection(reflection) {}
 
 AllocBoxInst *AllocBoxInst::create(SILDebugLocation Loc,
                                    CanSILBoxType BoxType,
                                    SILFunction &F,
                                    Optional<SILDebugVariable> Var,
-                                   bool hasDynamicLifetime) {
+                                   bool hasDynamicLifetime,
+                                   bool reflection) {
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, F, BoxType);
   auto Sz = totalSizeToAlloc<swift::Operand, char>(TypeDependentOperands.size(),
                                                    Var ? Var->Name.size() : 0);
   auto Buf = F.getModule().allocateInst(Sz, alignof(AllocBoxInst));
   return ::new (Buf) AllocBoxInst(Loc, BoxType, TypeDependentOperands, F, Var,
-                                  hasDynamicLifetime);
+                                  hasDynamicLifetime, reflection);
 }
 
 SILType AllocBoxInst::getAddressType() const {
@@ -2283,16 +2287,18 @@ CheckedCastBranchInst *CheckedCastBranchInst::create(
     SILBasicBlock *FailureBB, SILFunction &F,
     ProfileCounter Target1Count, ProfileCounter Target2Count,
     ValueOwnershipKind forwardingOwnershipKind) {
-  SILModule &Mod = F.getModule();
+  SILModule &module = F.getModule();
+  bool preservesOwnership = doesCastPreserveOwnershipForTypes(
+    module, Operand->getType().getASTType(), DestFormalTy);
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, F, DestFormalTy);
   unsigned size =
       totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
-  void *Buffer = Mod.allocateInst(size, alignof(CheckedCastBranchInst));
+  void *Buffer = module.allocateInst(size, alignof(CheckedCastBranchInst));
   return ::new (Buffer) CheckedCastBranchInst(
       DebugLoc, IsExact, Operand, TypeDependentOperands, DestLoweredTy,
       DestFormalTy, SuccessBB, FailureBB, Target1Count, Target2Count,
-      forwardingOwnershipKind);
+      forwardingOwnershipKind, preservesOwnership);
 }
 
 MetatypeInst *MetatypeInst::create(SILDebugLocation Loc, SILType Ty,
@@ -2836,7 +2842,7 @@ SILType GetAsyncContinuationInstBase::getLoweredResumeType() const {
   auto formalType = getFormalResumeType();
   auto &M = getFunction()->getModule();
   auto c = getFunction()->getTypeExpansionContext();
-  return M.Types.getLoweredType(AbstractionPattern(formalType), formalType, c);
+  return M.Types.getLoweredType(AbstractionPattern::getOpaque(), formalType, c);
 }
 
 ReturnInst::ReturnInst(SILFunction &func, SILDebugLocation debugLoc,

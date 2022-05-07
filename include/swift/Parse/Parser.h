@@ -160,6 +160,9 @@ public:
     IVOLP_InLet
   } InVarOrLetPattern = IVOLP_NotInVarOrLet;
 
+  /// Whether this context has an async attribute.
+  bool InPatternWithAsyncAttribute = false;
+
   bool InPoundLineEnvironment = false;
   bool InPoundIfEnvironment = false;
   /// Do not call \c addUnvalidatedDeclWithOpaqueResultType when in an inactive
@@ -474,7 +477,7 @@ public:
         savedConsumer(receiver, this) {}
       void receive(const Token &tok) override { delayedTokens.push_back(tok); }
       Optional<std::vector<Token>> finalize() override {
-        llvm_unreachable("Cannot finalize a DelayedTokenReciever");
+        llvm_unreachable("Cannot finalize a DelayedTokenReceiver");
       }
       ~DelayedTokenReceiver() {
         if (!shouldTransfer)
@@ -558,6 +561,11 @@ public:
 
     return f(backtrackScope);
   }
+
+  /// Discard the current token. This will avoid interface hashing or updating
+  /// the previous loc. Only should be used if you've completely re-lexed
+  /// a different token at that position.
+  SourceLoc discardToken();
 
   /// Consume a token that we created on the fly to correct the original token
   /// stream from lexer.
@@ -671,8 +679,15 @@ public:
   /// skipUntilDeclStmtRBrace - Skip to the next decl or '}'.
   void skipUntilDeclRBrace();
 
-  void skipUntilDeclStmtRBrace(tok T1);
-  void skipUntilDeclStmtRBrace(tok T1, tok T2);
+  template <typename ...T>
+  void skipUntilDeclStmtRBrace(T... K) {
+    while (Tok.isNot(K..., tok::eof, tok::r_brace, tok::pound_endif,
+                     tok::pound_else, tok::pound_elseif,
+                     tok::code_complete) &&
+           !isStartOfStmt() && !isStartOfSwiftDecl()) {
+      skipSingle();
+    }
+  }
 
   void skipUntilDeclRBrace(tok T1, tok T2);
   
@@ -772,9 +787,7 @@ public:
     return diagnose(Tok.getLoc(),
                     Diagnostic(DiagID, std::forward<ArgTypes>(Args)...));
   }
-  
-  void diagnoseRedefinition(ValueDecl *Prev, ValueDecl *New);
-  
+    
   /// Add a fix-it to remove the space in consecutive identifiers.
   /// Add a camel-cased option if it is different than the first option.
   void diagnoseConsecutiveIDs(StringRef First, SourceLoc FirstLoc,
@@ -888,7 +901,7 @@ public:
   /// When encountering an error or a missing matching token (e.g. '}'), return
   /// the location to use for it. This value should be at the last token in
   /// the ASTNode being parsed so that it nests within any enclosing nodes, and,
-  /// for ASTScope lookups, it does not preceed any identifiers to be looked up.
+  /// for ASTScope lookups, it does not precede any identifiers to be looked up.
   /// However, the latter case does not hold when  parsing an interpolated
   /// string literal because there may be identifiers to be looked up in the
   /// literal and their locations will not precede the location of a missing
@@ -1213,9 +1226,9 @@ public:
   parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD);
 
   ParserStatus parsePrimaryAssociatedTypes(
-      SmallVectorImpl<AssociatedTypeDecl *> &AssocTypes);
+      SmallVectorImpl<PrimaryAssociatedTypeName> &AssocTypeNames);
   ParserStatus parsePrimaryAssociatedTypeList(
-      SmallVectorImpl<AssociatedTypeDecl *> &AssocTypes);
+      SmallVectorImpl<PrimaryAssociatedTypeName> &AssocTypeNames);
   ParserResult<ProtocolDecl> parseDeclProtocol(ParseDeclOptions Flags,
                                                DeclAttributes &Attributes);
 
@@ -1691,7 +1704,7 @@ public:
   /// \param inLoc The location of the 'in' keyword, if present.
   ///
   /// \returns ParserStatus error if an error occurred. Success if no signature
-  /// is present or succssfully parsed.
+  /// is present or successfully parsed.
   ParserStatus parseClosureSignatureIfPresent(
           DeclAttributes &attributes,
           SourceRange &bracketRange,
@@ -1746,6 +1759,14 @@ public:
   parseExprPoundCodeCompletion(Optional<StmtKind> ParentKind);
 
   UnresolvedDeclRefExpr *parseExprOperator();
+
+  /// Try re-lex a '/' operator character as a regex literal. This should be
+  /// called when parsing in an expression position to ensure a regex literal is
+  /// correctly parsed.
+  ///
+  /// If \p mustBeRegex is set to true, a regex literal will always be lexed if
+  /// enabled. Otherwise, it will not be lexed if it may be ambiguous.
+  void tryLexRegexLiteral(bool mustBeRegex);
 
   void validateCollectionElement(ParserResult<Expr> element);
 
@@ -1960,7 +1981,7 @@ DeclName formDeclName(ASTContext &ctx,
                       bool isInitializer,
                       bool isSubscript = false);
 
-/// Form a Swift declaration name referemce from its constituent parts.
+/// Form a Swift declaration name reference from its constituent parts.
 DeclNameRef formDeclNameRef(ASTContext &ctx,
                             StringRef baseName,
                             ArrayRef<StringRef> argumentLabels,

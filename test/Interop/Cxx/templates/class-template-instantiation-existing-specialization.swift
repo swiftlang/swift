@@ -1,9 +1,9 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-cxx-interop)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
 //
 // REQUIRES: executable_test
 
 // Please don't add tests into this test case - its setup is quite delicate.
-import ClassTemplateInstantionExistingSpecialization
+import ClassTemplateInstantiationExistingSpecialization
 import StdlibUnittest
 
 var TemplatesTestSuite = TestSuite("TemplatesTestSuite")

@@ -5,6 +5,124 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
 ## Swift 5.7
 
+* References to `optional` methods on a protocol metatype, as well as references to dynamically looked up methods on the `AnyObject` metatype are now supported. These references always have the type of a function that accepts a single argument and returns an optional value of function type:
+
+  ```swift
+  class Object {
+    @objc func getTag() -> Int
+  }
+
+  @objc protocol P {
+    @objc optional func didUpdateObject(withTag tag: Int)
+  }
+
+  let getTag: (AnyObject) -> (() -> Int)? = AnyObject.getTag
+
+  let didUpdateObject: (any P) -> ((Int) -> Void)? = P.didUpdateObject
+  ```
+
+* [SE-0349][]:
+
+  Loading data from raw memory represented by `UnsafeRawPointer`,
+  `UnsafeRawBufferPointer` and their mutable counterparts now supports unaligned
+  accesses. This previously required a workaround involving an intermediate
+  copy:
+
+  ```swift
+  let result = unalignedData.withUnsafeBytes { buffer -> UInt32 in
+    var storage = UInt32.zero
+    withUnsafeMutableBytes(of: &storage) {
+      $0.copyBytes(from: buffer.prefix(MemoryLayout<UInt32>.size))
+    }
+    return storage
+  }
+  ```
+  Now:
+  ```swift
+  let result = unalignedData.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
+  ```
+  Additionally, the counterpart `storeBytes(of:toByteOffset:as:)` had its
+  alignment restriction lifted, so that storing to arbitrary offsets of raw
+  memory can now succeed.
+
+* [SE-0334][]:
+
+  - `UnsafeRawPointer` and `UnsafeMutableRawPointer` have new functionality for
+  pointer arithmetic, adding functions to obtain a pointer advanced to the next
+  or previous alignment boundary:
+
+    ```swift
+    extension UnsafeRawPointer {
+      public func alignedUp<T>(for: T.type) -> UnsafeRawPointer
+      public func alignedDown<T>(for: T.type) -> UnsafeRawPointer
+      public func alignedUp(toMultipleOf alignment: Int) -> UnsafeRawPointer
+      public func alignedDown(toMultipleOf alignment: Int) -> UnsafeRawPointer
+    }
+    ```
+  - It is now possible to use a pointer to `struct` to obtain a pointer to one
+  of its stored properties:
+
+    ```swift
+    withUnsafeMutablePointer(to: &myStruct) {
+      let interiorPointer = $0.pointer(to: \.myProperty)!
+      return myCFunction(interiorPointer)
+    }
+    ```
+  - Comparisons between pointers have been simplified by being more permissive.
+  Since pointers are representations of memory locations within a single pool of
+  underlying memory, Swift now allows comparing pointers without requiring type
+  conversions with the `==`, `!=`, `<`,`<=`,`>`, and `>=` operators. 
+
+* [SE-0333][]:
+
+  It is now possible to use the `withMemoryRebound<T>()` method on raw memory,
+  that is `UnsafeRawPointer` , `UnsafeRawBufferPointer` and their mutable
+  counterparts. Additionally, we clarified the semantics of
+  `withMemoryRebound<T>()` when used on typed memory (`UnsafePointer<Pointee>`,
+  `UnsafeBufferPointer<Pointee>` and their mutable counterparts). Whereas
+  `Pointee` and `T` were previously required to have the same stride, you can
+  now rebind in cases where `Pointee` is an aggregate of `T` or vice-versa. For
+  example, given an `UnsafeMutableBufferPointer<CGPoint>`, you can now use
+  `withMemoryRebound` to operate temporarily on a
+  `UnsafeMutableBufferPointer<CGFloat>`, because `CGPoint` is an aggregate of
+  `CGFloat`.
+
+* [SE-0352][]:
+
+  It's now possible to call a generic function with a value of protocol type
+  in places that would previously fail because `any` types do not conform
+  to their protocols. For example:
+
+  ```swift
+  protocol P {
+    associatedtype A
+    func getA() -> A
+  }
+
+  func takeP<T: P>(_ value: T) { }
+
+  func test(p: any P) {
+    takeP(p) // was an error "type 'any P' cannot conform to 'P'", now accepted
+  }
+  ```
+
+  This operates by "opening" the value of protocol type and passing the
+  underlying type directly to the generic function.
+
+* [SE-0347][]:
+
+  It's now possible to use a default value expression with a generic parameter type
+  to default the argument and its type:
+
+  ```swift
+  func compute<C: Collection>(_ values: C = [0, 1, 2]) {
+    ...
+  }
+  ```
+
+  `compute` is now accepted by compiler and `[Int]` is going to be inferred
+  for `C` at call sites that do not provide the argument explicitly.
+
 * [SE-0326][]:
 
   It's now possible to infer parameter and result types from the body of a multi-statement
@@ -71,54 +189,54 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
 * [SE-0343][]:
 
-Top-level scripts support asynchronous calls.
+  Top-level scripts support asynchronous calls.
 
-Using an `await` by calling an asynchronous function or accessing an isolated
-variable transitions the top-level to an asynchronous context. As an
-asynchronous context, top-level variables are `@MainActor`-isolated and the
-top-level is run on the `@MainActor`.
+  Using an `await` by calling an asynchronous function or accessing an isolated
+  variable transitions the top-level to an asynchronous context. As an
+  asynchronous context, top-level variables are `@MainActor`-isolated and the
+  top-level is run on the `@MainActor`.
 
-Note that the transition affects function overload resolution and starts an
-implicit run loop to drive the concurrency machinery.
+  Note that the transition affects function overload resolution and starts an
+  implicit run loop to drive the concurrency machinery.
 
-Unmodified scripts are not affected by this change unless `-warn-concurrency` is
-passed to the compiler invocation. With `-warn-concurrency`, variables in the
-top-level are isolated to the main actor and the top-level context is isolated
-to the main actor, but is not an asynchronous context.
+  Unmodified scripts are not affected by this change unless `-warn-concurrency` is
+  passed to the compiler invocation. With `-warn-concurrency`, variables in the
+  top-level are isolated to the main actor and the top-level context is isolated
+  to the main actor, but is not an asynchronous context.
 
 * [SE-0336][]:
 
-It is now possible to declare `distributed actor` and `distributed func`s inside of them.
+  It is now possible to declare `distributed actor` and `distributed func`s inside of them.
 
-Distributed actors provide stronger isolation guarantees than "local" actors, and enable additional checks to be made on return types and parameters of distributed methods, e.g. checking if they conform to `Codable`. Distributed methods can be called on "remote" references of distributed actors, turning those invocations into remote procedure calls, by means of pluggable and user extensible distributed actor system implementations. 
-
-Swift does not provide any specific distributed actor system by itself, however, packages in the ecosystem fulfil the role of providing those implementations.
-
-```swift
-distributed actor Greeter { 
-  var greetingsSent = 0
+  Distributed actors provide stronger isolation guarantees than "local" actors, and enable additional checks to be made on return types and parameters of distributed methods, e.g. checking if they conform to `Codable`. Distributed methods can be called on "remote" references of distributed actors, turning those invocations into remote procedure calls, by means of pluggable and user extensible distributed actor system implementations. 
   
-  distributed func greet(name: String) -> String {
-    greetingsSent += 1
-    return "Hello, \(name)!"
+  Swift does not provide any specific distributed actor system by itself, however, packages in the ecosystem fulfill the role of providing those implementations.
+  
+  ```swift
+  distributed actor Greeter { 
+    var greetingsSent = 0
+    
+    distributed func greet(name: String) -> String {
+      greetingsSent += 1
+      return "Hello, \(name)!"
+    }
   }
-}
-
-func talkTo(greeter: Greeter) async throws {
-  // isolation of distributed actors is stronger, it is impossible to refer to
-  // any stored properties of distributed actors from outside of them:
-  greeter.greetingsSent // distributed actor-isolated property 'name' can not be accessed from a non-isolated context
   
-  // remote calls are implicitly throwing and async, 
-  // to account for the potential networking involved:
-  let greeting = try await greeter.greet(name: "Alice")
-  print(greeting) // Hello, Alice!
-}
-```
+  func talkTo(greeter: Greeter) async throws {
+    // isolation of distributed actors is stronger, it is impossible to refer to
+    // any stored properties of distributed actors from outside of them:
+    greeter.greetingsSent // distributed actor-isolated property 'name' can not be accessed from a non-isolated context
+    
+    // remote calls are implicitly throwing and async, 
+    // to account for the potential networking involved:
+    let greeting = try await greeter.greet(name: "Alice")
+    print(greeting) // Hello, Alice!
+  }
+  ```
 
 * The compiler now emits a warning when a non-final class conforms to a protocol that imposes a same-type requirement between `Self` and an associated type. This is because such a requirement makes the conformance unsound for subclasses.
 
-For example, Swift 5.6 would allow the following code, which at runtime would construct an instance of `C` and not `SubC` as expected:
+  For example, Swift 5.6 would allow the following code, which at runtime would construct an instance of `C` and not `SubC` as expected:
 
   ```swift
   protocol P {
@@ -221,29 +339,32 @@ For example, Swift 5.6 would allow the following code, which at runtime would co
     return [ 1: "One", 2: "Two" ]
   }
   ```
+
 Swift 5.6
 ---------
 
+### 2022-03-14 (Xcode 13.3)
+
 * [SE-0327][]:
 
-In Swift 5 mode, a warning is now emitted if the default-value expression of an
-instance-member property requires global-actor isolation. For example:
+  In Swift 5 mode, a warning is now emitted if the default-value expression of an
+  instance-member property requires global-actor isolation. For example:
 
-```swift
-@MainActor
-func partyGenerator() -> [PartyMember] { fatalError("todo") }
-
-class Party {
-  @MainActor var members: [PartyMember] = partyGenerator()
-  //                                      ^~~~~~~~~~~~~~~~
-  // warning: expression requiring global actor 'MainActor' cannot
-  //          appear in default-value expression of property 'members'
-}
-```
-
-Previously, the isolation granted by the type checker matched the isolation of
-the property itself, but at runtime that is not guaranteed. In Swift 6, 
-such default-value expressions will become an error if they require isolation.
+  ```swift
+  @MainActor
+  func partyGenerator() -> [PartyMember] { fatalError("todo") }
+  
+  class Party {
+    @MainActor var members: [PartyMember] = partyGenerator()
+    //                                      ^~~~~~~~~~~~~~~~
+    // warning: expression requiring global actor 'MainActor' cannot
+    //          appear in default-value expression of property 'members'
+  }
+  ```
+  
+  Previously, the isolation granted by the type checker matched the isolation of
+  the property itself, but at runtime that is not guaranteed. In Swift 6, 
+  such default-value expressions will become an error if they require isolation.
 
 * Actor isolation checking now understands that `defer` bodies share the isolation of their enclosing function.
 
@@ -451,8 +572,6 @@ such default-value expressions will become an error if they require isolation.
       // iOS 15 functionality 
   }
   ```
-
-**Add new entries to the top of this section, not here!**
 
 Swift 5.5
 ---------
@@ -694,7 +813,7 @@ Swift 5.5
   }
 
     
-  func hadWithdrawlOn(_ day: Date, from acct: BankAccount) async -> Bool {
+  func hadWithdrawalOn(_ day: Date, from acct: BankAccount) async -> Bool {
     return await !acct[day].allSatisfy { $0.amount >= Amount.zero }
     //            ^~~~~~~~~ this access is async
   }
@@ -872,8 +991,6 @@ Swift 5.5
   Asynchronous for loops use asynchronous sequences, defined by the protocol
   `AsyncSequence` and its corresponding `AsyncIterator`.
 
-**Add new entries to the top of this section, not here!**
-
 Swift 5.4
 ---------
 
@@ -1039,8 +1156,6 @@ Swift 5.4
 
   let _: Foo? = .bar.anotherFoo.getFoo().optionalFoo?.optionalFoo![]
   ```
-
-**Add new entries to the top of this section, not here!**
 
 Swift 5.3
 ---------
@@ -2673,7 +2788,7 @@ Swift 3.1
   result in a compilation error.
 
   Examples of functions that "return twice" include `vfork` and `setjmp`.
-  These functions change the control flow of a program in ways that that Swift
+  These functions change the control flow of a program in ways that Swift
   has never supported. For example, definitive initialization of variables,
   a core Swift language feature, could not be guaranteed when these functions
   were used.
@@ -8983,7 +9098,7 @@ Swift 1.0
 [SE-0107]: <https://github.com/apple/swift-evolution/blob/main/proposals/0107-unsaferawpointer.md>
 [SE-0108]: <https://github.com/apple/swift-evolution/blob/main/proposals/0108-remove-assoctype-inference.md>
 [SE-0109]: <https://github.com/apple/swift-evolution/blob/main/proposals/0109-remove-boolean.md>
-[SE-0110]: <https://github.com/apple/swift-evolution/blob/main/proposals/0110-distingish-single-tuple-arg.md>
+[SE-0110]: <https://github.com/apple/swift-evolution/blob/main/proposals/0110-distinguish-single-tuple-arg.md>
 [SE-0111]: <https://github.com/apple/swift-evolution/blob/main/proposals/0111-remove-arg-label-type-significance.md>
 [SE-0112]: <https://github.com/apple/swift-evolution/blob/main/proposals/0112-nserror-bridging.md>
 [SE-0113]: <https://github.com/apple/swift-evolution/blob/main/proposals/0113-rounding-functions-on-floatingpoint.md>
@@ -9137,19 +9252,24 @@ Swift 1.0
 [SE-0316]: <https://github.com/apple/swift-evolution/blob/main/proposals/0316-global-actors.md>
 [SE-0320]: <https://github.com/apple/swift-evolution/blob/main/proposals/0320-codingkeyrepresentable.md>
 [SE-0322]: <https://github.com/apple/swift-evolution/blob/main/proposals/0322-temporary-buffers.md>
-[SE-0324]: <https://github.com/apple/swift-evolution/blob/main/proposals/0324-c-lang-pointer-arg-conversion.md>
 [SE-0323]: <https://github.com/apple/swift-evolution/blob/main/proposals/0323-async-main-semantics.md>
+[SE-0324]: <https://github.com/apple/swift-evolution/blob/main/proposals/0324-c-lang-pointer-arg-conversion.md>
+[SE-0326]: <https://github.com/apple/swift-evolution/blob/main/proposals/0326-extending-multi-statement-closure-inference.md>
 [SE-0327]: <https://github.com/apple/swift-evolution/blob/main/proposals/0327-actor-initializers.md>
 [SE-0328]: <https://github.com/apple/swift-evolution/blob/main/proposals/0328-structural-opaque-result-types.md>
 [SE-0331]: <https://github.com/apple/swift-evolution/blob/main/proposals/0331-remove-sendable-from-unsafepointer.md>
-[SE-0337]: <https://github.com/apple/swift-evolution/blob/main/proposals/0337-support-incremental-migration-to-concurrency-checking.md>
+[SE-0333]: <https://github.com/apple/swift-evolution/blob/main/proposals/0333-with-memory-rebound.md>
+[SE-0334]: <https://github.com/apple/swift-evolution/blob/main/proposals/0334-pointer-usability-improvements.md>
 [SE-0335]: <https://github.com/apple/swift-evolution/blob/main/proposals/0335-existential-any.md>
-[SE-0341]: <https://github.com/apple/swift-evolution/blob/main/proposals/0341-opaque-parameters.md>
 [SE-0336]: <https://github.com/apple/swift-evolution/blob/main/proposals/0336-distributed-actor-isolation.md>
-[SE-0343]: <https://github.com/apple/swift-evolution/blob/main/proposals/0343-top-level-concurrency.md>
+[SE-0337]: <https://github.com/apple/swift-evolution/blob/main/proposals/0337-support-incremental-migration-to-concurrency-checking.md>
 [SE-0340]: <https://github.com/apple/swift-evolution/blob/main/proposals/0340-swift-noasync.md>
+[SE-0341]: <https://github.com/apple/swift-evolution/blob/main/proposals/0341-opaque-parameters.md>
+[SE-0343]: <https://github.com/apple/swift-evolution/blob/main/proposals/0343-top-level-concurrency.md>
 [SE-0345]: <https://github.com/apple/swift-evolution/blob/main/proposals/0345-if-let-shorthand.md>
-[SE-0326]: <https://github.com/apple/swift-evolution/blob/main/proposals/0326-extending-multi-statement-closure-inference.md>
+[SE-0347]: <https://github.com/apple/swift-evolution/blob/main/proposals/0347-type-inference-from-default-exprs.md>
+[SE-0349]: <https://github.com/apple/swift-evolution/blob/main/proposals/0349-unaligned-loads-and-stores.md>
+[SE-0352]: <https://github.com/apple/swift-evolution/blob/main/proposals/0352-implicit-open-existentials.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>
 [SR-106]: <https://bugs.swift.org/browse/SR-106>

@@ -269,8 +269,8 @@ protected:
     auto FalseCount = inst->getFalseBBCount();
 
     // Try to use the scalar cast instruction.
-    if (canUseScalarCheckedCastInstructions(B.getModule(),
-                                            sourceType, targetType)) {
+    if (canSILUseScalarCheckedCastInstructions(B.getModule(),
+                                               sourceType, targetType)) {
       emitIndirectConditionalCastWithScalar(
           B, SwiftMod, loc, inst->getConsumptionKind(), src, sourceType, dest,
           targetType, succBB, failBB, TrueCount, FalseCount);

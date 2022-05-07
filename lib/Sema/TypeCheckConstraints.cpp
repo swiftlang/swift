@@ -292,13 +292,13 @@ public:
 
 void constraints::performSyntacticDiagnosticsForTarget(
     const SolutionApplicationTarget &target,
-    bool isExprStmt, bool disableExprAvailabiltyChecking) {
+    bool isExprStmt, bool disableExprAvailabilityChecking) {
   auto *dc = target.getDeclContext();
   switch (target.kind) {
   case SolutionApplicationTarget::Kind::expression: {
     // First emit diagnostics for the main expression.
     performSyntacticExprDiagnostics(target.getAsExpr(), dc,
-                                    isExprStmt, disableExprAvailabiltyChecking);
+                                    isExprStmt, disableExprAvailabilityChecking);
 
     // If this is a for-in statement, we also need to check the where clause if
     // present.
@@ -464,10 +464,6 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
       return defaultValue->getType();
     }
 
-    // If inference is disabled, fail.
-    if (!ctx.TypeCheckerOpts.EnableTypeInferenceFromDefaultArguments)
-      return Type();
-
     // Caller-side defaults are always type-checked based on the concrete
     // type of the argument deduced at a particular call site.
     if (isa<MagicIdentifierLiteralExpr>(defaultValue))
@@ -488,7 +484,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
   // First, let's check whether:
   //  - Parameter type is a generic parameter; and
   //  - It's only used in the current position in the parameter list
-  //    or result. This check makes sure that that generic argument
+  //    or result. This check makes sure that generic argument
   //    could only come from an explicit argument or this expression.
   //
   // If both of aforementioned conditions are true, let's attempt
@@ -581,7 +577,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
   auto *requirementBaseLocator = cs.getConstraintLocator(
       locator, LocatorPathElt::OpenedGeneric(signature));
 
-  // Let's check all of the requirements this parameter is invoved in,
+  // Let's check all of the requirements this parameter is involved in,
   // If it's connected to any other generic types (directly or through
   // a dependent member type), that means it could be inferred through
   // them e.g. `T: X.Y` or `T == U`.
@@ -880,6 +876,8 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
 
   std::tie(matchVar, matchCall) = *tildeEqualsApplication;
 
+  matchVar->setInterfaceType(rhsType->mapTypeOutOfContext());
+
   // Result of `~=` should always be a boolean.
   auto contextualTy = Context.getBoolDecl()->getDeclaredInterfaceType();
   auto target = SolutionApplicationTarget::forExprPattern(matchCall, DC, EP,
@@ -908,7 +906,6 @@ TypeChecker::synthesizeTildeEqualsOperatorApplication(ExprPattern *EP,
   auto *matchVar =
       new (Context) VarDecl(/*IsStatic*/ false, VarDecl::Introducer::Let,
                             EP->getLoc(), Context.Id_PatternMatchVar, DC);
-  matchVar->setInterfaceType(enumType->mapTypeOutOfContext());
 
   matchVar->setImplicit();
 
@@ -1061,9 +1058,8 @@ bool TypeChecker::isObjCBridgedTo(Type type1, Type type2, DeclContext *dc,
 }
 
 bool TypeChecker::checkedCastMaySucceed(Type t1, Type t2, DeclContext *dc) {
-  auto kind = TypeChecker::typeCheckCheckedCast(t1, t2,
-                                                CheckedCastContextKind::None, dc,
-                                   SourceLoc(), nullptr, SourceRange());
+  auto kind = TypeChecker::typeCheckCheckedCast(
+      t1, t2, CheckedCastContextKind::None, dc);
   return (kind != CheckedCastKind::Unresolved);
 }
 
@@ -1409,6 +1405,8 @@ void ConstraintSystem::print(raw_ostream &out) const {
       out << " [inout allowed]";
     if (tv->getImpl().canBindToNoEscape())
       out << " [noescape allowed]";
+    if (tv->getImpl().canBindToHole())
+      out << " [hole allowed]";
     auto rep = getRepresentative(tv);
     if (rep == tv) {
       if (auto fixed = getFixedType(tv)) {
@@ -1562,24 +1560,10 @@ void ConstraintSystem::print(raw_ostream &out) const {
 }
 
 /// Determine the semantics of a checked cast operation.
-CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
-                                                  Type toType,
-                                                  CheckedCastContextKind contextKind,
-                                                  DeclContext *dc,
-                                                  SourceLoc diagLoc,
-                                                  Expr *fromExpr,
-                                                  SourceRange diagToRange) {
-  // Determine whether we should suppress diagnostics.
-  const bool suppressDiagnostics =
-      contextKind == CheckedCastContextKind::None ||
-      contextKind == CheckedCastContextKind::Coercion;
-  assert((suppressDiagnostics || diagLoc.isValid()) &&
-         "diagnostics require a valid source location");
-
-  SourceRange diagFromRange;
-  if (fromExpr)
-    diagFromRange = fromExpr->getSourceRange();
-  
+CheckedCastKind
+TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
+                                  CheckedCastContextKind contextKind,
+                                  DeclContext *dc) {
   // If the from/to types are equivalent or convertible, this is a coercion.
   bool unwrappedIUO = false;
   if (fromType->isEqual(toType) ||
@@ -1597,31 +1581,20 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     return CheckedCastKind::BridgingCoercion;
   }
 
-  Type origFromType = fromType;
-  Type origToType = toType;
-
   auto *module = dc->getParentModule();
-
-  auto &diags = dc->getASTContext().Diags;
   bool optionalToOptionalCast = false;
 
   // Local function to indicate failure.
   auto failed = [&] {
-    if (suppressDiagnostics) {
+    if (contextKind == CheckedCastContextKind::Coercion)
       return CheckedCastKind::Unresolved;
-    }
 
     // Explicit optional-to-optional casts always succeed because a nil
     // value of any optional type can be cast to any other optional type.
     if (optionalToOptionalCast)
       return CheckedCastKind::ValueCast;
 
-    diags.diagnose(diagLoc, diag::downcast_to_unrelated, origFromType,
-                   origToType)
-      .highlight(diagFromRange)
-      .highlight(diagToRange);
-
-    return CheckedCastKind::ValueCast;
+    return CheckedCastKind::Unresolved;
   };
 
   // TODO: Explore optionals using the same strategy used by the
@@ -1650,9 +1623,8 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   // downcast. Complain.
   auto &Context = dc->getASTContext();
   if (extraFromOptionals > 0) {
-    switch (typeCheckCheckedCast(fromType, toType,
-                                 CheckedCastContextKind::None, dc,
-                                 SourceLoc(), nullptr, SourceRange())) {
+    switch (typeCheckCheckedCast(fromType, toType, CheckedCastContextKind::None,
+                                 dc)) {
     case CheckedCastKind::Coercion:
     case CheckedCastKind::BridgingCoercion: {
       // Treat this as a value cast so we preserve the semantics.
@@ -1673,7 +1645,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   auto checkElementCast = [&](Type fromElt, Type toElt,
                               CheckedCastKind castKind) -> CheckedCastKind {
     switch (typeCheckCheckedCast(fromElt, toElt, CheckedCastContextKind::None,
-                                 dc, SourceLoc(), nullptr, SourceRange())) {
+                                 dc)) {
     case CheckedCastKind::Coercion:
       return CheckedCastKind::Coercion;
 
@@ -1688,13 +1660,13 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
 
     case CheckedCastKind::Unresolved:
       // Even though we know the elements cannot be downcast, we cannot return
-      // failed() here as it's possible for an empty Array, Set or Dictionary to
-      // be cast to any element type at runtime (SR-6192). The one exception to
-      // this is when we're checking whether we can treat a coercion as a checked
-      // cast because we don't want to tell the user to use as!, as it's probably
-      // the wrong suggestion.
+      // Unresolved here as it's possible for an empty Array, Set or Dictionary
+      // to be cast to any element type at runtime (SR-6192). The one exception
+      // to this is when we're checking whether we can treat a coercion as a
+      // checked cast because we don't want to tell the user to use as!, as it's
+      // probably the wrong suggestion.
       if (contextKind == CheckedCastContextKind::Coercion)
-        return failed();
+        return CheckedCastKind::Unresolved;
       return castKind;
     }
     llvm_unreachable("invalid cast type");
@@ -1715,8 +1687,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         hasBridgingConversion = NoBridging;
       bool hasCast = false;
       switch (typeCheckCheckedCast(fromKeyValue->first, toKeyValue->first,
-                                   CheckedCastContextKind::None, dc,
-                                   SourceLoc(), nullptr, SourceRange())) {
+                                   CheckedCastContextKind::None, dc)) {
       case CheckedCastKind::Coercion:
         hasCoercion = true;
         break;
@@ -1730,7 +1701,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         // Handled the same as in checkElementCast; see comment there for
         // rationale.
         if (contextKind == CheckedCastContextKind::Coercion)
-          return failed();
+          return CheckedCastKind::Unresolved;
         LLVM_FALLTHROUGH;
 
       case CheckedCastKind::ArrayDowncast:
@@ -1742,8 +1713,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
       }
 
       switch (typeCheckCheckedCast(fromKeyValue->second, toKeyValue->second,
-                                   CheckedCastContextKind::None, dc,
-                                   SourceLoc(), nullptr, SourceRange())) {
+                                   CheckedCastContextKind::None, dc)) {
       case CheckedCastKind::Coercion:
         hasCoercion = true;
         break;
@@ -1757,7 +1727,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         // Handled the same as in checkElementCast; see comment there for
         // rationale.
         if (contextKind == CheckedCastContextKind::Coercion)
-          return failed();
+          return CheckedCastKind::Unresolved;
         LLVM_FALLTHROUGH;
 
       case CheckedCastKind::ArrayDowncast:
@@ -1839,31 +1809,14 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   if (fromFunctionType &&
       (toExistentialType || (toArchetypeType && toConstrainedArchetype))) {
     switch (contextKind) {
+    case CheckedCastContextKind::None:
     case CheckedCastContextKind::ConditionalCast:
     case CheckedCastContextKind::ForcedCast:
-      diags.diagnose(diagLoc, diag::downcast_to_unrelated, origFromType,
-                     origToType)
-          .highlight(diagFromRange)
-          .highlight(diagToRange);
-
-      // If we're referring to a function with a return value (not Void) then
-      // emit a fix-it suggesting to add `()` to call the function
-      if (auto DRE = dyn_cast<DeclRefExpr>(fromExpr)) {
-        if (auto FD = dyn_cast<FuncDecl>(DRE->getDecl())) {
-          if (!FD->getResultInterfaceType()->isVoid()) {
-            diags.diagnose(diagLoc, diag::downcast_to_unrelated_fixit,
-                           FD->getBaseIdentifier())
-                .fixItInsertAfter(fromExpr->getEndLoc(), "()");
-          }
-        }
-      }
-
-      return CheckedCastKind::ValueCast;
+      return CheckedCastKind::Unresolved;
 
     case CheckedCastContextKind::IsPattern:
     case CheckedCastContextKind::EnumElementPattern:
     case CheckedCastContextKind::IsExpr:
-    case CheckedCastContextKind::None:
     case CheckedCastContextKind::Coercion:
       break;
     }
@@ -1873,8 +1826,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   if (Type bridgedToClass = getDynamicBridgedThroughObjCClass(dc, fromType,
                                                               toType)) {
     switch (typeCheckCheckedCast(bridgedToClass, fromType,
-                                 CheckedCastContextKind::None, dc, SourceLoc(),
-                                 nullptr, SourceRange())) {
+                                 CheckedCastContextKind::None, dc)) {
     case CheckedCastKind::ArrayDowncast:
     case CheckedCastKind::BridgingCoercion:
     case CheckedCastKind::Coercion:
@@ -1892,8 +1844,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   if (Type bridgedFromClass = getDynamicBridgedThroughObjCClass(dc, toType,
                                                                 fromType)) {
     switch (typeCheckCheckedCast(toType, bridgedFromClass,
-                                 CheckedCastContextKind::None, dc, SourceLoc(),
-                                 nullptr, SourceRange())) {
+                                 CheckedCastContextKind::None, dc)) {
     case CheckedCastKind::ArrayDowncast:
     case CheckedCastKind::BridgingCoercion:
     case CheckedCastKind::Coercion:
@@ -2132,16 +2083,16 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   // The runtime doesn't support casts to CF types and always lets them succeed.
   // This "always fails" diagnosis makes no sense when paired with the CF
   // one.
-  auto clas = toType->getClassOrBoundGenericClass();
-  if (clas && clas->getForeignClassKind() == ClassDecl::ForeignKind::CFType)
+  auto clazz = toType->getClassOrBoundGenericClass();
+  if (clazz && clazz->getForeignClassKind() == ClassDecl::ForeignKind::CFType)
     return CheckedCastKind::ValueCast;
   
   // Don't warn on casts that change the generic parameters of ObjC generic
   // classes. This may be necessary to force-fit ObjC APIs that depend on
   // covariance, or for APIs where the generic parameter annotations in the
   // ObjC headers are inaccurate.
-  if (clas && clas->isTypeErasedGenericClass()) {
-    if (fromType->getClassOrBoundGenericClass() == clas)
+  if (clazz && clazz->isTypeErasedGenericClass()) {
+    if (fromType->getClassOrBoundGenericClass() == clazz)
       return CheckedCastKind::ValueCast;
   }
 

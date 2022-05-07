@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/Unicode.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/ConvertUTF.h"
 
@@ -127,4 +128,29 @@ unsigned swift::unicode::extractFirstUnicodeScalar(StringRef S) {
 bool swift::unicode::isWellFormedUTF8(StringRef S) {
   const llvm::UTF8 *begin = S.bytes_begin();
   return llvm::isLegalUTF8String(&begin, S.bytes_end());
+}
+
+std::string swift::unicode::sanitizeUTF8(StringRef Text) {
+  llvm::SmallString<256> Builder;
+  Builder.reserve(Text.size());
+  const llvm::UTF8* Data = reinterpret_cast<const llvm::UTF8*>(Text.begin());
+  const llvm::UTF8* End = reinterpret_cast<const llvm::UTF8*>(Text.end());
+  StringRef Replacement = u8"\ufffd";
+  while (Data < End) {
+    auto Step = llvm::getNumBytesForUTF8(*Data);
+    if (Data + Step > End) {
+      Builder.append(Replacement);
+      break;
+    }
+
+    if (llvm::isLegalUTF8Sequence(Data, Data + Step)) {
+      Builder.append(Data, Data + Step);
+    } else {
+
+      // If malformed, add replacement characters.
+      Builder.append(Replacement);
+    }
+    Data += Step;
+  }
+  return std::string(Builder.str());
 }

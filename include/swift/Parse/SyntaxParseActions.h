@@ -138,12 +138,12 @@ public:
   /// retrieved using \c getDeferredChildRange if element ranges should be
   /// verified
   /// \p node is the parent node for which the child at position \p ChildIndex
-  /// should be retrieved. Furthmore, \p node starts at \p StartLoc.
+  /// should be retrieved. Furthermore, \p node starts at \p StartLoc.
   virtual DeferredNodeInfo getDeferredChild(OpaqueSyntaxNode node,
                                             size_t childIndex) const = 0;
 
   /// To verify \c ParsedRawSyntaxNode element ranges, the range of child nodes
-  /// returend by \c getDeferredChild needs to be determined. That's what this
+  /// returned by \c getDeferredChild needs to be determined. That's what this
   /// method does.
   /// It assumes that \p node is a deferred layout node starting at \p startLoc
   /// and returns the range of the child node at \p childIndex.

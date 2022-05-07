@@ -14,7 +14,7 @@ actor SomeGlobalActor {
 // Witnessing and unsafe global actor
 // ----------------------------------------------------------------------
 protocol P1 {
-  @MainActor(unsafe) func onMainActor() // expected-note{{'onMainActor()' declared here}}
+  @MainActor(unsafe) func onMainActor() // expected-note{{mark the protocol requirement 'onMainActor()' 'async' to allow actor-isolated conformances}}
 }
 
 struct S1_P1: P1 {
@@ -35,7 +35,7 @@ struct S4_P1_quietly: P1 {
 
 @SomeGlobalActor
 struct S4_P1: P1 {
-  @SomeGlobalActor func onMainActor() { } // expected-warning{{instance method 'onMainActor()' isolated to global actor 'SomeGlobalActor' can not satisfy corresponding requirement from protocol 'P1' isolated to global actor 'MainActor'}}
+  @SomeGlobalActor func onMainActor() { } // expected-warning{{global actor 'SomeGlobalActor'-isolated instance method 'onMainActor()' cannot be used to satisfy main actor-isolated protocol requirement}}
 }
 
 

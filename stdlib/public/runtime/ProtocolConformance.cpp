@@ -31,6 +31,7 @@
 #include "ImageInspection.h"
 #include "Private.h"
 
+#include <new>
 #include <vector>
 
 #if __has_include(<mach-o/dyld_priv.h>)
@@ -510,7 +511,7 @@ struct ConformanceState {
                             SectionsToScan.snapshot().count() != sectionsCount)
                           return false; // abandon the new entry
 
-                        new (entry) ConformanceCacheEntry(
+                        ::new (entry) ConformanceCacheEntry(
                             ConformanceCacheKey(type, proto), witness);
                         return true; // keep the new entry
                       });

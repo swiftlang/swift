@@ -74,6 +74,9 @@ unsigned extractFirstUnicodeScalar(StringRef S);
 /// unit (Unicode scalar).
 bool isWellFormedUTF8(StringRef S);
 
+/// Replaces any ill-formed subsequences with `u8"\ufffd"`.
+std::string sanitizeUTF8(StringRef Text);
+
 } // end namespace unicode
 } // end namespace swift
 

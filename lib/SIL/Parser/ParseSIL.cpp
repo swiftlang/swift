@@ -973,6 +973,7 @@ static bool parseDeclSILOptional(bool *isTransparent,
                                  IsDistributed_t *isDistributed,
                                  IsExactSelfClass_t *isExactSelfClass,
                                  SILFunction **dynamicallyReplacedFunction,
+                                 SILFunction **usedAdHocRequirementWitness,
                                  Identifier *objCReplacementFor,
                                  SILFunction::Purpose *specialPurpose,
                                  Inline_t *inlineStrategy,
@@ -1069,7 +1070,7 @@ static bool parseDeclSILOptional(bool *isTransparent,
       *MRK = EffectsKind::ReadWrite;
     else if (MRK && SP.P.Tok.getText() == "releasenone")
       *MRK = EffectsKind::ReleaseNone;
-    else if  (dynamicallyReplacedFunction && SP.P.Tok.getText() == "dynamic_replacement_for") {
+    else if (dynamicallyReplacedFunction && SP.P.Tok.getText() == "dynamic_replacement_for") {
       SP.P.consumeToken(tok::identifier);
       if (SP.P.Tok.getKind() != tok::string_literal) {
         SP.P.diagnose(SP.P.Tok, diag::expected_in_attribute_list);
@@ -1085,6 +1086,26 @@ static bool parseDeclSILOptional(bool *isTransparent,
         return true;
       }
       *dynamicallyReplacedFunction = Func;
+      SP.P.consumeToken(tok::string_literal);
+
+      SP.P.parseToken(tok::r_square, diag::expected_in_attribute_list);
+      continue;
+    } else if (usedAdHocRequirementWitness && SP.P.Tok.getText() == "ref_adhoc_requirement_witness") {
+      SP.P.consumeToken(tok::identifier);
+      if (SP.P.Tok.getKind() != tok::string_literal) {
+        SP.P.diagnose(SP.P.Tok, diag::expected_in_attribute_list);
+        return true;
+      }
+      // Drop the double quotes.
+      StringRef witnessFunc = SP.P.Tok.getText().drop_front().drop_back();
+      SILFunction *Func = M.lookUpFunction(witnessFunc.str());
+      if (!Func) {
+        Identifier Id = SP.P.Context.getIdentifier(witnessFunc);
+        SP.P.diagnose(SP.P.Tok, diag::sil_adhoc_requirement_witness_func_not_found,
+                      Id);
+        return true;
+      }
+      *usedAdHocRequirementWitness = Func;
       SP.P.consumeToken(tok::string_literal);
 
       SP.P.parseToken(tok::r_square, diag::expected_in_attribute_list);
@@ -1991,17 +2012,17 @@ bool SILParser::parseSubstitutions(SmallVectorImpl<ParsedSubstitution> &parsed,
 /// Collect conformances by looking up the conformance from replacement
 /// type and protocol decl.
 static bool getConformancesForSubstitution(Parser &P,
-              ExistentialLayout::ProtocolTypeArrayRef protocols,
+              ArrayRef<ProtocolDecl*> protocols,
               Type subReplacement,
               SourceLoc loc,
               SmallVectorImpl<ProtocolConformanceRef> &conformances) {
   auto M = P.SF.getParentModule();
 
-  for (auto protoTy : protocols) {
-    auto conformance = M->lookupConformance(subReplacement,
-                                            protoTy->getDecl());
+  for (auto protoDecl : protocols) {
+    auto conformance = M->lookupConformance(subReplacement, protoDecl);
     if (conformance.isInvalid()) {
-      P.diagnose(loc, diag::sil_substitution_mismatch, subReplacement, protoTy);
+      P.diagnose(loc, diag::sil_substitution_mismatch, subReplacement,
+                 protoDecl->getDeclaredInterfaceType());
       return true;
     }
     conformances.push_back(conformance);
@@ -2751,8 +2772,19 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   switch (Opcode) {
   case SILInstructionKind::AllocBoxInst: {
     bool hasDynamicLifetime = false;
-    if (parseSILOptional(hasDynamicLifetime, *this, "dynamic_lifetime"))
-      return true;
+    bool hasReflection = false;
+    StringRef attrName;
+    SourceLoc attrLoc;
+    while (parseSILOptional(attrName, attrLoc, *this)) {
+      if (attrName.equals("dynamic_lifetime")) {
+        hasDynamicLifetime = true;
+      } else if (attrName.equals("reflection")) {
+        hasReflection = true;
+      } else {
+        P.diagnose(attrLoc, diag::sil_invalid_attribute_for_expected, attrName,
+                   "dynamic_lifetime or reflection");
+      }
+    }
 
     SILType Ty;
     if (parseSILType(Ty))
@@ -3256,14 +3288,14 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     break;
   }
   case SILInstructionKind::IsEscapingClosureInst: {
-    bool IsObjcVerifcationType = false;
-    if (parseSILOptional(IsObjcVerifcationType, *this, "objc"))
+    bool IsObjcVerificationType = false;
+    if (parseSILOptional(IsObjcVerificationType, *this, "objc"))
       return true;
     if (parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))
       return true;
     ResultVal = B.createIsEscapingClosure(
         InstLoc, Val,
-        IsObjcVerifcationType ? IsEscapingClosureInst::ObjCEscaping
+        IsObjcVerificationType ? IsEscapingClosureInst::ObjCEscaping
                               : IsEscapingClosureInst::WithoutActuallyEscaping);
     break;
   }
@@ -6335,12 +6367,13 @@ bool SILParserState::parseDeclSIL(Parser &P) {
   EffectsKind MRK = EffectsKind::Unspecified;
   llvm::SmallVector<ArgEffectLoc, 8> argEffectLocs;
   SILFunction *DynamicallyReplacedFunction = nullptr;
+  SILFunction *AdHocWitnessFunction = nullptr;
   Identifier objCReplacementFor;
   if (parseSILLinkage(FnLinkage, P) ||
       parseDeclSILOptional(
           &isTransparent, &isSerialized, &isCanonical, &hasOwnershipSSA,
           &isThunk, &isDynamic, &isDistributed, &isExactSelfClass,
-          &DynamicallyReplacedFunction, &objCReplacementFor, &specialPurpose,
+          &DynamicallyReplacedFunction, &AdHocWitnessFunction, &objCReplacementFor, &specialPurpose,
           &inlineStrategy, &optimizationMode, &perfConstr, nullptr,
           &isWeakImported, &availability,
           &isWithoutActuallyEscapingThunk, &Semantics,
@@ -6378,6 +6411,8 @@ bool SILParserState::parseDeclSIL(Parser &P) {
     FunctionState.F->setIsExactSelfClass(isExactSelfClass);
     FunctionState.F->setDynamicallyReplacedFunction(
         DynamicallyReplacedFunction);
+    FunctionState.F->setReferencedAdHocRequirementWitnessFunction(
+        AdHocWitnessFunction);
     if (!objCReplacementFor.empty())
       FunctionState.F->setObjCReplacement(objCReplacementFor);
     FunctionState.F->setSpecialPurpose(specialPurpose);
@@ -6571,7 +6606,7 @@ bool SILParserState::parseSILGlobal(Parser &P) {
   if (parseSILLinkage(GlobalLinkage, P) ||
       parseDeclSILOptional(nullptr, &isSerialized, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr,
+                           nullptr, nullptr, nullptr, nullptr,
                            &isLet, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, State, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_value_name) ||
@@ -6624,7 +6659,7 @@ bool SILParserState::parseSILProperty(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           SP, M))
+                           nullptr, SP, M))
     return true;
   
   ValueDecl *VD;
@@ -6694,7 +6729,7 @@ bool SILParserState::parseSILVTable(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, VTableState, M))
+                           nullptr, nullptr, VTableState, M))
     return true;
 
   // Parse the class name.
@@ -7211,7 +7246,7 @@ bool SILParserState::parseSILWitnessTable(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, WitnessState, M))
+                           nullptr, nullptr, WitnessState, M))
     return true;
 
   // Parse the protocol conformance.

@@ -220,8 +220,16 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
     if (!checkConformance(proto))
       return false;
 
-    // Now check any additional bounds on 'Self' from the where clause.
-    auto bounds = getSelfBoundsFromWhereClause(extension);
+    // Source file and module file have different ways to get self bounds.
+    // Source file extension will have trailing where clause which can avoid
+    // computing a generic signature. Module file will not have
+    // trailing where clause, so it will compute generic signature to get
+    // self bounds which might result in slow performance.
+    SelfBounds bounds;
+    if (extension->getParentSourceFile() != nullptr)
+      bounds = getSelfBoundsFromWhereClause(extension);
+    else
+      bounds = getSelfBoundsFromGenericSignature(extension);
     for (auto *decl : bounds.decls) {
       if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
         if (!checkConformance(proto))
@@ -2128,6 +2136,20 @@ bool AssociatedTypeInference::diagnoseAmbiguousSolutions(
   return false;
 }
 
+bool AssociatedTypeInference::canAttemptEagerTypeWitnessDerivation(
+    ConformanceChecker &checker,
+    AssociatedTypeDecl *assocType) {
+
+  /// Rather than locating the TypeID via the default implementation of
+  /// Identifiable, we need to find the type based on the associated ActorSystem
+  if (checker.Adoptee->isDistributedActor() &&
+      assocType->getProtocol()->isSpecificProtocol(KnownProtocolKind::Identifiable)) {
+    return true;
+  }
+
+  return false;
+}
+
 auto AssociatedTypeInference::solve(ConformanceChecker &checker)
     -> Optional<InferredTypeWitnesses> {
   // Track when we are checking type witnesses.
@@ -2141,6 +2163,16 @@ auto AssociatedTypeInference::solve(ConformanceChecker &checker)
     // If we already have a type witness, do nothing.
     if (conformance->hasTypeWitness(assocType))
       continue;
+
+    if (canAttemptEagerTypeWitnessDerivation(checker, assocType)) {
+      auto derivedType = computeDerivedTypeWitness(assocType);
+      if (derivedType.first) {
+        checker.recordTypeWitness(assocType,
+                                  derivedType.first->mapTypeOutOfContext(),
+                                  derivedType.second);
+        continue;
+      }
+    }
 
     // Try to resolve this type witness via name lookup, which is the
     // most direct mechanism, overriding all others.

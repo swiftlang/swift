@@ -594,6 +594,8 @@ private:
     case Node::Kind::AccessibleFunctionRecord:
     case Node::Kind::BackDeploymentThunk:
     case Node::Kind::BackDeploymentFallback:
+    case Node::Kind::ExtendedExistentialTypeShape:
+    case Node::Kind::Uniquable:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -2549,7 +2551,7 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
         if (index != 0)
           Printer << ", ";
         // Limit the number of printed generic parameters. In practice this
-        // it will never be exceeded. The limit is only imporant for malformed
+        // it will never be exceeded. The limit is only important for malformed
         // symbols where count can be really huge.
         if (index >= 128) {
           Printer << "...";
@@ -2962,6 +2964,35 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
       Printer << " suspend resume partial function for ";
     }
     return nullptr;
+  case Node::Kind::Uniquable:
+    Printer << "uniquable ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
+  case Node::Kind::ExtendedExistentialTypeShape: {
+    // Printing the requirement signature is pretty useless if we
+    // don't print `where` clauses.
+    auto savedDisplayWhereClauses = Options.DisplayWhereClauses;
+    Options.DisplayWhereClauses = true;
+
+    NodePointer genSig = nullptr, type = nullptr;
+    if (Node->getNumChildren() == 2) {
+      genSig = Node->getChild(1);
+      type = Node->getChild(2);
+    } else {
+      type = Node->getChild(1);
+    }
+
+    Printer << "existential shape for ";
+    if (genSig) {
+      print(genSig, depth + 1);
+      Printer << " ";
+    }
+    Printer << "any ";
+    print(type, depth + 1);
+
+    Options.DisplayWhereClauses = savedDisplayWhereClauses;
+    return nullptr;
+  }
   }
 
   printer_unreachable("bad node kind!");

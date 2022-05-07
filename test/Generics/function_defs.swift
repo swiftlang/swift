@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=verify
+// RUN: %target-typecheck-verify-swift
 
 //===----------------------------------------------------------------------===//
 // Type-check function definitions
@@ -34,7 +34,7 @@ func min<T : MethodLessComparable>(_ x: T, y: T) -> T {
 //===----------------------------------------------------------------------===//
 
 func existential<T : EqualComparable, U : EqualComparable>(_ t1: T, t2: T, u: U) {
-  var eqComp : EqualComparable = t1 // expected-warning {{use of protocol 'EqualComparable' as a type must be written 'any EqualComparable'}}
+  var eqComp : any EqualComparable = t1
   eqComp = u
   if t1.isEqual(eqComp) {} // expected-error{{cannot convert value of type 'any EqualComparable' to expected argument type 'T'}}
   if eqComp.isEqual(t2) {}
@@ -294,10 +294,11 @@ func badTypeConformance5<T>(_: T) where T & Sequence : EqualComparable { }
 // expected-error@-1 {{non-protocol, non-class type 'T' cannot be used within a protocol-constrained type}}
 
 func badTypeConformance6<T>(_: T) where [T] : Collection { }
-// expected-error@-1{{type '[T]' in conformance requirement does not refer to a generic parameter or associated type}}
+// expected-warning@-1{{redundant conformance constraint '[T]' : 'Collection'}}
 
 func badTypeConformance7<T, U>(_: T, _: U) where T? : U { }
-// expected-error@-1{{type 'T?' in conformance requirement does not refer to a generic parameter or associated type}}
+// expected-error@-1{{type 'T?' constrained to non-protocol, non-class type 'U'}}
 
 func badSameType<T, U : GeneratesAnElement, V>(_ : T, _ : U)
-  where T == U.Element, U.Element == V {} // expected-error{{same-type requirement makes generic parameters 'T' and 'V' equivalent}}
+  where T == U.Element, U.Element == V {}
+// expected-warning@-2{{same-type requirement makes generic parameters 'V' and 'T' equivalent}}

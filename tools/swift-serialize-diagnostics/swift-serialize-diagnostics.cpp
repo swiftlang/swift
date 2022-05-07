@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Convert localization YAML files to a srialized format.
+// Convert localization YAML files to a serialized format.
 //
 //===----------------------------------------------------------------------===//
 
@@ -86,7 +86,7 @@ int main(int argc, char *argv[]) {
   // Print out the diagnostics IDs that are available in YAML but not available
   // in `.def`
   if (!yaml.unknownIDs.empty()) {
-    llvm::errs() << "These diagnostic IDs are no longer availiable: '";
+    llvm::errs() << "These diagnostic IDs are no longer available: '";
     llvm::interleave(
         yaml.unknownIDs, [&](std::string id) { llvm::errs() << id; },
         [&] { llvm::errs() << ", "; });

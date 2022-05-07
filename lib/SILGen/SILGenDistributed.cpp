@@ -38,21 +38,6 @@ using namespace Lowering;
 
 // MARK: utility functions
 
-/// Obtain a nominal type's member by name, as a VarDecl.
-/// \returns nullptr if the name lookup doesn't resolve to exactly one member,
-///          or the subsequent cast to VarDecl failed.
-static VarDecl* lookupProperty(NominalTypeDecl *decl, DeclName name) {
-  assert(decl && "decl was null");
-  if (auto clazz = dyn_cast<ClassDecl>(decl)) {
-    auto refs = decl->lookupDirect(name);
-    if (refs.size() != 1)
-      return nullptr;
-    return dyn_cast<VarDecl>(refs.front());
-  }
-  
-  return nullptr;
-}
-
 /// Emit a reference to a specific stored property of the actor.
 static SILValue emitActorPropertyReference(
     SILGenFunction &SGF, SILLocation loc, SILValue actorSelf,
@@ -79,17 +64,12 @@ static void initializeProperty(SILGenFunction &SGF, SILLocation loc,
     SGF.B.createCopyAddr(loc, value, fieldAddr, IsNotTake, IsInitialization);
   } else {
     if (value->getType().isAddress()) {
-      value = SGF.B.createTrivialLoadOr(
-          loc, value, LoadOwnershipQualifier::Take);
+      SGF.emitSemanticLoadInto(loc, value, SGF.F.getTypeLowering(value->getType()),
+          fieldAddr, SGF.getTypeLowering(loweredType), IsTake, IsInitialization);
     } else {
       value = SGF.B.emitCopyValueOperation(loc, value);
-    }
-
-    SGF.B.emitStoreValueOperation(
+      SGF.B.emitStoreValueOperation(
         loc, value, fieldAddr, StoreOwnershipQualifier::Init);
-
-    if (value->getType().isAddress()) {
-      SGF.B.createDestroyAddr(loc, value);
     }
   }
 }
@@ -181,12 +161,11 @@ static void emitActorSystemInit(SILGenFunction &SGF,
 
   auto *dc = ctor->getDeclContext();
   auto classDecl = dc->getSelfClassDecl();
-  auto &C = ctor->getASTContext();
 
   // By construction, automatically generated distributed actor ctors have
   // exactly one ActorSystem-conforming argument to the constructor,
   // so we grab the first one from the params.
-  VarDecl *var = lookupProperty(classDecl, C.Id_actorSystem);
+  VarDecl *var = classDecl->getDistributedActorSystemProperty();
   assert(var);
       
   initializeProperty(SGF, loc, actorSelf.getValue(), var, systemValue);
@@ -219,7 +198,7 @@ void SILGenFunction::emitDistActorIdentityInit(ConstructorDecl *ctor,
 
   // --- create a temporary storage for the result of the call
   // it will be deallocated automatically as we exit this scope
-  VarDecl *var = lookupProperty(classDecl, C.Id_id);
+  VarDecl *var = classDecl->getDistributedActorIDProperty();
   auto resultTy = getLoweredType(F.mapTypeIntoContext(var->getInterfaceType()));
   auto temp = emitTemporaryAllocation(loc, resultTy);
 
@@ -321,7 +300,6 @@ void SILGenFunction::emitDistributedActorReady(
   // Only designated initializers get the lifecycle handling injected
   assert(ctor->isDesignatedInit());
 
-  auto &C = ctor->getASTContext();
   auto *dc = ctor->getDeclContext();
   auto classDecl = dc->getSelfClassDecl();
 
@@ -332,7 +310,7 @@ void SILGenFunction::emitDistributedActorReady(
   ManagedValue actorSystem;
   SGFContext sgfCxt;
   {
-    VarDecl *property = lookupProperty(classDecl, C.Id_actorSystem);
+    VarDecl *property = classDecl->getDistributedActorSystemProperty();
     Type formalType = F.mapTypeIntoContext(property->getInterfaceType());
     SILType loweredType = getLoweredType(formalType).getAddressType();
     SILValue actorSystemRef = emitActorPropertyReference(
@@ -466,11 +444,11 @@ void SILGenFunction::emitDistributedActorFactory(FuncDecl *fd) { // TODO(distrib
     auto classDecl = dc->getSelfClassDecl();
     
     initializeProperty(*this, loc, remote,
-                       lookupProperty(classDecl, C.Id_id),
+                       classDecl->getDistributedActorIDProperty(),
                        idArg);
 
     initializeProperty(*this, loc, remote,
-                       lookupProperty(classDecl, C.Id_actorSystem),
+                       classDecl->getDistributedActorSystemProperty(),
                        actorSystemArg);
 
     // ==== Branch to return the fully initialized remote instance
@@ -513,12 +491,12 @@ void SILGenFunction::emitDistributedActorSystemResignIDCall(
 
   // ==== locate: self.id
   auto idRef = emitActorPropertyReference(
-      *this, loc, actorSelf.getValue(), lookupProperty(actorDecl, ctx.Id_id));
+      *this, loc, actorSelf.getValue(), actorDecl->getDistributedActorIDProperty());
 
   // ==== locate: self.actorSystem
   auto systemRef = emitActorPropertyReference(
       *this, loc, actorSelf.getValue(),
-      lookupProperty(actorDecl, ctx.Id_actorSystem));
+      actorDecl->getDistributedActorSystemProperty());
 
   // Perform the call.
   emitDistributedActorSystemWitnessCall(

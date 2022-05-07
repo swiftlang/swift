@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=NestedRecords -I %S/Inputs -source-filename=x -enable-cxx-interop | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=NestedRecords -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
 
 // CHECK: struct S1 {
 // CHECK:   struct S2 {
@@ -82,7 +82,7 @@
 // CHECK:   struct ForwardDeclaredFriend {
 // CHECK:     init()
 // CHECK:   }
-// CHECK:   static func takesFriend(_ b: NestedDeclIsAFirstForwardDeclaration.ForwardDeclaredFriend)
+// CHECK:   static func takesFriend(_ f: NestedDeclIsAFirstForwardDeclaration.ForwardDeclaredFriend)
 // CHECK:   struct HasNestedForwardDeclaration {
 // CHECK:     init()
 // CHECK:     struct IsNestedForwardDeclaration {

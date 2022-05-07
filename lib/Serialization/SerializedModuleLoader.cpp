@@ -104,7 +104,7 @@ Optional<bool> forEachModuleSearchPath(
   if (Ctx.LangOpts.Target.isOSDarwin()) {
     for (const auto &path : Ctx.getDarwinImplicitFrameworkSearchPaths())
       if (auto result =
-              callback(path, ModuleSearchPathKind::DarwinImplictFramework,
+              callback(path, ModuleSearchPathKind::DarwinImplicitFramework,
                        /*isSystem=*/true))
         return result;
   }
@@ -231,7 +231,7 @@ void SerializedModuleLoaderBase::collectVisibleTopLevelModuleNamesImpl(
       return None;
     }
     case ModuleSearchPathKind::Framework:
-    case ModuleSearchPathKind::DarwinImplictFramework: {
+    case ModuleSearchPathKind::DarwinImplicitFramework: {
       // Look for:
       // $PATH/{name}.framework/Modules/{name}.swiftmodule/{arch}.{extension}
       forEachDirectoryEntryPath(searchPath, [&](StringRef path) {
@@ -659,7 +659,7 @@ SerializedModuleLoaderBase::findModule(ImportPath::Element moduleID,
       }
     }
     case ModuleSearchPathKind::Framework:
-    case ModuleSearchPathKind::DarwinImplictFramework: {
+    case ModuleSearchPathKind::DarwinImplicitFramework: {
       isFramework = true;
       llvm::sys::path::append(currPath, moduleName + ".framework");
 
@@ -1107,7 +1107,7 @@ bool swift::extractCompilerFlagsFromInterface(StringRef interfacePath,
 llvm::VersionTuple
 swift::extractUserModuleVersionFromInterface(StringRef moduleInterfacePath) {
   llvm::VersionTuple result;
-  // Read the inteface file and extract its compiler arguments line
+  // Read the interface file and extract its compiler arguments line
   if (auto file = llvm::MemoryBuffer::getFile(moduleInterfacePath)) {
     llvm::BumpPtrAllocator alloc;
     llvm::StringSaver argSaver(alloc);

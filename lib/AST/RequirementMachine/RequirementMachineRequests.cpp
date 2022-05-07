@@ -19,7 +19,7 @@
 //   user-written requirements.
 // - AbstractGenericSignatureRequest computes minimal generic signatures from a
 //   set of abstract Requirements.
-// - InferredGenericSignatureRequst computes minimal generic signatures from a
+// - InferredGenericSignatureRequest computes minimal generic signatures from a
 //   set of user-written requirements on a parsed generic declaration.
 //
 // Each request begins by constructing some desugared requirements using the
@@ -413,6 +413,18 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
       machine->computeRequirementDiagnostics(errors, proto->getLoc());
       diagnoseRequirementErrors(ctx, errors,
                                 AllowConcreteTypePolicy::NestedAssocTypes);
+
+      for (auto *protocol : machine->System.getProtocols()) {
+        auto selfType = protocol->getSelfInterfaceType();
+        auto concrete = machine->getConcreteType(selfType,
+                                                 machine->getGenericParams(),
+                                                 protocol);
+        if (!concrete || concrete->hasError())
+          continue;
+
+        protocol->diagnose(diag::requires_generic_param_made_equal_to_concrete,
+                           selfType);
+      }
     }
 
     if (!machine->getErrors()) {
@@ -685,7 +697,6 @@ AbstractGenericSignatureRequestRQM::evaluate(
 GenericSignatureWithError
 InferredGenericSignatureRequestRQM::evaluate(
         Evaluator &evaluator,
-        ModuleDecl *parentModule,
         const GenericSignatureImpl *parentSigImpl,
         GenericParamList *genericParamList,
         WhereClauseOwner whereClause,
@@ -693,8 +704,6 @@ InferredGenericSignatureRequestRQM::evaluate(
         SmallVector<TypeLoc, 2> inferenceSources,
         bool allowConcreteGenericParams) const {
   GenericSignature parentSig(parentSigImpl);
-
-  auto &ctx = parentModule->getASTContext();
 
   SmallVector<GenericTypeParamType *, 4> genericParams(
       parentSig.getGenericParams().begin(),
@@ -705,9 +714,12 @@ InferredGenericSignatureRequestRQM::evaluate(
   for (const auto &req : parentSig.getRequirements())
     requirements.push_back({req, SourceLoc(), /*wasInferred=*/false});
 
+  DeclContext *lookupDC = nullptr;
+
   const auto visitRequirement = [&](const Requirement &req,
                                     RequirementRepr *reqRepr) {
-    realizeRequirement(req, reqRepr, parentModule, requirements, errors);
+    realizeRequirement(lookupDC, req, reqRepr, /*inferRequirements=*/true,
+                       requirements, errors);
     return false;
   };
 
@@ -738,11 +750,12 @@ InferredGenericSignatureRequestRQM::evaluate(
                              ->castTo<GenericTypeParamType>();
         genericParams.push_back(gpType);
 
-        realizeInheritedRequirements(gpDecl, gpType, parentModule,
+        realizeInheritedRequirements(gpDecl, gpType,
+                                     /*inferRequirements=*/true,
                                      requirements, errors);
       }
 
-      auto *lookupDC = (*gpList->begin())->getDeclContext();
+      lookupDC = (*gpList->begin())->getDeclContext();
 
       // Add the generic parameter list's 'where' clause to the builder.
       //
@@ -758,6 +771,8 @@ InferredGenericSignatureRequestRQM::evaluate(
   // Realize all requirements in the free-standing 'where' clause, if there
   // is one.
   if (whereClause) {
+    lookupDC = whereClause.dc;
+
     if (loc.isInvalid())
       loc = whereClause.getLoc();
 
@@ -766,13 +781,18 @@ InferredGenericSignatureRequestRQM::evaluate(
         visitRequirement);
   }
 
+  auto *moduleForInference = lookupDC->getParentModule();
+
   // Perform requirement inference from function parameter and result
   // types and such.
   for (auto sourcePair : inferenceSources) {
     auto *typeRepr = sourcePair.getTypeRepr();
-    auto loc = typeRepr ? typeRepr->getStartLoc() : SourceLoc();
+    auto typeLoc = typeRepr ? typeRepr->getStartLoc() : SourceLoc();
+    if (loc.isInvalid())
+      loc = typeLoc;
 
-    inferRequirements(sourcePair.getType(), loc, parentModule, requirements);
+    inferRequirements(sourcePair.getType(), typeLoc, moduleForInference,
+                      requirements);
   }
 
   // Finish by adding any remaining requirements. This is used to introduce
@@ -781,6 +801,7 @@ InferredGenericSignatureRequestRQM::evaluate(
   for (const auto &req : addedRequirements)
     requirements.push_back({req, SourceLoc(), /*wasInferred=*/true});
 
+  auto &ctx = moduleForInference->getASTContext();
   auto &rewriteCtx = ctx.getRewriteContext();
 
   if (rewriteCtx.getDebugOptions().contains(DebugFlags::Timers)) {
@@ -852,8 +873,6 @@ InferredGenericSignatureRequestRQM::evaluate(
                                 : AllowConcreteTypePolicy::AssocTypes);
     }
 
-    // FIXME: Handle allowConcreteGenericParams
-
     // Don't bother splitting concrete equivalence classes if there were invalid
     // requirements, because the signature is not going to be ABI anyway.
     if (!errorFlags.contains(GenericSignatureErrorFlags::HasInvalidRequirements)) {
@@ -878,6 +897,28 @@ InferredGenericSignatureRequestRQM::evaluate(
       // performs queries.
       rewriteCtx.installRequirementMachine(result.getCanonicalSignature(),
                                            std::move(machine));
+    }
+
+    if (!allowConcreteGenericParams &&
+        ctx.LangOpts.RequirementMachineInferredSignatures ==
+        RequirementMachineMode::Enabled) {
+      for (auto genericParam : result.getInnermostGenericParams()) {
+        auto canonical = result.getCanonicalTypeInContext(genericParam);
+
+        if (canonical->hasError() || canonical->isEqual(genericParam))
+          continue;
+
+        if (canonical->isTypeParameter()) {
+          ctx.Diags.diagnose(loc, diag::requires_generic_params_made_equal,
+                             genericParam, result->getSugaredType(canonical))
+            .warnUntilSwiftVersion(6);
+        } else {
+          ctx.Diags.diagnose(loc,
+                             diag::requires_generic_param_made_equal_to_concrete,
+                             genericParam)
+            .warnUntilSwiftVersion(6);
+        }
+      }
     }
 
     if (!errorFlags.contains(GenericSignatureErrorFlags::HasInvalidRequirements)) {

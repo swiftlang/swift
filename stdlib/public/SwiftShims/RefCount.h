@@ -37,6 +37,7 @@ typedef InlineRefCountsPlaceholder InlineRefCounts;
 #include "swift/Runtime/Atomic.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Debug.h"
+#include "swift/Runtime/Heap.h"
 
 
 /*
@@ -768,7 +769,7 @@ class RefCounts {
       return;
     }
     // Immortal and no objc complications share a bit, so don't let setting
-    // the complications one clear the immmortal one
+    // the complications one clear the immortal one
     if (oldbits.isImmortal(true) || oldbits.pureSwiftDeallocation() == nonobjc){
       assert(!oldbits.hasSideTable());
       return;
@@ -1327,6 +1328,9 @@ class HeapObjectSideTableEntry {
 #endif
   { }
 
+  void *operator new(size_t) = delete;
+  void operator delete(void *) = delete;
+
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Winvalid-offsetof"
   static ptrdiff_t refCountsOffset() {
@@ -1453,7 +1457,7 @@ class HeapObjectSideTableEntry {
     // Weak ref count is now zero. Delete the side table entry.
     // FREED -> DEAD
     assert(refCounts.getUnownedCount() == 0);
-    delete this;
+    swift_cxx_deleteObject(this);
   }
 
   void decrementWeakNonAtomic() {
@@ -1466,7 +1470,7 @@ class HeapObjectSideTableEntry {
     // Weak ref count is now zero. Delete the side table entry.
     // FREED -> DEAD
     assert(refCounts.getUnownedCount() == 0);
-    delete this;
+    swift_cxx_deleteObject(this);
   }
 
   uint32_t getWeakCount() const {

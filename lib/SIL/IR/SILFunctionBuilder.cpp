@@ -14,6 +14,7 @@
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SemanticAttrs.h"
@@ -124,7 +125,7 @@ void SILFunctionBuilder::addFunctionAttributes(
     if (ParameterList *paramList = fnDecl->getParameters()) {
       for (ParamDecl *pd : *paramList) {
         // Give up on tuples. Their elements are added as individual
-        // argumenst. It destroys the 1-1 relation ship between parameters
+        // arguments. It destroys the 1-1 relation ship between parameters
         // and arguments.
         if (isa<TupleType>(CanType(pd->getType())))
           break;
@@ -200,29 +201,35 @@ void SILFunctionBuilder::addFunctionAttributes(
   // Only assign replacements when the thing being replaced is function-like and
   // explicitly declared.  
   auto *origDecl = decl->getDynamicallyReplacedDecl();
-  auto *replacedDecl = dyn_cast_or_null<AbstractFunctionDecl>(origDecl);
-  if (!replacedDecl)
-    return;
+  if (auto *replacedDecl = dyn_cast_or_null<AbstractFunctionDecl>(origDecl)) {
+    // For @objc method replacement we normally use categories to perform the
+    // replacement. Except for methods in generic class where we can't. Instead,
+    // we special case this and use the native swift replacement mechanism.
+    if (decl->isObjC() && !decl->isNativeMethodReplacement()) {
+      F->setObjCReplacement(replacedDecl);
+      return;
+    }
 
-  // For @objc method replacement we normally use categories to perform the
-  // replacement. Except for methods in generic class where we can't. Instead,
-  // we special case this and use the native swift replacement mechanism.
-  if (decl->isObjC() && !decl->isNativeMethodReplacement()) {
-    F->setObjCReplacement(replacedDecl);
-    return;
+    if (constant.canBeDynamicReplacement()) {
+      SILDeclRef declRef(replacedDecl, constant.kind, false);
+      auto *replacedFunc = getOrCreateDeclaration(replacedDecl, declRef);
+
+      assert(replacedFunc->getLoweredFunctionType() ==
+                 F->getLoweredFunctionType() ||
+             replacedFunc->getLoweredFunctionType()->hasOpaqueArchetype());
+
+      F->setDynamicallyReplacedFunction(replacedFunc);
+    }
+  } else if (constant.isDistributedThunk()) {
+    auto decodeFuncDecl =
+            getAssociatedDistributedInvocationDecoderDecodeNextArgumentFunction(
+                decl);
+    assert(decodeFuncDecl && "decodeNextArgument function not found!");
+
+    auto decodeRef = SILDeclRef(decodeFuncDecl);
+    auto *adHocFunc = getOrCreateDeclaration(decodeFuncDecl, decodeRef);
+    F->setReferencedAdHocRequirementWitnessFunction(adHocFunc);
   }
-
-  if (!constant.canBeDynamicReplacement())
-    return;
-
-  SILDeclRef declRef(replacedDecl, constant.kind, false);
-  auto *replacedFunc = getOrCreateDeclaration(replacedDecl, declRef);
-
-  assert(replacedFunc->getLoweredFunctionType() ==
-             F->getLoweredFunctionType() ||
-         replacedFunc->getLoweredFunctionType()->hasOpaqueArchetype());
-
-  F->setDynamicallyReplacedFunction(replacedFunc);
 }
 
 SILFunction *SILFunctionBuilder::getOrCreateFunction(
@@ -263,7 +270,11 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
 
   IsTransparent_t IsTrans =
       constant.isTransparent() ? IsTransparent : IsNotTransparent;
+
   IsSerialized_t IsSer = constant.isSerialized();
+  // Don't create a [serialized] function after serialization has happened.
+  if (IsSer == IsSerialized && mod.isSerialized())
+    IsSer = IsNotSerialized;
 
   Inline_t inlineStrategy = InlineDefault;
   if (constant.isNoinline())
@@ -315,7 +326,7 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
         F->setSpecialPurpose(SILFunction::Purpose::LazyPropertyGetter);
         
         // Lazy property getters should not get inlined because they are usually
-        // non-tivial functions (otherwise the user would not implement it as
+        // non-trivial functions (otherwise the user would not implement it as
         // lazy property). Inlining such getters would most likely not benefit
         // other optimizations because the top-level switch_enum cannot be
         // constant folded in most cases.

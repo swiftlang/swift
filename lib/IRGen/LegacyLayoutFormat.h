@@ -21,7 +21,7 @@
 // standard library and overlays are now built with resilience enabled, this
 // creates a backward-compatibility issue where such class definitions would now
 // require singleton metadata initialization instead of idempotent metadata
-// initialization, and singleton metadata initializaiton precludes the class
+// initialization, and singleton metadata initialization precludes the class
 // from being statically visible to Clang.
 //
 // To support this case, we emit fixed metadata for any such class, and in place

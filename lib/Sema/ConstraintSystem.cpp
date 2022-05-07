@@ -56,6 +56,22 @@ ExpressionTimer::ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS,
       PrintDebugTiming(CS.getASTContext().TypeCheckerOpts.DebugTimeExpressions),
       PrintWarning(true) {}
 
+SourceRange ExpressionTimer::getAffectedRange() const {
+  ASTNode anchor;
+
+  if (auto *locator = Anchor.dyn_cast<ConstraintLocator *>()) {
+    anchor = simplifyLocatorToAnchor(locator);
+    // If locator couldn't be simplified down to a single AST
+    // element, let's use its root.
+    if (!anchor)
+      anchor = locator->getAnchor();
+  } else {
+    anchor = Anchor.get<Expr *>();
+  }
+
+  return anchor.getSourceRange();
+}
+
 ExpressionTimer::~ExpressionTimer() {
   auto elapsed = getElapsedProcessTimeInFractionalSeconds();
   unsigned elapsedMS = static_cast<unsigned>(elapsed * 1000);
@@ -81,22 +97,13 @@ ExpressionTimer::~ExpressionTimer() {
   if (WarnLimit == 0 || elapsedMS < WarnLimit)
     return;
 
-  ASTNode anchor;
-  if (auto *locator = Anchor.dyn_cast<ConstraintLocator *>()) {
-    anchor = simplifyLocatorToAnchor(locator);
-    // If locator couldn't be simplified down to a single AST
-    // element, let's warn about its root.
-    if (!anchor)
-      anchor = locator->getAnchor();
-  } else {
-    anchor = Anchor.get<Expr *>();
-  }
+  auto sourceRange = getAffectedRange();
 
-  if (anchor.getStartLoc().isValid()) {
+  if (sourceRange.Start.isValid()) {
     Context.Diags
-        .diagnose(anchor.getStartLoc(), diag::debug_long_expression, elapsedMS,
+        .diagnose(sourceRange.Start, diag::debug_long_expression, elapsedMS,
                   WarnLimit)
-        .highlight(anchor.getSourceRange());
+        .highlight(sourceRange);
   }
 }
 
@@ -747,7 +754,7 @@ Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
 
 static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
                                        ConstraintLocatorBuilder locator) {
-  // If this is a type defined inside of constrainted extension, let's add all
+  // If this is a type defined inside of constrained extension, let's add all
   // of the generic requirements to the constraint system to make sure that it's
   // something we can use.
   GenericTypeDecl *decl = nullptr;
@@ -820,7 +827,7 @@ static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
     }
   }
 
-  // And now make sure sure the parent is okay, for things like X<T>.Y.Z.
+  // And now make sure the parent is okay, for things like X<T>.Y.Z.
   checkNestedTypeConstraints(cs, parentTy, locator);
 }
 
@@ -1155,7 +1162,7 @@ doesStorageProduceLValue(AbstractStorageDecl *storage, Type baseType,
   }
 
   // Unsettable storage decls always produce rvalues.
-  if (!storage->isSettable(useDC, base))
+  if (!storage->isSettableInSwift(useDC, base))
     return false;
 
   if (!storage->isSetterAccessibleFrom(useDC))
@@ -1397,6 +1404,38 @@ AnyFunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
       fnType, decl, dc, numApplies, isMainDispatchQueue, GetClosureType{*this});
 }
 
+/// For every parameter in \p type that has an error type, replace that
+/// parameter's type by a placeholder type, where \p value is the declaration
+/// that declared \p type. This is useful for code completion so we can match
+/// the types we do know instead of bailing out completely because \p type
+/// contains an error type.
+static Type replaceParamErrorTypeByPlaceholder(Type type, ValueDecl *value) {
+  if (!type->is<AnyFunctionType>() || !isa<AbstractFunctionDecl>(value)) {
+    return type;
+  }
+  auto funcType = type->castTo<AnyFunctionType>();
+  auto funcDecl = cast<AbstractFunctionDecl>(value);
+
+  auto declParams = funcDecl->getParameters();
+  auto typeParams = funcType->getParams();
+  assert(declParams->size() == typeParams.size());
+  SmallVector<AnyFunctionType::Param, 4> newParams;
+  newParams.reserve(declParams->size());
+  for (auto i : indices(typeParams)) {
+    AnyFunctionType::Param param = typeParams[i];
+    if (param.getPlainType()->is<ErrorType>()) {
+      auto paramDecl = declParams->get(i);
+      auto placeholder =
+          PlaceholderType::get(paramDecl->getASTContext(), paramDecl);
+      newParams.push_back(param.withType(placeholder));
+    } else {
+      newParams.push_back(param);
+    }
+  }
+  assert(newParams.size() == declParams->size());
+  return FunctionType::get(newParams, funcType->getResult());
+}
+
 std::pair<Type, Type>
 ConstraintSystem::getTypeOfReference(ValueDecl *value,
                                      FunctionRefKind functionRefKind,
@@ -1457,6 +1496,12 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     openedType = unwrapPropertyWrapperParameterTypes(*this, funcDecl, functionRefKind,
                                                      openedType->getAs<FunctionType>(),
                                                      locator);
+
+    if (isForCodeCompletion() && openedType->hasError()) {
+      // In code completion, replace error types by placeholder types so we can
+      // match the types we know instead of bailing out completely.
+      openedType = replaceParamErrorTypeByPlaceholder(openedType, value);
+    }
 
     // If we opened up any type variables, record the replacements.
     recordOpenedTypes(locator, replacements);
@@ -1948,38 +1993,6 @@ Type constraints::typeEraseOpenedExistentialReference(
     // Recurse.
     return None;
   });
-}
-
-/// For every parameter in \p type that has an error type, replace that
-/// parameter's type by a placeholder type, where \p value is the declaration
-/// that declared \p type. This is useful for code completion so we can match
-/// the types we do know instead of bailing out completely because \p type
-/// contains an error type.
-static Type replaceParamErrorTypeByPlaceholder(Type type, ValueDecl *value) {
-  if (!type->is<AnyFunctionType>() || !isa<AbstractFunctionDecl>(value)) {
-    return type;
-  }
-  auto funcType = type->castTo<AnyFunctionType>();
-  auto funcDecl = cast<AbstractFunctionDecl>(value);
-
-  auto declParams = funcDecl->getParameters();
-  auto typeParams = funcType->getParams();
-  assert(declParams->size() == typeParams.size());
-  SmallVector<AnyFunctionType::Param, 4> newParams;
-  newParams.reserve(declParams->size());
-  for (auto i : indices(typeParams)) {
-    AnyFunctionType::Param param = typeParams[i];
-    if (param.getPlainType()->is<ErrorType>()) {
-      auto paramDecl = declParams->get(i);
-      auto placeholder =
-          PlaceholderType::get(paramDecl->getASTContext(), paramDecl);
-      newParams.push_back(param.withType(placeholder));
-    } else {
-      newParams.push_back(param);
-    }
-  }
-  assert(newParams.size() == declParams->size());
-  return FunctionType::get(newParams, funcType->getResult());
 }
 
 std::pair<Type, Type>
@@ -3090,7 +3103,7 @@ void ConstraintSystem::bindOverloadType(
                                             : FunctionRefKind::Unapplied,
                              /*outerAlternatives=*/{}, keyPathLoc);
 
-    // In case of subscript things are more compicated comparing to "dot"
+    // In case of subscript things are more complicated comparing to "dot"
     // syntax, because we have to get "applicable function" constraint
     // associated with index expression and re-bind it to match "member type"
     // looked up by dynamically.
@@ -3298,7 +3311,8 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     // If we're choosing an asynchronous declaration within a synchronous
     // context, or vice-versa, increase the async/async mismatch score.
     if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-      if (!func->hasPolymorphicEffect(EffectKind::Async) &&
+      if (!Options.contains(ConstraintSystemFlags::IgnoreAsyncSyncMismatch) &&
+          !func->hasPolymorphicEffect(EffectKind::Async) &&
           func->isAsyncContext() != isAsynchronousContext(useDC)) {
         increaseScore(
             func->isAsyncContext() ? SK_AsyncInSyncMismatch : SK_SyncInAsync);
@@ -3523,6 +3537,109 @@ Type Solution::simplifyType(Type type) const {
   return resolvedType;
 }
 
+Type Solution::simplifyTypeForCodeCompletion(Type Ty) const {
+  auto &CS = getConstraintSystem();
+
+  // First, instantiate all type variables that we know, but don't replace
+  // placeholders by unresolved types.
+  Ty = CS.simplifyTypeImpl(Ty, [this](TypeVariableType *typeVar) -> Type {
+    return getFixedType(typeVar);
+  });
+
+  // Next, replace all placeholders by type variables. We know that all type
+  // variables now in the type originate from placeholders.
+  Ty = Ty.transform([](Type type) -> Type {
+    if (auto *placeholder = type->getAs<PlaceholderType>()) {
+      if (auto *typeVar =
+              placeholder->getOriginator().dyn_cast<TypeVariableType *>()) {
+        return typeVar;
+      }
+    }
+
+    return type;
+  });
+
+  // Replace all type variables (which must come from placeholders) by their
+  // generic parameters. Because we call into simplifyTypeImpl
+  Ty = CS.simplifyTypeImpl(Ty, [&CS](TypeVariableType *typeVar) -> Type {
+    // Code completion depends on generic parameter type being represented in
+    // terms of `ArchetypeType` since it's easy to extract protocol requirements
+    // from it.
+    auto getTypeVarAsArchetype = [](TypeVariableType *typeVar) -> Type {
+      if (auto *GP = typeVar->getImpl().getGenericParameter()) {
+        if (auto *GPD = GP->getDecl()) {
+          return GPD->getInnermostDeclContext()->mapTypeIntoContext(GP);
+        }
+      }
+      return Type();
+    };
+
+    if (auto archetype = getTypeVarAsArchetype(typeVar)) {
+      return archetype;
+    }
+
+    // When applying the logic below to get contextual types inside result
+    // builders, the code completion type variable is connected by a one-way
+    // constraint to a type variable in the buildBlock call, but that is not the
+    // type variable that represents the argument type. We need to find the type
+    // variable representing the argument to retrieve protocol requirements from
+    // it. Look for a ArgumentConversion constraint that allows us to retrieve
+    // the argument type var.
+    for (auto argConstraint :
+         CS.getConstraintGraph()[typeVar].getConstraints()) {
+      if (argConstraint->getKind() == ConstraintKind::ArgumentConversion &&
+          argConstraint->getFirstType()->getRValueType()->isEqual(typeVar)) {
+        if (auto argTV =
+                argConstraint->getSecondType()->getAs<TypeVariableType>()) {
+          if (auto archetype = getTypeVarAsArchetype(argTV)) {
+            return archetype;
+          }
+        }
+      }
+    }
+
+    return typeVar;
+  });
+
+  // Logic to determine the contextual type inside buildBlock result builders:
+  //
+  // When completing inside a result builder, the result builder
+  //   @ViewBuilder var body: some View {
+  //     Text("Foo")
+  //     #^COMPLETE^#
+  //   }
+  // gets rewritten to
+  //   @ViewBuilder var body: some View {
+  //     let $__builder2: Text
+  //     let $__builder0 = Text("Foo")
+  //     let $__builder1 = #^COMPLETE^#
+  //     $__builder2 = ViewBuilder.buildBlock($__builder0, $__builder1)
+  //     return $__builder2
+  //   }
+  // Inside the constraint system
+  //     let $__builder1 = #^COMPLETE^#
+  // gets type checked without context, so we can't know the contextual type for
+  // the code completion token. But we know that $__builder1 (and thus the type
+  // of #^COMPLETE^#) is used as the second argument to ViewBuilder.buildBlock,
+  // so we can extract the contextual type from that call. To do this, figure
+  // out the type variable that is used for $__builder1 in the buildBlock call.
+  // This type variable is connected to the type variable of $__builder1's
+  // definition by a one-way constraint.
+  if (auto TV = Ty->getAs<TypeVariableType>()) {
+    for (auto constraint : CS.getConstraintGraph()[TV].getConstraints()) {
+      if (constraint->getKind() == ConstraintKind::OneWayEqual &&
+          constraint->getSecondType()->isEqual(TV)) {
+        return simplifyTypeForCodeCompletion(constraint->getFirstType());
+      }
+    }
+  }
+
+  // Remove any remaining type variables and placeholders
+  Ty = simplifyType(Ty);
+
+  return Ty->getRValueType();
+}
+
 size_t Solution::getTotalMemory() const {
   return sizeof(*this) + typeBindings.getMemorySize() +
          overloadChoices.getMemorySize() +
@@ -3662,8 +3779,8 @@ SolutionResult ConstraintSystem::salvage() {
     // Fall through to produce diagnostics.
   }
 
-  if (getExpressionTooComplex(viable))
-    return SolutionResult::forTooComplex();
+  if (isTooComplex(viable))
+    return SolutionResult::forTooComplex(getTooComplexRange());
 
   // Could not produce a specific diagnostic; punt to the client.
   return SolutionResult::forUndiagnosedError();
@@ -3987,7 +4104,7 @@ static bool diagnoseAmbiguityWithContextualType(
   };
 
   auto resultType = getResultType(aggregateFix.front());
-  // If right-hand side of the conversion (result of the the AST node)
+  // If right-hand side of the conversion (result of the AST node)
   // is the same across all of the solutions let's diagnose it as if
   // it it as a single failure.
   if (llvm::all_of(
@@ -4948,7 +5065,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
 
     case ConstraintLocator::ArgumentAttribute: {
       // At this point we should have already found argument expression
-      // this attribute belogs to, so we can leave this element in place
+      // this attribute belongs to, so we can leave this element in place
       // because it points out exact location useful for diagnostics.
       break;
     }
@@ -4965,8 +5082,8 @@ void constraints::simplifyLocator(ASTNode &anchor,
       continue;
     }
 
-    case ConstraintLocator::ClosureBodyElement: {
-      auto bodyElt = path[0].castTo<LocatorPathElt::ClosureBodyElement>();
+    case ConstraintLocator::SyntacticElement: {
+      auto bodyElt = path[0].castTo<LocatorPathElt::SyntacticElement>();
       anchor = bodyElt.getElement();
       path = path.slice(1);
       continue;
@@ -5111,7 +5228,7 @@ bool constraints::hasAppliedSelf(const OverloadChoice &choice,
          doesMemberRefApplyCurriedSelf(baseType, decl);
 }
 
-/// Check whether given type conforms to `RawPepresentable` protocol
+/// Check whether given type conforms to `RawRepresentable` protocol
 /// and return the witness type.
 Type constraints::isRawRepresentable(ConstraintSystem &cs, Type type) {
   auto *DC = cs.DC;
@@ -6447,12 +6564,12 @@ bool ConstraintSystem::isReadOnlyKeyPathComponent(
     // WritableKeyPaths to be formed in the same conditions we did
     // in previous releases even if we should not be able to set
     // the value in this context.
-    if (!storage->isSettable(DC)) {
+    if (!storage->isSettableInSwift(DC)) {
       // A non-settable component makes the key path read-only, unless
       // a reference-writable component shows up later.
       return true;
     }
-  } else if (!storage->isSettable(nullptr) ||
+  } else if (!storage->isSettableInSwift(nullptr) ||
              !storage->isSetterAccessibleFrom(DC)) {
     // A non-settable component makes the key path read-only, unless
     // a reference-writable component shows up later.
@@ -6525,9 +6642,7 @@ bool ConstraintSystem::participatesInInference(ClosureExpr *closure) const {
   if (Options.contains(ConstraintSystemFlags::LeaveClosureBodyUnchecked))
     return false;
 
-  auto &ctx = closure->getASTContext();
-  if (closure->hasEmptyBody() ||
-      !ctx.TypeCheckerOpts.EnableMultiStatementClosureInference)
+  if (closure->hasEmptyBody())
     return false;
 
   // If body is nested in a parent that has a function builder applied,

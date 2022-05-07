@@ -1,48 +1,50 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-string-processing
+// RUN: %target-typecheck-verify-swift -enable-bare-slash-regex -disable-availability-checking
 // REQUIRES: swift_in_compiler
 
-_ = re'(' // expected-error {{expected ')'}}
+_ = /(/ // expected-error@:7 {{expected ')'}}
+_ = #/(/# // expected-error@:8 {{expected ')'}}
 
 // FIXME: Should be 'group openings'
-_ = re')' // expected-error {{closing ')' does not balance any groups openings}}
+_ = /)/ // expected-error@:6 {{closing ')' does not balance any groups openings}}
+_ = #/)/# // expected-error@:7 {{closing ')' does not balance any groups openings}}
 
-_ = #/\\/''/ // expected-error {{unterminated regex literal}}
-_ = #|\| // expected-error {{unterminated regex literal}}
-_ = #// // expected-error {{unterminated regex literal}}
-_ = re'x // expected-error {{unterminated regex literal}}
+_ = #/\\/''/ // expected-error@:5 {{unterminated regex literal}}
+_ = #/\| // expected-error@:5 {{unterminated regex literal}}
+_ = #// // expected-error@:5 {{unterminated regex literal}}
 
-_ = #/xy // expected-error {{unterminated regex literal}}
+_ = #/xy // expected-error@:5 {{unterminated regex literal}}
 
-_ = re'(?' // expected-error {{expected group specifier}}
+_ = #/(?/# // expected-error@:7 {{expected group specifier}}
+_ = #/(?'/# // expected-error@:10 {{expected group name}}
+_ = #/(?'abc/# // expected-error@:13 {{expected '''}}
+_ = #/(?'abc /# // expected-error@:13 {{expected '''}}
 
-_ = re'(?'' // expected-error {{unterminated regex literal}}
-// expected-error@-1 {{expected group name}}
+do {
+  _ = #/(?'a
+  // expected-error@-1:7 {{unterminated regex literal}}
+  // expected-error@-2:13 {{cannot parse regular expression: expected '''}}
+}
 
-_ = re'(?'abc' // expected-error {{unterminated regex literal}}
-// expected-error@-1 {{expected ')'}}
+_ = #/\(?'abc/#
 
-// TODO: Maybe change "unterminated string literal" to "unterminated single quote"?
-_ = re'(?'abc ' // expected-error {{unterminated string literal}}
-// expected-error@-1 {{expected group specifier}}
-// expected-error@-2 {{consecutive statements on a line must be separated by ';'}}
+do {
+  _ = /\
+  /
+  // expected-error@-2:7 {{unterminated regex literal}}
+  // expected-error@-3:9 {{expected escape sequence}}
+} // expected-error@:1 {{expected expression after operator}}
 
-_ = re'(?'a // expected-error {{expected group specifier}}
-// expected-error@-1 {{cannot find 'a' in scope}}
-// expected-error@-2 {{consecutive statements on a line must be separated by ';'}}
-
-_ = re'\(?'abc' // expected-error {{unterminated string literal}}
-// expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
-
- _ = re'\
- '
-// expected-error@-2 {{unterminated regex literal}}
-// expected-error@-3 {{expected escape sequence}}
-// expected-error@-3 {{unterminated string literal}}
+do {
+  _ = #/\
+  /#
+  // expected-error@-2:7 {{unterminated regex literal}}
+  // expected-error@-3:10 {{expected escape sequence}}
+  // expected-error@-3:3 {{unterminated regex literal}}
+  // expected-warning@-4:3 {{regular expression literal is unused}}
+}
 
 func foo<T>(_ x: T, _ y: T) {}
-foo(re'(?', re'abc') // expected-error {{expected group specifier}}
-foo(re'(?C', re'abc') // expected-error {{expected ')'}}
+foo(#/(?/#, #/abc/#) // expected-error@:7 {{expected group specifier}}
+foo(#/(?C/#, #/abc/#) // expected-error@:10 {{expected ')'}}
 
-foo(re'(?'', re'abc') // expected-error {{expected group name}}
-// expected-error@-1 {{unterminated string literal}}
-// expected-error@-2 {{expected ',' separator}}
+foo(#/(?'/#, #/abc/#) // expected-error@:10 {{expected group name}}

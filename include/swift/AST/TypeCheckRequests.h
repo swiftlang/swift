@@ -604,7 +604,6 @@ struct WhereClauseOwner {
     return !(lhs == rhs);
   }
 
-public:
   /// Retrieve the array of requirements.
   MutableArrayRef<RequirementRepr> getRequirements() const;
 
@@ -1078,6 +1077,33 @@ private:
       Evaluator &evaluator,
       NominalTypeDecl *nominal,
       KnownProtocolKind protoKind) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
+/// Check a distributed function declaration and cache if it was valid or not.
+///
+/// This is used because we not only type-check to emit errors, but also use
+/// the information to potentially avoid emitting the distributed thunk for
+/// methods which are invalid (e.g. their parameters dont conform to
+/// SerializationRequirement), as otherwise we'd be causing errors in synthesized
+/// code which looks very confusing to end-users.
+///
+class CheckDistributedFunctionRequest :
+    public SimpleRequest<CheckDistributedFunctionRequest,
+                         bool(AbstractFunctionDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  /// \returns \c true if there was a problem with the function declaration,
+  /// \c false otherwise.
+  bool evaluate(Evaluator &evaluator, AbstractFunctionDecl *) const;
 
 public:
   // Caching
@@ -1903,8 +1929,7 @@ public:
 /// InferredGenericSignatureRequest.
 class InferredGenericSignatureRequestRQM :
     public SimpleRequest<InferredGenericSignatureRequestRQM,
-                         GenericSignatureWithError (ModuleDecl *,
-                                                    const GenericSignatureImpl *,
+                         GenericSignatureWithError (const GenericSignatureImpl *,
                                                     GenericParamList *,
                                                     WhereClauseOwner,
                                                     SmallVector<Requirement, 2>,
@@ -1920,7 +1945,6 @@ private:
   // Evaluation.
   GenericSignatureWithError
   evaluate(Evaluator &evaluator,
-           ModuleDecl *parentModule,
            const GenericSignatureImpl *baseSignature,
            GenericParamList *genericParams,
            WhereClauseOwner whereClause,
@@ -2240,7 +2264,7 @@ public:
 class PatternBindingEntryRequest
     : public SimpleRequest<PatternBindingEntryRequest,
                            const PatternBindingEntry *(PatternBindingDecl *,
-                                                       unsigned),
+                                                       unsigned, bool),
                            RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2249,8 +2273,9 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  const PatternBindingEntry *
-  evaluate(Evaluator &evaluator, PatternBindingDecl *PBD, unsigned i) const;
+  const PatternBindingEntry *evaluate(Evaluator &evaluator,
+                                      PatternBindingDecl *PBD, unsigned i,
+                                      bool LeaveClosureBodiesUnchecked) const;
 
 public:
   // Separate caching.
@@ -3188,7 +3213,7 @@ void simple_display(llvm::raw_ostream &out, ConformanceLookupKind kind);
 
 /// Lookup and expand all conformances in the given context.
 ///
-/// This request specifically accomodates algorithms for retrieving all
+/// This request specifically accommodates algorithms for retrieving all
 /// conformances in the primary, even those that are unstated in source but
 /// are implied by other conformances, inherited from other types, or synthesized
 /// by the compiler. A simple case of this is the following:

@@ -33,12 +33,15 @@
 namespace swift {
 namespace ide {
 
-using DeclFilter = std::function<bool(ValueDecl *, DeclVisibilityKind)>;
+using DeclFilter =
+    std::function<bool(ValueDecl *, DeclVisibilityKind, DynamicLookupInfo)>;
 
 /// A filter that always returns \c true.
-bool DefaultFilter(ValueDecl *VD, DeclVisibilityKind Kind);
+bool DefaultFilter(ValueDecl *VD, DeclVisibilityKind Kind,
+                   DynamicLookupInfo dynamicLookupInfo);
 
-bool KeyPathFilter(ValueDecl *decl, DeclVisibilityKind);
+bool KeyPathFilter(ValueDecl *decl, DeclVisibilityKind,
+                   DynamicLookupInfo dynamicLookupInfo);
 
 /// Returns \c true only if the completion is happening for top-level
 /// declrarations. i.e.:
@@ -206,9 +209,17 @@ public:
     static RequestedResultsTy toplevelResults() {
       return {nullptr, false, false, false, true};
     }
+
+    friend bool operator==(const RequestedResultsTy &LHS,
+                           const RequestedResultsTy &RHS) {
+      return LHS.TheModule == RHS.TheModule && LHS.OnlyTypes == RHS.OnlyTypes &&
+             LHS.OnlyPrecedenceGroups == RHS.OnlyPrecedenceGroups &&
+             LHS.NeedLeadingDot == RHS.NeedLeadingDot &&
+             LHS.IncludeModuleQualifier == RHS.IncludeModuleQualifier;
+    }
   };
 
-  std::vector<RequestedResultsTy> RequestedCachedResults;
+  llvm::SetVector<RequestedResultsTy> RequestedCachedResults;
 
 public:
   CompletionLookup(CodeCompletionResultSink &Sink, ASTContext &Ctx,
@@ -345,7 +356,7 @@ public:
 
   static bool hasInterestingDefaultValue(const ParamDecl *param);
 
-  bool addItemWithoutDefaultArgs(const AbstractFunctionDecl *func);
+  bool shouldAddItemWithoutDefaultArgs(const AbstractFunctionDecl *func);
 
   /// Build argument patterns for calling. Returns \c true if any content was
   /// added to \p Builder. If \p declParams is non-empty, the size must match
@@ -528,7 +539,7 @@ public:
         : Consumer(Consumer), Filter(Filter) {}
     void foundDecl(ValueDecl *VD, DeclVisibilityKind Kind,
                    DynamicLookupInfo dynamicLookupInfo) override {
-      if (Filter(VD, Kind))
+      if (Filter(VD, Kind, dynamicLookupInfo))
         Consumer.foundDecl(VD, Kind, dynamicLookupInfo);
     }
   };
@@ -588,9 +599,36 @@ public:
                                  bool ResultsHaveLeadingDot);
 
   void getStmtLabelCompletions(SourceLoc Loc, bool isContinue);
+
+  void getOptionalBindingCompletions(SourceLoc Loc);
 };
 
 } // end namespace ide
 } // end namespace swift
+
+namespace llvm {
+using RequestedResultsTy = swift::ide::CompletionLookup::RequestedResultsTy;
+template <>
+struct DenseMapInfo<RequestedResultsTy> {
+  static inline RequestedResultsTy getEmptyKey() {
+    return {DenseMapInfo<swift::ModuleDecl *>::getEmptyKey(), false, false,
+            false, false};
+  }
+  static inline RequestedResultsTy getTombstoneKey() {
+    return {DenseMapInfo<swift::ModuleDecl *>::getTombstoneKey(), false, false,
+            false, false};
+  }
+  static unsigned getHashValue(const RequestedResultsTy &Val) {
+    return hash_combine(
+        DenseMapInfo<swift::ModuleDecl *>::getHashValue(Val.TheModule),
+        Val.OnlyTypes, Val.OnlyPrecedenceGroups, Val.NeedLeadingDot,
+        Val.IncludeModuleQualifier);
+  }
+  static bool isEqual(const RequestedResultsTy &LHS,
+                      const RequestedResultsTy &RHS) {
+    return LHS == RHS;
+  }
+};
+} // namespace llvm
 
 #endif // SWIFT_IDE_COMPLETIONLOOKUP_H

@@ -16,9 +16,6 @@
 #include "llvm/ADT/StringSet.h"
 #include "swift/Basic/Version.h"
 #include <vector>
-#include <set>
-#include <string>
-#include <memory>
 
 namespace llvm {
 class raw_ostream;
@@ -71,7 +68,7 @@ struct TBDGenOptions {
   /// For these modules, TBD gen should embed their symbols in the emitted tbd
   /// file.
   /// Typically, these modules are static linked libraries. Thus their symbols
-  /// are embeded in the current dylib.
+  /// are embedded in the current dylib.
   std::vector<std::string> embedSymbolsFromModules;
 
   friend bool operator==(const TBDGenOptions &lhs, const TBDGenOptions &rhs) {
@@ -107,26 +104,12 @@ struct TBDGenOptions {
   }
 };
 
-/// Used for symbols which are made public by the CrossModuleOptimization pass
-/// and therefore must be included in the TBD file.
-///
-/// We cannot use llvm::StringSet, because we need deterministic iteration order.
-using TBDSymbolSet = std::set<std::string>;
-
-/// A pointer to TBDSymbolSet.
-///
-/// Do reference counting for memory management.
-/// This set is created in the optimizer and primarily stored in the SILModule.
-/// But then they need to be kept alive beyond the lifetime of the SILModule.
-using TBDSymbolSetPtr = std::shared_ptr<TBDSymbolSet>;
-
 std::vector<std::string> getPublicSymbols(TBDGenDescriptor desc);
 
 void writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
-                  const TBDGenOptions &opts, TBDSymbolSetPtr publicCMOSymbols);
+                  const TBDGenOptions &opts);
 
-void writeAPIJSONFile(ModuleDecl *M, llvm::raw_ostream &os, bool PrettyPrint,
-                      TBDSymbolSetPtr publicCMOSymbols);
+void writeAPIJSONFile(ModuleDecl *M, llvm::raw_ostream &os, bool PrettyPrint);
 
 } // end namespace swift
 

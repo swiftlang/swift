@@ -235,11 +235,11 @@ struct RewriteStep {
   /// If Kind is Relation, the relation index returned from
   /// RewriteSystem::recordRelation().
   ///
-  /// If Kind is DecomposeConcrete, the type difference ID returend from
+  /// If Kind is DecomposeConcrete, the type difference ID returned from
   /// RewriteSystem::recordTypeDifference().
   ///
   /// If Kind is LeftConcreteProjection or RightConcreteProjection, the
-  /// type difference returend from RewriteSystem::recordTypeDifference()
+  /// type difference returned from RewriteSystem::recordTypeDifference()
   /// in the most significant 16 bits, together with the substitution index
   /// in the least significant 16 bits. See getConcreteProjectionArg(),
   /// getTypeDifference() and getSubstitutionIndex().
@@ -411,8 +411,9 @@ public:
 
   bool replaceRuleWithPath(unsigned ruleID, const RewritePath &path);
 
-  SmallVector<unsigned, 1> getRulesInEmptyContext(const MutableTerm &term,
-                                                  const RewriteSystem &system);
+  SmallVector<unsigned, 1>
+  findRulesAppearingOnceInEmptyContext(const MutableTerm &term,
+                                       const RewriteSystem &system) const;
 
   void invert();
 

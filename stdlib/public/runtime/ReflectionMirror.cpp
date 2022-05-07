@@ -607,20 +607,20 @@ struct ClassImpl : ReflectionMirrorImpl {
   }
   
   bool hasSuperclassMirror() {
-    auto *Clas = static_cast<const ClassMetadata*>(type);
-    auto description = Clas->getDescription();
+    auto *Clazz = static_cast<const ClassMetadata*>(type);
+    auto description = Clazz->getDescription();
 
     return ((description->SuperclassType)
-            && (Clas->Superclass)
-            && (Clas->Superclass->isTypeMetadata()));
+            && (Clazz->Superclass)
+            && (Clazz->Superclass->isTypeMetadata()));
   }
 
   ClassImpl superclassMirror() {
-    auto *Clas = static_cast<const ClassMetadata*>(type);
-    auto description = Clas->getDescription();
+    auto *Clazz = static_cast<const ClassMetadata*>(type);
+    auto description = Clazz->getDescription();
 
     if (description->SuperclassType) {
-      if (auto theSuperclass = Clas->Superclass) {
+      if (auto theSuperclass = Clazz->Superclass) {
         auto impl = ClassImpl();
         impl.type = (Metadata *)theSuperclass;
         impl.value = nullptr;
@@ -634,8 +634,8 @@ struct ClassImpl : ReflectionMirrorImpl {
     if (!isReflectable())
       return 0;
 
-    auto *Clas = static_cast<const ClassMetadata*>(type);
-    auto description = Clas->getDescription();
+    auto *Clazz = static_cast<const ClassMetadata*>(type);
+    auto description = Clazz->getDescription();
     auto count = description->NumFields;
 
     return count;
@@ -650,8 +650,8 @@ struct ClassImpl : ReflectionMirrorImpl {
   }
 
   intptr_t childOffset(intptr_t i) override {
-    auto *Clas = static_cast<const ClassMetadata*>(type);
-    auto description = Clas->getDescription();
+    auto *Clazz = static_cast<const ClassMetadata*>(type);
+    auto description = Clazz->getDescription();
 
     if (i < 0 || (size_t)i > description->NumFields)
       swift::crash("Swift mirror subscript bounds check failure");
@@ -660,12 +660,12 @@ struct ClassImpl : ReflectionMirrorImpl {
     // metadata, because we don't update the field offsets in the face of
     // resilient base classes.
     uintptr_t fieldOffset;
-    if (usesNativeSwiftReferenceCounting(Clas)) {
-      fieldOffset = Clas->getFieldOffsets()[i];
+    if (usesNativeSwiftReferenceCounting(Clazz)) {
+      fieldOffset = Clazz->getFieldOffsets()[i];
     } else {
   #if SWIFT_OBJC_INTEROP
       Ivar *ivars = class_copyIvarList(
-          reinterpret_cast<Class>(const_cast<ClassMetadata *>(Clas)), nullptr);
+          reinterpret_cast<Class>(const_cast<ClassMetadata *>(Clazz)), nullptr);
       fieldOffset = ivar_getOffset(ivars[i]);
       free(ivars);
   #else
@@ -1076,6 +1076,8 @@ const char *swift_OpaqueSummary(const Metadata *T) {
       return "(Heap Generic Local Variable)";
     case MetadataKind::ErrorObject:
       return "(ErrorType Object)";
+    case MetadataKind::ExtendedExistential:
+      return "(Extended Existential)";
     default:
       return "(Unknown)";
   }

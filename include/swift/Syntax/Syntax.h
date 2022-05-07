@@ -18,12 +18,12 @@
 // There are two versions of the Syntax type.
 // SyntaxRef:
 // SyntaxRef is designed around efficiency. It *does not* retain the
-// SyntaxDataRef that stores its data - the user must gurantee that the
+// SyntaxDataRef that stores its data - the user must guarantee that the
 // SyntaxDataRef outlives the SyntaxRef that references it. Instead,
 // SyntaxDataRef provides a *view* into the SyntaxDataRef and the view provides
-// all convinience APIs. The advantage of this is that the underlying SyntaxData
+// all convenience APIs. The advantage of this is that the underlying SyntaxData
 // can be stack-allocated and does not need to be copied when the the SyntaxRef
-// is being passsed around or when the SyntaxRef is being casted.
+// is being passed around or when the SyntaxRef is being casted.
 //
 // Syntax:
 // The syntax nodes are designed for memory safety. Syntax nodes always retain
@@ -33,7 +33,7 @@
 //
 // Note that the two access modes can also be mixed. When a syntax tree is
 // accessed by Syntax (memory-safe) nodes, they can be demoted to SyntaxRef
-// nodes to perform perfomance-critical tasks.
+// nodes to perform performance-critical tasks.
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_SYNTAX_SYNTAX_H
@@ -98,7 +98,7 @@ class OwnedSyntaxRef {
   SyntaxRefType Ref;
 
 public:
-  /// Create an *uninintialized* \c OwnedSyntaxRef. Its storage needs to be
+  /// Create an *uninitialized* \c OwnedSyntaxRef. Its storage needs to be
   /// initialised by writing a \c SyntaxDataRef to the pointer returned by
   /// \c getDataPtr()
   /// Implementation Note: We need to initialise \c Ref without validation,
@@ -141,7 +141,7 @@ public:
 
 /// Same as \c OwnedSyntaxRef but can be null. We don't use \c
 /// Optional<OwnedSyntaxRef<SyntaxRefType>>>, because then we couldn't access
-/// the underlying \c SytnaxRefType via the \c -> operator (the use of \c ->
+/// the underlying \c SyntaxRefType via the \c -> operator (the use of \c ->
 /// would access the \c OwnedSyntaxRef<SyntaxRefType> wrapped by \c Optional and
 /// not the \c SyntaxRefType wrapped by \c OwnedSyntaxRef.
 template <typename SyntaxRefType>
@@ -310,7 +310,7 @@ public:
     return Data->getAbsolutePositionBeforeLeadingTrivia();
   }
 
-  /// Get the offset at which the actual content (i.e. non-triva) of this node
+  /// Get the offset at which the actual content (i.e. non-trivia) of this node
   /// starts.
   AbsoluteOffsetPosition getAbsolutePositionAfterLeadingTrivia() const {
     return Data->getAbsolutePositionAfterLeadingTrivia();
@@ -405,7 +405,7 @@ public:
     return getDataRef()->getAbsolutePositionBeforeLeadingTrivia();
   }
 
-  /// Get the offset at which the actual content (i.e. non-triva) of this node
+  /// Get the offset at which the actual content (i.e. non-trivia) of this node
   /// starts.
   AbsoluteOffsetPosition getAbsolutePositionAfterLeadingTrivia() const {
     return getDataRef()->getAbsolutePositionAfterLeadingTrivia();

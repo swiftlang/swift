@@ -529,6 +529,7 @@ protected:
   NodePointer demangleArchetype();
   NodePointer demangleAssociatedTypeSimple(NodePointer GenericParamIdx);
   NodePointer demangleAssociatedTypeCompound(NodePointer GenericParamIdx);
+  NodePointer demangleExtendedExistentialShape(char kind);
 
   NodePointer popAssocTypeName();
   NodePointer popAssocTypePath();
@@ -622,7 +623,7 @@ public:
 
 /// A demangler which uses stack space for its initial memory.
 ///
-/// The \p Size paramter specifies the size of the stack space.
+/// The \p Size parameter specifies the size of the stack space.
 template <size_t Size> class StackAllocatedDemangler : public Demangler {
   char StackSpace[Size];
 

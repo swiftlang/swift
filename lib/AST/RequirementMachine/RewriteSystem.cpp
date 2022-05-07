@@ -591,10 +591,7 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::GenericParam);
       }
 
-      // Completion can produce rules like [P:T].[Q:R] => [P:T].[Q]
-      // which are immediately simplified away.
-      if (!rule.isRHSSimplified() &&
-          index != 0) {
+      if (index != 0) {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::Protocol);
       }
     }
@@ -663,6 +660,15 @@ void RewriteSystem::computeRedundantRequirementDiagnostics(
 
     if (!isInMinimizationDomain(rule.getLHS().getRootProtocol()))
       continue;
+
+    // Concrete conformance rules do not map to requirements in the minimized
+    // signature; we don't consider them to be 'non-explicit non-redundant',
+    // so that a conformance rule (T.[P] => T) expressed in terms of a concrete
+    // conformance (T.[concrete: C : P] => T) is still diagnosed as redundant.
+    if (auto optSymbol = rule.isPropertyRule()) {
+      if (optSymbol->getKind() == Symbol::Kind::ConcreteConformance)
+        continue;
+    }
 
     auto requirementID = rule.getRequirementID();
 
@@ -764,6 +770,9 @@ void RewriteSystem::computeRedundantRequirementDiagnostics(
 
     // If all rules derived from this structural requirement are redundant,
     // then the requirement is unnecessary in the source code.
+    //
+    // This means the rules derived from this requirement were all
+    // determined to be redundant by homotopy reduction.
     const auto &ruleIDs = pairIt->second;
     if (llvm::all_of(ruleIDs, isRedundantRule)) {
       auto requirement = WrittenRequirements[requirementID];
@@ -907,6 +916,18 @@ void RewriteSystem::dump(llvm::raw_ostream &out) const {
 
       out << "- (#" << loopID << ") ";
       loop.dump(out, *this);
+      out << "\n";
+    }
+  }
+  if (!WrittenRequirements.empty()) {
+    out << "Written requirements: {\n";
+
+    for (unsigned reqID : indices(WrittenRequirements)) {
+      out << " - ID: " << reqID << " - ";
+      const auto &requirement = WrittenRequirements[reqID];
+      requirement.req.dump(out);
+      out << " at ";
+      requirement.loc.print(out, Context.getASTContext().SourceMgr);
       out << "\n";
     }
   }

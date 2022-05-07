@@ -18,6 +18,7 @@
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/AtomicWaitQueue.h"
+#include "../SwiftShims/Visibility.h"
 #include <condition_variable>
 #include <thread>
 
@@ -39,7 +40,8 @@ public:
 
   void Reset() {}
 
-  LLVM_ATTRIBUTE_RETURNS_NONNULL void *Allocate(size_t size, size_t alignment);
+  SWIFT_RETURNS_NONNULL SWIFT_NODISCARD
+  void *Allocate(size_t size, size_t alignment);
   using AllocatorBase<MetadataAllocator>::Allocate;
 
   void Deallocate(const void *Ptr, size_t size, size_t Alignment);
@@ -59,11 +61,12 @@ public:
 class MetadataAllocator {
 public:
   MetadataAllocator(uint16_t tag) {}
+  SWIFT_RETURNS_NONNULL SWIFT_NODISCARD
   void *Allocate(size_t size, size_t alignment) {
     if (alignment < sizeof(void*)) alignment = sizeof(void*);
     void *ptr = nullptr;
-    if (posix_memalign(&ptr, alignment, size) != 0) {
-      return nullptr;
+    if (SWIFT_UNLIKELY(posix_memalign(&ptr, alignment, size) != 0 || !ptr)) {
+      swift::crash("Could not allocate memory for type metadata.");
     }
     return ptr;
   }
@@ -400,11 +403,12 @@ public:
 
 /// A summary of the information from a generic signature that's
 /// sufficient to compare arguments.
+template<typename Runtime>
 struct GenericSignatureLayout {
   uint16_t NumKeyParameters = 0;
   uint16_t NumWitnessTables = 0;
 
-  GenericSignatureLayout(const RuntimeGenericSignature &sig) {
+  GenericSignatureLayout(const RuntimeGenericSignature<Runtime> &sig) {
     for (const auto &gp : sig.getParams()) {
       if (gp.hasKeyArgument())
         ++NumKeyParameters;
@@ -420,13 +424,13 @@ struct GenericSignatureLayout {
     return NumKeyParameters + NumWitnessTables;
   }
 
-  friend bool operator==(const GenericSignatureLayout &lhs,
-                         const GenericSignatureLayout &rhs) {
+  friend bool operator==(const GenericSignatureLayout<Runtime> &lhs,
+                         const GenericSignatureLayout<Runtime> &rhs) {
     return lhs.NumKeyParameters == rhs.NumKeyParameters &&
            lhs.NumWitnessTables == rhs.NumWitnessTables;
   }
-  friend bool operator!=(const GenericSignatureLayout &lhs,
-                         const GenericSignatureLayout &rhs) {
+  friend bool operator!=(const GenericSignatureLayout<Runtime> &lhs,
+                         const GenericSignatureLayout<Runtime> &rhs) {
     return !(lhs == rhs);
   }
 };
@@ -434,7 +438,7 @@ struct GenericSignatureLayout {
 /// A key value as provided to the concurrent map.
 class MetadataCacheKey {
   const void * const *Data;
-  GenericSignatureLayout Layout;
+  GenericSignatureLayout<InProcess> Layout;
   uint32_t Hash;
 
   /// Compare two witness tables, which may involving checking the
@@ -475,9 +479,8 @@ public:
 
 private:
   /// Compare the content from two keys.
-  static int compareContent(const void * const *adata,
-                            const void * const *bdata,
-                            const GenericSignatureLayout &layout) {
+  static int compareContent(const void *const *adata, const void *const *bdata,
+                            const GenericSignatureLayout<InProcess> &layout) {
     // Compare generic arguments for key parameters.
     for (unsigned i = 0; i != layout.NumKeyParameters; ++i) {
       if (auto result = comparePointers(*adata++, *bdata++))
@@ -496,14 +499,13 @@ private:
   }
 
 public:
-  MetadataCacheKey(const GenericSignatureLayout &layout,
-                   const void * const *data)
-      : Data(data), Layout(layout), Hash(computeHash()) { }
+  MetadataCacheKey(const GenericSignatureLayout<InProcess> &layout,
+                   const void *const *data)
+      : Data(data), Layout(layout), Hash(computeHash()) {}
 
-  MetadataCacheKey(const GenericSignatureLayout &layout,
-                   const void * const *data,
-                   uint32_t hash)
-    : Data(data), Layout(layout), Hash(hash) {}
+  MetadataCacheKey(const GenericSignatureLayout<InProcess> &layout,
+                   const void *const *data, uint32_t hash)
+      : Data(data), Layout(layout), Hash(hash) {}
 
   bool operator==(MetadataCacheKey rhs) const {
     // Compare the hashes.
@@ -544,9 +546,7 @@ public:
     return Hash;
   }
 
-  const GenericSignatureLayout &layout() const {
-    return Layout;
-  }
+  const GenericSignatureLayout<InProcess> &layout() const { return Layout; }
 
   friend llvm::hash_code hash_value(const MetadataCacheKey &key) {
     return key.Hash;
@@ -1375,7 +1375,7 @@ protected:
 
 private:
   /// These are set during construction and never changed.
-  const GenericSignatureLayout Layout;
+  const GenericSignatureLayout<InProcess> Layout;
   const uint32_t Hash;
 
   /// Valid if TrackingInfo.getState() >= PrivateMetadataState::Abstract.

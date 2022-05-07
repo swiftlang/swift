@@ -1,7 +1,7 @@
 public struct Notification {}
 
 public protocol AmbiguousFuncProtocol {
-  func application(recieved: Notification)
+  func application(received: Notification)
 }
 
 public protocol AmbiguousVarProtocol {

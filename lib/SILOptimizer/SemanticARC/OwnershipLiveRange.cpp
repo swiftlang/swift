@@ -91,7 +91,7 @@ OwnershipLiveRange::OwnershipLiveRange(SILValue value)
     // here), we could get back a different value. Thus we can not transform
     // such a thing from owned to guaranteed.
     if (auto *i = OwnershipForwardingMixin::get(op->getUser())) {
-      if (!i->isDirectlyForwarding()) {
+      if (!i->preservesOwnership()) {
         tmpUnknownConsumingUses.push_back(op);
         continue;
       }

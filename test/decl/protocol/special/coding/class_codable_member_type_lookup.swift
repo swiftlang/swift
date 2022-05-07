@@ -18,7 +18,7 @@ struct SynthesizedClass : Codable {
   // Qualified type lookup should always be unambiguous.
   public func qualifiedFoo(_ key: SynthesizedClass.CodingKeys) {} // expected-error {{method cannot be declared public because its parameter uses a private type}}
   internal func qualifiedBar(_ key: SynthesizedClass.CodingKeys) {} // expected-error {{method cannot be declared internal because its parameter uses a private type}}
-  fileprivate func qualfiedBaz(_ key: SynthesizedClass.CodingKeys) {} // expected-error {{method cannot be declared fileprivate because its parameter uses a private type}}
+  fileprivate func qualifiedBaz(_ key: SynthesizedClass.CodingKeys) {} // expected-error {{method cannot be declared fileprivate because its parameter uses a private type}}
   private func qualifiedQux(_ key: SynthesizedClass.CodingKeys) {}
 
   // Unqualified lookups should find the synthesized CodingKeys type instead
@@ -97,7 +97,7 @@ struct SynthesizedClass : Codable {
     // Qualified lookup should remain as-is.
     public func qualifiedFoo(_ key: SynthesizedClass.CodingKeys) {} // expected-error {{method cannot be declared public because its parameter uses a private type}}
     internal func qualifiedBar(_ key: SynthesizedClass.CodingKeys) {} // expected-error {{method cannot be declared internal because its parameter uses a private type}}
-    fileprivate func qualfiedBaz(_ key: SynthesizedClass.CodingKeys) {} // expected-error {{method cannot be declared fileprivate because its parameter uses a private type}}
+    fileprivate func qualifiedBaz(_ key: SynthesizedClass.CodingKeys) {} // expected-error {{method cannot be declared fileprivate because its parameter uses a private type}}
     private func qualifiedQux(_ key: SynthesizedClass.CodingKeys) {}
 
     // Unqualified lookups should find the SynthesizedClass's synthesized
@@ -186,7 +186,7 @@ struct NonSynthesizedClass : Codable { // expected-note 4 {{'NonSynthesizedClass
   // type here.
   public func qualifiedFoo(_ key: NonSynthesizedClass.CodingKeys) {} // expected-error {{'CodingKeys' is not a member type of struct 'class_codable_member_type_lookup.NonSynthesizedClass'}}
   internal func qualifiedBar(_ key: NonSynthesizedClass.CodingKeys) {} // expected-error {{'CodingKeys' is not a member type of struct 'class_codable_member_type_lookup.NonSynthesizedClass'}}
-  fileprivate func qualfiedBaz(_ key: NonSynthesizedClass.CodingKeys) {} // expected-error {{'CodingKeys' is not a member type of struct 'class_codable_member_type_lookup.NonSynthesizedClass'}}
+  fileprivate func qualifiedBaz(_ key: NonSynthesizedClass.CodingKeys) {} // expected-error {{'CodingKeys' is not a member type of struct 'class_codable_member_type_lookup.NonSynthesizedClass'}}
   private func qualifiedQux(_ key: NonSynthesizedClass.CodingKeys) {} // expected-error {{'CodingKeys' is not a member type of struct 'class_codable_member_type_lookup.NonSynthesizedClass'}}
 
   // Unqualified lookups should find the public top-level CodingKeys type.
@@ -268,7 +268,7 @@ struct ExplicitClass : Codable {
   // Qualified type lookup should always be unambiguous.
   public func qualifiedFoo(_ key: ExplicitClass.CodingKeys) {}
   internal func qualifiedBar(_ key: ExplicitClass.CodingKeys) {}
-  fileprivate func qualfiedBaz(_ key: ExplicitClass.CodingKeys) {}
+  fileprivate func qualifiedBaz(_ key: ExplicitClass.CodingKeys) {}
   private func qualifiedQux(_ key: ExplicitClass.CodingKeys) {}
 
   // Unqualified lookups should find the synthesized CodingKeys type instead
@@ -347,7 +347,7 @@ struct ExplicitClass : Codable {
     // Qualified lookup should remain as-is.
     public func qualifiedFoo(_ key: ExplicitClass.CodingKeys) {}
     internal func qualifiedBar(_ key: ExplicitClass.CodingKeys) {}
-    fileprivate func qualfiedBaz(_ key: ExplicitClass.CodingKeys) {}
+    fileprivate func qualifiedBaz(_ key: ExplicitClass.CodingKeys) {}
     private func qualifiedQux(_ key: ExplicitClass.CodingKeys) {}
 
     // Unqualified lookups should find the ExplicitClass's synthesized
@@ -437,7 +437,7 @@ struct ExtendedClass : Codable {
   // Qualified type lookup should always be unambiguous.
   public func qualifiedFoo(_ key: ExtendedClass.CodingKeys) {}
   internal func qualifiedBar(_ key: ExtendedClass.CodingKeys) {}
-  fileprivate func qualfiedBaz(_ key: ExtendedClass.CodingKeys) {}
+  fileprivate func qualifiedBaz(_ key: ExtendedClass.CodingKeys) {}
   private func qualifiedQux(_ key: ExtendedClass.CodingKeys) {}
 
   // Unqualified lookups should find the synthesized CodingKeys type instead
@@ -516,7 +516,7 @@ struct ExtendedClass : Codable {
     // Qualified lookup should remain as-is.
     public func qualifiedFoo(_ key: ExtendedClass.CodingKeys) {}
     internal func qualifiedBar(_ key: ExtendedClass.CodingKeys) {}
-    fileprivate func qualfiedBaz(_ key: ExtendedClass.CodingKeys) {}
+    fileprivate func qualifiedBaz(_ key: ExtendedClass.CodingKeys) {}
     private func qualifiedQux(_ key: ExtendedClass.CodingKeys) {}
 
     // Unqualified lookups should find the ExtendedClass's synthesized

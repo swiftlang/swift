@@ -152,8 +152,7 @@ CoerceToCheckedCast *CoerceToCheckedCast::attempt(ConstraintSystem &cs,
     return nullptr;
 
   const auto castKind = TypeChecker::typeCheckCheckedCast(
-      fromType, toType, CheckedCastContextKind::Coercion, cs.DC,
-      SourceLoc(), coerceExpr->getSubExpr(), SourceRange());
+      fromType, toType, CheckedCastContextKind::Coercion, cs.DC);
 
   // Invalid cast.
   if (castKind == CheckedCastKind::Unresolved)
@@ -1681,7 +1680,7 @@ AllowNonClassTypeToConvertToAnyObject::create(ConstraintSystem &cs, Type type,
 
 bool AddQualifierToAccessTopLevelName::diagnose(const Solution &solution,
                                                 bool asNote) const {
-  MissingQuialifierInMemberRefFailure failure(solution, getLocator());
+  MissingQualifierInMemberRefFailure failure(solution, getLocator());
   return failure.diagnose(asNote);
 }
 
@@ -1999,9 +1998,36 @@ bool AllowNoopCheckedCast::diagnose(const Solution &solution,
   return warning.diagnose(asNote);
 }
 
+AllowNoopExistentialToCFTypeCheckedCast *
+AllowNoopExistentialToCFTypeCheckedCast::attempt(ConstraintSystem &cs,
+                                                 Type fromType, Type toType,
+                                                 CheckedCastKind kind,
+                                                 ConstraintLocator *locator) {
+  if (!isExpr<IsExpr>(locator->getAnchor()))
+    return nullptr;
+
+  if (!fromType->isExistentialType())
+    return nullptr;
+
+  const auto *cls = toType->getAs<ClassType>();
+  if (!(cls && cls->getDecl()->getForeignClassKind() ==
+                   ClassDecl::ForeignKind::CFType))
+    return nullptr;
+
+  return new (cs.getAllocator()) AllowNoopExistentialToCFTypeCheckedCast(
+      cs, fromType, toType, kind, locator);
+}
+
+bool AllowNoopExistentialToCFTypeCheckedCast::diagnose(const Solution &solution,
+                                                       bool asNote) const {
+  NoopExistentialToCFTypeCheckedCast warning(
+      solution, getFromType(), getToType(), CastKind, getLocator());
+  return warning.diagnose(asNote);
+}
+
 // Although function types maybe compile-time convertible because
 // compiler can emit thunks at SIL to handle the conversion when
-// required, only convertions that are supported by the runtime are
+// required, only conversions that are supported by the runtime are
 // when types are trivially equal or non-throwing from type is equal
 // to throwing to type without throwing clause conversions are not
 // possible at runtime.
@@ -2039,6 +2065,26 @@ bool AllowUnsupportedRuntimeCheckedCast::diagnose(const Solution &solution,
   UnsupportedRuntimeCheckedCastFailure failure(
       solution, getFromType(), getToType(), CastKind, getLocator());
   return failure.diagnose(asNote);
+}
+
+AllowCheckedCastToUnrelated *
+AllowCheckedCastToUnrelated::attempt(ConstraintSystem &cs, Type fromType,
+                                     Type toType, CheckedCastKind kind,
+                                     ConstraintLocator *locator) {
+  // Explicit optional-to-optional casts always succeed because a nil
+  // value of any optional type can be cast to any other optional type.
+  if (fromType->getOptionalObjectType() && toType->getOptionalObjectType()) {
+    return nullptr;
+  }
+  return new (cs.getAllocator())
+      AllowCheckedCastToUnrelated(cs, fromType, toType, kind, locator);
+}
+
+bool AllowCheckedCastToUnrelated::diagnose(const Solution &solution,
+                                           bool asNote) const {
+  CheckedCastToUnrelatedFailure warning(solution, getFromType(), getToType(),
+                                        CastKind, getLocator());
+  return warning.diagnose(asNote);
 }
 
 bool AllowInvalidStaticMemberRefOnProtocolMetatype::diagnose(

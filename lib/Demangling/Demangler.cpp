@@ -2117,6 +2117,8 @@ NodePointer Demangler::demangleMetatype() {
       return createWithChild(Node::Kind::ProtocolDescriptor, popProtocol());
     case 'P':
       return createWithPoppedType(Node::Kind::GenericTypeMetadataPattern);
+    case 'q':
+      return createWithChild(Node::Kind::Uniquable, popNode());
     case 'Q':
       return createWithChild(Node::Kind::OpaqueTypeDescriptor, popNode());
     case 'r':
@@ -3227,6 +3229,9 @@ NodePointer Demangler::demangleSpecialType() {
       return popFunctionType(Node::Kind::ObjCBlock);
     case 'C':
       return popFunctionType(Node::Kind::CFunctionPointer);
+    case 'g':
+    case 'G':
+      return demangleExtendedExistentialShape(specialChar);
     case 'z':
       switch (auto cchar = nextChar()) {
       case 'B':
@@ -3371,6 +3376,23 @@ NodePointer Demangler::demangleSpecialType() {
       }
     default:
       return nullptr;
+  }
+}
+
+NodePointer Demangler::demangleExtendedExistentialShape(char nodeKind) {
+  assert(nodeKind == 'g' || nodeKind == 'G');
+
+  NodePointer type = popNode(Node::Kind::Type);
+
+  NodePointer genSig = nullptr;
+  if (nodeKind == 'G')
+    genSig = popNode(Node::Kind::DependentGenericSignature);
+
+  if (genSig) {
+    return createWithChildren(Node::Kind::ExtendedExistentialTypeShape,
+                              genSig, type);
+  } else {
+    return createWithChild(Node::Kind::ExtendedExistentialTypeShape, type);
   }
 }
 

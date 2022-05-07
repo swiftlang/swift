@@ -124,7 +124,7 @@ internal var _orphanedFoundationSubclassesReparented: Bool = false
 
 /// Reparents the SwiftNativeNS*Base classes to be subclasses of their respective
 /// Foundation types, or is false if they couldn't be reparented. Must be run
-/// in order to bridge Swift Strings, Arrays, Dictionarys, Sets, or Enumerators to ObjC.
+/// in order to bridge Swift Strings, Arrays, Dictionaries, Sets, or Enumerators to ObjC.
  internal func _connectOrphanedFoundationSubclassesIfNeeded() -> Void {
   let bridgeWorks = _bridgeInitializedSuccessfully
   _debugPrecondition(bridgeWorks)

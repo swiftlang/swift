@@ -1020,8 +1020,7 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
   }
 
   // Otherwise, the existential might conform abstractly.
-  for (auto proto : layout.getProtocols()) {
-    auto *protoDecl = proto->getDecl();
+  for (auto protoDecl : layout.getProtocols()) {
 
     // If we found the protocol we're looking for, return an abstract
     // conformance to it.
@@ -1050,13 +1049,6 @@ static bool shouldCreateMissingConformances(Type type, ProtocolDecl *proto) {
   // Sendable may be able to be synthesized.
   if (proto->isSpecificProtocol(KnownProtocolKind::Sendable)) {
     return true;
-  }
-
-  // A 'distributed actor' may have to create missing Codable conformances.
-  if (auto nominal = dyn_cast_or_null<ClassDecl>(type->getAnyNominal())) {
-    return nominal->isDistributedActor() &&
-           (proto->isSpecificProtocol(swift::KnownProtocolKind::Decodable) ||
-            proto->isSpecificProtocol(swift::KnownProtocolKind::Encodable));
   }
 
   return false;
@@ -2629,17 +2621,27 @@ LibraryLevel
 ModuleLibraryLevelRequest::evaluate(Evaluator &evaluator,
                                     const ModuleDecl *module) const {
   auto &ctx = module->getASTContext();
+  namespace path = llvm::sys::path;
+  SmallString<128> scratch;
+
+  /// Is \p path under the folder SDK/a/b/c/d/e?
+  auto hasSDKPrefix =
+    [&](StringRef path, const Twine &a, const Twine &b = "",
+        const Twine &c = "", const Twine &d = "", const Twine &e = "") {
+    scratch = ctx.SearchPathOpts.getSDKPath();
+    path::append(scratch, a, b, c, d);
+    path::append(scratch, e);
+    return path.startswith(scratch);
+  };
 
   /// Is \p modulePath from System/Library/PrivateFrameworks/?
   auto fromPrivateFrameworks = [&](StringRef modulePath) -> bool {
     if (!ctx.LangOpts.Target.isOSDarwin()) return false;
 
-    namespace path = llvm::sys::path;
-    SmallString<128> scratch;
-    scratch = ctx.SearchPathOpts.getSDKPath();
-    path::append(scratch, "System", "Library", "PrivateFrameworks");
-    return hasPrefix(path::begin(modulePath), path::end(modulePath),
-                     path::begin(scratch), path::end(scratch));
+    return hasSDKPrefix(modulePath, "AppleInternal", "Library", "Frameworks") ||
+           hasSDKPrefix(modulePath, "System", "Library", "PrivateFrameworks") ||
+           hasSDKPrefix(modulePath, "System", "iOSSupport", "System", "Library", "PrivateFrameworks") ||
+           hasSDKPrefix(modulePath, "usr", "local", "include");
   };
 
   if (module->isNonSwiftModule()) {
@@ -2647,8 +2649,7 @@ ModuleLibraryLevelRequest::evaluate(Evaluator &evaluator,
       // Imported clangmodules are SPI if they are defined by a private
       // modulemap or from the PrivateFrameworks folder in the SDK.
       bool moduleIsSPI = underlying->ModuleMapIsPrivate ||
-                         (underlying->isPartOfFramework() &&
-                          fromPrivateFrameworks(underlying->PresumedModuleMapFile));
+                         fromPrivateFrameworks(underlying->PresumedModuleMapFile);
       return moduleIsSPI ? LibraryLevel::SPI : LibraryLevel::API;
     }
     return LibraryLevel::Other;
@@ -2917,7 +2918,17 @@ bool FileUnit::walk(ASTWalker &walker) {
   getTopLevelDecls(Decls);
   llvm::SaveAndRestore<ASTWalker::ParentTy> SAR(walker.Parent,
                                                 getParentModule());
+
+  bool SkipInternal = getKind() == FileUnitKind::SerializedAST &&
+      !walker.shouldWalkSerializedTopLevelInternalDecls();
   for (Decl *D : Decls) {
+    if (SkipInternal) {
+      if (auto *VD = dyn_cast<ValueDecl>(D)) {
+        if (!VD->isAccessibleFrom(nullptr))
+          continue;
+      }
+    }
+
 #ifndef NDEBUG
     PrettyStackTraceDecl debugStack("walking into decl", D);
 #endif

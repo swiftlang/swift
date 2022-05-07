@@ -393,7 +393,7 @@ called function where it isn't obviously using its `inout`
 argument.  Perhaps we should track accesses to `inout` arguments
 at a finer-grained level, within the callee, instead of attempting
 to enforce the Law of Exclusivity in the caller.  The problem
-is that that idea is simply too dynamic to be efficiently
+is that idea is simply too dynamic to be efficiently
 implemented.
 
 A caller-side rule for `inout` has one key advantage: the
@@ -1163,7 +1163,7 @@ here because, as mentioned above, the entire co-routine
 must logically execute within the scope of an access to the
 base value.  If, as is common for generators, the generator
 function actually returns some sort of generator object,
-the compiler must ensure that that object does not escape
+the compiler must ensure that object does not escape
 that enclosing access.  This is a significant source of
 complexity.
 

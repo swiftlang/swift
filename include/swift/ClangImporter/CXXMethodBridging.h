@@ -8,15 +8,15 @@
 #include <string>
 namespace swift {
 struct CXXMethodBridging {
-  enum class Kind { unkown, getter, setter, subscript };
+  enum class Kind { unknown, getter, setter, subscript };
 
-  enum class NameKind { unkown, snake, lower, camel, title };
+  enum class NameKind { unknown, snake, lower, camel, title };
 
   CXXMethodBridging(const clang::CXXMethodDecl *method) : method(method) {}
 
   Kind classify() {
     if (nameIsBlacklist())
-      return Kind::unkown;
+      return Kind::unknown;
 
     // this should be handled as snake case. See: rdar://89453010
     // case. In the future we could
@@ -24,51 +24,51 @@ struct CXXMethodBridging {
     auto nameKind = classifyNameKind();
     if (nameKind != NameKind::title && nameKind != NameKind::camel &&
         nameKind != NameKind::lower)
-      return Kind::unkown;
+      return Kind::unknown;
 
     if (getClangName().startswith_insensitive("set")) {
       // Setters only have one parameter.
       if (method->getNumParams() != 1)
-        return Kind::unkown;
+        return Kind::unknown;
 
       // rdar://89453106 (We need to handle imported properties that return a
       // reference)
       if (method->getParamDecl(0)->getType()->isReferenceType())
-        return Kind::unkown;
+        return Kind::unknown;
 
       return Kind::setter;
     }
 
     // Getters and subscripts cannot return void.
     if (method->getReturnType()->isVoidType())
-      return Kind::unkown;
+      return Kind::unknown;
 
     if (getClangName().startswith_insensitive("get")) {
       // Getters cannot take arguments.
       if (method->getNumParams() != 0)
-        return Kind::unkown;
+        return Kind::unknown;
 
       // rdar://89453106 (We need to handle imported properties that return a
       // reference)
       if (method->getReturnType()->isReferenceType())
-        return Kind::unkown;
+        return Kind::unknown;
 
       return Kind::getter;
     }
 
     // rdar://89453187 (Add subscripts clarification to CXXMethod Bridging to
     // clean up importDecl)
-    return Kind::unkown;
+    return Kind::unknown;
   }
 
   NameKind classifyNameKind() {
     bool allLower = llvm::all_of(getClangName(), islower);
 
     if (getClangName().empty())
-      return NameKind::unkown;
+      return NameKind::unknown;
 
     if (getClangName().contains('_'))
-      return allLower ? NameKind::snake : NameKind::unkown;
+      return allLower ? NameKind::snake : NameKind::unknown;
 
     if (allLower)
       return NameKind::lower;

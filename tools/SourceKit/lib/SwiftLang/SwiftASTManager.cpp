@@ -1049,12 +1049,12 @@ ASTUnitRef ASTBuildOperation::buildASTUnit(std::string &Error) {
   }
 
   if (CompIns.setup(Invocation, Error)) {
-    // FIXME: Report the diagnostic.
     LOG_WARN_FUNC("Compilation setup failed!!!");
-    Error = "compilation setup failed";
+    if (Error.empty()) {
+      Error = "compilation setup failed";
+    }
     return nullptr;
   }
-  CompIns.getASTContext().CancellationFlag = CancellationFlag;
   registerIDERequestFunctions(CompIns.getASTContext().evaluator);
   if (TracedOp.enabled()) {
     TracedOp.start(TraceInfo);

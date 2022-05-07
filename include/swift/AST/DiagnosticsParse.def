@@ -94,6 +94,9 @@ ERROR(forbidden_extended_escaping_string,none,
 ERROR(regex_literal_parsing_error,none,
       "%0", (StringRef))
 
+ERROR(prefix_slash_not_allowed,none,
+      "prefix operator may not contain '/'", ())
+
 //------------------------------------------------------------------------------
 // MARK: Lexer diagnostics
 //------------------------------------------------------------------------------
@@ -140,7 +143,10 @@ ERROR(lex_invalid_escape_delimiter,none,
 ERROR(lex_invalid_closing_delimiter,none,
       "too many '#' characters in closing delimiter", ())
 
-ERROR(lex_unterminated_regex,none,
+ERROR(lex_regex_literal_invalid_starting_char,none,
+      "regex literal may not start with %0; add backslash to escape",
+      (StringRef))
+ERROR(lex_regex_literal_unterminated,none,
       "unterminated regex literal", ())
 
 ERROR(lex_invalid_unicode_scalar,none,
@@ -213,8 +219,6 @@ ERROR(number_cant_start_decl_name,none,
       (StringRef))
 ERROR(expected_identifier_after_case_comma, PointsToFirstBadToken,
       "expected identifier after comma in enum 'case' declaration", ())
-ERROR(decl_redefinition,none,
-      "definition conflicts with previous value", ())
 ERROR(let_cannot_be_computed_property,none,
       "'let' declarations cannot be computed properties", ())
 ERROR(let_cannot_be_observing_property,none,
@@ -378,9 +382,6 @@ ERROR(expected_rbrace_actor,none,
       "expected '}' in actor", ())
 
 // Protocol
-ERROR(generic_arguments_protocol,PointsToFirstBadToken,
-      "protocols do not allow generic parameters; use associated types instead",
-      ())
 ERROR(expected_lbrace_protocol,PointsToFirstBadToken,
       "expected '{' in protocol type", ())
 ERROR(expected_rbrace_protocol,none,
@@ -679,6 +680,8 @@ ERROR(expected_sil_function_type, none,
       "sil function expected to have SIL function type", ())
 ERROR(sil_dynamically_replaced_func_not_found,none,
       "dynamically replaced function not found %0", (Identifier))
+ERROR(sil_adhoc_requirement_witness_func_not_found,none,
+      "ad-hoc requirement witness function not found %0", (Identifier))
 ERROR(sil_specialize_target_func_not_found,none,
       "_specialize target function not found %0", (Identifier))
 ERROR(sil_availability_expected_version,none,
@@ -728,7 +731,7 @@ ERROR(sil_witness_protocol_conformance_not_found,none,
 ERROR(sil_diff_witness_expected_token,PointsToFirstBadToken,
       "expected '%0' in differentiability witness", (StringRef))
 ERROR(sil_diff_witness_unknown_kind,PointsToFirstBadToken,
-      "unknonwn differentiability kind '%0'; expected 'forward', 'reverse', "
+      "unknown differentiability kind '%0'; expected 'forward', 'reverse', "
       "'normal', or 'linear'", (StringRef))
 ERROR(sil_diff_witness_serialized_declaration,none,
       "differentiability witness declaration should not be serialized", ())
@@ -1059,7 +1062,7 @@ ERROR(expected_expr_throw,PointsToFirstBadToken,
 ERROR(expected_await_not_async,none,
       "found 'async' in expression; did you mean 'await'?", ())
 
-// Yield Statment
+// Yield Statement
 ERROR(expected_expr_yield,PointsToFirstBadToken,
       "expected expression in 'yield' statement", ())
 ERROR(unexpected_label_yield,none,
@@ -1093,7 +1096,7 @@ ERROR(conditional_var_valid_identifiers_only,none,
 ERROR(expected_condition_if,PointsToFirstBadToken,
       "expected expression, var, or let in 'if' condition", ())
 ERROR(missing_condition_after_if,none,
-      "missing condition in an 'if' statement", ())
+      "missing condition in 'if' statement", ())
 ERROR(expected_lbrace_after_if,PointsToFirstBadToken,
       "expected '{' after 'if' condition", ())
 ERROR(expected_lbrace_or_if_after_else,PointsToFirstBadToken,
@@ -1109,7 +1112,7 @@ NOTE(suggest_removing_else,none,
 ERROR(expected_condition_guard,PointsToFirstBadToken,
       "expected expression, var, let or case in 'guard' condition", ())
 ERROR(missing_condition_after_guard,none,
-      "missing condition in an 'guard' statement", ())
+      "missing condition in 'guard' statement", ())
 ERROR(expected_else_after_guard,PointsToFirstBadToken,
       "expected 'else' after 'guard' condition", ())
 ERROR(expected_lbrace_after_guard,PointsToFirstBadToken,
@@ -1119,7 +1122,7 @@ ERROR(expected_lbrace_after_guard,PointsToFirstBadToken,
 ERROR(expected_condition_while,PointsToFirstBadToken,
       "expected expression, var, or let in 'while' condition", ())
 ERROR(missing_condition_after_while,none,
-      "missing condition in a 'while' statement", ())
+      "missing condition in 'while' statement", ())
 ERROR(expected_lbrace_after_while,PointsToFirstBadToken,
       "expected '{' after 'while' condition", ())
 

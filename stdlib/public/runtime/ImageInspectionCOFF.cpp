@@ -77,13 +77,13 @@ static StaticMutex mutex;
 static bool isDbgHelpInitialized = false;
 
 void swift::_swift_withWin32DbgHelpLibrary(
-  const std::function<void(bool /* isInitialized */)>& body) {
-  mutex.withLock([&body] () {
+  void (* body)(bool isInitialized, void *context), void *context) {
+  mutex.withLock([=] () {
     if (!isDbgHelpInitialized) {
       SymSetOptions(SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS);
       isDbgHelpInitialized = SymInitialize(GetCurrentProcess(), nullptr, true);
     }
-    body(isDbgHelpInitialized);
+    body(isDbgHelpInitialized, context);
   });
 }
 #endif

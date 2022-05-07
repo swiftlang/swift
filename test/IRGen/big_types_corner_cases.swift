@@ -203,7 +203,7 @@ public func testGetFunc() {
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} hidden swiftcc void @"$s22big_types_corner_cases7TestBigC4testyyF"(%T22big_types_corner_cases7TestBigC* swiftself %0)
 // CHECK: [[CALL1:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$sSayy22big_types_corner_cases9BigStructVcSgGMD"
 // CHECK: [[CALL2:%.*]] = call i8** @"$sSayy22big_types_corner_cases9BigStructVcSgGSayxGSlsWl
-// CHECK:  call swiftcc void @"$sSlsE10firstIndex5where0B0QzSgSb7ElementQzKXE_tKF"(%swift.opaque* noalias nocapture sret({{.*}}) %{{[0-9]+}}, i8* bitcast ({{.*}}* @"$s22big_types_corner_cases9BigStruct{{.*}}_TRTA{{(\.ptrauth)?}}" to i8*), %swift.opaque* %{{[0-9]+}}, %swift.type* %{{[0-9]+}}, i8** [[CALL2]]
+// CHECK:  call swiftcc void @"$sSlsE10firstIndex5where0B0QzSgSb7ElementQzKXE_tKF"(%swift.opaque* noalias nocapture sret({{.*}}) %{{[0-9]+}}, i8* bitcast ({{.*}}* @"$s22big_types_corner_cases7TestBig{{.*}}" to i8*), %swift.opaque* null, %swift.type* %{{[0-9]+}}, i8** [[CALL2]]
 class TestBig {
     typealias Handler = (BigStruct) -> Void
 

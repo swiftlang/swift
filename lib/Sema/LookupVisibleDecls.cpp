@@ -212,7 +212,7 @@ static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS,
   return true;
 }
 
-/// Collect visble members from \p Parent into \p FoundDecls .
+/// Collect visible members from \p Parent into \p FoundDecls .
 static void collectVisibleMemberDecls(const DeclContext *CurrDC, LookupState LS,
                                       Type BaseType,
                                       IterableDeclContext *Parent,
@@ -500,7 +500,7 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
                     DeclVisibilityKind::MemberOfProtocolDerivedByCurrentNominal;
               } else if (!LS.isIncludingProtocolExtensionMembers() &&
                          WD->getDeclContext()->getExtendedProtocolDecl()) {
-                // Don't skip this requiement.
+                // Don't skip this requirement.
                 // Witnesses in protocol extensions aren't reported.
               } else {
                 // lookupVisibleMemberDecls() generally prefers witness members
@@ -1178,7 +1178,7 @@ static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
                                    const DeclContext *DC,
                                    bool IncludeTopLevel, SourceLoc Loc) {
   const SourceManager &SM = DC->getASTContext().SourceMgr;
-  auto Reason = DeclVisibilityKind::MemberOfCurrentNominal;
+  auto MemberReason = DeclVisibilityKind::MemberOfCurrentNominal;
 
   // If we are inside of a method, check to see if there are any ivars in scope,
   // and if so, whether this is a reference to one of them.
@@ -1280,12 +1280,15 @@ static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
       dcGenericParams = dcGenericParams->getOuterParameters();
     }
 
-    if (ExtendedType)
-      ::lookupVisibleMemberDecls(ExtendedType, Consumer, DC, LS, Reason,
+    if (ExtendedType) {
+      ::lookupVisibleMemberDecls(ExtendedType, Consumer, DC, LS, MemberReason,
                                  nullptr);
 
+      // Going outside the current type context.
+      MemberReason = DeclVisibilityKind::MemberOfOutsideNominal;
+    }
+
     DC = DC->getParent();
-    Reason = DeclVisibilityKind::MemberOfOutsideNominal;
   }
 
   if (auto SF = dyn_cast<SourceFile>(DC)) {

@@ -190,7 +190,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
 
   // Add flags for C++ interop.
   if (inputArgs.hasArg(options::OPT_enable_experimental_cxx_interop)) {
-    arguments.push_back("-enable-cxx-interop");
+    arguments.push_back("-enable-experimental-cxx-interop");
   }
   if (const Arg *arg =
           inputArgs.getLastArg(options::OPT_experimental_cxx_stdlib)) {
@@ -235,6 +235,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
                        options::OPT_enable_actor_data_race_checks,
                        options::OPT_disable_actor_data_race_checks);
   inputArgs.AddLastArg(arguments, options::OPT_warn_concurrency);
+  inputArgs.AddLastArg(arguments, options::OPT_strict_concurrency);
   inputArgs.AddLastArg(arguments, options::OPT_warn_implicit_overrides);
   inputArgs.AddLastArg(arguments, options::OPT_typo_correction_limit);
   inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension);
@@ -298,7 +299,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
                        options::OPT_verify_incremental_dependencies);
   inputArgs.AddLastArg(arguments, options::OPT_access_notes_path);
   inputArgs.AddLastArg(arguments, options::OPT_library_level);
-  inputArgs.AddLastArg(arguments, options::OPT_enable_regex_literals);
+  inputArgs.AddLastArg(arguments, options::OPT_enable_bare_slash_regex);
 
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);
@@ -316,7 +317,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   // Pass through the values passed to -Xfrontend.
   inputArgs.AddAllArgValues(arguments, options::OPT_Xfrontend);
 
-  // Pass on module names whose symbols should be embeded in tbd.
+  // Pass on module names whose symbols should be embedded in tbd.
   inputArgs.AddAllArgs(arguments, options::OPT_embed_tbd_for_module);
 
   if (auto *A = inputArgs.getLastArg(options::OPT_working_directory)) {

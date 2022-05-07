@@ -38,6 +38,9 @@ add_swift_target_library(swift_RegexParser ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
     -Dswift_RegexParser_EXPORTS
   SWIFT_COMPILE_FLAGS
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
+    # Workaround until `_RegexParser` is imported as implementation-only
+    # by `_StringProcessing`.
+    -Xfrontend -disable-implicit-string-processing-module-import
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
 
   INSTALL_IN_COMPONENT stdlib

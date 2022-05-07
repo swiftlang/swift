@@ -481,7 +481,7 @@ ConstraintSystem::SolverState::~SolverState() {
     CS.activateConstraint(constraint);
   }
 
-  // If global constraing debugging is off and we are finished logging the
+  // If global constraint debugging is off and we are finished logging the
   // current solution attempt, switch debugging back off.
   const auto &tyOpts = CS.getASTContext().TypeCheckerOpts;
   if (!tyOpts.DebugConstraintSolver &&
@@ -1298,12 +1298,21 @@ Optional<std::vector<Solution>> ConstraintSystem::solve(
       maybeProduceFallbackDiagnostic(target);
       return None;
 
-    case SolutionResult::TooComplex:
-      getASTContext().Diags.diagnose(
-          target.getLoc(), diag::expression_too_complex)
-            .highlight(target.getSourceRange());
+    case SolutionResult::TooComplex: {
+      auto affectedRange = solution.getTooComplexAt();
+
+      // If affected range is unknown, let's use whole
+      // target.
+      if (!affectedRange)
+        affectedRange = target.getSourceRange();
+
+      getASTContext()
+          .Diags.diagnose(affectedRange->Start, diag::expression_too_complex)
+          .highlight(*affectedRange);
+
       solution.markAsDiagnosed();
       return None;
+    }
 
     case SolutionResult::Ambiguous:
       // If salvaging produced an ambiguous result, it has already been
@@ -1374,8 +1383,8 @@ ConstraintSystem::solveImpl(SolutionApplicationTarget &target,
   SmallVector<Solution, 4> solutions;
   solve(solutions, allowFreeTypeVariables);
 
-  if (getExpressionTooComplex(solutions))
-    return SolutionResult::forTooComplex();
+  if (isTooComplex(solutions))
+    return SolutionResult::forTooComplex(getTooComplexRange());
 
   switch (solutions.size()) {
   case 0:
@@ -1415,7 +1424,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
   filterSolutions(solutions);
 
   // We fail if there is no solution or the expression was too complex.
-  return solutions.empty() || getExpressionTooComplex(solutions);
+  return solutions.empty() || isTooComplex(solutions);
 }
 
 void ConstraintSystem::solveImpl(SmallVectorImpl<Solution> &solutions) {
@@ -1453,7 +1462,7 @@ void ConstraintSystem::solveImpl(SmallVectorImpl<Solution> &solutions) {
   bool prevFailed = false;
 
   // Advance the solver by taking a given step, which might involve
-  // a prelimilary "setup", if this is the first time this step is taken.
+  // a preliminary "setup", if this is the first time this step is taken.
   auto advance = [](SolverStep *step, bool prevFailed) -> StepResult {
     auto currentState = step->getState();
     if (currentState == StepState::Setup) {
@@ -1489,7 +1498,7 @@ void ConstraintSystem::solveImpl(SmallVectorImpl<Solution> &solutions) {
 
       switch (result.getKind()) {
       // It was impossible to solve this step, let's note that
-      // for followup steps, to propogate the error.
+      // for followup steps, to propagate the error.
       case SolutionKind::Error:
         LLVM_FALLTHROUGH;
 
@@ -1516,26 +1525,8 @@ void ConstraintSystem::solveImpl(SmallVectorImpl<Solution> &solutions) {
   }
 }
 
-bool ConstraintSystem::solveForCodeCompletion(
-    SolutionApplicationTarget &target, SmallVectorImpl<Solution> &solutions) {
-  auto *expr = target.getAsExpr();
-  // Tell the constraint system what the contextual type is.
-  setContextualType(expr, target.getExprContextualTypeLoc(),
-                    target.getExprContextualTypePurpose());
-
-  // Set up the expression type checker timer.
-  Timer.emplace(expr, *this);
-
-  shrink(expr);
-
-  if (isDebugMode()) {
-    auto &log = llvm::errs();
-    log << "--- Code Completion ---\n";
-  }
-
-  if (generateConstraints(target, FreeTypeVariableBinding::Disallow))
-    return false;
-
+void ConstraintSystem::solveForCodeCompletion(
+    SmallVectorImpl<Solution> &solutions) {
   {
     SolverState state(*this, FreeTypeVariableBinding::Disallow);
 
@@ -1556,6 +1547,30 @@ bool ConstraintSystem::solveForCodeCompletion(
     }
   }
 
+  return;
+}
+
+bool ConstraintSystem::solveForCodeCompletion(
+    SolutionApplicationTarget &target, SmallVectorImpl<Solution> &solutions) {
+  auto *expr = target.getAsExpr();
+  // Tell the constraint system what the contextual type is.
+  setContextualType(expr, target.getExprContextualTypeLoc(),
+                    target.getExprContextualTypePurpose());
+
+  // Set up the expression type checker timer.
+  Timer.emplace(expr, *this);
+
+  shrink(expr);
+
+  if (isDebugMode()) {
+    auto &log = llvm::errs();
+    log << "--- Code Completion ---\n";
+  }
+
+  if (generateConstraints(target, FreeTypeVariableBinding::Disallow))
+    return false;
+
+  solveForCodeCompletion(solutions);
   return true;
 }
 
@@ -1603,7 +1618,7 @@ ConstraintSystem::filterDisjunction(
       constraintsToRestoreOnFail.push_back(constraint);
 
     if (solverState)
-      solverState->disableContraint(constraint);
+      solverState->disableConstraint(constraint);
     else
       constraint->setDisabled();
   }
@@ -1637,7 +1652,7 @@ ConstraintSystem::filterDisjunction(
 
       for (auto *currentChoice : disjunction->getNestedConstraints()) {
         if (currentChoice != choice)
-          solverState->disableContraint(currentChoice);
+          solverState->disableConstraint(currentChoice);
       }
       return SolutionKind::Solved;
     }
@@ -2015,7 +2030,7 @@ void DisjunctionChoiceProducer::partitionGenericOperators(
   first = std::copy(concreteOverloads.begin(), concreteOverloads.end(), first);
 
   // Check if any of the known argument types conform to one of the standard
-  // arithmetic protocols. If so, the sovler should attempt the corresponding
+  // arithmetic protocols. If so, the solver should attempt the corresponding
   // overload choices first.
   for (auto arg : argFnType->getParams()) {
     auto argType = arg.getPlainType();
@@ -2210,7 +2225,7 @@ Constraint *ConstraintSystem::selectDisjunction() {
         }
 
         // Everything else equal, choose the disjunction with the greatest
-        // number of resoved argument types. The number of resolved argument
+        // number of resolved argument types. The number of resolved argument
         // types is always zero for disjunctions that don't represent applied
         // overloads.
         if (firstFavored == secondFavored) {

@@ -287,8 +287,8 @@ namespace {
 
   private:
     CastStrategy computeStrategy() const {
-      if (canUseScalarCheckedCastInstructions(SGF.SGM.M, SourceType,
-                                              TargetType))
+      if (canSILUseScalarCheckedCastInstructions(SGF.SGM.M, SourceType,
+                                                 TargetType))
         return CastStrategy::Scalar;
       return CastStrategy::Address;
     }
@@ -361,7 +361,7 @@ adjustForConditionalCheckedCastOperand(SILLocation loc, ManagedValue src,
   
   // Figure out if we need the value to be in a temporary.
   bool requiresAddress =
-    !canUseScalarCheckedCastInstructions(SGF.SGM.M, sourceType, targetType);
+    !canSILUseScalarCheckedCastInstructions(SGF.SGM.M, sourceType, targetType);
   
   AbstractionPattern abstraction = SGF.SGM.M.Types.getMostGeneralAbstraction();
   auto &srcAbstractTL = SGF.getTypeLowering(abstraction, sourceType);

@@ -265,6 +265,11 @@ typedef NSString *NonSendableStringEnum NS_STRING_ENUM NONSENDABLE;
 typedef NSString *SendableStringStruct NS_EXTENSIBLE_STRING_ENUM;
 typedef NSString *NonSendableStringStruct NS_EXTENSIBLE_STRING_ENUM NONSENDABLE;
 
+SENDABLE
+typedef struct {
+  void *ptr;
+} SendableStructWithNonSendable;
+
 ASSUME_NONSENDABLE_END
 
 typedef id ObjectTypedef;
@@ -304,5 +309,14 @@ struct StructWithSendableContents {
 
 SENDABLE id StructWithSendableContentsGetSendableComputed(struct StructWithSendableContents contents)
   __attribute__((swift_name("getter:StructWithSendableContents.sendableComputed(self:)")));
+
+@interface CostcoManager : NSObject
++ (instancetype)sharedManager;
+- (void)isCustomerEnrolledInExecutiveProgram:(NSObject *)customer completion:(void(^)(BOOL enrolled))completion;
+@end
+
+@interface Person : NSObject
++ (void)getAsCustomer:(void(^_Nonnull)(NSObject *device))completion;
+@end
 
 #pragma clang assume_nonnull end

@@ -360,13 +360,13 @@ bool parseIncrementalEditArguments(SyntaxParsingCache *Cache,
                                    StringRef OldFileName) {
   // Get a source manager for the old file
   InputFile OldFile = InputFile(OldFileName, true);
-  auto OldFileBufferOrErrror = llvm::MemoryBuffer::getFileOrSTDIN(OldFileName);
-  if (!OldFileBufferOrErrror) {
+  auto OldFileBufferOrError = llvm::MemoryBuffer::getFileOrSTDIN(OldFileName);
+  if (!OldFileBufferOrError) {
     llvm::errs() << "Unable to open old source file";
     return false;
   }
   SourceManager SourceMgr;
-  unsigned BufferID = SourceMgr.addNewSourceBuffer(std::move(OldFileBufferOrErrror.get()));
+  unsigned BufferID = SourceMgr.addNewSourceBuffer(std::move(OldFileBufferOrError.get()));
 
   llvm::Regex MatchRegex("([0-9]+):([0-9]+)-([0-9]+):([0-9]+)=(.*)");
   // Parse the source edits
@@ -406,7 +406,7 @@ bool parseIncrementalEditArguments(SyntaxParsingCache *Cache,
         SourceMgr.getLocOffsetInBuffer(EditStartLoc, BufferID);
     auto EditEndOffset = SourceMgr.getLocOffsetInBuffer(EditEndLoc, BufferID);
     Cache->addEdit(EditStartOffset, EditEndOffset,
-                   /*ReplacmentLength=*/Matches[5].size());
+                   /*ReplacementLength=*/Matches[5].size());
   }
   return true;
 }

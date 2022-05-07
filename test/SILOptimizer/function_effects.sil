@@ -1,0 +1,315 @@
+// RUN: %target-sil-opt %s -compute-effects | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+protocol ClassP : AnyObject {
+  func foo()
+}
+
+class X : ClassP {
+  func foo()
+  deinit
+}
+
+class Derived : X {
+}
+
+struct Str {
+  @_hasStorage var a: X
+  @_hasStorage var b: (X, X)
+}
+
+class Y {
+  @_hasStorage var s: Str
+}
+
+class Z {
+  @_hasStorage var y: Y
+}
+
+class DerivedZ : Z {
+}
+
+class LinkedNode {
+  @_hasStorage var next: LinkedNode;
+  @_hasStorage var x: X;
+}
+
+enum E {
+  case A(Z)
+  case B(Z)
+}
+
+struct PointerAndInt {
+  @_hasStorage var p: UnsafeMutablePointer<Int>
+  @_hasStorage var i: Int
+}
+
+sil_global @globalY : $Y
+
+sil [ossa] @unknown_function : $@convention(thin) (@owned X) -> ()
+sil [ossa] @unknown_function_y : $@convention(thin) (@owned Y) -> ()
+
+// CHECK-LABEL: sil [escapes %1.v** => %3.v**, !%2, %2.c*.v** -> %r.v**, !%3] [ossa] @test_basic
+sil [ossa] @test_basic : $@convention(thin) (@owned X, @guaranteed Str, @guaranteed Z, @inout X) -> @owned Y {
+bb0(%0 : @owned $X, %1 : @guaranteed $Str, %2 : @guaranteed $Z, %3 : $*X):
+  // %0 escapes to global
+  %4 = function_ref @unknown_function : $@convention(thin) (@owned X) -> ()
+  %5 = apply %4(%0) : $@convention(thin) (@owned X) -> ()
+  
+  // %1 escapes to argument %3
+  %6 = struct_extract %1 : $Str, #Str.a
+  %7 = copy_value %6 : $X
+  store %7 to [assign] %3 : $*X
+
+  // content of %2 escapes to return
+  // %2 does not escape
+  %8 = ref_element_addr %2 : $Z, #Z.y
+  %9 = load [copy] %8 : $*Y
+  return %9 : $Y
+}
+
+// CHECK-LABEL: sil [escapes %0 => %r, %0.c*.v** => %r.c*.v**] @simple_forwarding
+sil @simple_forwarding : $@convention(thin) (@owned Z) -> @owned Z {
+bb0(%0 : $Z):
+  return %0 : $Z
+}
+
+// CHECK-LABEL: sil [escapes %0.v** => %r.v**, %0.v**.c*.v** => %r.v**.c*.v**] @forwarding_struct_element
+sil @forwarding_struct_element : $@convention(thin) (@owned Str) -> @owned X {
+bb0(%0 : $Str):
+  %1 = struct_extract %0 : $Str, #Str.a
+  return %1 : $X
+}
+
+// CHECK-LABEL: sil [escapes %0 => %r.s1.0, %0.c*.v** => %r.s1.0.c*.v**, %1 => %r.s1.1, %1.c*.v** => %r.s1.1.c*.v**, %2 => %r.s0, %2.c*.v** => %r.s0.c*.v**]  @forwarding_in_struct
+sil @forwarding_in_struct : $@convention(thin) (@owned X, @owned X, @owned X) -> @owned Str {
+bb0(%0 : $X, %1 : $X, %2: $X):
+  %3 = tuple (%0 : $X, %1 : $X)
+  %4 = struct $Str(%2 : $X, %3 : $(X, X))
+  return %4 : $Str
+}
+
+// CHECK-LABEL: sil [escapes %0 -> %r.v**, %0.c*.v** -> %r.v**.c*.v**] @forwarding_same_arg_in_struct
+sil @forwarding_same_arg_in_struct : $@convention(thin) (@owned X) -> @owned Str {
+bb0(%0 : $X):
+  %1 = tuple (%0 : $X, %0 : $X)
+  %2 = struct $Str(%0 : $X, %1 : $(X, X))
+  return %2 : $Str
+}
+
+// CHECK-LABEL: sil [escapes !%0] [ossa] @test_escaping_content
+sil [ossa] @test_escaping_content : $@convention(thin) (@guaranteed Z) -> () {
+bb0(%0 : @guaranteed $Z):
+  %1 = ref_element_addr %0 : $Z, #Z.y
+  %2 = load [copy] %1 : $*Y
+  %3 = function_ref @unknown_function_y : $@convention(thin) (@owned Y) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@owned Y) -> ()
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK-LABEL: sil [escapes !%0.**] @not_escaping_argument
+sil @not_escaping_argument : $@convention(thin) (@guaranteed Z) -> () {
+bb0(%0 : $Z):
+  %1 = ref_element_addr %0 : $Z, #Z.y
+  %2 = global_addr @globalY : $*Y
+  // Even a store does not make the argument escaping.
+  copy_addr %2 to [initialization] %1 : $*Y
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// CHECK-LABEL: sil [escapes %0 -> %r, %0.c*.v** -> %r.c*.v**] @load_from_inout
+sil @load_from_inout : $@convention(thin) (@inout Y) -> @owned Y {
+bb0(%0 : $*Y):
+  %2 = load %0 : $*Y
+  return %2 : $Y
+}
+
+// CHECK-LABEL: sil [escapes !%0, %0.c*.v** -> %r.v**, !%1] [ossa] @followstore_implies_non_exclusive
+sil [ossa] @followstore_implies_non_exclusive : $@convention(thin) (@guaranteed Z, @owned Y) -> @owned Y {
+bb0(%0 : @guaranteed $Z, %1 : @owned $Y):
+  %2 = ref_element_addr %0 : $Z, #Z.y
+  %3 = load [copy] %2 : $*Y
+  destroy_value %1 : $Y
+  return %3 : $Y
+}
+
+// CHECK-LABEL: sil [escapes !%0, %0.c*.v** -> %r.v**, %1 -> %r] [ossa] @test_not_exclusive_escaping_through_phi
+sil [ossa] @test_not_exclusive_escaping_through_phi : $@convention(thin) (@guaranteed Z, @owned Y) -> @owned Y {
+bb0(%0 : @guaranteed $Z, %1 : @owned $Y):
+  cond_br undef, bb1, bb2
+bb1:
+  %3 = ref_element_addr %0 : $Z, #Z.y
+  %4 = load [copy] %3 : $*Y
+  destroy_value %1 : $Y
+  br bb3(%4 : $Y)
+bb2:
+  br bb3(%1 : $Y)
+
+bb3(%7: @owned $Y):
+  return %7 : $Y
+}
+
+// CHECK-LABEL: sil [escapes !%0, %0.c*.v** -> %r.v**] [ossa] @test_not_exclusive_through_store
+sil [ossa] @test_not_exclusive_through_store : $@convention(thin) (@guaranteed Z, @owned Y) -> @owned Y {
+bb0(%0 : @guaranteed $Z, %1 : @owned $Y):
+  %2 = ref_element_addr %0 : $Z, #Z.y
+  %3 = load [copy] %2 : $*Y
+  store %1 to [assign] %2 : $*Y
+  return %3 : $Y
+}
+
+sil [escapes %0.v** => %0.v**] [ossa] @self_arg_callee : $@convention(thin) (@inout Str) -> ()
+
+// CHECK-LABEL: sil [escapes %0.v** => %0.v**] [ossa] @test_self_arg_escape
+sil [ossa] @test_self_arg_escape : $@convention(thin) (@inout Str) -> () {
+bb0(%0 : $*Str):
+  %1 = function_ref @self_arg_callee : $@convention(thin) (@inout Str) -> ()
+  %2 = apply %1(%0) : $@convention(thin) (@inout Str) -> ()
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil [escapes %0.v** => %0.s1.0.v**] [ossa] @test_self_arg_escape_with_copy
+sil [ossa] @test_self_arg_escape_with_copy : $@convention(thin) (@inout Str) -> () {
+bb0(%0 : $*Str):
+  %1 = struct_element_addr %0 : $*Str, #Str.a
+  %2 = struct_element_addr %0 : $*Str, #Str.b
+  %3 = tuple_element_addr %2 : $*(X,X), 0
+  copy_addr %1 to %3 : $*X
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK-LABEL: sil [escapes %0.v** => %0.v**] [ossa] @test_self_arg_escape_with_bidirectional_copy
+sil [ossa] @test_self_arg_escape_with_bidirectional_copy : $@convention(thin) (@inout Str) -> () {
+bb0(%0 : $*Str):
+  %1 = struct_element_addr %0 : $*Str, #Str.a
+  %2 = struct_element_addr %0 : $*Str, #Str.b
+  %3 = tuple_element_addr %2 : $*(X,X), 0
+  copy_addr %1 to %3 : $*X
+  copy_addr %3 to %1 : $*X
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK-LABEL: sil [escapes !%0.**, !%1, %1.c*.v** => %0.v**] [ossa] @test_content_to_arg_addr
+sil [ossa] @test_content_to_arg_addr : $@convention(thin) (@guaranteed Y) -> @out Str {
+bb0(%0 : $*Str, %1 : @guaranteed $Y):
+  %2 = ref_element_addr %1 : $Y, #Y.s
+  %3 = begin_access [read] [dynamic] %2 : $*Str
+  copy_addr %3 to [initialization] %0 : $*Str
+  end_access %3 : $*Str
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: sil [escapes %0.v** => %r.v**, %0.v**.c*.v** => %r.v**.c*.v**] @escaping_pointer
+sil @escaping_pointer : $@convention(thin) (PointerAndInt) -> UnsafeMutablePointer<Int> {
+bb0(%0 : $PointerAndInt):
+  %1 = struct_extract %0 : $PointerAndInt, #PointerAndInt.p
+  return %1 : $UnsafeMutablePointer<Int>
+}
+
+// CHECK-LABEL: sil [escapes !%0.**] @not_escaping_int
+sil @not_escaping_int : $@convention(thin) (PointerAndInt) -> Int {
+bb0(%0 : $PointerAndInt):
+  %1 = struct_extract %0 : $PointerAndInt, #PointerAndInt.i
+  return %1 : $Int
+}
+
+// CHECK-LABEL: sil [escapes !%0.**] @test_simple_recursion
+sil @test_simple_recursion : $@convention(thin) (@guaranteed Y) -> () {
+bb0(%0 : $Y):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = function_ref @test_simple_recursion : $@convention(thin) (@guaranteed Y) -> ()
+  %3 = apply %2(%0) : $@convention(thin) (@guaranteed Y) -> ()
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %5 = tuple ()
+  return %5 : $() 
+}
+
+// CHECK-LABEL: sil @test_recursion_with_escaping_param
+sil @test_recursion_with_escaping_param : $@convention(thin) (@guaranteed Y, @guaranteed Y) -> Y {
+bb0(%0 : $Y, %1 : $Y):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = function_ref @test_recursion_with_escaping_param : $@convention(thin) (@guaranteed Y, @guaranteed Y) -> Y
+  %3 = apply %2(%1, %0) : $@convention(thin) (@guaranteed Y, @guaranteed Y) -> Y
+  br bb3(%3 : $Y)
+
+bb2:
+  br bb3(%1 : $Y)
+
+bb3(%5 : $Y):
+  return %5 : $Y
+}
+
+// CHECK-LABEL: [escapes !%0.**] @inout_class_argument
+sil @inout_class_argument : $@convention(thin) (@inout X) -> () {
+bb0(%0 : $*X):
+  %1 = alloc_ref $X
+  store %1 to %0: $*X
+  %3 = tuple()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil [escapes %0 -> %r, %0.c*.v** -> %r.c*.v**] @load_and_store_to_inout
+sil @load_and_store_to_inout : $@convention(thin) (@inout Z, @guaranteed Y) -> Z {
+bb0(%0 : $*Z, %1 : $Y):
+  %2 = load %0 : $*Z
+  %3 = ref_element_addr %2 : $Z, #Z.y
+  store %1 to %3 : $*Y
+  return %2 : $Z
+}
+
+// CHECK-LABEL: sil [escapes %0 => %r, %0.c*.v** => %r.c*.v**] @store_to_content
+sil @store_to_content : $@convention(thin) (@owned Z, @guaranteed Y) -> @owned Z {
+bb0(%0 : $Z, %1 : $Y):
+  %2 = ref_element_addr %0 : $Z, #Z.y
+  store %1 to %2 : $*Y
+  return %0 : $Z
+}
+
+// CHECK-LABEL: sil [escapes !%1.**] @non_returning_function
+sil @non_returning_function : $@convention(thin) (Str, @inout Str) -> () {
+bb0(%0 : $Str, %1 : $*Str):
+  store %0 to %1 : $*Str
+  unreachable
+}
+
+// CHECK-LABEL: sil [escapes !%0] @followStore_introducing1
+sil @followStore_introducing1 : $@convention(thin) (@guaranteed Z) -> @owned Y {
+bb0(%0 : $Z):
+  %1 = ref_element_addr %0 : $Z, #Z.y
+  %2 = load %1 : $*Y
+  store %2 to %1 : $*Y
+  %4 = load %1 : $*Y
+  return %4 : $Y
+}
+
+// CHECK-LABEL: sil [escapes !%0.**] @followStore_introducing2
+sil @followStore_introducing2 : $@convention(thin) (@inout Z, @guaranteed Y) -> () {
+bb0(%0 : $*Z, %1 : $Y):
+  %2 = load %0 : $*Z
+  %3 = ref_element_addr %2 : $Z, #Z.y
+  store %1 to %3 : $*Y
+  %5 = tuple ()
+  return %5 : $()
+}

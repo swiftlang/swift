@@ -67,6 +67,12 @@ public struct DiagnosticEngine {
   public init(bridged: BridgedDiagnosticEngine) {
     self.bridged = bridged
   }
+  public init?(bridged: BridgedOptionalDiagnosticEngine) {
+    guard let object = bridged.object else {
+      return nil
+    }
+    self.bridged = BridgedDiagnosticEngine(object: object)
+  }
 
   public func diagnose(_ position: SourceLoc?,
                        _ id: DiagID,
@@ -82,7 +88,7 @@ public struct DiagnosticEngine {
     // Build a higher-order function to wrap every 'withBridgedXXX { ... }'
     // calls, so we don't escape anything from the closure. 'bridgedArgs' and
     // 'bridgedFixIts' are temporary storage to store bridged values. So they
-    // should not be used after the closue is executed.
+    // should not be used after the closure is executed.
  
     var closure: () -> Void = {
       bridgedArgs.withBridgedArrayRef { bridgedArgsRef in

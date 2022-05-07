@@ -8,10 +8,11 @@
 
 # NOTE: Subdirectories must be added in dependency order.
 
-add_subdirectory(Basic)
-add_subdirectory(AST)
-if(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
+if(SWIFT_BUILD_REGEX_PARSER_IN_COMPILER)
   add_subdirectory(_RegexParser)
 endif()
+add_subdirectory(Basic)
+add_subdirectory(AST)
+add_subdirectory(Parse)
 add_subdirectory(SIL)
 add_subdirectory(Optimizer)

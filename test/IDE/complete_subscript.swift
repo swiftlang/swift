@@ -175,5 +175,5 @@ func testSettableSub(x: inout HasSettableSub) {
 // SETTABLE_SUBSCRIPT: Begin completions
 // SETTABLE_SUBSCRIPT-DAG: Pattern/CurrNominal/Flair[ArgLabels]: ['[']{#keyPath: KeyPath<HasSettableSub, Value>#}[']'][#Value#];
 // SETTABLE_SUBSCRIPT-DAG: Decl[Subscript]/CurrNominal/Flair[ArgLabels]: ['[']{#(a): String#}[']'][#@lvalue Any#];
-// SETTABLE_SUBSCRIPT-DAG: Decl[LocalVar]/Local/TypeRelation[Identical]: local[#String#]; name=local
+// SETTABLE_SUBSCRIPT-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: local[#String#]; name=local
 // SETTABLE_SUBSCRIPT: End completions

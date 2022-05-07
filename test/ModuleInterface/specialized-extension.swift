@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -module-name Test -typecheck -emit-module-interface-path - -enable-experimental-bound-generic-extensions %s -requirement-machine-inferred-signatures=on | %FileCheck %s
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name Test -enable-experimental-bound-generic-extensions -requirement-machine-inferred-signatures=on
+// RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name Test
+// RUN: %FileCheck %s < %t.swiftinterface
 
 public struct Tree<T> {
   public struct Branch<B> {

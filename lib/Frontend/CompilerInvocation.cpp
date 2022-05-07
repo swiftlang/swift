@@ -188,7 +188,15 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
     LibPath = SearchPathOpts.getSDKPath();
     llvm::sys::path::append(LibPath, "usr", "lib", "swift");
     if (!Triple.isOSDarwin()) {
+      // Use the non-architecture suffixed form with directory-layout
+      // swiftmodules.
       llvm::sys::path::append(LibPath, getPlatformNameForTriple(Triple));
+      RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
+
+      // Compatibility with older releases - use the architecture suffixed form
+      // for pre-directory-layout multi-architecture layout.  Note that some
+      // platforms (e.g. Windows) will use this even with directory layout in
+      // older releases.
       llvm::sys::path::append(LibPath, swift::getMajorArchitectureName(Triple));
     }
     RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
@@ -448,13 +456,13 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalNamedOpaqueTypes |=
       Args.hasArg(OPT_enable_experimental_named_opaque_types);
 
-  Opts.EnableParameterizedProtocolTypes |=
-      Args.hasArg(OPT_enable_parameterized_protocol_types);
+  Opts.EnableParameterizedExistentialTypes |=
+      Args.hasArg(OPT_enable_parameterized_existential_types);
 
   Opts.EnableOpenedExistentialTypes =
     Args.hasFlag(OPT_enable_experimental_opened_existential_types,
                  OPT_disable_experimental_opened_existential_types,
-                 false);
+                 true);
 
   Opts.EnableExperimentalVariadicGenerics |=
     Args.hasArg(OPT_enable_experimental_variadic_generics);
@@ -464,9 +472,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableExperimentalMoveOnly |=
     Args.hasArg(OPT_enable_experimental_move_only);
-
-  Opts.EnableExperimentalPairwiseBuildBlock |=
-    Args.hasArg(OPT_enable_experimental_pairwise_build_block);
 
   Opts.EnableInferPublicSendable |=
     Args.hasFlag(OPT_enable_infer_public_concurrent_value,
@@ -485,6 +490,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DisableImplicitConcurrencyModuleImport |=
     Args.hasArg(OPT_disable_implicit_concurrency_module_import);
 
+  Opts.DisableImplicitStringProcessingModuleImport |=
+    Args.hasArg(OPT_disable_implicit_string_processing_module_import);
+
   if (Args.hasArg(OPT_enable_experimental_async_top_level))
     Diags.diagnose(SourceLoc(), diag::warn_flag_deprecated,
                    "-enable-experimental-async-top-level");
@@ -498,9 +506,24 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       = A->getOption().matches(OPT_enable_deserialization_recovery);
   }
 
-  // Experimental string processing
-  Opts.EnableExperimentalStringProcessing |=
-      Args.hasArg(OPT_enable_experimental_string_processing);
+  // Whether '/.../' regex literals are enabled. This implies experimental
+  // string processing.
+  if (Args.hasArg(OPT_enable_bare_slash_regex)) {
+    Opts.EnableBareSlashRegexLiterals = true;
+    Opts.EnableExperimentalStringProcessing = true;
+  }
+
+  // Experimental string processing.
+  if (auto A = Args.getLastArg(OPT_enable_experimental_string_processing,
+                               OPT_disable_experimental_string_processing)) {
+    Opts.EnableExperimentalStringProcessing =
+        A->getOption().matches(OPT_enable_experimental_string_processing);
+
+    // When experimental string processing is explicitly disabled, also disable
+    // forward slash regex `/.../`.
+    if (!Opts.EnableExperimentalStringProcessing)
+      Opts.EnableBareSlashRegexLiterals = false;
+  }
 
   Opts.EnableExperimentalBoundGenericExtensions |=
     Args.hasArg(OPT_enable_experimental_bound_generic_extensions);
@@ -667,7 +690,28 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
-  Opts.WarnConcurrency |= Args.hasArg(OPT_warn_concurrency);
+  // Swift 6+ uses the strictest concurrency level.
+  if (Opts.isSwiftVersionAtLeast(6)) {
+    Opts.StrictConcurrencyLevel = StrictConcurrency::Complete;
+  } else if (const Arg *A = Args.getLastArg(OPT_strict_concurrency)) {
+    auto value = llvm::StringSwitch<Optional<StrictConcurrency>>(A->getValue())
+      .Case("minimal", StrictConcurrency::Minimal)
+      .Case("targeted", StrictConcurrency::Targeted)
+      .Case("complete", StrictConcurrency::Complete)
+      .Default(None);
+
+    if (value)
+      Opts.StrictConcurrencyLevel = *value;
+    else
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+
+  } else if (Args.hasArg(OPT_warn_concurrency)) {
+    Opts.StrictConcurrencyLevel = StrictConcurrency::Complete;
+  } else {
+    // Default to "limited" checking in Swift 5.x.
+    Opts.StrictConcurrencyLevel = StrictConcurrency::Targeted;
+  }
 
   Opts.WarnImplicitOverrides =
     Args.hasArg(OPT_warn_implicit_overrides);
@@ -743,7 +787,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   // Collect -clang-target value if specified in the front-end invocation.
   // Usually, the driver will pass down a clang target with the
-  // exactly same value as the main target, so we could dignose the usage of
+  // exactly same value as the main target, so we could diagnose the usage of
   // unavailable APIs.
   // The reason we cannot infer clang target from -target is that not all
   // front-end invocation will include a -target to start with. For instance,
@@ -755,10 +799,13 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.ClangTarget = llvm::Triple(A->getValue());
   }
 
-  Opts.EnableCXXInterop |= Args.hasArg(OPT_enable_cxx_interop);
+  Opts.EnableCXXInterop |= Args.hasArg(OPT_enable_experimental_cxx_interop) ||
+                           Args.hasArg(OPT_enable_cxx_interop);
   Opts.EnableObjCInterop =
       Args.hasFlag(OPT_enable_objc_interop, OPT_disable_objc_interop,
                    Target.isOSDarwin());
+
+  Opts.CxxInteropGettersSettersAsProperties = Args.hasArg(OPT_cxx_interop_getters_setters_as_properties);
 
   Opts.VerifyAllSubstitutionMaps |= Args.hasArg(OPT_verify_all_substitution_maps);
 
@@ -793,10 +840,13 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   // First, set up default minimum inlining target versions.
   auto getDefaultMinimumInliningTargetVersion =
       [&](const llvm::Triple &triple) -> llvm::VersionTuple {
+    // FIXME: Re-enable with rdar://91387029
+#if SWIFT_DEFAULT_API_TARGET_MIN_INLINING_VERSION_TO_MIN
     // In API modules, default to the version when Swift first became available.
     if (Opts.LibraryLevel == LibraryLevel::API)
       if (auto minTriple = minimumAvailableOSVersionForTriple(triple))
         return *minTriple;
+#endif
 
     // In other modules, assume that availability is used less consistently
     // and that library clients will generally raise deployment targets as the
@@ -1004,9 +1054,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_disable_requirement_machine_reuse))
     Opts.EnableRequirementMachineReuse = false;
 
-  if (Args.hasArg(OPT_enable_regex_literals))
-    Opts.EnableForwardSlashRegexLiterals = true;
-
   if (Args.hasArg(OPT_enable_requirement_machine_opaque_archetypes))
     Opts.EnableRequirementMachineOpaqueArchetypes = true;
 
@@ -1098,12 +1145,6 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
 
   Opts.EnableOneWayClosureParameters |=
       Args.hasArg(OPT_experimental_one_way_closure_params);
-
-  Opts.EnableMultiStatementClosureInference |=
-      Args.hasArg(OPT_experimental_multi_statement_closures);
-
-  Opts.EnableTypeInferenceFromDefaultArguments |=
-      Args.hasArg(OPT_experimental_type_inference_from_defaults);
 
   Opts.PrintFullConvention |=
       Args.hasArg(OPT_experimental_print_full_convention);
@@ -1197,7 +1238,9 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
 
   Opts.DisableOverlayModules |= Args.hasArg(OPT_emit_imported_modules);
 
-  Opts.EnableClangSPI = !Args.hasArg(OPT_disable_clang_spi);
+  if (Args.hasArg(OPT_disable_clang_spi)) {
+    Opts.EnableClangSPI = false;
+  }
 
   Opts.ExtraArgsOnly |= Args.hasArg(OPT_extra_clang_options_only);
 
@@ -1549,6 +1592,15 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   // -Ounchecked might also set removal of runtime asserts (cond_fail).
   Opts.RemoveRuntimeAsserts |= Args.hasArg(OPT_RemoveRuntimeAsserts);
 
+  Optional<DestroyHoistingOption> specifiedDestroyHoistingOption;
+  if (Arg *A = Args.getLastArg(OPT_enable_destroy_hoisting)) {
+    specifiedDestroyHoistingOption = 
+        llvm::StringSwitch<Optional<DestroyHoistingOption>>(A->getValue())
+          .Case("true", DestroyHoistingOption::On)
+          .Case("false", DestroyHoistingOption::Off)
+          .Default(None);
+  }
+
   Optional<CopyPropagationOption> specifiedCopyPropagationOption;
   if (Arg *A = Args.getLastArg(OPT_copy_propagation_state_EQ)) {
     specifiedCopyPropagationOption =
@@ -1650,13 +1702,17 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
 
   // Unless overridden below, enabling copy propagation means enabling lexical
   // lifetimes.
-  if (Opts.CopyPropagation == CopyPropagationOption::On)
+  if (Opts.CopyPropagation == CopyPropagationOption::On) {
     Opts.LexicalLifetimes = LexicalLifetimesOption::On;
+    Opts.DestroyHoisting = DestroyHoistingOption::On;
+  }
 
   // Unless overridden below, disable copy propagation means disabling lexical
   // lifetimes.
-  if (Opts.CopyPropagation == CopyPropagationOption::Off)
+  if (Opts.CopyPropagation == CopyPropagationOption::Off) {
     Opts.LexicalLifetimes = LexicalLifetimesOption::DiagnosticMarkersOnly;
+    Opts.DestroyHoisting = DestroyHoistingOption::Off;
+  }
 
   // If move-only is enabled, always enable lexical lifetime as well.  Move-only
   // depends on lexical lifetimes.
@@ -1677,6 +1733,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       Opts.LexicalLifetimes = LexicalLifetimesOption::Off;
     }
   }
+  if (specifiedDestroyHoistingOption)
+    Opts.DestroyHoisting = *specifiedDestroyHoistingOption;
 
   Opts.EnableARCOptimizations &= !Args.hasArg(OPT_disable_arc_opts);
   Opts.EnableOSSAModules |= Args.hasArg(OPT_enable_ossa_modules);
@@ -1687,7 +1745,11 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       OPT_enable_actor_data_race_checks,
       OPT_disable_actor_data_race_checks, /*default=*/false);
   Opts.DisableSILPerfOptimizations |= Args.hasArg(OPT_disable_sil_perf_optzns);
-  Opts.CrossModuleOptimization |= Args.hasArg(OPT_CrossModuleOptimization);
+  if (Args.hasArg(OPT_CrossModuleOptimization)) {
+    Opts.CMOMode = CrossModuleOptimizationMode::Aggressive;
+  } else if (Args.hasArg(OPT_EnbaleDefaultCMO)) {
+    Opts.CMOMode = CrossModuleOptimizationMode::Default;  
+  }
   Opts.EnablePerformanceAnnotations |=
       Args.hasArg(OPT_ExperimentalPerformanceAnnotations);
   Opts.VerifyAll |= Args.hasArg(OPT_sil_verify_all);
@@ -2051,7 +2113,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.UseTypeLayoutValueHandling
       = A->getOption().matches(OPT_enable_type_layouts);
   } else if (Opts.OptMode == OptimizationMode::NoOptimization) {
-    // Disable type layouts at Onone except if explictly requested.
+    // Disable type layouts at Onone except if explicitly requested.
     Opts.UseTypeLayoutValueHandling = false;
   }
 
@@ -2301,7 +2363,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   } else if (Triple.isWatchOS() && !Triple.isSimulatorEnvironment()) {
     // watchOS does not support auto async frame pointers due to bitcode, so
     // silently override "auto" to "never" when back-deploying. This approach
-    // sacrifies async backtraces when back-deploying but prevents crashes in
+    // sacrifices async backtraces when back-deploying but prevents crashes in
     // older tools that cannot handle the async frame bit in the frame pointer.
     unsigned major, minor, micro;
     Triple.getWatchOSVersion(major, minor, micro);

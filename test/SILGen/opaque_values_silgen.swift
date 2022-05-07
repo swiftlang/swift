@@ -4,6 +4,8 @@
 
 // FIXME: "HECK" lines all need to be updated for OSSA.
 
+class C {}
+
 func genericInout<T>(_: inout T) {}
 
 func hasVarArg(_ args: Any...) {}
@@ -60,12 +62,14 @@ func forEachStmt() {
 // ---
 // CHECK-LABEL: sil hidden [ossa] @$s20opaque_values_silgen12openExistBoxySSs5Error_pF : $@convention(thin) (@guaranteed Error) -> @owned String {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $Error):
-// HECK:   [[OPAQUE_ARG:%.*]] = open_existential_box_value [[ARG]] : $Error to $@opened({{.*}}) Error
-// HECK:   [[ALLOC_OPEN:%.*]] = alloc_stack $@opened({{.*}}) Error
-// HECK:   store_borrow [[OPAQUE_ARG]] to [[ALLOC_OPEN]]
-// HECK:   dealloc_stack [[ALLOC_OPEN]]
+// CHECK:   [[OPAQUE_ARG:%.*]] = open_existential_box_value [[ARG]] : $Error to $@opened({{.*}}) Error
+// CHECK:   [[ALLOC_OPEN:%.*]] = alloc_stack $@opened({{.*}}) Error
+// CHECK:   [[COPY:%.*]] = copy_value [[OPAQUE_ARG]]
+// CHECK:   store [[COPY]] to [init] [[ALLOC_OPEN]]
+// CHECK:   destroy_addr [[ALLOC_OPEN]]
+// CHECK:   dealloc_stack [[ALLOC_OPEN]]
 // CHECK-NOT:   destroy_value [[ARG]] : $Error
-// HECK:   return {{.*}} : $String
+// CHECK:   return {{.*}} : $String
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen12openExistBoxySSs5Error_pF'
 func openExistBox(_ x: Error) -> String {
   return x._domain
@@ -365,5 +369,69 @@ extension Array where Element == Int {
     return transformEachElement { element in
       return element + 1
     }
+  }
+}
+
+// CHECK-LABEL: sil private [ossa] @$s20opaque_values_silgen22anon_read_only_captureyS2iFSiyXEfU_ : $@convention(thin) (@inout_aliasable Int) -> Int {
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen22anon_read_only_captureyS2iFSiyXEfU_'
+func anon_read_only_capture(_ x: Int) -> Int {
+  var x = x
+  return ({ x })()
+}
+
+
+// CHECK-LABEL: sil private [ossa] @$s20opaque_values_silgen22testEmptyReturnClosureyyFyycyKXEfu_yycfU_ : $@convention(thin) @substituted <τ_0_0> () -> @out τ_0_0 for <()> {
+// CHECK-NOT: bb1 
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen22testEmptyReturnClosureyyFyycyKXEfu_yycfU_'
+func testEmptyReturnClosure() {
+  func bar() {}
+  let b = nil ?? { bar() }
+}
+
+// Test that PatternMatchEmission::emitIsDispatch can emit a
+// class-to-AnyObject cast as a guaranteed scalar cast
+// (doesCastPreserveOwnershipForTypes returns true).
+//
+// CHECK-LABEL: sil hidden [ossa] @$s20opaque_values_silgen24testCastClassToAnyObjectyyXlAA1CCF : $@convention(thin) (@guaranteed C) -> @owned AnyObject {
+// CHECK: bb0(%0 : @guaranteed $C):
+// CHECK:   checked_cast_br %0 : $C to AnyObject, bb2, bb1
+// CHECK: bb1(%{{.*}} : @guaranteed $C):
+// CHECK: bb2(%{{.*}} : @guaranteed $AnyObject):
+// CHECK-LABEL: } // end sil function
+func testCastClassToAnyObject(_ c: C) -> AnyObject {
+  switch (c) {
+  case let x as AnyObject:
+    _ = x
+    break
+  }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s20opaque_values_silgen24testCastAnyObjectToClassyAA1CCyXlF : $@convention(thin) (@guaranteed AnyObject) -> @owned C {
+// CHECK: bb0(%0 : @guaranteed $AnyObject):
+// CHECK:   [[CP:%.*]] = copy_value %0 : $AnyObject
+// CHECK:   checked_cast_br [[CP]] : $AnyObject to C, bb1, bb2
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen24testCastAnyObjectToClassyAA1CCyXlF'
+func testCastAnyObjectToClass(_ o: AnyObject) -> C {
+  switch (o) {
+  case let x as C:
+    _ = x
+    break
+  default:
+    break
+  }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s20opaque_values_silgen024testCastClassArchetypeToF0yAA1CCxRlzClF : $@convention(thin) <T where T : AnyObject> (@guaranteed T) -> @owned C {
+// CHECK: bb0(%0 : @guaranteed $T):
+// CHECK:   [[CP:%.*]] = copy_value %0 : $T
+// CHECK:   checked_cast_br [[CP]] : $T to C, bb1, bb2
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen024testCastClassArchetypeToF0yAA1CCxRlzClF'
+func testCastClassArchetypeToClass<T : AnyObject>(_ o: T) -> C {
+  switch (o) {
+  case let x as C:
+    _ = x
+    break
+  default:
+    break
   }
 }

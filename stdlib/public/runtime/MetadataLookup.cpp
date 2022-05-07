@@ -38,6 +38,8 @@
 #include <functional>
 #include <vector>
 #include <list>
+#include <new>
+#include <cstring>
 
 using namespace swift;
 using namespace Demangle;
@@ -471,6 +473,16 @@ static bool sameObjCTypeManglings(Demangle::NodePointer node1,
 }
 #endif
 
+/// Optimization for the case where we need to compare a StringRef and a null terminated C string
+/// Not converting s2 to a StringRef avoids the need to call both strlen and memcmp when non-matching
+/// but equal length
+static bool stringRefEqualsCString(StringRef s1, const char *s2) {
+  size_t length = s1.size();
+  // It may be possible for s1 to contain embedded NULL characters
+  // so additionally validate that the lengths match
+  return strncmp(s1.data(), s2, length) == 0 && strlen(s2) == length;
+}
+
 bool
 swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
                                          Demangle::NodePointer node) {
@@ -495,7 +507,7 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
       // Match to a mangled module name.
       if (node->getKind() != Demangle::Node::Kind::Module)
         return false;
-      if (!node->getText().equals(module->Name.get()))
+      if (!stringRefEqualsCString(node->getText(), module->Name.get()))
         return false;
       
       node = nullptr;
@@ -567,7 +579,7 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
         auto nameNode = node->getChild(1);
         if (nameNode->getKind() != Demangle::Node::Kind::Identifier)
           return false;
-        if (nameNode->getText() == proto->Name.get()) {
+        if (stringRefEqualsCString(nameNode->getText(), proto->Name.get())) {
           node = node->getChild(0);
           break;
         }
@@ -774,7 +786,7 @@ _findContextDescriptor(Demangle::NodePointer node,
                                                     *entry,
                                                 bool created) {
       if (created)
-        new (entry) NominalTypeDescriptorCacheEntry{mangledName, foundContext};
+        ::new (entry) NominalTypeDescriptorCacheEntry{mangledName, foundContext};
       return true;
     });
 
@@ -931,7 +943,7 @@ _findProtocolDescriptor(NodePointer node,
                                                      *entry,
                                                  bool created) {
       if (created)
-        new (entry) ProtocolDescriptorCacheEntry{mangledName, foundProtocol};
+        ::new (entry) ProtocolDescriptorCacheEntry{mangledName, foundProtocol};
       return true;
     });
   }
@@ -1322,6 +1334,10 @@ public:
   using BuiltType = const Metadata *;
   using BuiltTypeDecl = const ContextDescriptor *;
   using BuiltProtocolDecl = ProtocolDescriptorRef;
+  using BuiltGenericSignature = const Metadata *;
+  using BuiltSubstitution = std::pair<BuiltType, BuiltType>;
+  using BuiltSubstitutionMap = llvm::ArrayRef<BuiltSubstitution>;
+  using BuiltGenericTypeParam = const Metadata *;
 
   BuiltType decodeMangledType(NodePointer node,
                               bool forRequirement = true) {
@@ -1645,7 +1661,6 @@ public:
   }
 
   using BuiltSILBoxField = llvm::PointerIntPair<BuiltType, 1>;
-  using BuiltSubstitution = std::pair<BuiltType, BuiltType>;
   struct BuiltLayoutConstraint {
     bool operator==(BuiltLayoutConstraint rhs) const { return true; }
     operator bool() const { return true; }
@@ -1975,7 +1990,7 @@ static NodePointer getParameterList(NodePointer funcType) {
       funcType->findByKind(Node::Kind::ArgumentTuple, /*maxDepth=*/1);
   assert(parameterContainer->getNumChildren() > 0);
 
-  // This is a type that convers entire parameter list.
+  // This is a type that covers entire parameter list.
   auto parameterList = parameterContainer->getFirstChild();
   assert(parameterList->getKind() == Node::Kind::Type);
 
@@ -2642,7 +2657,7 @@ void DynamicReplacementDescriptor::disableReplacement() const {
       !replacedFunctionKey->isAsync(), /*allowNull*/ false);
 }
 
-/// An automatic dymamic replacement entry.
+/// An automatic dynamic replacement entry.
 namespace {
 class AutomaticDynamicReplacementEntry {
   RelativeDirectPointer<DynamicReplacementScope, false> replacementScope;

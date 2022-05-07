@@ -16,7 +16,6 @@
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDistributed.h"
 #include "TypeChecker.h"
-#include "TypeCheckType.h"
 #include "swift/Strings.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Initializer.h"
@@ -432,13 +431,59 @@ static bool checkDistributedTargetResultType(
   return false;
 }
 
+bool swift::checkDistributedActorSystem(const NominalTypeDecl *system) {
+  auto nominal = const_cast<NominalTypeDecl *>(system);
+
+  // ==== Ensure the Distributed module is available,
+  // without it there's no reason to check the decl in more detail anyway.
+  if (!swift::ensureDistributedModuleLoaded(nominal))
+    return true;
+
+  auto &C = nominal->getASTContext();
+  auto DAS = C.getDistributedActorSystemDecl();
+
+  // === AssociatedTypes
+  // --- SerializationRequirement MUST be a protocol TODO(distributed): rdar://91663941
+  // we may lift this in the future and allow classes but this requires more
+  // work to enable associatedtypes to be constrained to class or protocol,
+  // which then will unlock using them as generic constraints in protocols.
+  Type requirementTy = getDistributedSerializationRequirementType(nominal, DAS);
+
+  if (auto existentialTy = requirementTy->getAs<ExistentialType>()) {
+    requirementTy = existentialTy->getConstraintType();
+  }
+
+  if (auto alias = dyn_cast<TypeAliasType>(requirementTy.getPointer())) {
+    auto concreteReqTy = alias->getDesugaredType();
+    if (auto comp = dyn_cast<ProtocolCompositionType>(concreteReqTy)) {
+      // ok, protocol composition is fine as requirement,
+      // since special case of just a single protocol
+    } else if (auto proto = dyn_cast<ProtocolType>(concreteReqTy)) {
+      // ok, protocols is exactly what we want to be used as constraints here
+    } else {
+      nominal->diagnose(diag::distributed_actor_system_serialization_req_must_be_protocol,
+                        requirementTy);
+      return true;
+    }
+  }
+
+  // all good, didn't find any errors
+  return false;
+}
+
 /// Check whether the function is a proper distributed function
-///
-/// \param diagnose Whether to emit a diagnostic when a problem is encountered.
 ///
 /// \returns \c true if there was a problem with adding the attribute, \c false
 /// otherwise.
-bool swift::checkDistributedFunction(FuncDecl *func, bool diagnose) {
+bool swift::checkDistributedFunction(AbstractFunctionDecl *func) {
+  auto &C = func->getASTContext();
+  return evaluateOrDefault(C.evaluator,
+                           CheckDistributedFunctionRequest{func},
+                           false); // no error if cycle
+}
+
+bool CheckDistributedFunctionRequest::evaluate(
+    Evaluator &evaluator, AbstractFunctionDecl *func) const {
   assert(func->isDistributed());
 
   auto &C = func->getASTContext();
@@ -456,9 +501,8 @@ bool swift::checkDistributedFunction(FuncDecl *func, bool diagnose) {
     serializationRequirements = extractDistributedSerializationRequirements(
         C, extension->getGenericRequirements());
   } else if (auto actor = dyn_cast<ClassDecl>(DC)) {
-    auto systemProp = actor->getDistributedActorSystemProperty();
     serializationRequirements = getDistributedSerializationRequirementProtocols(
-        systemProp->getInterfaceType()->getAnyNominal(),
+        getDistributedActorSystemType(actor)->getAnyNominal(),
         C.getProtocol(KnownProtocolKind::DistributedActorSystem));
   } else {
     llvm_unreachable("Cannot handle types other than extensions and actor "
@@ -476,18 +520,16 @@ bool swift::checkDistributedFunction(FuncDecl *func, bool diagnose) {
 
     for (auto req : serializationRequirements) {
       if (TypeChecker::conformsToProtocol(paramTy, req, module).isInvalid()) {
-        if (diagnose) {
-          auto diag = func->diagnose(
-              diag::distributed_actor_func_param_not_codable,
-              param->getArgumentName().str(), param->getInterfaceType(),
-              func->getDescriptiveKind(),
-              serializationRequirementIsCodable ? "Codable"
-                                                : req->getNameStr());
+        auto diag = func->diagnose(
+            diag::distributed_actor_func_param_not_codable,
+            param->getArgumentName().str(), param->getInterfaceType(),
+            func->getDescriptiveKind(),
+            serializationRequirementIsCodable ? "Codable"
+                                              : req->getNameStr());
 
-          if (auto paramNominalTy = paramTy->getAnyNominal()) {
-            addCodableFixIt(paramNominalTy, diag);
-          } // else, no nominal type to suggest the fixit for, e.g. a closure
-        }
+        if (auto paramNominalTy = paramTy->getAnyNominal()) {
+          addCodableFixIt(paramNominalTy, diag);
+        } // else, no nominal type to suggest the fixit for, e.g. a closure
         return true;
       }
     }
@@ -513,7 +555,8 @@ bool swift::checkDistributedFunction(FuncDecl *func, bool diagnose) {
   }
 
   // --- Result type must be either void or a codable type
-  if (checkDistributedTargetResultType(module, func, serializationRequirements, diagnose)) {
+  if (checkDistributedTargetResultType(module, func, serializationRequirements,
+                                       /*diagnose=*/true)) {
     return true;
   }
 
@@ -764,7 +807,7 @@ GetDistributedActorArgumentDecodingMethodRequest::evaluate(Evaluator &evaluator,
       continue;
 
     auto *params = FD->getParameters();
-    // No arguemnts.
+    // No arguments.
     if (params->size() != 0)
       continue;
 

@@ -28,6 +28,7 @@
 #include "swift/Runtime/Exclusivity.h"
 #include "swift/Runtime/HeapObject.h"
 #include <atomic>
+#include <new>
 
 #define SWIFT_FATAL_ERROR swift_Concurrency_fatalError
 #include "../runtime/StackAllocator.h"
@@ -210,7 +211,7 @@ public:
 ///
 /// 32 bit systems with SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION=1
 ///
-///          Flags               Exeuction Lock           Unused           TaskStatusRecord *
+///          Flags               Execution Lock           Unused           TaskStatusRecord *
 /// |----------------------|----------------------|----------------------|-------------------|
 ///          32 bits                32 bits                32 bits              32 bits
 ///
@@ -545,7 +546,7 @@ struct AsyncTask::PrivateStorage {
 
   /// Storage for the ActiveTaskStatus. See doc for ActiveTaskStatus for size
   /// and alignment requirements.
-  alignas(2 * sizeof(void *)) char StatusStorage[sizeof(ActiveTaskStatus)];
+  alignas(ActiveTaskStatus) char StatusStorage[sizeof(ActiveTaskStatus)];
 
   /// The allocator for the task stack.
   /// Currently 2 words + 8 bytes.
@@ -648,11 +649,11 @@ AsyncTask::OpaquePrivateStorage::get() const {
   return reinterpret_cast<const PrivateStorage &>(*this);
 }
 inline void AsyncTask::OpaquePrivateStorage::initialize(JobPriority basePri) {
-  new (this) PrivateStorage(basePri);
+  ::new (this) PrivateStorage(basePri);
 }
 inline void AsyncTask::OpaquePrivateStorage::initializeWithSlab(
     JobPriority basePri, void *slab, size_t slabCapacity) {
-  new (this) PrivateStorage(basePri, slab, slabCapacity);
+  ::new (this) PrivateStorage(basePri, slab, slabCapacity);
 }
 inline void AsyncTask::OpaquePrivateStorage::complete(AsyncTask *task) {
   get().complete(task);
@@ -724,7 +725,7 @@ retry:;
 /// task. Otherwise, if we reset the voucher and priority escalation too early, the
 /// thread may be preempted immediately before we can finish the enqueue of the
 /// high priority task to the next location. We will then have a priority inversion
-/// of waiting for a low priority thread to enqueue a high priorty task.
+/// of waiting for a low priority thread to enqueue a high priority task.
 ///
 /// In order to do this correctly, we need enqueue-ing of a task to the next
 /// executor, to have a "hand-over-hand locking" type of behaviour - until the

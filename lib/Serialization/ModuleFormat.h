@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 682; // Remove unused instructions
+const uint16_t SWIFTMODULE_VERSION_MINOR = 689; // cast ownership serialization
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1128,7 +1128,7 @@ namespace decls_block {
     BCFixed<1>,          // throws?
     DifferentiabilityKindField, // differentiability kind
     TypeIDField,         // global actor
-    GenericSignatureIDField // generic signture
+    GenericSignatureIDField // generic signature
 
     // trailed by parameters
   >;
@@ -1166,6 +1166,7 @@ namespace decls_block {
   using SILLayoutLayout = BCRecordLayout<
     SIL_LAYOUT,
     GenericSignatureIDField,    // generic signature
+    BCFixed<1>,                 // captures generic env
     BCVBR<8>,                   // number of fields
     BCArray<TypeIDWithBitField> // field types with mutability
   >;
@@ -1234,7 +1235,6 @@ namespace decls_block {
     DeclContextIDField,  // context decl
     TypeIDField,         // default definition
     BCFixed<1>,          // implicit flag
-    BCFixed<1>,          // is primary
     BCArray<DeclIDField> // overridden associated types
   >;
 
@@ -1414,7 +1414,13 @@ namespace decls_block {
     // - the foreign error convention, if any
     // - inlinable body text, if any
   >;
-  
+
+  using ConditionalSubstitutionLayout = BCRecordLayout<
+    CONDITIONAL_SUBSTITUTION,
+    SubstitutionMapIDField,
+    BCArray<IdentifierIDField> // N conditions where each is <major>.<minor>.<patch>
+  >;
+
   using OpaqueTypeLayout = BCRecordLayout<
     OPAQUE_TYPE_DECL,
     DeclContextIDField, // decl context
@@ -1425,6 +1431,7 @@ namespace decls_block {
     SubstitutionMapIDField, // optional substitution map for underlying type
     AccessLevelField // access level
     // trailed by generic parameters
+    // trailed by conditional substitutions
   >;
 
   // TODO: remove the unnecessary FuncDecl components here
@@ -1602,7 +1609,8 @@ namespace decls_block {
 
   using AnyPatternLayout = BCRecordLayout<
     ANY_PATTERN,
-    TypeIDField  // type
+    TypeIDField, // type
+    BCFixed<1>   // isAsyncLet
     // FIXME: is the type necessary?
   >;
 
@@ -1648,6 +1656,11 @@ namespace decls_block {
 
   using AssociatedTypeLayout = BCRecordLayout<
     ASSOCIATED_TYPE,
+    DeclIDField                  // associated type decl
+  >;
+
+  using PrimaryAssociatedTypeLayout = BCRecordLayout<
+    PRIMARY_ASSOCIATED_TYPE,
     DeclIDField                  // associated type decl
   >;
 

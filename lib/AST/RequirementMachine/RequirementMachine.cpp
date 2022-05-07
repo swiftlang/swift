@@ -320,7 +320,7 @@ RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
     llvm::dbgs() << "Adding generic signature " << sig << " {\n";
   }
 
-  // Collect the top-level requirements, and all transtively-referenced
+  // Collect the top-level requirements, and all transitively-referenced
   // protocol requirement signatures.
   RuleBuilder builder(Context, System.getReferencedProtocols());
   builder.initWithGenericSignatureRequirements(sig.getRequirements());
@@ -422,7 +422,7 @@ RequirementMachine::initWithWrittenRequirements(
     llvm::dbgs() << "\n";
   }
 
-  // Collect the top-level requirements, and all transtively-referenced
+  // Collect the top-level requirements, and all transitively-referenced
   // protocol requirement signatures.
   RuleBuilder builder(Context, System.getReferencedProtocols());
   builder.initWithWrittenRequirements(requirements);
@@ -485,6 +485,10 @@ RequirementMachine::computeCompletion(RewriteSystem::ValidityPolicy policy) {
 
       unsigned rulesAdded = (System.getRules().size() - ruleCount);
 
+      // If buildPropertyMap() didn't add any new rules, we are done.
+      if (rulesAdded == 0)
+        break;
+
       if (Stats) {
         Stats->getFrontendCounters()
           .NumRequirementMachineUnifiedConcreteTerms += rulesAdded;
@@ -507,10 +511,6 @@ RequirementMachine::computeCompletion(RewriteSystem::ValidityPolicy policy) {
         return std::make_pair(CompletionResult::MaxRuleCount,
                               System.getRules().size() - 1);
       }
-
-      // If buildPropertyMap() didn't add any new rules, we are done.
-      if (rulesAdded == 0)
-        break;
     }
   }
 

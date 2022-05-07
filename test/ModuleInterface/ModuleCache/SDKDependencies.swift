@@ -72,7 +72,7 @@
 // RUN: echo '2: PASSED'
 
 
-// 3) Baseline check: Make sure we use the the prebuilt module cache when using the SDK it was built with
+// 3) Baseline check: Make sure we use the prebuilt module cache when using the SDK it was built with
 //
 // RUN: %target-swift-frontend -typecheck -I %t/my-sdk -sdk %t/my-sdk -prebuilt-module-cache-path %t/prebuilt-cache -module-cache-path %t/MCP -emit-dependencies-path %t/dummy.d -track-system-dependencies  -emit-loaded-module-trace-path %t/trace.json %s
 //

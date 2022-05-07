@@ -570,6 +570,6 @@ FrontendInputsAndOutputs::primaryInputNamed(StringRef name) const {
   if (iterator == PrimaryInputsByName.end())
     return nullptr;
   const InputFile *f = &AllInputs[iterator->second];
-  assert(f->isPrimary() && "PrimaryInputsByName should only include primries");
+  assert(f->isPrimary() && "PrimaryInputsByName should only include primaries");
   return f;
 }

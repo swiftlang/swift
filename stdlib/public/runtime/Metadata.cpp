@@ -76,7 +76,7 @@ using namespace metadataimpl;
 // GenericParamDescriptor is a single byte, so while it's difficult to
 // imagine needing even a quarter this many generic params, there's very
 // little harm in doing it.
-constexpr GenericParamDescriptor
+const GenericParamDescriptor
 swift::ImplicitGenericParamDescriptors[MaxNumImplicitGenericParamDescriptors] = {
 #define D GenericParamDescriptor::implicit()
   D,D,D,D, D,D,D,D, D,D,D,D, D,D,D,D, D,D,D,D, D,D,D,D, D,D,D,D, D,D,D,D,
@@ -377,7 +377,7 @@ namespace {
   class GenericMetadataCache :
     public MetadataCache<GenericCacheEntry, GenericMetadataCacheTag> {
   public:
-    GenericSignatureLayout SigLayout;
+    GenericSignatureLayout<InProcess> SigLayout;
 
     GenericMetadataCache(const TargetGenericContext<InProcess> &genericContext)
       : SigLayout(genericContext.getGenericSignature()) {
@@ -770,7 +770,7 @@ _cacheCanonicalSpecializedMetadata(const TypeContextDescriptor *description) {
       assert(result.second.Value == canonicalMetadata);
     }
   } else {
-    auto canonicalMetadatas = description->getCanonicicalMetadataPrespecializations();
+    auto canonicalMetadatas = description->getCanonicalMetadataPrespecializations();
     for (auto &canonicalMetadataPtr : canonicalMetadatas) {
       Metadata *canonicalMetadata = canonicalMetadataPtr.get();
       const void *const *arguments =
@@ -2384,7 +2384,7 @@ static ValueWitnessTable *getMutableVWTableForInit(StructMetadata *self,
   // Otherwise, allocate permanent memory for it and copy the existing table.
   void *memory = allocateMetadata(sizeof(ValueWitnessTable),
                                   alignof(ValueWitnessTable));
-  auto newTable = new (memory) ValueWitnessTable(*oldTable);
+  auto newTable = ::new (memory) ValueWitnessTable(*oldTable);
 
   // If we ever need to check layout-completeness asynchronously from
   // initialization, we'll need this to be a store-release (and rely on
@@ -4182,10 +4182,14 @@ public:
 
   struct Key {
     const NonUniqueExtendedExistentialTypeShape *Candidate;
+    llvm::StringRef TypeString;
+
+    Key(const NonUniqueExtendedExistentialTypeShape *candidate)
+      : Candidate(candidate),
+        TypeString(candidate->getExistentialTypeStringForUniquing()) {}
 
     friend llvm::hash_code hash_value(const Key &key) {
-      auto &candidate = *key.Candidate;
-      return hash_value(candidate.Hash);
+      return hash_value(key.TypeString);
     }
   };
 
@@ -4200,13 +4204,12 @@ public:
     auto self = Data;
     auto other = key.Candidate;
     if (self == other) return true;
-    return other->Hash == self->Hash;
+    return self->getExistentialTypeStringForUniquing() == key.TypeString;
   }
 
   friend llvm::hash_code hash_value(
                         const ExtendedExistentialTypeShapeCacheEntry &value) {
-    Key key = {value.Data};
-    return hash_value(key);
+    return hash_value(Key(value.Data));
   }
 
   static size_t getExtraAllocationSize(Key key) {
@@ -4250,7 +4253,7 @@ swift::swift_getExtendedExistentialTypeShape(
 
   // Find the unique entry.
   auto uniqueEntry = ExtendedExistentialTypeShapes.getOrInsert(
-      ExtendedExistentialTypeShapeCacheEntry::Key{ nonUnique });
+      ExtendedExistentialTypeShapeCacheEntry::Key(nonUnique));
 
   const ExtendedExistentialTypeShape *unique =
     &uniqueEntry.first->Data->LocalCopy;
@@ -4360,7 +4363,8 @@ ExtendedExistentialTypeCacheEntry::getOrCreateVWT(Key key) {
   auto sigSizeInWords = shape->ReqSigHeader.getArgumentLayoutSizeInWords();
 
 #ifndef NDEBUG
-  auto layout = GenericSignatureLayout(shape->getRequirementSignature());
+  auto layout =
+      GenericSignatureLayout<InProcess>(shape->getRequirementSignature());
   assert(layout.NumKeyParameters == shape->ReqSigHeader.NumParams &&
          "requirement signature for existential includes a "
          "redundant parameter?");
@@ -4649,7 +4653,7 @@ static const WitnessTable *_getForeignWitnessTable(
   ForeignWitnessTables.getOrInsert(
       key, [&](ForeignWitnessTableCacheEntry *entryPtr, bool created) {
         if (created)
-          new (entryPtr)
+          ::new (entryPtr)
               ForeignWitnessTableCacheEntry(key, witnessTableCandidate);
         result = entryPtr->data;
         return true;
@@ -6309,7 +6313,8 @@ void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
       if (SWIFT_UNLIKELY(_swift_debug_metadataAllocationIterationEnabled))
         poolSize -= sizeof(PoolTrailer);
       allocatedNewPage = true;
-      allocation = new char[PoolRange::PageSize];
+      allocation = reinterpret_cast<char *>(swift_slowAlloc(PoolRange::PageSize,
+                                                            alignof(char) - 1));
       memsetScribble(allocation, PoolRange::PageSize);
 
       if (SWIFT_UNLIKELY(_swift_debug_metadataAllocationIterationEnabled)) {
@@ -6367,7 +6372,7 @@ void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
 
     // If it failed, go back to a neutral state and try again.
     if (allocatedNewPage) {
-      delete[] allocation;
+      swift_slowDealloc(allocation, PoolRange::PageSize, alignof(char) - 1);
     }
   }
 }

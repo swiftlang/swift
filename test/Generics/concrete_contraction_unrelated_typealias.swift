@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-inferred-signatures=on 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck -verify %s -debug-generic-signatures -requirement-machine-inferred-signatures=on 2>&1 | %FileCheck %s
 
 // Another GenericSignatureBuilder oddity, reduced from RxSwift.
 //
@@ -27,8 +27,8 @@ class GenericDelegateProxy<P : AnyObject, D> {
   // CHECK-NEXT: <P, D, Proxy where P == Proxy.[DelegateProxyType]Parent, D == Proxy.[DelegateProxyType]Delegate, Proxy : GenericDelegateProxy<P, D>, Proxy : DelegateProxyType>
   init<Proxy: DelegateProxyType>(_: Proxy.Type)
     where Proxy: GenericDelegateProxy<P, D>,
-          Proxy.Parent == P,
-          Proxy.Delegate == D {}
+          Proxy.Parent == P, // expected-warning {{redundant same-type constraint 'GenericDelegateProxy<P, D>.Parent' (aka 'P') == 'P'}}
+          Proxy.Delegate == D {} // expected-warning {{redundant same-type constraint 'GenericDelegateProxy<P, D>.Delegate' (aka 'D') == 'D'}}
 }
 
 class SomeClass {}
@@ -53,6 +53,8 @@ class ConcreteDelegateProxy {
   // CHECK-LABEL: .ConcreteDelegateProxy.init(_:_:_:)@
   // CHECK-NEXT: <P, D, Proxy where P == SomeClass, D == SomeStruct, Proxy : ConcreteDelegateProxy, Proxy : DelegateProxyType, Proxy.[DelegateProxyType]Delegate == SomeStruct, Proxy.[DelegateProxyType]Parent == SomeClass>
 
+  // expected-warning@+2 {{same-type requirement makes generic parameter 'P' non-generic}}
+  // expected-warning@+1 {{same-type requirement makes generic parameter 'D' non-generic}}
   init<P, D, Proxy: DelegateProxyType>(_: P, _: D, _: Proxy.Type)
     where Proxy: ConcreteDelegateProxy,
           Proxy.Parent == P,

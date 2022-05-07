@@ -94,7 +94,7 @@ namespace swift {
   /// should be used when you want to look up declarations with the same name as
   /// one you already have.
   ResolvedMemberResult resolveValueMember(DeclContext &DC, Type BaseTy,
-                                         DeclName Name);
+                                          DeclName Name);
 
   /// Given a type and an extension to the original type decl of that type,
   /// decide if the extension has been applied, i.e. if the requirements of the
@@ -140,7 +140,7 @@ namespace swift {
   /// Typecheck the given expression.
   bool typeCheckExpression(DeclContext *DC, Expr *&parsedExpr);
 
-  /// Type check a function body element which is at \p TagetLoc .
+  /// Type check a function body element which is at \p TargetLoc .
   bool typeCheckASTNodeAtLoc(DeclContext *DC, SourceLoc TargetLoc);
 
   /// Thunk around \c TypeChecker::typeCheckForCodeCompletion to make it
@@ -154,7 +154,7 @@ namespace swift {
   /// solutions. Such solutions can have any number of holes in them.
   ///
   /// \returns `true` if target was applicable and it was possible to infer
-  /// types for code completion, `false` othrewise.
+  /// types for code completion, `false` otherwise.
   bool typeCheckForCodeCompletion(
       constraints::SolutionApplicationTarget &target, bool needsPrecheck,
       llvm::function_ref<void(const constraints::Solution &)> callback);

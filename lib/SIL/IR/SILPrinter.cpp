@@ -1355,6 +1355,10 @@ public:
   void visitAllocBoxInst(AllocBoxInst *ABI) {
     if (ABI->hasDynamicLifetime())
       *this << "[dynamic_lifetime] ";
+    
+    if (ABI->emitReflectionMetadata()) {
+      *this << "[reflection] ";
+    }
     *this << ABI->getType();
     printDebugVar(ABI->getVarInfo(),
                   &ABI->getModule().getASTContext().SourceMgr);
@@ -2980,6 +2984,12 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   if (auto *replacedFun = getDynamicallyReplacedFunction()) {
     OS << "[dynamic_replacement_for \"";
     OS << replacedFun->getName();
+    OS << "\"] ";
+  }
+
+  if (auto *usedFunc = getReferencedAdHocRequirementWitnessFunction()) {
+    OS << "[ref_adhoc_requirement_witness \"";
+    OS << usedFunc->getName();
     OS << "\"] ";
   }
 

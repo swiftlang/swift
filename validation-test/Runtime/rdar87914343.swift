@@ -31,6 +31,8 @@
 // RUN: %target-run %t/main | %FileCheck %s
 
 // REQUIRES: executable_test
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 import Resilient
 

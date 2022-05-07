@@ -256,6 +256,12 @@ public:
     return getNonEnumBaseStorage(getStorage(value));
   }
 
+  void setStorageAddress(SILValue value, SILValue addr) {
+    auto &storage = getStorage(value);
+    assert(!storage.storageAddress || storage.storageAddress == addr);
+    storage.storageAddress = addr;
+  }
+
   /// Insert a value in the map, creating a ValueStorage object for it. This
   /// must be called in RPO order.
   void insertValue(SILValue value, SILValue storageAddress);

@@ -113,22 +113,6 @@ class ClassWithCustomName2 {}
 @objc(CustomNameSub)
 class ClassWithCustomNameSub : ClassWithCustomName {}
 
-
-// CHECK-LABEL: @interface ClassWithNSObjectProtocol <NSObject>
-// CHECK-NEXT: @property (nonatomic, readonly, copy) NSString * _Nonnull description;
-// CHECK-NEXT: - (BOOL)conformsToProtocol:(Protocol * _Nonnull)_ SWIFT_WARN_UNUSED_RESULT;
-// CHECK-NEXT: - (BOOL)isKindOfClass:(Class _Nonnull)aClass SWIFT_WARN_UNUSED_RESULT;
-// CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
-// CHECK-NEXT: @end
-@objc @objcMembers class ClassWithNSObjectProtocol : NSObjectProtocol {
-  @objc var description: String { return "me" }
-  @objc(conformsToProtocol:)
-  func conforms(to _: Protocol) -> Bool { return false }
-
-  @objc(isKindOfClass:)
-  func isKind(of aClass: AnyClass) -> Bool { return false }
-}
-
 // CHECK-LABEL: @interface DiscardableResult : NSObject
 // CHECK-NEXT: - (NSInteger)nonDiscardable:(NSInteger)x SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: - (NSInteger)discardable:(NSInteger)x;

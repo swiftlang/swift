@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 #include "MiscDiagnostics.h"
 #include "TypeCheckAvailability.h"
+#include "TypeCheckConcurrency.h"
 #include "TypeCheckDecl.h"
 #include "TypeCheckObjC.h"
 #include "TypeChecker.h"
@@ -492,7 +493,7 @@ static bool noteFixableMismatchedTypes(ValueDecl *decl, const ValueDecl *base) {
         ctx, baseTy->getAs<AnyFunctionType>()->getParams());
     auto diagKind = diag::override_type_mismatch_with_fixits_init;
     unsigned numArgs = baseInit->getParameters()->size();
-    return computeFixitsForOverridenDeclaration(
+    return computeFixitsForOverriddenDeclaration(
         decl, base, [&](bool HasNotes) -> Optional<InFlightDiagnostic> {
           if (!HasNotes)
             return None;
@@ -503,7 +504,7 @@ static bool noteFixableMismatchedTypes(ValueDecl *decl, const ValueDecl *base) {
     if (isa<AbstractFunctionDecl>(base))
       baseTy = baseTy->getAs<AnyFunctionType>()->getResult();
 
-    return computeFixitsForOverridenDeclaration(
+    return computeFixitsForOverriddenDeclaration(
         decl, base, [&](bool HasNotes) -> Optional<InFlightDiagnostic> {
           if (!HasNotes)
             return None;
@@ -518,6 +519,7 @@ static bool noteFixableMismatchedTypes(ValueDecl *decl, const ValueDecl *base) {
 namespace {
   enum class OverrideCheckingAttempt {
     PerfectMatch,
+    MismatchedSendability,
     MismatchedOptional,
     MismatchedTypes,
     BaseName,
@@ -547,6 +549,20 @@ static void diagnoseGeneralOverrideFailure(ValueDecl *decl,
     diags.diagnose(decl, diag::override_multiple_decls_base,
                    decl->getName());
     break;
+  case OverrideCheckingAttempt::MismatchedSendability: {
+    SendableCheckContext fromContext(decl->getDeclContext(),
+                                     SendableCheck::Explicit);
+    auto baseDeclClass =
+        decl->getOverriddenDecl()->getDeclContext()->getSelfClassDecl();
+
+    diagnoseSendabilityErrorBasedOn(baseDeclClass, fromContext,
+                                    [&](DiagnosticBehavior limit) {
+      diags.diagnose(decl, diag::override_sendability_mismatch, decl->getName())
+          .limitBehavior(limit);
+      return false;
+    });
+    break;
+  }
   case OverrideCheckingAttempt::BaseName:
     diags.diagnose(decl, diag::override_multiple_decls_arg_mismatch,
                    decl->getName());
@@ -886,6 +902,7 @@ SmallVector<OverrideMatch, 2> OverrideMatcher::match(
   DeclName name;
   switch (attempt) {
   case OverrideCheckingAttempt::PerfectMatch:
+  case OverrideCheckingAttempt::MismatchedSendability:
   case OverrideCheckingAttempt::MismatchedOptional:
   case OverrideCheckingAttempt::MismatchedTypes:
     name = decl->getName();
@@ -976,6 +993,8 @@ SmallVector<OverrideMatch, 2> OverrideMatcher::match(
       matchMode |= TypeMatchFlags::AllowNonOptionalForIUOParam;
       matchMode |= TypeMatchFlags::IgnoreNonEscapingForOptionalFunctionParam;
     }
+    if (attempt == OverrideCheckingAttempt::MismatchedSendability)
+      matchMode |= TypeMatchFlags::IgnoreFunctionSendability;
 
     auto declFnTy = getDeclComparisonType()->getAs<AnyFunctionType>();
     auto parentDeclTy = getMemberTypeForComparison(parentDecl, decl);
@@ -1277,8 +1296,23 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
   if (emittedMatchError)
     return true;
 
+  if (attempt == OverrideCheckingAttempt::MismatchedSendability) {
+    SendableCheckContext fromContext(decl->getDeclContext(),
+                                     SendableCheck::Explicit);
+    auto baseDeclClass = baseDecl->getDeclContext()->getSelfClassDecl();
+
+    diagnoseSendabilityErrorBasedOn(baseDeclClass, fromContext,
+                                    [&](DiagnosticBehavior limit) {
+      diags.diagnose(decl, diag::override_sendability_mismatch,
+                     decl->getName())
+        .limitBehavior(limit);
+      diags.diagnose(baseDecl, diag::overridden_here)
+        .limitBehavior(limit);
+      return false;
+    });
+  }
   // Catch-all to make sure we don't silently accept something we shouldn't.
-  if (attempt != OverrideCheckingAttempt::PerfectMatch) {
+  else if (attempt != OverrideCheckingAttempt::PerfectMatch) {
     OverrideMatch match{decl, /*isExact=*/false};
     diagnoseGeneralOverrideFailure(decl, match, attempt);
   }
@@ -1374,11 +1408,12 @@ bool swift::checkOverrides(ValueDecl *decl) {
     switch (attempt) {
     case OverrideCheckingAttempt::PerfectMatch:
       break;
-    case OverrideCheckingAttempt::MismatchedOptional:
+    case OverrideCheckingAttempt::MismatchedSendability:
       // Don't keep looking if the user didn't indicate it's an override.
       if (!decl->getAttrs().hasAttribute<OverrideAttr>())
         return false;
       break;
+    case OverrideCheckingAttempt::MismatchedOptional:
     case OverrideCheckingAttempt::MismatchedTypes:
       break;
     case OverrideCheckingAttempt::BaseName:

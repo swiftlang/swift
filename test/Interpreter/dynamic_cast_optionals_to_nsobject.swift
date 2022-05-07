@@ -12,7 +12,7 @@ func AnyToNSObject(_ a: Any) {
   if a is NSObject {
     // ok
   } else {
-    fatalError("argument is not bridgable to NSObject")
+    fatalError("argument is not bridgeable to NSObject")
   }
 }
 

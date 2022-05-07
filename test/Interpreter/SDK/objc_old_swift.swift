@@ -9,6 +9,11 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
+// The bit twiddling done by this test falls afoul of ptrauth on ARM64e. We
+// don't support pre-stable Swift ABI code on ARM64e anyway, so just disable the
+// test there.
+// UNSUPPORTED: CPU=arm64e
+
 // Verify that objects that appear to be from the pre-stable Swift ABI
 // are correctly ignored by stable Swift's entry points.
 

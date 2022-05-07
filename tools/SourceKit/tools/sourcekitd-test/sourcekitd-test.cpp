@@ -1145,6 +1145,13 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
       sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND,
           "-disable-implicit-concurrency-module-import");
     }
+    if (Opts.DisableImplicitStringProcessingModuleImport &&
+        !compilerArgsAreClang) {
+      sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND,
+                                          "-Xfrontend");
+      sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND,
+          "-disable-implicit-string-processing-module-import");
+    }
 
     for (auto Arg : Opts.CompilerArgs)
       sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND, Arg);

@@ -16,7 +16,7 @@ struct TestSingleExprClosureRet {
 
 // TestSingleExprClosureRet: Begin completions
 // TestSingleExprClosureRet-DAG: Decl[InstanceMethod]/CurrNominal:   str()[#String#];
-// TestSingleExprClosureRet-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: int()[#Int#];
+// TestSingleExprClosureRet-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: int()[#Int#];
 // TestSingleExprClosureRet-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: void()[#Void#];
 // TestSingleExprClosureRet: End completions
 }
@@ -35,7 +35,7 @@ struct TestSingleExprClosureRetVoid {
 // TestSingleExprClosureRetVoid: Begin completions
 // TestSingleExprClosureRetVoid-DAG: Decl[InstanceMethod]/CurrNominal: str()[#String#];
 // TestSingleExprClosureRetVoid-DAG: Decl[InstanceMethod]/CurrNominal: int()[#Int#];
-// TestSingleExprClosureRetVoid-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: void()[#Void#];
+// TestSingleExprClosureRetVoid-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: void()[#Void#];
 // TestSingleExprClosureRetVoid: End completions
 }
 
@@ -53,7 +53,7 @@ struct TestSingleExprClosureRetUnresolved {
 
 // TestSingleExprClosureRetUnresolved: Begin completions
 // TestSingleExprClosureRetUnresolved-NOT: notMine
-// TestSingleExprClosureRetUnresolved: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: myEnum[#MyEnum#];
+// TestSingleExprClosureRetUnresolved: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: myEnum[#MyEnum#];
 // TestSingleExprClosureRetUnresolved-NOT: notMine
 // TestSingleExprClosureRetUnresolved: End completions
 }
@@ -70,7 +70,7 @@ struct TestSingleExprClosure {
   }
 // TestSingleExprClosure: Begin completions
 // TestSingleExprClosure-DAG: Decl[InstanceMethod]/CurrNominal:   str()[#String#];
-// TestSingleExprClosure-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: int()[#Int#];
+// TestSingleExprClosure-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: int()[#Int#];
 // NOTE: this differs from the one using a return keyword.
 // TestSingleExprClosure-DAG: Decl[InstanceMethod]/CurrNominal: void()[#Void#];
 // TestSingleExprClosure: End completions
@@ -108,7 +108,7 @@ struct TestSingleExprClosureUnresolved {
 }
 // TestSingleExprClosureUnresolved: Begin completions
 // TestSingleExprClosureUnresolved-NOT: notMine
-// TestSingleExprClosureUnresolved: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: myEnum[#MyEnum#];
+// TestSingleExprClosureUnresolved: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: myEnum[#MyEnum#];
 // TestSingleExprClosureUnresolved-NOT: notMine
 // TestSingleExprClosureUnresolved: End completions
 
@@ -137,9 +137,9 @@ struct TestSingleExprClosureGlobal {
     }()
   }
 // TestSingleExprClosureGlobal: Begin completions
-// TestSingleExprClosureGlobal-DAG: Decl[InstanceMethod]/OutNominal:   str()[#String#];
-// TestSingleExprClosureGlobal-DAG: Decl[InstanceMethod]/OutNominal/TypeRelation[Identical]: int()[#Int#];
-// TestSingleExprClosureGlobal-DAG: Decl[InstanceMethod]/OutNominal: void()[#Void#];
+// TestSingleExprClosureGlobal-DAG: Decl[InstanceMethod]/CurrNominal:   str()[#String#];
+// TestSingleExprClosureGlobal-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: int()[#Int#];
+// TestSingleExprClosureGlobal-DAG: Decl[InstanceMethod]/CurrNominal: void()[#Void#];
 // TestSingleExprClosureGlobal: End completions
 }
 
@@ -155,9 +155,9 @@ struct TestNonSingleExprClosureGlobal {
     }()
   }
 // TestNonSingleExprClosureGlobal: Begin completions
-// TestNonSingleExprClosureGlobal-DAG: Decl[InstanceMethod]/OutNominal: str()[#String#];
-// TestNonSingleExprClosureGlobal-DAG: Decl[InstanceMethod]/OutNominal: int()[#Int#];
-// TestNonSingleExprClosureGlobal-DAG: Decl[InstanceMethod]/OutNominal: void()[#Void#];
+// TestNonSingleExprClosureGlobal-DAG: Decl[InstanceMethod]/CurrNominal: str()[#String#];
+// TestNonSingleExprClosureGlobal-DAG: Decl[InstanceMethod]/CurrNominal: int()[#Int#];
+// TestNonSingleExprClosureGlobal-DAG: Decl[InstanceMethod]/CurrNominal: void()[#Void#];
 // TestNonSingleExprClosureGlobal: End completions
 }
 
@@ -190,7 +190,7 @@ struct TestSingleExprFuncRet {
 
 // TestSingleExprFuncRet: Begin completions
 // TestSingleExprFuncRet-DAG: Decl[InstanceMethod]/CurrNominal:   str()[#String#];
-// TestSingleExprFuncRet-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: int()[#Int#];
+// TestSingleExprFuncRet-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: int()[#Int#];
 // TestSingleExprFuncRet-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: void()[#Void#];
 // TestSingleExprFuncRet: End completions
 }
@@ -206,7 +206,7 @@ struct TestSingleExprFunc {
 
 // TestSingleExprFunc: Begin completions
 // TestSingleExprFunc-DAG: Decl[InstanceMethod]/CurrNominal:   str()[#String#];
-// TestSingleExprFunc-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: int()[#Int#];
+// TestSingleExprFunc-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: int()[#Int#];
 // TestSingleExprFunc-DAG: Decl[InstanceMethod]/CurrNominal: void()[#Void#];
 // TestSingleExprFunc: End completions
 }
@@ -223,7 +223,7 @@ struct TestSingleExprFuncUnresolved {
 
 // TestSingleExprFuncUnresolved: Begin completions
 // TestSingleExprFuncUnresolved-NOT: notMine
-// TestSingleExprFuncUnresolved: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: myEnum[#MyEnum#];
+// TestSingleExprFuncUnresolved: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: myEnum[#MyEnum#];
 // TestSingleExprFuncUnresolved-NOT: notMine
 // TestSingleExprFuncUnresolved: End completions
 }
@@ -266,7 +266,7 @@ struct TestSingleExprFuncGlobal {
   }
 // TestSingleExprFuncGlobal: Begin completions
 // TestSingleExprFuncGlobal-DAG: Decl[InstanceMethod]/CurrNominal:   str()[#String#];
-// TestSingleExprFuncGlobal-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: int()[#Int#];
+// TestSingleExprFuncGlobal-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: int()[#Int#];
 // TestSingleExprFuncGlobal-DAG: Decl[InstanceMethod]/CurrNominal: void()[#Void#];
 // TestSingleExprFuncGlobal: End completions
 }
@@ -300,7 +300,7 @@ struct TestSingleExprAccessorRet {
 
 // TestSingleExprAccessorRet: Begin completions
 // TestSingleExprAccessorRet-DAG: Decl[InstanceMethod]/CurrNominal:   str()[#String#];
-// TestSingleExprAccessorRet-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: int()[#Int#];
+// TestSingleExprAccessorRet-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: int()[#Int#];
 // TestSingleExprAccessorRet-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: void()[#Void#];
 // TestSingleExprAccessorRet: End completions
 }
@@ -316,7 +316,7 @@ struct TestSingleExprAccessor {
 
 // TestSingleExprAccessor: Begin completions
 // TestSingleExprAccessor-DAG: Decl[InstanceMethod]/CurrNominal:   str()[#String#];
-// TestSingleExprAccessor-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: int()[#Int#];
+// TestSingleExprAccessor-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: int()[#Int#];
 // TestSingleExprAccessor-DAG: Decl[InstanceMethod]/CurrNominal: void()[#Void#];
 // TestSingleExprAccessor: End completions
 }
@@ -333,7 +333,7 @@ struct TestSingleExprAccessorUnresolved {
 
 // TestSingleExprAccessorUnresolved: Begin completions
 // TestSingleExprAccessorUnresolved-NOT: notMine
-// TestSingleExprAccessorUnresolved: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: myEnum[#MyEnum#];
+// TestSingleExprAccessorUnresolved: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: myEnum[#MyEnum#];
 // TestSingleExprAccessorUnresolved-NOT: notMine
 // TestSingleExprAccessorUnresolved: End completions
 }
@@ -376,7 +376,7 @@ struct TestSingleExprAccessorGlobal {
   }
 // TestSingleExprAccessorGlobal: Begin completions
 // TestSingleExprAccessorGlobal-DAG: Decl[InstanceMethod]/CurrNominal:   str()[#String#];
-// TestSingleExprAccessorGlobal-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: int()[#Int#];
+// TestSingleExprAccessorGlobal-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: int()[#Int#];
 // TestSingleExprAccessorGlobal-DAG: Decl[InstanceMethod]/CurrNominal: void()[#Void#];
 // TestSingleExprAccessorGlobal: End completions
 }
@@ -394,7 +394,7 @@ struct TestNonSingleExprAccessorGlobal {
 // TestNonSingleExprAccessorGlobal: Begin completions
 // TestNonSingleExprAccessorGlobal-DAG: Decl[InstanceMethod]/CurrNominal: str()[#String#];
 // FIXME: should should not have type context.
-// TestNonSingleExprAccessorGlobal-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: int()[#Int#];
+// TestNonSingleExprAccessorGlobal-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: int()[#Int#];
 // TestNonSingleExprAccessorGlobal-DAG: Decl[InstanceMethod]/CurrNominal: void()[#Void#];
 // TestNonSingleExprAccessorGlobal: End completions
 }
@@ -452,7 +452,7 @@ struct TestSingleExprSubscriptRet {
 
 // TestSingleExprSubscriptRet: Begin completions
 // TestSingleExprSubscriptRet-DAG: Decl[InstanceMethod]/CurrNominal:   str()[#String#];
-// TestSingleExprSubscriptRet-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: int()[#Int#];
+// TestSingleExprSubscriptRet-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: int()[#Int#];
 // TestSingleExprSubscriptRet-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: void()[#Void#];
 // TestSingleExprSubscriptRet: End completions
 }
@@ -468,7 +468,7 @@ struct TestSingleExprSubscript {
 
 // TestSingleExprSubscript: Begin completions
 // TestSingleExprSubscript-DAG: Decl[InstanceMethod]/CurrNominal:   str()[#String#];
-// TestSingleExprSubscript-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: int()[#Int#];
+// TestSingleExprSubscript-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: int()[#Int#];
 // TestSingleExprSubscript-DAG: Decl[InstanceMethod]/CurrNominal: void()[#Void#];
 // TestSingleExprSubscript: End completions
 }
@@ -485,7 +485,7 @@ struct TestSingleExprSubscriptUnresolved {
 
 // TestSingleExprSubscriptUnresolved: Begin completions
 // TestSingleExprSubscriptUnresolved-NOT: notMine
-// TestSingleExprSubscriptUnresolved: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: myEnum[#MyEnum#];
+// TestSingleExprSubscriptUnresolved: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: myEnum[#MyEnum#];
 // TestSingleExprSubscriptUnresolved-NOT: notMine
 // TestSingleExprSubscriptUnresolved: End completions
 }
@@ -516,7 +516,7 @@ struct TestSingleExprSubscriptGlobal {
 
 // TestSingleExprSubscriptGlobal: Begin completions
 // TestSingleExprSubscriptGlobal-DAG: Decl[InstanceMethod]/CurrNominal: str()[#String#];
-// TestSingleExprSubscriptGlobal-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: int()[#Int#];
+// TestSingleExprSubscriptGlobal-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: int()[#Int#];
 // TestSingleExprSubscriptGlobal-DAG: Decl[InstanceMethod]/CurrNominal: void()[#Void#];
 // TestSingleExprSubscriptGlobal: End completions
 }
@@ -546,7 +546,7 @@ enum TestSingeExprInitNilRet {
   init?() {
     return #^TestSingeExprInitNilRet^#
   }
-// TestSingeExprInitNilRet: Literal[Nil]/None/TypeRelation[Identical]: nil[#TestSingeExprInitNil{{(Ret)?}}?#];
+// TestSingeExprInitNilRet: Literal[Nil]/None/TypeRelation[Convertible]: nil[#TestSingeExprInitNil{{(Ret)?}}?#];
 }
 
 enum TestSingeExprInitNil {
@@ -590,7 +590,7 @@ enum TopLevelEnum {
   case foo
 }
 
-// TopLevelEnum: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: foo[#TopLevelEnum#];
+// TopLevelEnum: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: foo[#TopLevelEnum#];
 
 var testAccessorUnresolvedTopLevel: TopLevelEnum {
   .#^testAccessorUnresolvedTopLevel?check=TopLevelEnum^#

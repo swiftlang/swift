@@ -105,6 +105,50 @@ enum class FreeTypeVariableBinding {
 
 namespace constraints {
 
+struct ResultBuilder {
+private:
+  DeclContext *DC;
+  /// An implicit variable that represents `Self` type of the result builder.
+  VarDecl *BuilderSelf;
+  Type BuilderType;
+  llvm::SmallDenseMap<DeclName, bool> SupportedOps;
+
+  Identifier BuildOptionalId;
+
+  /// Counter used to give unique names to the variables that are
+  /// created implicitly.
+  unsigned VarCounter = 0;
+
+public:
+  ResultBuilder(ConstraintSystem *CS, DeclContext *DC, Type builderType);
+
+  DeclContext *getDeclContext() const { return DC; }
+
+  Type getType() const { return BuilderType; }
+
+  NominalTypeDecl *getBuilderDecl() const {
+    return BuilderType->getAnyNominal();
+  }
+
+  Identifier getBuildOptionalId() const { return BuildOptionalId; }
+
+  bool supports(Identifier fnBaseName, ArrayRef<Identifier> argLabels = {},
+                bool checkAvailability = false);
+
+  bool supportsOptional() { return supports(getBuildOptionalId()); }
+
+  Expr *buildCall(SourceLoc loc, Identifier fnName,
+                  ArrayRef<Expr *> argExprs,
+                  ArrayRef<Identifier> argLabels) const;
+
+  /// Build an implicit variable in this context.
+  VarDecl *buildVar(SourceLoc loc);
+
+  /// Build a reference to a given variable and mark it
+  /// as located at a given source location.
+  DeclRefExpr *buildVarRef(VarDecl *var, SourceLoc loc);
+};
+
 /// Describes the algorithm to use for trailing closure matching.
 enum class TrailingClosureMatching {
   /// Match a trailing closure to the first parameter that appears to work.
@@ -193,6 +237,8 @@ public:
   ~ExpressionTimer();
 
   AnchorType getAnchor() const { return Anchor; }
+
+  SourceRange getAffectedRange() const;
 
   unsigned getWarnLimit() const {
     return Context.TypeCheckerOpts.WarnLongExpressionTypeChecking;
@@ -296,7 +342,7 @@ public:
   void setRawOptions(unsigned bits) {
     getTypeVariable()->Bits.TypeVariableType.Options = bits;
     assert(getTypeVariable()->Bits.TypeVariableType.Options == bits
-           && "Trucation");
+           && "Truncation");
   }
 
   /// Whether this type variable can bind to an lvalue type.
@@ -1288,6 +1334,24 @@ public:
   /// type variables for their fixed types.
   Type simplifyType(Type type) const;
 
+  // To aid code completion, we need to attempt to convert type placeholders
+  // back into underlying generic parameters if possible, since type
+  // of the code completion expression is used as "expected" (or contextual)
+  // type so it's helpful to know what requirements it has to filter
+  // the list of possible member candidates e.g.
+  //
+  // \code
+  // func test<T: P>(_: [T]) {}
+  //
+  // test(42.#^MEMBERS^#)
+  // \code
+  //
+  // It's impossible to resolve `T` in this case but code completion
+  // expression should still have a type of `[T]` instead of `[<<hole>>]`
+  // because it helps to produce correct contextual member list based on
+  // a conformance requirement associated with generic parameter `T`.
+  Type simplifyTypeForCodeCompletion(Type type) const;
+
   /// Coerce the given expression to the given type.
   ///
   /// This operation cannot fail.
@@ -1473,7 +1537,7 @@ enum class ConstraintSystemFlags {
   /// Note that this flag is automatically applied to all constraint systems,
   /// when \c DebugConstraintSolver is set in \c TypeCheckerOptions. It can be
   /// automatically enabled for select constraint solving attempts by setting
-  /// \c DebugConstraintSolverAttempt. Finally, it can also be automatically 
+  /// \c DebugConstraintSolverAttempt. Finally, it can also be automatically
   /// enabled for a pre-configured set of expressions on line numbers by setting
   /// \c DebugConstraintSolverOnLines.
   DebugConstraints = 0x10,
@@ -1497,6 +1561,9 @@ enum class ConstraintSystemFlags {
   /// calling conventions, say due to Clang attributes such as
   /// `__attribute__((ns_consumed))`.
   UseClangFunctionTypes = 0x80,
+
+  /// When set, ignore async/sync mismatches
+  IgnoreAsyncSyncMismatch = 0x100,
 };
 
 /// Options that affect the constraint system as a whole.
@@ -1984,7 +2051,7 @@ public:
         !expression.pattern->isImplicit();
   }
 
-  /// Check whether this is an initializaion for `async let` pattern.
+  /// Check whether this is an initialization for `async let` pattern.
   bool isAsyncLetInitializer() const {
     if (!(kind == Kind::expression &&
           expression.contextualPurpose == CTP_Initialization))
@@ -2821,7 +2888,7 @@ private:
 
     /// Disable the given constraint; this change will be rolled back
     /// when we exit the current solver scope.
-    void disableContraint(Constraint *constraint) {
+    void disableConstraint(Constraint *constraint) {
       constraint->setDisabled();
       disabledConstraints.push_back(constraint);
     }
@@ -3158,7 +3225,7 @@ private:
   ///
   /// \param solutions The set of solutions to filter.
   ///
-  /// \param minimize The flag which idicates if the
+  /// \param minimize The flag which indicates if the
   /// set of solutions should be filtered even if there is
   /// no single best solution, see `findBestSolution` for
   /// more details.
@@ -3352,7 +3419,7 @@ public:
     return known->second;
   }
 
-  /// Retrieve type type of the given declaration to be used in
+  /// Retrieve type of the given declaration to be used in
   /// constraint system, this is better than calling `getType()`
   /// directly because it accounts of constraint system flags.
   Type getVarType(const VarDecl *var);
@@ -3484,7 +3551,7 @@ public:
   std::pair<Type, OpenedArchetypeType *> openExistentialType(
       Type type, ConstraintLocator *locator);
 
-  /// Retrive the constraint locator for the given anchor and
+  /// Retrieve the constraint locator for the given anchor and
   /// path, uniqued and automatically infer the summary flags
   ConstraintLocator *
   getConstraintLocator(ASTNode anchor,
@@ -4036,12 +4103,12 @@ public:
   isRepresentativeFor(TypeVariableType *typeVar,
                       ConstraintLocator::PathElementKind kind) const;
 
-  /// Gets the VarDecl associateed with resolvedOverload, and the type of the
+  /// Gets the VarDecl associated with resolvedOverload, and the type of the
   /// projection if the decl has an associated property wrapper with a projectedValue.
   Optional<std::pair<VarDecl *, Type>>
   getPropertyWrapperProjectionInfo(SelectedOverload resolvedOverload);
 
-  /// Gets the VarDecl associateed with resolvedOverload, and the type of the
+  /// Gets the VarDecl associated with resolvedOverload, and the type of the
   /// backing storage if the decl has an associated property wrapper.
   Optional<std::pair<VarDecl *, Type>>
   getPropertyWrapperInformation(SelectedOverload resolvedOverload);
@@ -4521,6 +4588,7 @@ public:
   /// Generate constraints for the given solution target.
   ///
   /// \returns true if an error occurred, false otherwise.
+  LLVM_NODISCARD
   bool generateConstraints(SolutionApplicationTarget &target,
                            FreeTypeVariableBinding allowFreeTypeVariables);
 
@@ -4529,11 +4597,13 @@ public:
   /// \param closure the closure expression
   ///
   /// \returns \c true if constraint generation failed, \c false otherwise
+  LLVM_NODISCARD
   bool generateConstraints(ClosureExpr *closure);
 
   /// Generate constraints for the given (unchecked) expression.
   ///
   /// \returns a possibly-sanitized expression, or null if an error occurred.
+  LLVM_NODISCARD
   Expr *generateConstraints(Expr *E, DeclContext *dc,
                             bool isInputExpression = true);
 
@@ -4541,6 +4611,7 @@ public:
   /// value of the given expression.
   ///
   /// \returns a possibly-sanitized initializer, or null if an error occurred.
+  LLVM_NODISCARD
   Type generateConstraints(Pattern *P, ConstraintLocatorBuilder locator,
                            bool bindPatternVarsOneWay,
                            PatternBindingDecl *patternBinding,
@@ -4550,6 +4621,7 @@ public:
   ///
   /// \returns true if there was an error in constraint generation, false
   /// if generation succeeded.
+  LLVM_NODISCARD
   bool generateConstraints(StmtCondition condition, DeclContext *dc);
 
   /// Generate constraints for a case statement.
@@ -4559,6 +4631,7 @@ public:
   ///
   /// \returns true if there was an error in constraint generation, false
   /// if generation succeeded.
+  LLVM_NODISCARD
   bool generateConstraints(CaseStmt *caseStmt, DeclContext *dc,
                            Type subjectType, ConstraintLocator *locator);
 
@@ -4602,6 +4675,7 @@ public:
   /// \param propertyType The type of the wrapped property.
   ///
   /// \returns true if there is an error.
+  LLVM_NODISCARD
   bool generateWrappedPropertyTypeConstraints(VarDecl *wrappedVar,
                                               Type initializerType,
                                               Type propertyType);
@@ -5054,9 +5128,9 @@ private:
                  TypeMatchOptions flags,
                  ConstraintLocatorBuilder locator);
 
-  /// Simplify a closure body element constraint by generating required
+  /// Simplify a syntactic element constraint by generating required
   /// constraints to represent the given element in constraint system.
-  SolutionKind simplifyClosureBodyElementConstraint(
+  SolutionKind simplifySyntacticElementConstraint(
       ASTNode element, ContextualTypeInfo context, bool isDiscarded,
       TypeMatchOptions flags, ConstraintLocatorBuilder locator);
 
@@ -5274,18 +5348,21 @@ public:
                                  = FreeTypeVariableBinding::Disallow,
                                  bool allowFixes = false);
 
-  /// Construct and solve a system of constraints based on the given expression
-  /// and its contextual information.
+  /// Assuming that constraints have already been generated, solve the
+  /// constraint system for code completion, writing all solutions to
+  /// \p solutions.
   ///
   /// This method is designed to be used for code completion which means that
   /// it doesn't mutate given expression, even if there is a single valid
   /// solution, and constraint solver is allowed to produce partially correct
   /// solutions. Such solutions can have any number of holes in them.
   ///
-  /// \param target The expression involved in code completion.
-  ///
   /// \param solutions The solutions produced for the given target without
   /// filtering.
+  void solveForCodeCompletion(SmallVectorImpl<Solution> &solutions);
+
+  /// Generate constraints for \p target and solve the resulting constraint
+  /// system for code completion (see overload above).
   ///
   /// \returns `false` if this call fails (e.g. pre-check or constraint
   /// generation fails), `true` otherwise.
@@ -5390,9 +5467,17 @@ public:
   
   /// Determine if we've already explored too many paths in an
   /// attempt to solve this expression.
-  bool isExpressionAlreadyTooComplex = false;
-  bool getExpressionTooComplex(size_t solutionMemory) {
-    if (isExpressionAlreadyTooComplex)
+  std::pair<bool, SourceRange> isAlreadyTooComplex = {false, SourceRange()};
+
+  /// If optional is not nil, result is guaranteed to point at a valid
+  /// location.
+  Optional<SourceRange> getTooComplexRange() const {
+    auto range = isAlreadyTooComplex.second;
+    return range.isValid() ? range : Optional<SourceRange>();
+  }
+
+  bool isTooComplex(size_t solutionMemory) {
+    if (isAlreadyTooComplex.first)
       return true;
 
     auto CancellationFlag = getASTContext().CancellationFlag;
@@ -5403,7 +5488,9 @@ public:
     MaxMemory = std::max(used, MaxMemory);
     auto threshold = getASTContext().TypeCheckerOpts.SolverMemoryThreshold;
     if (MaxMemory > threshold) {
-      return isExpressionAlreadyTooComplex= true;
+      // No particular location for OoM problems.
+      isAlreadyTooComplex.first = true;
+      return true;
     }
 
     if (Timer && Timer->isExpired()) {
@@ -5412,24 +5499,29 @@ public:
       // emitting an error.
       Timer->disableWarning();
 
-      return isExpressionAlreadyTooComplex = true;
+      isAlreadyTooComplex = {true, Timer->getAffectedRange()};
+      return true;
     }
 
     // Bail out once we've looked at a really large number of
     // choices.
     if (CountScopes > getASTContext().TypeCheckerOpts.SolverBindingThreshold) {
-      return isExpressionAlreadyTooComplex = true;
+      isAlreadyTooComplex.first = true;
+      return true;
     }
 
     return false;
   }
 
-  bool getExpressionTooComplex(SmallVectorImpl<Solution> const &solutions) {
+  bool isTooComplex(SmallVectorImpl<Solution> const &solutions) {
+    if (isAlreadyTooComplex.first)
+      return true;
+
     size_t solutionMemory = 0;
     for (auto const& s : solutions) {
       solutionMemory += s.getTotalMemory();
     }
-    return getExpressionTooComplex(solutionMemory);
+    return isTooComplex(solutionMemory);
   }
 
   // If the given constraint is an applied disjunction, get the argument function
@@ -5690,7 +5782,7 @@ matchCallArguments(
 Expr *getArgumentLabelTargetExpr(Expr *fn);
 
 /// Given a type that includes an existential type that has been opened to
-/// the given type variable, type-erase occurences of that opened type
+/// the given type variable, type-erase occurrences of that opened type
 /// variable and anything that depends on it to their non-dependent bounds.
 Type typeEraseOpenedExistentialReference(Type type, Type existentialBaseType,
                                          TypeVariableType *openedTypeVar,
@@ -5762,7 +5854,7 @@ bool isPatternMatchingOperator(ASTNode node);
 /// "standard" comparison operator such as "==", "!=", ">" etc.
 bool isStandardComparisonOperator(ASTNode node);
 
-/// If given expression references operator overlaod(s)
+/// If given expression references operator overload(s)
 /// extract and produce name of the operator.
 Optional<Identifier> getOperatorName(Expr *expr);
 
@@ -6027,7 +6119,7 @@ private:
   /// be supertypes extracted from one of the current bindings
   /// or default literal types etc.
   ///
-  /// \returns true if some new bindings were sucessfully computed,
+  /// \returns true if some new bindings were successfully computed,
   /// false otherwise.
   bool computeNext();
 
@@ -6176,7 +6268,7 @@ bool isKnownKeyPathType(Type type);
 /// `{Writable, ReferenceWritable}KeyPath`.
 bool isKnownKeyPathDecl(ASTContext &ctx, ValueDecl *decl);
 
-/// Determine whether givne closure has any explicit `return`
+/// Determine whether given closure has any explicit `return`
 /// statements that could produce non-void result.
 bool hasExplicitResult(ClosureExpr *closure);
 
@@ -6184,7 +6276,7 @@ bool hasExplicitResult(ClosureExpr *closure);
 /// application target.
 void performSyntacticDiagnosticsForTarget(
     const SolutionApplicationTarget &target,
-    bool isExprStmt,bool disableExprAvailabiltyChecking = false);
+    bool isExprStmt,bool disableExprAvailabilityChecking = false);
 
 /// Given a member of a protocol, check whether `Self` type of that
 /// protocol is contextually bound to some concrete type via same-type

@@ -372,7 +372,7 @@ public:
   /// the name of the module being imported, possibly including submodules.
   ///
   /// \c ImportPath::Module contains one or more identifiers. The first
-  /// identiifer names a top-level module. The second and subsequent
+  /// identifier names a top-level module. The second and subsequent
   /// identifiers, if present, chain together to name a specific submodule to
   /// import. (Although Swift modules cannot currently contain submodules, Swift
   /// can import Clang submodules.)

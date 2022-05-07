@@ -75,6 +75,13 @@ Type getTypeForCompletion(const constraints::Solution &S, ASTNode Node);
 /// completion expression \p E.
 Type getPatternMatchType(const constraints::Solution &S, Expr *E);
 
+/// Populate \p Result with types of variables that were determined in the
+/// solution \p S. This in particular includes parameters of closures that
+/// were type-checked with the code completion expression.
+void getSolutionSpecificVarTypes(
+    const constraints::Solution &S,
+    llvm::SmallDenseMap<const VarDecl *, Type> &Result);
+
 /// Whether the given completion expression is the only expression in its
 /// containing closure or function body and its value is implicitly returned.
 ///

@@ -590,7 +590,7 @@ mapFrontendInvocationToAction(const CompilerInvocation &Invocation) {
 
 static DetailedTaskDescription
 constructDetailedTaskDescription(const CompilerInvocation &Invocation,
-                                 const InputFile &PrimaryInput,
+                                 ArrayRef<InputFile> PrimaryInputs,
                                  ArrayRef<const char *> Args) {
   // Command line and arguments
   std::string Executable = Invocation.getFrontendOptions().MainExecutablePath;
@@ -604,24 +604,30 @@ constructDetailedTaskDescription(const CompilerInvocation &Invocation,
     CommandLine += std::string(" ") + A;
   }
 
-  // Primary Input only
-  Inputs.push_back(CommandInput(PrimaryInput.getFileName()));
+  // Primary Inputs
+  for (const auto &input : PrimaryInputs) {
+    Inputs.push_back(CommandInput(input.getFileName()));
+  }
 
-  // Output for this Primary
-  auto OutputFile = PrimaryInput.outputFilename();
-  Outputs.push_back(OutputPair(file_types::lookupTypeForExtension(
-                                   llvm::sys::path::extension(OutputFile)),
-                               OutputFile));
+  for (const auto &input : PrimaryInputs) {
+    // Main outputs
+    auto OutputFile = input.outputFilename();
+    if (!OutputFile.empty()) {
+      Outputs.push_back(OutputPair(file_types::lookupTypeForExtension(
+                                       llvm::sys::path::extension(OutputFile)),
+                                   OutputFile));
+    }
 
-  // Supplementary outputs
-  const auto &primarySpecificFiles = PrimaryInput.getPrimarySpecificPaths();
-  const auto &supplementaryOutputPaths =
-      primarySpecificFiles.SupplementaryOutputs;
-  supplementaryOutputPaths.forEachSetOutput([&](const std::string &output) {
-    Outputs.push_back(OutputPair(
-        file_types::lookupTypeForExtension(llvm::sys::path::extension(output)),
-        output));
-  });
+    // Supplementary outputs
+    const auto &primarySpecificFiles = input.getPrimarySpecificPaths();
+    const auto &supplementaryOutputPaths =
+        primarySpecificFiles.SupplementaryOutputs;
+    supplementaryOutputPaths.forEachSetOutput([&](const std::string &output) {
+      Outputs.push_back(OutputPair(file_types::lookupTypeForExtension(
+                                       llvm::sys::path::extension(output)),
+                                   output));
+    });
+  }
   return DetailedTaskDescription{Executable, Arguments, CommandLine, Inputs,
                                  Outputs};
 }
@@ -696,10 +702,16 @@ static bool writeTBDIfNeeded(CompilerInstance &Instance) {
     return false;
   }
 
+  if (Invocation.getSILOptions().CMOMode ==
+      CrossModuleOptimizationMode::Aggressive) {
+    Instance.getDiags().diagnose(SourceLoc(),
+                                 diag::tbd_not_supported_with_cmo);
+    return false;
+  }
+
   const std::string &TBDPath = Invocation.getTBDPathForWholeModule();
 
-  return writeTBD(Instance.getMainModule(), TBDPath, tbdOpts,
-                  Instance.getPublicCMOSymbols());
+  return writeTBD(Instance.getMainModule(), TBDPath, tbdOpts);
 }
 
 static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
@@ -1093,7 +1105,7 @@ static bool printSwiftFeature(CompilerInstance &instance) {
   out << "    \"LastOption\"\n";
   out << "  ],\n";
   out << "  \"SupportedFeatures\": [\n";
-  // Print supported featur names here.
+  // Print supported feature names here.
   out << "    \"LastFeature\"\n";
   out << "  ]\n";
   return false;
@@ -1386,16 +1398,16 @@ static bool processCommandLineAndRunImmediately(CompilerInstance &Instance,
 
 static bool validateTBDIfNeeded(const CompilerInvocation &Invocation,
                                 ModuleOrSourceFile MSF,
-                                const llvm::Module &IRModule,
-                                TBDSymbolSetPtr publicCMOSymbols) {
-  auto mode = Invocation.getFrontendOptions().ValidateTBDAgainstIR;
-  if (mode == FrontendOptions::TBDValidationMode::All &&
-      Invocation.getSILOptions().CrossModuleOptimization)
-    mode = FrontendOptions::TBDValidationMode::MissingFromTBD;
-
+                                const llvm::Module &IRModule) {
+  const auto mode = Invocation.getFrontendOptions().ValidateTBDAgainstIR;
   const bool canPerformTBDValidation = [&]() {
     // If the user has requested we skip validation, honor it.
     if (mode == FrontendOptions::TBDValidationMode::None) {
+      return false;
+    }
+
+    // Cross-module optimization does not support TBD.
+    if (Invocation.getSILOptions().CMOMode == CrossModuleOptimizationMode::Aggressive) {
       return false;
     }
 
@@ -1459,10 +1471,9 @@ static bool validateTBDIfNeeded(const CompilerInvocation &Invocation,
   // noise from e.g. statically-linked libraries.
   Opts.embedSymbolsFromModules.clear();
   if (auto *SF = MSF.dyn_cast<SourceFile *>()) {
-    return validateTBD(SF, IRModule, Opts, publicCMOSymbols,
-                       diagnoseExtraSymbolsInTBD);
+    return validateTBD(SF, IRModule, Opts, diagnoseExtraSymbolsInTBD);
   } else {
-    return validateTBD(MSF.get<ModuleDecl *>(), IRModule, Opts, publicCMOSymbols,
+    return validateTBD(MSF.get<ModuleDecl *>(), IRModule, Opts,
                        diagnoseExtraSymbolsInTBD);
   }
 }
@@ -1478,7 +1489,7 @@ static void freeASTContextIfPossible(CompilerInstance &Instance) {
   // to live.
   if (Instance.getInvocation()
           .getFrontendOptions()
-          .ReuseFrontendForMutipleCompilations) {
+          .ReuseFrontendForMultipleCompilations) {
     return;
   }
 
@@ -1510,7 +1521,7 @@ static bool generateCode(CompilerInstance &Instance, StringRef OutputFilename,
   // Free up some compiler resources now that we have an IRModule.
   freeASTContextIfPossible(Instance);
 
-  // If we emitted any errors while perfoming the end-of-pipeline actions, bail.
+  // If we emitted any errors while performing the end-of-pipeline actions, bail.
   if (Instance.getDiags().hadAnyError())
     return true;
 
@@ -1616,7 +1627,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   if (observer)
     observer->performedSILProcessing(*SM);
 
-  // Cancellation check after SILOptimzation.
+  // Cancellation check after SILOptimization.
   if (Instance.isCancellationRequested())
     return true;
 
@@ -1675,8 +1686,6 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
     return processCommandLineAndRunImmediately(
         Instance, std::move(SM), MSF, observer, ReturnValue);
 
-  TBDSymbolSetPtr publicCMOSymbols = SM->getPublicCMOSymbols();
-
   StringRef OutputFilename = PSPs.OutputFilename;
   std::vector<std::string> ParallelOutputFilenames =
       opts.InputsAndOutputs.copyOutputFilenames();
@@ -1695,8 +1704,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   if (!IRModule)
     return Instance.getDiags().hadAnyError();
 
-  if (validateTBDIfNeeded(Invocation, MSF, *IRModule.getModule(),
-                          publicCMOSymbols))
+  if (validateTBDIfNeeded(Invocation, MSF, *IRModule.getModule()))
     return true;
 
   return generateCode(Instance, OutputFilename, IRModule.getModule(),
@@ -2125,15 +2133,26 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     // making sure it cannot collide with a real PID (always positive). Non-batch
     // compilation gets a real OS PID.
     int64_t Pid = IO.hasUniquePrimaryInput() ? OSPid : QUASI_PID_START;
-    IO.forEachPrimaryInputWithIndex([&](const InputFile &Input,
-                                        unsigned idx) -> bool {
-      emitBeganMessage(
-          llvm::errs(),
-          mapFrontendInvocationToAction(Invocation),
-          constructDetailedTaskDescription(Invocation, Input, Args), Pid - idx,
-          ProcInfo);
-      return false;
-    });
+
+    if (IO.hasPrimaryInputs()) {
+      IO.forEachPrimaryInputWithIndex([&](const InputFile &Input,
+                                          unsigned idx) -> bool {
+        ArrayRef<InputFile> Inputs(Input);
+        emitBeganMessage(llvm::errs(),
+                         mapFrontendInvocationToAction(Invocation),
+                         constructDetailedTaskDescription(Invocation,
+                                                          Inputs,
+                                                          Args), Pid - idx,
+                         ProcInfo);
+        return false;
+      });
+    } else {
+      // If no primary inputs are present, we are in WMO.
+      emitBeganMessage(llvm::errs(),
+                       mapFrontendInvocationToAction(Invocation),
+                       constructDetailedTaskDescription(Invocation, IO.getAllInputs(), Args),
+                       OSPid, ProcInfo);
+    }
   }
 
   int ReturnValue = 0;
@@ -2164,23 +2183,41 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     // making sure it cannot collide with a real PID (always positive). Non-batch
     // compilation gets a real OS PID.
     int64_t Pid = IO.hasUniquePrimaryInput() ? OSPid : QUASI_PID_START;
-    IO.forEachPrimaryInputWithIndex([&](const InputFile &Input,
-                                        unsigned idx) -> bool {
-      assert(FileSpecificDiagnostics.count(Input.getFileName()) != 0 &&
-             "Expected diagnostic collection for input.");
 
-      // Join all diagnostics produced for this file into a single output.
-      auto PrimaryDiags = FileSpecificDiagnostics.lookup(Input.getFileName());
+    if (IO.hasPrimaryInputs()) {
+      IO.forEachPrimaryInputWithIndex([&](const InputFile &Input,
+                                          unsigned idx) -> bool {
+        assert(FileSpecificDiagnostics.count(Input.getFileName()) != 0 &&
+               "Expected diagnostic collection for input.");
+
+        // Join all diagnostics produced for this file into a single output.
+        auto PrimaryDiags = FileSpecificDiagnostics.lookup(Input.getFileName());
+        const char *const Delim = "";
+        std::ostringstream JoinedDiags;
+        std::copy(PrimaryDiags.begin(), PrimaryDiags.end(),
+                  std::ostream_iterator<std::string>(JoinedDiags, Delim));
+
+        emitFinishedMessage(llvm::errs(),
+                            mapFrontendInvocationToAction(Invocation),
+                            JoinedDiags.str(), r, Pid - idx, ProcInfo);
+        return false;
+      });
+    } else {
+      // If no primary inputs are present, we are in WMO.
+      std::vector<std::string> AllDiagnostics;
+      for (const auto &FileDiagnostics : FileSpecificDiagnostics) {
+        AllDiagnostics.insert(AllDiagnostics.end(),
+                              FileDiagnostics.getValue().begin(),
+                              FileDiagnostics.getValue().end());
+      }
       const char *const Delim = "";
       std::ostringstream JoinedDiags;
-      std::copy(PrimaryDiags.begin(), PrimaryDiags.end(),
+      std::copy(AllDiagnostics.begin(), AllDiagnostics.end(),
                 std::ostream_iterator<std::string>(JoinedDiags, Delim));
-
       emitFinishedMessage(llvm::errs(),
                           mapFrontendInvocationToAction(Invocation),
-                          JoinedDiags.str(), r, Pid - idx, ProcInfo);
-      return false;
-    });
+                          JoinedDiags.str(), r, OSPid, ProcInfo);
+    }
   }
 
   return r;

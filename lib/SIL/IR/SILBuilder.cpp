@@ -638,7 +638,7 @@ void SILBuilder::emitScopedBorrowOperation(SILLocation loc, SILValue original,
 /// copy. This does require the client code to handle ending the lifetime of an
 /// owned result even if the input was passed as guaranteed.
 ///
-/// Note: For simplicitly, ownership None is not propagated for any statically
+/// Note: For simplicity, ownership None is not propagated for any statically
 /// nontrivial result, even if \p targetType may also be dynamically
 /// trivial. For example, the operand of a switch_enum could be a nested enum
 /// such that all switch cases may be dynamically trivial. Or a checked_cast_br

@@ -33,6 +33,9 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/Decl.h"
+#include "clang/Lex/MacroInfo.h"
+#include "clang/Lex/Preprocessor.h"
 #include "clang/AST/DeclVisitor.h"
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/Basic/IdentifierTable.h"
@@ -60,12 +63,8 @@ class SmallBitVector;
 
 namespace clang {
 class APValue;
-class Decl;
 class DeclarationName;
-class EnumDecl;
-class MacroInfo;
 class MangleContext;
-class NamedDecl;
 class ObjCInterfaceDecl;
 class ObjCMethodDecl;
 class ObjCPropertyDecl;
@@ -317,7 +316,7 @@ public:
   bool isPlatformRelevant(StringRef platform) const;
 
   /// Returns true when the given declaration with the given deprecation
-  /// should be inlucded in the cutoff of imported deprecated APIs marked
+  /// should be included in the cutoff of imported deprecated APIs marked
   /// unavailable.
   bool treatDeprecatedAsUnavailable(const clang::Decl *clangDecl,
                                     const llvm::VersionTuple &version,
@@ -1148,7 +1147,7 @@ public:
   /// 'unavailable' in Swift.
   bool isUnavailableInSwift(const clang::Decl *decl) {
     return importer::isUnavailableInSwift(
-        decl, platformAvailability, SwiftContext.LangOpts.EnableObjCInterop);
+        decl, &platformAvailability, SwiftContext.LangOpts.EnableObjCInterop);
   }
 
   /// Add "Unavailable" annotation to the swift declaration.
@@ -1590,8 +1589,15 @@ public:
     llvm_unreachable("unimplemented for ClangImporter");
   }
 
-  void loadAssociatedTypes(const ProtocolDecl *decl, uint64_t contextData,
-                           SmallVectorImpl<AssociatedTypeDecl *> &assocTypes) override {
+  void loadAssociatedTypes(
+      const ProtocolDecl *decl, uint64_t contextData,
+      SmallVectorImpl<AssociatedTypeDecl *> &assocTypes) override {
+    llvm_unreachable("unimplemented for ClangImporter");
+  }
+
+  void loadPrimaryAssociatedTypes(
+      const ProtocolDecl *decl, uint64_t contextData,
+      SmallVectorImpl<AssociatedTypeDecl *> &assocTypes) override {
     llvm_unreachable("unimplemented for ClangImporter");
   }
 
@@ -1843,6 +1849,9 @@ public:
 /// actor.
 bool isMainActorAttr(const clang::SwiftAttrAttr *swiftAttr);
 
+/// Determines whether the given swift_attr controls mutability
+bool isMutabilityAttr(const clang::SwiftAttrAttr *swiftAttr);
+
 /// Apply an attribute to a function type.
 static inline Type applyToFunctionType(
     Type type, llvm::function_ref<ASTExtInfo(ASTExtInfo)> transform) {
@@ -1860,6 +1869,26 @@ static inline Type applyToFunctionType(
   }
 
   return type;
+}
+
+inline Optional<const clang::EnumDecl *> findAnonymousEnumForTypedef(
+    const ASTContext &ctx,
+    const clang::TypedefType *typedefType) {
+  auto *typedefDecl = typedefType->getDecl();
+  auto *lookupTable = ctx.getClangModuleLoader()->findLookupTable(typedefDecl->getOwningModule());
+
+  auto foundDecls = lookupTable->lookup(
+      SerializedSwiftName(typedefDecl->getName()), EffectiveClangContext());
+
+  auto found = llvm::find_if(foundDecls, [](SwiftLookupTable::SingleEntry decl) {
+    return decl.is<clang::NamedDecl *>() &&
+        isa<clang::EnumDecl>(decl.get<clang::NamedDecl *>());
+  });
+
+  if (found != foundDecls.end())
+    return cast<clang::EnumDecl>(found->get<clang::NamedDecl *>());
+
+  return None;
 }
 
 }

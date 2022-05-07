@@ -32,6 +32,10 @@ protocol PH {
 }
 
 protocol PI {
+// expected-warning@-1 {{protocol 'PI' should be declared to refine 'Decodable' due to a same-type constraint on 'Self'}}
+// expected-warning@-2 {{protocol 'PI' should be declared to refine 'Encodable' due to a same-type constraint on 'Self'}}
+// expected-warning@-3 {{protocol 'PI' should be declared to refine 'Hashable' due to a same-type constraint on 'Self'}}
+// expected-warning@-4 {{protocol 'PI' should be declared to refine 'SIMDScalar' due to a same-type constraint on 'Self'}}
   associatedtype A8 where A8.A7 == Self // expected-warning {{redundant same-type constraint 'Self.A8.A7' == 'Self'}}
   associatedtype A9 where A9.A7 == Self, A9.A8 == A8
   associatedtype A10 where A10.A7 == Self, A10.A8 == A8, A10.A9 == A9 // expected-warning {{redundant same-type constraint 'Self.A10.A7' == 'Self'}}

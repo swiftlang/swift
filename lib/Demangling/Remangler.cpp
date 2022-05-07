@@ -3437,6 +3437,36 @@ ManglingError Remangler::mangleBackDeploymentFallback(Node *node,
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleUniquable(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangle(node->getChild(0), depth + 1));
+  Buffer << "Mq";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleExtendedExistentialTypeShape(Node *node,
+                                                            unsigned depth) {
+  NodePointer genSig, type;
+  if (node->getNumChildren() == 1) {
+    genSig = nullptr;
+    type = node->getChild(0);
+  } else {
+    genSig = node->getChild(0);
+    type = node->getChild(1);
+  }
+
+  if (genSig) {
+    RETURN_IF_ERROR(mangle(genSig, depth + 1));  
+  }
+  RETURN_IF_ERROR(mangle(type, depth + 1));
+
+  if (genSig)
+    Buffer << "XG";
+  else
+    Buffer << "Xg";
+
+  return ManglingError::Success;
+}
+
 } // anonymous namespace
 
 /// The top-level interface to the remangler.

@@ -170,6 +170,7 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
       ParsedArgs.hasArg(OPT_v),
       ParsedArgs.hasArg(OPT_skip_inherited_docs),
       ParsedArgs.hasArg(OPT_include_spi_symbols),
+      /*IncludeClangDocs=*/false,
   };
 
   if (auto *A = ParsedArgs.getLastArg(OPT_minimum_access_level)) {
@@ -222,7 +223,10 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
     return EXIT_FAILURE;
   }
 
-  const auto &MainFile = M->getMainFile(FileUnitKind::SerializedAST);
+  FileUnitKind expectedKind = FileUnitKind::SerializedAST;
+  if (M->isNonSwiftModule())
+    expectedKind = FileUnitKind::ClangModule;
+  const auto &MainFile = M->getMainFile(expectedKind);
   
   if (Options.PrintMessages)
     llvm::errs() << "Emitting symbol graph for module file: " << MainFile.getModuleDefiningPath() << '\n';

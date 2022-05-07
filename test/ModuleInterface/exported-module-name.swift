@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -typecheck -emit-module-interface-path %t/CoreKitClient.swiftinterface -module-name CoreKitClient -I %S/Inputs/exported-module-name-before %s
+// RUN: %target-swift-emit-module-interface(%t/CoreKitClient.swiftinterface) %s -module-name CoreKitClient -I %S/Inputs/exported-module-name-before
 // RUN: %FileCheck -implicit-check-not BAD %s < %t/CoreKitClient.swiftinterface
 
 // Test that we can rebuild it even when the "export as" module goes away.
-// RUN: %target-swift-frontend -compile-module-from-interface -o %t/CoreKitClient.swiftmodule -I %S/Inputs/exported-module-name-after %t/CoreKitClient.swiftinterface
+// RUN: %target-swift-typecheck-module-from-interface(%t/CoreKitClient.swiftinterface) -module-name CoreKitClient -I %S/Inputs/exported-module-name-after
 
 // CHECK: import CoreKit
 import CoreKit

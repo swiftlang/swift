@@ -9,6 +9,10 @@
 //
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MODULE_SCOPED %S/Inputs/multiple-files-1.swift %S/Inputs/multiple-files-2.swift | %FileCheck %s -check-prefix=MODULE_SCOPED
 
+// RUN: %empty-directory(%t)
+// RUN: echo "" > %t/empty.swift
+// RUN: %swift-ide-test --code-completion --code-completion-token VAR_INITIALIZED_BY_CALLING_CLOSURE --source-filename %s --second-source-filename %t/empty.swift | %FileCheck %s -check-prefix=VAR_INITIALIZED_BY_CALLING_CLOSURE
+
 func testObjectExpr() {
   fooObject.#^T1^#
 }
@@ -45,3 +49,16 @@ func moduleScoped() {
 // MODULE_SCOPED: Decl[Struct]/CurrModule: FooStruct[#FooStruct#]{{; name=.+$}}
 // MODULE_SCOPED-NOT: ERROR
 // MODULE_SCOPED: End completions
+
+enum Foo {
+    case bar
+}
+
+var sr15495: Void = {
+    let foo: Foo = .#^VAR_INITIALIZED_BY_CALLING_CLOSURE^#
+}()
+
+// VAR_INITIALIZED_BY_CALLING_CLOSURE:     Begin completions, 2 items
+// VAR_INITIALIZED_BY_CALLING_CLOSURE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: bar[#Foo#];
+// VAR_INITIALIZED_BY_CALLING_CLOSURE-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): Foo#})[#(into: inout Hasher) -> Void#];
+// VAR_INITIALIZED_BY_CALLING_CLOSURE:     End completions

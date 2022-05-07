@@ -651,9 +651,19 @@ class ModuleInterfaceLoaderImpl {
 
   std::pair<std::string, std::string> getCompiledModuleCandidates() {
     std::pair<std::string, std::string> result;
-    // Keep track of whether we should attempt to load a .swiftmodule adjacent
-    // to the .swiftinterface.
+    // Should we attempt to load a swiftmodule adjacent to the swiftinterface?
     bool shouldLoadAdjacentModule = true;
+
+    // Don't use the adjacent swiftmodule for frameworks from the public
+    // Frameworks folder of the SDK.
+    SmallString<128> publicFrameworksPath;
+    llvm::sys::path::append(publicFrameworksPath,
+                            ctx.SearchPathOpts.getSDKPath(),
+                            "System", "Library", "Frameworks");
+    if (!ctx.SearchPathOpts.getSDKPath().empty() &&
+        modulePath.startswith(publicFrameworksPath)) {
+      shouldLoadAdjacentModule = false;
+    }
 
     switch (loadMode) {
     case ModuleLoadingMode::OnlyInterface:
@@ -1047,7 +1057,7 @@ class ModuleInterfaceLoaderImpl {
       // file and removed the fallback interface file, we can rebuild the cache.
       fallbackBuilder.addExtraDependency(interfacePath);
       // Use cachedOutputPath as the output file path. This output path was
-      // calcualted using the canonical interface file path to make sure we
+      // calculated using the canonical interface file path to make sure we
       // can find it from the canonical interface file.
       auto failedAgain = fallbackBuilder.buildSwiftModule(cachedOutputPath,
           /*shouldSerializeDeps*/true, &moduleBuffer, remarkRebuild);
@@ -1464,9 +1474,9 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   }
   // Pass down -explicit-swift-module-map-file
   // FIXME: we shouldn't need this. Remove it?
-  StringRef explictSwiftModuleMap = searchPathOpts.ExplicitSwiftModuleMap;
+  StringRef explicitSwiftModuleMap = searchPathOpts.ExplicitSwiftModuleMap;
   genericSubInvocation.getSearchPathOptions().ExplicitSwiftModuleMap =
-    explictSwiftModuleMap.str();
+    explicitSwiftModuleMap.str();
   auto &subClangImporterOpts = genericSubInvocation.getClangImporterOptions();
   // Respect the detailed-record preprocessor setting of the parent context.
   // This, and the "raw" clang module format it implicitly enables, are
@@ -1474,7 +1484,7 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   subClangImporterOpts.DetailedPreprocessingRecord =
     clangImporterOpts.DetailedPreprocessingRecord;
 
-  // We need to add these extra clang flags because explict module building
+  // We need to add these extra clang flags because explicit module building
   // related flags are all there: -fno-implicit-modules, -fmodule-map-file=,
   // and -fmodule-file=.
   // If we don't add these flags, the interface will be built with implicit
@@ -1491,6 +1501,11 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
       GenericArgs.push_back("-Xcc");
       GenericArgs.push_back(ArgSaver.save(arg));
     }
+  }
+
+  subClangImporterOpts.EnableClangSPI = clangImporterOpts.EnableClangSPI;
+  if (!subClangImporterOpts.EnableClangSPI) {
+    GenericArgs.push_back("-disable-clang-spi");
   }
 
   // Tell the genericSubInvocation to serialize dependency hashes if asked to do

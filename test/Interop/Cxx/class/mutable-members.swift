@@ -1,6 +1,8 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-cxx-interop)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
 //
 // REQUIRES: executable_test
+
+// REQUIRES: rdar91961524
 
 import StdlibUnittest
 import MutableMembers

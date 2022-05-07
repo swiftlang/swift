@@ -874,6 +874,7 @@ internal enum KeyPathComputedIDKind {
 
 internal enum KeyPathComputedIDResolution {
   case resolved
+  case resolvedAbsolute
   case indirectPointer
   case functionCall
 }
@@ -1108,6 +1109,9 @@ internal struct RawKeyPathComponent {
     internal static var computedIDResolved: UInt32 {
       return _SwiftKeyPathComponentHeader_ComputedIDResolved
     }
+    internal static var computedIDResolvedAbsolute: UInt32 {
+      return _SwiftKeyPathComponentHeader_ComputedIDResolvedAbsolute
+    }
     internal static var computedIDUnresolvedIndirectPointer: UInt32 {
       return _SwiftKeyPathComponentHeader_ComputedIDUnresolvedIndirectPointer
     }
@@ -1118,6 +1122,8 @@ internal struct RawKeyPathComponent {
       switch payload & Header.computedIDResolutionMask {
       case Header.computedIDResolved:
         return .resolved
+      case Header.computedIDResolvedAbsolute:
+        return .resolvedAbsolute
       case Header.computedIDUnresolvedIndirectPointer:
         return .indirectPointer
       case Header.computedIDUnresolvedFunctionCall:
@@ -1764,7 +1770,7 @@ internal struct KeyPathBuffer {
     internal mutating func pushRaw(size: Int, alignment: Int)
         -> UnsafeMutableRawBufferPointer {
       var baseAddress = buffer.baseAddress.unsafelyUnwrapped
-      var misalign = Int(bitPattern: baseAddress) % alignment
+      var misalign = Int(bitPattern: baseAddress) & (alignment - 1)
       if misalign != 0 {
         misalign = alignment - misalign
         baseAddress = baseAddress.advanced(by: misalign)
@@ -3252,7 +3258,7 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
   ) {
     let alignment = MemoryLayout<T>.alignment
     var baseAddress = destData.baseAddress.unsafelyUnwrapped
-    var misalign = Int(bitPattern: baseAddress) % alignment
+    var misalign = Int(bitPattern: baseAddress) & (alignment - 1)
     if misalign != 0 {
       misalign = alignment - misalign
       baseAddress = baseAddress.advanced(by: misalign)
@@ -3381,35 +3387,39 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
       resolvedID = UnsafeRawPointer(bitPattern: value)
 
     case .pointer:
-      // Resolve the sign-extended relative reference.
-      var absoluteID: UnsafeRawPointer? = _resolveRelativeAddress(idValueBase, idValue)
-
       // If the pointer ID is unresolved, then it needs work to get to
       // the final value.
       switch idResolution {
       case .resolved:
+        resolvedID = _resolveRelativeAddress(idValueBase, idValue)
+        break
+
+      case .resolvedAbsolute:
+        let value = UInt(UInt32(bitPattern: idValue))
+        resolvedID = UnsafeRawPointer(bitPattern: value)
         break
 
       case .indirectPointer:
         // The pointer in the pattern is an indirect pointer to the real
         // identifier pointer.
-        absoluteID = absoluteID.unsafelyUnwrapped
+        let absoluteID = _resolveRelativeAddress(idValueBase, idValue)
+        resolvedID = absoluteID
           .load(as: UnsafeRawPointer?.self)
 
       case .functionCall:
         // The pointer in the pattern is to a function that generates the
         // identifier pointer.
         typealias Resolver = @convention(c) (UnsafeRawPointer?) -> UnsafeRawPointer?
+        let absoluteID = _resolveCompactFunctionPointer(idValueBase, idValue)
         let resolverSigned = _PtrAuth.sign(
-          pointer: absoluteID.unsafelyUnwrapped,
+          pointer: absoluteID,
           key: .processIndependentCode,
           discriminator: _PtrAuth.discriminator(for: Resolver.self))
         let resolverFn = unsafeBitCast(resolverSigned,
                                        to: Resolver.self)
 
-        absoluteID = resolverFn(patternArgs)
+        resolvedID = resolverFn(patternArgs)
       }
-      resolvedID = absoluteID
     }
 
     // Bring over the header, getter, and setter.

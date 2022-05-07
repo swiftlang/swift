@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # adb_reboot.py - Reboots and cleans an Android device. -*- python -*-
 #
 # This source file is part of the Swift.org open source project

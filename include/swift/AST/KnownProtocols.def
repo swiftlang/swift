@@ -60,6 +60,7 @@
 
 PROTOCOL(Actor)
 PROTOCOL(Sequence)
+PROTOCOL(Identifiable)
 PROTOCOL(IteratorProtocol)
 PROTOCOL(RawRepresentable)
 PROTOCOL(Equatable)

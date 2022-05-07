@@ -189,6 +189,8 @@ Globals
   global ::= global 'MN'                 // noncanonical specialized generic type metadata for global
   global ::= global 'Mz'                 // canonical specialized generic type metadata caching token
 
+  global ::= global 'Mq'                 // global with a uniquing prefix
+
   #if SWIFT_RUNTIME_VERSION >= 5.4
     global ::= context (decl-name '_')+ 'WZ' // global variable one-time initialization function
     global ::= context (decl-name '_')+ 'Wz' // global variable one-time initialization token
@@ -303,7 +305,7 @@ witness functions for a type.
   AUTODIFF-FUNCTION-KIND ::= 'd'        // differential
   AUTODIFF-FUNCTION-KIND ::= 'p'        // pullback
 
-``<AUTODIFF-FUNCTION-KIND>`` differentiates the kinds of functions assocaited
+``<AUTODIFF-FUNCTION-KIND>`` differentiates the kinds of functions associated
 with a differentiable function used for differentiable programming.
 
 ::
@@ -594,7 +596,7 @@ Types
   FUNCTION-KIND ::= 'zB' C-TYPE              // objc block type with non-canonical C type
   FUNCTION-KIND ::= 'L'                      // objc block function type with canonical C type (escaping) (DWARF only; otherwise use 'B' or 'zB' C-TYPE)
   FUNCTION-KIND ::= 'C'                      // C function pointer / C++ method type
-  FUNCTION-KIND ::= 'zC' C-TYPE              // C function pointer / C++ method type with with non-canonical C type
+  FUNCTION-KIND ::= 'zC' C-TYPE              // C function pointer / C++ method type with non-canonical C type
   FUNCTION-KIND ::= 'A'                      // @auto_closure function type (escaping)
   FUNCTION-KIND ::= 'E'                      // function type (noescape)
 
@@ -635,7 +637,7 @@ Types
   type ::= protocol-list 'p'                 // existential type
   type ::= protocol-list superclass 'Xc'     // existential type with superclass
   type ::= protocol-list 'Xl'                // existential type with AnyObject
-  type ::= protocol-list 'y' (type* '_')* type* retroactive-conformance* 'Xp'   // parameterized protocol type
+  type ::= protocol-list 'y' (type* '_')* type* retroactive-conformance* 'XP'   // parameterized protocol type
   type ::= type-list 't'                     // tuple
   type ::= type generic-signature 'u'        // generic type
   type ::= 'x'                               // generic param, depth=0, idx=0
@@ -914,6 +916,11 @@ than the module of the conforming type or the conformed-to protocol), it is
 mangled with its offset into the set of conformance requirements, the
 root protocol conformance, and the suffix 'g'.
 
+::
+
+  // No generalization signature.
+  extended-existential-shape ::= type 'Xg' // no generalization signature
+  extended-existential-shape ::= generic-signature type 'XG'
 
 Identifiers
 ~~~~~~~~~~~

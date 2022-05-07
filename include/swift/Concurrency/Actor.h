@@ -39,7 +39,7 @@ enum : uint32_t {
   // It is possible for an actor to be in Running and yet completely released
   // by clients. However, the actor needs to be kept alive until it is done
   // executing the task that is running on it and gives it up. It is only
-  // after that that we can safely deallocate it.
+  // after that we can safely deallocate it.
   ActorStateMask = 0x7,
 
   /// The actor is not currently scheduled.  Completely redundant

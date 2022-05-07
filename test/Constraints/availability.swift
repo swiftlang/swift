@@ -16,7 +16,7 @@ func f(c: C) {
   let _: C? = C(c)
 }
 
-// rdar://problem/60047439 - unable to disambiguite expression based on availablity
+// rdar://problem/60047439 - unable to disambiguate expression based on availability
 func test_contextual_member_with_availability() {
   struct A {
     static var foo: A = A()

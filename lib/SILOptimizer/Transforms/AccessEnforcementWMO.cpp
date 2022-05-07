@@ -164,7 +164,7 @@ public:
   void perform();
 
 protected:
-  void visitInstruction(SILInstruction *I);
+  bool visitInstruction(SILInstruction *I);
   void recordAccess(SILInstruction *beginAccess, DisjointAccessLocationKey key,
                     AccessStorage::Kind storageKind, bool hasNoNestedConflict);
   void removeNonreentrantAccess();
@@ -180,27 +180,33 @@ void GlobalAccessRemoval::perform() {
       continue;
 
     for (auto &BB : F) {
-      for (auto &I : BB)
-        visitInstruction(&I);
+      for (auto &I : BB) {
+        if (!visitInstruction(&I))
+          return;
+      }
     }
   }
   removeNonreentrantAccess();
 }
 
-void GlobalAccessRemoval::visitInstruction(SILInstruction *I) {
+bool GlobalAccessRemoval::visitInstruction(SILInstruction *I) {
   if (auto *BAI = dyn_cast<BeginAccessInst>(I)) {
     auto storageAndBase = AccessStorageWithBase::compute(BAI->getSource());
+    if (!storageAndBase.base)
+      return false;
     auto key = getDisjointAccessLocation(storageAndBase);
     recordAccess(BAI, key, storageAndBase.storage.getKind(),
                  BAI->hasNoNestedConflict());
-    return;
+    return true;
   }
   if (auto *BUAI = dyn_cast<BeginUnpairedAccessInst>(I)) {
     auto storageAndBase = AccessStorageWithBase::compute(BUAI->getSource());
+    if (!storageAndBase.base)
+      return false;
     auto key = getDisjointAccessLocation(storageAndBase);
     recordAccess(BUAI, key, storageAndBase.storage.getKind(),
                  BUAI->hasNoNestedConflict());
-    return;
+    return true;
   }
   if (auto *KPI = dyn_cast<KeyPathInst>(I)) {
     for (const KeyPathPatternComponent &component :
@@ -219,8 +225,8 @@ void GlobalAccessRemoval::visitInstruction(SILInstruction *I) {
         break;
       }
     }
-    return;
   }
+  return true;
 }
 
 // Record an access in the disjointAccessMap.

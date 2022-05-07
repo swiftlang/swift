@@ -219,7 +219,7 @@ can be performed. For example, "a.getvalue()" would be fine so long as the
 result is ignored or if the value is in an explicit async block structure.
 
 From an implementation perspective, the code above corresponds directly to GCD's
-dispatch_asynch on a per-actor queue.
+dispatch_async on a per-actor queue.
 
 Performing synchronous operations
 ---------------------------------
@@ -254,7 +254,7 @@ couple of interesting observations:
    mutable data or is shared. Mutable data (e.g. normal objects) can be ref
    counted with non-atomic reference counting, which is 20-30x faster than
    atomic adjustments. Actors are shared, so they'd have to have atomic ref
-   counts, but they should be much much less common than the normal objects in
+   counts, but they should be much less common than the normal objects in
    the program. Immutable data is shared (and thus needs atomic reference
    counts) but there are optimizations that can be performed since the edges in
    the pointer graph can never change and cycles aren't possible in immutable

@@ -1,6 +1,13 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -swift-version 5 -enable-library-evolution -typecheck -module-name Test -emit-module-interface-path %t/Test.swiftinterface %s -define-availability "_iOS8Aligned:macOS 10.10, iOS 8.0" -define-availability "_iOS9Aligned:macOS 10.11, iOS 9.0" -define-availability "_iOS9:iOS 9.0" -define-availability "_macOS10_11:macOS 10.11" -define-availability "_myProject 1.0:macOS 10.11" -define-availability "_myProject 2.5:macOS 10.12"
+// RUN: %target-swift-emit-module-interface(%t/Test.swiftinterface) %s \
+// RUN:   -define-availability "_iOS8Aligned:macOS 10.10, iOS 8.0" \
+// RUN:   -define-availability "_iOS9Aligned:macOS 10.11, iOS 9.0" \
+// RUN:   -define-availability "_iOS9:iOS 9.0" \
+// RUN:   -define-availability "_macOS10_11:macOS 10.11" \
+// RUN:   -define-availability "_myProject 1.0:macOS 10.11" \
+// RUN:   -define-availability "_myProject 2.5:macOS 10.12"
+// RUN: %target-swift-typecheck-module-from-interface(%t/Test.swiftinterface)
 // RUN: %FileCheck %s < %t/Test.swiftinterface
 
 @available(_iOS8Aligned, *)

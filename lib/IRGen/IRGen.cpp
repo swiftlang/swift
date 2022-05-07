@@ -364,7 +364,8 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
   // rely on any other LLVM ARC transformations, but we do need ARC
   // contraction to add the objc_retainAutoreleasedReturnValue
   // assembly markers and remove clang.arc.used.
-  if (Opts.shouldOptimize() && !DisableObjCARCContract)
+  if (Opts.shouldOptimize() && !DisableObjCARCContract &&
+      !Opts.DisableLLVMOptzns)
     ModulePasses.add(createObjCARCContractPass());
 
   // Do it.
@@ -759,6 +760,18 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
   opts.AsyncContextExtendedFrameEntry = PointerAuthSchema(
       dataKey, /*address*/ true, Discrimination::Constant,
       SpecialPointerAuthDiscriminators::SwiftAsyncContextExtendedFrameEntry);
+
+  opts.ExtendedExistentialTypeShape =
+      PointerAuthSchema(dataKey, /*address*/ false,
+                        Discrimination::Constant,
+                        SpecialPointerAuthDiscriminators
+                          ::ExtendedExistentialTypeShape);
+
+  opts.NonUniqueExtendedExistentialTypeShape =
+      PointerAuthSchema(dataKey, /*address*/ false,
+                        Discrimination::Constant,
+                        SpecialPointerAuthDiscriminators
+                          ::NonUniqueExtendedExistentialTypeShape);
 }
 
 std::unique_ptr<llvm::TargetMachine>
@@ -1019,7 +1032,6 @@ getSymbolSourcesToEmit(const IRGenDescriptor &desc) {
       irEntitiesToEmit.push_back(source->getIRLinkEntity());
       break;
     case SymbolSource::Kind::LinkerDirective:
-    case SymbolSource::Kind::CrossModuleOptimization:
     case SymbolSource::Kind::Unknown:
       llvm_unreachable("Not supported");
     }

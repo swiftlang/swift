@@ -110,6 +110,9 @@ SWIFT_REQUEST(TypeChecker, IsActorRequest, bool(NominalTypeDecl *),
 SWIFT_REQUEST(TypeChecker, IsDefaultActorRequest,
               bool(ClassDecl *, ModuleDecl *, ResilienceExpansion),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, CheckDistributedFunctionRequest,
+              bool(AbstractFunctionDecl *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsDistributedActorRequest, bool(NominalTypeDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, GetDistributedActorImplicitCodableRequest,
@@ -263,7 +266,7 @@ SWIFT_REQUEST(TypeChecker, OverriddenDeclsRequest,
               llvm::TinyPtrVector<ValueDecl *>(ValueDecl *), SeparatelyCached,
               NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, PatternBindingEntryRequest,
-              const PatternBindingEntry *(PatternBindingDecl *, unsigned),
+              const PatternBindingEntry *(PatternBindingDecl *, unsigned, bool),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, PrimarySourceFilesRequest,
               ArrayRef<SourceFile *>(ModuleDecl *), Cached, NoLocationInfo)

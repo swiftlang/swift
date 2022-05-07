@@ -1716,7 +1716,7 @@ void Parser::parseAllAvailabilityMacroArguments() {
   // The sub-parser is not actually parsing the source file but the LangOpts
   // AvailabilityMacros. No point creating a libSyntax tree for it. In fact, the
   // creation of a libSyntax tree would always fail because the
-  // AvailibilityMacro is not valid Swift source code.
+  // AvailabilityMacro is not valid Swift source code.
   LangOpts.BuildSyntaxTree = false;
 
   for (StringRef macro: LangOpts.AvailabilityMacros) {
@@ -2921,7 +2921,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     StringRef message;
     if (consumeIf(tok::l_paren)) {
       if (!Tok.is(tok::identifier)) {
-        llvm_unreachable("Flag must start with an indentifier");
+        llvm_unreachable("Flag must start with an identifier");
       }
 
       StringRef flag = Tok.getText();
@@ -3870,6 +3870,8 @@ bool Parser::parseDeclModifierList(DeclAttributes &Attributes,
 
       if (Kind == DAK_Count)
         break;
+
+      Tok.setKind(tok::contextual_keyword);
 
       if (Kind == DAK_Actor) {
         // If the next token is a startOfSwiftDecl, we are part of the modifier
@@ -6343,7 +6345,7 @@ static bool parseAccessorIntroducer(Parser &P,
 /// \endverbatim
 ///
 /// While only 'get' accessors currently support such specifiers,
-/// this routine will also diagnose unspported effects specifiers on
+/// this routine will also diagnose unsupported effects specifiers on
 /// other accessors.
 ///
 /// \param accessors the accessors we've parsed already.
@@ -6959,6 +6961,11 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
       llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
       T(InVarOrLetPattern, isLet ? IVOLP_InLet : IVOLP_InVar);
 
+      // Track whether we are parsing an 'async let' pattern.
+      const auto hasAsyncAttr = Attributes.hasAttribute<AsyncAttr>();
+      llvm::SaveAndRestore<bool> AsyncAttr(InPatternWithAsyncAttribute,
+                                           hasAsyncAttr);
+
       auto patternRes = parseTypedPattern();
       if (patternRes.hasCodeCompletion())
         return makeResult(makeParserCodeCompletionStatus());
@@ -7377,12 +7384,16 @@ Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
       SourceLoc LBraceLoc, RBraceLoc;
       LBraceLoc = consumeToken(tok::l_brace);
       auto *CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
+      auto *Return =
+          new (Context) ReturnStmt(SourceLoc(), CCE, /*implicit=*/true);
       CodeCompletion->setParsedDecl(accessor);
       CodeCompletion->completeAccessorBeginning(CCE);
       RBraceLoc = Tok.getLoc();
       consumeToken(tok::code_complete);
-      auto *BS = BraceStmt::create(Context, LBraceLoc, ASTNode(CCE), RBraceLoc,
-                                   /*implicit*/ true);
+      auto *BS =
+          BraceStmt::create(Context, LBraceLoc, ASTNode(Return), RBraceLoc,
+                            /*implicit*/ true);
+      AFD->setHasSingleExpressionBody();
       AFD->setBodyParsed(BS);
       return {BS, Fingerprint::ZERO()};
     }
@@ -7639,7 +7650,11 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
         llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
         T(InVarOrLetPattern, Parser::IVOLP_InMatchingPattern);
         parseMatchingPattern(/*isExprBasic*/false);
-        
+
+        // Reset async attribute in parser context.
+        llvm::SaveAndRestore<bool> AsyncAttr(InPatternWithAsyncAttribute,
+                                             false);
+
         if (consumeIf(tok::colon)) {
           backtrack.cancelBacktrack();
           diagnose(CaseLoc, diag::case_outside_of_switch, "case");
@@ -7977,13 +7992,13 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
 }
 
 ParserStatus Parser::parsePrimaryAssociatedTypes(
-    SmallVectorImpl<AssociatedTypeDecl *> &AssocTypes) {
+    SmallVectorImpl<PrimaryAssociatedTypeName> &AssocTypeNames) {
   SyntaxParsingContext GPSContext(SyntaxContext,
                                   SyntaxKind::PrimaryAssociatedTypeClause);
 
   SourceLoc LAngleLoc = consumeStartingLess();
 
-  auto Result = parsePrimaryAssociatedTypeList(AssocTypes);
+  auto Result = parsePrimaryAssociatedTypeList(AssocTypeNames);
 
   // Parse the closing '>'.
   SourceLoc RAngleLoc;
@@ -8001,7 +8016,7 @@ ParserStatus Parser::parsePrimaryAssociatedTypes(
 }
 
 ParserStatus Parser::parsePrimaryAssociatedTypeList(
-    SmallVectorImpl<AssociatedTypeDecl *> &AssocTypes) {
+    SmallVectorImpl<PrimaryAssociatedTypeName> &AssocTypeNames) {
   ParserStatus Result;
   SyntaxParsingContext PATContext(SyntaxContext,
                                   SyntaxKind::PrimaryAssociatedTypeList);
@@ -8010,16 +8025,6 @@ ParserStatus Parser::parsePrimaryAssociatedTypeList(
   do {
     SyntaxParsingContext ATContext(SyntaxContext,
                                    SyntaxKind::PrimaryAssociatedType);
-
-    // Note that we're parsing a declaration.
-    StructureMarkerRAII ParsingDecl(*this, Tok.getLoc(),
-                                    StructureMarkerKind::Declaration);
-
-    // Parse attributes.
-    DeclAttributes Attrs;
-    if (Tok.hasComment())
-      Attrs.add(new (Context) RawDocCommentAttr(Tok.getCommentRange()));
-    parseDeclAttributeList(Attrs);
 
     // Parse the name of the parameter.
     Identifier Name;
@@ -8030,54 +8035,7 @@ ParserStatus Parser::parsePrimaryAssociatedTypeList(
       break;
     }
 
-    // Parse the ':' followed by a type.
-    SmallVector<InheritedEntry, 1> Inherited;
-    if (Tok.is(tok::colon)) {
-      (void)consumeToken();
-      ParserResult<TypeRepr> Ty;
-
-      if (Tok.isAny(tok::identifier, tok::code_complete, tok::kw_protocol,
-                    tok::kw_Any)) {
-        Ty = parseType();
-      } else if (Tok.is(tok::kw_class)) {
-        diagnose(Tok, diag::unexpected_class_constraint);
-        diagnose(Tok, diag::suggest_anyobject)
-        .fixItReplace(Tok.getLoc(), "AnyObject");
-        consumeToken();
-        Result.setIsParseError();
-      } else {
-        diagnose(Tok, diag::expected_generics_type_restriction, Name);
-        Result.setIsParseError();
-      }
-
-      if (Ty.hasCodeCompletion())
-        return makeParserCodeCompletionStatus();
-
-      if (Ty.isNonNull())
-        Inherited.push_back({Ty.get()});
-    }
-
-    ParserResult<TypeRepr> UnderlyingTy;
-    if (Tok.is(tok::equal)) {
-      SyntaxParsingContext InitContext(SyntaxContext,
-                                       SyntaxKind::TypeInitializerClause);
-      consumeToken(tok::equal);
-      UnderlyingTy = parseType(diag::expected_type_in_associatedtype);
-      Result |= UnderlyingTy;
-      if (UnderlyingTy.isNull())
-        return Result;
-    }
-
-    auto *AssocType = new (Context)
-        AssociatedTypeDecl(CurDeclContext, NameLoc, Name, NameLoc,
-                           UnderlyingTy.getPtrOrNull(),
-                           /*trailingWhere=*/nullptr);
-    AssocType->getAttrs() = Attrs;
-    if (!Inherited.empty())
-      AssocType->setInherited(Context.AllocateCopy(Inherited));
-    AssocType->setPrimary();
-
-    AssocTypes.push_back(AssocType);
+    AssocTypeNames.emplace_back(Name, NameLoc);
 
     // Parse the comma, if the list continues.
     HasNextParam = consumeIf(tok::comma);
@@ -8097,13 +8055,7 @@ ParserStatus Parser::parsePrimaryAssociatedTypeList(
 ///     inheritance? 
 ///
 ///   primary-associated-type-list:
-///     '<' primary-associated-type+ '>'
-///
-///   primary-associated-type:
-///     identifier inheritance? default-associated-type
-///
-///   default-associated-type:
-///     '=' type
+///     '<' identifier+ '>'
 ///
 ///   protocol-member:
 ///      decl-func
@@ -8124,20 +8076,9 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   if (Status.isErrorOrHasCompletion())
     return Status;
 
-  SmallVector<AssociatedTypeDecl *, 2> PrimaryAssociatedTypes;
-
-  if (Context.LangOpts.EnableParameterizedProtocolTypes) {
-    if (startsWithLess(Tok)) {
-      Status |= parsePrimaryAssociatedTypes(PrimaryAssociatedTypes);
-    }
-  } else {
-    // Protocols don't support generic parameters, but people often want them and
-    // we want to have good error recovery if they try them out.  Parse them and
-    // produce a specific diagnostic if present.
-    if (startsWithLess(Tok)) {
-      diagnose(Tok, diag::generic_arguments_protocol);
-      maybeParseGenericParams();
-    }
+  SmallVector<PrimaryAssociatedTypeName, 2> PrimaryAssociatedTypeNames;
+  if (startsWithLess(Tok)) {
+    Status |= parsePrimaryAssociatedTypes(PrimaryAssociatedTypeNames);
   }
 
   DebuggerContextChange DCC (*this);
@@ -8167,6 +8108,7 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   ProtocolDecl *Proto = new (Context)
       ProtocolDecl(CurDeclContext, ProtocolLoc, NameLoc, ProtocolName,
+                   Context.AllocateCopy(PrimaryAssociatedTypeNames),
                    Context.AllocateCopy(InheritedProtocols), TrailingWhere);
   // No need to setLocalDiscriminator: protocols can't appear in local contexts.
 
@@ -8175,12 +8117,6 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     CodeCompletion->setParsedDecl(Proto);
 
   ContextChange CC(*this, Proto);
-
-  // Re-parent the primary associated type declarations into the protocol.
-  for (auto *AssocType : PrimaryAssociatedTypes) {
-    AssocType->setDeclContext(Proto);
-    Proto->addMember(AssocType);
-  }
 
   // Parse the body.
   {
@@ -8602,6 +8538,13 @@ Parser::parseDeclOperator(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     if (!Tok.getText().empty() && (Tok.getRawText().front() == '?' ||
                                    Tok.getRawText().front() == '!'))
       diagnose(Tok, diag::postfix_operator_name_cannot_start_with_unwrap);
+
+  // Prefix operators may not contain the `/` character when `/.../` regex
+  // literals are enabled.
+  if (Context.LangOpts.EnableBareSlashRegexLiterals) {
+    if (Attributes.hasAttribute<PrefixAttr>() && Tok.getText().contains("/"))
+      diagnose(Tok, diag::prefix_slash_not_allowed);
+  }
 
   // A common error is to try to define an operator with something in the
   // unicode plane considered to be an operator, or to try to define an

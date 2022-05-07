@@ -302,21 +302,21 @@ void SyntaxParsingContext::createNodeInPlace(SyntaxKind Kind,
   }
 }
 
-void SyntaxParsingContext::collectNodesInPlace(SyntaxKind ColletionKind,
+void SyntaxParsingContext::collectNodesInPlace(SyntaxKind CollectionKind,
                                          SyntaxNodeCreationKind nodeCreateK) {
-  assert(isCollectionKind(ColletionKind));
+  assert(isCollectionKind(CollectionKind));
   assert(isTopOfContextStack());
   if (!Enabled)
     return;
   auto Parts = getParts();
   auto Count = 0;
   for (auto I = Parts.rbegin(), End = Parts.rend(); I != End; ++I) {
-    if (!SyntaxFactory::canServeAsCollectionMemberRaw(ColletionKind, I->getKind()))
+    if (!SyntaxFactory::canServeAsCollectionMemberRaw(CollectionKind, I->getKind()))
       break;
     ++Count;
   }
   if (Count)
-    createNodeInPlace(ColletionKind, Count, nodeCreateK);
+    createNodeInPlace(CollectionKind, Count, nodeCreateK);
 }
 
 static ParsedRawSyntaxNode finalizeSourceFile(RootContextData &RootData,

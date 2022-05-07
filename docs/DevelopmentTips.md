@@ -42,7 +42,7 @@ Given the size of artifacts generated, you might also want to bump the cache siz
 
 You can run some compiles to see if it is actually doing something by running `sccache --show-stats`. Depending on the exact compilation task you're running, you might see very different cache hit rates. For example, `sccache` is particularly effective if you're rebuilding LLVM, which doesn't change so frequently from the Swift compiler's perspective. On the other hand, if you're changing the compiler's AST, the cache hit rate is likely to be much lower.
 
-One known issue with `sccache` is that you might occassionally get an "error: Connection to server timed out", even though you didn't stop the server. Simply re-running the build command usually works.
+One known issue with `sccache` is that you might occasionally get an "error: Connection to server timed out", even though you didn't stop the server. Simply re-running the build command usually works.
 
 ## Memory usage
 

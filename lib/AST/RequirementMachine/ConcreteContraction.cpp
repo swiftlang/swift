@@ -223,7 +223,8 @@ Optional<Type> ConcreteContraction::substTypeParameter(
 
     auto conformance = ((*substBaseType)->isTypeParameter()
                         ? ProtocolConformanceRef(proto)
-                        : module->lookupConformance(*substBaseType, proto));
+                        : module->lookupConformance(*substBaseType, proto,
+                                                    /*allowMissing=*/true));
 
     // The base type doesn't conform, in which case the requirement remains
     // unsubstituted.
@@ -362,8 +363,25 @@ ConcreteContraction::substRequirement(const Requirement &req) const {
 
     auto *proto = req.getProtocolDecl();
     auto *module = proto->getParentModule();
+
+    // For conformance to 'Sendable', allow synthesis of a missing conformance
+    // if the generic parameter is concrete, that is, if we're looking at a
+    // signature of the form 'T == Foo, T : Sendable'.
+    //
+    // Otherwise, we have a superclass requirement, like 'T : C, T : Sendable';
+    // don't synthesize the conformance in this case since dropping
+    // 'T : Sendable' would be incorrect; we want to ensure that we only admit
+    // subclasses of 'C' which are 'Sendable'.
+    bool allowMissing = false;
+    if (auto *rootParam = firstType->getAs<GenericTypeParamType>()) {
+      auto key = GenericParamKey(rootParam);
+      if (ConcreteTypes.count(key) > 0)
+        allowMissing = true;
+    }
+
     if (!substFirstType->isTypeParameter() &&
-        !module->lookupConformance(substFirstType, proto)) {
+        !module->lookupConformance(substFirstType, proto,
+                                   allowMissing)) {
       // Handle the case of <T where T : P, T : C> where C is a class and
       // C does not conform to P by leaving the conformance requirement
       // unsubstituted.
@@ -599,6 +617,17 @@ bool ConcreteContraction::performConcreteContraction(
     // requirement where the left hand side is not a type parameter.
     SmallVector<Requirement, 4> reqs;
     if (req.inferred) {
+      // Discard errors from desugaring a substituted requirement that
+      // was inferred. For example, if we have something like
+      //
+      //   <T, U where T == Int, U == Set<T>>
+      //
+      // The inferred requirement 'T : Hashable' from 'Set<>' will
+      // be substituted with 'T == Int' to get 'Int : Hashable'.
+      //
+      // Desugaring will diagnose a redundant conformance requirement,
+      // but we want to ignore that, since the user did not explicitly
+      // write 'Int : Hashable' (or 'T : Hashable') anywhere.
       SmallVector<RequirementError, 4> discardErrors;
       desugarRequirement(substReq, SourceLoc(), reqs, discardErrors);
     } else {

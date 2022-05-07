@@ -293,6 +293,13 @@ getTypeRefByFunction(IRGenModule &IGM,
 
 bool swift::irgen::mangledNameIsUnknownToDeployTarget(IRGenModule &IGM,
                                                       CanType type) {
+  // We don't currently support demangling extended existential types.
+  // FIXME: implement this and remove this logic
+  bool hasExtendedExistential = type.findIf([](CanType t) -> bool {
+    return isa<ParameterizedProtocolType>(t);
+  });
+  if (hasExtendedExistential) return true;
+
   if (auto runtimeCompatVersion = getSwiftRuntimeCompatibilityVersionForTarget(
           IGM.Context.LangOpts.Target)) {
     if (auto minimumSupportedRuntimeVersion =
@@ -310,7 +317,12 @@ getTypeRefImpl(IRGenModule &IGM,
                CanType type,
                CanGenericSignature sig,
                MangledTypeRefRole role) {
+  bool useFlatUnique = false;
   switch (role) {
+  case MangledTypeRefRole::FlatUnique:
+    useFlatUnique = true;
+    break;
+
   case MangledTypeRefRole::DefaultAssociatedTypeWitness:
   case MangledTypeRefRole::Metadata:
     // Note that we're using all of the nominal types referenced by this type,
@@ -335,7 +347,9 @@ getTypeRefImpl(IRGenModule &IGM,
   }
 
   IRGenMangler Mangler;
-  auto SymbolicName = Mangler.mangleTypeForReflection(IGM, sig, type);
+  auto SymbolicName =
+    useFlatUnique ? Mangler.mangleTypeForFlatUniqueTypeRef(sig, type)
+                  : Mangler.mangleTypeForReflection(IGM, sig, type);
   return {IGM.getAddrOfStringForTypeRef(SymbolicName, role),
           SymbolicName.runtimeSizeInBytes()};
 }
@@ -717,21 +731,21 @@ private:
     if (!type) {
       B.addInt32(0);
     } else {
-      if (type->isForeignReferenceType()) {
-        type->getASTContext().Diags.diagnose(
-            type->lookThroughAllOptionalTypes()
-                ->getClassOrBoundGenericClass()
-                ->getLoc(),
-            diag::foreign_reference_types_unsupported.ID, {});
-        exit(1);
-      }
-
       auto genericSig = NTD->getGenericSignature();
 
-      // The standard library's Mirror demangles metadata from field
-      // descriptors, so use MangledTypeRefRole::Metadata to ensure
-      // runtime metadata is available.
-      addTypeRef(type, genericSig, MangledTypeRefRole::Metadata);
+      // Special case, UFOs are opaque pointers for now.
+      if (type->isForeignReferenceType()) {
+        auto opaqueType = type->getASTContext().getOpaquePointerType();
+        // The standard library's Mirror demangles metadata from field
+        // descriptors, so use MangledTypeRefRole::Metadata to ensure
+        // runtime metadata is available.
+        addTypeRef(opaqueType, genericSig, MangledTypeRefRole::Metadata);
+      } else {
+        // The standard library's Mirror demangles metadata from field
+        // descriptors, so use MangledTypeRefRole::Metadata to ensure
+        // runtime metadata is available.
+        addTypeRef(type, genericSig, MangledTypeRefRole::Metadata);
+      }
     }
 
     if (IGM.IRGen.Opts.EnableReflectionNames) {

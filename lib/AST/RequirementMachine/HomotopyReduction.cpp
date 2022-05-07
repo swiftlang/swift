@@ -126,39 +126,51 @@ void RewriteSystem::propagateRedundantRequirementIDs() {
     llvm::dbgs() << "\nPropagating requirement IDs: {";
   }
 
-  for (auto ruleAndReplacement : RedundantRules) {
-    auto ruleID = ruleAndReplacement.first;
-    auto rewritePath = ruleAndReplacement.second;
-    auto &rule = Rules[ruleID];
+  for (const auto &ruleAndReplacement : RedundantRules) {
+    unsigned ruleID = ruleAndReplacement.first;
+    const auto &rewritePath = ruleAndReplacement.second;
+    const auto &rule = Rules[ruleID];
 
     auto requirementID = rule.getRequirementID();
-    if (!requirementID.hasValue())
+    if (!requirementID.hasValue()) {
+      if (Debug.contains(DebugFlags::PropagateRequirementIDs)) {
+        llvm::dbgs() << "\n- rule does not have a requirement ID: "
+                     << rule;
+      }
       continue;
+    }
 
     MutableTerm lhs(rule.getLHS());
-    for (auto ruleID : rewritePath.getRulesInEmptyContext(lhs, *this)) {
+    for (auto ruleID : rewritePath.findRulesAppearingOnceInEmptyContext(lhs, *this)) {
       auto &replacement = Rules[ruleID];
-      if (!replacement.isPermanent()) {
-        // If the replacement rule already has a requirementID, overwrite
-        // it if the existing ID corresponds to an inferred requirement.
-        // This effectively makes the inferred requirement the redundant
-        // one, which makes it easier to suppress redundancy warnings for
-        // inferred requirements later on.
-        auto existingID = replacement.getRequirementID();
-        if (existingID.hasValue() && !WrittenRequirements[*existingID].inferred)
-          continue;
-
+      if (replacement.isPermanent()) {
         if (Debug.contains(DebugFlags::PropagateRequirementIDs)) {
-          llvm::dbgs() << "\n- propagating ID = "
-            << requirementID
-            << "\n  from ";
-          rule.dump(llvm::dbgs());
-          llvm::dbgs() << "\n  to ";
-          replacement.dump(llvm::dbgs());
+          llvm::dbgs() << "\n- skipping permanent rule: " << rule;
         }
-
-        replacement.setRequirementID(requirementID);
+        continue;
       }
+
+      // If the replacement rule already has a requirementID, overwrite
+      // it if the existing ID corresponds to an inferred requirement.
+      // This effectively makes the inferred requirement the redundant
+      // one, which makes it easier to suppress redundancy warnings for
+      // inferred requirements later on.
+      auto existingID = replacement.getRequirementID();
+      if (existingID.hasValue() && !WrittenRequirements[*existingID].inferred) {
+        if (Debug.contains(DebugFlags::PropagateRequirementIDs)) {
+          llvm::dbgs() << "\n- rule already has a requirement ID: "
+                       << rule;
+        }
+        continue;
+      }
+
+      if (Debug.contains(DebugFlags::PropagateRequirementIDs)) {
+        llvm::dbgs() << "\n- propagating ID = " << requirementID
+                     << "\n  from " << rule;
+        llvm::dbgs() << "\n  to " << replacement;
+      }
+
+      replacement.setRequirementID(requirementID);
     }
   }
 

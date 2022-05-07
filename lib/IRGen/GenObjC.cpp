@@ -281,7 +281,7 @@ llvm::Constant *IRGenModule::getAddrOfObjCMethodName(StringRef selector) {
 
 /// Get or create an Objective-C selector reference.  Always returns
 /// an i8**.  The design is that the compiler will emit a load of this
-/// pointer, and the linker will ensure that that pointer is unique.
+/// pointer, and the linker will ensure that pointer is unique.
 llvm::Constant *IRGenModule::getAddrOfObjCSelectorRef(StringRef selector) {
   // Check whether a reference for this selector already exists.
   auto &entry = ObjCSelectorRefs[selector];
@@ -1279,7 +1279,10 @@ irgen::emitObjCGetterDescriptorParts(IRGenModule &IGM,
 ObjCMethodDescriptor
 irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
                                      VarDecl *property) {
-  assert(property->isSettable(property->getDeclContext()) &&
+  // Optional properties support mutation on the Objective-C side, but not the
+  // Swift side.
+  assert((property->getAttrs().hasAttribute<OptionalAttr>() ||
+          property->isSettable(property->getDeclContext())) &&
          "not a settable property?!");
 
   Selector setterSel(property, Selector::ForSetter);
@@ -1320,7 +1323,11 @@ irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
 ObjCMethodDescriptor
 irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
                                      SubscriptDecl *subscript) {
-  assert(subscript->supportsMutation() && "not a settable subscript?!");
+  // Optional subscripts support mutation on the Objective-C side, but not the
+  // Swift side.
+  assert((subscript->getAttrs().hasAttribute<OptionalAttr>() ||
+          subscript->supportsMutation()) &&
+         "not a settable subscript?!");
 
   Selector setterSel(subscript, Selector::ForSetter);
   ObjCMethodDescriptor descriptor{};

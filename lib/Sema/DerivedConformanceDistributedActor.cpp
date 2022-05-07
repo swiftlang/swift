@@ -24,10 +24,27 @@
 
 using namespace swift;
 
+bool DerivedConformance::canDeriveIdentifiable(
+    NominalTypeDecl *nominal, DeclContext *dc) {
+  // we only synthesize for concrete 'distributed actor' decls (which are class)
+  if (!isa<ClassDecl>(nominal))
+    return false;
+
+  auto &C = nominal->getASTContext();
+  if (!C.getLoadedModule(C.Id_Distributed))
+    return false;
+
+  return nominal->isDistributedActor();
+}
+
 bool DerivedConformance::canDeriveDistributedActor(
     NominalTypeDecl *nominal, DeclContext *dc) {
+  auto &C = nominal->getASTContext();
   auto classDecl = dyn_cast<ClassDecl>(nominal);
-  return classDecl && classDecl->isDistributedActor() && dc == nominal;
+
+  return C.getLoadedModule(C.Id_Distributed) &&
+         classDecl && classDecl->isDistributedActor() &&
+         dc == nominal;
 }
 
 bool DerivedConformance::canDeriveDistributedActorSystem(
@@ -500,6 +517,49 @@ deriveDistributedActorType_ActorSystem(
   return defaultDistributedActorSystemTypeDecl->getDeclaredInterfaceType();
 }
 
+static Type
+deriveDistributedActorType_ID(
+    DerivedConformance &derived) {
+  if (!derived.Nominal->isDistributedActor())
+    return nullptr;
+
+  // Look for a type DefaultDistributedActorSystem within the parent context.
+  auto systemTy = getDistributedActorSystemType(derived.Nominal);
+
+  // There is no known actor system type, so fail to synthesize.
+  if (!systemTy || systemTy->hasError())
+    return nullptr;
+
+  if (auto systemNominal = systemTy->getAnyNominal()) {
+    return getDistributedActorSystemActorIDType(systemNominal);
+  }
+
+  return nullptr;
+}
+
+static Type
+deriveDistributedActorType_SerializationRequirement(
+    DerivedConformance &derived) {
+  if (!derived.Nominal->isDistributedActor())
+    return nullptr;
+
+  // Look for a type DefaultDistributedActorSystem within the parent context.
+  auto systemTy = getDistributedActorSystemType(derived.Nominal);
+
+  // There is no known actor system type, so fail to synthesize.
+  if (!systemTy || systemTy->hasError())
+    return nullptr;
+
+  auto DAS = derived.Context.getDistributedActorSystemDecl();
+  if (!DAS)
+    return nullptr;
+
+  if (auto systemNominal = systemTy->getAnyNominal())
+    return getDistributedSerializationRequirementType(systemNominal, DAS);
+
+  return nullptr;
+}
+
 /******************************************************************************/
 /**************************** ENTRY POINTS ************************************/
 /******************************************************************************/
@@ -535,7 +595,17 @@ std::pair<Type, TypeDecl *> DerivedConformance::deriveDistributedActor(
     return std::make_pair(Type(), nullptr);
 
   if (assocType->getName() == Context.Id_ActorSystem) {
-    return std::make_pair(deriveDistributedActorType_ActorSystem(*this), nullptr);
+    return std::make_pair(deriveDistributedActorType_ActorSystem(*this),
+                          nullptr);
+  }
+
+  if (assocType->getName() == Context.Id_SerializationRequirement) {
+    return std::make_pair(
+        deriveDistributedActorType_SerializationRequirement(*this), nullptr);
+  }
+
+  if (assocType->getName() == Context.Id_ID) {
+    return std::make_pair(deriveDistributedActorType_ID(*this), nullptr);
   }
 
   Context.Diags.diagnose(assocType->getLoc(),
@@ -562,10 +632,10 @@ DerivedConformance::deriveDistributedActorSystem(ValueDecl *requirement) {
 
 void DerivedConformance::tryDiagnoseFailedDistributedActorDerivation(
         DeclContext *DC, NominalTypeDecl *nominal) {
-  // TODO: offer better diagnosis for error scenarios here
+  // TODO(distributed): offer better diagnosis for error scenarios here
 }
 
 void DerivedConformance::tryDiagnoseFailedDistributedActorSystemDerivation(
     DeclContext *DC, NominalTypeDecl *nominal) {
-  // TODO: offer better diagnosis for error scenarios here
+  // TODO(distributed): offer better diagnosis for error scenarios here
 }

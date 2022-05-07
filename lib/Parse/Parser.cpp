@@ -413,7 +413,7 @@ class TokenRecorder: public ConsumeTokenReceiver {
   // Token list ordered by their appearance in the source file.
   std::vector<Token> Tokens;
 
-  // Registered token kind change. These changes are regiestered before the
+  // Registered token kind change. These changes are registered before the
   // token is consumed, so we need to keep track of them here.
   llvm::DenseMap<const void*, tok> TokenKindChangeMap;
 
@@ -504,7 +504,7 @@ public:
       return;
     }
 
-    // Update Token kind if a kind update was regiestered before.
+    // Update Token kind if a kind update was registered before.
     auto Found = TokenKindChangeMap.find(Tok.getLoc().
                                          getOpaquePointerValue());
     if (Found != TokenKindChangeMap.end()) {
@@ -579,13 +579,16 @@ const Token &Parser::peekToken() {
   return L->peekNextToken();
 }
 
-SourceLoc Parser::consumeTokenWithoutFeedingReceiver() {
-  SourceLoc Loc = Tok.getLoc();
+SourceLoc Parser::discardToken() {
   assert(Tok.isNot(tok::eof) && "Lexing past eof!");
-
-  recordTokenHash(Tok);
-
+  SourceLoc Loc = Tok.getLoc();
   L->lex(Tok, LeadingTrivia, TrailingTrivia);
+  return Loc;
+}
+
+SourceLoc Parser::consumeTokenWithoutFeedingReceiver() {
+  recordTokenHash(Tok);
+  auto Loc = discardToken();
   PreviousLoc = Loc;
   return Loc;
 }
@@ -767,24 +770,6 @@ void Parser::skipUntilDeclRBrace() {
     skipSingle();
 }
 
-void Parser::skipUntilDeclStmtRBrace(tok T1) {
-  while (Tok.isNot(T1, tok::eof, tok::r_brace, tok::pound_endif,
-                   tok::pound_else, tok::pound_elseif,
-                   tok::code_complete) &&
-         !isStartOfStmt() && !isStartOfSwiftDecl()) {
-    skipSingle();
-  }
-}
-
-void Parser::skipUntilDeclStmtRBrace(tok T1, tok T2) {
-  while (Tok.isNot(T1, T2, tok::eof, tok::r_brace, tok::pound_endif,
-                   tok::pound_else, tok::pound_elseif,
-                   tok::code_complete) &&
-         !isStartOfStmt() && !isStartOfSwiftDecl()) {
-    skipSingle();
-  }
-}
-
 void Parser::skipListUntilDeclRBrace(SourceLoc startLoc, tok T1, tok T2) {
   while (Tok.isNot(T1, T2, tok::eof, tok::r_brace, tok::pound_endif,
                    tok::pound_else, tok::pound_elseif)) {
@@ -805,7 +790,7 @@ void Parser::skipListUntilDeclRBrace(SourceLoc startLoc, tok T1, tok T2) {
         consumeToken();
         
         // If the following token is either <identifier> or :, it means that
-        // this `var` or `let` shoud be interpreted as a label
+        // this `var` or `let` should be interpreted as a label
         if ((Tok.canBeArgumentLabel() && peekToken().is(tok::colon)) ||
              peekToken().is(tok::colon)) {
           backtrack.cancelBacktrack();
@@ -1172,15 +1157,6 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
   }
 
   return Status;
-}
-
-/// diagnoseRedefinition - Diagnose a redefinition error, with a note
-/// referring back to the original definition.
-
-void Parser::diagnoseRedefinition(ValueDecl *Prev, ValueDecl *New) {
-  assert(New != Prev && "Cannot conflict with self");
-  diagnose(New->getLoc(), diag::decl_redefinition);
-  diagnose(Prev->getLoc(), diag::previous_decldef, Prev->getBaseName());
 }
 
 Optional<StringRef>

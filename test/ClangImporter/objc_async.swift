@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules %s -verify -verify-additional-file %swift_src_root/test/Inputs/clang-importer-sdk/usr/include/ObjCConcurrency.h -warn-concurrency -parse-as-library
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules %s -verify -verify-additional-file %swift_src_root/test/Inputs/clang-importer-sdk/usr/include/ObjCConcurrency.h -strict-concurrency=targeted -parse-as-library
 
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
@@ -178,8 +178,16 @@ actor MySubclassCheckingSwiftAttributes : ProtocolWithSwiftAttributes {
 
 // Sendable conformance inference for imported types.
 func acceptCV<T: Sendable>(_: T) { }
-func testCV(r: NSRange) {
+
+struct MyStruct: Sendable {
+  var range: NSRange
+  var inner: SendableStructWithNonSendable
+}
+
+@available(SwiftStdlib 5.5, *)
+func testCV(r: NSRange, someStruct: SendableStructWithNonSendable) async {
   acceptCV(r)
+  acceptCV(someStruct)
 }
 
 // Global actor (unsafe) isolation.
@@ -315,6 +323,7 @@ func check() async {
   _ = await BazFrame(size: 0)
 }
 
+@available(SwiftStdlib 5.5, *)
 func testSender(
   sender: NXSender,
   sendableObject: SendableClass,
@@ -326,7 +335,7 @@ func testSender(
   nonSendableGeneric: GenericObject<SendableClass>,
   ptr: UnsafeMutableRawPointer,
   stringArray: [String]
-) {
+) async {
   sender.sendAny(sendableObject)
   sender.sendAny(nonSendableObject)
   // expected-warning@-1 {{conformance of 'NonSendableClass' to 'Sendable' is unavailable}}
@@ -345,24 +354,22 @@ func testSender(
 
   sender.sendProto(sendableProtos)
   sender.sendProto(nonSendableProtos)
-  // expected-error@-1 {{argument type 'any LabellyProtocol & ObjCClub' does not conform to expected type 'Sendable'}}
-  // FIXME(rdar://89992095): Should be a warning because we're in -warn-concurrency
+  // expected-warning@-1 {{type 'any LabellyProtocol & ObjCClub' does not conform to the 'Sendable' protocol}}
 
   sender.sendProtos(sendableProtos)
   sender.sendProtos(nonSendableProtos)
-  // expected-error@-1 {{argument type 'any LabellyProtocol & ObjCClub' does not conform to expected type 'Sendable'}}
-  // FIXME(rdar://89992095): Should be a warning because we're in -warn-concurrency
+  // expected-warning@-1 {{type 'any LabellyProtocol & ObjCClub' does not conform to the 'Sendable' protocol}}
 
   sender.sendAnyArray([sendableObject])
   sender.sendAnyArray([nonSendableObject])
-  // expected-warning@-1 {{conformance of 'NonSendableClass' to 'Sendable' is unavailable}}
+  // expected-warning@-1 {{conformance of 'NonSendableClass' to 'Sendable' is unavailable; this is an error in Swift 6}}
 
   sender.sendGeneric(sendableGeneric)
-  // expected-warning@-1 {{type 'GenericObject<SendableClass>' does not conform to the 'Sendable' protocol}}
-  // FIXME(rdar://89992569): Should allow for the possibility that GenericObject will have a Sendable subclass
+  // expected-warning@-1{{type 'GenericObject<SendableClass>' does not conform to the 'Sendable' protocol}}
+  // FIXME: Shouldn't warn
+
   sender.sendGeneric(nonSendableGeneric)
-  // expected-error@-1 {{argument type 'GenericObject<SendableClass>' does not conform to expected type 'Sendable'}}
-  // FIXME(rdar://89992095): Should be a warning because we're in -warn-concurrency
+  // expected-warning@-1 {{type 'GenericObject<SendableClass>' does not conform to the 'Sendable' protocol}}
 
   sender.sendPtr(ptr)
   sender.sendStringArray(stringArray)

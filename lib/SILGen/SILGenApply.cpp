@@ -1072,7 +1072,10 @@ public:
       isObjCDirect = objcDecl->isDirectMethod();
     }
 
-    if (isObjCDirect) {
+    // Methods on unsafe foreign objects are always called directly.
+    bool isUFO = isa_and_nonnull<ClassDecl>(afd->getDeclContext()) &&
+        cast<ClassDecl>(afd->getDeclContext())->isForeignReferenceType();
+    if (isObjCDirect || isUFO) {
       setCallee(Callee::forDirect(SGF, constant, subs, e));
     } else {
       setCallee(Callee::forClassMethod(SGF, constant, subs, e));
@@ -4427,27 +4430,6 @@ public:
 #endif
   }
 };
-
-class EmitBreadcrumbCleanup : public Cleanup {
-  ExecutorBreadcrumb breadcrumb;
-
-public:
-  EmitBreadcrumbCleanup(ExecutorBreadcrumb &&breadcrumb)
-    : breadcrumb(std::move(breadcrumb)) {}
-
-  void emit(SILGenFunction &SGF, CleanupLocation l,
-            ForUnwind_t forUnwind) override {
-    breadcrumb.emit(SGF, l);
-  }
-
-  void dump(SILGenFunction &SGF) const override {
-#ifndef NDEBUG
-    llvm::errs() << "EmitBreadcrumbCleanup "
-                 << "State:" << getState()
-                 << "NeedsEmit:" << breadcrumb.needsEmit();
-#endif
-  }
-};
 } // end anonymous namespace
 
 //===----------------------------------------------------------------------===//
@@ -4598,11 +4580,6 @@ RValue SILGenFunction::emitApply(
     rawDirectResult = rawDirectResults[0];
   }
 
-  if (!calleeTypeInfo.foreign.async) {
-    // hop back to the current executor
-    breadcrumb.emit(*this, loc);
-  }
-
   // For objc async calls, lifetime extend the args until the result plan which
   // generates `await_async_continuation`.
   // Lifetime is extended by creating unmanaged copies here and by pushing the
@@ -4614,6 +4591,14 @@ RValue SILGenFunction::emitApply(
         unmanagedCopies.push_back(arg.unmanagedCopy(*this, loc));
       }
     }
+    // similarly, we defer the emission of the breadcrumb until the result
+    // plan's finish method is called, because it must happen in the
+    // successors of the `await_async_continuation` terminator.
+    resultPlan->deferExecutorBreadcrumb(std::move(breadcrumb));
+
+  } else {
+    // In the ordinary case, we hop back to the current executor
+    breadcrumb.emit(*this, loc);
   }
 
   // Pop the argument scope.
@@ -4700,8 +4685,6 @@ RValue SILGenFunction::emitApply(
     for (auto unmanagedCopy : unmanagedCopies) {
       Cleanups.pushCleanup<FixLifetimeDestroyCleanup>(unmanagedCopy);
     }
-    // save breadcrumb as a clean-up so it is emitted in result / throw cases.
-    Cleanups.pushCleanup<EmitBreadcrumbCleanup>(std::move(breadcrumb));
   } else {
     assert(unmanagedCopies.empty());
   }

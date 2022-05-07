@@ -43,7 +43,6 @@
 
 namespace swift {
 namespace impl {
-
 /// The default implementation for swift::atomic<T>, which just wraps
 /// std::atomic with minor differences.
 ///
@@ -181,7 +180,7 @@ public:
 } // end namespace swift::impl
 
 /// A simple wrapper for std::atomic that provides the most important
-/// interfaces and fixes the API bug where all of the orderings dafault
+/// interfaces and fixes the API bug where all of the orderings default
 /// to sequentially-consistent.
 ///
 /// It also sometimes uses a different implementation in cases where

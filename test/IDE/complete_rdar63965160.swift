@@ -34,5 +34,5 @@ func test(values: [Value]) {
 }
 // CHECK: Begin completions, 2 items
 // CHECK-DAG: Keyword[self]/CurrNominal:          self[#Value#];
-// CHECK-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[{{Convertible|Identical}}]: name[#String#];
+// CHECK-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]: name[#String#];
 // CHECK: End completions

@@ -43,6 +43,9 @@ let releaseDevirtualizerPass = FunctionPass(
           // these we know that they don't have associated objects, which are
           // _not_ released by the deinit method.
           if let deallocStackRef = instruction as? DeallocStackRefInst {
+            if !context.continueWithNextSubpassRun(for: release) {
+              return
+            }
             tryDevirtualizeReleaseOfObject(context, release, deallocStackRef)
             lastRelease = nil
             continue
@@ -82,7 +85,7 @@ private func tryDevirtualizeReleaseOfObject(
 
   let type = allocRefInstruction.type
 
-  guard let dealloc = context.getDestructor(ofClass: type) else {
+  guard let dealloc = context.calleeAnalysis.getDestructor(ofExactType: type) else {
     return
   }
 

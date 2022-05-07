@@ -37,7 +37,7 @@
 ///
 /// 1. Reused-storage: Some operations are guaranteed to reuse their operand's
 /// storage. This includes extracting an enum payload and opening an existential
-/// value. This is required avoid introducing new copies or moves.
+/// value. This is required to avoid introducing new copies or moves.
 ///
 ///   // %data's storage must reuse storage allocated for %enum
 ///   %data = unchecked_enum_data %enum : $Optional<T>, #Optional.some!enumelt
@@ -419,6 +419,11 @@ struct AddressLoweringState {
   // parameters are rewritten.
   SmallBlotSetVector<FullApplySite, 16> indirectApplies;
 
+  // checked_cast_br instructions with loadable source type and opaque target
+  // type need to be rewritten in a post-pass, once all the uses of the opaque
+  // target value are rewritten to their address forms.
+  SmallVector<CheckedCastBranchInst *, 8> opaqueResultCCBs;
+
   // All function-exiting terminators (return or throw instructions).
   SmallVector<TermInst *, 8> exitingInsts;
 
@@ -605,6 +610,15 @@ void OpaqueValueVisitor::mapValueStorage() {
     for (auto &inst : *block) {
       if (auto apply = FullApplySite::isa(&inst))
         checkForIndirectApply(apply);
+
+      // Collect all checked_cast_br instructions that have a loadable source
+      // type and opaque target type
+      if (auto *ccb = dyn_cast<CheckedCastBranchInst>(&inst)) {
+        if (!ccb->getSourceLoweredType().isAddressOnly(*ccb->getFunction()) &&
+            ccb->getTargetLoweredType().isAddressOnly(*ccb->getFunction())) {
+          pass.opaqueResultCCBs.push_back(ccb);
+        }
+      }
 
       for (auto result : inst.getResults()) {
         if (isPseudoCallResult(result) || isPseudoReturnValue(result))
@@ -821,6 +835,11 @@ static Operand *getReusedStorageOperand(SILValue value) {
     if (auto *term = cast<SILPhiArgument>(value)->getTerminatorForResult()) {
       if (auto *switchEnum = dyn_cast<SwitchEnumInst>(term)) {
         return &switchEnum->getAllOperands()[0];
+      }
+      if (auto *checkedCastBr = dyn_cast<CheckedCastBranchInst>(term)) {
+        if (value->getParentBlock() == checkedCastBr->getFailureBB()) {
+          return &checkedCastBr->getAllOperands()[0];
+        }
       }
     }
     break;
@@ -2248,6 +2267,99 @@ void ApplyRewriter::replaceDirectResults(DestructureTupleInst *oldDestructure) {
 }
 
 //===----------------------------------------------------------------------===//
+//                               CheckedCastBrRewriter
+//
+//    Utilities for rewriting checked_cast_br with opaque source/target type
+// ===---------------------------------------------------------------------===//
+class CheckedCastBrRewriter {
+  CheckedCastBranchInst *ccb;
+  AddressLoweringState &pass;
+  SILLocation castLoc;
+  SILFunction *func;
+  SILBasicBlock *successBB;
+  SILBasicBlock *failureBB;
+  SILArgument *origSuccessVal;
+  SILArgument *origFailureVal;
+  SILBuilder termBuilder;
+  SILBuilder successBuilder;
+  SILBuilder failureBuilder;
+
+public:
+  CheckedCastBrRewriter(CheckedCastBranchInst *ccb, AddressLoweringState &pass)
+      : ccb(ccb), pass(pass), castLoc(ccb->getLoc()), func(ccb->getFunction()),
+        successBB(ccb->getSuccessBB()), failureBB(ccb->getFailureBB()),
+        origSuccessVal(successBB->getArgument(0)),
+        origFailureVal(failureBB->getArgument(0)),
+        termBuilder(pass.getTermBuilder(ccb)),
+        successBuilder(pass.getBuilder(successBB->begin())),
+        failureBuilder(pass.getBuilder(failureBB->begin())) {}
+
+  /// Rewrite checked_cast_br with opaque source/target operands to
+  /// checked_cast_addr_br
+  void rewrite() {
+    auto srcAddr =
+        getAddressForCastEntity(ccb->getOperand(), /* needsInit */ true);
+    auto destAddr =
+        getAddressForCastEntity(origSuccessVal, /* needsInit */ false);
+
+    // getReusedStorageOperand() ensured we do not allocate a separate address
+    // for failure block arg. Set the storage address of the failure block arg
+    // to be source address here.
+    if (origFailureVal->getType().isAddressOnly(*func)) {
+      pass.valueStorageMap.setStorageAddress(origFailureVal, srcAddr);
+    }
+
+    termBuilder.createCheckedCastAddrBranch(
+        castLoc, CastConsumptionKind::TakeOnSuccess, srcAddr,
+        ccb->getSourceFormalType(), destAddr, ccb->getTargetFormalType(),
+        successBB, failureBB, ccb->getTrueBBCount(), ccb->getFalseBBCount());
+
+    replaceBlockArg(origSuccessVal, destAddr);
+    replaceBlockArg(origFailureVal, srcAddr);
+
+    pass.deleter.forceDelete(ccb);
+  }
+
+private:
+  /// Return the storageAddress if \p value is opaque, otherwise create and
+  /// return a stack temporary.
+  SILValue getAddressForCastEntity(SILValue value, bool needsInit) {
+    if (value->getType().isAddressOnly(*func))
+      return pass.valueStorageMap.getStorage(value).storageAddress;
+
+    // Create a stack temporary for a loadable value
+    auto *addr = termBuilder.createAllocStack(castLoc, value->getType());
+    if (needsInit) {
+      termBuilder.createStore(castLoc, value, addr,
+                              value->getType().isTrivial(*func)
+                                  ? StoreOwnershipQualifier::Trivial
+                                  : StoreOwnershipQualifier::Init);
+    }
+    successBuilder.createDeallocStack(castLoc, addr);
+    failureBuilder.createDeallocStack(castLoc, addr);
+    return addr;
+  }
+
+  void replaceBlockArg(SILArgument *blockArg, SILValue addr) {
+    // Replace all uses of the opaque block arg with a load from its
+    // storage address.
+    auto load =
+        pass.getBuilder(blockArg->getParent()->begin())
+            .createTrivialLoadOr(castLoc, addr, LoadOwnershipQualifier::Take);
+    blockArg->replaceAllUsesWith(load);
+
+    blockArg->getParent()->eraseArgument(blockArg->getIndex());
+
+    if (blockArg->getType().isAddressOnly(*func)) {
+      // In case of opaque block arg, replace the block arg with the dummy load
+      // in the valueStorageMap. DefRewriter::visitLoadInst will then rewrite
+      // the dummy load to copy_addr.
+      pass.valueStorageMap.replaceValue(blockArg, load);
+    }
+  }
+};
+
+//===----------------------------------------------------------------------===//
 //                               ReturnRewriter
 //
 //             Rewrite return instructions for indirect results.
@@ -2503,12 +2615,6 @@ protected:
   // types.
   void visitOpenExistentialValueInst(OpenExistentialValueInst *openExistential);
 
-  void visitOpenExistentialBoxValueInst(
-      OpenExistentialBoxValueInst *openExistentialBox) {
-    // FIXME: Unimplemented
-    llvm::report_fatal_error("Unimplemented OpenExistentialBox use.");
-  }
-
   void visitReturnInst(ReturnInst *returnInst) {
     // Returns are rewritten for any function with indirect results after
     // opaque value rewriting.
@@ -2565,6 +2671,11 @@ protected:
 
     markRewritten(uncheckedCastInst, destAddr);
   }
+
+  void visitUnconditionalCheckedCastInst(
+      UnconditionalCheckedCastInst *uncondCheckedCast);
+
+  void visitCheckedCastBranchInst(CheckedCastBranchInst *checkedCastBranch);
 
   void visitUncheckedEnumDataInst(UncheckedEnumDataInst *enumDataInst);
 };
@@ -2625,15 +2736,7 @@ void UseRewriter::visitOpenExistentialValueInst(
       openExistential->getType().getAddressType(),
       OpenedExistentialAccess::Immutable);
 
-  SmallVector<Operand *, 4> typeUses;
-  for (Operand *use : openExistential->getUses()) {
-    if (use->isTypeDependent()) {
-      typeUses.push_back(use);
-    }
-  }
-  for (Operand *use : typeUses) {
-    use->set(openAddr);
-  }
+  openExistential->replaceAllTypeDependentUsesWith(openAddr);
   markRewritten(openExistential, openAddr);
 }
 
@@ -2815,6 +2918,10 @@ void UseRewriter::visitSwitchEnumInst(SwitchEnumInst * switchEnum) {
                                defaultCounter);
 }
 
+void UseRewriter::visitCheckedCastBranchInst(CheckedCastBranchInst *ccb) {
+  CheckedCastBrRewriter(ccb, pass).rewrite();
+}
+
 void UseRewriter::visitUncheckedEnumDataInst(
     UncheckedEnumDataInst *enumDataInst) {
   assert(use == getReusedStorageOperand(enumDataInst));
@@ -2833,6 +2940,38 @@ void UseRewriter::visitUncheckedEnumDataInst(
       builder.createUncheckedTakeEnumDataAddr(loc, srcAddr, elt, destTy);
 
   markRewritten(enumDataInst, enumAddrInst);
+}
+
+void UseRewriter::visitUnconditionalCheckedCastInst(
+    UnconditionalCheckedCastInst *uncondCheckedCast) {
+  SILValue srcVal = uncondCheckedCast->getOperand();
+  assert(srcVal->getType().isAddressOnly(*pass.function));
+  SILValue srcAddr = pass.valueStorageMap.getStorage(srcVal).storageAddress;
+
+  if (uncondCheckedCast->getType().isAddressOnly(*pass.function)) {
+    // When cast destination has address only type, use the storage address
+    SILValue destAddr = addrMat.materializeAddress(uncondCheckedCast);
+    markRewritten(uncondCheckedCast, destAddr);
+    builder.createUnconditionalCheckedCastAddr(
+        uncondCheckedCast->getLoc(), srcAddr, srcAddr->getType().getASTType(),
+        destAddr, destAddr->getType().getASTType());
+    return;
+  }
+  // For loadable cast destination type, create a stack temporary
+  SILValue destAddr = builder.createAllocStack(uncondCheckedCast->getLoc(),
+                                               uncondCheckedCast->getType());
+  builder.createUnconditionalCheckedCastAddr(
+      uncondCheckedCast->getLoc(), srcAddr, srcAddr->getType().getASTType(),
+      destAddr, destAddr->getType().getASTType());
+  auto nextBuilder =
+      pass.getBuilder(uncondCheckedCast->getNextInstruction()->getIterator());
+  auto dest = nextBuilder.createLoad(
+      uncondCheckedCast->getLoc(), destAddr,
+      destAddr->getType().isTrivial(*uncondCheckedCast->getFunction())
+          ? LoadOwnershipQualifier::Trivial
+          : LoadOwnershipQualifier::Copy);
+  nextBuilder.createDeallocStack(uncondCheckedCast->getLoc(), destAddr);
+  uncondCheckedCast->replaceAllUsesWith(dest);
 }
 
 //===----------------------------------------------------------------------===//
@@ -2864,7 +3003,6 @@ public:
   static void rewriteValue(SILValue value, AddressLoweringState &pass) {
     if (auto *inst = value->getDefiningInstruction()) {
       DefRewriter(pass, value, inst->getIterator()).visit(inst);
-
     } else {
       // function args are already rewritten.
       auto *blockArg = cast<SILPhiArgument>(value);
@@ -2879,7 +3017,6 @@ protected:
     LLVM_DEBUG(llvm::dbgs() << "REWRITE ARG "; arg->dump());
     if (storage.storageAddress)
       LLVM_DEBUG(llvm::dbgs() << "  STORAGE "; storage.storageAddress->dump());
-
     storage.storageAddress = addrMat.materializeAddress(arg);
   }
 
@@ -2939,11 +3076,18 @@ protected:
     addrMat.initializeComposingUse(&initExistentialValue->getOperandRef());
   }
 
-  // Project an opaque value out of a box-type existential.
   void visitOpenExistentialBoxValueInst(
-      OpenExistentialBoxValueInst *openExistentialBox) {
-    // FIXME: Unimplemented
-    llvm::report_fatal_error("Unimplemented OpenExistentialBoxValue def.");
+      OpenExistentialBoxValueInst *openExistentialBoxValue) {
+    // Replace the module's openedArchetypesDef
+    pass.getModule()->willDeleteInstruction(openExistentialBoxValue);
+
+    auto *openAddr = builder.createOpenExistentialBox(
+        openExistentialBoxValue->getLoc(),
+        openExistentialBoxValue->getOperand(),
+        openExistentialBoxValue->getType().getAddressType());
+
+    openExistentialBoxValue->replaceAllTypeDependentUsesWith(openAddr);
+    pass.valueStorageMap.setStorageAddress(openExistentialBoxValue, openAddr);
   }
 
   // Load an opaque value.
@@ -2978,6 +3122,29 @@ protected:
     for (Operand &operand : tupleInst->getAllOperands())
       addrMat.initializeComposingUse(&operand);
   }
+
+  void visitUnconditionalCheckedCastInst(
+      UnconditionalCheckedCastInst *uncondCheckedCast) {
+    SILValue srcVal = uncondCheckedCast->getOperand();
+    assert(srcVal->getType().isLoadable(*pass.function));
+    assert(uncondCheckedCast->getType().isAddressOnly(*pass.function));
+
+    // Create a stack temporary to store the srcVal
+    SILValue srcAddr = builder.createAllocStack(uncondCheckedCast->getLoc(),
+                                                srcVal->getType());
+    builder.createStore(uncondCheckedCast->getLoc(), srcVal, srcAddr,
+                        srcVal->getType().isTrivial(*srcVal->getFunction())
+                            ? StoreOwnershipQualifier::Trivial
+                            : StoreOwnershipQualifier::Init);
+    // Use the storage address as destination
+    SILValue destAddr = addrMat.materializeAddress(uncondCheckedCast);
+    builder.createUnconditionalCheckedCastAddr(
+        uncondCheckedCast->getLoc(), srcAddr, srcAddr->getType().getASTType(),
+        destAddr, destAddr->getType().getASTType());
+
+    pass.getBuilder(uncondCheckedCast->getNextInstruction()->getIterator())
+        .createDeallocStack(uncondCheckedCast->getLoc(), srcAddr);
+  }
 };
 } // end anonymous namespace
 
@@ -2985,7 +3152,7 @@ protected:
 //                           Rewrite Opaque Values
 //===----------------------------------------------------------------------===//
 
-// Rewrite applies with indirect paramters or results of loadable types which
+// Rewrite applies with indirect parameters or results of loadable types which
 // were not visited during opaque value rewritting.
 static void rewriteIndirectApply(FullApplySite apply,
                                  AddressLoweringState &pass) {
@@ -3038,6 +3205,13 @@ static void rewriteFunction(AddressLoweringState &pass) {
       rewriteIndirectApply(optionalApply.getValue(), pass);
     }
   }
+
+  // Rewrite all checked_cast_br instructions with loadable source type and
+  // opaque target type now
+  for (auto *ccb : pass.opaqueResultCCBs) {
+    CheckedCastBrRewriter(ccb, pass).rewrite();
+  }
+
   // Rewrite this function's return value now that all opaque values within the
   // function are rewritten. This still depends on a valid ValueStorage
   // projection operands.
@@ -3132,7 +3306,8 @@ static void deleteRewrittenInstructions(AddressLoweringState &pass) {
       }
     }
     LLVM_DEBUG(llvm::dbgs() << "DEAD "; deadInst->dump());
-    if (!isa<OpenExistentialValueInst>(deadInst)) {
+    if (!isa<OpenExistentialValueInst>(deadInst) &&
+        !isa<OpenExistentialBoxValueInst>(deadInst)) {
       pass.deleter.forceDeleteWithUsers(deadInst);
       continue;
     }

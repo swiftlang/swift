@@ -59,7 +59,7 @@ void swift_initEnumMetadataSinglePayload(EnumMetadata *enumType,
                                          unsigned emptyCases);
 
 using getExtraInhabitantTag_t =
-  SWIFT_CC(swift) unsigned (const OpaqueValue *vaue,
+  SWIFT_CC(swift) unsigned (const OpaqueValue *value,
                             unsigned numExtraInhabitants,
                             const Metadata *payloadType);
 
@@ -130,7 +130,7 @@ void swift_storeEnumTagMultiPayload(OpaqueValue *value,
                                     unsigned whichCase);
 
 /// The unspecialized getEnumTagSinglePayload value witness to be used by the
-/// VWTs for for specialized generic enums that are multi-payload.
+/// VWTs for specialized generic enums that are multi-payload.
 ///
 /// Runtime availability: Swift 5.6
 SWIFT_RUNTIME_EXPORT
@@ -139,7 +139,7 @@ unsigned swift_getMultiPayloadEnumTagSinglePayload(const OpaqueValue *value,
                                                    const Metadata *enumType);
 
 /// The unspecialized storeEnumTagSinglePayload value witness to be used by the
-/// VWTs for for specialized generic enums that are multi-payload.
+/// VWTs for specialized generic enums that are multi-payload.
 ///
 /// Runtime availability: Swift 5.6
 SWIFT_RUNTIME_EXPORT

@@ -506,11 +506,6 @@ protected:
     IsOpaqueType : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(AssociatedTypeDecl, AbstractTypeParamDecl, 1,
-    /// Whether this is a primary associated type.
-    IsPrimary : 1
-  );
-
   SWIFT_INLINE_BITFIELD_EMPTY(GenericTypeDecl, TypeDecl);
 
   SWIFT_INLINE_BITFIELD(TypeAliasDecl, GenericTypeDecl, 1+1,
@@ -532,7 +527,7 @@ protected:
     IsComputingSemanticMembers : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+1+1+1+8,
+  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+8,
     /// Whether the \c RequiresClass bit is valid.
     RequiresClassValid : 1,
 
@@ -566,6 +561,9 @@ protected:
 
     /// Whether we have a lazy-loaded list of associated types.
     HasLazyAssociatedTypes : 1,
+
+    /// Whether we have a lazy-loaded list of primary associated types.
+    HasLazyPrimaryAssociatedTypes : 1,
 
     : NumPadBits,
 
@@ -2176,6 +2174,9 @@ class GenericParameterReferenceInfo final {
   using OptionalTypePosition = OptionalEnum<decltype(TypePosition::Covariant)>;
 
 public:
+  /// Whether the uncurried interface type of the declaration, stripped of any
+  /// optionality, is a direct reference to the generic parameter at hand. For
+  /// example, "func foo(x: Int) -> () -> Self?" has a covariant 'Self' result.
   bool hasCovariantSelfResult;
 
   OptionalTypePosition selfRef;
@@ -2184,6 +2185,12 @@ public:
   /// A reference to 'Self'.
   static GenericParameterReferenceInfo forSelfRef(TypePosition position) {
     return GenericParameterReferenceInfo(false, position, llvm::None);
+  }
+
+  /// A reference to the generic parameter in covariant result position.
+  static GenericParameterReferenceInfo forCovariantResult() {
+    return GenericParameterReferenceInfo(true, TypePosition::Covariant,
+                                         llvm::None);
   }
 
   /// A reference to 'Self' through an associated type.
@@ -2242,7 +2249,7 @@ class ValueDecl : public Decl {
     unsigned isFinalComputed : 1;
 
     /// Whether this declaration is 'final'. A final class can't be subclassed,
-    /// a final class member can't be overriden.
+    /// a final class member can't be overridden.
     unsigned isFinal : 1;
 
     /// Whether the "isIUO" bit" has been computed yet.
@@ -2686,13 +2693,14 @@ public:
   /// that this declaration dynamically replaces.
   ValueDecl *getDynamicallyReplacedDecl() const;
 
-  /// Report 'Self' references within the type of this declaration as a
-  /// member of the given existential base type.
+  /// Find references to 'Self' in the type signature of this declaration in the
+  /// context of the given existential base type.
   ///
-  /// \param treatNonResultCovariantSelfAsInvariant If true, 'Self' or 'Self?'
-  /// is considered covariant only when it appears as the immediate type of a
-  /// property, or the uncurried result type of a method/subscript, e.g.
-  /// '() -> () -> Self'.
+  /// \param treatNonResultCovariantSelfAsInvariant When set, covariant 'Self'
+  /// references that are not in covariant result type position are considered
+  /// invariant. This position is the uncurried interface type of a declaration,
+  /// stripped of any optionality. For example, this is true for 'Self' in
+  /// 'func foo(Int) -> () -> Self?'.
   GenericParameterReferenceInfo findExistentialSelfReferences(
       Type baseTy, bool treatNonResultCovariantSelfAsInvariant) const;
 };
@@ -2794,7 +2802,7 @@ public:
 
 private:
   /// The original declaration that "names" the opaque type. Although a specific
-  /// opaque type cannot be explicitly named, oapque types can propagate
+  /// opaque type cannot be explicitly named, opaque types can propagate
   /// arbitrarily through expressions, so we need to know *which* opaque type is
   /// propagated.
   ///
@@ -2906,6 +2914,10 @@ public:
   void setUniqueUnderlyingTypeSubstitutions(SubstitutionMap subs) {
     assert(!UniqueUnderlyingType.hasValue() && "resetting underlying type?!");
     UniqueUnderlyingType = subs;
+  }
+
+  bool hasConditionallyAvailableSubstitutions() const {
+    return ConditionallyAvailableTypes.hasValue();
   }
 
   ArrayRef<ConditionallyAvailableSubstitutions *>
@@ -3190,7 +3202,7 @@ public:
   /// Determine whether this generic parameter represents an opaque type.
   ///
   /// \code
-  /// // "some P" is representated by a generic type parameter.
+  /// // "some P" is represented by a generic type parameter.
   /// func f() -> [some P] { ... }
   /// \endcode
   bool isOpaqueType() const {
@@ -3271,14 +3283,6 @@ public:
                      SourceLoc nameLoc, TrailingWhereClause *trailingWhere,
                      LazyMemberLoader *definitionResolver,
                      uint64_t resolverData);
-
-  bool isPrimary() const {
-    return Bits.AssociatedTypeDecl.IsPrimary;
-  }
-
-  void setPrimary() {
-    Bits.AssociatedTypeDecl.IsPrimary = true;
-  }
 
   /// Get the protocol in which this associated type is declared.
   ProtocolDecl *getProtocol() const {
@@ -3560,10 +3564,10 @@ public:
   VarDecl *getDistributedActorIDProperty() const;
 
   /// Find the 'RemoteCallTarget.init(_:)' initializer function.
-  ConstructorDecl* getDistributedRemoteCallTargetInitFunction() const;
+  ConstructorDecl *getDistributedRemoteCallTargetInitFunction() const;
 
   /// Find the 'RemoteCallArgument(label:name:value:)' initializer function.
-  ConstructorDecl* getDistributedRemoteCallArgumentInitFunction() const;
+  ConstructorDecl *getDistributedRemoteCallArgumentInitFunction() const;
 
   /// Collect the set of protocols to which this type should implicitly
   /// conform, such as AnyObject (for classes).
@@ -4338,7 +4342,7 @@ public:
     return !hasClangNode();
   }
 
-  /// Used to determine if this class decl is a foriegn reference type. I.e., a
+  /// Used to determine if this class decl is a foreign reference type. I.e., a
   /// non-reference-counted swift reference type that was imported from a C++
   /// record.
   bool isForeignReferenceType() const;
@@ -4358,10 +4362,13 @@ enum class KnownDerivableProtocolKind : uint8_t {
   Decodable,
   AdditiveArithmetic,
   Differentiable,
+  Identifiable,
   Actor,
   DistributedActor,
   DistributedActorSystem,
 };
+
+using PrimaryAssociatedTypeName = std::pair<Identifier, SourceLoc>;
 
 /// ProtocolDecl - A declaration of a protocol, for example:
 ///
@@ -4372,13 +4379,14 @@ enum class KnownDerivableProtocolKind : uint8_t {
 /// Every protocol has an implicitly-created 'Self' generic parameter that
 /// stands for a type that conforms to the protocol. For example,
 ///
-///   protocol Cloneable {
+///   protocol Clonable {
 ///     func clone() -> Self
 ///   }
 ///
 class ProtocolDecl final : public NominalTypeDecl {
   SourceLoc ProtocolLoc;
 
+  ArrayRef<PrimaryAssociatedTypeName> PrimaryAssociatedTypeNames;
   ArrayRef<ProtocolDecl *> InheritedProtocols;
   ArrayRef<AssociatedTypeDecl *> AssociatedTypes;
 
@@ -4445,6 +4453,10 @@ class ProtocolDecl final : public NominalTypeDecl {
     return Bits.ProtocolDecl.HasLazyRequirementSignature;
   }
 
+  bool hasLazyPrimaryAssociatedTypes() const {
+    return Bits.ProtocolDecl.HasLazyPrimaryAssociatedTypes;
+  }
+
   friend class SuperclassDeclRequest;
   friend class SuperclassTypeRequest;
   friend class StructuralRequirementsRequest;
@@ -4457,10 +4469,13 @@ class ProtocolDecl final : public NominalTypeDecl {
   friend class ExistentialConformsToSelfRequest;
   friend class ExistentialRequiresAnyRequest;
   friend class InheritedProtocolsRequest;
+  friend class PrimaryAssociatedTypesRequest;
   
 public:
   ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc, SourceLoc NameLoc,
-               Identifier Name, ArrayRef<InheritedEntry> Inherited,
+               Identifier Name,
+               ArrayRef<PrimaryAssociatedTypeName> PrimaryAssociatedTypeNames,
+               ArrayRef<InheritedEntry> Inherited,
                TrailingWhereClause *TrailingWhere);
 
   using Decl::getASTContext;
@@ -4485,6 +4500,13 @@ public:
   /// saves loading the set of members in cases where there's no possibility of
   /// a protocol having nested types (ObjC protocols).
   ArrayRef<AssociatedTypeDecl *> getAssociatedTypeMembers() const;
+
+  /// Returns the list of primary associated type names. These are the associated
+  /// types that is parametrized with same-type requirements in a
+  /// parametrized protocol type of the form SomeProtocol<Arg1, Arg2...>.
+  ArrayRef<PrimaryAssociatedTypeName> getPrimaryAssociatedTypeNames() const {
+    return PrimaryAssociatedTypeNames;
+  }
 
   /// Returns the list of primary associated types. These are the associated
   /// types that is parametrized with same-type requirements in a
@@ -4672,6 +4694,9 @@ public:
   void setLazyAssociatedTypeMembers(LazyMemberLoader *lazyLoader,
                                     uint64_t associatedTypesData);
 
+  void setLazyPrimaryAssociatedTypeMembers(LazyMemberLoader *lazyLoader,
+                                           uint64_t associatedTypesData);
+
 public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -4850,11 +4875,21 @@ public:
     return getImplInfo().supportsMutation();
   }
 
-  /// isSettable - Determine whether references to this decl may appear
-  /// on the left-hand side of an assignment or as the operand of a
-  /// `&` or 'inout' operator.
+  /// Determine whether references to this storage declaration may appear
+  /// on the left-hand side of an assignment, as the operand of a
+  /// `&` or 'inout' operator, or as a component in a writable key path.
   bool isSettable(const DeclContext *UseDC,
                   const DeclRefExpr *base = nullptr) const;
+
+  /// Determine whether references to this storage declaration in Swift may
+  /// appear on the left-hand side of an assignment, as the operand of a
+  /// `&` or 'inout' operator, or as a component in a writable key path.
+  ///
+  /// This method is equivalent to \c isSettable with the exception of
+  /// 'optional' storage requirements, which lack support for direct writes
+  /// in Swift.
+  bool isSettableInSwift(const DeclContext *UseDC,
+                         const DeclRefExpr *base = nullptr) const;
 
   /// Does this storage declaration have explicitly-defined accessors
   /// written in the source?
@@ -5468,11 +5503,11 @@ public:
   /// bound generic version.
   VarDecl *getPropertyWrapperBackingProperty() const;
 
-  /// Retreive the projection var for a property that has an attached
+  /// Retrieve the projection var for a property that has an attached
   /// property wrapper with a \c projectedValue .
   VarDecl *getPropertyWrapperProjectionVar() const;
 
-  /// Retrieve the local wrapped value var for for a parameter that has
+  /// Retrieve the local wrapped value var for a parameter that has
   /// an attached property wrapper.
   VarDecl *getPropertyWrapperWrappedValueVar() const;
 
@@ -6601,7 +6636,7 @@ public:
   Optional<Fingerprint> getBodyFingerprint() const;
 
   /// Retrieve the fingerprint of the body including the local type members and
-  /// the local funcition bodies.
+  /// the local function bodies.
   Optional<Fingerprint> getBodyFingerprintIncludingLocalTypeMembers() const;
 
   /// Retrieve the source range of the *original* function body.
@@ -6719,7 +6754,7 @@ public:
 
   /// If \p asyncAlternative is set, then compare its parameters to this
   /// (presumed synchronous) function's parameters to find the index of the
-  /// completion handler parameter. This should be the the only missing
+  /// completion handler parameter. This should be the only missing
   /// parameter in \p asyncAlternative, ignoring defaulted parameters if they
   /// have the same label. It must have a void-returning function type and be
   /// attributed with @escaping but not @autoclosure.
@@ -7071,7 +7106,7 @@ public:
   /// attribute. For example a "mutating set" accessor.
   bool isExplicitNonMutating() const;
 
-  /// Is the accesor one of the kinds that's assumed nonmutating by default?
+  /// Is the accessor one of the kinds that's assumed nonmutating by default?
   bool isAssumedNonMutating() const;
 
   /// Is this accessor one of the kinds that's implicitly a coroutine?
@@ -7787,7 +7822,7 @@ public:
     case DeclKind::PostfixOperator:
       return OperatorFixity::Postfix;
     }
-    llvm_unreachable("inavlid decl kind");
+    llvm_unreachable("invalid decl kind");
   }
 
   SourceLoc getOperatorLoc() const { return OperatorLoc; }
@@ -7944,8 +7979,11 @@ public:
   }
 };
 
-/// Find references to the given generic paramaeter in the generic signature
-/// and the type of the given value.
+/// Find references to the given generic parameter in the type signature of the
+/// given declaration using the given generic signature.
+///
+/// \param skipParamIndex If the value is a function or subscript declaration,
+/// specifies the index of the parameter that shall be skipped.
 GenericParameterReferenceInfo findGenericParameterReferences(
     const ValueDecl *value,
     CanGenericSignature sig, GenericTypeParamType *genericParam,
@@ -7959,6 +7997,17 @@ inline bool AbstractStorageDecl::isSettable(const DeclContext *UseDC,
 
   auto sd = cast<SubscriptDecl>(this);
   return sd->supportsMutation();
+}
+
+inline bool
+AbstractStorageDecl::isSettableInSwift(const DeclContext *UseDC,
+                                       const DeclRefExpr *base) const {
+  // TODO: Writing to an optional storage requirement is not supported in Swift.
+  if (getAttrs().hasAttribute<OptionalAttr>()) {
+    return false;
+  }
+
+  return isSettable(UseDC, base);
 }
 
 inline void

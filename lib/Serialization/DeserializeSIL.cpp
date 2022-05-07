@@ -521,9 +521,10 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   DeclID clangNodeOwnerID;
   TypeID funcTyID;
   IdentifierID replacedFunctionID;
+  IdentifierID usedAdHocWitnessFunctionID;
   GenericSignatureID genericSigID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
-      isWithoutactuallyEscapingThunk, specialPurpose, inlineStrategy,
+      isWithoutActuallyEscapingThunk, specialPurpose, inlineStrategy,
       optimizationMode, perfConstr,
       subclassScope, hasCReferences, effect, numAttrs,
       hasQualifiedOwnership, isWeakImported, LIST_VER_TUPLE_PIECES(available),
@@ -531,11 +532,12 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
-      isWithoutactuallyEscapingThunk, specialPurpose, inlineStrategy,
+      isWithoutActuallyEscapingThunk, specialPurpose, inlineStrategy,
       optimizationMode, perfConstr,
       subclassScope, hasCReferences, effect, numAttrs,
       hasQualifiedOwnership, isWeakImported, LIST_VER_TUPLE_PIECES(available),
-      isDynamic, isExactSelfClass, isDistributed, funcTyID, replacedFunctionID,
+      isDynamic, isExactSelfClass, isDistributed, funcTyID,
+      replacedFunctionID, usedAdHocWitnessFunctionID,
       genericSigID, clangNodeOwnerID, SemanticsIDs);
 
   if (funcTyID == 0) {
@@ -564,6 +566,13 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
         getFuncForReference(MF->getIdentifier(replacedFunctionID).str());
   } else if (replacedFunctionID) {
     replacedObjectiveCFunc = MF->getIdentifier(replacedFunctionID);
+  }
+
+  SILFunction *usedAdHocWitnessFunction = nullptr;
+  if (usedAdHocWitnessFunctionID) {
+    auto usedAdHocWitnessFunctionStr =
+        MF->getIdentifier(usedAdHocWitnessFunctionID).str();
+    usedAdHocWitnessFunction = getFuncForReference(usedAdHocWitnessFunctionStr);
   }
 
   auto linkageOpt = fromStableSILLinkage(rawLinkage);
@@ -607,7 +616,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     fn->setSerialized(IsSerialized_t(isSerialized));
 
     // If the serialized function comes from the same module, we're merging
-    // modules, and can update the the linkage directly. This is needed to
+    // modules, and can update the linkage directly. This is needed to
     // correctly update the linkage for forward declarations to entities defined
     // in another file of the same module – we want to ensure the linkage
     // reflects the fact that the entity isn't really external and shouldn't be
@@ -646,7 +655,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     fn->setTransparent(IsTransparent_t(isTransparent == 1));
     fn->setSerialized(IsSerialized_t(isSerialized));
     fn->setThunk(IsThunk_t(isThunk));
-    fn->setWithoutActuallyEscapingThunk(bool(isWithoutactuallyEscapingThunk));
+    fn->setWithoutActuallyEscapingThunk(bool(isWithoutActuallyEscapingThunk));
     fn->setInlineStrategy(Inline_t(inlineStrategy));
     fn->setSpecialPurpose(SILFunction::Purpose(specialPurpose));
     fn->setEffectsKind(EffectsKind(effect));
@@ -670,6 +679,8 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
       fn->setDynamicallyReplacedFunction(replacedFunction);
     if (!replacedObjectiveCFunc.empty())
       fn->setObjCReplacement(replacedObjectiveCFunc);
+    if (usedAdHocWitnessFunction)
+      fn->setReferencedAdHocRequirementWitnessFunction(usedAdHocWitnessFunction);
     if (clangNodeOwner)
       fn->setClangNodeOwner(clangNodeOwner);
     for (auto ID : SemanticsIDs) {
@@ -686,7 +697,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   builder.setHasOwnership(fn, hasQualifiedOwnership);
 
   // Mark this function as deserialized. This avoids rerunning diagnostic
-  // passes. Certain passes in the madatory pipeline may not work as expected
+  // passes. Certain passes in the mandatory pipeline may not work as expected
   // after arbitrary optimization and lowering.
   if (!MF->isSIB())
     fn->setWasDeserializedCanonical();
@@ -699,7 +710,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   }
 
   // Read and instantiate the specialize attributes.
-  bool shouldAddSpecAtttrs = fn->getSpecializeAttrs().empty();
+  bool shouldAddSpecAttrs = fn->getSpecializeAttrs().empty();
   bool shouldAddEffectAttrs = !fn->hasArgumentEffects();
   for (unsigned attrIdx = 0; attrIdx < numAttrs; ++attrIdx) {
     llvm::Expected<llvm::BitstreamEntry> maybeNext =
@@ -766,7 +777,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
     auto specializedSig = MF->getGenericSignature(specializedSigID);
     // Only add the specialize attributes once.
-    if (shouldAddSpecAtttrs) {
+    if (shouldAddSpecAttrs) {
       // Read the substitution list and construct a SILSpecializeAttr.
       fn->addSpecializeAttr(SILSpecializeAttr::create(
           SILMod, specializedSig, exported != 0, specializationKind, target,
@@ -1246,7 +1257,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
     ResultInst = Builder.createAllocBox(
         Loc, cast<SILBoxType>(MF->getType(TyID)->getCanonicalType()), None,
-        /*bool hasDynamicLifetime*/ Attr != 0);
+        /*bool hasDynamicLifetime*/ Attr & 1,
+        /*bool reflection*/ Attr & 2);
     break;
   case SILInstructionKind::AllocStackInst: {
     assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
@@ -1334,7 +1346,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   ONEOPERAND_ONETYPE_INST(RefTo##Name) \
   ONEOPERAND_ONETYPE_INST(Name##ToRef)
 #include "swift/AST/ReferenceStorage.def"
-  ONEOPERAND_ONETYPE_INST(UncheckedRefCast)
   ONEOPERAND_ONETYPE_INST(UncheckedAddrCast)
   ONEOPERAND_ONETYPE_INST(UncheckedTrivialBitCast)
   ONEOPERAND_ONETYPE_INST(UncheckedBitwiseCast)
@@ -2658,6 +2669,17 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         failureBB);
     break;
   }
+  case SILInstructionKind::UncheckedRefCastInst: {
+    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
+           "Layout should be OneTypeOneOperand.");
+    auto *urc = Builder.createUncheckedRefCast(Loc,
+        getLocalValue(ValID, getSILType(MF->getType(TyID2),
+                                        (SILValueCategory)TyCategory2, Fn)),
+        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
+    urc->setForwardingOwnershipKind(decodeValueOwnership(Attr));
+    ResultInst = urc;
+    break;
+  }
   case SILInstructionKind::UncheckedRefCastAddrInst: {
     CanType sourceType = MF->getType(ListOfValues[0])->getCanonicalType();
     // ignore attr.
@@ -2954,9 +2976,10 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   DeclID clangOwnerID;
   TypeID funcTyID;
   IdentifierID replacedFunctionID;
+  IdentifierID usedAdHocWitnessFunctionID;
   GenericSignatureID genericSigID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
-      isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
+      isWithoutActuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, perfConstr,
       subclassScope, hasCReferences, effect, numSpecAttrs,
       hasQualifiedOwnership, isWeakImported, LIST_VER_TUPLE_PIECES(available),
@@ -2964,11 +2987,12 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
-      isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
+      isWithoutActuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, perfConstr,
       subclassScope, hasCReferences, effect, numSpecAttrs,
       hasQualifiedOwnership, isWeakImported, LIST_VER_TUPLE_PIECES(available),
-      isDynamic, isExactSelfClass, isDistributed, funcTyID, replacedFunctionID,
+      isDynamic, isExactSelfClass, isDistributed, funcTyID,
+      replacedFunctionID, usedAdHocWitnessFunctionID,
       genericSigID, clangOwnerID, SemanticsIDs);
   auto linkage = fromStableSILLinkage(rawLinkage);
   if (!linkage) {

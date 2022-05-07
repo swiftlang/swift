@@ -16,6 +16,7 @@
 #include "swift/SIL/SILBridgingUtils.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/SILBuilder.h"
+#include <string>
 
 using namespace swift;
 
@@ -149,11 +150,12 @@ BridgedStringRef SILFunction_getName(BridgedFunction function) {
   return getBridgedStringRef(castToFunction(function)->getName());
 }
 
-BridgedStringRef SILFunction_debugDescription(BridgedFunction function) {
+std::string SILFunction_debugDescription(BridgedFunction function) {
   std::string str;
   llvm::raw_string_ostream os(str);
   castToFunction(function)->print(os);
-  return getCopiedBridgedStringRef(str, /*removeTrailingNewline*/ true);
+  str.pop_back(); // Remove trailing newline.
+  return str;
 }
 
 OptionalBridgedBasicBlock SILFunction_firstBlock(BridgedFunction function) {
@@ -239,11 +241,12 @@ BridgedFunction SILBasicBlock_getFunction(BridgedBasicBlock block) {
   return {castToBasicBlock(block)->getParent()};
 }
 
-BridgedStringRef SILBasicBlock_debugDescription(BridgedBasicBlock block) {
+std::string SILBasicBlock_debugDescription(BridgedBasicBlock block) {
   std::string str;
   llvm::raw_string_ostream os(str);
   castToBasicBlock(block)->print(os);
-  return getCopiedBridgedStringRef(str, /*removeTrailingNewline*/ true);
+  str.pop_back(); // Remove trailing newline.
+  return str;
 }
 
 OptionalBridgedInstruction SILBasicBlock_firstInst(BridgedBasicBlock block) {
@@ -308,11 +311,12 @@ SwiftInt SILArgument_isExclusiveIndirectParameter(BridgedArgument argument) {
 static_assert(BridgedOperandSize == sizeof(Operand),
               "wrong bridged Operand size");
 
-BridgedStringRef SILNode_debugDescription(BridgedNode node) {
+std::string SILNode_debugDescription(BridgedNode node) {
   std::string str;
   llvm::raw_string_ostream os(str);
   castToSILNode(node)->print(os);
-  return getCopiedBridgedStringRef(str, /*removeTrailingNewline*/ true);
+  str.pop_back(); // Remove trailing newline.
+  return str;
 }
 
 BridgedFunction SILNode_getFunction(BridgedNode node) {
@@ -369,6 +373,12 @@ SwiftInt SILType_isTrivial(BridgedType type, BridgedFunction function) {
 SwiftInt SILType_isReferenceCounted(BridgedType type, BridgedFunction function) {
   SILFunction *f = castToFunction(function);
   return castToSILType(type).isReferenceCounted(f->getModule()) ? 1 : 0;
+}
+
+SwiftInt SILType_isNonTrivialOrContainsRawPointer(BridgedType type,
+                                                  BridgedFunction function) {
+  SILFunction *f = castToFunction(function);
+  return castToSILType(type).isNonTrivialOrContainsRawPointer(*f);
 }
 
 SwiftInt SILType_isNominal(BridgedType type) {
@@ -459,11 +469,12 @@ BridgedStringRef SILGlobalVariable_getName(BridgedGlobalVar global) {
   return getBridgedStringRef(castToGlobal(global)->getName());
 }
 
-BridgedStringRef SILGlobalVariable_debugDescription(BridgedGlobalVar global) {
+std::string SILGlobalVariable_debugDescription(BridgedGlobalVar global) {
   std::string str;
   llvm::raw_string_ostream os(str);
   castToGlobal(global)->print(os);
-  return getCopiedBridgedStringRef(str, /*removeTrailingNewline*/ true);
+  str.pop_back(); // Remove trailing newline.
+  return str;
 }
 
 //===----------------------------------------------------------------------===//
@@ -518,6 +529,11 @@ bool SILInstruction_mayRelease(BridgedInstruction inst) {
 
 BridgedInstruction MultiValueInstResult_getParent(BridgedMultiValueResult result) {
   return {static_cast<MultipleValueInstructionResult *>(result.obj)->getParent()};
+}
+
+SwiftInt MultiValueInstResult_getIndex(BridgedMultiValueResult result) {
+  auto *rs = static_cast<MultipleValueInstructionResult *>(result.obj);
+  return (SwiftInt)rs->getIndex();
 }
 
 SwiftInt MultipleValueInstruction_getNumResults(BridgedInstruction inst) {
@@ -694,10 +710,10 @@ BridgedInstruction SILBuilder_createBuiltinBinaryFunction(
 }
 
 BridgedInstruction SILBuilder_createCondFail(BridgedInstruction insertionPoint,
-          BridgedLocation loc, BridgedValue condition, BridgedStringRef messge) {
+          BridgedLocation loc, BridgedValue condition, BridgedStringRef message) {
   SILBuilder builder(castToInst(insertionPoint), getSILDebugScope(loc));
   return {builder.createCondFail(getRegularLocation(loc),
-    castToSILValue(condition), getStringRef(messge))};
+    castToSILValue(condition), getStringRef(message))};
 }
 
 BridgedInstruction SILBuilder_createIntegerLiteral(BridgedInstruction insertionPoint,

@@ -512,6 +512,15 @@ std::string LinkEntity::mangleAsString() const {
     Result.append("HF");
     return Result;
   }
+
+  case Kind::ExtendedExistentialTypeShape: {
+    auto genSig = getExtendedExistentialTypeShapeGenSig();
+    auto existentialType = getExtendedExistentialTypeShapeType();
+    auto isUnique = isExtendedExistentialTypeShapeUnique();
+
+    return mangler.mangleExtendedExistentialTypeShape(
+                     isUnique, genSig, existentialType);
+  }
   }
   llvm_unreachable("bad entity kind!");
 }
@@ -657,7 +666,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     switch (getMetadataAddress()) {
     case TypeMetadataAddress::FullMetadata:
       // The full class stub object is private to the containing module,
-      // excpet for foreign types.
+      // except for foreign types.
       return SILLinkage::Private;
     case TypeMetadataAddress::AddressPoint: {
       auto *classDecl = cast<ClassDecl>(getDecl());
@@ -815,6 +824,9 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::DistributedAccessor:
   case Kind::AccessibleFunctionRecord:
     return SILLinkage::Private;
+  case Kind::ExtendedExistentialTypeShape:
+    return (isExtendedExistentialTypeShapeShared()
+              ? SILLinkage::Shared : SILLinkage::Private);
   }
   llvm_unreachable("bad link entity kind");
 }
@@ -907,6 +919,7 @@ bool LinkEntity::isContextDescriptor() const {
   case Kind::KnownAsyncFunctionPointer:
   case Kind::DistributedAccessor:
   case Kind::AccessibleFunctionRecord:
+  case Kind::ExtendedExistentialTypeShape:
     return false;
   }
   llvm_unreachable("invalid descriptor");
@@ -1035,6 +1048,8 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
     return IGM.FunctionPtrTy;
   case Kind::AccessibleFunctionRecord:
     return IGM.AccessibleFunctionRecordTy;
+  case Kind::ExtendedExistentialTypeShape:
+    return IGM.RelativeAddressTy;
   default:
     llvm_unreachable("declaration LLVM type not specified");
   }
@@ -1066,6 +1081,7 @@ Alignment LinkEntity::getAlignment(IRGenModule &IGM) const {
   case Kind::OpaqueTypeDescriptor:
   case Kind::OpaqueTypeDescriptorRecord:
   case Kind::AccessibleFunctionRecord:
+  case Kind::ExtendedExistentialTypeShape:
     return Alignment(4);
   case Kind::AsyncFunctionPointer:
   case Kind::DispatchThunkAsyncFunctionPointer:
@@ -1222,6 +1238,7 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   case Kind::CoroutineContinuationPrototype:
   case Kind::DifferentiabilityWitness:
   case Kind::AccessibleFunctionRecord:
+  case Kind::ExtendedExistentialTypeShape:
     return false;
 
   case Kind::AsyncFunctionPointer:
@@ -1351,6 +1368,7 @@ DeclContext *LinkEntity::getDeclContextForEmission() const {
   case Kind::DifferentiabilityWitness:
   case Kind::PartialApplyForwarder:
   case Kind::KnownAsyncFunctionPointer:
+  case Kind::ExtendedExistentialTypeShape:
     return nullptr;
 
   case Kind::AsyncFunctionPointer:

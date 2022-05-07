@@ -240,7 +240,7 @@ SILValue swift::stripBorrow(SILValue V) {
 // All instructions handled here must propagate their first operand into their
 // single result.
 //
-// This is guaranteed to handle all function-type converstions: ThinToThick,
+// This is guaranteed to handle all function-type conversions: ThinToThick,
 // ConvertFunction, and ConvertEscapeToNoEscapeInst.
 SingleValueInstruction *swift::getSingleValueCopyOrCast(SILInstruction *I) {
   if (auto *convert = dyn_cast<ConversionInst>(I))
@@ -484,7 +484,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     return RuntimeEffect::NoEffect;
 
   case SILInstructionKind::DebugValueInst:
-    // Ignore runtime calls of debug_vlaue
+    // Ignore runtime calls of debug_value
     return RuntimeEffect::NoEffect;
 
   case SILInstructionKind::GetAsyncContinuationInst:
@@ -626,7 +626,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
       return RuntimeEffect::MetaData | RuntimeEffect::RefCounting;
     return RuntimeEffect::MetaData;
   }
-  // Equialent to a copy_addr [init]
+  // Equivalent to a copy_addr [init]
   case SILInstructionKind::MarkUnresolvedMoveAddrInst: {
     return RuntimeEffect::MetaData | RuntimeEffect::RefCounting;
   }

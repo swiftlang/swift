@@ -251,10 +251,10 @@ class BBQ {
 
 var global_observing_property : Int = zero {
   // The variable is initialized with "zero".
-  // CHECK-LABEL: sil private [global_init_once_fn] [ossa] @{{.*}}WZ : $@convention(c) () -> () {
-  // CHECK: bb0:
+  // CHECK-LABEL: sil private [global_init_once_fn] [ossa] @{{.*}}WZ : $@convention(c) (Builtin.RawPointer) -> () {
+  // CHECK: bb0(%0 : $Builtin.RawPointer):
   // CHECK-NEXT: alloc_global @$s9observers25global_observing_propertySiv
-  // CHECK-NEXT: %1 = global_addr @$s9observers25global_observing_propertySivp : $*Int
+  // CHECK-NEXT: %2 = global_addr @$s9observers25global_observing_propertySivp : $*Int
   // CHECK: observers.zero.unsafeMutableAddressor
   // CHECK: return
 

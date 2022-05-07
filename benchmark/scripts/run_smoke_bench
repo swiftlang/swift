@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 # ===--- run_smoke_bench -------------------------------------------------===//
@@ -15,13 +15,11 @@
 #
 # Performs a very fast check which benchmarks regressed and improved.
 #
-# Initially runs the benchmars with a low sample count and just re-runs those
+# Initially runs the benchmarks with a low sample count and just re-runs those
 # benchmarks which differ.
 # Also reports code size differences.
 #
 # ===---------------------------------------------------------------------===//
-
-from __future__ import print_function
 
 import argparse
 import glob
@@ -226,7 +224,7 @@ def measure(driver, tests, i):
 
 
 def merge(results, other_results):
-    """"Merge the other PreformanceTestResults into the first dictionary."""
+    """"Merge the other PerformanceTestResults into the first dictionary."""
     for test, result in other_results.items():
         results[test].merge(result)
     return results
@@ -309,11 +307,12 @@ def report_code_size(opt_level, old_dir, new_dir, architecture, platform, output
 
 
 def get_codesize(filename):
-    output = subprocess.check_output(["size", filename]).splitlines()
-    header_line = output[0]
-    data_line = output[1]
+    output = subprocess.check_output(["size", filename])
+    lines = output.decode('utf-8').splitlines()
+    header_line = lines[0]
+    data_line = lines[1]
     if header_line.find("__TEXT") != 0:
-        sys.exit("unexpected output from size command:\n" + output)
+        sys.exit("unexpected output from size command:\n" + lines)
     return int(data_line.split("\t")[0])
 
 
@@ -363,7 +362,8 @@ performance team (@eeckstein).
   <summary><strong>Hardware Overview</strong></summary>
 
 """
-    po = subprocess.check_output(["system_profiler", "SPHardwareDataType"])
+    output = subprocess.check_output(["system_profiler", "SPHardwareDataType"])
+    po = output.decode('utf-8')
     for line in po.splitlines():
         selection = [
             "Model Name",

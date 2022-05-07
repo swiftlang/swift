@@ -723,7 +723,7 @@ std::pair<StringRef, IdentifierID> Serializer::addUniquedString(StringRef str) {
 }
 
 IdentifierID Serializer::addFilename(StringRef filename) {
-  assert(!filename.empty() && "Attemping to add an empty filename");
+  assert(!filename.empty() && "Attempting to add an empty filename");
 
   return addUniquedString(filename).second;
 }
@@ -1090,7 +1090,7 @@ void Serializer::writeHeader(const SerializationOptions &options) {
             }
           } else if (arg.startswith("-fdebug-prefix-map=")) {
             // We don't serialize the debug prefix map flags as these
-            // contain absoute paths that are not usable on different
+            // contain absolute paths that are not usable on different
             // machines. These flags are not necessary to compile the
             // clang modules again so are safe to remove.
             continue;
@@ -1396,13 +1396,27 @@ void Serializer::serializeGenericRequirements(
   }
 }
 
-void Serializer::writeAssociatedTypes(ArrayRef<AssociatedTypeDecl *> assocTypes) {
+void Serializer::writeAssociatedTypes(
+    ArrayRef<AssociatedTypeDecl *> assocTypes) {
   using namespace decls_block;
 
   auto assocTypeAbbrCode = DeclTypeAbbrCodes[AssociatedTypeLayout::Code];
 
   for (auto *assocType : assocTypes) {
     AssociatedTypeLayout::emitRecord(
+        Out, ScratchRecord, assocTypeAbbrCode,
+        addDeclRef(assocType));
+  }
+}
+
+void Serializer::writePrimaryAssociatedTypes(
+    ArrayRef<AssociatedTypeDecl *> assocTypes) {
+  using namespace decls_block;
+
+  auto assocTypeAbbrCode = DeclTypeAbbrCodes[PrimaryAssociatedTypeLayout::Code];
+
+  for (auto *assocType : assocTypes) {
+    PrimaryAssociatedTypeLayout::emitRecord(
         Out, ScratchRecord, assocTypeAbbrCode,
         addDeclRef(assocType));
   }
@@ -1514,6 +1528,7 @@ void Serializer::writeASTBlockEntity(const SILLayout *layout) {
   SILLayoutLayout::emitRecord(
                         Out, ScratchRecord, abbrCode,
                         addGenericSignatureRef(layout->getGenericSignature()),
+                        layout->capturesGenericEnvironment(),
                         layout->getFields().size(),
                         data);
 }
@@ -2841,7 +2856,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
         access <= swift::AccessLevel::FilePrivate &&
         !value->getDeclContext()->isLocalContext();
 
-    // Emit the the filename for private mapping for private decls and
+    // Emit the filename for private mapping for private decls and
     // decls with private accessors if compiled with -enable-private-imports.
     bool shouldEmitFilenameForPrivate =
         S.M->arePrivateImportsEnabled() &&
@@ -3077,8 +3092,10 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     }
     case PatternKind::Any: {
       unsigned abbrCode = S.DeclTypeAbbrCodes[AnyPatternLayout::Code];
+      auto anyPattern = cast<AnyPattern>(pattern);
       AnyPatternLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                   S.addTypeRef(getPatternType()));
+                                   S.addTypeRef(getPatternType()),
+                                   anyPattern->isAsyncLet());
       break;
     }
     case PatternKind::Typed: {
@@ -3134,7 +3151,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
                                           abbrCode, witnessIDs);
   }
 
-  /// Writes the body text of the provided funciton, if the function is
+  /// Writes the body text of the provided function, if the function is
   /// inlinable and has body text.
   void writeInlinableBodyTextIfNeeded(const AbstractFunctionDecl *AFD) {
     using namespace decls_block;
@@ -3487,7 +3504,6 @@ public:
       contextID.getOpaqueValue(),
       S.addTypeRef(assocType->getDefaultDefinitionType()),
       assocType->isImplicit(),
-      assocType->isPrimary(),
       overriddenAssocTypeIDs);
   }
 
@@ -3707,6 +3723,7 @@ public:
     writeGenericParams(proto->getGenericParams());
     S.writeRequirementSignature(proto->getRequirementSignature());
     S.writeAssociatedTypes(proto->getAssociatedTypeMembers());
+    S.writePrimaryAssociatedTypes(proto->getPrimaryAssociatedTypes());
     writeMembers(id, proto->getAllMembers(), true);
     writeDefaultWitnessTable(proto);
   }
@@ -3898,16 +3915,44 @@ public:
     auto genericSigID = S.addGenericSignatureRef(opaqueDecl->getGenericSignature());
 
     SubstitutionMapID underlyingSubsID = 0;
-    if (auto underlying = opaqueDecl->getUniqueUnderlyingTypeSubstitutions())
+    if (auto underlying = opaqueDecl->getUniqueUnderlyingTypeSubstitutions()) {
       underlyingSubsID = S.addSubstitutionMapRef(*underlying);
+    } else if (opaqueDecl->hasConditionallyAvailableSubstitutions()) {
+      // Universally available type doesn't have any availability conditions
+      // so it could be serialized into "unique" slot to safe space.
+      auto universal =
+          opaqueDecl->getConditionallyAvailableSubstitutions().back();
+      underlyingSubsID = S.addSubstitutionMapRef(universal->getSubstitutions());
+    }
     uint8_t rawAccessLevel =
-      getRawStableAccessLevel(opaqueDecl->getFormalAccess());
+        getRawStableAccessLevel(opaqueDecl->getFormalAccess());
     unsigned abbrCode = S.DeclTypeAbbrCodes[OpaqueTypeLayout::Code];
     OpaqueTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                  contextID.getOpaqueValue(), namingDeclID,
                                  interfaceSigID, interfaceTypeID, genericSigID,
                                  underlyingSubsID, rawAccessLevel);
     writeGenericParams(opaqueDecl->getGenericParams());
+
+    // Serialize all of the conditionally available substitutions expect the
+    // last one - universal, it's serialized into "unique" slot.
+    if (opaqueDecl->hasConditionallyAvailableSubstitutions()) {
+      unsigned abbrCode =
+          S.DeclTypeAbbrCodes[ConditionalSubstitutionLayout::Code];
+      for (const auto *subs :
+           opaqueDecl->getConditionallyAvailableSubstitutions().drop_back()) {
+        SmallVector<IdentifierID, 4> conditions;
+
+        for (const auto &condition : subs->getAvailability()) {
+          auto lowerEndpoint = condition.getLowerEndpoint();
+          conditions.push_back(
+              S.addUniquedStringRef(lowerEndpoint.getAsString()));
+        }
+
+        ConditionalSubstitutionLayout::emitRecord(
+            S.Out, S.ScratchRecord, abbrCode,
+            S.addSubstitutionMapRef(subs->getSubstitutions()), conditions);
+      }
+    }
   }
 
   void visitAccessorDecl(const AccessorDecl *fn) {
@@ -5017,6 +5062,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<PatternBindingLayout>();
   registerDeclTypeAbbr<ProtocolLayout>();
   registerDeclTypeAbbr<AssociatedTypeLayout>();
+  registerDeclTypeAbbr<PrimaryAssociatedTypeLayout>();
   registerDeclTypeAbbr<DefaultWitnessTableLayout>();
   registerDeclTypeAbbr<PrefixOperatorLayout>();
   registerDeclTypeAbbr<PostfixOperatorLayout>();
@@ -5074,6 +5120,8 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<FilenameForPrivateLayout>();
   registerDeclTypeAbbr<MembersLayout>();
   registerDeclTypeAbbr<XRefLayout>();
+
+  registerDeclTypeAbbr<ConditionalSubstitutionLayout>();
 
 #define DECL_ATTR(X, NAME, ...) \
   registerDeclTypeAbbr<NAME##DeclAttrLayout>();

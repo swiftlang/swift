@@ -530,7 +530,7 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
   assert(changeNotifications == SILAnalysis::InvalidationKind::Nothing
          && "change notifications not cleared");
 
-  swiftPassInvocation.startFunctionPassRun(F);
+  swiftPassInvocation.startFunctionPassRun(SFT);
 
   // Run it!
   SFT->run();
@@ -1209,9 +1209,10 @@ void SwiftPassInvocation::freeBlockSet(BasicBlockSet *set) {
   }
 }
 
-void SwiftPassInvocation::startFunctionPassRun(SILFunction *function) {
-  assert(!this->function && "a pass is already running");
-  this->function = function;
+void SwiftPassInvocation::startFunctionPassRun(SILFunctionTransform *transform) {
+  assert(!this->function && !this->transform && "a pass is already running");
+  this->function = transform->getFunction();
+  this->transform = transform;
 }
 
 void SwiftPassInvocation::startInstructionPassRun(SILInstruction *inst) {
@@ -1221,8 +1222,9 @@ void SwiftPassInvocation::startInstructionPassRun(SILInstruction *inst) {
 
 void SwiftPassInvocation::finishedFunctionPassRun() {
   endPassRunChecks();
-  assert(function && "not running a pass");
+  assert(function && transform && "not running a pass");
   function = nullptr;
+  transform = nullptr;
 }
 
 void SwiftPassInvocation::finishedInstructionPassRun() {
@@ -1280,6 +1282,14 @@ BridgedSlab PassContext_freeSlab(BridgedPassContext passContext,
                                  BridgedSlab slab) {
   auto *inv = castToPassInvocation(passContext);
   return toBridgedSlab(inv->freeSlab(castToSlab(slab)));
+}
+
+SwiftInt PassContext_continueWithNextSubpassRun(BridgedPassContext passContext,
+                                                OptionalBridgedInstruction inst) {
+  SwiftPassInvocation *inv = castToPassInvocation(passContext);
+  SILInstruction *i = castToInst(inst);
+  return inv->getPassManager()->continueWithNextSubpassRun(i,
+                inv->getFunction(), inv->getTransform()) ? 1: 0;
 }
 
 void PassContext_notifyChanges(BridgedPassContext passContext,
@@ -1389,19 +1399,6 @@ BridgedFunction BasicBlockSet_getFunction(BridgedBasicBlockSet set) {
 
 void AllocRefInstBase_setIsStackAllocatable(BridgedInstruction arb) {
   castToInst<AllocRefInstBase>(arb)->setStackAllocatable();
-}
-
-OptionalBridgedFunction PassContext_getDestructor(BridgedPassContext context,
-                                                  BridgedType type) {
-  auto *cd = castToSILType(type).getClassOrBoundGenericClass();
-  assert(cd && "no class type allocated with alloc_ref");
-
-  auto *pm = castToPassInvocation(context)->getPassManager();
-  // Find the destructor of the type.
-  auto *destructor = cd->getDestructor();
-  SILDeclRef deallocRef(destructor, SILDeclRef::Kind::Deallocator);
-
-  return {pm->getModule()->lookUpFunction(deallocRef)};
 }
 
 BridgedSubstitutionMap

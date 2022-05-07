@@ -133,7 +133,7 @@ struct S: P {
   }
 }
 
-// MARK: - Overridding protocol method adding `@differentiable` attribute.
+// MARK: - Overriding protocol method adding `@differentiable` attribute.
 
 public protocol Distribution {
   associatedtype Value

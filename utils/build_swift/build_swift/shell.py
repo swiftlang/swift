@@ -12,8 +12,6 @@ Shell utilities wrapper module.
 """
 
 
-from __future__ import absolute_import, unicode_literals
-
 import abc
 import collections
 import functools
@@ -208,7 +206,7 @@ def quote(command):
     if isinstance(command, (str,)):
         return _quote(command)
 
-    if isinstance(command, collections.Iterable):
+    if isinstance(command, collections.abc.Iterable):
         return ' '.join([_quote(arg) for arg in _normalize_args(command)])
 
     raise ValueError('Invalid command type: {}'.format(type(command).__name__))

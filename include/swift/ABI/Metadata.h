@@ -877,7 +877,7 @@ public:
   //
   // Using Objective-C runtime, KVO can modify object behavior without needing
   // to modify the object's code. This is done by dynamically creating an
-  // artificial subclass of the the object's type.
+  // artificial subclass of the object's type.
   //
   // The isa pointer of the observed object is swapped out to point to
   // the artificial subclass, which has the following properties:
@@ -1735,6 +1735,12 @@ public:
 using ExistentialTypeMetadata
   = TargetExistentialTypeMetadata<InProcess>;
 
+template<typename Runtime>
+struct TargetExistentialTypeExpression {
+  /// The type expression.
+  TargetRelativeDirectPointer<Runtime, const char, /*nullable*/ false> name;
+};
+
 /// A description of the shape of an existential type.
 ///
 /// An existential type has the general form:
@@ -1791,7 +1797,7 @@ struct TargetExtendedExistentialTypeShape
       // Optional generalization signature header
       TargetGenericContextDescriptorHeader<Runtime>,
       // Optional type subexpression
-      TargetRelativeDirectPointer<Runtime, const char, /*nullable*/ false>,
+      TargetExistentialTypeExpression<Runtime>,
       // Optional suggested value witnesses
       TargetRelativeIndirectablePointer<Runtime, const TargetValueWitnessTable<Runtime>,
                                         /*nullable*/ false>,
@@ -1802,8 +1808,6 @@ struct TargetExtendedExistentialTypeShape
       // for generalization signature
       TargetGenericRequirementDescriptor<Runtime>> {
 private:
-  using RelativeStringPointer =
-    TargetRelativeDirectPointer<Runtime, const char, /*nullable*/ false>;
   using RelativeValueWitnessTablePointer =
     TargetRelativeIndirectablePointer<Runtime,
                                       const TargetValueWitnessTable<Runtime>,
@@ -1812,7 +1816,7 @@ private:
     swift::ABI::TrailingObjects<
       TargetExtendedExistentialTypeShape<Runtime>,
       TargetGenericContextDescriptorHeader<Runtime>,
-      RelativeStringPointer,
+      TargetExistentialTypeExpression<Runtime>,
       RelativeValueWitnessTablePointer,
       GenericParamDescriptor,
       TargetGenericRequirementDescriptor<Runtime>>;
@@ -1825,7 +1829,7 @@ private:
     return Flags.hasGeneralizationSignature();
   }
 
-  size_t numTrailingObjects(OverloadToken<RelativeStringPointer>) const {
+  size_t numTrailingObjects(OverloadToken<TargetExistentialTypeExpression<Runtime>>) const {
     return Flags.hasTypeExpression();
   }
 
@@ -1855,10 +1859,37 @@ public:
   /// Flags for the existential shape.
   ExtendedExistentialTypeShapeFlags Flags;
 
+  /// The mangling of the generalized existential type, expressed
+  /// (if necessary) in terms of the type parameters of the
+  /// generalization signature.
+  ///
+  /// If this shape is non-unique, this is always a flat string, not a
+  /// "symbolic" mangling which can contain relative references.  This
+  /// allows uniquing to simply compare the string content.
+  ///
+  /// In principle, the content of the requirement signature and type
+  /// expression are derivable from this type.  We store them separately
+  /// so that code which only needs to work with the logical content of
+  /// the type doesn't have to break down the existential type string.
+  /// This both (1) allows those operations to work substantially more
+  /// efficiently (and without needing code to produce a requirement
+  /// signature from an existential type to exist in the runtime) and
+  /// (2) potentially allows old runtimes to support new existential
+  /// types without as much invasive code.
+  ///
+  /// The content of this string is *not* necessarily derivable from
+  /// the requirement signature.  This is because there may be multiple
+  /// existential types that have equivalent logical content but which
+  /// we nonetheless distinguish at compile time.  Storing this also
+  /// allows us to far more easily produce a formal type from this
+  /// shape reflectively.
+  TargetRelativeDirectPointer<Runtime, const char, /*nullable*/ false>
+      ExistentialType;
+
   /// The header describing the requirement signature of the existential.
   TargetGenericContextDescriptorHeader<Runtime> ReqSigHeader;
 
-  RuntimeGenericSignature getRequirementSignature() const {
+  RuntimeGenericSignature<Runtime> getRequirementSignature() const {
     return {ReqSigHeader, getReqSigParams(), getReqSigRequirements()};
   }
 
@@ -1868,8 +1899,8 @@ public:
 
   const GenericParamDescriptor *getReqSigParams() const {
     return Flags.hasImplicitReqSigParams()
-             ? ImplicitGenericParamDescriptors
-             : this->template getTrailingObjects<GenericParamDescriptor>();
+               ? swift::targetImplicitGenericParamDescriptors<Runtime>()
+               : this->template getTrailingObjects<GenericParamDescriptor>();
   }
 
   unsigned getNumReqSigRequirements() const {
@@ -1885,10 +1916,11 @@ public:
   /// The type expression of the existential, as a symbolic mangled type
   /// string.  Must be null if the header is just the (single)
   /// requirement type parameter.
-  TargetPointer<Runtime, const char> getTypeExpression() const {
+  const TargetExistentialTypeExpression<Runtime> *getTypeExpression() const {
     return Flags.hasTypeExpression()
-      ? this->template getTrailingObjects<RelativeStringPointer>()->get()
-      : nullptr;
+               ? this->template getTrailingObjects<
+                     TargetExistentialTypeExpression<Runtime>>()
+               : nullptr;
   }
 
   bool isTypeExpressionOpaque() const {
@@ -1935,8 +1967,8 @@ public:
     return Flags.hasGeneralizationSignature();
   }
 
-  RuntimeGenericSignature getGeneralizationSignature() const {
-    if (!hasGeneralizationSignature()) return RuntimeGenericSignature();
+  RuntimeGenericSignature<Runtime> getGeneralizationSignature() const {
+    if (!hasGeneralizationSignature()) return RuntimeGenericSignature<Runtime>();
     return {*getGenSigHeader(), getGenSigParams(), getGenSigRequirements()};
   }
 
@@ -1948,7 +1980,7 @@ public:
   const GenericParamDescriptor *getGenSigParams() const {
     assert(hasGeneralizationSignature());
     if (Flags.hasImplicitGenSigParams())
-      return ImplicitGenericParamDescriptors;
+      return swift::targetImplicitGenericParamDescriptors<Runtime>();
     auto base = this->template getTrailingObjects<GenericParamDescriptor>();
     if (!Flags.hasImplicitReqSigParams())
       base += getNumReqSigParams();
@@ -1999,7 +2031,7 @@ using ExtendedExistentialTypeShape
 /// existential shape.
 ///
 /// We'd like to use BLAKE3 for this, but pending acceptance of
-/// that into LLVM, we're using SHA-256.  We simply truncaate the
+/// that into LLVM, we're using SHA-256.  We simply truncate the
 /// hash to the desired length.
 struct UniqueHash {
   static_assert(NumBytes_UniqueHash % sizeof(uint32_t) == 0,
@@ -2024,6 +2056,9 @@ struct UniqueHash {
 
 /// A descriptor for an extended existential type descriptor which
 /// needs to be uniqued at runtime.
+///
+/// Uniquing is performed by comparing the existential type strings
+/// of the shapes.
 template <typename Runtime>
 struct TargetNonUniqueExtendedExistentialTypeShape {
   /// A reference to memory that can be used to cache a globally-unique
@@ -2032,10 +2067,12 @@ struct TargetNonUniqueExtendedExistentialTypeShape {
     std::atomic<ConstTargetMetadataPointer<Runtime,
                   TargetExtendedExistentialTypeShape>>> UniqueCache;
 
-  /// A hash of the mangling of the existential shape.
-  ///
-  /// TODO: describe that mangling here
-  UniqueHash Hash;
+  llvm::StringRef getExistentialTypeStringForUniquing() const {
+    // When we have a non-unique shape, we're guaranteed that
+    // ExistentialType contains no symbolic references, so we can just
+    // recover it this way rather than having to parse it.
+    return LocalCopy.ExistentialType.get();
+  }
 
   /// The local copy of the existential shape descriptor.
   TargetExtendedExistentialTypeShape<Runtime> LocalCopy;
@@ -2055,6 +2092,8 @@ struct TargetExtendedExistentialTypeMetadata
     swift::ABI::TrailingObjects<
       TargetExtendedExistentialTypeMetadata<Runtime>,
       ConstTargetPointer<Runtime, void>> {
+  using StoredSize = typename Runtime::StoredSize;
+
 private:
   using TrailingObjects =
     swift::ABI::TrailingObjects<
@@ -2066,8 +2105,11 @@ private:
   using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
 
   size_t numTrailingObjects(OverloadToken<ConstTargetPointer<Runtime, void>>) const {
-    return Shape->getGenSigLayoutSizeInWords();
+    return Shape->getGenSigArgumentLayoutSizeInWords();
   }
+
+public:
+  static constexpr StoredSize OffsetToArguments = sizeof(TargetMetadata<Runtime>);
 
 public:
   explicit constexpr
@@ -2081,6 +2123,11 @@ public:
 
   ConstTargetPointer<Runtime, void> const *getGeneralizationArguments() const {
     return this->template getTrailingObjects<ConstTargetPointer<Runtime, void>>();
+  }
+
+public:
+  static bool classof(const TargetMetadata<Runtime> *metadata) {
+    return metadata->getKind() == MetadataKind::ExtendedExistential;
   }
 };
 using ExtendedExistentialTypeMetadata
@@ -3510,12 +3557,12 @@ public:
     return getTypeContextDescriptorFlags().hasSingletonMetadataInitialization();
   }
 
-  /// Does this type have "foreign" metadata initialiation?
+  /// Does this type have "foreign" metadata initialization?
   bool hasForeignMetadataInitialization() const {
     return getTypeContextDescriptorFlags().hasForeignMetadataInitialization();
   }
 
-  bool hasCanonicicalMetadataPrespecializations() const {
+  bool hasCanonicalMetadataPrespecializations() const {
     return getTypeContextDescriptorFlags().hasCanonicalMetadataPrespecializations();
   }
 
@@ -3557,7 +3604,7 @@ public:
   }
 
   const llvm::ArrayRef<TargetRelativeDirectPointer<Runtime, TargetMetadata<Runtime>, /*Nullable*/ false>>
-  getCanonicicalMetadataPrespecializations() const;
+  getCanonicalMetadataPrespecializations() const;
 
   swift_once_t *getCanonicalMetadataPrespecializationCachingOnceToken() const;
 
@@ -3868,25 +3915,25 @@ private:
   }
 
   size_t numTrailingObjects(OverloadToken<MetadataListCount>) const {
-    return this->hasCanonicicalMetadataPrespecializations() ?
+    return this->hasCanonicalMetadataPrespecializations() ?
       1
       : 0;
   }
 
   size_t numTrailingObjects(OverloadToken<MetadataListEntry>) const {
-    return this->hasCanonicicalMetadataPrespecializations() ?
+    return this->hasCanonicalMetadataPrespecializations() ?
       this->template getTrailingObjects<MetadataListCount>()->count
       : 0;
   }
 
   size_t numTrailingObjects(OverloadToken<MetadataAccessorListEntry>) const {
-    return this->hasCanonicicalMetadataPrespecializations() ?
+    return this->hasCanonicalMetadataPrespecializations() ?
       this->template getTrailingObjects<MetadataListCount>()->count
       : 0;
   }
 
   size_t numTrailingObjects(OverloadToken<MetadataCachingOnceToken>) const {
-    return this->hasCanonicicalMetadataPrespecializations() ? 1 : 0;
+    return this->hasCanonicalMetadataPrespecializations() ? 1 : 0;
   }
 
 public:
@@ -4034,8 +4081,8 @@ public:
       ->Stub.get();
   }
 
-  llvm::ArrayRef<Metadata> getCanonicicalMetadataPrespecializations() const {
-    if (!this->hasCanonicicalMetadataPrespecializations()) {
+  llvm::ArrayRef<Metadata> getCanonicalMetadataPrespecializations() const {
+    if (!this->hasCanonicalMetadataPrespecializations()) {
       return {};
     }
 
@@ -4048,7 +4095,7 @@ public:
   }
 
   llvm::ArrayRef<MetadataAccessor> getCanonicalMetadataPrespecializationAccessors() const {
-    if (!this->hasCanonicicalMetadataPrespecializations()) {
+    if (!this->hasCanonicalMetadataPrespecializations()) {
       return {};
     }
 
@@ -4061,7 +4108,7 @@ public:
   }
 
   swift_once_t *getCanonicalMetadataPrespecializationCachingOnceToken() const {
-    if (!this->hasCanonicicalMetadataPrespecializations()) {
+    if (!this->hasCanonicalMetadataPrespecializations()) {
       return nullptr;
     }
     auto box = this->template getTrailingObjects<MetadataCachingOnceToken>();
@@ -4138,19 +4185,19 @@ private:
   }
 
   size_t numTrailingObjects(OverloadToken<MetadataListCount>) const {
-    return this->hasCanonicicalMetadataPrespecializations() ?
+    return this->hasCanonicalMetadataPrespecializations() ?
       1
       : 0;
   }
 
   size_t numTrailingObjects(OverloadToken<MetadataListEntry>) const {
-    return this->hasCanonicicalMetadataPrespecializations() ?
+    return this->hasCanonicalMetadataPrespecializations() ?
       this->template getTrailingObjects<MetadataListCount>()->count
       : 0;
   }
 
   size_t numTrailingObjects(OverloadToken<MetadataCachingOnceToken>) const {
-    return this->hasCanonicicalMetadataPrespecializations() ? 1 : 0;
+    return this->hasCanonicalMetadataPrespecializations() ? 1 : 0;
   }
 
 public:
@@ -4185,8 +4232,8 @@ public:
     return TargetStructMetadata<Runtime>::getGenericArgumentOffset();
   }
 
-  llvm::ArrayRef<Metadata> getCanonicicalMetadataPrespecializations() const {
-    if (!this->hasCanonicicalMetadataPrespecializations()) {
+  llvm::ArrayRef<Metadata> getCanonicalMetadataPrespecializations() const {
+    if (!this->hasCanonicalMetadataPrespecializations()) {
       return {};
     }
 
@@ -4199,7 +4246,7 @@ public:
   }
 
   swift_once_t *getCanonicalMetadataPrespecializationCachingOnceToken() const {
-    if (!this->hasCanonicicalMetadataPrespecializations()) {
+    if (!this->hasCanonicalMetadataPrespecializations()) {
       return nullptr;
     }
     auto box = this->template getTrailingObjects<MetadataCachingOnceToken>();
@@ -4265,19 +4312,19 @@ private:
   }
 
   size_t numTrailingObjects(OverloadToken<MetadataListCount>) const {
-    return this->hasCanonicicalMetadataPrespecializations() ?
+    return this->hasCanonicalMetadataPrespecializations() ?
       1
       : 0;
   }
 
   size_t numTrailingObjects(OverloadToken<MetadataListEntry>) const {
-    return this->hasCanonicicalMetadataPrespecializations() ?
+    return this->hasCanonicalMetadataPrespecializations() ?
       this->template getTrailingObjects<MetadataListCount>()->count
       : 0;
   }
 
   size_t numTrailingObjects(OverloadToken<MetadataCachingOnceToken>) const {
-    return this->hasCanonicicalMetadataPrespecializations() ? 1 : 0;
+    return this->hasCanonicalMetadataPrespecializations() ? 1 : 0;
   }
 
 public:
@@ -4326,8 +4373,8 @@ public:
     return *this->template getTrailingObjects<SingletonMetadataInitialization>();
   }
 
-  llvm::ArrayRef<Metadata> getCanonicicalMetadataPrespecializations() const {
-    if (!this->hasCanonicicalMetadataPrespecializations()) {
+  llvm::ArrayRef<Metadata> getCanonicalMetadataPrespecializations() const {
+    if (!this->hasCanonicalMetadataPrespecializations()) {
       return {};
     }
 
@@ -4340,7 +4387,7 @@ public:
   }
 
   swift_once_t *getCanonicalMetadataPrespecializationCachingOnceToken() const {
-    if (!this->hasCanonicicalMetadataPrespecializations()) {
+    if (!this->hasCanonicalMetadataPrespecializations()) {
       return nullptr;
     }
     auto box = this->template getTrailingObjects<MetadataCachingOnceToken>();
@@ -4483,17 +4530,17 @@ TargetTypeContextDescriptor<Runtime>::getSingletonMetadataInitialization() const
 
 template<typename Runtime>
 inline const llvm::ArrayRef<TargetRelativeDirectPointer<Runtime, TargetMetadata<Runtime>, /*Nullable*/ false>>
-TargetTypeContextDescriptor<Runtime>::getCanonicicalMetadataPrespecializations() const {
+TargetTypeContextDescriptor<Runtime>::getCanonicalMetadataPrespecializations() const {
   switch (this->getKind()) {
   case ContextDescriptorKind::Enum:
     return llvm::cast<TargetEnumDescriptor<Runtime>>(this)
-        ->getCanonicicalMetadataPrespecializations();
+        ->getCanonicalMetadataPrespecializations();
   case ContextDescriptorKind::Struct:
     return llvm::cast<TargetStructDescriptor<Runtime>>(this)
-        ->getCanonicicalMetadataPrespecializations();
+        ->getCanonicalMetadataPrespecializations();
   case ContextDescriptorKind::Class:
     return llvm::cast<TargetClassDescriptor<Runtime>>(this)
-        ->getCanonicicalMetadataPrespecializations();
+        ->getCanonicalMetadataPrespecializations();
   default:
     swift_unreachable("Not a type context descriptor.");
   }

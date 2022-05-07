@@ -51,6 +51,7 @@
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/APSInt.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/Twine.h"
@@ -321,7 +322,7 @@ static bool inferFinalAndDiagnoseIfNeeded(ValueDecl *D, ClassDecl *cls,
   return true;
 }
 
-/// Runtime-replacable accessors are dynamic when their storage declaration
+/// Runtime-replaceable accessors are dynamic when their storage declaration
 /// is dynamic and they were explicitly defined or they are implicitly defined
 /// getter/setter because no accessor was defined.
 static bool doesAccessorNeedDynamicAttribute(AccessorDecl *accessor) {
@@ -703,9 +704,54 @@ PrimaryAssociatedTypesRequest::evaluate(Evaluator &evaluator,
                                         ProtocolDecl *decl) const {
   SmallVector<AssociatedTypeDecl *, 2> assocTypes;
 
-  for (auto *assocType : decl->getAssociatedTypeMembers()) {
-    if (assocType->isPrimary())
-      assocTypes.push_back(assocType);
+  if (decl->hasLazyPrimaryAssociatedTypes()) {
+    auto &ctx = decl->getASTContext();
+    auto contextData = static_cast<LazyProtocolData *>(
+        ctx.getOrCreateLazyContextData(decl, nullptr));
+
+    contextData->loader->loadPrimaryAssociatedTypes(
+        decl, contextData->primaryAssociatedTypesData, assocTypes);
+
+    return decl->getASTContext().AllocateCopy(assocTypes);
+  }
+
+  llvm::SmallDenseSet<Identifier, 2> assocTypeNames;
+
+  for (auto pair : decl->getPrimaryAssociatedTypeNames()) {
+    if (!assocTypeNames.insert(pair.first).second) {
+      auto &ctx = decl->getASTContext();
+      ctx.Diags.diagnose(pair.second,
+                         diag::protocol_declares_duplicate_primary_assoc_type,
+                         pair.first);
+      continue;
+    }
+
+    SmallVector<ValueDecl *, 2> result;
+
+    decl->lookupQualified(ArrayRef<NominalTypeDecl *>(decl),
+                          DeclNameRef(pair.first),
+                          NL_QualifiedDefault | NL_OnlyTypes,
+                          result);
+
+    AssociatedTypeDecl *bestAssocType = nullptr;
+    for (auto *decl : result) {
+      if (auto *assocType = dyn_cast<AssociatedTypeDecl>(decl)) {
+        if (bestAssocType == nullptr ||
+            TypeDecl::compare(assocType, bestAssocType) < 0) {
+          bestAssocType = assocType;
+        }
+      }
+    }
+
+    if (bestAssocType == nullptr) {
+      auto &ctx = decl->getASTContext();
+      ctx.Diags.diagnose(pair.second,
+                         diag::protocol_declares_unknown_primary_assoc_type,
+                         pair.first, decl->getDeclaredInterfaceType());
+      continue;
+    }
+
+    assocTypes.push_back(bestAssocType);
   }
 
   return decl->getASTContext().AllocateCopy(assocTypes);
@@ -861,7 +907,7 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   }
 
   if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
-    // Runtime-replacable accessors are dynamic when their storage declaration
+    // Runtime-replaceable accessors are dynamic when their storage declaration
     // is dynamic and they were explicitly defined or they are implicitly defined
     // getter/setter because no accessor was defined.
     return doesAccessorNeedDynamicAttribute(accessor);
@@ -1865,7 +1911,7 @@ FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
       for (DeclContext *CurContext = FD->getLocalContext();
            !isa<SourceFile>(CurContext);
            CurContext = CurContext->getParent()) {
-        // Skip over non-decl contexts (e.g. closure expresssions)
+        // Skip over non-decl contexts (e.g. closure expressions)
         if (auto *D = CurContext->getAsDecl())
             insertionLoc = D->getStartLoc();
       }
@@ -2407,7 +2453,8 @@ NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
     // and TypeCheckPattern handle the others. But that's all really gross.
     unsigned i = PBD->getPatternEntryIndexForVarDecl(VD);
     (void)evaluateOrDefault(evaluator,
-                            PatternBindingEntryRequest{PBD, i},
+                            PatternBindingEntryRequest{
+                                PBD, i, /*LeaveClosureBodiesUnchecked=*/false},
                             nullptr);
     if (PBD->isInvalid()) {
       VD->getParentPattern()->setType(ErrorType::get(Context));

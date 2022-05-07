@@ -221,7 +221,7 @@ private:
   // It is used if a function has no source-file association.
   llvm::DenseMap<SILFunction *, IRGenModule *> DefaultIGMForFunction;
 
-  // The IGMs where sepecializations of functions are emitted. The key is the
+  // The IGMs where specializations of functions are emitted. The key is the
   // non-specialized function.
   // Storing all specializations of a function in the same IGM increases the
   // chances of function merging.
@@ -575,6 +575,9 @@ enum class MangledTypeRefRole {
   /// The mangled type reference is used for a default associated type
   /// witness.
   DefaultAssociatedTypeWitness,
+  /// The mangled type reference must be a flat string (i.e. no
+  /// symbolic references) and unique for the target type.
+  FlatUnique,
 };
 
 /// IRGenModule - Primary class for emitting IR for global declarations.
@@ -1061,6 +1064,10 @@ public:
   ConstantReference getConstantReferenceForProtocolDescriptor(ProtocolDecl *proto);
 
   ConstantIntegerLiteral getConstantIntegerLiteral(APInt value);
+
+  llvm::Constant *getOrCreateLazyGlobalVariable(LinkEntity entity,
+      llvm::function_ref<ConstantInitFuture(ConstantInitBuilder &)> build,
+      llvm::function_ref<void(llvm::GlobalVariable *)> finish);
 
   void addUsedGlobal(llvm::GlobalValue *global);
   void addCompilerUsedGlobal(llvm::GlobalValue *global);

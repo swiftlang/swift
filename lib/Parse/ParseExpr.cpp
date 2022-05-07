@@ -177,7 +177,7 @@ ParserResult<Expr> Parser::parseExprArrow() {
 ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
                                              bool isExprBasic,
                                              bool isForConditionalDirective) {
-  SyntaxParsingContext ExprSequnceContext(SyntaxContext, SyntaxContextKind::Expr);
+  SyntaxParsingContext ExprSequenceContext(SyntaxContext, SyntaxContextKind::Expr);
 
   SmallVector<Expr*, 8> SequencedExprs;
   SourceLoc startLoc = Tok.getLoc();
@@ -380,8 +380,8 @@ done:
   if (SequencedExprs.size() == 1)
     return makeParserResult(SequenceStatus, SequencedExprs[0]);
 
-  ExprSequnceContext.createNodeInPlace(SyntaxKind::ExprList);
-  ExprSequnceContext.setCreateSyntax(SyntaxKind::SequenceExpr);
+  ExprSequenceContext.createNodeInPlace(SyntaxKind::ExprList);
+  ExprSequenceContext.setCreateSyntax(SyntaxKind::SequenceExpr);
   return makeParserResult(SequenceStatus,
                           SequenceExpr::create(Context, SequencedExprs));
 }
@@ -511,6 +511,10 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
 ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   SyntaxParsingContext UnaryContext(SyntaxContext, SyntaxContextKind::Expr);
   UnresolvedDeclRefExpr *Operator;
+
+  // First check to see if we have the start of a regex literal `/.../`.
+  tryLexRegexLiteral(/*mustBeRegex*/ true);
+
   switch (Tok.getKind()) {
   default:
     // If the next token is not an operator, just parse this as expr-postfix.
@@ -532,16 +536,19 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   case tok::backslash:
     return parseExprKeyPath();
 
-  case tok::oper_postfix:
+  case tok::oper_postfix: {
     // Postfix operators cannot start a subexpression, but can happen
     // syntactically because the operator may just follow whatever precedes this
     // expression (and that may not always be an expression).
     diagnose(Tok, diag::invalid_postfix_operator);
     Tok.setKind(tok::oper_prefix);
-    LLVM_FALLTHROUGH;
-  case tok::oper_prefix:
     Operator = parseExprOperator();
     break;
+  }
+  case tok::oper_prefix: {
+    Operator = parseExprOperator();
+    break;
+  }
   case tok::oper_binary_spaced:
   case tok::oper_binary_unspaced: {
     // For recovery purposes, accept an oper_binary here.
@@ -563,7 +570,7 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   if (SubExpr.isNull())
     return Status;
 
-  // We are sure we can create a prefix prefix operator expr now.
+  // We are sure we can create a prefix operator expr now.
   UnaryContext.setCreateSyntax(SyntaxKind::PrefixOperatorExpr);
 
   // Check if we have a unary '-' with number literal sub-expression, for
@@ -871,6 +878,59 @@ UnresolvedDeclRefExpr *Parser::parseExprOperator() {
   consumeToken();
   // Bypass local lookup.
   return new (Context) UnresolvedDeclRefExpr(name, refKind, DeclNameLoc(loc));
+}
+
+void Parser::tryLexRegexLiteral(bool mustBeRegex) {
+  if (!Context.LangOpts.EnableBareSlashRegexLiterals)
+    return;
+
+  // Check to see if we have a regex literal `/.../`, optionally with a prefix
+  // operator e.g `!/.../`.
+  switch (Tok.getKind()) {
+  case tok::oper_prefix:
+  case tok::oper_binary_spaced:
+  case tok::oper_binary_unspaced: {
+    // Check to see if we have an operator containing '/'.
+    auto slashIdx = Tok.getText().find("/");
+    if (slashIdx == StringRef::npos)
+      break;
+
+    CancellableBacktrackingScope backtrack(*this);
+    {
+      Optional<Lexer::ForwardSlashRegexRAII> regexScope;
+      regexScope.emplace(*L, mustBeRegex);
+
+      // Try re-lex as a `/.../` regex literal, this will split an operator if
+      // necessary.
+      L->restoreState(getParserPosition().LS, /*enableDiagnostics*/ true);
+
+      // If we didn't split a prefix operator, reset the regex lexing scope.
+      // Otherwise, we want to keep it in place for the next token.
+      auto didSplit = L->peekNextToken().getLength() == slashIdx;
+      if (!didSplit)
+        regexScope.reset();
+
+      // Discard the current token, which will be replaced by the re-lexed
+      // token, which will either be a regex literal token, a prefix operator,
+      // or the original unchanged token.
+      discardToken();
+
+      // If we split a prefix operator from the regex literal, and are not sure
+      // whether this should be a regex, backtrack if we didn't end up lexing a
+      // regex literal.
+      if (didSplit && !mustBeRegex &&
+          !L->peekNextToken().is(tok::regex_literal)) {
+        return;
+      }
+
+      // Otherwise, accept the result.
+      backtrack.cancelBacktrack();
+    }
+    break;
+  }
+  default:
+    break;
+  }
 }
 
 /// parseExprSuper
@@ -2582,7 +2642,8 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
             diagnose(Tok, diag::attr_unowned_expected_rparen);
         }
       } else if (Tok.isAny(tok::identifier, tok::kw_self, tok::code_complete) &&
-                 peekToken().isAny(tok::equal, tok::comma, tok::r_square)) {
+                 peekToken().isAny(tok::equal, tok::comma, tok::r_square,
+                                   tok::period)) {
         // "x = 42", "x," and "x]" are all strong captures of x.
       } else {
         diagnose(Tok, diag::expected_capture_specifier);
@@ -2626,8 +2687,20 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
         // It is a common error to try to capture a nested field instead of just
         // a local name, reject it with a specific error message.
         if (Tok.isAny(tok::period, tok::exclaim_postfix,tok::question_postfix)){
-          diagnose(Tok, diag::cannot_capture_fields);
-          skipUntil(tok::comma, tok::r_square);
+          auto diag = diagnose(Tok, diag::cannot_capture_fields);
+          while (peekToken().isNot(tok::comma, tok::r_square, tok::eof,
+                                   tok::kw_in, tok::r_brace,
+                                   tok::pound_endif, tok::pound_else,
+                                   tok::pound_elseif))
+            consumeToken();
+          if (Tok.isKeyword() || Tok.isContextualDeclKeyword()) {
+            StringRef name = Tok.getText();
+            diag.fixItInsert(nameLoc, ("`" + name + "` = ").str());
+          } else if (Tok.is(tok::identifier)) {
+            StringRef name = Tok.getRawText();
+            diag.fixItInsert(nameLoc, (name + " = ").str());
+          }
+          skipSingle(); // Advance to the comma or r_square
           continue;
         }
 
@@ -2851,7 +2924,10 @@ ParserResult<Expr> Parser::parseExprClosure() {
   // reset our state to not be in a pattern for any recursive pattern parses.
   llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
   T(InVarOrLetPattern, IVOLP_NotInVarOrLet);
-  
+
+  // Reset async attribute in parser context.
+  llvm::SaveAndRestore<bool> AsyncAttr(InPatternWithAsyncAttribute, false);
+
   // Parse the opening left brace.
   SourceLoc leftBrace = consumeToken();
 
@@ -3147,6 +3223,11 @@ ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
     SourceLoc FieldNameLoc;
     parseOptionalArgumentLabel(FieldName, FieldNameLoc);
 
+    // First check to see if we have the start of a regex literal `/.../`. We
+    // need to do this before handling unapplied operator references, as e.g
+    // `(/, /)` might be a regex literal.
+    tryLexRegexLiteral(/*mustBeRegex*/ false);
+
     // See if we have an operator decl ref '(<op>)'. The operator token in
     // this case lexes as a binary operator because it neither leads nor
     // follows a proper subexpression.
@@ -3429,7 +3510,7 @@ ParserResult<Expr> Parser::parseExprPoundUnknown(SourceLoc LSquareLoc) {
 /// Handle code completion after pound in expression position.
 ///
 /// In case it's in a stmt condition position, specify \p ParentKind to
-/// decide the position accepts #available(...) condtion.
+/// decide the position accepts #available(...) condition.
 ///
 /// expr-pound-codecompletion:
 ///   '#' code-completion-token

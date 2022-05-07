@@ -912,7 +912,7 @@ static StringRef getPrivateDiscriminatorIfNecessary(const ValueDecl *decl) {
 }
 
 /// If the declaration is an @objc protocol defined in Swift and the
-/// Objective-C name has been overrridden from the default, return the
+/// Objective-C name has been overridden from the default, return the
 /// specified name.
 ///
 /// \param useObjCProtocolNames When false, always returns \c None.
@@ -1045,8 +1045,7 @@ void ASTMangler::appendExistentialLayout(
   bool First = true;
   bool DroppedRequiresClass = false;
   bool SawRequiresClass = false;
-  for (Type protoTy : layout.getProtocols()) {
-    auto proto = protoTy->castTo<ProtocolType>()->getDecl();
+  for (auto proto : layout.getProtocols()) {
     // If we aren't allowed to emit marker protocols, suppress them here.
     if (!AllowMarkerProtocols && proto->isMarkerProtocol()) {
       if (proto->requiresClass())
@@ -1058,7 +1057,7 @@ void ASTMangler::appendExistentialLayout(
     if (proto->requiresClass())
       SawRequiresClass = true;
 
-    appendProtocolName(protoTy->castTo<ProtocolType>()->getDecl());
+    appendProtocolName(proto);
     appendListSeparator(First);
   }
   if (First)
@@ -1258,7 +1257,8 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
 
     case TypeKind::Protocol: {
       return appendExistentialLayout(
-          ExistentialLayout(cast<ProtocolType>(tybase)), sig, forDecl);
+          ExistentialLayout(CanProtocolType(cast<ProtocolType>(tybase))),
+          sig, forDecl);
     }
 
     case TypeKind::ProtocolComposition: {
@@ -2008,7 +2008,7 @@ ASTMangler::getSpecialManglingContext(const ValueDecl *decl,
         hasNameForLinkage = !clangDecl->getDeclName().isEmpty();
       if (hasNameForLinkage) {
         auto *clangDC = clangDecl->getDeclContext();
-        // In C, "nested" structs, unions, enums, etc. will become sibilings:
+        // In C, "nested" structs, unions, enums, etc. will become siblings:
         //   struct Foo { struct Bar { }; }; -> struct Foo { }; struct Bar { };
         // Whereas in C++, nested records will actually be nested. So if this is
         // a C++ record, simply treat it like a namespace and exit early.

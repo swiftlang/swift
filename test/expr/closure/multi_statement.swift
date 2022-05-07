@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5 -experimental-multi-statement-closures -enable-experimental-static-assert
+// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-experimental-static-assert
 
 func isInt<T>(_ value: T) -> Bool {
   return value is Int
@@ -290,5 +290,63 @@ func test_pattern_matches_only_cases() {
     case let ParsingError.ok(result): print(result) // Ok
     default: break
     }
+  }
+}
+
+// rdar://91225620 - type of expression is ambiguous without more context in closure
+func test_wrapped_var_without_initializer() {
+  @propertyWrapper
+  struct Wrapper {
+    private let name: String
+
+    var wrappedValue: Bool {
+      didSet {}
+    }
+
+    init(name: String) {
+      self.wrappedValue = false
+      self.name = name
+    }
+  }
+
+  func fn(_: () -> Void) {}
+
+  fn {
+    @Wrapper(name: "foo")
+    var v;
+  }
+}
+
+// rdar://92366212 - crash in ConstraintSystem::getType
+func test_unknown_refs_in_tilde_operator() {
+  enum E {
+  }
+
+  let _: (E) -> Void = {
+    if case .test(unknown) = $0 {
+      // expected-error@-1 {{type 'E' has no member 'test'}}
+      // expected-error@-2 2 {{cannot find 'unknown' in scope}}
+    }
+  }
+}
+
+// rdar://92347054 - crash during conjunction processing
+func test_no_crash_with_circular_ref_due_to_error() {
+  struct S { // expected-note {{did you mean 'S'?}}
+    var x: Int?
+  }
+
+  func test(v: Int?, arr: [S]) -> Int { // expected-note {{did you mean 'v'?}}
+    // There is missing `f` here which made body of the
+    // `if` a multiple statement closure instead that uses
+    // `next` inside.
+    i let x = v, let next = arr.first?.x { // expected-error {{cannot find 'i' in scope}}
+      // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
+      // expected-error@-2 {{'let' cannot appear nested inside another 'var' or 'let' pattern}}
+      // expected-error@-3 {{cannot call value of non-function type 'Int?'}}
+      print(next)
+      return x
+    }
+    return 0
   }
 }

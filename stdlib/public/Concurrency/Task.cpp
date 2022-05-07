@@ -28,6 +28,7 @@
 #include "Debug.h"
 #include "Error.h"
 #include <atomic>
+#include <new>
 
 #if SWIFT_CONCURRENCY_ENABLE_DISPATCH
 #include <dispatch/dispatch.h>
@@ -105,7 +106,7 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
   auto fragment = futureFragment();
 
   auto queueHead = fragment->waitQueue.load(std::memory_order_acquire);
-  bool contextIntialized = false;
+  bool contextInitialized = false;
   while (true) {
     switch (queueHead.getStatus()) {
     case Status::Error:
@@ -113,7 +114,7 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
       SWIFT_TASK_DEBUG_LOG("task %p waiting on task %p, completed immediately",
                            waitingTask, this);
       _swift_tsan_acquire(static_cast<Job *>(this));
-      if (contextIntialized) waitingTask->flagAsRunning();
+      if (contextInitialized) waitingTask->flagAsRunning();
       // The task is done; we don't need to wait.
       return queueHead.getStatus();
 
@@ -127,8 +128,8 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
       break;
     }
 
-    if (!contextIntialized) {
-      contextIntialized = true;
+    if (!contextInitialized) {
+      contextInitialized = true;
       auto context =
           reinterpret_cast<TaskFutureWaitAsyncContext *>(waitingTaskContext);
       context->errorResult = nullptr;
@@ -770,20 +771,20 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   // Initialize the child fragment if applicable.
   if (parent) {
     auto childFragment = task->childFragment();
-    new (childFragment) AsyncTask::ChildFragment(parent);
+    ::new (childFragment) AsyncTask::ChildFragment(parent);
   }
 
   // Initialize the group child fragment if applicable.
   if (group) {
     auto groupChildFragment = task->groupChildFragment();
-    new (groupChildFragment) AsyncTask::GroupChildFragment(group);
+    ::new (groupChildFragment) AsyncTask::GroupChildFragment(group);
   }
 
   // Initialize the future fragment if applicable.
   if (futureResultType) {
     assert(task->isFuture());
     auto futureFragment = task->futureFragment();
-    new (futureFragment) FutureFragment(futureResultType);
+    ::new (futureFragment) FutureFragment(futureResultType);
 
     // Set up the context for the future so there is no error, and a successful
     // result will be written into the future fragment's storage.
@@ -835,7 +836,11 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   // be is the final hop.  Store a signed null instead.
   initialContext->Parent = nullptr;
 
-  concurrency::trace::task_create(task, parent, group, asyncLet);
+  concurrency::trace::task_create(
+      task, parent, group, asyncLet,
+      static_cast<uint8_t>(task->Flags.getPriority()),
+      task->Flags.task_isChildTask(), task->Flags.task_isFuture(),
+      task->Flags.task_isGroupChildTask(), task->Flags.task_isAsyncLetTask());
 
   // Attach to the group, if needed.
   if (group) {
@@ -1099,7 +1104,7 @@ static void swift_continuation_awaitImpl(ContinuationAsyncContext *context) {
     return context->ResumeParent(context);
   }
 
-  // Load the current task (we alreaady did this in assertions builds).
+  // Load the current task (we already did this in assertions builds).
 #ifdef NDEBUG
   auto task = swift_task_getCurrent();
 #endif
@@ -1202,7 +1207,7 @@ swift_task_addCancellationHandlerImpl(
   void *allocation =
       swift_task_alloc(sizeof(CancellationNotificationStatusRecord));
   auto unsigned_handler = swift_auth_code(handler, 3848);
-  auto *record = new (allocation)
+  auto *record = ::new (allocation)
       CancellationNotificationStatusRecord(unsigned_handler, context);
 
   bool fireHandlerNow = false;
@@ -1237,7 +1242,7 @@ swift_task_createNullaryContinuationJobImpl(
   void *allocation =
       swift_task_alloc(sizeof(NullaryContinuationJob));
   auto *job =
-      new (allocation) NullaryContinuationJob(
+      ::new (allocation) NullaryContinuationJob(
         swift_task_getCurrent(), static_cast<JobPriority>(priority),
         continuation);
 
@@ -1264,23 +1269,21 @@ static void swift_task_asyncMainDrainQueueImpl() {
                        "swift_task_asyncMainDrainQueue");
 #else
 #if defined(_WIN32)
-  static void(FAR *pfndispatch_main)(void) = NULL;
-
-  if (pfndispatch_main)
-    return pfndispatch_main();
-
   HMODULE hModule = LoadLibraryW(L"dispatch.dll");
-  if (hModule == NULL)
-    swift_reportError(0, "unable to load dispatch.dll");
+  if (hModule == NULL) {
+    swift_Concurrency_fatalError(0,
+      "unable to load dispatch.dll: %lu", GetLastError());
+  }
 
-  pfndispatch_main =
-      reinterpret_cast<void (FAR *)(void)>(GetProcAddress(hModule,
-                                                          "dispatch_main"));
-  if (pfndispatch_main == NULL)
-    swift_reportError(0, "unable to locate dispatch_main in dispatch.dll");
+  auto pfndispatch_main = reinterpret_cast<void (FAR *)(void)>(
+    GetProcAddress(hModule, "dispatch_main"));
+  if (pfndispatch_main == NULL) {
+    swift_Concurrency_fatalError(0,
+      "unable to locate dispatch_main in dispatch.dll: %lu", GetLastError());
+  }
 
   pfndispatch_main();
-  exit(0);
+  swift_unreachable("Returned from dispatch_main()");
 #else
   // CFRunLoop is not available on non-Darwin targets.  Foundation has an
   // implementation, but CoreFoundation is not meant to be exposed.  We can only

@@ -628,6 +628,22 @@ findSwiftNameAttr(const clang::Decl *decl, ImportNameVersion version) {
         activeAttr = decodeAttr(nameAttr);
     }
 
+    if (auto enumDecl = dyn_cast<clang::EnumDecl>(decl)) {
+      // Intentionally don't get the cannonical type here.
+      if (auto typedefType = dyn_cast<clang::TypedefType>(enumDecl->getIntegerType().getTypePtr())) {
+        // If the typedef is available in Swift, the user will get ambiguity.
+        // It also means they may not have intended this API to be imported like this.
+        if (importer::isUnavailableInSwift(typedefType->getDecl(), nullptr, true)) {
+          if (auto asyncAttr = typedefType->getDecl()->getAttr<clang::SwiftAsyncNameAttr>())
+            activeAttr = decodeAttr(asyncAttr);
+          if (!activeAttr) {
+            if (auto nameAttr = typedefType->getDecl()->getAttr<clang::SwiftNameAttr>())
+              activeAttr = decodeAttr(nameAttr);
+          }
+        }
+      }
+    }
+
     Optional<AnySwiftNameAttr> result = activeAttr;
     llvm::VersionTuple bestSoFar;
     for (auto *attr : decl->attrs()) {
@@ -999,7 +1015,11 @@ bool NameImporter::hasNamingConflict(const clang::NamedDecl *decl,
   lookupResult.setAllowHidden(true);
   lookupResult.suppressDiagnostics();
 
-  if (clangSema.LookupName(lookupResult, /*scope=*/clangSema.TUScope)) {
+  // Only force the Objective-C codepath in LookupName if clangSema.TUScope is
+  // nullptr
+  if (clangSema.LookupName(lookupResult, /*scope=*/clangSema.TUScope,
+                           /*AllowBuiltinCreation=*/false,
+                           /*ForceNoCPlusPlus=*/!clangSema.TUScope)) {
     if (std::any_of(lookupResult.begin(), lookupResult.end(), conflicts))
       return true;
   }
@@ -1263,7 +1283,7 @@ NameImporter::considerAsyncImport(
       }
 
       // Check whether the parameter itself has a name that indicates that
-      // it is a completion handelr.
+      // it is a completion handler.
       if (isCompletionHandlerParamName(
               params[completionHandlerParamIndex]->getName()))
         break;
@@ -1417,7 +1437,7 @@ bool NameImporter::hasErrorMethodNameCollision(
   // been marked NS_SWIFT_UNAVAILABLE, because it's actually marked unavailable,
   // or because it was deprecated before our API sunset. We can handle
   // "conflicts" where one form is unavailable.
-  return !isUnavailableInSwift(conflict, availability,
+  return !isUnavailableInSwift(conflict, &availability,
                                enableObjCInterop());
 }
 
@@ -1678,7 +1698,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     }
   }
 
-  // Spcial case: unnamed/anonymous fields.
+  // Special case: unnamed/anonymous fields.
   if (auto field = dyn_cast<clang::FieldDecl>(D)) {
     static_assert((clang::Decl::lastField - clang::Decl::firstField) == 2,
                   "update logic for new FieldDecl subclasses");
@@ -1736,6 +1756,21 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
             nameStream << field->getName();
           }
           result.setDeclName(swiftCtx.getIdentifier(nameStream.str()));
+          result.setEffectiveContext(D->getDeclContext());
+          return result;
+        }
+      }
+    }
+
+    // If this enum inherits from a typedef we can compute the name from the
+    // typedef (even if it's an anonymous enum).
+    if (auto enumDecl = dyn_cast<clang::EnumDecl>(D)) {
+      // Intentionally don't get the cannonical type here.
+      if (auto typedefType = dyn_cast<clang::TypedefType>(enumDecl->getIntegerType().getTypePtr())) {
+        // If the typedef is available in Swift, the user will get ambiguity.
+        // It also means they may not have intended this API to be imported like this.
+        if (importer::isUnavailableInSwift(typedefType->getDecl(), nullptr, true)) {
+          result.setDeclName(swiftCtx.getIdentifier(typedefType->getDecl()->getName()));
           result.setEffectiveContext(D->getDeclContext());
           return result;
         }

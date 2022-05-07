@@ -160,6 +160,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/SetVector.h"
 #include "RewriteContext.h"
+#include "NameLookup.h"
 
 using namespace swift;
 using namespace rewriting;
@@ -291,7 +292,8 @@ static void desugarConformanceRequirement(Type subjectType, Type constraintType,
       // Check if the subject type actually conforms.
       auto *protoDecl = constraintType->castTo<ProtocolType>()->getDecl();
       auto *module = protoDecl->getParentModule();
-      auto conformance = module->lookupConformance(subjectType, protoDecl);
+      auto conformance = module->lookupConformance(
+          subjectType, protoDecl, /*allowMissing=*/true);
       if (conformance.isInvalid()) {
         errors.push_back(RequirementError::forInvalidRequirementSubject(
             {RequirementKind::Conformance, subjectType, constraintType}, loc));
@@ -338,7 +340,7 @@ static void desugarConformanceRequirement(Type subjectType, Type constraintType,
   }
 
   for (auto memberType : compositionType->getMembers()) {
-    if (memberType->isExistentialType())
+    if (memberType->isConstraintType())
       desugarConformanceRequirement(subjectType, memberType,
                                     loc, result, errors);
     else
@@ -384,11 +386,39 @@ swift::rewriting::desugarRequirement(Requirement req, SourceLoc loc,
 // Requirement realization and inference.
 //
 
-static void realizeTypeRequirement(Type subjectType, Type constraintType,
+static void realizeTypeRequirement(DeclContext *dc,
+                                   Type subjectType, Type constraintType,
                                    SourceLoc loc,
                                    SmallVectorImpl<StructuralRequirement> &result,
                                    SmallVectorImpl<RequirementError> &errors) {
   SmallVector<Requirement, 2> reqs;
+
+  // The GenericSignatureBuilder allowed the right hand side of a
+  // conformance or superclass requirement to reference a protocol
+  // typealias whose underlying type was a protocol or class.
+  //
+  // Since protocol typealiases resolve to DependentMemberTypes in
+  // ::Structural mode, this relied on the GSB's "delayed requirements"
+  // mechanism.
+  //
+  // The RequirementMachine does not have an equivalent, and cannot really
+  // support that because we need to collect the protocols mentioned on
+  // the right hand sides of conformance requirements ahead of time.
+  //
+  // However, we can support it in simple cases where the typealias is
+  // defined in the protocol itself and is accessed as a member of 'Self'.
+  if (auto *proto = dc->getSelfProtocolDecl()) {
+    if (auto memberType = constraintType->getAs<DependentMemberType>()) {
+      if (memberType->getBase()->isEqual(proto->getSelfInterfaceType())) {
+        SmallVector<TypeDecl *, 1> result;
+        lookupConcreteNestedType(proto, memberType->getName(), result);
+        auto *typeDecl = findBestConcreteNestedType(result);
+        if (auto *aliasDecl = dyn_cast_or_null<TypeAliasDecl>(typeDecl)) {
+          constraintType = aliasDecl->getUnderlyingType();
+        }
+      }
+    }
+  }
 
   if (constraintType->isConstraintType()) {
     // Handle conformance requirements.
@@ -534,18 +564,20 @@ void swift::rewriting::inferRequirements(
 /// Desugar a requirement and perform requirement inference if requested
 /// to obtain zero or more structural requirements.
 void swift::rewriting::realizeRequirement(
+    DeclContext *dc,
     Requirement req, RequirementRepr *reqRepr,
-    ModuleDecl *moduleForInference,
+    bool shouldInferRequirements,
     SmallVectorImpl<StructuralRequirement> &result,
     SmallVectorImpl<RequirementError> &errors) {
   auto firstType = req.getFirstType();
   auto loc = (reqRepr ? reqRepr->getSeparatorLoc() : SourceLoc());
+  auto *moduleForInference = dc->getParentModule();
 
   switch (req.getKind()) {
   case RequirementKind::Superclass:
   case RequirementKind::Conformance: {
     auto secondType = req.getSecondType();
-    if (moduleForInference) {
+    if (shouldInferRequirements) {
       auto firstLoc = (reqRepr ? reqRepr->getSubjectRepr()->getStartLoc()
                                : SourceLoc());
       inferRequirements(firstType, firstLoc, moduleForInference, result);
@@ -555,12 +587,12 @@ void swift::rewriting::realizeRequirement(
       inferRequirements(secondType, secondLoc, moduleForInference, result);
     }
 
-    realizeTypeRequirement(firstType, secondType, loc, result, errors);
+    realizeTypeRequirement(dc, firstType, secondType, loc, result, errors);
     break;
   }
 
   case RequirementKind::Layout: {
-    if (moduleForInference) {
+    if (shouldInferRequirements) {
       auto firstLoc = (reqRepr ? reqRepr->getSubjectRepr()->getStartLoc()
                                : SourceLoc());
       inferRequirements(firstType, firstLoc, moduleForInference, result);
@@ -578,7 +610,7 @@ void swift::rewriting::realizeRequirement(
 
   case RequirementKind::SameType: {
     auto secondType = req.getSecondType();
-    if (moduleForInference) {
+    if (shouldInferRequirements) {
       auto firstLoc = (reqRepr ? reqRepr->getFirstTypeRepr()->getStartLoc()
                                : SourceLoc());
       inferRequirements(firstType, firstLoc, moduleForInference, result);
@@ -602,11 +634,13 @@ void swift::rewriting::realizeRequirement(
 /// Collect structural requirements written in the inheritance clause of an
 /// AssociatedTypeDecl or GenericTypeParamDecl.
 void swift::rewriting::realizeInheritedRequirements(
-    TypeDecl *decl, Type type, ModuleDecl *moduleForInference,
+    TypeDecl *decl, Type type, bool shouldInferRequirements,
     SmallVectorImpl<StructuralRequirement> &result,
     SmallVectorImpl<RequirementError> &errors) {
   auto &ctx = decl->getASTContext();
   auto inheritedTypes = decl->getInherited();
+  auto *dc = decl->getInnermostDeclContext();
+  auto *moduleForInference = dc->getParentModule();
 
   for (unsigned index : indices(inheritedTypes)) {
     Type inheritedType
@@ -616,41 +650,21 @@ void swift::rewriting::realizeInheritedRequirements(
                           Type());
     if (!inheritedType) continue;
 
-    // The GenericSignatureBuilder allowed an associated type's inheritance
-    // clause to reference a protocol typealias whose underlying type was a
-    // protocol or class.
-    //
-    // Since protocol typealiases resolve to DependentMemberTypes in
-    // ::Structural mode, this relied on the GSB's "delayed requirements"
-    // mechanism.
-    //
-    // The RequirementMachine does not have an equivalent, and cannot really
-    // support that because we need to collect the protocols mentioned on
-    // the right hand sides of conformance requirements ahead of time.
-    //
-    // However, we can support it in simple cases where the typealias is
-    // defined in the protocol itself and is accessed as a member of 'Self'.
-    if (auto *assocTypeDecl = dyn_cast<AssociatedTypeDecl>(decl)) {
-      if (auto memberType = inheritedType->getAs<DependentMemberType>()) {
-        if (memberType->getBase()->isEqual(
-            assocTypeDecl->getProtocol()->getSelfInterfaceType())) {
-          inheritedType
-            = evaluateOrDefault(ctx.evaluator,
-                                InheritedTypeRequest{decl, index,
-                                TypeResolutionStage::Interface},
-                                Type());
-          if (!inheritedType) continue;
-        }
-      }
+    // Ignore trivially circular protocol refinement (protocol P : P)
+    // since we diagnose that elsewhere. Adding a rule here would emit
+    // a useless redundancy warning.
+    if (auto *protoDecl = dyn_cast<ProtocolDecl>(decl)) {
+      if (inheritedType->isEqual(protoDecl->getDeclaredInterfaceType()))
+        continue;
     }
 
     auto *typeRepr = inheritedTypes[index].getTypeRepr();
     SourceLoc loc = (typeRepr ? typeRepr->getStartLoc() : SourceLoc());
-    if (moduleForInference) {
+    if (shouldInferRequirements) {
       inferRequirements(inheritedType, loc, moduleForInference, result);
     }
 
-    realizeTypeRequirement(type, inheritedType, loc, result, errors);
+    realizeTypeRequirement(dc, type, inheritedType, loc, result, errors);
   }
 }
 
@@ -823,14 +837,14 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
   auto selfTy = proto->getSelfInterfaceType();
 
   realizeInheritedRequirements(proto, selfTy,
-                               /*moduleForInference=*/nullptr,
+                               /*inferRequirements=*/false,
                                result, errors);
 
   // Add requirements from the protocol's own 'where' clause.
   WhereClauseOwner(proto).visitRequirements(TypeResolutionStage::Structural,
       [&](const Requirement &req, RequirementRepr *reqRepr) {
-        realizeRequirement(req, reqRepr,
-                           /*moduleForInference=*/nullptr,
+        realizeRequirement(proto, req, reqRepr,
+                           /*inferRequirements=*/false,
                            result, errors);
         return false;
       });
@@ -855,15 +869,15 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
     // Add requirements placed directly on this associated type.
     auto assocType = assocTypeDecl->getDeclaredInterfaceType();
     realizeInheritedRequirements(assocTypeDecl, assocType,
-                                 /*moduleForInference=*/nullptr,
+                                 /*inferRequirements=*/false,
                                  result, errors);
 
     // Add requirements from this associated type's where clause.
     WhereClauseOwner(assocTypeDecl).visitRequirements(
         TypeResolutionStage::Structural,
         [&](const Requirement &req, RequirementRepr *reqRepr) {
-          realizeRequirement(req, reqRepr,
-                             /*moduleForInference=*/nullptr,
+          realizeRequirement(proto, req, reqRepr,
+                             /*inferRequirements=*/false,
                              result, errors);
           return false;
         });

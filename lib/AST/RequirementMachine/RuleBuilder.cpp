@@ -435,8 +435,8 @@ void RuleBuilder::collectRulesFromReferencedProtocols() {
   // Now visit each subordinate requirement machine pull in its rules.
   for (auto *proto : ProtocolsToImport) {
     // This will trigger requirement signature computation for this protocol,
-    // if neccessary, which will cause us to re-enter into a new RuleBuilder
-    // instace under RuleBuilder::initWithProtocolWrittenRequirements().
+    // if necessary, which will cause us to re-enter into a new RuleBuilder
+    // instance under RuleBuilder::initWithProtocolWrittenRequirements().
     if (Dump) {
       llvm::dbgs() << "importing protocol " << proto->getName() << "\n";
     }

@@ -61,33 +61,34 @@ distributed actor MyDistActor {
 
 // *** only destroy the id and system if remote ***
 // CHECK: [[REMOTE_BB_DEALLOC]]:
-            // *** destroy system ***
-// SKIP:   [[REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.actorSystem
-// SKIP:   [[ACCESS:%[0-9]+]] = begin_access [deinit] [static] [[REF]]
-// SKIP:   destroy_addr [[ACCESS]] : $*FakeActorSystem
-// SKIP:   end_access [[ACCESS]]
             // *** destroy identity ***
 // CHECK:   [[REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.id
 // CHECK:   [[ACCESS:%[0-9]+]] = begin_access [deinit] [static] [[REF]]
 // CHECK:   destroy_addr [[ACCESS]] : $*ActorAddress
 // CHECK:   end_access [[ACCESS]]
+            // *** destroy system ***
+// CHECK:   [[REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.actorSystem
+// CHECK:   [[ACCESS:%[0-9]+]] = begin_access [deinit] [static] [[REF]]
+// CHECK:   destroy_addr [[ACCESS]] : $*FakeActorSystem
+// CHECK:   end_access [[ACCESS]]
 // CHECK:   br [[AFTER_DEALLOC:bb[0-9]+]]
 
 // *** destroy everything if local ***
 // CHECK: [[LOCAL_BB_DEALLOC]]:
-            // *** destroy the user-defined field ***
-// CHECK:   [[REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.localOnlyField
+            // *** destroy identity ***
+// CHECK:   [[REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.id
 // CHECK:   [[ACCESS:%[0-9]+]] = begin_access [deinit] [static] [[REF]]
-// CHECK:   destroy_addr [[ACCESS]] : $*SomeClass
+// CHECK:   destroy_addr [[ACCESS]] : $*ActorAddress
 // CHECK:   end_access [[ACCESS]]
-            // *** the rest of this part is identical to the remote case ***
+            // *** destroy system ***
 // SKIP:   [[REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.actorSystem
 // SKIP:   [[ACCESS:%[0-9]+]] = begin_access [deinit] [static] [[REF]]
 // SKIP:   destroy_addr [[ACCESS]] : $*FakeActorSystem
 // SKIP:   end_access [[ACCESS]]
-// CHECK:   [[REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.id
+            // *** destroy the user-defined field ***
+// CHECK:   [[REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.localOnlyField
 // CHECK:   [[ACCESS:%[0-9]+]] = begin_access [deinit] [static] [[REF]]
-// CHECK:   destroy_addr [[ACCESS]] : $*ActorAddress
+// CHECK:   destroy_addr [[ACCESS]] : $*SomeClass
 // CHECK:   end_access [[ACCESS]]
 // CHECK:   br [[AFTER_DEALLOC]]
 

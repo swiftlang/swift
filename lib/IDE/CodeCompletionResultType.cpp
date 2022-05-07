@@ -29,15 +29,13 @@ USRBasedTypeContext::USRBasedTypeContext(const ExpectedTypeContext *TypeContext,
     : Arena(Arena) {
 
   for (auto possibleTy : TypeContext->getPossibleTypes()) {
-    ContextualTypes.emplace_back(USRBasedType::fromType(possibleTy, Arena),
-                                 /*IsConvertible=*/false);
+    ContextualTypes.emplace_back(USRBasedType::fromType(possibleTy, Arena));
 
     // Add the unwrapped optional types as 'convertible' contextual types.
     auto UnwrappedOptionalType = possibleTy->getOptionalObjectType();
     while (UnwrappedOptionalType) {
       ContextualTypes.emplace_back(
-          USRBasedType::fromType(UnwrappedOptionalType, Arena),
-          /*IsConvertible=*/true);
+          USRBasedType::fromType(UnwrappedOptionalType, Arena));
       UnwrappedOptionalType = UnwrappedOptionalType->getOptionalObjectType();
     }
 
@@ -57,7 +55,7 @@ USRBasedTypeContext::USRBasedTypeContext(const ExpectedTypeContext *TypeContext,
       // Archetypes are also be used to model generic return types, in which
       // case they don't have any conformsTo entries. We simply ignore those.
       if (!USRTypes.empty()) {
-        ContextualTypes.emplace_back(USRTypes, /*IsConvertible=*/false);
+        ContextualTypes.emplace_back(USRTypes);
       }
     }
   }
@@ -76,6 +74,9 @@ USRBasedTypeContext::typeRelation(const USRBasedType *ResultType) const {
   TypeRelation Res = TypeRelation::Unknown;
   for (auto &ContextualType : ContextualTypes) {
     Res = std::max(Res, ContextualType.typeRelation(ResultType, VoidType));
+    if (Res == TypeRelation::MAX_VALUE) {
+      return Res; // We can't improve further
+    }
   }
   return Res;
 }
@@ -105,7 +106,7 @@ TypeRelation USRBasedType::typeRelationImpl(
     return TypeRelation::Unknown;
   }
   if (ResultType == this) {
-    return TypeRelation::Identical;
+    return TypeRelation::Convertible;
   }
   for (const USRBasedType *Supertype : ResultType->getSupertypes()) {
     if (!VisitedTypes.insert(Supertype).second) {
@@ -203,10 +204,38 @@ const USRBasedType *USRBasedType::fromType(Type Ty, USRBasedTypeArena &Arena) {
           Conformance->getProtocol()->getDeclaredInterfaceType(), Arena));
     }
   }
-  Type Superclass = Ty->getSuperclass();
+
+  // You would think that superclass + conformances form a DAG. You are wrong!
+  // We can achieve a circular supertype hierarcy with
+  //
+  // protocol Proto : Class {}
+  // class Class : Proto {}
+  //
+  // USRBasedType is not set up for this. Serialization of code completion
+  // results from global modules can't handle cycles in the supertype hierarchy
+  // because it writes the DAG leaf to root(s) and needs to know the type
+  // offsets. To get consistent results independent of where we start
+  // constructing USRBasedTypes, ignore superclasses of protocols. If we kept
+  // track of already visited types, we would get different results depending on
+  // whether we start constructing the USRBasedType hierarchy from Proto or
+  // Class.
+  // Ignoring superclasses of protocols is safe to do because USRBasedType is an
+  // under-approximation anyway.
+
+  /// If `Ty` is a class type and has a superclass, return that. In all other
+  /// cases, return null.
+  auto getSuperclass = [](Type Ty) -> Type {
+    if (isa_and_nonnull<ClassDecl>(Ty->getAnyNominal())) {
+      return Ty->getSuperclass();
+    } else {
+      return Type();
+    }
+  };
+
+  Type Superclass = getSuperclass(Ty);
   while (Superclass) {
     Supertypes.push_back(USRBasedType::fromType(Superclass, Arena));
-    Superclass = Superclass->getSuperclass();
+    Superclass = getSuperclass(Superclass);
   }
 
   assert(llvm::all_of(Supertypes, [&USR](const USRBasedType *Ty) {
@@ -239,13 +268,9 @@ TypeRelation USRBasedTypeContext::ContextualType::typeRelation(
 
   /// Types is a conjunction, not a disjunction (see documentation on Types),
   /// so we need to compute the minimum type relation here.
-  TypeRelation Result = TypeRelation::Identical;
+  TypeRelation Result = TypeRelation::Convertible;
   for (auto ContextType : Types) {
     Result = std::min(Result, ContextType->typeRelation(ResultType, VoidType));
-  }
-
-  if (IsConvertible && Result == TypeRelation::Identical) {
-    Result = TypeRelation::Convertible;
   }
   return Result;
 }
@@ -262,7 +287,7 @@ static TypeRelation calculateTypeRelation(Type Ty, Type ExpectedTy,
   // requirements – ignore them
   if (!Ty->hasTypeParameter() && !ExpectedTy->hasTypeParameter()) {
     if (Ty->isEqual(ExpectedTy))
-      return TypeRelation::Identical;
+      return TypeRelation::Convertible;
     bool isAny = false;
     isAny |= ExpectedTy->isAny();
     isAny |= ExpectedTy->is<ArchetypeType>() &&

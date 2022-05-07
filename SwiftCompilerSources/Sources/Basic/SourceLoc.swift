@@ -1,4 +1,4 @@
-//===--- SourceLoc.swift - SourceLoc bridiging utilities ------------------===//
+//===--- SourceLoc.swift - SourceLoc bridging utilities ------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -30,6 +30,12 @@ public struct SourceLoc {
 
   public var bridged: BridgedSourceLoc {
     .init(pointer: locationInFile)
+  }
+}
+
+extension SourceLoc {
+  public func advanced(by n: Int) -> SourceLoc {
+    SourceLoc(locationInFile: locationInFile.advanced(by: n))!
   }
 }
 

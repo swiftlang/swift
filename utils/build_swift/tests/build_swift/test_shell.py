@@ -7,8 +7,6 @@
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 
-from __future__ import absolute_import, unicode_literals
-
 import builtins
 import collections
 import sys
@@ -67,7 +65,7 @@ class TestHelpers(unittest.TestCase):
 
         result = shell._flatmap(duplicate, [1, 2, 3])
 
-        self.assertIsInstance(result, collections.Iterable)
+        self.assertIsInstance(result, collections.abc.Iterable)
         self.assertEqual(list(result), [1, 1, 2, 2, 3, 3])
 
     # -------------------------------------------------------------------------

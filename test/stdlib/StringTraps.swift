@@ -17,6 +17,7 @@ import Foundation // For NSString
 let testSuiteSuffix = _isDebugAssertConfiguration() ? "_debug" : "_release"
 
 var StringTraps = TestSuite("StringTraps" + testSuiteSuffix)
+defer { runAllTests() }
 
 StringTraps.test("startIndex/predecessor")
   .skip(.custom(
@@ -353,5 +354,113 @@ StringTraps.test("UTF8View foreign index(before:) trap on i == startIndex")
 }
 #endif
 
-runAllTests()
+#if _runtime(_ObjC)
+if #available(SwiftStdlib 5.7, *) {
+  let native = "🫱🏼‍🫲🏽 a 🧑🏽‍🌾 b"
+  let cocoa = ("🫱🏼‍🫲🏽 a 🧑🏽‍🌾 b" as NSString) as String
 
+  let goodIndices: [String.Index] = [
+    native.startIndex,
+    native.unicodeScalars.startIndex,
+    native.utf8.startIndex,
+    native.utf16.startIndex,
+  ]
+
+  StringTraps.test("Start index encoding").forEach(in: goodIndices) { i in
+    // The startIndex works fine in both encodings.
+    print(i)
+    expectEqual(cocoa[i], native[i])
+  }
+
+  let badIndices: [String.Index] = [
+    native.index(native.startIndex, offsetBy: 3),
+    native.unicodeScalars.index(native.startIndex, offsetBy: 3),
+    native.utf8.index(native.startIndex, offsetBy: 3),
+    native.utf16.index(native.startIndex, offsetBy: 3),
+  ]
+
+  StringTraps.test("String.subscript/encoding trap")
+  .forEach(in: badIndices) { i in
+    print(i)
+    expectCrashLater()
+    print(cocoa[i])
+  }
+
+  StringTraps.test("String.index(after:)/encoding trap")
+  .forEach(in: badIndices) { i in
+    print(i)
+    expectCrashLater()
+    print(cocoa.index(after: i))
+  }
+
+  StringTraps.test("String.index(before:)/encoding trap")
+  .forEach(in: badIndices) { i in
+    print(i)
+    expectCrashLater()
+    print(cocoa.index(before: i))
+  }
+
+  StringTraps.test("String.UnicodeScalarView.subscript/encoding trap")
+  .forEach(in: badIndices) { i in
+    print(i)
+    expectCrashLater()
+    print(cocoa.unicodeScalars[i])
+  }
+
+  StringTraps.test("String.UnicodeScalarView.index(after:)/encoding trap")
+  .forEach(in: badIndices) { i in
+    print(i)
+    expectCrashLater()
+    print(cocoa.unicodeScalars.index(after: i))
+  }
+
+  StringTraps.test("String.UnicodeScalarView.index(before:)/encoding trap")
+  .forEach(in: badIndices) { i in
+    print(i)
+    expectCrashLater()
+    print(cocoa.unicodeScalars.index(before: i))
+  }
+
+  StringTraps.test("String.UTF8View.subscript/encoding trap")
+  .forEach(in: badIndices) { i in
+    print(i)
+    expectCrashLater()
+    print(cocoa.utf8[i])
+  }
+
+  StringTraps.test("String.UTF8View.index(after:)/encoding trap")
+  .forEach(in: badIndices) { i in
+    print(i)
+    expectCrashLater()
+    print(cocoa.utf8.index(after: i))
+  }
+
+  StringTraps.test("String.UTF8View.index(before:)/encoding trap")
+  .forEach(in: badIndices) { i in
+    print(i)
+    expectCrashLater()
+    print(cocoa.utf8.index(before: i))
+  }
+
+  StringTraps.test("String.UTF16View.subscript/encoding trap")
+  .forEach(in: badIndices) { i in
+    print(i)
+    expectCrashLater()
+    print(cocoa.utf16[i])
+  }
+
+  StringTraps.test("String.UTF16View.index(after:)/encoding trap")
+  .forEach(in: badIndices) { i in
+    print(i)
+    expectCrashLater()
+    print(cocoa.utf16.index(after: i))
+  }
+
+  StringTraps.test("String.UTF16View.index(before:)/encoding trap")
+  .forEach(in: badIndices) { i in
+    print(i)
+    expectCrashLater()
+    print(cocoa.utf16.index(before: i))
+  }
+}
+#endif

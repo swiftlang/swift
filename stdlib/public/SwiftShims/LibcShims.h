@@ -60,10 +60,11 @@ static inline __swift_size_t _swift_stdlib_strlen_unsigned(const unsigned char *
 SWIFT_READONLY
 static inline int _swift_stdlib_memcmp(const void *s1, const void *s2,
                                        __swift_size_t n) {
-#if defined(__APPLE__) || defined(__ANDROID__) || defined(__OpenBSD__)
-  extern int memcmp(const void * _Nullable, const void * _Nullable, __swift_size_t);
+// FIXME: Is there a way to identify Glibc specifically?
+#if defined(__gnu_linux__)
+  extern int memcmp(const void * _Nonnull, const void * _Nonnull, __swift_size_t);
 #else
-  extern int memcmp(const void *, const void *, __swift_size_t);
+  extern int memcmp(const void * _Null_unspecified, const void * _Null_unspecified, __swift_size_t);
 #endif
   return memcmp(s1, s2, n);
 }

@@ -13,8 +13,7 @@
 // rdar://90373022
 // UNSUPPORTED: OS=watchos
 
-// FIXME(distributed): seems to fail also on simulator on x86_64?
-// REQUIRES: rdar90373022
+// REQUIRES: rdar92277324
 
 import Distributed
 

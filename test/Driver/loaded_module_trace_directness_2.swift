@@ -32,7 +32,7 @@ public class MyNode {
 
 // 2. FilesystemKit - Nothing to do (pure Clang module).
 
-// 3. TestFilesystem - Check that CoreFilesystem and Filesytem can be imported.
+// 3. TestFilesystem - Check that CoreFilesystem and Filesystem can be imported.
 
 // RUN: %target-swift-frontend %s -typecheck -DTestFilesystem -DV1 -module-name TestFilesystemV1 -emit-loaded-module-trace-path %t/TestFilesystemV1.trace.json -I %t/include
 // RUN: %FileCheck %s --check-prefix=TESTFILESYSTEM < %t/TestFilesystemV1.trace.json

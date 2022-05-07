@@ -462,10 +462,15 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   if (auto *fun = F.getDynamicallyReplacedFunction()) {
     addReferencedSILFunction(fun, true);
     replacedFunctionID = S.addUniquedStringRef(fun->getName());
-  }
-  else if (F.hasObjCReplacement()) {
+  } else if (F.hasObjCReplacement()) {
     replacedFunctionID =
         S.addUniquedStringRef(F.getObjCReplacement().str());
+  }
+
+  IdentifierID usedAdHocWitnessFunctionID = 0;
+  if (auto *fun = F.getReferencedAdHocRequirementWitnessFunction()) {
+    addReferencedSILFunction(fun, true);
+    usedAdHocWitnessFunctionID = S.addUniquedStringRef(fun->getName());
   }
 
   unsigned numAttrs = NoBody ? 0 : F.getSpecializeAttrs().size();
@@ -495,9 +500,11 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.hasCReferences(), (unsigned)F.getEffectsKind(),
       (unsigned)numAttrs, (unsigned)F.hasOwnership(),
       F.isAlwaysWeakImported(), LIST_VER_TUPLE_PIECES(available),
-      (unsigned)F.isDynamicallyReplaceable(), (unsigned)F.isExactSelfClass(),
-      (unsigned)F.isDistributed(), FnID, replacedFunctionID, genericSigID,
-      clangNodeOwnerID, SemanticsIDs);
+      (unsigned)F.isDynamicallyReplaceable(),
+      (unsigned)F.isExactSelfClass(),
+      (unsigned)F.isDistributed(),
+      FnID, replacedFunctionID, usedAdHocWitnessFunctionID,
+      genericSigID, clangNodeOwnerID, SemanticsIDs);
 
   F.visitArgEffects(
     [&](int effectIdx, bool isDerived, SILFunction::ArgEffectKind) {
@@ -995,7 +1002,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::AllocBoxInst: {
     const AllocBoxInst *ABI = cast<AllocBoxInst>(&SI);
-    writeOneTypeLayout(ABI->getKind(), ABI->hasDynamicLifetime() ? 1 : 0,
+    unsigned flags
+      = (ABI->hasDynamicLifetime() ? 1 : 0)
+      | (ABI->emitReflectionMetadata() ? 2 : 0);
+    writeOneTypeLayout(ABI->getKind(),
+                       flags,
                        ABI->getType());
     break;
   }
@@ -1745,6 +1756,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     if (SI.getKind() == SILInstructionKind::ConvertFunctionInst) {
       if (cast<ConvertFunctionInst>(SI).withoutActuallyEscaping())
         attrs |= 0x01;
+    } else if (auto *refCast = dyn_cast<UncheckedRefCastInst>(&SI)) {
+      attrs = encodeValueOwnership(refCast->getOwnershipKind());
     }
     writeConversionLikeInstruction(cast<SingleValueInstruction>(&SI), attrs);
     break;

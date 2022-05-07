@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-cxx-interop -Xfrontend -validate-tbd-against-ir=none)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none)
 //
 // REQUIRES: executable_test
 
@@ -17,7 +17,7 @@ TemplateNotInSignatureTestSuite.test("Function with defaulted template type para
   expectEqual(y, 10)
 }
 
-TemplateNotInSignatureTestSuite.test("Instanciate the same function template twice.") {
+TemplateNotInSignatureTestSuite.test("Instantiate the same function template twice.") {
   // Intentionally test the same thing twice.
   templateTypeParamNotUsedInSignature(T: Int.self)
   templateTypeParamNotUsedInSignature(T: Int.self)

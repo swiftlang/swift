@@ -30,6 +30,7 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
+#include "clang/AST/ASTContext.h"
 using namespace swift;
 
 #define DEBUG_TYPE "Name lookup"
@@ -85,10 +86,11 @@ ProtocolDecl *DeclContext::getExtendedProtocolDecl() const {
 
 VarDecl *DeclContext::getNonLocalVarDecl() const {
   if (auto *init = dyn_cast<PatternBindingInitializer>(this)) {
-   if (auto *var =
-         init->getBinding()->getAnchoringVarDecl(init->getBindingIndex())) {
-      return var;
-     }
+    if (auto binding = init->getBinding()) {
+      if (auto *var = binding->getAnchoringVarDecl(init->getBindingIndex())) {
+        return var;
+      }
+    }
   }
   return nullptr;
 }
@@ -733,6 +735,14 @@ unsigned DeclContext::printContext(raw_ostream &OS, const unsigned indent,
   }
   }
 
+  if (auto decl = getAsDecl())
+    if (decl->getClangNode().getLocation().isValid()) {
+      auto &clangSM = getASTContext().getClangModuleLoader()
+                          ->getClangASTContext().getSourceManager();
+      OS << " clang_loc=";
+      decl->getClangNode().getLocation().print(OS, clangSM);
+    }
+
   if (!onlyAPartialLine)
     OS << "\n";
   return Depth + 1;
@@ -1284,7 +1294,7 @@ SourceLoc swift::extractNearestSourceLoc(const DeclContext *dc) {
   case DeclContextKind::SerializedLocal:
     return extractNearestSourceLoc(dc->getParent());
   }
-  llvm_unreachable("Unhandled DeclCopntextKindin switch");
+  llvm_unreachable("Unhandled DeclContextKindIn switch");
 }
 
 #define DECL(Id, Parent) \

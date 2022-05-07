@@ -244,7 +244,6 @@ namespace {
     IMPL(BuiltinInteger, Trivial)
     IMPL(BuiltinIntegerLiteral, Trivial)
     IMPL(BuiltinFloat, Trivial)
-    IMPL(BuiltinRawPointer, Trivial)
     IMPL(BuiltinRawUnsafeContinuation, Trivial)
     IMPL(BuiltinJob, Trivial)
     IMPL(BuiltinExecutor, Trivial)
@@ -258,6 +257,14 @@ namespace {
     IMPL(Module, Trivial)
 
 #undef IMPL
+
+    RetTy visitBuiltinRawPointerType(CanBuiltinRawPointerType type,
+                                     AbstractionPattern orig,
+                                     IsTypeExpansionSensitive_t isSensitive) {
+      RecursiveProperties props = mergeIsTypeExpansionSensitive(isSensitive,
+                                          RecursiveProperties::forRawPointer());
+      return asImpl().handleTrivial(type, props);
+    }
 
     RetTy visitBuiltinUnsafeValueBufferType(
                                          CanBuiltinUnsafeValueBufferType type,
@@ -1784,7 +1791,7 @@ namespace {
         //
         // Note: if the type is in a different module, the lowering does
         // not depend on the resilience expansion, so we do not need to set
-        // the isResilent() flag above.
+        // the isResilient() flag above.
         if (!sameModule || Expansion.getResilienceExpansion() ==
                                ResilienceExpansion::Minimal) {
           properties.addSubobject(RecursiveProperties::forOpaque());
@@ -2115,7 +2122,7 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
   auto loweredSubstType =
       computeLoweredRValueType(forExpansion, origType, substType);
 
-  // If that didn't change the type and the key is cachable, there's no
+  // If that didn't change the type and the key is cacheable, there's no
   // point in re-checking the table, so just construct a type lowering
   // and cache it.
   if (loweredSubstType == substType && key.isCacheable()) {
@@ -3317,7 +3324,7 @@ public:
     return (isa<SubstitutableType>(type) || isa<DependentMemberType>(type));
   };
 
-  // We can fast-path some of these checks by proviing these two overrides:
+  // We can fast-path some of these checks by providing these two overrides:
   bool visitSubstitutableType(CanSubstitutableType type1,
                               CanSubstitutableType type2) {
     return false;
@@ -3509,7 +3516,8 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
   // We don't need to capture the generic environment.
   if (!loweredInterfaceType->hasTypeParameter()) {
     auto layout = SILLayout::get(C, nullptr,
-                                 SILField(loweredInterfaceType, isMutable));
+                                 SILField(loweredInterfaceType, isMutable),
+                                 /*captures generics*/ false);
     return SILBoxType::get(C, layout, {});
   }
   
@@ -3519,7 +3527,8 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
   // only the parts used by the captured variable.
   
   auto layout = SILLayout::get(C, signature,
-                               SILField(loweredInterfaceType, isMutable));
+                               SILField(loweredInterfaceType, isMutable),
+                               /*captures generics*/ false);
   
   // Instantiate the layout with identity substitutions.
   auto subMap = SubstitutionMap::get(
@@ -3590,7 +3599,8 @@ CanSILBoxType TypeConverter::getBoxTypeForEnumElement(
   if (boxSignature == CanGenericSignature()) {
     auto eltIntfTy = elt->getArgumentInterfaceType();
     auto boxVarTy = getLoweredRValueType(context, eltIntfTy);
-    auto layout = SILLayout::get(C, nullptr, SILField(boxVarTy, true));
+    auto layout = SILLayout::get(C, nullptr, SILField(boxVarTy, true),
+                                 /*captures generics*/ false);
     return SILBoxType::get(C, layout, {});
   }
 
@@ -3602,7 +3612,8 @@ CanSILBoxType TypeConverter::getBoxTypeForEnumElement(
 
   auto boxVarTy = getLoweredRValueType(context,
                                        getAbstractionPattern(elt), eltIntfTy);
-  auto layout = SILLayout::get(C, boxSignature, SILField(boxVarTy, true));
+  auto layout = SILLayout::get(C, boxSignature, SILField(boxVarTy, true),
+                               /*captures generics*/ false);
 
   // Instantiate the layout with enum's substitution list.
   auto subMap = boundEnum->getContextSubstitutionMap(

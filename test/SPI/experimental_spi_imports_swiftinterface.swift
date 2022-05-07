@@ -11,6 +11,8 @@
 
 /// Test the generated swiftinterface.
 // RUN: %target-swift-frontend -typecheck %s %S/Inputs/experimental_spi_imports_inconsistent.swift -emit-module-interface-path %t/main.swiftinterface -emit-private-module-interface-path %t/main.private.swiftinterface -enable-library-evolution -swift-version 5 -I %t -experimental-spi-imports
+// RUN: %target-swift-typecheck-module-from-interface(%t/main.swiftinterface) -I %t
+// RUN: %target-swift-typecheck-module-from-interface(%t/main.private.swiftinterface) -I %t
 // RUN: %FileCheck -check-prefix=CHECK-PUBLIC %s < %t/main.swiftinterface
 // RUN: %FileCheck -check-prefix=CHECK-PRIVATE %s < %t/main.private.swiftinterface
 

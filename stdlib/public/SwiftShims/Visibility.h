@@ -121,7 +121,7 @@
 // are known to be exported from a different image.  This never
 // includes a definition.
 //
-// Getting the right attribute on a declaratioon can be pretty awkward,
+// Getting the right attribute on a declaration can be pretty awkward,
 // but it's necessary under the C translation model.  All of this
 // ceremony is familiar to Windows programmers; C/C++ programmers
 // everywhere else usually don't bother, but since we have to get it
@@ -236,6 +236,13 @@
 #define SWIFT_NODISCARD
 #endif
 
+#if __has_cpp_attribute(gnu::returns_nonnull)
+#define SWIFT_RETURNS_NONNULL [[gnu::returns_nonnull]]
+#elif defined(_MSC_VER) && defined(_Ret_notnull_)
+#define SWIFT_RETURNS_NONNULL _Ret_notnull_
+#else
+#define SWIFT_RETURNS_NONNULL
+#endif
 
 /// Attributes for runtime-stdlib interfaces.
 /// Use these for C implementations that are imported into Swift via SwiftShims
