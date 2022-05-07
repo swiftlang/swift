@@ -79,6 +79,19 @@ bool swift::isExported(const ValueDecl *VD) {
   return false;
 }
 
+static bool hasConformancesToPublicProtocols(const ExtensionDecl *ED) {
+  auto protocols = ED->getLocalProtocols(ConformanceLookupKind::OnlyExplicit);
+  for (const ProtocolDecl *PD : protocols) {
+    AccessScope scope =
+        PD->getFormalAccessScope(/*useDC*/ nullptr,
+                                 /*treatUsableFromInlineAsPublic*/ true);
+    if (scope.isPublic())
+      return true;
+  }
+
+  return false;
+}
+
 bool swift::isExported(const ExtensionDecl *ED) {
   // An extension can only be exported if it extends an exported type.
   if (auto *NTD = ED->getExtendedNominal()) {
@@ -94,14 +107,8 @@ bool swift::isExported(const ExtensionDecl *ED) {
 
   // If the extension declares a conformance to a public protocol then the
   // extension is exported.
-  auto protocols = ED->getLocalProtocols(ConformanceLookupKind::OnlyExplicit);
-  for (const ProtocolDecl *PD : protocols) {
-    AccessScope scope =
-      PD->getFormalAccessScope(/*useDC*/nullptr,
-                               /*treatUsableFromInlineAsPublic*/true);
-    if (scope.isPublic())
-      return true;
-  }
+  if (hasConformancesToPublicProtocols(ED))
+    return true;
 
   return false;
 }
@@ -313,7 +320,7 @@ static bool hasActiveAvailableAttribute(Decl *D,
   return getActiveAvailableAttribute(D, AC);
 }
 
-static bool bodyIsResilienceBoundary(Decl *D) {
+static bool shouldConstrainBodyToDeploymentTarget(Decl *D) {
   // The declaration contains code...
   if (auto afd = dyn_cast<AbstractFunctionDecl>(D)) {
     // And it has a location so we can check it...
@@ -526,9 +533,7 @@ private:
     AvailabilityContext DeclInfo = ExplicitDeclInfo;
     DeclInfo.intersectWith(getCurrentTRC()->getAvailabilityInfo());
 
-    // If the entire declaration is surrounded by a resilience boundary, it is
-    // also constrained by the deployment target.
-    if (signatureIsResilienceBoundary(D))
+    if (shouldConstrainSignatureToDeploymentTarget(D))
       DeclInfo.intersectWith(AvailabilityContext::forDeploymentTarget(Context));
 
     SourceRange Range = refinementSourceRangeForDecl(D);
@@ -562,9 +567,10 @@ private:
     }
 
     // No need to introduce a context if the declaration does not have an
-    // availability attribute and the signature is not a resilience boundary.
+    // availability attribute and the signature does not constrain availability
+    // to the deployment target.
     if (!hasActiveAvailableAttribute(D, Context) &&
-        !signatureIsResilienceBoundary(D)) {
+        !shouldConstrainSignatureToDeploymentTarget(D)) {
       return false;
     }
 
@@ -581,12 +587,23 @@ private:
     return true;
   }
 
-  /// A declaration's signature is a resilience boundary if the entire
-  /// declaration--not just the body--is not ABI-public and it's in a context
-  /// where ABI-public declarations would be available below the minimum
-  /// deployment target.
-  bool signatureIsResilienceBoundary(Decl *D) {
-    return !isCurrentTRCContainedByDeploymentTarget() && !::isExported(D);
+  /// Checks whether the entire declaration, including its signature, should be
+  /// constrained to the deployment target. Generally public API declarations
+  /// are not constrained since they appear in the interface of the module and
+  /// may be consumed by clients with lower deployment targets, but there are
+  /// some exceptions.
+  bool shouldConstrainSignatureToDeploymentTarget(Decl *D) {
+    if (isCurrentTRCContainedByDeploymentTarget())
+      return false;
+
+    // As a convenience, SPI decls and explicitly unavailable decls are
+    // constrained to the deployment target. There's not much benefit to
+    // checking these declarations at a lower availability version floor since
+    // neither can be used by API clients.
+    if (D->isSPI() || AvailableAttr::isUnavailable(D))
+      return true;
+
+    return !::isExported(D);
   }
 
   /// Returns the source range which should be refined by declaration. This
@@ -633,14 +650,14 @@ private:
   }
 
   bool bodyIntroducesNewContext(Decl *D) {
-    // Are we already effectively in a resilience boundary? If not, adding one
-    // wouldn't change availability.
+    // Are we already constrained by the deployment target? If not, adding a
+    // new context wouldn't change availability.
     if (isCurrentTRCContainedByDeploymentTarget())
       return false;
 
-    // If we're in a function, is its body a resilience boundary?
+    // If we're in a function, check if it ought to use the deployment target.
     if (auto afd = dyn_cast<AbstractFunctionDecl>(D))
-      return bodyIsResilienceBoundary(afd);
+      return shouldConstrainBodyToDeploymentTarget(afd);
 
     // The only other case we care about is top-level code.
     return isa<TopLevelCodeDecl>(D);
@@ -4089,14 +4106,7 @@ void swift::checkExplicitAvailability(Decl *decl) {
       return false;
     });
 
-    auto protocols = extension->getLocalProtocols(ConformanceLookupKind::OnlyExplicit);
-    auto hasProtocols = std::any_of(protocols.begin(), protocols.end(),
-                                    [](const ProtocolDecl *PD) -> bool {
-      AccessScope scope =
-        PD->getFormalAccessScope(/*useDC*/nullptr,
-                                 /*treatUsableFromInlineAsPublic*/true);
-      return scope.isPublic();
-    });
+    auto hasProtocols = hasConformancesToPublicProtocols(extension);
 
     if (!hasMembers && !hasProtocols) return;
 
