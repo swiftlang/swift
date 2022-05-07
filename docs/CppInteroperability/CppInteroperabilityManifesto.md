@@ -500,7 +500,7 @@ accepts an address.
 
 C++ has complex overload resolution rules, in part to support certain API design
 patterns. Some API design patterns appeared as a consequence of overload
-resolution rules. Therefore, in C++ an "API atom" is an an overload set, not an
+resolution rules. Therefore, in C++ an "API atom" is an overload set, not an
 individual function ([CppCon 2018: Titus Winters "Modern C++ Design (part 1 of
 2)"](https://www.youtube.com/watch?v=xTdeZ4MxbKo)). The same is also the case in
 Swift, so, fundamentally, there is no impedance mismatch here.
