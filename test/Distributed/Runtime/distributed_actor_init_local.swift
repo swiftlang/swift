@@ -8,8 +8,6 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-// REQUIRES: rdar92910719
-
 import Distributed
 
 enum MyError: Error {
@@ -92,15 +90,6 @@ distributed actor MaybeAfterAssign {
   }
 }
 
-distributed actor LocalTestingSystemDA {
-  typealias ActorSystem = LocalTestingDistributedActorSystem
-  var x: Int
-  init() {
-    actorSystem = .init()
-    x = 100
-  }
-}
-
 distributed actor LocalTestingDA_Int {
   typealias ActorSystem = LocalTestingDistributedActorSystem
   var int: Int
@@ -110,7 +99,6 @@ distributed actor LocalTestingDA_Int {
     // CRASH
   }
 }
-
 
 // ==== Fake Transport ---------------------------------------------------------
 
@@ -296,6 +284,7 @@ func test() async {
   // CHECK: -- start of no-assign tests --
   // CHECK-NOT: assign
   // CHECK: -- end of no-assign tests --
+
 
   // resigns that come out of the deinits:
 
