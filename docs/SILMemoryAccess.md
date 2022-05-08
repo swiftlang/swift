@@ -293,7 +293,7 @@ scope:
 end_access %access : $*S
 ```
 
-Note that is is possible to have a nested access scope on the address
+Note that it is possible to have a nested access scope on the address
 of a struct field, which may show up as an access of
 struct_element_addr after inlining. The rule is that access
 projections cannot occur outside of the outermost access scope within
@@ -396,7 +396,7 @@ instructions may reference the same variable. To find all global uses,
 the client must independently find all global variable references
 within the function. Clients that need to know which SILValue base was
 discovered during use-def traversal in all cases can make use of
-`AccessStorageWithBase` or `AccessPathWithBase`. 
+`AccessStorageWithBase` or `AccessPathWithBase`.
 
 ### AccessPath
 
