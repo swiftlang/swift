@@ -1,0 +1,9 @@
+func boop() {
+  enum LocalEnum {
+    case east
+    case south
+  }
+
+  print(LocalEnum.east)
+}
+
