@@ -1532,7 +1532,7 @@ bool IndexSwiftASTWalker::reportRef(ValueDecl *D, SourceLoc Loc,
   if (!shouldIndex(D, /*IsRef=*/true))
     return true; // keep walking
 
-  if (isa<AbstractFunctionDecl>(D)) {
+  if (isa<AbstractFunctionDecl>(D) || isa<EnumElementDecl>(D)) {
     if (initFuncRefIndexSymbol(D, Loc, Info))
       return true;
   } else if (isa<AbstractStorageDecl>(D)) {
