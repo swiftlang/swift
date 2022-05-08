@@ -6,7 +6,7 @@
 import Distributed
 
 // Type descriptor.
-// CHECK-LABEL: @"$s17distributed_actor7MyActorC2id11Distributed012LocalTestingD7AddressVvpWvd"
+// CHECK-LABEL: @"$s17distributed_actor7MyActorC2id11Distributed012LocalTestingD2IDVvpWvd"
 @available(SwiftStdlib 5.6, *)
 public distributed actor MyActor {
   public typealias ActorSystem = LocalTestingDistributedActorSystem

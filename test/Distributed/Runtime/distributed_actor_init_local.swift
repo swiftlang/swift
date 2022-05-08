@@ -90,6 +90,15 @@ distributed actor MaybeAfterAssign {
   }
 }
 
+distributed actor LocalTestingDA_Int {
+  typealias ActorSystem = LocalTestingDistributedActorSystem
+  var int: Int
+  init() {
+    actorSystem = .init()
+    int = 12
+  }
+}
+
 // ==== Fake Transport ---------------------------------------------------------
 
 struct ActorAddress: Sendable, Hashable, Codable {
@@ -261,6 +270,10 @@ func test() async {
   test.append(MaybeAfterAssign(fail: false))
   // CHECK:      assign type:MaybeAfterAssign, id:ActorAddress(address: "[[ID10:.*]]")
   // CHECK-NEXT: ready actor:main.MaybeAfterAssign, id:ActorAddress(address: "[[ID10]]")
+
+  let localDA = LocalTestingDA_Int()
+  print("localDA = \(localDA.id)")
+  // CHECK: localDA = LocalTestingActorID(id: "1")
 
   // the following tests fail to initialize the actor's identity.
   print("-- start of no-assign tests --")

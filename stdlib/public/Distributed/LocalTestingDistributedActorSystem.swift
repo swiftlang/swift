@@ -125,22 +125,34 @@ public final class LocalTestingDistributedActorSystem: DistributedActorSystem, @
   }
 }
 
-@available(SwiftStdlib 5.7, *)
-public struct LocalTestingActorAddress: Hashable, Sendable, Codable {
-  public let address: String
+@available(*, deprecated, renamed: "LocalTestingActorID")
+public typealias LocalTestingActorAddress = LocalTestingActorID
 
-  public init(parse address: String) {
-    self.address = address
+@available(SwiftStdlib 5.7, *)
+public struct LocalTestingActorID: Hashable, Sendable, Codable {
+  @available(*, deprecated, renamed: "id")
+  public var address: String {
+    self.id
+  }
+  public let id: String
+
+  @available(*, deprecated, renamed: "init(id:)")
+  public init(parse id: String) {
+    self.id = id
+  }
+
+  public init(id: String) {
+    self.id = id
   }
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.singleValueContainer()
-    self.address = try container.decode(String.self)
+    self.id = try container.decode(String.self)
   }
 
   public func encode(to encoder: Encoder) throws {
     var container = encoder.singleValueContainer()
-    try container.encode(self.address)
+    try container.encode(self.id)
   }
 }
 
