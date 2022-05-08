@@ -8,6 +8,8 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
+// REQUIRES: rdar92910719
+
 import Distributed
 
 enum MyError: Error {
