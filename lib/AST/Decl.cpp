@@ -8311,7 +8311,7 @@ void AbstractFunctionDecl::prepareDerivativeFunctionConfigurations() {
 }
 
 ArrayRef<AutoDiffConfig>
-AbstractFunctionDecl::getDerivativeFunctionConfigurations(bool NonPrimaryLookup) {
+AbstractFunctionDecl::getDerivativeFunctionConfigurations(bool lookInNonPrimarySources) {
   prepareDerivativeFunctionConfigurations();
 
   // Resolve derivative function configurations from `@differentiable`
@@ -8345,7 +8345,8 @@ AbstractFunctionDecl::getDerivativeFunctionConfigurations(bool NonPrimaryLookup)
         for (auto *derAttr : afd->getAttrs().getAttributes<DerivativeAttr>()) {
           // Resolve derivative function configurations from `@derivative`
           // attributes by type-checking them.
-          if (AFD->getName().matchesRef(derAttr->getOriginalFunctionName().Name.getFullName())) {
+          if (AFD->getName().matchesRef(
+                derAttr->getOriginalFunctionName().Name.getFullName())) {
             (void)derAttr->getOriginalFunction(afd->getASTContext());
             return false;
           }
@@ -8358,8 +8359,8 @@ AbstractFunctionDecl::getDerivativeFunctionConfigurations(bool NonPrimaryLookup)
 
   // Load derivative configurations from @derivative attributes defined in
   // non-primary sources. Note that it might trigger lookup cycles if called
-  // from inside Sema stages
-  if (NonPrimaryLookup) {
+  // from inside Sema stages.
+  if (lookInNonPrimarySources) {
     DerivativeFinder finder(this);
     getParent()->walkContext(finder);
   }

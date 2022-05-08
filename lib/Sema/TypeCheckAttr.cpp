@@ -5373,7 +5373,7 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
 AbstractFunctionDecl *
 DerivativeAttrOriginalDeclRequest::evaluate(Evaluator &evaluator,
                                             DerivativeAttr *attr) const {
-  // Try to resolve the original function
+  // Try to resolve the original function.
   if (attr->isValid() && attr->OriginalFunction.isNull())
     if (typeCheckDerivativeAttr(attr))
       attr->setInvalid();
