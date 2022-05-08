@@ -426,32 +426,6 @@ static FuncDecl *deriveDistributedActorSystem_invokeHandlerOnReturn(
 /******************************* PROPERTIES ***********************************/
 /******************************************************************************/
 
-// TODO(distributed): make use of this after all, but FORCE it?
-static ValueDecl *deriveDistributedActor_id(DerivedConformance &derived) {
-  assert(derived.Nominal->isDistributedActor());
-  auto &C = derived.Context;
-
-  // ```
-  // nonisolated
-  // let id: Self.ID // Self.ActorSystem.ActorID
-  // ```
-  auto propertyType = getDistributedActorIDType(derived.Nominal);
-
-  VarDecl *propDecl;
-  PatternBindingDecl *pbDecl;
-  std::tie(propDecl, pbDecl) = derived.declareDerivedProperty(
-      DerivedConformance::SynthesizedIntroducer::Let, C.Id_id, propertyType,
-      propertyType,
-      /*isStatic=*/false, /*isFinal=*/true);
-
-  // mark as nonisolated, allowing access to it from everywhere
-  propDecl->getAttrs().add(
-      new (C) NonisolatedAttr(/*IsImplicit=*/true));
-
-  derived.addMembersToConformanceContext({ propDecl, pbDecl });
-  return propDecl;
-}
-
 static ValueDecl *deriveDistributedActor_actorSystem(
     DerivedConformance &derived) {
   auto &C = derived.Context;
@@ -460,8 +434,7 @@ static ValueDecl *deriveDistributedActor_actorSystem(
   assert(classDecl && derived.Nominal->isDistributedActor());
 
   // ```
-  // nonisolated
-  // let actorSystem: ActorSystem
+  // nonisolated let actorSystem: ActorSystem
   // ```
   // (no need for @actorIndependent because it is an immutable let)
   auto propertyType = getDistributedActorSystemType(classDecl);
@@ -477,7 +450,14 @@ static ValueDecl *deriveDistributedActor_actorSystem(
   propDecl->getAttrs().add(
       new (C) NonisolatedAttr(/*IsImplicit=*/true));
 
-  derived.addMembersToConformanceContext({ propDecl, pbDecl });
+  // IMPORTANT: `id` MUST be the first field of a distributed actor, and
+  // `actorSystem` MUST be the second field, because for a remote instance
+  // we don't allocate memory after those two fields, so their order is very
+  // important. The `hint` below makes sure the system is inserted right after.
+  auto id = derived.Nominal->getDistributedActorIDProperty();
+  derived.addMemberToConformanceContext(pbDecl, /*hint=*/id);
+  derived.addMemberToConformanceContext(propDecl, /*hint=*/id);
+
   return propDecl;
 }
 
@@ -571,11 +551,14 @@ deriveDistributedActorType_SerializationRequirement(
 
 ValueDecl *DerivedConformance::deriveDistributedActor(ValueDecl *requirement) {
   if (auto var = dyn_cast<VarDecl>(requirement)) {
-    if (var->getName() == Context.Id_id)
-      return deriveDistributedActor_id(*this);
-
     if (var->getName() == Context.Id_actorSystem)
       return deriveDistributedActor_actorSystem(*this);
+
+    if (var->getName() == Context.Id_id)
+      llvm_unreachable("DistributedActor.id MUST be synthesized earlier, "
+                       "because it is forced by the Identifiable conformance. "
+                       "If we attempted to do synthesis here, the earlier phase "
+                       "failed and something is wrong: please report a bug.");
   }
 
   if (auto func = dyn_cast<FuncDecl>(requirement)) {

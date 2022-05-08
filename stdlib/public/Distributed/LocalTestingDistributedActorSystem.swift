@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 import Swift
-import _Concurrency
 
 #if canImport(Darwin)
 import Darwin
@@ -27,33 +26,25 @@ import WinSDK
 /// for learning about `distributed actor` isolation, as well as early
 /// prototyping stages of development where a real system is not necessary yet.
 @available(SwiftStdlib 5.7, *)
-public struct LocalTestingDistributedActorSystem: DistributedActorSystem, @unchecked Sendable {
+public final class LocalTestingDistributedActorSystem: DistributedActorSystem, @unchecked Sendable {
   public typealias ActorID = LocalTestingActorAddress
   public typealias ResultHandler = LocalTestingInvocationResultHandler
   public typealias InvocationEncoder = LocalTestingInvocationEncoder
   public typealias InvocationDecoder = LocalTestingInvocationDecoder
-  public typealias SerializationRequirement = any Codable
+  public typealias SerializationRequirement = Codable
 
+  private var activeActors: [ActorID: any DistributedActor] = [:]
+  private let activeActorsLock = _Lock()
 
-  @usableFromInline
-  final class _Storage {
+  private var idProvider: ActorIDProvider = ActorIDProvider()
+  private var assignedIDs: Set<ActorID> = []
+  private let assignedIDsLock = _Lock()
 
-    var activeActors: [ActorID: any DistributedActor] = [:]
-    let activeActorsLock = _Lock()
-
-    var assignedIDs: Set<ActorID> = []
-    let assignedIDsLock = _Lock()
-  }
-  let storage: _Storage
-  var idProvider: ActorIDProvider = ActorIDProvider()
-
-  public init() {
-    storage = .init()
-  }
+  public init() {}
 
   public func resolve<Act>(id: ActorID, as actorType: Act.Type)
-    throws -> Act? where Act: DistributedActor, Act.ID == ActorID {
-    guard let anyActor = storage.activeActorsLock.withLock({ self.storage.activeActors[id] }) else {
+    throws -> Act? where Act: DistributedActor {
+    guard let anyActor = self.activeActorsLock.withLock({ self.activeActors[id] }) else {
       throw LocalTestingDistributedActorSystemError(message: "Unable to locate id '\(id)' locally")
     }
     guard let actor = anyActor as? Act else {
@@ -63,25 +54,28 @@ public struct LocalTestingDistributedActorSystem: DistributedActorSystem, @unche
   }
 
   public func assignID<Act>(_ actorType: Act.Type) -> ActorID
-    where Act: DistributedActor, Act.ID == ActorID {
+    where Act: DistributedActor {
     let id = self.idProvider.next()
-    storage.assignedIDsLock.withLock {
-      self.storage.assignedIDs.insert(id)
+    self.assignedIDsLock.withLock {
+      self.assignedIDs.insert(id)
     }
     return id
   }
 
   public func actorReady<Act>(_ actor: Act)
-    where Act: DistributedActor, Act.ID == ActorID {
-    guard storage.assignedIDsLock.withLock({ self.storage.assignedIDs.contains(actor.id) }) else {
+    where Act: DistributedActor,
+    Act.ID == ActorID {
+    guard self.assignedIDsLock.withLock({ self.assignedIDs.contains(actor.id) }) else {
       fatalError("Attempted to mark an unknown actor '\(actor.id)' ready")
     }
-    self.storage.activeActors[actor.id] = actor
+    self.activeActorsLock.withLock {
+      self.activeActors[actor.id] = actor
+    }
   }
 
   public func resignID(_ id: ActorID) {
-    storage.activeActorsLock.withLock {
-      self.storage.activeActors.removeValue(forKey: id)
+    self.activeActorsLock.withLock {
+      self.activeActors.removeValue(forKey: id)
     }
   }
 
@@ -99,7 +93,7 @@ public struct LocalTestingDistributedActorSystem: DistributedActorSystem, @unche
     where Act: DistributedActor,
           Act.ID == ActorID,
           Err: Error,
-          Res: Codable {
+          Res: SerializationRequirement {
     fatalError("Attempted to make remote call to \(target) on actor \(actor) using a local-only actor system")
   }
 
@@ -115,40 +109,51 @@ public struct LocalTestingDistributedActorSystem: DistributedActorSystem, @unche
     fatalError("Attempted to make remote call to \(target) on actor \(actor) using  a local-only actor system")
   }
 
-  @usableFromInline
-  final class ActorIDProvider {
+  private struct ActorIDProvider {
     private var counter: Int = 0
     private let counterLock = _Lock()
 
-    @usableFromInline
     init() {}
 
-    func next() -> LocalTestingActorAddress {
+    mutating func next() -> LocalTestingActorAddress {
       let id: Int = self.counterLock.withLock {
         self.counter += 1
         return self.counter
       }
-      return LocalTestingActorAddress(id)
+      return LocalTestingActorAddress(parse: "\(id)")
     }
   }
 }
 
 @available(SwiftStdlib 5.7, *)
-public struct LocalTestingActorAddress: Hashable, Sendable, Codable {
-  public let uuid: String
+@available(*, deprecated, renamed: "LocalTestingActorID")
+public typealias LocalTestingActorAddress = LocalTestingActorID
 
-  public init(_ uuid: Int) {
-    self.uuid = "\(uuid)"
+@available(SwiftStdlib 5.7, *)
+public struct LocalTestingActorID: Hashable, Sendable, Codable {
+  @available(*, deprecated, renamed: "id")
+  public var address: String {
+    self.id
+  }
+  public let id: String
+
+  @available(*, deprecated, renamed: "init(id:)")
+  public init(parse id: String) {
+    self.id = id
+  }
+
+  public init(id: String) {
+    self.id = id
   }
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.singleValueContainer()
-    self.uuid = try container.decode(String.self)
+    self.id = try container.decode(String.self)
   }
 
   public func encode(to encoder: Encoder) throws {
     var container = encoder.singleValueContainer()
-    try container.encode(self.uuid)
+    try container.encode(self.id)
   }
 }
 
@@ -228,7 +233,7 @@ public struct LocalTestingDistributedActorSystemError: DistributedActorSystemErr
 // === lock ----------------------------------------------------------------
 
 @available(SwiftStdlib 5.7, *)
-internal class _Lock {
+fileprivate class _Lock {
   #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
   private let underlying: UnsafeMutablePointer<os_unfair_lock>
   #elseif os(Windows)
@@ -241,27 +246,10 @@ internal class _Lock {
   private let underlying: UnsafeMutablePointer<pthread_mutex_t>
   #endif
 
-  init() {
-    #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
-    self.underlying = UnsafeMutablePointer.allocate(capacity: 1)
-    self.underlying.initialize(to: os_unfair_lock())
-    #elseif os(Windows)
-    self.underlying = UnsafeMutablePointer.allocate(capacity: 1)
-    InitializeSRWLock(self.underlying)
-    #elseif os(WASI)
-    // WASI environment has only a single thread
-    #else
-    self.underlying = UnsafeMutablePointer.allocate(capacity: 1)
-    guard pthread_mutex_init(self.underlying, nil) == 0 else {
-      fatalError("pthread_mutex_init failed")
-    }
-    #endif
-  }
-
   deinit {
     #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
     // `os_unfair_lock`s do not need to be explicitly destroyed
-    #elseif os(Windows)
+    #elseif os(Windows)    
     // `SRWLOCK`s do not need to be explicitly destroyed
     #elseif os(WASI)
     // WASI environment has only a single thread
@@ -274,6 +262,22 @@ internal class _Lock {
     #if !os(WASI)
     self.underlying.deinitialize(count: 1)
     self.underlying.deallocate()
+    #endif
+  }
+
+  init() {
+    #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
+    self.underlying = UnsafeMutablePointer.allocate(capacity: 1)
+    #elseif os(Windows)
+    self.underlying = UnsafeMutablePointer.allocate(capacity: 1)
+    InitializeSRWLock(self.underlying)
+    #elseif os(WASI)
+    // WASI environment has only a single thread
+    #else
+    self.underlying = UnsafeMutablePointer.allocate(capacity: 1)
+    guard pthread_mutex_init(self.underlying, nil) == 0 else {
+      fatalError("pthread_mutex_init failed")
+    }
     #endif
   }
 

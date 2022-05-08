@@ -286,7 +286,7 @@ func test() async {
 
   let localDA = LocalTestingDA_Int()
   print("localDA = \(localDA.id)")
-  // CHECK: localDA = LocalTestingActorAddress(uuid: "1")
+  // CHECK: localDA = LocalTestingActorID(id: "1")
 
   // the following tests fail to initialize the actor's identity.
   print("-- start of no-assign tests --")
