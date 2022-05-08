@@ -864,6 +864,28 @@ isApplicable(const ResolvedCursorInfo &CursorInfo, DiagnosticEngine &Diag) {
     RenameOp.getValue() == RefactoringKind::LocalRename;
 }
 
+/// Returns true if there is a way to access types defined in \p DC from outside
+/// \p DC.
+static bool canDeclContextElementsBeReferencedFromOutside(DeclContext *DC) {
+  switch (DC->getContextKind()) {
+  case DeclContextKind::GenericTypeDecl:
+  case DeclContextKind::ExtensionDecl:
+  case DeclContextKind::TopLevelCodeDecl:
+  case DeclContextKind::EnumElementDecl:
+    // You can access types inside these decls by specifying their type name.
+    // This is not possible for the decl contexts below.
+    return true;
+  case DeclContextKind::AbstractFunctionDecl:
+  case DeclContextKind::SubscriptDecl:
+  case DeclContextKind::AbstractClosureExpr:
+  case DeclContextKind::Initializer:
+  case DeclContextKind::SerializedLocal:
+  case DeclContextKind::Module:
+  case DeclContextKind::FileUnit:
+    return false;
+  }
+}
+
 static void analyzeRenameScope(ValueDecl *VD, Optional<RenameRefInfo> RefInfo,
                                DiagnosticEngine &Diags,
                                SmallVectorImpl<DeclContext *> &Scopes) {
@@ -874,10 +896,9 @@ static void analyzeRenameScope(ValueDecl *VD, Optional<RenameRefInfo> RefInfo,
   }
 
   auto *Scope = VD->getDeclContext();
-  // If the context is a top-level code decl, there may be other sibling
-  // decls that the renamed symbol is visible from
-  if (isa<TopLevelCodeDecl>(Scope))
+  while (canDeclContextElementsBeReferencedFromOutside(Scope)) {
     Scope = Scope->getParent();
+  }
 
   Scopes.push_back(Scope);
 }

@@ -1,0 +1,36 @@
+
+func myFunc() {
+  print(LocalEnum.north)
+
+  enum LocalEnum {
+    case north
+    case south
+  }
+
+  print(LocalEnum.north)
+}
+
+
+struct Other {
+  enum EnumInStruct {
+    case first
+    case second
+  }
+
+  func foo() {
+    print(EnumInStruct.first)
+  }
+}
+
+
+func nested() {
+  struct MyStruct {
+    enum NestedEnum {
+      case one
+      case b
+    }
+  }
+
+  print(MyStruct.NestedEnum.one)
+}
+
