@@ -136,7 +136,9 @@ def show_paired_incrementality(args):
                   "new_pct", "new_skip",
                   "delta_pct", "delta_skip",
                   "name"]
-    out = csv.DictWriter(args.output, fieldnames, dialect='excel-tab')
+    out = csv.DictWriter(args.output,
+                         (field.encode() for field in fieldnames),
+                         dialect='excel-tab')
     out.writeheader()
     vargs = vars_of_args(args)
 
@@ -161,7 +163,9 @@ def show_paired_incrementality(args):
 
 def show_incrementality(args):
     fieldnames = ["incrementality", "name"]
-    out = csv.DictWriter(args.output, fieldnames, dialect='excel-tab')
+    out = csv.DictWriter(args.output,
+                         (field.encode() for field in fieldnames),
+                         dialect='excel-tab')
     out.writeheader()
 
     vargs = vars_of_args(args)
@@ -259,7 +263,8 @@ def set_csv_baseline(args):
         return io.open(path, "w", encoding='utf-8', newline='\n')
 
     with _open(args.set_csv_baseline) as f:
-        out = csv.DictWriter(f, fieldnames, dialect='excel-tab',
+        out = csv.DictWriter(f, (field.encode() for field in fieldnames),
+                             dialect='excel-tab',
                              quoting=csv.QUOTE_NONNUMERIC)
         m = merge_all_jobstats((s for d in args.remainder
                                 for s in load_stats_dir(d, **vargs)),
@@ -407,7 +412,8 @@ def write_comparison(args, old_stats, new_stats):
 
     else:
         rows.sort(key=sort_key, reverse=args.sort_descending)
-        out = csv.DictWriter(args.output, OutputRow._fields,
+        out = csv.DictWriter(args.output,
+                             (field.encode() for field in OutputRow._fields),
                              dialect='excel-tab')
         out.writeheader()
         for row in rows:
