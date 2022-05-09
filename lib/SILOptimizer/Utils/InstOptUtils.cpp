@@ -1801,13 +1801,11 @@ void swift::salvageDebugInfo(SILInstruction *I) {
 
   if (auto *SI = dyn_cast<StoreInst>(I)) {
     if (SILValue DestVal = SI->getDest())
-      // TODO: Generalize this into "get the attached debug info
-      // on `DestVal`".
       if (auto *ASI = dyn_cast_or_null<AllocStackInst>(
               DestVal.getDefiningInstruction())) {
         if (auto VarInfo = ASI->getVarInfo())
           SILBuilder(SI, ASI->getDebugScope())
-              .createDebugValue(SI->getLoc(), SI->getSrc(), *VarInfo);
+              .createDebugValue(ASI->getLoc(), SI->getSrc(), *VarInfo);
       }
   }
 
