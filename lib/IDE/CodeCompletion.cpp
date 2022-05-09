@@ -1698,6 +1698,35 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   case CompletionKind::AttributeBegin: {
     Lookup.getAttributeDeclCompletions(IsInSil, AttTargetDK);
+    OptionSet<CustomAttributeKind> ExpectedCustomAttributeKinds;
+    if (AttTargetDK) {
+      switch (*AttTargetDK) {
+      case DeclKind::Var:
+        ExpectedCustomAttributeKinds |= CustomAttributeKind::GlobalActor;
+        LLVM_FALLTHROUGH;
+      case DeclKind::Param:
+        ExpectedCustomAttributeKinds |= CustomAttributeKind::ResultBuilder;
+        ExpectedCustomAttributeKinds |= CustomAttributeKind::PropertyWrapper;
+        break;
+      case DeclKind::Func:
+        ExpectedCustomAttributeKinds |= CustomAttributeKind::ResultBuilder;
+        ExpectedCustomAttributeKinds |= CustomAttributeKind::GlobalActor;
+        break;
+      default:
+        break;
+      }
+    }
+    if (!ExpectedCustomAttributeKinds) {
+      // If we don't know on which decl kind we are completing, suggest all
+      // attribute kinds.
+      ExpectedCustomAttributeKinds |= CustomAttributeKind::PropertyWrapper;
+      ExpectedCustomAttributeKinds |= CustomAttributeKind::ResultBuilder;
+      ExpectedCustomAttributeKinds |= CustomAttributeKind::GlobalActor;
+    }
+    Lookup.setExpectedTypes(/*Types=*/{},
+                            /*isImplicitSingleExpressionReturn=*/false,
+                            /*preferNonVoid=*/false,
+                            ExpectedCustomAttributeKinds);
 
     // TypeName at attribute position after '@'.
     // - VarDecl: Property Wrappers.
