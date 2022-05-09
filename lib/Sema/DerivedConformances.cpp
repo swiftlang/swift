@@ -51,6 +51,18 @@ void DerivedConformance::addMembersToConformanceContext(
     IDC->addMember(child);
 }
 
+void DerivedConformance::addMemberToConformanceContext(
+    Decl *member, Decl *hint) {
+  auto IDC = cast<IterableDeclContext>(ConformanceDecl);
+  IDC->addMember(member, hint, /*insertAtHead=*/false);
+}
+
+void DerivedConformance::addMemberToConformanceContext(
+    Decl *member, bool insertAtHead) {
+  auto IDC = cast<IterableDeclContext>(ConformanceDecl);
+  IDC->addMember(member, /*hint=*/nullptr, insertAtHead);
+}
+
 Type DerivedConformance::getProtocolType() const {
   return Protocol->getDeclaredInterfaceType();
 }
@@ -324,10 +336,6 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     // Actor.unownedExecutor
     if (name.isSimpleName(ctx.Id_unownedExecutor))
       return getRequirement(KnownProtocolKind::Actor);
-
-    // DistributedActor.id
-    if(name.isSimpleName(ctx.Id_id))
-      return getRequirement(KnownProtocolKind::DistributedActor);
 
     // DistributedActor.actorSystem
     if(name.isSimpleName(ctx.Id_actorSystem))
