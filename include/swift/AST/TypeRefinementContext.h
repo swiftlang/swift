@@ -58,11 +58,11 @@ public:
     /// function declaration or the contents of a class declaration).
     Decl,
 
-    /// The context was introduced by a resilience boundary; that is, we are in
+    /// The context was introduced by an API boundary; that is, we are in
     /// a module with library evolution enabled and the parent context's
     /// contents can be visible to the module's clients, but this context's
     /// contents are not.
-    ResilienceBoundary,
+    APIBoundary,
 
     /// The context was introduced for the Then branch of an IfStmt.
     IfStmtThenBranch,
@@ -131,8 +131,7 @@ private:
     }
 
     Decl *getAsDecl() const {
-      assert(IntroReason == Reason::Decl ||
-             IntroReason == Reason::ResilienceBoundary);
+      assert(IntroReason == Reason::Decl || IntroReason == Reason::APIBoundary);
       return D;
     }
 
@@ -195,10 +194,8 @@ public:
 
   /// Create a refinement context for the given declaration.
   static TypeRefinementContext *
-  createForResilienceBoundary(ASTContext &Ctx, Decl *D,
-                              TypeRefinementContext *Parent,
-                              const AvailabilityContext &Info,
-                              SourceRange SrcRange);
+  createForAPIBoundary(ASTContext &Ctx, Decl *D, TypeRefinementContext *Parent,
+                       const AvailabilityContext &Info, SourceRange SrcRange);
 
   /// Create a refinement context for the Then branch of the given IfStmt.
   static TypeRefinementContext *

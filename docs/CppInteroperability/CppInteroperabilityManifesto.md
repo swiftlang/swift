@@ -500,7 +500,7 @@ accepts an address.
 
 C++ has complex overload resolution rules, in part to support certain API design
 patterns. Some API design patterns appeared as a consequence of overload
-resolution rules. Therefore, in C++ an "API atom" is an an overload set, not an
+resolution rules. Therefore, in C++ an "API atom" is an overload set, not an
 individual function ([CppCon 2018: Titus Winters "Modern C++ Design (part 1 of
 2)"](https://www.youtube.com/watch?v=xTdeZ4MxbKo)). The same is also the case in
 Swift, so, fundamentally, there is no impedance mismatch here.
@@ -938,7 +938,7 @@ be handled in Swift.
 
 While it is possible to [propagate C++ exceptions](#exceptions) thrown by normal
 member functions to Swift code, special member functions are different as they
-used used to implement value witnesses, which are called by the compiler
+used to implement value witnesses, which are called by the compiler
 implicitly. Therefore, either such exceptions have to be mapped to fatal errors
 (as we do for other unhandled C++ exceptions), or calls to such special member
 functions must be prevented statically.
@@ -2337,7 +2337,7 @@ different APIs across specializations of the same class. All instantiations of a
 generic type in Swift have the API described in the generic declaration (with
 type parameters substituted), plus applicable conditional extensions.
 
-C++ templates support non-type template parameters, template template
+C++ templates support non-type template parameters, template
 parameters, and parameter packs (variadic generics), all of which are not
 supported in Swift.
 
