@@ -441,7 +441,7 @@ private:
 
     cs.addConstraint(
         ConstraintKind::Conversion, elementType, initType,
-        cs.getConstraintLocator(contextualLocator,
+        cs.getConstraintLocator(sequenceLocator,
                                 ConstraintLocator::SequenceElementType));
 
     // Reference the makeIterator witness.
@@ -450,9 +450,10 @@ private:
 
     Type makeIteratorType =
         cs.createTypeVariable(locator, TVO_CanBindToNoEscape);
-    cs.addValueWitnessConstraint(LValueType::get(sequenceType), makeIterator,
-                                 makeIteratorType, context.getAsDeclContext(),
-                                 FunctionRefKind::Compound, contextualLocator);
+    cs.addValueWitnessConstraint(
+        LValueType::get(sequenceType), makeIterator, makeIteratorType,
+        context.getAsDeclContext(), FunctionRefKind::Compound,
+        cs.getConstraintLocator(sequenceLocator, ConstraintLocator::Witness));
 
     // After successful constraint generation, let's record
     // solution application target with all relevant information.
