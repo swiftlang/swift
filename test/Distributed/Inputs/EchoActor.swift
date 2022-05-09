@@ -14,7 +14,7 @@
 
 import Distributed
 
-distributed actor Echo /* in the mirror */{
+distributed actor Echo /* in the mirror */ {
   typealias ActorSystem = LocalTestingDistributedActorSystem
 
   distributed func echo(_ input: String) -> String {
