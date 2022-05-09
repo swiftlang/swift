@@ -20,19 +20,6 @@ class Person {
 }
 
 struct Place {
-internal init(person: Person, street: String, apartment: Optional<String> = nil, city: String, state: String, postalCode: Int, plusFour: Int? = nil, callback: @escaping Place.Callback, wrapped: String, `protocol`: String) {
-self.person = person
-self.street = street
-self.apartment = apartment
-self.city = city
-self.state = state
-self.postalCode = postalCode
-self.plusFour = plusFour
-self.callback = callback
-self.wrapped = wrapped
-self.`protocol` = `protocol`
-}
-
   typealias Callback = () -> ()
   let person: Person
   let street: String
@@ -55,6 +42,9 @@ enum Idea {
 }
 
 struct OnlyComputed {
+internal init() {
+}
+
   lazy var idea: Idea = { fatalError() }()
   var computed: String { "hi" }
 }
