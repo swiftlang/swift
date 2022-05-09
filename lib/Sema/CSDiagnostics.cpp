@@ -6127,6 +6127,19 @@ void SkipUnhandledConstructInResultBuilderFailure::diagnosePrimary(
   }
 
   if (auto stmt = unhandled.dyn_cast<Stmt *>()) {
+    if (auto *switchStmt = getAsStmt<SwitchStmt>(stmt)) {
+      auto caseStmts = switchStmt->getCases();
+      if (caseStmts.empty())
+        return;
+    }
+
+    // Empty case statements are diagnosed by parser.
+    if (auto *caseStmt = getAsStmt<CaseStmt>(stmt)) {
+      auto *body = caseStmt->getBody();
+      if (body->getNumElements() == 0)
+        return;
+    }
+
     emitDiagnostic(asNote ? diag::note_result_builder_control_flow
                           : diag::result_builder_control_flow,
                    builder->getName());
