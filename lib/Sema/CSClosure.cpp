@@ -327,7 +327,6 @@ class SyntacticElementConstraintGenerator
 
   ConstraintSystem &cs;
   AnyFunctionRef context;
-  Type resultType;
   ConstraintLocator *locator;
 
 public:
@@ -335,8 +334,8 @@ public:
   bool hadError = false;
 
   SyntacticElementConstraintGenerator(ConstraintSystem &cs, AnyFunctionRef fn,
-                                      Type resultTy, ConstraintLocator *locator)
-      : cs(cs), context(fn), resultType(resultTy), locator(locator) {}
+                                      ConstraintLocator *locator)
+      : cs(cs), context(fn), locator(locator) {}
 
   void visitPattern(Pattern *pattern, ContextualTypeInfo context) {
     auto parentElement =
@@ -890,7 +889,7 @@ private:
     }
 
     SolutionApplicationTarget target(resultExpr, context.getAsDeclContext(),
-                                     CTP_ReturnStmt, resultType,
+                                     CTP_ReturnStmt, getContextualResultType(),
                                      /*isDiscarded=*/false);
 
     if (cs.generateConstraints(target, FreeTypeVariableBinding::Disallow)) {
@@ -1025,8 +1024,7 @@ bool ConstraintSystem::generateConstraints(ClosureExpr *closure) {
 
   if (participatesInInference(closure)) {
     SyntacticElementConstraintGenerator generator(
-        *this, closure, getClosureType(closure)->getResult(),
-        getConstraintLocator(closure));
+        *this, closure, getConstraintLocator(closure));
 
     generator.visit(closure->getBody());
 
@@ -1051,6 +1049,22 @@ bool ConstraintSystem::generateConstraints(ClosureExpr *closure) {
   }
 
   return false;
+}
+
+bool ConstraintSystem::generateConstraints(AnyFunctionRef fn, BraceStmt *body) {
+  NullablePtr<ConstraintLocator> locator;
+
+  if (auto *func = fn.getAbstractFunctionDecl()) {
+    locator = getConstraintLocator(func);
+  } else {
+    locator = getConstraintLocator(fn.getAbstractClosureExpr());
+  }
+
+  SyntacticElementConstraintGenerator generator(*this, fn, locator.get());
+
+  generator.visit(body);
+
+  return generator.hadError;
 }
 
 bool ConstraintSystem::isInResultBuilderContext(ClosureExpr *closure) const {
@@ -1095,32 +1109,20 @@ ConstraintSystem::SolutionKind
 ConstraintSystem::simplifySyntacticElementConstraint(
     ASTNode element, ContextualTypeInfo contextInfo, bool isDiscarded,
     TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
-
-  DeclContext *context;
-  Type resultType;
-
   auto anchor = locator.getAnchor();
 
+  DeclContext *context;
   if (auto *closure = getAsExpr<ClosureExpr>(anchor)) {
     context = closure;
-    resultType = getClosureType(closure)->getResult();
   } else if (auto *fn = getAsDecl<AbstractFunctionDecl>(anchor)) {
     context = fn;
-    resultType = AnyFunctionRef(fn).getBodyResultType();
   } else {
     return SolutionKind::Error;
   }
 
   AnyFunctionRef fn = AnyFunctionRef::fromFunctionDeclContext(context);
 
-  // If this element belongs to a result builder, let's use its result type.
-  {
-    auto transform = resultBuilderTransformed.find(fn);
-    if (transform != resultBuilderTransformed.end())
-      resultType = transform->second.bodyResultType;
-  }
-
-  SyntacticElementConstraintGenerator generator(*this, fn, resultType,
+  SyntacticElementConstraintGenerator generator(*this, fn,
                                                 getConstraintLocator(locator));
 
   if (auto *expr = element.dyn_cast<Expr *>()) {
@@ -1156,7 +1158,9 @@ namespace {
 class SyntacticElementSolutionApplication
     : public StmtVisitor<SyntacticElementSolutionApplication, ASTNode> {
   friend StmtVisitor<SyntacticElementSolutionApplication, ASTNode>;
+  friend class ResultBuilderRewriter;
 
+protected:
   Solution &solution;
   AnyFunctionRef context;
   Type resultType;
@@ -1176,6 +1180,8 @@ public:
       : solution(solution), context(context), resultType(resultType),
         rewriteTarget(rewriteTarget),
         isSingleExpression(context.hasSingleExpressionBody()) {}
+
+  virtual ~SyntacticElementSolutionApplication() {}
 
 private:
   /// Rewrite an expression without any particularly special context.
@@ -1207,6 +1213,18 @@ private:
     // Generate constraints for pattern binding declarations.
     if (auto patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
       SolutionApplicationTarget target(patternBinding);
+
+      // If this is a placeholder varaible with an initializer, let's set
+      // the inferred type, and ask `typeCheckDecl` to type-check initializer.
+      if (isPlaceholderVar(patternBinding) && patternBinding->getInit(0)) {
+        auto *pattern = patternBinding->getPattern(0);
+        pattern->setType(
+            solution.getResolvedType(patternBinding->getSingleVar()));
+
+        TypeChecker::typeCheckDecl(decl);
+        return;
+      }
+
       if (!rewriteTarget(target)) {
         hadError = true;
         return;
@@ -1310,7 +1328,7 @@ private:
     return whileStmt;
   }
 
-  ASTNode visitDoStmt(DoStmt *doStmt) {
+  virtual ASTNode visitDoStmt(DoStmt *doStmt) {
     auto body = visit(doStmt->getBody()).get<Stmt *>();
     doStmt->setBody(cast<BraceStmt>(body));
     return doStmt;
@@ -1668,7 +1686,177 @@ public:
     return body;
   }
 };
-}
+
+class ResultBuilderRewriter : public SyntacticElementSolutionApplication {
+public:
+  ResultBuilderRewriter(Solution &solution, AnyFunctionRef context,
+                        const AppliedBuilderTransform &transform,
+                        RewriteTargetFn rewriteTarget)
+      : SyntacticElementSolutionApplication(
+            solution, context, transform.bodyResultType, rewriteTarget) {}
+
+  bool apply() {
+    auto body = visit(context.getBody());
+
+    if (!body || hadError)
+      return true;
+
+    context.setTypecheckedBody(castToStmt<BraceStmt>(body),
+                               /*hasSingleExpression=*/false);
+
+    if (auto *closure =
+            getAsExpr<ClosureExpr>(context.getAbstractClosureExpr()))
+      solution.setExprTypes(closure);
+
+    return false;
+  }
+
+private:
+  ASTNode visitDoStmt(DoStmt *doStmt) override {
+    if (auto transformed = transformDo(doStmt))
+      return visit(transformed.get());
+
+    auto newBody = visit(doStmt->getBody());
+    if (!newBody)
+      return nullptr;
+
+    doStmt->setBody(castToStmt<BraceStmt>(newBody));
+    return doStmt;
+  }
+
+  NullablePtr<Stmt> transformDo(DoStmt *doStmt) {
+    if (!doStmt->isImplicit())
+      return nullptr;
+
+    // Implicit `do` wraps a statement and it's `type_join` expression.
+    auto *body = doStmt->getBody();
+
+    // If there are more than two elements, this `do` doesn't need to
+    // get be transformed.
+    if (body->getNumElements() != 2)
+      return nullptr;
+
+    auto *stmt = castToStmt(body->getFirstElement());
+    auto *join = castToExpr<TypeJoinExpr>(body->getLastElement());
+
+    switch (stmt->getKind()) {
+    case StmtKind::If:
+      return transformIf(castToStmt<IfStmt>(stmt), join, /*index=*/0);
+
+    case StmtKind::Switch:
+      return transformSwitch(castToStmt<SwitchStmt>(stmt), join);
+
+    default:
+      llvm_unreachable("only 'if' and 'switch' statements are transformed");
+    }
+  }
+
+  NullablePtr<Stmt> transformSwitch(SwitchStmt *switchStmt,
+                                    TypeJoinExpr *join) {
+    unsigned caseIndex = 0;
+    for (auto *caseStmt : switchStmt->getCases()) {
+      auto newBody = transformBody(caseStmt->getBody(), join, caseIndex++);
+      if (!newBody)
+        return nullptr;
+
+      caseStmt->setBody(newBody.get());
+    }
+
+    return switchStmt;
+  }
+
+  NullablePtr<Stmt> transformIf(IfStmt *ifStmt, TypeJoinExpr *join,
+                                unsigned index) {
+    auto *joinVar = join->getVar();
+
+    // First, let's add assignment to the end of `then` branch
+    {
+      auto *thenBody = castToStmt<BraceStmt>(ifStmt->getThenStmt());
+      auto newBody = transformBody(thenBody, join, index);
+      if (!newBody)
+        return nullptr;
+
+      ifStmt->setThenStmt(newBody.get());
+    }
+
+    if (auto *elseStmt = ifStmt->getElseStmt()) {
+      if (auto *innerIfStmt = getAsStmt<IfStmt>(elseStmt)) {
+        auto transformedIf = transformIf(innerIfStmt, join, index + 1);
+        if (!transformedIf)
+          return nullptr;
+
+        ifStmt->setElseStmt(transformedIf.get());
+      } else {
+        auto newBody =
+            transformBody(castToStmt<BraceStmt>(elseStmt), join, index + 1);
+        if (!newBody)
+          return nullptr;
+
+        ifStmt->setElseStmt(newBody.get());
+      }
+    } else {
+      auto &ctx = getASTContext();
+      SmallVector<ASTNode, 2> elseBranch;
+
+      elseBranch.push_back(
+          createAssignment(joinVar, join->getElement(index + 1)));
+
+      ifStmt->setElseStmt(BraceStmt::create(ctx, ifStmt->getEndLoc(),
+                                            elseBranch, ifStmt->getEndLoc(),
+                                            /*implicit=*/true));
+    }
+
+    return ifStmt;
+  }
+
+  NullablePtr<BraceStmt> transformBody(BraceStmt *body, TypeJoinExpr *join,
+                                       unsigned index) {
+    for (auto &element : body->getElements()) {
+      if (auto *doStmt = getAsStmt<DoStmt>(element)) {
+        if (auto transformed = transformDo(doStmt))
+          element = transformed.get();
+      }
+    }
+
+    return addBuilderAssignment(body, join->getVar(), join->getElement(index));
+  }
+
+  // Add `$__bulderN = build{Optional, Either}(...)` at the end of a block body.
+  BraceStmt *addBuilderAssignment(BraceStmt *body, DeclRefExpr *joinVar,
+                                  Expr *builderCall) {
+    SmallVector<ASTNode, 4> newBody;
+    llvm::copy(body->getElements(), std::back_inserter(newBody));
+
+    newBody.push_back(createAssignment(joinVar, builderCall));
+
+    return BraceStmt::create(getASTContext(), body->getLBraceLoc(), newBody,
+                             body->getRBraceLoc(), body->isImplicit());
+  }
+
+  AssignExpr *createAssignment(DeclRefExpr *destRef, Expr *source) {
+    auto &ctx = getASTContext();
+    auto &CS = solution.getConstraintSystem();
+
+    auto *assignment = new (ctx) AssignExpr(destRef, /*EqualLoc=*/SourceLoc(),
+                                            source, /*Implicit=*/true);
+
+    {
+      // Assignment expression is always `Void`.
+      CS.setType(assignment, ctx.TheEmptyTupleType);
+
+      CS.setSolutionApplicationTarget(
+          {assignment}, {assignment, context.getAsDeclContext(), CTP_Unused,
+                         /*contextualType=*/Type(), /*isDiscarded=*/false});
+    }
+
+    return assignment;
+  }
+
+  ASTContext &getASTContext() const {
+    return context.getAsDeclContext()->getASTContext();
+  }
+};
+} // namespace
 
 SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
     Solution &solution, AnyFunctionRef fn,
@@ -1708,9 +1896,23 @@ SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
 
   // Apply the result builder transform, if there is one.
   if (auto transform = solution.getAppliedBuilderTransform(fn)) {
+    NullablePtr<BraceStmt> newBody;
+
+    if (Context.LangOpts.hasFeature(Feature::ResultBuilderASTTransform)) {
+      BraceStmt *transformedBody =
+          const_cast<BraceStmt *>(transform->transformedBody.get());
+
+      fn.setParsedBody(transformedBody, /*singleExpression=*/false);
+
+      ResultBuilderRewriter rewriter(solution, fn, *transform, rewriteTarget);
+
+      return rewriter.apply() ? SolutionApplicationToFunctionResult::Failure
+                              : SolutionApplicationToFunctionResult::Success;
+    }
+
     // Apply the result builder to the closure. We want to be in the
     // context of the closure for subsequent transforms.
-    auto newBody = applyResultBuilderTransform(
+    newBody = applyResultBuilderTransform(
         solution, *transform, fn.getBody(), fn.getAsDeclContext(),
         [&](SolutionApplicationTarget target) {
           auto resultTarget = rewriteTarget(target);
@@ -1721,10 +1923,11 @@ SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
 
           return resultTarget;
         });
+
     if (!newBody)
       return SolutionApplicationToFunctionResult::Failure;
 
-    fn.setTypecheckedBody(newBody, /*isSingleExpression=*/false);
+    fn.setTypecheckedBody(newBody.get(), /*isSingleExpression=*/false);
     if (closure) {
       solution.setExprTypes(closure);
     }
@@ -1783,11 +1986,6 @@ bool ConstraintSystem::applySolutionToBody(Solution &solution,
 
   fn.setTypecheckedBody(castToStmt<BraceStmt>(body),
                         fn.hasSingleExpressionBody());
-
-  if (auto *closure = getAsExpr<ClosureExpr>(fn.getAbstractClosureExpr())) {
-    closure->setBodyState(ClosureExpr::BodyState::TypeCheckedWithSignature);
-  }
-
   return false;
 }
 

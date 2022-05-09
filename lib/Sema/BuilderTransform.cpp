@@ -77,11 +77,6 @@ protected:
                                   ArrayRef<Expr *> argExprs,
                                   ArrayRef<Identifier> argLabels) = 0;
 
-  /// Build an implicit reference to the given variable.
-  DeclRefExpr *buildVarRef(VarDecl *var, SourceLoc loc) {
-    return new (ctx) DeclRefExpr(var, DeclNameLoc(loc), /*Implicit=*/true);
-  }
-
   static bool isBuildableIfChainRecursive(IfStmt *ifStmt, unsigned &numPayloads,
                                           bool &isOptional) {
     // The 'then' clause contributes a payload.
@@ -103,6 +98,16 @@ protected:
     }
 
     return true;
+  }
+
+  static bool hasUnconditionalElse(IfStmt *ifStmt) {
+    if (auto *elseStmt = ifStmt->getElseStmt()) {
+      if (auto *ifStmt = dyn_cast<IfStmt>(elseStmt))
+        return hasUnconditionalElse(ifStmt);
+      return true;
+    }
+
+    return false;
   }
 
   bool isBuildableIfChain(IfStmt *ifStmt, unsigned &numPayloads,
@@ -903,6 +908,720 @@ protected:
   CONTROL_FLOW_STMT(Return)
 
 #undef CONTROL_FLOW_STMT
+};
+
+class ResultBuilderTransform
+    : private BuilderTransformerBase,
+      private StmtVisitor<ResultBuilderTransform, NullablePtr<Stmt>,
+                          NullablePtr<VarDecl>> {
+  friend StmtVisitor<ResultBuilderTransform, NullablePtr<Stmt>,
+                     NullablePtr<VarDecl>>;
+
+  using UnsupportedElt = SkipUnhandledConstructInResultBuilder::UnhandledNode;
+
+  /// The constraint system this transform is associated with.
+  ConstraintSystem &CS;
+  /// The result type of this result builder body.
+  Type ResultType;
+
+  /// The first recorded unsupported element discovered by the transformation.
+  UnsupportedElt FirstUnsupported;
+
+public:
+  ResultBuilderTransform(ConstraintSystem &cs, DeclContext *dc,
+                         Type builderType, Type resultTy)
+      : BuilderTransformerBase(&cs, dc, builderType), CS(cs),
+        ResultType(resultTy) {}
+
+  UnsupportedElt getUnsupportedElement() const { return FirstUnsupported; }
+
+  BraceStmt *apply(BraceStmt *braceStmt) {
+    auto newBody = visitBraceStmt(braceStmt, /*bodyVar=*/nullptr);
+    if (!newBody)
+      return nullptr;
+    return castToStmt<BraceStmt>(newBody.get());
+  }
+
+protected:
+  NullablePtr<Stmt> failTransform(UnsupportedElt unsupported) {
+    recordUnsupported(unsupported);
+    return nullptr;
+  }
+
+  Expr *buildCallIfWanted(SourceLoc loc, Identifier fnName,
+                          ArrayRef<Expr *> argExprs,
+                          ArrayRef<Identifier> argLabels) override {
+    return builder.buildCall(loc, fnName, argExprs, argLabels);
+  }
+
+  VarDecl *recordVar(PatternBindingDecl *PB,
+                     SmallVectorImpl<ASTNode> &container) {
+    container.push_back(PB);
+    container.push_back(PB->getSingleVar());
+    return PB->getSingleVar();
+  }
+
+  VarDecl *captureExpr(Expr *expr, SmallVectorImpl<ASTNode> &container) {
+    auto *var = builder.buildVar(expr->getStartLoc());
+    Pattern *pattern = NamedPattern::createImplicit(ctx, var);
+    auto *PB = PatternBindingDecl::createImplicit(ctx, StaticSpellingKind::None,
+                                                  pattern, expr, dc);
+    return recordVar(PB, container);
+  }
+
+  VarDecl *buildPlaceholderVar(SourceLoc loc,
+                               SmallVectorImpl<ASTNode> &container,
+                               Type type = Type(), Expr *initExpr = nullptr) {
+    auto *var = builder.buildVar(loc);
+    Pattern *placeholder = TypedPattern::createImplicit(
+        ctx, NamedPattern::createImplicit(ctx, var),
+        type ? type : PlaceholderType::get(ctx, var));
+    auto *PB = PatternBindingDecl::createImplicit(
+        ctx, StaticSpellingKind::None, placeholder, /*init=*/initExpr, dc);
+    return recordVar(PB, container);
+  }
+
+  AssignExpr *buildAssignment(VarDecl *dst, VarDecl *src) {
+    auto *dstRef = builder.buildVarRef(dst, /*Loc=*/SourceLoc());
+    auto *srcRef = builder.buildVarRef(src, /*Loc=*/SourceLoc());
+    return new (ctx) AssignExpr(dstRef, /*EqualLoc=*/SourceLoc(), srcRef,
+                                /*Implicit=*/true);
+  }
+
+  AssignExpr *buildAssignment(VarDecl *dst, Expr *srcExpr) {
+    auto *dstRef = builder.buildVarRef(dst, /*Loc=*/SourceLoc());
+    return new (ctx) AssignExpr(dstRef, /*EqualLoc=*/SourceLoc(), srcExpr,
+                                /*implicit=*/true);
+  }
+
+  void recordUnsupported(UnsupportedElt node) {
+    if (!FirstUnsupported)
+      FirstUnsupported = node;
+  }
+
+#define UNSUPPORTED_STMT(StmtClass)                                            \
+  NullablePtr<Stmt> visit##StmtClass##Stmt(StmtClass##Stmt *stmt,              \
+                                           NullablePtr<VarDecl> var) {         \
+    return failTransform(stmt);                                                \
+  }
+
+  std::pair<NullablePtr<VarDecl>, Optional<UnsupportedElt>>
+  transform(BraceStmt *braceStmt, SmallVectorImpl<ASTNode> &newBody) {
+    SmallVector<Expr *, 4> buildBlockArguments;
+
+    auto failTransform = [&](UnsupportedElt unsupported) {
+      return std::make_pair(nullptr, unsupported);
+    };
+
+    for (auto element : braceStmt->getElements()) {
+      if (auto *returnStmt = getAsStmt<ReturnStmt>(element)) {
+        assert(returnStmt->isImplicit());
+        element = returnStmt->getResult();
+      }
+
+      if (auto *decl = element.dyn_cast<Decl *>()) {
+        switch (decl->getKind()) {
+        case DeclKind::PatternBinding: {
+          if (!isValidPatternBinding(cast<PatternBindingDecl>(decl)))
+            return failTransform(decl);
+
+          LLVM_FALLTHROUGH;
+        }
+
+        // Just ignore #if; the chosen children should appear in
+        // the surrounding context.  This isn't good for source
+        // tools but it at least works.
+        case DeclKind::IfConfig:
+        // Skip #warning/#error; we'll handle them when applying
+        // the builder.
+        case DeclKind::PoundDiagnostic:
+        // Ignore variable declarations, because they're always
+        // handled within their enclosing pattern bindings.
+        case DeclKind::Var:
+        case DeclKind::Param:
+          newBody.push_back(element);
+          break;
+
+        default:
+          return failTransform(decl);
+        }
+
+        continue;
+      }
+
+      if (auto *stmt = element.dyn_cast<Stmt *>()) {
+        // Throw is allowed as is.
+        if (auto *throwStmt = dyn_cast<ThrowStmt>(stmt)) {
+          newBody.push_back(throwStmt);
+          continue;
+        }
+
+        // Allocate variable with a placeholder type
+        auto *resultVar = buildPlaceholderVar(stmt->getStartLoc(), newBody);
+
+        auto result = visit(stmt, resultVar);
+        if (!result)
+          return failTransform(stmt);
+
+        newBody.push_back(result.get());
+        buildBlockArguments.push_back(
+            builder.buildVarRef(resultVar, stmt->getStartLoc()));
+        continue;
+      }
+
+      auto *expr = element.get<Expr *>();
+      if (builder.supports(ctx.Id_buildExpression)) {
+        expr = builder.buildCall(expr->getLoc(), ctx.Id_buildExpression, {expr},
+                                 {Identifier()});
+      }
+
+      auto *capture = captureExpr(expr, newBody);
+      // A reference to the synthesized variable is passed as an argument
+      // to buildBlock.
+      buildBlockArguments.push_back(
+          builder.buildVarRef(capture, element.getStartLoc()));
+    }
+
+    // Synthesize `buildBlock` or `buildPartial` based on captured arguments.
+    NullablePtr<VarDecl> buildBlockVar;
+    {
+      // If the builder supports `buildPartialBlock(first:)` and
+      // `buildPartialBlock(accumulated:next:)`, use this to combine
+      // sub-expressions pairwise.
+      if (!buildBlockArguments.empty() &&
+          builder.supports(ctx.Id_buildPartialBlock, {ctx.Id_first},
+                           /*checkAvailability*/ true) &&
+          builder.supports(ctx.Id_buildPartialBlock,
+                           {ctx.Id_accumulated, ctx.Id_next},
+                           /*checkAvailability*/ true)) {
+        //   let v0 = Builder.buildPartialBlock(first: arg_0)
+        //   let v1 = Builder.buildPartialBlock(accumulated: v0, next: arg_1)
+        //   ...
+        //   let vN = Builder.buildPartialBlock(accumulated: vN-1, next: argN)
+        auto *buildPartialFirst = builder.buildCall(
+            braceStmt->getStartLoc(), ctx.Id_buildPartialBlock,
+            {buildBlockArguments.front()},
+            /*argLabels=*/{ctx.Id_first});
+
+        buildBlockVar = captureExpr(buildPartialFirst, newBody);
+
+        for (auto *argExpr : llvm::drop_begin(buildBlockArguments)) {
+          auto *accumPartialBlock = builder.buildCall(
+              braceStmt->getStartLoc(), ctx.Id_buildPartialBlock,
+              {builder.buildVarRef(buildBlockVar.get(), argExpr->getStartLoc()),
+               argExpr},
+              {ctx.Id_accumulated, ctx.Id_next});
+          buildBlockVar = captureExpr(accumPartialBlock, newBody);
+        }
+      }
+      // If `buildBlock` does not exist at this point, it could be the case that
+      // `buildPartialBlock` did not have the sufficient availability for this
+      // call site.  Diagnose it.
+      else if (!builder.supports(ctx.Id_buildBlock)) {
+        ctx.Diags.diagnose(
+            braceStmt->getStartLoc(),
+            diag::result_builder_missing_available_buildpartialblock,
+            builder.getType());
+        return failTransform(braceStmt);
+      }
+      // Otherwise, call `buildBlock` on all subexpressions.
+      else {
+        // Call Builder.buildBlock(... args ...)
+        auto *buildBlock = builder.buildCall(
+            braceStmt->getStartLoc(), ctx.Id_buildBlock, buildBlockArguments,
+            /*argLabels=*/{});
+        buildBlockVar = captureExpr(buildBlock, newBody);
+      }
+    }
+
+    return std::make_pair(buildBlockVar.get(), None);
+  }
+
+  std::pair<bool, UnsupportedElt>
+  transform(BraceStmt *braceStmt, NullablePtr<VarDecl> bodyVar,
+            SmallVectorImpl<ASTNode> &elements) {
+    // Arguments passed to a synthesized `build{Partial}Block`.
+    SmallVector<Expr *, 4> buildBlockArguments;
+
+    auto failure = [&](UnsupportedElt element) {
+      return std::make_pair(true, element);
+    };
+
+    NullablePtr<VarDecl> buildBlockVar;
+    Optional<UnsupportedElt> unsupported;
+
+    std::tie(buildBlockVar, unsupported) = transform(braceStmt, elements);
+    if (unsupported)
+      return failure(*unsupported);
+
+    // If this is not a top-level brace statement, we need to form an
+    // assignment from the `build{Partial}Block` call result variable
+    // to the provided one.
+    //
+    // Use start loc for the return statement so any contextual issues
+    // are attached to the beginning of the brace instead of its end.
+    auto resultLoc = braceStmt->getStartLoc();
+    if (bodyVar) {
+      elements.push_back(new (ctx) AssignExpr(
+          builder.buildVarRef(bodyVar.get(), resultLoc),
+          /*EqualLoc=*/SourceLoc(),
+          builder.buildVarRef(buildBlockVar.get(), resultLoc),
+          /*Implicit=*/true));
+    } else {
+      Expr *buildBlockResult =
+          builder.buildVarRef(buildBlockVar.get(), resultLoc);
+      // Otherwise, it's a top-level brace and we need to synthesize
+      // a call to `buildFialBlock` if supported.
+      if (builder.supports(ctx.Id_buildFinalResult, {Identifier()})) {
+        buildBlockResult =
+            builder.buildCall(resultLoc, ctx.Id_buildFinalResult,
+                              {buildBlockResult}, {Identifier()});
+      }
+
+      // Type erase return if the result type requires it.
+      buildBlockResult = CS.buildTypeErasedExpr(buildBlockResult, dc,
+                                                ResultType, CTP_ReturnStmt);
+
+      elements.push_back(new (ctx) ReturnStmt(resultLoc, buildBlockResult,
+                                              /*Implicit=*/true));
+    }
+
+    return std::make_pair(false, UnsupportedElt());
+  }
+
+  BraceStmt *cloneBraceWith(BraceStmt *braceStmt,
+                            SmallVectorImpl<ASTNode> &elements) {
+    auto lBrace = braceStmt ? braceStmt->getLBraceLoc() : SourceLoc();
+    auto rBrace = braceStmt ? braceStmt->getRBraceLoc() : SourceLoc();
+    bool implicit = braceStmt ? braceStmt->isImplicit() : true;
+
+    return BraceStmt::create(ctx, lBrace, elements, rBrace, implicit);
+  }
+
+  NullablePtr<Stmt> visitBraceStmt(BraceStmt *braceStmt,
+                                   NullablePtr<VarDecl> bodyVar) {
+    SmallVector<ASTNode, 4> elements;
+
+    bool failed;
+    UnsupportedElt unsupported;
+
+    std::tie(failed, unsupported) = transform(braceStmt, bodyVar, elements);
+
+    if (failed)
+      return failTransform(unsupported);
+
+    return cloneBraceWith(braceStmt, elements);
+  }
+
+  NullablePtr<Stmt> visitDoStmt(DoStmt *doStmt, NullablePtr<VarDecl> doVar) {
+    auto body = visitBraceStmt(doStmt->getBody(), doVar);
+    if (!body)
+      return nullptr;
+
+    return new (ctx) DoStmt(doStmt->getLabelInfo(), doStmt->getDoLoc(),
+                            cast<BraceStmt>(body.get()), doStmt->isImplicit());
+  }
+
+  NullablePtr<Stmt> visitIfStmt(IfStmt *ifStmt, NullablePtr<VarDecl> ifVar) {
+    // Check whether the chain is buildable and whether it terminates
+    // without an `else`.
+    bool isOptional = false;
+    unsigned numPayloads = 0;
+    if (!isBuildableIfChain(ifStmt, numPayloads, isOptional))
+      return failTransform(ifStmt);
+
+    SmallVector<std::pair<VarDecl *, Stmt *>, 4> branchVars;
+
+    auto transformed = transformIf(ifStmt, branchVars);
+    if (!transformed)
+      return failTransform(ifStmt);
+
+    // Let's wrap `if` statement into a `do` and inject `type-join`
+    // operation with appropriate combination of `buildEither` that
+    // would get re-distributed after inference.
+    SmallVector<ASTNode, 4> doBody;
+    {
+      ifStmt = transformed.get();
+
+      // `if` goes first.
+      doBody.push_back(ifStmt);
+
+      assert(numPayloads == branchVars.size());
+
+      SmallVector<Expr *, 4> buildEitherCalls;
+      for (unsigned i = 0; i != numPayloads; i++) {
+        VarDecl *branchVar;
+        Stmt *anchor;
+
+        std::tie(branchVar, anchor) = branchVars[i];
+
+        auto *branchVarRef =
+            builder.buildVarRef(branchVar, ifStmt->getEndLoc());
+        auto *builderCall =
+            buildWrappedChainPayload(branchVarRef, i, numPayloads, isOptional);
+
+        // The operand should have optional type if we had optional results,
+        // so we just need to call `buildIf` now, since we're at the top level.
+        if (isOptional && (ifStmt->getThenStmt() == anchor ||
+                           ifStmt->getElseStmt() == anchor)) {
+          builderCall = buildCallIfWanted(ifStmt->getEndLoc(),
+                                          builder.getBuildOptionalId(),
+                                          builderCall, /*argLabels=*/{});
+        }
+
+        buildEitherCalls.push_back(builderCall);
+      }
+
+      // If there is no `else` branch we need to build one.
+      // It consists a `buildOptional` call that uses `nil` as an argument.
+      //
+      // ```
+      // {
+      //   $__builderResult = buildOptional(nil)
+      // }
+      // ```
+      //
+      // Type of `nil` is going to be inferred from `$__builderResult`.
+      if (!hasUnconditionalElse(ifStmt)) {
+        assert(isOptional);
+
+        auto *nil =
+            new (ctx) NilLiteralExpr(ifStmt->getEndLoc(), /*implicit=*/true);
+
+        buildEitherCalls.push_back(buildCallIfWanted(
+            /*loc=*/ifStmt->getEndLoc(), builder.getBuildOptionalId(), nil,
+            /*argLabels=*/{}));
+      }
+
+      auto *ifVarRef = builder.buildVarRef(ifVar.get(), ifStmt->getEndLoc());
+      doBody.push_back(TypeJoinExpr::create(ctx, ifVarRef, buildEitherCalls));
+    }
+
+    return DoStmt::createImplicit(ctx, LabeledStmtInfo(), doBody);
+  }
+
+  NullablePtr<IfStmt>
+  transformIf(IfStmt *ifStmt,
+              SmallVectorImpl<std::pair<VarDecl *, Stmt *>> &branchVars) {
+    Optional<UnsupportedElt> unsupported;
+
+    // If there is a #available in the condition, wrap the 'then' or 'else'
+    // in a call to buildLimitedAvailability(_:).
+    auto availabilityCond = findAvailabilityCondition(ifStmt->getCond());
+    bool supportsAvailability =
+        availabilityCond && builder.supports(ctx.Id_buildLimitedAvailability);
+
+    NullablePtr<VarDecl> thenVar;
+    NullablePtr<Stmt> thenBranch;
+    {
+      SmallVector<ASTNode, 4> thenBody;
+
+      auto *ifBraceStmt = cast<BraceStmt>(ifStmt->getThenStmt());
+
+      std::tie(thenVar, unsupported) = transform(ifBraceStmt, thenBody);
+      if (unsupported) {
+        recordUnsupported(*unsupported);
+        return nullptr;
+      }
+
+      if (supportsAvailability &&
+          !availabilityCond->getAvailability()->isUnavailability()) {
+        auto *thenVarRef =
+            builder.buildVarRef(thenVar.get(), ifBraceStmt->getEndLoc());
+
+        auto *builderCall = buildCallIfWanted(
+            ifStmt->getThenStmt()->getEndLoc(), ctx.Id_buildLimitedAvailability,
+            {thenVarRef}, {Identifier()});
+
+        thenVar = captureExpr(builderCall, thenBody);
+      }
+
+      thenBranch = cloneBraceWith(ifBraceStmt, thenBody);
+      branchVars.push_back({thenVar.get(), thenBranch.get()});
+    }
+
+    NullablePtr<Stmt> elseBranch;
+
+    if (auto *elseStmt = ifStmt->getElseStmt()) {
+      NullablePtr<VarDecl> elseVar;
+
+      if (auto *innerIfStmt = getAsStmt<IfStmt>(elseStmt)) {
+        elseBranch = transformIf(innerIfStmt, branchVars);
+        if (!elseBranch) {
+          recordUnsupported(innerIfStmt);
+          return nullptr;
+        }
+      } else {
+        auto *elseBraceStmt = cast<BraceStmt>(elseStmt);
+        SmallVector<ASTNode> elseBody;
+
+        std::tie(elseVar, unsupported) = transform(elseBraceStmt, elseBody);
+        if (unsupported) {
+          recordUnsupported(*unsupported);
+          return nullptr;
+        }
+
+        // If there is a #unavailable in the condition, wrap the 'else' in a
+        // call to buildLimitedAvailability(_:).
+        if (supportsAvailability &&
+            availabilityCond->getAvailability()->isUnavailability()) {
+          auto *elseVarRef =
+              builder.buildVarRef(elseVar.get(), elseBraceStmt->getEndLoc());
+
+          auto *builderCall = buildCallIfWanted(
+              ifStmt->getThenStmt()->getEndLoc(),
+              ctx.Id_buildLimitedAvailability, {elseVarRef}, {Identifier()});
+
+          elseVar = captureExpr(builderCall, elseBody);
+        }
+
+        elseBranch = cloneBraceWith(elseBraceStmt, elseBody);
+        branchVars.push_back({elseVar.get(), elseBranch.get()});
+      }
+    }
+
+    return new (ctx)
+        IfStmt(ifStmt->getLabelInfo(), ifStmt->getIfLoc(), ifStmt->getCond(),
+               thenBranch.get(), ifStmt->getElseLoc(),
+               elseBranch.getPtrOrNull(), ifStmt->isImplicit());
+  }
+
+  NullablePtr<Stmt> visitSwitchStmt(SwitchStmt *switchStmt,
+                                    NullablePtr<VarDecl> switchVar) {
+    // For a do statement wrapping this switch that contains all of the
+    // `buildEither` calls that would get injected back into `case` bodies
+    // after solving is done.
+    //
+    // This is necessary because `buildEither requires type information from
+    // both sides to be available, so all case statements have to be
+    // type-checked first.
+    SmallVector<ASTNode, 4> doBody;
+
+    SmallVector<ASTNode, 4> cases;
+    SmallVector<VarDecl *, 4> caseVars;
+
+    for (auto *caseStmt : switchStmt->getCases()) {
+      auto transformed = transformCase(caseStmt);
+      if (!transformed)
+        return failTransform(caseStmt);
+
+      cases.push_back(transformed->second);
+      caseVars.push_back(transformed->first);
+    }
+
+    // If there are no 'case' statements in the body let's try
+    // to diagnose this situation via limited exhaustiveness check
+    // before failing a builder transform, otherwise type-checker
+    // might end up without any diagnostics which leads to crashes
+    // in SILGen.
+    if (caseVars.empty()) {
+      TypeChecker::checkSwitchExhaustiveness(switchStmt, dc,
+                                             /*limitChecking=*/true);
+      return failTransform(switchStmt);
+    }
+
+    auto *transformedSwitch = SwitchStmt::create(
+        switchStmt->getLabelInfo(), switchStmt->getSwitchLoc(),
+        switchStmt->getSubjectExpr(), switchStmt->getLBraceLoc(), cases,
+        switchStmt->getRBraceLoc(), switchStmt->getEndLoc(), ctx);
+
+    doBody.push_back(transformedSwitch);
+
+    SmallVector<Expr *, 4> injectedExprs;
+    for (auto idx : indices(caseVars)) {
+      auto caseStmt = cases[idx];
+      auto *caseVar = caseVars[idx];
+
+      // Build the expression that injects the case variable into appropriate
+      // buildEither(first:)/buildEither(second:) chain.
+      Expr *caseVarRef = builder.buildVarRef(caseVar, caseStmt.getEndLoc());
+      Expr *injectedCaseExpr = buildWrappedChainPayload(
+          caseVarRef, idx, caseVars.size(), /*isOptional=*/false);
+
+      injectedExprs.push_back(injectedCaseExpr);
+    }
+
+    auto *switchVarRef =
+        builder.buildVarRef(switchVar.get(), switchStmt->getEndLoc());
+    doBody.push_back(TypeJoinExpr::create(ctx, switchVarRef, injectedExprs));
+
+    return DoStmt::createImplicit(ctx, LabeledStmtInfo(), doBody);
+  }
+
+  Optional<std::pair<VarDecl *, CaseStmt *>> transformCase(CaseStmt *caseStmt) {
+    auto *body = caseStmt->getBody();
+
+    // Explicitly disallow `case` statements with empty bodies
+    // since that helps to diagnose other issues with switch
+    // statements by excluding invalid cases.
+    if (auto *BS = dyn_cast<BraceStmt>(body)) {
+      if (BS->getNumElements() == 0) {
+        // HACK: still allow empty bodies if typechecking for code
+        // completion. Code completion ignores diagnostics
+        // and won't get any types if we fail.
+        if (!ctx.SourceMgr.hasCodeCompletionBuffer())
+          return None;
+      }
+    }
+
+    NullablePtr<VarDecl> caseVar;
+    Optional<UnsupportedElt> unsupported;
+    SmallVector<ASTNode, 4> newBody;
+
+    std::tie(caseVar, unsupported) = transform(body, newBody);
+
+    if (unsupported) {
+      recordUnsupported(*unsupported);
+      return None;
+    }
+
+    auto *newCase = CaseStmt::create(
+        ctx, caseStmt->getParentKind(), caseStmt->getLoc(),
+        caseStmt->getCaseLabelItems(),
+        caseStmt->hasUnknownAttr() ? caseStmt->getStartLoc() : SourceLoc(),
+        caseStmt->getItemTerminatorLoc(), cloneBraceWith(body, newBody),
+        caseStmt->getCaseBodyVariablesOrEmptyArray(), caseStmt->isImplicit(),
+        caseStmt->getFallthroughStmt());
+
+    return std::make_pair(caseVar.get(), newCase);
+  }
+
+  /// do {
+  ///   var $__forEach = []
+  ///   for ... in ... {
+  ///     ...
+  ///     $__builderVar = buildBlock(...)
+  ///     $__forEach.append($__builderVar)
+  ///   }
+  ///   buildArray($__forEach)
+  /// }
+  NullablePtr<Stmt> visitForEachStmt(ForEachStmt *forEachStmt,
+                                     NullablePtr<VarDecl> forEachVar) {
+    // for...in statements are handled via buildArray(_:); bail out if the
+    // builder does not support it.
+    if (!builder.supports(ctx.Id_buildArray))
+      return failTransform(forEachStmt);
+
+    // For-each statements require the Sequence protocol. If we don't have
+    // it (which generally means the standard library isn't loaded), fall
+    // out of the result-builder path entirely to let normal type checking
+    // take care of this.
+    auto sequenceProto = TypeChecker::getProtocol(
+        dc->getASTContext(), forEachStmt->getForLoc(),
+        forEachStmt->getAwaitLoc().isValid() ? KnownProtocolKind::AsyncSequence
+                                             : KnownProtocolKind::Sequence);
+    if (!sequenceProto)
+      return failTransform(forEachStmt);
+
+    SmallVector<ASTNode, 4> doBody;
+    SourceLoc endLoc = forEachStmt->getEndLoc();
+
+    // Build a variable that is going to hold array of results produced
+    // by each iteration of the loop.
+    //
+    // Not that it's not going to be initialized here, that would happen
+    // only when a solution is found.
+    VarDecl *arrayVar = buildPlaceholderVar(
+        forEachStmt->getEndLoc(), doBody,
+        ArraySliceType::get(PlaceholderType::get(ctx, forEachVar.get())),
+        ArrayExpr::create(ctx, /*LBrace=*/endLoc, /*Elements=*/{},
+                          /*Commas=*/{}, /*RBrace=*/endLoc));
+
+    NullablePtr<VarDecl> bodyVar;
+    Optional<UnsupportedElt> unsupported;
+
+    SmallVector<ASTNode, 4> newBody;
+    {
+      std::tie(bodyVar, unsupported) =
+          transform(forEachStmt->getBody(), newBody);
+      if (unsupported)
+        return failTransform(*unsupported);
+
+      // Form a call to Array.append(_:) to add the result of executing each
+      // iteration of the loop body to the array formed above.
+      {
+        auto arrayVarRef = builder.buildVarRef(arrayVar, endLoc);
+        auto arrayAppendRef = new (ctx) UnresolvedDotExpr(
+            arrayVarRef, endLoc, DeclNameRef(ctx.getIdentifier("append")),
+            DeclNameLoc(endLoc), /*implicit=*/true);
+        arrayAppendRef->setFunctionRefKind(FunctionRefKind::SingleApply);
+
+        auto bodyVarRef = builder.buildVarRef(bodyVar.get(), endLoc);
+        auto *argList = ArgumentList::createImplicit(
+            ctx, endLoc, {Argument::unlabeled(bodyVarRef)}, endLoc);
+
+        newBody.push_back(
+            CallExpr::createImplicit(ctx, arrayAppendRef, argList));
+      }
+    }
+
+    auto *newForEach = new (ctx)
+        ForEachStmt(forEachStmt->getLabelInfo(), forEachStmt->getForLoc(),
+                    forEachStmt->getTryLoc(), forEachStmt->getAwaitLoc(),
+                    forEachStmt->getPattern(), forEachStmt->getInLoc(),
+                    forEachStmt->getParsedSequence(),
+                    forEachStmt->getWhereLoc(), forEachStmt->getWhere(),
+                    cloneBraceWith(forEachStmt->getBody(), newBody),
+                    forEachStmt->isImplicit());
+
+    // For a body of new `do` statement that holds updated `for-in` loop
+    // and epilog that consists of a call to `buildArray` that forms the
+    // final result.
+    {
+      // Modified `for { ... }`
+      doBody.push_back(newForEach);
+
+      // $__forEach = buildArray($__arrayVar)
+      doBody.push_back(buildAssignment(
+          forEachVar.get(),
+          buildCallIfWanted(forEachStmt->getEndLoc(), ctx.Id_buildArray,
+                            {builder.buildVarRef(arrayVar, endLoc)},
+                            {Identifier()})));
+    }
+
+    return DoStmt::createImplicit(ctx, LabeledStmtInfo(), doBody);
+  }
+
+  bool isValidPatternBinding(PatternBindingDecl *PB) {
+    // Enforce some restrictions on local variables inside a result builder.
+    for (unsigned i : range(PB->getNumPatternEntries())) {
+      // The pattern binding must have an initial value expression.
+      if (!PB->isExplicitlyInitialized(i))
+        return false;
+
+      // Each variable bound by the pattern must be stored, and cannot
+      // have observers.
+      SmallVector<VarDecl *, 8> variables;
+      PB->getPattern(i)->collectVariables(variables);
+
+      for (auto *var : variables) {
+        if (!var->getImplInfo().isSimpleStored())
+          return false;
+
+        // Also check for invalid attributes.
+        TypeChecker::checkDeclAttributes(var);
+      }
+    }
+
+    return true;
+  }
+
+  UNSUPPORTED_STMT(Throw)
+  UNSUPPORTED_STMT(Return)
+  UNSUPPORTED_STMT(Yield)
+  UNSUPPORTED_STMT(Defer)
+  UNSUPPORTED_STMT(Guard)
+  UNSUPPORTED_STMT(While)
+  UNSUPPORTED_STMT(DoCatch)
+  UNSUPPORTED_STMT(RepeatWhile)
+  UNSUPPORTED_STMT(Break)
+  UNSUPPORTED_STMT(Continue)
+  UNSUPPORTED_STMT(Fallthrough)
+  UNSUPPORTED_STMT(Fail)
+  UNSUPPORTED_STMT(PoundAssert)
+  UNSUPPORTED_STMT(Case)
+
+#undef UNSUPPORTED_STMT
 };
 
 /// Describes the target into which the result of a particular statement in
@@ -1756,6 +2475,76 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
     // If the body has a return statement, suppress the transform but
     // continue solving the constraint system.
     return None;
+  }
+
+  if (Context.TypeCheckerOpts.ResultBuilderASTTransform) {
+    ResultBuilderTransform transform(*this, fn.getAsDeclContext(), builderType,
+                                     bodyResultType);
+    auto *body = transform.apply(fn.getBody());
+
+    if (auto unsupported = transform.getUnsupportedElement()) {
+      assert(!body);
+
+      // If we aren't supposed to attempt fixes, fail.
+      if (!shouldAttemptFixes()) {
+        return getTypeMatchFailure(locator);
+      }
+
+      // If we're solving for code completion and the body contains the code
+      // completion location, skipping it won't get us to a useful solution so
+      // just bail.
+      if (isForCodeCompletion() && containsCodeCompletionLoc(fn.getBody())) {
+        return getTypeMatchFailure(locator);
+      }
+
+      // Record the first unhandled construct as a fix.
+      if (recordFix(SkipUnhandledConstructInResultBuilder::create(
+              *this, unsupported, builder, getConstraintLocator(locator)))) {
+        return getTypeMatchFailure(locator);
+      }
+
+      if (auto *closure = getAsExpr<ClosureExpr>(fn.getAbstractClosureExpr())) {
+        auto closureTy = getClosureType(closure);
+        simplifyType(closureTy).visit([&](Type componentTy) {
+          if (auto *typeVar = componentTy->getAs<TypeVariableType>()) {
+            assignFixedType(typeVar,
+                            PlaceholderType::get(getASTContext(), typeVar));
+          }
+        });
+      }
+
+      return getTypeMatchSuccess();
+    }
+
+    if (isDebugMode()) {
+      auto &log = llvm::errs();
+      auto indent = solverState ? solverState->depth * 2 : 0;
+      log.indent(indent) << "------- Transfomed Body -------\n";
+      body->dump(log);
+      log << '\n';
+    }
+
+    AppliedBuilderTransform transformInfo;
+
+    transformInfo.builderType = builderType;
+    transformInfo.bodyResultType = bodyResultType;
+    transformInfo.transformedBody = body;
+
+    // Record the transformation.
+    assert(
+        std::find_if(
+            resultBuilderTransformed.begin(), resultBuilderTransformed.end(),
+            [&](const std::pair<AnyFunctionRef, AppliedBuilderTransform> &elt) {
+              return elt.first == fn;
+            }) == resultBuilderTransformed.end() &&
+        "already transformed this body along this path!?!");
+    resultBuilderTransformed.insert(
+        std::make_pair(fn, std::move(transformInfo)));
+
+    if (generateConstraints(fn, body))
+      return getTypeMatchFailure(locator);
+
+    return getTypeMatchSuccess();
   }
 
   // Check the form of this body to see if we can apply the
