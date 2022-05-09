@@ -865,6 +865,9 @@ importer::addCommonInvocationArguments(
 
   invocationArgStrs.push_back("-fansi-escape-codes");
 
+  invocationArgStrs.push_back("-Xclang");
+  invocationArgStrs.push_back("-no-opaque-pointers");
+
   for (auto extraArg : importerOpts.ExtraArgs) {
     invocationArgStrs.push_back(extraArg);
   }
