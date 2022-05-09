@@ -255,7 +255,7 @@ func test() async {
   // CHECK-NOT: ready
   // CHECK: resign id:ActorAddress(address: "[[ID5]]")
 
-  test.append(await PickATransport2(other: 1, thesystem: system))
+  test.append(await PickATransport2(other: 1, theSystem: system))
   // CHECK: assign type:PickATransport2, id:ActorAddress(address: "[[ID6:.*]]")
   // CHECK: ready actor:main.PickATransport2, id:ActorAddress(address: "[[ID6]]")
 
