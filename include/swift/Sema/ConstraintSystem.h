@@ -4719,6 +4719,16 @@ public:
   LLVM_NODISCARD
   bool generateConstraints(ClosureExpr *closure);
 
+  /// Generate constraints for the body of the given function.
+  ///
+  /// \param fn The function or closure expression
+  /// \param body The body of the given function that should be
+  /// used for constraint generation.
+  ///
+  /// \returns \c true if constraint generation failed, \c false otherwise
+  LLVM_NODISCARD
+  bool generateConstraints(AnyFunctionRef fn, BraceStmt *body);
+
   /// Generate constraints for the given (unchecked) expression.
   ///
   /// \returns a possibly-sanitized expression, or null if an error occurred.
