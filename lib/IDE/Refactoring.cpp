@@ -3152,12 +3152,12 @@ bool RefactoringActionLocalizeString::performChange() {
 }
 
 struct MemberwiseParameter {
-  Identifier Name;
+  CharSourceRange NameRange;
   Type MemberType;
   Expr *DefaultExpr;
 
-  MemberwiseParameter(Identifier name, Type type, Expr *initialExpr)
-      : Name(name), MemberType(type), DefaultExpr(initialExpr) {}
+  MemberwiseParameter(CharSourceRange nameRange, Type type, Expr *initialExpr)
+      : NameRange(nameRange), MemberType(type), DefaultExpr(initialExpr) {}
 };
 
 static void generateMemberwiseInit(SourceEditConsumer &EditConsumer,
@@ -3165,13 +3165,11 @@ static void generateMemberwiseInit(SourceEditConsumer &EditConsumer,
                                    ArrayRef<MemberwiseParameter> memberVector,
                                    SourceLoc targetLocation) {
   
-  assert(!memberVector.empty());
-
   EditConsumer.accept(SM, targetLocation, "\ninternal init(");
   auto insertMember = [&SM](const MemberwiseParameter &memberData,
                             raw_ostream &OS, bool wantsSeparator) {
     {
-      OS << memberData.Name << ": ";
+      OS << SM.extractText(memberData.NameRange) << ": ";
       // Unconditionally print '@escaping' if we print out a function type -
       // the assignments we generate below will escape this parameter.
       if (isa<AnyFunctionType>(memberData.MemberType->getCanonicalType())) {
@@ -3180,15 +3178,18 @@ static void generateMemberwiseInit(SourceEditConsumer &EditConsumer,
       OS << memberData.MemberType.getString();
     }
 
+    bool HasAddedDefault = false;
     if (auto *expr = memberData.DefaultExpr) {
-      if (isa<NilLiteralExpr>(expr)) {
-        OS << " = nil";
-      } else if (expr->getSourceRange().isValid()) {
+      if (expr->getSourceRange().isValid()) {
         auto range =
           Lexer::getCharSourceRangeFromSourceRange(
             SM, expr->getSourceRange());
         OS << " = " << SM.extractText(range);
+        HasAddedDefault = true;
       }
+    }
+    if (!HasAddedDefault && memberData.MemberType->isOptional()) {
+      OS << " = nil";
     }
 
     if (wantsSeparator) {
@@ -3199,18 +3200,17 @@ static void generateMemberwiseInit(SourceEditConsumer &EditConsumer,
   // Process the initial list of members, inserting commas as appropriate.
   std::string Buffer;
   llvm::raw_string_ostream OS(Buffer);
-  for (const auto &memberData : memberVector.drop_back()) {
-    insertMember(memberData, OS, /*wantsSeparator*/ true);
+  for (const auto &memberData : llvm::enumerate(memberVector)) {
+    bool wantsSeparator = (memberData.index() != memberVector.size() - 1);
+    insertMember(memberData.value(), OS, wantsSeparator);
   }
-
-  // Process the last (or perhaps, only) member.
-  insertMember(memberVector.back(), OS, /*wantsSeparator*/ false);
 
   // Synthesize the body.
   OS << ") {\n";
   for (auto &member : memberVector) {
     // self.<property> = <property>
-    OS << "self." << member.Name << " = " << member.Name << "\n";
+    auto name = SM.extractText(member.NameRange);
+    OS << "self." << name << " = " << name << "\n";
   }
   OS << "}\n";
 
@@ -3239,30 +3239,41 @@ collectMembersForInit(const ResolvedCursorInfo &CursorInfo,
   if (!targetLocation.isValid())
     return SourceLoc();
 
-  for (auto varDecl : nominalDecl->getStoredProperties()) {
-    auto patternBinding = varDecl->getParentPatternBinding();
-    if (!patternBinding)
+  SourceManager &SM = nominalDecl->getASTContext().SourceMgr;
+
+  for (auto member : nominalDecl->getMembers()) {
+    auto varDecl = dyn_cast<VarDecl>(member);
+    if (!varDecl) {
       continue;
+    }
+    if (varDecl->getAttrs().hasAttribute<LazyAttr>()) {
+      // Exclude lazy members from the memberwise initializer. This is
+      // inconsistent with the implicitly synthesized memberwise initializer but
+      // we think it makes more sense because otherwise the lazy variable's
+      // initializer gets evaluated eagerly.
+      continue;
+    }
 
     if (!varDecl->isMemberwiseInitialized(/*preferDeclaredProperties=*/true)) {
       continue;
     }
 
+    auto patternBinding = varDecl->getParentPatternBinding();
+    if (!patternBinding)
+      continue;
+
     const auto i = patternBinding->getPatternEntryIndexForVarDecl(varDecl);
     Expr *defaultInit = nullptr;
     if (patternBinding->isExplicitlyInitialized(i) ||
         patternBinding->isDefaultInitializable()) {
-      defaultInit = varDecl->getParentInitializer();
+      defaultInit = patternBinding->getOriginalInit(i);
     }
 
-    memberVector.emplace_back(varDecl->getName(),
-                              varDecl->getType(), defaultInit);
+    auto NameRange =
+        Lexer::getCharSourceRangeFromSourceRange(SM, varDecl->getNameLoc());
+    memberVector.emplace_back(NameRange, varDecl->getType(), defaultInit);
   }
-  
-  if (memberVector.empty()) {
-    return SourceLoc();
-  }
-  
+
   return targetLocation;
 }
 
