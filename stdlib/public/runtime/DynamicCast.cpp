@@ -1234,6 +1234,7 @@ tryCastToTuple(
   for (unsigned i = 0; typesMatch && i != numElements; ++i) {
     if (srcTupleType->getElement(i).Type != destTupleType->getElement(i).Type) {
       typesMatch = false;
+      break;
     }
   }
 
