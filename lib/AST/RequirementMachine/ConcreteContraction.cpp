@@ -518,9 +518,6 @@ bool ConcreteContraction::performConcreteContraction(
     assert(subjectType->isTypeParameter() &&
            "You forgot to call desugarRequirement()");
 
-    if (!subjectType->is<GenericTypeParamType>())
-      continue;
-
     auto kind = req.req.getKind();
     switch (kind) {
     case RequirementKind::SameType: {
