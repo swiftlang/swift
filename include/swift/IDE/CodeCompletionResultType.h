@@ -21,6 +21,15 @@
 namespace swift {
 namespace ide {
 
+enum class CustomAttributeKind : uint8_t {
+  /// A type that can be used as a property wrapper.
+  PropertyWrapper = 1 << 0,
+  /// A type that can be used as a result builder.
+  ResultBuilder = 1 << 1,
+  /// A type that can be used as a global actor.
+  GlobalActor = 1 << 2,
+};
+
 /// The expected contextual type(s) for code-completion.
 class ExpectedTypeContext {
   /// Possible types of the code completion expression.
@@ -36,6 +45,11 @@ class ExpectedTypeContext {
   /// only a hint.
   bool IsImplicitSingleExpressionReturn = false;
   bool PreferNonVoid = false;
+
+  /// If not empty, \c PossibleTypes are ignored and types that have an
+  /// attribute kind that is contained in this list will be reported as
+  /// 'Convertible'. All other types are related as 'Invalid'.
+  OptionSet<CustomAttributeKind> ExpectedCustomAttributeKinds;
 
 public:
   ExpectedTypeContext() = default;
@@ -81,6 +95,15 @@ public:
 
   void setPreferNonVoid(bool PreferNonVoid) {
     this->PreferNonVoid = PreferNonVoid;
+  }
+
+  OptionSet<CustomAttributeKind> getExpectedCustomAttributeKinds() const {
+    return ExpectedCustomAttributeKinds;
+  }
+
+  void setExpectedCustomAttributeKinds(
+      OptionSet<CustomAttributeKind> ExpectedAttributeKinds) {
+    this->ExpectedCustomAttributeKinds = ExpectedAttributeKinds;
   }
 };
 
@@ -162,6 +185,9 @@ private:
 
   SmallVector<ContextualType, 4> ContextualTypes;
 
+  /// See \c ExpectedTypeContext::ExpectedAttributeKinds.
+  OptionSet<CustomAttributeKind> ExpectedCustomAttributeKinds;
+
 public:
   /// Create a USR-based equivalent of the \p TypeContext.
   USRBasedTypeContext(const ExpectedTypeContext *TypeContext,
@@ -191,10 +217,15 @@ class USRBasedType {
   /// declared in the same module that the type was defined.
   ArrayRef<const USRBasedType *> Supertypes;
 
+  /// The kinds of attributes this type can be used as.
+  OptionSet<CustomAttributeKind> CustomAttributeKinds;
+
   /// Memberwise initializer. \p USR and \p Supertypes need to be allocated in
   /// the same arena as this \c USRBasedType.
-  USRBasedType(StringRef USR, ArrayRef<const USRBasedType *> Supertypes)
-      : USR(USR), Supertypes(Supertypes) {}
+  USRBasedType(StringRef USR, ArrayRef<const USRBasedType *> Supertypes,
+               OptionSet<CustomAttributeKind> CustomAttributeKinds)
+      : USR(USR), Supertypes(Supertypes),
+        CustomAttributeKinds(CustomAttributeKinds) {}
 
   /// Implementation of \c typeRelation. \p VisistedTypes keeps track which
   /// types have already been visited.
@@ -213,12 +244,17 @@ public:
 
   /// Construct as \c USRBasedType from a USR and its supertypes. This method
   /// takes care of copying \p USR and \p Supertypes to \p Arena.
-  static const USRBasedType *fromUSR(StringRef USR,
-                                     ArrayRef<const USRBasedType *> Supertypes,
-                                     USRBasedTypeArena &Arena);
+  static const USRBasedType *
+  fromUSR(StringRef USR, ArrayRef<const USRBasedType *> Supertypes,
+          OptionSet<CustomAttributeKind> CustomAttributeKinds,
+          USRBasedTypeArena &Arena);
 
   StringRef getUSR() const { return USR; }
   ArrayRef<const USRBasedType *> getSupertypes() const { return Supertypes; }
+
+  OptionSet<CustomAttributeKind> getCustomAttributeKinds() const {
+    return CustomAttributeKinds;
+  }
 
   /// Compute the relation of \c ResultType when to this contextual type.
   CodeCompletionResultTypeRelation
