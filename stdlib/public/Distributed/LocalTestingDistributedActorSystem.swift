@@ -124,6 +124,7 @@ public final class LocalTestingDistributedActorSystem: DistributedActorSystem, @
   }
 }
 
+@available(SwiftStdlib 5.7, *)
 @available(*, deprecated, renamed: "LocalTestingActorID")
 public typealias LocalTestingActorAddress = LocalTestingActorID
 
