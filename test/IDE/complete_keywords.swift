@@ -6,6 +6,7 @@
 
 // KW_DECL: Begin completions
 // KW_DECL-DAG: Keyword[class]/None: class{{; name=.+$}}
+// KW_DECL-DAG: Keyword/None: actor{{; name=.+$}}
 // KW_DECL-DAG: Keyword/None: convenience{{; name=.+$}}
 // KW_DECL-DAG: Keyword[deinit]/None: deinit{{; name=.+$}}
 // KW_DECL-DAG: Keyword/None: dynamic{{; name=.+$}}
@@ -42,6 +43,7 @@
 
 // KW_DECL_PROTOCOL: Begin completions
 // KW_DECL_PROTOCOL-DAG: Keyword[class]/None/Flair[RareKeyword]: class{{; name=.+$}}
+// KW_DECL_PROTOCOL-DAG: Keyword/None/Flair[RareKeyword]: actor{{; name=.+$}}
 // KW_DECL_PROTOCOL-DAG: Keyword/None: convenience{{; name=.+$}}
 // KW_DECL_PROTOCOL-DAG: Keyword[deinit]/None: deinit{{; name=.+$}}
 // KW_DECL_PROTOCOL-DAG: Keyword/None: dynamic{{; name=.+$}}
@@ -78,6 +80,7 @@
 
 // KW_DECL_TYPECONTEXT: Begin completions
 // KW_DECL_TYPECONTEXT-DAG: Keyword[class]/None: class{{; name=.+$}}
+// KW_DECL_TYPECONTEXT-DAG: Keyword/None: actor{{; name=.+$}}
 // KW_DECL_TYPECONTEXT-DAG: Keyword/None: convenience{{; name=.+$}}
 // KW_DECL_TYPECONTEXT-DAG: Keyword[deinit]/None: deinit{{; name=.+$}}
 // KW_DECL_TYPECONTEXT-DAG: Keyword/None: dynamic{{; name=.+$}}
@@ -118,6 +121,7 @@
 // Declaration keywords.
 //
 // KW_DECL_STMT_TOPLEVEL-DAG: Keyword[class]/None: class{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword/None: actor{{; name=.+$}}
 // KW_DECL_STMT_TOPLEVEL-DAG: Keyword/None: convenience{{; name=.+$}}
 // KW_DECL_STMT_TOPLEVEL-DAG: Keyword[deinit]/None: deinit{{; name=.+$}}
 // KW_DECL_STMT_TOPLEVEL-DAG: Keyword/None: dynamic{{; name=.+$}}
