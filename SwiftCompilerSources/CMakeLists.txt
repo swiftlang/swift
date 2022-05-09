@@ -267,25 +267,3 @@ else()
   endif()
 
 endif()
-
-# Configure 'SwiftCompilerModules' SwiftPM package. The 'Package.swift' will
-# be created at '${build_dir}/SwiftCompilerModulesPackage/Package.swift' and can
-# be built with 'swift-build'.
-# Note that this SwiftPM package itself is just for development purposes, and
-# is not actually used for the compiler building. 
-set(swiftcompiler_modules_package_directory
-    "${SWIFT_BINARY_DIR}/SwiftCompilerModulesPackage")
-configure_file(Package.swift.in
-  "${swiftcompiler_modules_package_directory}/Package.swift" @ONLY)
-# SwiftPM requires all sources are inside the directory of 'Package.swift'.
-# Create symlinks to the actual source directories.
-execute_process(COMMAND
-  "${CMAKE_COMMAND}" -E create_symlink
-  "${CMAKE_CURRENT_SOURCE_DIR}/Sources"
-  "${swiftcompiler_modules_package_directory}/Sources")
-if(SWIFT_BUILD_REGEX_PARSER_IN_COMPILER)
-  execute_process(COMMAND
-    "${CMAKE_COMMAND}" -E create_symlink
-    "${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}/Sources/_RegexParser"
-    "${swiftcompiler_modules_package_directory}/_RegexParser_Sources")
-endif()
