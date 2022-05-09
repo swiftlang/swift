@@ -534,6 +534,9 @@ llvm::Value *IRGenFunction::emitUnmanagedAlloc(const HeapLayout &layout,
                                                const llvm::Twine &name,
                                            llvm::Constant *captureDescriptor,
                                            const HeapNonFixedOffsets *offsets) {
+  if (layout.isKnownEmpty())
+    return IGM.RefCountedNull;
+
   llvm::Value *metadata = layout.getPrivateMetadata(IGM, captureDescriptor);
   llvm::Value *size, *alignMask;
   if (offsets) {
@@ -1505,7 +1508,10 @@ class FixedBoxTypeInfoBase : public BoxTypeInfo {
 public:
   FixedBoxTypeInfoBase(IRGenModule &IGM, HeapLayout &&layout)
     : BoxTypeInfo(IGM), layout(std::move(layout))
-  {}
+  {
+    // Empty layouts should always use EmptyBoxTypeInfo instead
+    assert(!layout.isKnownEmpty());
+  }
 
   OwnedAddress
   allocate(IRGenFunction &IGF, SILType boxedType, GenericEnvironment *env,
