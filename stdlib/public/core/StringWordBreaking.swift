@@ -17,10 +17,14 @@ extension _StringGuts {
     _internalInvariant(hasMatchingEncoding(i))
     _internalInvariant(i._encodedOffset <= count)
 
+    if _fastPath(i._isWordAligned) {
+      return i
+    }
+
     let offset = i._encodedOffset
 
     if offset == 0 || offset == count {
-      return i
+      return i._wordAligned
     }
 
     return _slowRoundDownToNearestWord(i)
@@ -33,15 +37,15 @@ extension _StringGuts {
 
     let offset = i._encodedOffset
     let start = offset &- words._uncheckedIndex(before: i)._encodedOffset
-    let startIndex = String.Index(_encodedOffset: start)._scalarAligned
+    let startIndex = String.Index(_encodedOffset: start)._wordAligned
     let stride = words._uncheckedIndex(after: startIndex)._encodedOffset
     _internalInvariant(offset <= start + stride, "Word breaking inconsistency")
 
     if offset >= start + stride {
-      return i
+      return i._wordAligned
     }
 
-    let r = String.Index(_encodedOffset: start)._scalarAligned
+    let r = String.Index(_encodedOffset: start)._wordAligned
     return markEncoding(r)
   }
 }
@@ -170,7 +174,7 @@ extension String._WordView {
 
     // WB3a and WB3b
     case (.newlineCRLF, _),
-      (_, .newlineCRLF):
+         (_, .newlineCRLF):
       return true
 
     // WB3c
@@ -183,8 +187,8 @@ extension String._WordView {
 
     // WB4
     case (_, .format),
-      (_, .extend),
-      (_, .zwj):
+         (_, .extend),
+         (_, .zwj):
       if x != .format && x != .extend && x != .zwj {
         state.previousProperty = x
       }
@@ -212,9 +216,9 @@ extension String._WordView {
     switch (x, y) {
     // WB5
     case (.aLetter, .aLetter),
-      (.aLetter, .hebrewLetter),
-      (.hebrewLetter, .aLetter),
-      (.hebrewLetter, .hebrewLetter):
+         (.aLetter, .hebrewLetter),
+         (.hebrewLetter, .aLetter),
+         (.hebrewLetter, .hebrewLetter):
       return false
 
     // WB6
@@ -276,12 +280,12 @@ extension String._WordView {
 
     // WB9
     case (.aLetter, .numeric),
-      (.hebrewLetter, .numeric):
+         (.hebrewLetter, .numeric):
       return false
 
     // WB10
     case (.numeric, .aLetter),
-      (.numeric, .hebrewLetter):
+         (.numeric, .hebrewLetter):
       return false
 
     // WB11
@@ -314,17 +318,17 @@ extension String._WordView {
 
     // WB13a
     case (.aLetter, .extendNumLet),
-      (.hebrewLetter, .extendNumLet),
-      (.numeric, .extendNumLet),
-      (.katakana, .extendNumLet),
-      (.extendNumLet, .extendNumLet):
+         (.hebrewLetter, .extendNumLet),
+         (.numeric, .extendNumLet),
+         (.katakana, .extendNumLet),
+         (.extendNumLet, .extendNumLet):
       return false
 
     // WB13b
     case (.extendNumLet, .aLetter),
-      (.extendNumLet, .hebrewLetter),
-      (.extendNumLet, .numeric),
-      (.extendNumLet, .katakana):
+         (.extendNumLet, .hebrewLetter),
+         (.extendNumLet, .numeric),
+         (.extendNumLet, .katakana):
       return false
 
     // WB15
@@ -370,7 +374,7 @@ extension String._WordView {
 
     // WB3a and WB3b
     case (.newlineCRLF, _),
-      (_, .newlineCRLF):
+         (_, .newlineCRLF):
       return true
 
     // WB3c
@@ -383,8 +387,8 @@ extension String._WordView {
 
     // WB4
     case (.format, _),
-      (.extend, _),
-      (.zwj, _):
+         (.extend, _),
+         (.zwj, _):
       if y != .format && y != .extend && y != .zwj {
         state.previousProperty = y
         state.previousIndex = state.index
@@ -394,8 +398,8 @@ extension String._WordView {
 
     // WB4
     case (_, .format),
-      (_, .extend),
-      (_, .zwj):
+         (_, .extend),
+         (_, .zwj):
       if state.previousProperty != nil {
         fallthrough
       }
@@ -426,18 +430,18 @@ extension String._WordView {
 
     // WB5
     case (.aLetter, .aLetter),
-      (.aLetter, .hebrewLetter),
-      (.hebrewLetter, .aLetter),
-      (.hebrewLetter, .hebrewLetter):
+         (.aLetter, .hebrewLetter),
+         (.hebrewLetter, .aLetter),
+         (.hebrewLetter, .hebrewLetter):
       state.previousIndex = nil
       return false
 
     // WB6
     case (.aLetter, .midLetter),
-      (.hebrewLetter, .midLetter),
-      (.aLetter, .midNumLet),
-      (.hebrewLetter, .midNumLet),
-      (.aLetter, .singleQuote):
+         (.hebrewLetter, .midLetter),
+         (.aLetter, .midNumLet),
+         (.hebrewLetter, .midNumLet),
+         (.aLetter, .singleQuote):
       if let constraint = state.constraint {
         if constraint.question == .requireAHLetter {
           state.constraint = nil
@@ -453,11 +457,11 @@ extension String._WordView {
 
     // WB7
     case (.midLetter, .aLetter),
-      (.midLetter, .hebrewLetter),
-      (.midNumLet, .aLetter),
-      (.midNumLet, .hebrewLetter),
-      (.singleQuote, .aLetter),
-      (.singleQuote, .hebrewLetter):
+         (.midLetter, .hebrewLetter),
+         (.midNumLet, .aLetter),
+         (.midNumLet, .hebrewLetter),
+         (.singleQuote, .aLetter),
+         (.singleQuote, .hebrewLetter):
       state.constraint = (question: .requireAHLetter, index: state.index)
 
       return false
@@ -495,28 +499,28 @@ extension String._WordView {
 
     // WB9
     case (.aLetter, .numeric),
-      (.hebrewLetter, .numeric):
+         (.hebrewLetter, .numeric):
       state.previousIndex = nil
       return false
 
     // WB10
     case (.numeric, .aLetter),
-      (.numeric, .hebrewLetter):
+         (.numeric, .hebrewLetter):
       state.previousIndex = nil
       return false
 
     // WB11
     case (.midNum, .numeric),
-      (.midNumLet, .numeric),
-      (.singleQuote, .numeric):
+         (.midNumLet, .numeric),
+         (.singleQuote, .numeric):
       state.constraint = (question: .requireNumeric, index: state.index)
 
       return false
 
     // WB12
     case (.numeric, .midNum),
-      (.numeric, .midNumLet),
-      (.numeric, .singleQuote):
+         (.numeric, .midNumLet),
+         (.numeric, .singleQuote):
       if let constraint = state.constraint {
         if constraint.question == .requireNumeric {
           state.constraint = nil
@@ -537,18 +541,18 @@ extension String._WordView {
 
     // WB13a
     case (.aLetter, .extendNumLet),
-      (.hebrewLetter, .extendNumLet),
-      (.numeric, .extendNumLet),
-      (.katakana, .extendNumLet),
-      (.extendNumLet, .extendNumLet):
+         (.hebrewLetter, .extendNumLet),
+         (.numeric, .extendNumLet),
+         (.katakana, .extendNumLet),
+         (.extendNumLet, .extendNumLet):
       state.previousIndex = nil
       return false
 
     // WB13b
     case (.extendNumLet, .aLetter),
-      (.extendNumLet, .hebrewLetter),
-      (.extendNumLet, .numeric),
-      (.extendNumLet, .katakana):
+         (.extendNumLet, .hebrewLetter),
+         (.extendNumLet, .numeric),
+         (.extendNumLet, .katakana):
       state.previousIndex = nil
       return false
 

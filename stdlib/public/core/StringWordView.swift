@@ -53,7 +53,7 @@ extension String._WordView: Collection {
   internal func _uncheckedIndex(after i: Index) -> Index {
     _internalInvariant(_guts.hasMatchingEncoding(i))
     _internalInvariant(i < endIndex)
-    _internalInvariant(i._isScalarAligned)
+    _internalInvariant(i._isWordAligned)
 
     if _slowPath(_guts.isForeign) {
       return _foreignIndex(after: i)
@@ -72,7 +72,7 @@ extension String._WordView: Collection {
       }
     }
 
-    let nextIndex = String.Index(_encodedOffset: nextOffset)._scalarAligned
+    let nextIndex = String.Index(_encodedOffset: nextOffset)._wordAligned
     return _guts.markEncoding(nextIndex)
   }
 

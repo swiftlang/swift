@@ -21,6 +21,11 @@ extension _StringGuts {
   internal func isFastCharacterIndex(_ i: String.Index) -> Bool {
     hasMatchingEncoding(i) && i._isCharacterAligned
   }
+
+  @_alwaysEmitIntoClient @inline(__always)
+  internal func isFastWordIndex(_ i: String.Index) -> Bool {
+    hasMatchingEncoding(i) && i._isWordAligned
+  }
 }
 
 // Subscalar index validation (UTF-8 & UTF-16 views)
@@ -444,13 +449,21 @@ extension _StringGuts {
 extension _StringGuts {
   @available(SwiftStdlib 5.7, *)
   internal func validateWordIndex(_ i: String.Index) -> String.Index {
-    // TODO: Maybe fast word index bit?
+    if isFastWordIndex(i) {
+      _precondition(i._encodedOffset < count, "String index is out of bounds")
+      return i
+    }
+
     return roundDownToNearestWord(scalarAlign(validateSubscalarIndex(i)))
   }
 
   @available(SwiftStdlib 5.7, *)
   internal func validateInclusiveWordIndex(_ i: String.Index) -> String.Index {
-    // TODO: Maybe fast word index bit?
+    if isFastWordIndex(i) {
+      _precondition(i._encodedOffset < count, "String index is out of bounds")
+      return i
+    }
+
     return roundDownToNearestCharacter(
       scalarAlign(validateInclusiveSubscalarIndex(i))
     )
