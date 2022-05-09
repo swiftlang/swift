@@ -6,7 +6,7 @@ struct SomeStruct {
 
 func test(s: SomeStruct) {
   s.simple { }
-  // CHECK: [[@LINE-1]]:5 | instance-method/Swift | simple(_:) | s:14swift_ide_test10SomeStructV6simpleyyyyXEF | Ref,Call,RelRec,RelCall,RelCont | rel: 2
+  // CHECK: [[@LINE-1]]:5 | instance-method/Swift | simple(_:) | s:14swift_ide_test10SomeStructV6simpleyyyyXEF | Ref,Call,RelCall,RelCont | rel: 1
   (((s).simple)) { }
-  // CHECK: [[@LINE-1]]:9 | instance-method/Swift | simple(_:) | s:14swift_ide_test10SomeStructV6simpleyyyyXEF | Ref,Call,RelRec,RelCall,RelCont | rel: 2
+  // CHECK: [[@LINE-1]]:9 | instance-method/Swift | simple(_:) | s:14swift_ide_test10SomeStructV6simpleyyyyXEF | Ref,Call,RelCall,RelCont | rel: 1
 }
