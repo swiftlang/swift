@@ -25,7 +25,7 @@ extension G2 where U == S, U : AnyObject {}
 // CHECK: ExtensionDecl line={{.*}} base=G2
 // CHECK-NEXT: Generic signature: <U where U == C>
 extension G2 where U == C, U : AnyObject {}
-// expected-warning@-1 {{redundant constraint 'C' : 'AnyObject'}}
+// expected-warning@-1 {{redundant constraint 'U' : 'AnyObject'}}
 
 // CHECK: ExtensionDecl line={{.*}} base=G2
 // CHECK-NEXT: Generic signature: <U where U : C>
