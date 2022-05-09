@@ -70,6 +70,10 @@ public:
 
   /// Add \c children as members of the context that declares the conformance.
   void addMembersToConformanceContext(ArrayRef<Decl *> children);
+  /// Add \c member right after the \c hint member which may be the tail
+  void addMemberToConformanceContext(Decl *member, Decl* hint);
+  /// Add \c member in front of any other existing members
+  void addMemberToConformanceContext(Decl *member, bool insertAtHead);
 
   /// Get the declared type of the protocol that this is conformance is for.
   Type getProtocolType() const;
