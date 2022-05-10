@@ -960,6 +960,16 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
           // element does contribute to the overall score.
           restoreOriginalScores();
 
+          // Transform all of the unbound outer variables into
+          // placeholders since we are not going to solve for
+          // each ambguous solution.
+          for (auto *typeVar : CS.getTypeVariables()) {
+            if (!typeVar->getImpl().hasRepresentativeOrFixed()) {
+              CS.assignFixedType(
+                  typeVar, PlaceholderType::get(CS.getASTContext(), typeVar));
+            }
+          }
+
           // Note that `worseThanBestSolution` isn't checked
           // here because `Solutions` were pre-filtered, and
           // outer score is the same for all of them.
