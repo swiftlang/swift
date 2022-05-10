@@ -426,7 +426,6 @@ static FuncDecl *deriveDistributedActorSystem_invokeHandlerOnReturn(
 /******************************* PROPERTIES ***********************************/
 /******************************************************************************/
 
-// TODO(distributed): make use of this after all, but FORCE it?
 static ValueDecl *deriveDistributedActor_id(DerivedConformance &derived) {
   assert(derived.Nominal->isDistributedActor());
   auto &C = derived.Context;
@@ -480,17 +479,12 @@ static ValueDecl *deriveDistributedActor_actorSystem(
   // `actorSystem` MUST be the second field, because for a remote instance
   // we don't allocate memory after those two fields, so their order is very
   // important. The `hint` below makes sure the system is inserted right after.
-  if (auto id = derived.Nominal->getDistributedActorIDProperty()) {
-    derived.addMemberToConformanceContext(pbDecl, /*hint=*/id);
-    derived.addMemberToConformanceContext(propDecl, /*hint=*/id);
-  } else {
-    // it will be synthesized next, and will insert at head,
-    // so in order for system to be SECOND (as it must be),
-    // we'll insert at head right now and as id gets synthesized we'll get
-    // the correct order: id, actorSystem.
-    derived.addMemberToConformanceContext(pbDecl, /*insertAtHead==*/true);
-    derived.addMemberToConformanceContext(propDecl, /*insertAtHead=*/true);
-  }
+  auto id = derived.Nominal->getDistributedActorIDProperty();
+  assert(id && "id must be synthesized first, so it is the first field of any "
+               "distributed actor (followed by actorSystem)");
+
+  derived.addMemberToConformanceContext(pbDecl, /*hint=*/id);
+  derived.addMemberToConformanceContext(propDecl, /*hint=*/id);
 
   return propDecl;
 }
