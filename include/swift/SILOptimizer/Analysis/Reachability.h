@@ -65,6 +65,7 @@ class BackwardReachability {
   SILFunction *function;
   BlockReachability &reachableBlocks;
   BasicBlockWorklist cfgWorklist;
+  bool solved = false;
 
 public:
   BackwardReachability(SILFunction *function,
@@ -74,6 +75,7 @@ public:
 
   // Initialize data flow starting points before running solveBackward.
   void initLastUse(SILInstruction *lastUsePoint) {
+    assert(!solved && "adding last use after solving!?");
     auto *lastUseBlock = lastUsePoint->getParent();
     auto *previous = lastUsePoint->getPreviousInstruction();
     if (!previous || canReachBlockBegin(previous)) {
@@ -93,6 +95,7 @@ public:
         pushPreds(block);
       }
     }
+    solved = true;
   }
 
 protected:
