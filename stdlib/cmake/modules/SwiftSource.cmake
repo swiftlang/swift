@@ -497,6 +497,10 @@ function(_compile_swift_files
     list(APPEND swift_flags "-D" "SWIFT_ENABLE_REFLECTION")
   endif()
 
+  if(NOT "${SWIFT_STDLIB_TRAP_FUNCTION}" STREQUAL "")
+    list(APPEND swift_flags "-Xfrontend" "-trap-function" "-Xfrontend" "${SWIFT_STDLIB_TRAP_FUNCTION}")
+  endif()
+
   # FIXME: Cleaner way to do this?
   if(SWIFTFILE_IS_STDLIB_CORE)
     list(APPEND swift_flags
