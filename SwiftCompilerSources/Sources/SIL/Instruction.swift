@@ -38,8 +38,7 @@ public class Instruction : ListNode, CustomStringConvertible, Hashable {
   final public var function: Function { block.function }
 
   final public var description: String {
-    let s = SILNode_debugDescription(bridgedNode)
-    return String(cString: s.c_str())
+    return String(cString: SILNode_debugDescription(bridgedNode).c_str())
   }
 
   final public var operands: OperandArray {
@@ -136,8 +135,7 @@ public class SingleValueInstruction : Instruction, Value {
 
 public final class MultipleValueInstructionResult : Value {
   final public var description: String {
-    let s = SILNode_debugDescription(bridgedNode)
-    return String(cString: s.c_str())
+    return String(cString: SILNode_debugDescription(bridgedNode).c_str())
   }
 
   public var instruction: Instruction {

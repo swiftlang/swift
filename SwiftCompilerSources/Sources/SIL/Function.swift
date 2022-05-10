@@ -21,8 +21,7 @@ final public class Function : CustomStringConvertible, HasName {
   }
 
   final public var description: String {
-    let s = SILFunction_debugDescription(bridged)
-    return String(cString: s.c_str())
+    return String(cString: SILFunction_debugDescription(bridged).c_str())
   }
 
   public var entryBlock: BasicBlock {
