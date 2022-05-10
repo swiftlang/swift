@@ -2477,10 +2477,6 @@ ERROR(requires_not_suitable_archetype,none,
       "type %0 in conformance requirement does not refer to a "
       "generic parameter or associated type",
       (Type))
-WARNING(requires_no_same_type_archetype,none,
-        "neither type in same-type constraint (%0 or %1) refers to a "
-        "generic parameter or associated type",
-        (Type, Type))
 
 ERROR(requires_generic_params_made_equal,none,
       "same-type requirement makes generic parameters %0 and %1 equivalent",
@@ -2494,71 +2490,32 @@ ERROR(recursive_generic_signature,none,
       "%0 %1 has self-referential generic requirements", (DescriptiveDeclKind, DeclBaseName))
 ERROR(recursive_generic_signature_extension,none,
       "extension of %0 %1 has self-referential generic requirements", (DescriptiveDeclKind, DeclBaseName))
-ERROR(recursive_same_type_constraint,none,
-      "same-type constraint %0 == %1 is recursive", (Type, Type))
-ERROR(recursive_superclass_constraint,none,
-      "superclass constraint %0 : %1 is recursive", (Type, Type))
-ERROR(requires_generic_param_same_type_does_not_conform,none,
-      "same-type constraint type %0 does not conform to required protocol %1",
-      (Type, Identifier))
-ERROR(same_type_does_not_inherit,none,
-      "same-type constraint type %0 does not inherit from required superclass %1",
-      (Type, Type))
 ERROR(requires_same_concrete_type,none,
       "generic signature requires types %0 and %1 to be the same", (Type, Type))
 WARNING(redundant_conformance_constraint,none,
         "redundant conformance constraint %0 : %1", (Type, ProtocolDecl *))
-NOTE(redundant_conformance_here,none,
-     "conformance constraint %0 : %1 implied here",
-     (Type, ProtocolDecl *))
 
 WARNING(missing_protocol_refinement, none,
         "protocol %0 should be declared to refine %1 due to a same-type constraint on 'Self'",
         (ProtocolDecl *, ProtocolDecl *))
 
-ERROR(same_type_conflict,none,
-      "%select{generic parameter |protocol |}0%1 cannot be equal to both "
-      "%2 and %3", (unsigned, Type, Type, Type))
 ERROR(requirement_conflict,none,
       "no type for %0 can satisfy both %1",
       (Type, StringRef))
 WARNING(redundant_same_type_to_concrete,none,
         "redundant same-type constraint %0 == %1", (Type, Type))
-NOTE(same_type_redundancy_here,none,
-     "same-type constraint %1 == %2 %select{written here|implied here|"
-     "inferred from type here}0",
-     (unsigned, Type, Type))
 ERROR(conflicting_superclass_constraints,none,
       "type %0 cannot be a subclass of both %1 and %2",
       (Type, Type, Type))
-NOTE(conflicting_superclass_constraint,none,
-     "constraint conflicts with %0 : %1",
-     (Type, Type))
 WARNING(redundant_superclass_constraint,none,
         "redundant superclass constraint %0 : %1", (Type, Type))
-NOTE(superclass_redundancy_here,none,
-     "superclass constraint %0 : %1 implied here",
-     (Type, Type))
 
-ERROR(conflicting_layout_constraints,none,
-      "type %0 has conflicting constraints %1 and %2",
-      (Type, LayoutConstraint, LayoutConstraint))
-NOTE(conflicting_layout_constraint, none,
-     "constraint conflicts with %0 : %1",
-     (Type, LayoutConstraint))
 WARNING(redundant_layout_constraint,none,
         "redundant constraint %0 : %1",
         (Type, LayoutConstraint))
-NOTE(previous_layout_constraint, none,
-     "constraint %0 : %1 implied here",
-     (Type, LayoutConstraint))
 
 WARNING(redundant_same_type_constraint,none,
         "redundant same-type constraint %0 == %1", (Type, Type))
-NOTE(previous_same_type_constraint, none,
-     "previous same-type constraint %1 == %2 "
-     "%select{written here|implied here|inferred from type here}0",
-     (unsigned, Type, Type))
 
 WARNING(inherited_associated_type_redecl,none,
         "redeclaration of associated type %0 from protocol %1 is better "

@@ -90,10 +90,6 @@ NOTE(note_typo_candidate,none,
 NOTE(profile_read_error,none,
      "failed to load profile data '%0': '%1'", (StringRef, StringRef))
 
-WARNING(protocol_extension_redundant_requirement,none,
-      "requirement of '%1' to '%2' is redundant in an extension of '%0'",
-      (StringRef, StringRef, StringRef))
-
 ERROR(attr_only_on_parameters, none,
       "'%0' may only be used on parameters", (StringRef))
 

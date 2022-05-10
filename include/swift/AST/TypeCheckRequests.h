@@ -472,48 +472,6 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Compute a protocol's requirement signature using the RequirementMachine.
-/// This is temporary; once the GenericSignatureBuilder goes away this will
-/// be folded into RequirementSignatureRequest.
-class RequirementSignatureRequestRQM :
-    public SimpleRequest<RequirementSignatureRequestRQM,
-                         RequirementSignature(ProtocolDecl *),
-                         RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  RequirementSignature
-  evaluate(Evaluator &evaluator, ProtocolDecl *proto) const;
-
-public:
-  bool isCached() const { return true; }
-};
-
-/// Compute a protocol's requirement signature using the GenericSignatureBuilder.
-/// This is temporary; once the GenericSignatureBuilder goes away this will
-/// be removed.
-class RequirementSignatureRequestGSB :
-    public SimpleRequest<RequirementSignatureRequestGSB,
-                         RequirementSignature(ProtocolDecl *),
-                         RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  RequirementSignature
-  evaluate(Evaluator &evaluator, ProtocolDecl *proto) const;
-
-public:
-  bool isCached() const { return true; }
-};
-
 /// Compute the requirements that describe a protocol.
 class RequirementSignatureRequest :
     public SimpleRequest<RequirementSignatureRequest,
@@ -1821,114 +1779,8 @@ public:
   }
 };
 
-/// Build a generic signature using the RequirementMachine. This is temporary;
-/// once the GenericSignatureBuilder goes away this will be folded into
-/// AbstractGenericSignatureRequest.
-class AbstractGenericSignatureRequestRQM :
-    public SimpleRequest<AbstractGenericSignatureRequestRQM,
-                         GenericSignatureWithError (const GenericSignatureImpl *,
-                                                    SmallVector<GenericTypeParamType *, 2>,
-                                                    SmallVector<Requirement, 2>),
-                         RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  GenericSignatureWithError
-  evaluate(Evaluator &evaluator,
-           const GenericSignatureImpl *baseSignature,
-           SmallVector<GenericTypeParamType *, 2> addedParameters,
-           SmallVector<Requirement, 2> addedRequirements) const;
-
-public:
-  // Separate caching.
-  bool isCached() const { return true; }
-
-  /// Abstract generic signature requests never have source-location info.
-  SourceLoc getNearestLoc() const {
-    return SourceLoc();
-  }
-};
-
-/// Build a generic signature using the GenericSignatureBuilder. This is temporary;
-/// once the GenericSignatureBuilder goes away this will be removed.
-class AbstractGenericSignatureRequestGSB :
-    public SimpleRequest<AbstractGenericSignatureRequestGSB,
-                         GenericSignatureWithError (const GenericSignatureImpl *,
-                                                    SmallVector<GenericTypeParamType *, 2>,
-                                                    SmallVector<Requirement, 2>),
-                         RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  GenericSignatureWithError
-  evaluate(Evaluator &evaluator,
-           const GenericSignatureImpl *baseSignature,
-           SmallVector<GenericTypeParamType *, 2> addedParameters,
-           SmallVector<Requirement, 2> addedRequirements) const;
-
-public:
-  // Separate caching.
-  bool isCached() const { return true; }
-
-  /// Abstract generic signature requests never have source-location info.
-  SourceLoc getNearestLoc() const {
-    return SourceLoc();
-  }
-};
-
 class InferredGenericSignatureRequest :
     public SimpleRequest<InferredGenericSignatureRequest,
-                         GenericSignatureWithError (ModuleDecl *,
-                                                    const GenericSignatureImpl *,
-                                                    GenericParamList *,
-                                                    WhereClauseOwner,
-                                                    SmallVector<Requirement, 2>,
-                                                    SmallVector<TypeLoc, 2>,
-                                                    bool),
-                         RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  GenericSignatureWithError
-  evaluate(Evaluator &evaluator,
-           ModuleDecl *parentModule,
-           const GenericSignatureImpl *baseSignature,
-           GenericParamList *genericParams,
-           WhereClauseOwner whereClause,
-           SmallVector<Requirement, 2> addedRequirements,
-           SmallVector<TypeLoc, 2> inferenceSources,
-           bool allowConcreteGenericParams) const;
-
-public:
-  // Separate caching.
-  bool isCached() const { return true; }
-
-  /// Inferred generic signature requests don't have source-location info.
-  SourceLoc getNearestLoc() const {
-    return SourceLoc();
-  }
-
-  // Cycle handling.
-  void noteCycleStep(DiagnosticEngine &diags) const;
-};
-
-/// Build a generic signature using the RequirementMachine. This is temporary;
-/// once the GenericSignatureBuilder goes away this will be folded into
-/// InferredGenericSignatureRequest.
-class InferredGenericSignatureRequestRQM :
-    public SimpleRequest<InferredGenericSignatureRequestRQM,
                          GenericSignatureWithError (const GenericSignatureImpl *,
                                                     GenericParamList *,
                                                     WhereClauseOwner,
@@ -1945,48 +1797,6 @@ private:
   // Evaluation.
   GenericSignatureWithError
   evaluate(Evaluator &evaluator,
-           const GenericSignatureImpl *baseSignature,
-           GenericParamList *genericParams,
-           WhereClauseOwner whereClause,
-           SmallVector<Requirement, 2> addedRequirements,
-           SmallVector<TypeLoc, 2> inferenceSources,
-           bool allowConcreteGenericParams) const;
-
-public:
-  // Separate caching.
-  bool isCached() const { return true; }
-
-  /// Inferred generic signature requests don't have source-location info.
-  SourceLoc getNearestLoc() const {
-    return SourceLoc();
-  }
-
-  // Cycle handling.
-  void noteCycleStep(DiagnosticEngine &diags) const;
-};
-
-/// Build a generic signature using the GenericSignatureBuilder. This is temporary;
-/// once the GenericSignatureBuilder goes away this will be removed.
-class InferredGenericSignatureRequestGSB :
-    public SimpleRequest<InferredGenericSignatureRequestGSB,
-                         GenericSignatureWithError (ModuleDecl *,
-                                                    const GenericSignatureImpl *,
-                                                    GenericParamList *,
-                                                    WhereClauseOwner,
-                                                    SmallVector<Requirement, 2>,
-                                                    SmallVector<TypeLoc, 2>,
-                                                    bool),
-                         RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  GenericSignatureWithError
-  evaluate(Evaluator &evaluator,
-           ModuleDecl *parentModule,
            const GenericSignatureImpl *baseSignature,
            GenericParamList *genericParams,
            WhereClauseOwner whereClause,

@@ -93,21 +93,6 @@ namespace swift {
     ErrorOnFailureRemarkOnSuccess
   };
 
-  /// Value for LangOptions::EnableRequirementMachine.
-  enum class RequirementMachineMode {
-    /// Use the GenericSignatureBuilder for all queries.
-    Disabled = 0,
-
-    /// Use the RequirementMachine for all queries.
-    Enabled = 1,
-
-    /// Use both and assert if the results do not match.
-    Verify = 2,
-
-    /// Use both, print a message only but do not assert on mismatch.
-    Check = 3,
-  };
-
   /// A collection of options that affect the language dialect and
   /// provide compiler debugging facilities.
   class LangOptions final {
@@ -538,21 +523,6 @@ namespace swift {
     /// Maximum number of attempts to make when splitting concrete equivalence
     /// classes.
     unsigned RequirementMachineMaxSplitConcreteEquivClassAttempts = 2;
-
-    /// Enable the new experimental protocol requirement signature minimization
-    /// algorithm.
-    RequirementMachineMode RequirementMachineProtocolSignatures =
-        RequirementMachineMode::Enabled;
-
-    /// Enable the new experimental generic signature minimization algorithm
-    /// for abstract generic signatures.
-    RequirementMachineMode RequirementMachineAbstractSignatures =
-        RequirementMachineMode::Enabled;
-
-    /// Enable the new experimental generic signature minimization algorithm
-    /// for user-written generic signatures.
-    RequirementMachineMode RequirementMachineInferredSignatures =
-        RequirementMachineMode::Enabled;
 
     /// Enable preprocessing pass to eliminate conformance requirements
     /// on generic parameters which are made concrete. Usually you want this
