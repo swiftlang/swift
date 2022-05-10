@@ -10,8 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-public protocol LazyCollectionProtocol<Elements>
-: Collection, LazySequenceProtocol
+public protocol LazyCollectionProtocol: Collection, LazySequenceProtocol
 where Elements: Collection {}
 
 extension LazyCollectionProtocol {
