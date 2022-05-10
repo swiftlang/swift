@@ -1,8 +1,6 @@
 -static
 -lswiftSwiftOnoneSupport
 -lswiftWasiPthread
--licuuc
--licudata
 -ldl
 -lstdc++
 -lm
