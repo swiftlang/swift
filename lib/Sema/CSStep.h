@@ -781,6 +781,9 @@ class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
   class SolverSnapshot {
     ConstraintSystem &CS;
 
+    /// The conjunction this snapshot belongs to.
+    Constraint *Conjunction;
+
     Optional<llvm::SaveAndRestore<DeclContext *>> DC = None;
 
     llvm::SetVector<TypeVariableType *> TypeVars;
@@ -794,8 +797,9 @@ class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
 
   public:
     SolverSnapshot(ConstraintSystem &cs, Constraint *conjunction)
-        : CS(cs), TypeVars(std::move(cs.TypeVariables)) {
-      auto *locator = conjunction->getLocator();
+        : CS(cs), Conjunction(conjunction),
+          TypeVars(std::move(cs.TypeVariables)) {
+      auto *locator = Conjunction->getLocator();
       // If this conjunction represents a closure, we need to
       // switch declaration context over to it.
       if (locator->directlyAt<ClosureExpr>()) {
@@ -820,7 +824,7 @@ class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
       IsolationScope = std::make_unique<Scope>(CS);
 
       // Apply solution inferred for the conjunction.
-      CS.applySolution(solution);
+      applySolution(solution);
 
       // Add constraints to the graph after solution
       // has been applied to make sure that all type
@@ -854,6 +858,36 @@ class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
       auto &CG = CS.getConstraintGraph();
       for (auto &constraint : CS.InactiveConstraints)
         CG.addConstraint(&constraint);
+    }
+
+    void applySolution(const Solution &solution) {
+      CS.applySolution(solution);
+
+      if (!CS.shouldAttemptFixes())
+        return;
+
+      // If inference succeeded, we are done.
+      auto score = solution.getFixedScore();
+      if (score.Data[SK_Fix] == 0)
+        return;
+
+      // If this conjunction represents a closure and inference
+      // has failed, let's bind all of unresolved type variables
+      // in its interface type to holes to avoid extraneous
+      // fixes produced by outer context.
+
+      auto locator = Conjunction->getLocator();
+      if (locator->directlyAt<ClosureExpr>()) {
+        auto closureTy =
+            CS.getClosureType(castToExpr<ClosureExpr>(locator->getAnchor()));
+
+        CS.simplifyType(closureTy).visit([&](Type componentTy) {
+          if (auto *typeVar = componentTy->getAs<TypeVariableType>()) {
+            CS.assignFixedType(
+                typeVar, PlaceholderType::get(CS.getASTContext(), typeVar));
+          }
+        });
+      }
     }
   };
 
