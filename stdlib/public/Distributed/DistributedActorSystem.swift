@@ -14,7 +14,7 @@ import _Concurrency
 
 /// A distributed actor system
 @available(SwiftStdlib 5.7, *)
-public protocol DistributedActorSystem: Sendable {
+public protocol DistributedActorSystem<SerializationRequirement>: Sendable {
   /// The identity used by actors that communicate via this transport
   associatedtype ActorID: Sendable & Hashable
 
@@ -445,7 +445,7 @@ func _executeDistributedTarget<D: DistributedTargetInvocationDecoder>(
 /// so decoding can rely on simply invoking e.g. `Codable` (if that is the `SerializationRequirement`) decoding
 /// entry points on the provided types.
 @available(SwiftStdlib 5.7, *)
-public protocol DistributedTargetInvocationEncoder {
+public protocol DistributedTargetInvocationEncoder<SerializationRequirement> {
   associatedtype SerializationRequirement
 
   /// The arguments must be encoded order-preserving, and once `decodeGenericSubstitutions`
@@ -518,7 +518,7 @@ public struct RemoteCallArgument<Value> {
 /// Decoder that must be provided to `executeDistributedTarget` and is used
 /// by the Swift runtime to decode arguments of the invocation.
 @available(SwiftStdlib 5.7, *)
-public protocol DistributedTargetInvocationDecoder {
+public protocol DistributedTargetInvocationDecoder<SerializationRequirement> {
   associatedtype SerializationRequirement
 
   mutating func decodeGenericSubstitutions() throws -> [Any.Type]
@@ -548,7 +548,9 @@ public protocol DistributedTargetInvocationDecoder {
 }
 
 @available(SwiftStdlib 5.7, *)
-public protocol DistributedTargetInvocationResultHandler {
+public protocol DistributedTargetInvocationResultHandler<
+  SerializationRequirement
+> {
   associatedtype SerializationRequirement
 //  func onReturn<Success: SerializationRequirement>(value: Success) async throws
 
