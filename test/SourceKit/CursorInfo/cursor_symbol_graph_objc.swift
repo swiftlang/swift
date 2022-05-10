@@ -217,11 +217,11 @@ struct ObjCStruct {
   // CHECK-ART-NEXT:      {
   // CHECK-ART-NEXT:        "text": " last"
   // CHECK-ART-NEXT:      },
-  // CHECK-ART-NEXT:      {
-  // CHECK-ART-NEXT:        "text": "   "
-  // CHECK-ART-NEXT:      }
-  // CHECK-ART-NEXT:    ]
-  // CHECK-ART-NEXT:  }
+  // DISABLED-CHECK-ART-NEXT:      {
+  // DISABLED-CHECK-ART-NEXT:        "text": "   "
+  // DISABLED-CHECK-ART-NEXT:      }
+  // DISABLED-CHECK-ART-NEXT:    ]
+  // DISABLED-CHECK-ART-NEXT:  }
 
   /// doc1
   // reg1
@@ -268,14 +268,14 @@ struct ObjCStruct {
   // CHECK-MIXED-DOC-NEXT:      {
   // CHECK-MIXED-DOC-NEXT:        "text": ""
   // CHECK-MIXED-DOC-NEXT:      },
-  // CHECK-MIXED-DOC-NEXT:      {
-  // CHECK-MIXED-DOC-NEXT:        "text": ""
-  // CHECK-MIXED-DOC-NEXT:      },
-  // CHECK-MIXED-DOC-NEXT:      {
-  // CHECK-MIXED-DOC-NEXT:        "text": "doc3"
-  // CHECK-MIXED-DOC-NEXT:      }
-  // CHECK-MIXED-DOC-NEXT:    ]
-  // CHECK-MIXED-DOC-NEXT:  }
+  // DISABLED-CHECK-MIXED-DOC-NEXT:      {
+  // DISABLED-CHECK-MIXED-DOC-NEXT:        "text": ""
+  // DISABLED-CHECK-MIXED-DOC-NEXT:      },
+  // DISABLED-CHECK-MIXED-DOC-NEXT:      {
+  // DISABLED-CHECK-MIXED-DOC-NEXT:        "text": "doc3"
+  // DISABLED-CHECK-MIXED-DOC-NEXT:      }
+  // DISABLED-CHECK-MIXED-DOC-NEXT:    ]
+  // DISABLED-CHECK-MIXED-DOC-NEXT:  }
 };
 
 #line 10 "other.h"
