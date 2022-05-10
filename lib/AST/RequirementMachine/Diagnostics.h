@@ -13,6 +13,7 @@
 #ifndef SWIFT_REQUIREMENT_DIAGNOSTICS_H
 #define SWIFT_REQUIREMENT_DIAGNOSTICS_H
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/Type.h"
 
@@ -86,6 +87,25 @@ public:
     return {Kind::RedundantRequirement, req, loc};
   }
 };
+
+/// Policy for the fixit that transforms 'T : S' where 'S' is not a protocol
+/// or a class into 'T == S'.
+enum AllowConcreteTypePolicy {
+  /// Any type parameter can be concrete.
+  All,
+
+  /// Only associated types can be concrete.
+  AssocTypes,
+
+  /// Only nested associated types can be concrete. This is for protocols,
+  /// where we don't want to suggest making an associated type member of
+  /// 'Self' concrete.
+  NestedAssocTypes
+};
+
+bool diagnoseRequirementErrors(ASTContext &ctx,
+                               ArrayRef<RequirementError> errors,
+                               AllowConcreteTypePolicy concreteTypePolicy);
 
 } // end namespace rewriting
 
