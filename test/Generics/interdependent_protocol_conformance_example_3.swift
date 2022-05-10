@@ -19,7 +19,7 @@ public protocol MultiPoint {
 
   typealias P = Self.C.P
   // expected-warning@-1 {{redundant same-type constraint 'Self.P' == 'Self.C.P'}}
-  // FIXME: This is bogus
+  // FIXME(rqm-diagnostics): This is bogus
 
   associatedtype X: NonEmptyProtocol
     where X.C: NonEmptyProtocol,
