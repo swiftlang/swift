@@ -17,6 +17,8 @@
 // REQUIRES: CPU=x86_64 || CPU=arm64
 // REQUIRES: optimized_stdlib
 
+// REQUIRES: rdar93031874
+
 //////////////////
 // Declarations //
 //////////////////
