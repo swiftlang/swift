@@ -572,6 +572,9 @@ namespace swift {
     /// rewrite system.
     bool EnableRequirementMachineOpaqueArchetypes = false;
 
+    /// Enable warnings for redundant requirements in generic signatures.
+    bool WarnRedundantRequirements = false;
+
     /// Enables dumping type witness systems from associated type inference.
     bool DumpTypeWitnessSystems = false;
 
