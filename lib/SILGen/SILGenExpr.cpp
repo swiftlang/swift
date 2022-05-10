@@ -917,6 +917,13 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
   // If the referenced decl isn't a VarDecl, it should be a constant of some
   // sort.
   SILDeclRef silDeclRef(decl);
+  auto closure = *silDeclRef.getAnyFunctionRef();
+  if (auto* e = closure.getAbstractClosureExpr()) {
+    if (auto contextOrigType = C.getAbstractionPattern()) {
+      SGM.Types.setAbstractionPattern(e, *contextOrigType);
+    }
+  }
+
   assert(silDeclRef.getParameterListCount() == 1);
   ManagedValue result = emitClosureValue(loc, silDeclRef, refType,
                                          declRef.getSubstitutions(),
