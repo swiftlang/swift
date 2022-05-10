@@ -18,6 +18,7 @@
 
 #include <string>
 #include <vector>
+#include <unordered_set>
 
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Frontend/Frontend.h"
@@ -112,6 +113,7 @@ public:
 /// Return 'true' if there was an error, and 'false' otherwise.
 static bool
 extractLinkerFlagsFromObjectFile(const llvm::object::ObjectFile *ObjectFile,
+                                 std::unordered_set<std::string> &SeenLinkerLibraryFlags,
                                  std::vector<std::string> &LinkerFlags,
                                  CompilerInstance &Instance) {
   // Search for the section we hold autolink entries in
@@ -140,8 +142,15 @@ extractLinkerFlagsFromObjectFile(const llvm::object::ObjectFile *ObjectFile,
       llvm::SmallVector<llvm::StringRef, 4> SplitFlags;
       SectionData->split(SplitFlags, llvm::StringRef("\0", 1), -1,
                          /*KeepEmpty=*/false);
-      for (const auto &Flag : SplitFlags)
-        LinkerFlags.push_back(Flag.str());
+      for (const auto &Flag : SplitFlags) {
+        // If this is a library '-lxxx' flag, only add it if we have not seen it before
+        if (Flag.str().rfind("-l", 0) == 0) {
+          auto SeenFlagsInsertResult = SeenLinkerLibraryFlags.insert(Flag.str());
+          if (SeenFlagsInsertResult.second == true)
+            LinkerFlags.push_back(Flag.str());
+        } else
+          LinkerFlags.push_back(Flag.str());
+      }
     }
   }
   return false;
@@ -152,6 +161,7 @@ extractLinkerFlagsFromObjectFile(const llvm::object::ObjectFile *ObjectFile,
 /// 'true' if there was an error, and 'false' otherwise.
 static bool
 extractLinkerFlagsFromObjectFile(const llvm::object::WasmObjectFile *ObjectFile,
+                                 std::unordered_set<std::string> &SeenLinkerLibraryFlags,
                                  std::vector<std::string> &LinkerFlags,
                                  CompilerInstance &Instance) {
   // Search for the data segment we hold autolink entries in
@@ -164,8 +174,15 @@ extractLinkerFlagsFromObjectFile(const llvm::object::WasmObjectFile *ObjectFile,
       llvm::SmallVector<llvm::StringRef, 4> SplitFlags;
       SegmentData.split(SplitFlags, llvm::StringRef("\0", 1), -1,
                         /*KeepEmpty=*/false);
-      for (const auto &Flag : SplitFlags)
-        LinkerFlags.push_back(Flag.str());
+      for (const auto &Flag : SplitFlags) {
+        // If this is a library '-lxxx' flag, only add it if we have not seen it before
+        if (Flag.str().rfind("-l", 0) == 0) {
+          auto SeenFlagsInsertResult = SeenLinkerLibraryFlags.insert(Flag.str());
+          if (SeenFlagsInsertResult.second == true)
+            LinkerFlags.push_back(Flag.str());
+        } else
+          LinkerFlags.push_back(Flag.str());
+      }
     }
   }
   return false;
@@ -178,12 +195,13 @@ extractLinkerFlagsFromObjectFile(const llvm::object::WasmObjectFile *ObjectFile,
 static bool extractLinkerFlags(const llvm::object::Binary *Bin,
                                CompilerInstance &Instance,
                                StringRef BinaryFileName,
+                               std::unordered_set<std::string> &SeenLinkerLibraryFlags,
                                std::vector<std::string> &LinkerFlags) {
   if (auto *ObjectFile = llvm::dyn_cast<llvm::object::ELFObjectFileBase>(Bin)) {
-    return extractLinkerFlagsFromObjectFile(ObjectFile, LinkerFlags, Instance);
+    return extractLinkerFlagsFromObjectFile(ObjectFile, SeenLinkerLibraryFlags, LinkerFlags, Instance);
   } else if (auto *ObjectFile =
                  llvm::dyn_cast<llvm::object::WasmObjectFile>(Bin)) {
-    return extractLinkerFlagsFromObjectFile(ObjectFile, LinkerFlags, Instance);
+    return extractLinkerFlagsFromObjectFile(ObjectFile, SeenLinkerLibraryFlags, LinkerFlags, Instance);
   } else if (auto *Archive = llvm::dyn_cast<llvm::object::Archive>(Bin)) {
     llvm::Error Error = llvm::Error::success();
     for (const auto &Child : Archive->children(Error)) {
@@ -197,7 +215,7 @@ static bool extractLinkerFlags(const llvm::object::Binary *Bin,
         return true;
       }
       if (extractLinkerFlags(ChildBinary->get(), Instance, BinaryFileName,
-                             LinkerFlags)) {
+                             SeenLinkerLibraryFlags, LinkerFlags)) {
         return true;
       }
     }
@@ -228,6 +246,8 @@ int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
   }
 
   std::vector<std::string> LinkerFlags;
+  // Flags of the form '-lxxx' seen so far
+  std::unordered_set<std::string> SeenLinkerLibraryFlags;
 
   // Extract the linker flags from the objects.
   for (const auto &BinaryFileName : Invocation.getInputFilenames()) {
@@ -245,7 +265,7 @@ int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
     }
 
     if (extractLinkerFlags(BinaryOwner->getBinary(), Instance, BinaryFileName,
-                           LinkerFlags)) {
+                           SeenLinkerLibraryFlags, LinkerFlags)) {
       return 1;
     }
   }
