@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-objc-attr-requires-foundation-module
+// RUN: %target-typecheck-verify-swift -disable-objc-attr-requires-foundation-module -warn-redundant-requirements
 // RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures -disable-objc-attr-requires-foundation-module 2>&1 | %FileCheck %s
 
 // REQUIRES: objc_interop

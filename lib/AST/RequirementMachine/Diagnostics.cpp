@@ -138,6 +138,11 @@ bool swift::rewriting::diagnoseRequirementErrors(
     }
 
     case RequirementError::Kind::RedundantRequirement: {
+      // We only emit redundant requirement warnings if the user passed
+      // the -warn-redundant-requirements frontend flag.
+      if (!ctx.LangOpts.WarnRedundantRequirements)
+        break;
+
       auto requirement = error.requirement;
       if (requirement.hasError())
         break;
