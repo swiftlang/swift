@@ -39,7 +39,7 @@
 /// lifetime of an object. If an object has a stronger notion of identity, it
 /// may be appropriate to provide a custom implementation.
 @available(SwiftStdlib 5.1, *)
-public protocol Identifiable {
+public protocol Identifiable<ID> {
 
   /// A type representing the stable identity of the entity associated with
   /// an instance.

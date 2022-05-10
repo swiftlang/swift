@@ -30,7 +30,7 @@
 /// collection, either the index for your custom type must conform to the
 /// `Strideable` protocol or you must implement the `index(_:offsetBy:)` and
 /// `distance(from:to:)` methods with O(1) efficiency.
-public protocol RandomAccessCollection: BidirectionalCollection
+public protocol RandomAccessCollection<Element>: BidirectionalCollection
 where SubSequence: RandomAccessCollection, Indices: RandomAccessCollection
 {
   // FIXME: Associated type inference requires these.

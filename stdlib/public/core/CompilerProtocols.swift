@@ -98,7 +98,7 @@
 ///     // Prints "false"
 ///     print(allowedMoves.rawValue & Directions.right.rawValue)
 ///     // Prints "0"
-public protocol RawRepresentable {
+public protocol RawRepresentable<RawValue> {
   /// The raw type that can be used to represent all values of the conforming
   /// type.
   ///

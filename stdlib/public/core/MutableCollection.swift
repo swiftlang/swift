@@ -57,7 +57,7 @@
 ///     // Must be equivalent to:
 ///     a[i] = x
 ///     let y = x
-public protocol MutableCollection: Collection
+public protocol MutableCollection<Element>: Collection
 where SubSequence: MutableCollection
 {
   // FIXME: Associated type inference requires these.

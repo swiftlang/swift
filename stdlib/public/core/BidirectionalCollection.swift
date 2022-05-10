@@ -39,7 +39,7 @@
 /// Valid indices are exactly those indices that are reachable from the
 /// collection's `startIndex` by repeated applications of `index(after:)`, up
 /// to, and including, the `endIndex`.
-public protocol BidirectionalCollection: Collection
+public protocol BidirectionalCollection<Element>: Collection
 where SubSequence: BidirectionalCollection, Indices: BidirectionalCollection {
   // FIXME: Only needed for associated type inference.
   override associatedtype Element

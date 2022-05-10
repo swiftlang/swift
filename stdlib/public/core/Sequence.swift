@@ -174,7 +174,7 @@
 ///     // Prints "3..."
 ///     // Prints "2..."
 ///     // Prints "1..."
-public protocol IteratorProtocol {
+public protocol IteratorProtocol<Element> {
   /// The type of element traversed by the iterator.
   associatedtype Element
 
@@ -322,7 +322,7 @@ public protocol IteratorProtocol {
 /// makes no other requirements about element access, so routines that
 /// traverse a sequence should be considered O(*n*) unless documented
 /// otherwise.
-public protocol Sequence {
+public protocol Sequence<Element> {
   /// A type representing the sequence's elements.
   associatedtype Element
 

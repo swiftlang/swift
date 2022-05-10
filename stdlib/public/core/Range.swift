@@ -14,7 +14,7 @@
 ///
 /// A type that conforms to `RangeExpression` can convert itself to a
 /// `Range<Bound>` of indices within a given collection.
-public protocol RangeExpression {
+public protocol RangeExpression<Bound> {
   /// The type for which the expression describes a range.
   associatedtype Bound: Comparable
 
