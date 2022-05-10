@@ -1,5 +1,5 @@
 class Person {
-internal init(firstName: String? = nil, lastName: String? = nil, age: Int? = nil, planet: String = "Earth", solarSystem: String = "Milky Way", avgHeight: Int = 175, location: @escaping () -> Place = { fatalError() }, secondLocation: (() -> Place)? = nil) {
+internal init(firstName: String? = nil, lastName: String? = nil, age: Int? = nil, planet: String = "Earth", solarSystem: String = "Milky Way", avgHeight: Int = 175, location: @escaping () -> Place = { fatalError() }, secondLocation: (() -> Place)? = nil, wrapped: String = "", didSet: String = "ds") {
 self.firstName = firstName
 self.lastName = lastName
 self.age = age
@@ -8,6 +8,8 @@ self.solarSystem = solarSystem
 self.avgHeight = avgHeight
 self.location = location
 self.secondLocation = secondLocation
+self.wrapped = wrapped
+self.didSet = didSet
 }
 
   var firstName: String!
@@ -19,6 +21,15 @@ self.secondLocation = secondLocation
   lazy var idea: Idea = { fatalError() }()
   var location: () -> Place = { fatalError() }
   var secondLocation: (() -> Place)!
+  @MyWrapper var wrapped: String = ""
+  var computed: String { "hi" }
+  var getSet: String {
+    get { "hi" }
+    set {}
+  }
+  var didSet: String = "ds" {
+    didSet { print("didSet") }
+  }
 }
 
 struct Place {
@@ -31,6 +42,8 @@ struct Place {
   let postalCode: Int
   let plusFour: Int?
   let callback: Callback
+  @MyWrapper var wrapped: String
+  var `protocol`: String
 }
 
 protocol Thing {
@@ -40,6 +53,17 @@ protocol Thing {
 enum Idea {
   var subject: String { fatalError() }
 }
+
+struct OnlyComputed {
+  lazy var idea: Idea = { fatalError() }()
+  var computed: String { "hi" }
+}
+
+@propertyWrapper
+struct MyWrapper {
+  let wrappedValue: String
+}
+
 
 
 
