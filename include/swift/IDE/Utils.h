@@ -151,6 +151,14 @@ struct ResolvedCursorInfo {
   ValueDecl *ValueD = nullptr;
   TypeDecl *CtorTyRef = nullptr;
   ExtensionDecl *ExtTyRef = nullptr;
+  /// Declarations that were shadowed by \c ValueD using a shorthand syntax that
+  /// names both the newly declared variable and the referenced variable by the
+  /// same identifier in the source text. This includes shorthand closure
+  /// captures (`[foo]`) and shorthand if captures
+  /// (`if let foo {`).
+  /// Decls that are shadowed using shorthand syntax should be reported as
+  /// additional cursor info results.
+  SmallVector<ValueDecl *, 2> ShorthandShadowedDecls;
   ModuleEntity Mod;
   bool IsRef = true;
   bool IsKeywordArgument = false;
