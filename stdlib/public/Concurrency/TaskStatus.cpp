@@ -549,7 +549,7 @@ SWIFT_CC(swift)
 JobPriority
 static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
 
-  SWIFT_TASK_DEBUG_LOG("Escalating %p to %#x priority", task, newPriority);
+  SWIFT_TASK_DEBUG_LOG("Escalating %p to %#zx priority", task, newPriority);
   auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
   auto newStatus = oldStatus;
 
@@ -557,7 +557,7 @@ static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
     // Fast path: check that the stored priority is already at least
     // as high as the desired priority.
     if (oldStatus.getStoredPriority() >= newPriority) {
-      SWIFT_TASK_DEBUG_LOG("Task is already at %x priority", oldStatus.getStoredPriority());
+      SWIFT_TASK_DEBUG_LOG("Task is already at %#zx priority", oldStatus.getStoredPriority());
       return oldStatus.getStoredPriority();
     }
 
