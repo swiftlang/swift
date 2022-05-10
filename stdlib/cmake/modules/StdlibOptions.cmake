@@ -113,6 +113,9 @@ option(SWIFT_STDLIB_HAS_TYPE_PRINTING
        "Build stdlib with support for printing user-friendly type name as strings at runtime"
        TRUE)
 
+set(SWIFT_STDLIB_TRAP_FUNCTION "" CACHE STRING
+  "Name of function to call instead of emitting a trap instruction in the stdlib")
+
 option(SWIFT_STDLIB_BUILD_PRIVATE
        "Build private part of the Standard Library."
        TRUE)
