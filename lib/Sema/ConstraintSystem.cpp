@@ -564,6 +564,13 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
   }
 
   if (auto *UDE = getAsExpr<UnresolvedDotExpr>(anchor)) {
+    if (UDE->isImplicit() &&
+        UDE->getName().getBaseName() == Context.Id_callAsFunction) {
+      return getConstraintLocator(anchor,
+                                  {LocatorPathElt::ApplyFunction(),
+                                   LocatorPathElt::ImplicitCallAsFunction()});
+    }
+
     return getConstraintLocator(
         anchor, TypeChecker::getSelfForInitDelegationInConstructor(DC, UDE)
                     ? ConstraintLocator::ConstructorMember

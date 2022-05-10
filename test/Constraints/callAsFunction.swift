@@ -29,3 +29,25 @@ struct Test {
     }
   }
 }
+
+// rdar://92912878 - filtering prevents disambiguation of `.callAsFunction`
+func test_no_filtering_of_overloads() {
+  struct S {
+    init() {}
+    init(_: String) {}
+
+    func callAsFunction<T>(_ fn: () -> T) -> T {
+      fn()
+    }
+  }
+
+  func test(_: () -> Void) {
+  }
+
+  test {
+    _ = S() { // Ok
+      _ = 42
+      print("Hello")
+    }
+  }
+}
