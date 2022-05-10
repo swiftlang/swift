@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s -disable-availability-checking -requirement-machine-inferred-signatures=on -enable-requirement-machine-opaque-archetypes
+// RUN: %target-swift-frontend -typecheck -verify %s -disable-availability-checking -enable-requirement-machine-opaque-archetypes
 
 protocol P1 {}
 

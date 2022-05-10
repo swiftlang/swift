@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=on -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
 
 protocol P1 : class { }
 

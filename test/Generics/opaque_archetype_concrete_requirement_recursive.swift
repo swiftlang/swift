@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -typecheck -verify %s -disable-availability-checking -debug-generic-signatures -requirement-machine-inferred-signatures=on 2>&1 | %FileCheck %s
-// RUN: %target-swift-frontend -emit-silgen %s -disable-availability-checking -requirement-machine-inferred-signatures=on
+// RUN: %target-swift-frontend -typecheck -verify %s -disable-availability-checking -debug-generic-signatures 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s -disable-availability-checking
 
 // FIXME: This does not work with -enable-requirement-machine-opaque-archetypes.
 // See opaque_archetype_concrete_requirement_rejected.swift for a demonstration

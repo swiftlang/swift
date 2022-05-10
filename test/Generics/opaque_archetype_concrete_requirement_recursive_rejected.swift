@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -requirement-machine-inferred-signatures=on -enable-requirement-machine-opaque-archetypes
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-requirement-machine-opaque-archetypes
 
 // FIXME: This does not work with -enable-requirement-machine-opaque-archetypes.
 // See opaque_archetype_concrete_requirement_recursive.swift for a demonstration

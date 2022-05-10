@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift %s -requirement-machine-inferred-signatures=on -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift %s -warn-redundant-requirements
 
 class Base<T> { }
 class Derived: Base<Int> { }

@@ -464,7 +464,7 @@ swift::handleSILGenericParams(GenericParamList *genericParams,
   }
 
   auto request = InferredGenericSignatureRequest{
-      DC->getParentModule(), /*parentSig=*/nullptr,
+      /*parentSig=*/nullptr,
       nestedList.back(), WhereClauseOwner(),
       {}, {}, /*allowConcreteGenericParams=*/true};
   auto sig = evaluateOrDefault(DC->getASTContext().evaluator, request,

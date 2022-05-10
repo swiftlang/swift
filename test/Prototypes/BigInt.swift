@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -swift-version 4 -o %t/a.out %s -Xfrontend -requirement-machine-inferred-signatures=on -Xfrontend -requirement-machine-abstract-signatures=on -Xfrontend -requirement-machine-protocol-signatures=on
+// RUN: %target-build-swift -swift-version 4 -o %t/a.out %s
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test

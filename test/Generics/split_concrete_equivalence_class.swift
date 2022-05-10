@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-inferred-signatures=on 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
 // CHECK-LABEL: split_concrete_equivalence_class.(file).f01@
 // CHECK-NEXT: Generic signature: <C, R where C : Collection, R : Collection, C.[Collection]SubSequence == Substring, R.[Sequence]Element == Character>

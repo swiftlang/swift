@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name Test -enable-experimental-bound-generic-extensions -requirement-machine-inferred-signatures=on
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name Test -enable-experimental-bound-generic-extensions
 // RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name Test
 // RUN: %FileCheck %s < %t.swiftinterface
 
