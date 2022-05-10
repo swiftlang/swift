@@ -19,7 +19,7 @@ final public class GlobalVariable : CustomStringConvertible, HasName {
   }
 
   public var description: String {
-    let s = SILGlobalVariable_debugDescription(bridged)
+    var s = SILGlobalVariable_debugDescription(bridged)
     return String(cString: s.c_str())
   }
 
