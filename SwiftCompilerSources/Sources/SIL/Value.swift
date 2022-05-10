@@ -21,7 +21,7 @@ public protocol Value : AnyObject, CustomStringConvertible {
 
 extension Value {
   public var description: String {
-    let s = SILNode_debugDescription(bridgedNode)
+    var s = SILNode_debugDescription(bridgedNode)
     return String(cString: s.c_str())
   }
 

@@ -1705,14 +1705,15 @@ bb0(%0 : @owned $MyNSObj):
   return %2 : $@callee_owned () -> @owned MyNSObj
 }
 
-// Check that convert_function is not eliminated if the result type of the converted function is different from the apply result type.
-// CHECK-LABEL: sil {{.*}} @do_not_peephole_convert_function : $@convention(thin) (@in AnotherClass) -> @out @callee_owned (@in ()) -> @out AnotherClass {
-// CHECK: [[CF:%[0-9]+]] = convert_function
-// CHECK: [[APPLY:%[0-9]+]] = apply
-// CHECK: [[FUN:%[0-9]+]] = function_ref
-// CHECK: [[CF:%[0-9]+]] = partial_apply [[FUN]]([[APPLY]])
-// CHECK: // end sil function 'do_not_peephole_convert_function'
-sil shared [ossa] [transparent] [reabstraction_thunk] @do_not_peephole_convert_function : $@convention(thin) (@in AnotherClass) -> @out @callee_owned (@in ()) -> @out AnotherClass {
+// Check that convert_function is eliminated if the result type of the converted function is different from the apply result type.
+// CHECK-LABEL: sil {{.*}} @peephole_convert_function_result_change : $@convention(thin) (@in AnotherClass) -> @out @callee_owned (@in ()) -> @out AnotherClass {
+// CHECK: [[F1:%[0-9]+]] = function_ref @curry_thunk_for_MyNSObj_self
+// CHECK: [[APPLY:%[0-9]+]] = apply [[F1]]
+// CHECK: [[CONV_RESULT:%[0-9]+]] = convert_function [[APPLY]]
+// CHECK: [[FUN:%[0-9]+]] = function_ref @reabstraction_thunk1
+// CHECK: [[CF:%[0-9]+]] = partial_apply [[FUN]]([[CONV_RESULT]])
+// CHECK: // end sil function 'peephole_convert_function_result_change'
+sil shared [ossa] [transparent] [reabstraction_thunk] @peephole_convert_function_result_change : $@convention(thin) (@in AnotherClass) -> @out @callee_owned (@in ()) -> @out AnotherClass {
 bb0(%0 : $*@callee_owned (@in ()) -> @out AnotherClass, %1 : $*AnotherClass):
   // function_ref @nonobjc curry thunk of MyNSObj.self()
   %2 = function_ref @curry_thunk_for_MyNSObj_self : $@convention(thin) (@owned MyNSObj) -> @owned @callee_owned () -> @owned MyNSObj
@@ -1725,7 +1726,65 @@ bb0(%0 : $*@callee_owned (@in ()) -> @out AnotherClass, %1 : $*AnotherClass):
   store %8 to [init] %0 : $*@callee_owned (@in ()) -> @out AnotherClass
   %10 = tuple ()
   return %10 : $()
-} // end sil function 'do_not_peephole_convert_function'
+} // end sil function 'peephole_convert_function_result_change'
+
+sil @convertible_result_with_error : $@convention(thin) () -> (@owned AnotherClass, @error Error)
+
+// TODO
+sil [ossa] @peephole_convert_function_result_change_with_error : $@convention(thin) () -> () {
+entry:
+  %f = function_ref @convertible_result_with_error : $@convention(thin) () -> (@owned AnotherClass, @error Error)
+  %c = convert_function %f : $@convention(thin) () -> (@owned AnotherClass, @error Error) to $@convention(thin) () -> (@owned MyNSObj, @error Error)
+  try_apply %c() : $@convention(thin) () -> (@owned MyNSObj, @error Error), normal success, error failure
+
+success(%r : $MyNSObj):
+  destroy_value %r : $MyNSObj
+  br exit
+
+failure(%e : $Error):
+  destroy_value %e : $Error
+  br exit
+
+exit:
+  return undef : $()
+}
+
+sil @convertible_indirect_result : $@convention(thin) (@guaranteed MyNSObj) -> @out AnotherClass
+
+// CHECK-LABEL: sil [ossa] @peephole_convert_function_indirect_result :
+// CHECK:       bb0([[A:%.*]] : @guaranteed $AnotherClass):
+// CHECK:         [[F:%.*]] = function_ref @convertible_indirect_result :
+// CHECK:         [[B:%.*]] = alloc_stack $MyNSObj
+// CHECK:         [[B_CONV:%.*]] = unchecked_addr_cast [[B]]
+// CHECK:         [[A_CONV:%.*]] = upcast [[A]]
+// CHECK:         apply [[F]]([[B_CONV]], [[A_CONV]])
+sil [ossa] @peephole_convert_function_indirect_result : $@convention(thin) (@guaranteed AnotherClass) -> @owned MyNSObj {
+entry(%a : @guaranteed $AnotherClass):
+  %f = function_ref @convertible_indirect_result : $@convention(thin) (@guaranteed MyNSObj) -> @out AnotherClass
+  %c = convert_function %f : $@convention(thin) (@guaranteed MyNSObj) -> @out AnotherClass to $@convention(thin) (@guaranteed AnotherClass) -> @out MyNSObj
+  %b = alloc_stack $*MyNSObj
+  apply %c(%b, %a) : $@convention(thin) (@guaranteed AnotherClass) -> @out MyNSObj
+  %r = load [take] %b : $*MyNSObj
+  dealloc_stack %b : $*MyNSObj
+  return %r : $MyNSObj
+}
+
+sil @convertible_owned_aggregate_input : $@convention(thin) (@owned (MyNSObj, MyNSObj)) -> @owned (AnotherClass, AnotherClass)
+
+// CHECK-LABEL: sil [ossa] @peephole_convert_owned_aggregate_input_result :
+// CHECK:       bb0([[A:%.*]] : @owned $(AnotherClass, AnotherClass)):
+// CHECK:         [[F:%.*]] = function_ref @convertible_owned_aggregate_input :
+// CHECK:         [[A_CONV:%.*]] = unchecked_value_cast [[A]]
+// CHECK:         [[R:%.*]] = apply [[F]]([[A_CONV]])
+// CHECK:         [[R_CONV:%.*]] = unchecked_value_cast [[R]]
+// CHECK:         return [[R_CONV]]
+sil [ossa] @peephole_convert_owned_aggregate_input_result : $@convention(thin) (@owned (AnotherClass, AnotherClass)) -> @owned (MyNSObj, MyNSObj) {
+entry(%a : @owned $(AnotherClass, AnotherClass)):
+  %f = function_ref @convertible_owned_aggregate_input : $@convention(thin) (@owned (MyNSObj, MyNSObj)) -> @owned (AnotherClass, AnotherClass)
+  %c = convert_function %f : $@convention(thin) (@owned (MyNSObj, MyNSObj)) -> @owned (AnotherClass, AnotherClass) to $@convention(thin) (@owned (AnotherClass, AnotherClass)) -> @owned (MyNSObj, MyNSObj)
+  %r = apply %c(%a) : $@convention(thin) (@owned (AnotherClass, AnotherClass)) -> @owned (MyNSObj, MyNSObj)
+  return %r : $(MyNSObj, MyNSObj)
+}
 
 // CHECK-LABEL: sil [ossa] @upcast_formation : $@convention(thin) (@inout E, @owned E, @inout B) -> @owned B {
 // CHECK: bb0
