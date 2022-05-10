@@ -41,7 +41,7 @@ import _Concurrency
 /// Use the `CodingUserInfoKey.actorSystemKey` to provide the necessary
 /// actor system for the decoding initializer when decoding a distributed actor.
 @available(SwiftStdlib 5.7, *)
-public protocol DistributedActor: AnyActor, Identifiable, Hashable
+public protocol DistributedActor<ActorSystem>: AnyActor, Identifiable, Hashable
   where ID == ActorSystem.ActorID,
         SerializationRequirement == ActorSystem.SerializationRequirement {
   
