@@ -41,6 +41,8 @@ class Token {
 
   /// Whether this token is an escaped `identifier` token.
   unsigned EscapedIdentifier : 1;
+
+  unsigned EscapedOperator : 1;
   
   /// Modifiers for string literals
   unsigned MultilineString : 1;
@@ -65,8 +67,8 @@ class Token {
 public:
   Token(tok Kind, StringRef Text, unsigned CommentLength = 0)
           : Kind(Kind), AtStartOfLine(false), EscapedIdentifier(false),
-            MultilineString(false), CustomDelimiterLen(0),
-            CommentLength(CommentLength), Text(Text) {}
+            EscapedOperator(false), MultilineString(false),
+            CustomDelimiterLen(0), CommentLength(CommentLength), Text(Text) {}
 
   Token() : Token(tok::NUM_TOKENS, {}, 0) {}
 
@@ -127,6 +129,11 @@ public:
     assert((!value || Kind == tok::identifier) &&
            "only identifiers can be escaped identifiers");
     EscapedIdentifier = value;
+  }
+
+  bool isEscapedOperator() const { return EscapedOperator; }
+  void setEscapedOperator(bool value) {
+    EscapedOperator = value;
   }
   
   bool isContextualKeyword(StringRef ContextKW) const {
@@ -276,7 +283,7 @@ public:
   }
 
   StringRef getText() const {
-    if (EscapedIdentifier) {
+    if (EscapedIdentifier || EscapedOperator) {
       // Strip off the backticks on either side.
       assert(Text.front() == '`' && Text.back() == '`');
       return Text.slice(1, Text.size() - 1);
@@ -292,6 +299,7 @@ public:
     Text = T;
     this->CommentLength = CommentLength;
     EscapedIdentifier = false;
+    EscapedOperator = false;
     this->MultilineString = false;
     this->CustomDelimiterLen = 0;
     assert(this->CustomDelimiterLen == CustomDelimiterLen &&

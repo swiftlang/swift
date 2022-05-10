@@ -8535,8 +8535,8 @@ Parser::parseDeclOperator(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   // Postfix operators starting with ? or ! conflict with builtin
   // unwrapping operators.
   if (Attributes.hasAttribute<PostfixAttr>())
-    if (!Tok.getText().empty() && (Tok.getRawText().front() == '?' ||
-                                   Tok.getRawText().front() == '!'))
+    if (!Tok.getText().empty() && (Tok.getText().front() == '?' ||
+                                   Tok.getText().front() == '!'))
       diagnose(Tok, diag::postfix_operator_name_cannot_start_with_unwrap);
 
   // Prefix operators may not contain the `/` character when `/.../` regex

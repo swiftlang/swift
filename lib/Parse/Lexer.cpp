@@ -792,49 +792,7 @@ static bool rangeContainsPlaceholderEnd(const char *CurPtr,
   return false;
 }
 
-/// lexOperatorIdentifier - Match identifiers formed out of punctuation.
-void Lexer::lexOperatorIdentifier() {
-  const char *TokStart = CurPtr-1;
-  CurPtr = TokStart;
-  bool didStart = advanceIfValidStartOfOperator(CurPtr, BufferEnd);
-  assert(didStart && "unexpected operator start");
-  (void) didStart;
-  
-  do {
-    if (CurPtr != BufferEnd && InSILBody &&
-        (*CurPtr == '!' || *CurPtr == '?'))
-      // When parsing SIL body, '!' and '?' are special token and can't be
-      // in the middle of an operator.
-      break;
-
-    // '.' cannot appear in the middle of an operator unless the operator
-    // started with a '.'.
-    if (*CurPtr == '.' && *TokStart != '.')
-      break;
-    if (Identifier::isEditorPlaceholder(StringRef(CurPtr, BufferEnd-CurPtr)) &&
-        rangeContainsPlaceholderEnd(CurPtr + 2, BufferEnd)) {
-      break;
-    }
-
-    // If we are lexing a `/.../` regex literal, we don't consider `/` to be an
-    // operator character.
-    if (ForwardSlashRegexMode != LexerForwardSlashRegexMode::None &&
-        *CurPtr == '/') {
-      break;
-    }
-  } while (advanceIfValidContinuationOfOperator(CurPtr, BufferEnd));
-
-  if (CurPtr-TokStart > 2) {
-    // If there is a "//" or "/*" in the middle of an identifier token, 
-    // it starts a comment.
-    for (auto Ptr = TokStart+1; Ptr != CurPtr-1; ++Ptr) {
-      if (Ptr[0] == '/' && (Ptr[1] == '/' || Ptr[1] == '*')) {
-        CurPtr = Ptr;
-        break;
-      }
-    }
-  }
-
+void Lexer::formOperatorToken(const char *TokStart, const char *OperEnd) {
   // Decide between the binary, prefix, and postfix cases.
   // It's binary if either both sides are bound or both sides are not bound.
   // Otherwise, it's postfix if left-bound and prefix if right-bound.
@@ -842,7 +800,7 @@ void Lexer::lexOperatorIdentifier() {
   bool rightBound = isRightBound(CurPtr, leftBound, CodeCompletionPtr);
 
   // Match various reserved words.
-  if (CurPtr-TokStart == 1) {
+  if (OperEnd-TokStart == 1) {
     switch (TokStart[0]) {
     case '=':
       // Refrain from emitting this message in operator name position.
@@ -901,7 +859,7 @@ void Lexer::lexOperatorIdentifier() {
         return formToken(tok::question_postfix, TokStart);
       return formToken(tok::question_infix, TokStart);
     }
-  } else if (CurPtr-TokStart == 2) {
+  } else if (OperEnd-TokStart == 2) {
     switch ((TokStart[0] << 8) | TokStart[1]) {
     case ('-' << 8) | '>': // ->
       return formToken(tok::arrow, TokStart);
@@ -912,7 +870,7 @@ void Lexer::lexOperatorIdentifier() {
   } else {
     // Verify there is no "*/" in the middle of the identifier token, we reject
     // it as potentially ending a block comment.
-    auto Pos = StringRef(TokStart, CurPtr-TokStart).find("*/");
+    auto Pos = StringRef(TokStart, OperEnd-TokStart).find("*/");
     if (Pos != StringRef::npos) {
       diagnose(TokStart+Pos, diag::lex_unexpected_block_comment_end);
       return formToken(tok::unknown, TokStart);
@@ -924,6 +882,75 @@ void Lexer::lexOperatorIdentifier() {
                                  tok::oper_binary_spaced, TokStart);
 
   return formToken(leftBound ? tok::oper_postfix : tok::oper_prefix, TokStart);
+}
+
+/// lexOperatorIdentifier - Match identifiers formed out of punctuation.
+void Lexer::lexOperatorIdentifier() {
+  auto *const TokStart = CurPtr-1;
+
+  auto HadBacktick = (*TokStart == '`');
+  if (!HadBacktick)
+    CurPtr = TokStart;
+
+  auto *const OperStart = CurPtr;
+
+  bool didStart = advanceIfValidStartOfOperator(CurPtr, BufferEnd);
+  assert(didStart && "unexpected operator start");
+  (void) didStart;
+  
+  do {
+    if (CurPtr != BufferEnd && InSILBody &&
+        (*CurPtr == '!' || *CurPtr == '?'))
+      // When parsing SIL body, '!' and '?' are special token and can't be
+      // in the middle of an operator.
+      break;
+
+    // '.' cannot appear in the middle of an operator unless the operator
+    // started with a '.'.
+    if (*CurPtr == '.' && *TokStart != '.')
+      break;
+    if (Identifier::isEditorPlaceholder(StringRef(CurPtr, BufferEnd-CurPtr)) &&
+        rangeContainsPlaceholderEnd(CurPtr + 2, BufferEnd)) {
+      break;
+    }
+
+    // If we are lexing a `/.../` regex literal, we don't consider `/` to be an
+    // operator character.
+    if (ForwardSlashRegexMode != LexerForwardSlashRegexMode::None &&
+        *CurPtr == '/') {
+      break;
+    }
+  } while (advanceIfValidContinuationOfOperator(CurPtr, BufferEnd));
+
+  if (CurPtr-TokStart > 2) {
+    // If there is a "//" or "/*" in the middle of an identifier token, 
+    // it starts a comment.
+    for (auto Ptr = TokStart+1; Ptr != CurPtr-1; ++Ptr) {
+      if (Ptr[0] == '/' && (Ptr[1] == '/' || Ptr[1] == '*')) {
+        CurPtr = Ptr;
+        break;
+      }
+    }
+  }
+
+  auto *const OperEnd = CurPtr;
+  if (HadBacktick) {
+    if (*OperEnd != '`') {
+      // The backtick is punctuation.
+      CurPtr = OperStart;
+      return formToken(tok::backtick, TokStart);
+    }
+    ++CurPtr;
+  }
+
+  formOperatorToken(TokStart, OperEnd);
+  if (HadBacktick) {
+    // If this token is at ArtificialEOF, it's forced to be tok::eof. Don't mark
+    // this as escaped-operator in this case. Also don't mark if we had
+    // something unrecoverable.
+    if (!NextToken.is(tok::eof) && !NextToken.is(tok::unknown))
+      NextToken.setEscapedOperator(true);
+  }
 }
 
 /// lexDollarIdent - Match $[0-9a-zA-Z_$]+
@@ -2652,6 +2679,10 @@ void Lexer::lexImpl() {
     return lexStringLiteral();
       
   case '`':
+    auto *Tmp = CurPtr;
+    if (advanceIfValidStartOfOperator(Tmp, BufferEnd))
+      return lexOperatorIdentifier();
+
     return lexEscapedIdentifier();
   }
 }

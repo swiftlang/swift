@@ -608,6 +608,10 @@ private:
   void formStringLiteralToken(const char *TokStart, bool IsMultilineString,
                               unsigned CustomDelimiterLen);
 
+  /// Form an operator token starting at \p TokStart. \p OperEnd is the last
+  /// character, not including backticks.
+  void formOperatorToken(const char *TokStart, const char *OperEnd);
+
   /// Advance to the end of the line.
   /// If EatNewLine is true, CurPtr will be at end of newline character.
   /// Otherwise, CurPtr will be at newline character.
