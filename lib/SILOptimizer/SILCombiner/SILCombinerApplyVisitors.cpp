@@ -146,42 +146,20 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   if (SubstCalleeTy->hasArchetype() || ConvertCalleeTy->hasArchetype())
     return nullptr;
 
-  // Indirect results are not currently handled.
-  if (AI.hasIndirectSILResults())
-    return nullptr;
-
-  // Bail if the result type of the converted callee is different from the callee's
-  // result type of the apply instruction.
-  if (SubstCalleeTy->getAllResultsSubstType(
-          AI.getModule(), AI.getFunction()->getTypeExpansionContext()) !=
-      ConvertCalleeTy->getAllResultsSubstType(
-          AI.getModule(), AI.getFunction()->getTypeExpansionContext())) {
-    return nullptr;
-  }
-
   // Ok, we can now perform our transformation. Grab AI's operands and the
   // relevant types from the ConvertFunction function type and AI.
   Builder.setCurrentDebugScope(AI.getDebugScope());
-  OperandValueArrayRef Ops = AI.getArgumentsWithoutIndirectResults();
+  OperandValueArrayRef Ops = AI.getArguments();
   SILFunctionConventions substConventions(SubstCalleeTy, FRI->getModule());
   SILFunctionConventions convertConventions(ConvertCalleeTy, FRI->getModule());
   auto context = AI.getFunction()->getTypeExpansionContext();
-  auto oldOpTypes = substConventions.getParameterSILTypes(context);
-  auto newOpTypes = convertConventions.getParameterSILTypes(context);
-
-  assert(Ops.size() == SubstCalleeTy->getNumParameters()
-         && "Ops and op types must have same size.");
-  assert(Ops.size() == ConvertCalleeTy->getNumParameters()
-         && "Ops and op types must have same size.");
+  auto oldOpRetTypes = substConventions.getIndirectSILResultTypes(context);
+  auto newOpRetTypes = convertConventions.getIndirectSILResultTypes(context);
+  auto oldOpParamTypes = substConventions.getParameterSILTypes(context);
+  auto newOpParamTypes = convertConventions.getParameterSILTypes(context);
 
   llvm::SmallVector<SILValue, 8> Args;
-  auto newOpI = newOpTypes.begin();
-  auto oldOpI = oldOpTypes.begin();
-  for (unsigned i = 0, e = Ops.size(); i != e; ++i, ++newOpI, ++oldOpI) {
-    SILValue Op = Ops[i];
-    SILType OldOpType = *oldOpI;
-    SILType NewOpType = *newOpI;
-
+  auto convertOp = [&](SILValue Op, SILType OldOpType, SILType NewOpType) {
     // Convert function takes refs to refs, address to addresses, and leaves
     // other types alone.
     if (OldOpType.isAddress()) {
@@ -190,17 +168,68 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
       Args.push_back(UAC);
     } else if (OldOpType.getASTType() != NewOpType.getASTType()) {
       auto URC =
-          Builder.createUncheckedReinterpretCast(AI.getLoc(), Op, NewOpType);
+          Builder.createUncheckedBitCast(AI.getLoc(), Op, NewOpType);
       Args.push_back(URC);
     } else {
       Args.push_back(Op);
     }
+  };
+
+  unsigned OpI = 0;
+  
+  auto newRetI = newOpRetTypes.begin();
+  auto oldRetI = oldOpRetTypes.begin();
+  
+  for (auto e = newOpRetTypes.end(); newRetI != e;
+       ++OpI, ++newRetI, ++oldRetI) {
+    convertOp(Ops[OpI], *oldRetI, *newRetI);
+  }
+  
+  auto newParamI = newOpParamTypes.begin();
+  auto oldParamI = oldOpParamTypes.begin();
+  for (auto e = newOpParamTypes.end(); newParamI != e;
+       ++OpI, ++newParamI, ++oldParamI) {
+    convertOp(Ops[OpI], *oldParamI, *newParamI);
   }
 
+  // Convert the direct results if they changed.
+  auto oldResultTy = SubstCalleeTy
+    ->getDirectFormalResultsType(AI.getModule(),
+                                 AI.getFunction()->getTypeExpansionContext());
+  auto newResultTy = ConvertCalleeTy
+    ->getDirectFormalResultsType(AI.getModule(),
+                                 AI.getFunction()->getTypeExpansionContext());
+  
   // Create the new apply inst.
   if (auto *TAI = dyn_cast<TryApplyInst>(AI)) {
+    // If the results need to change, create a new landing block to do that
+    // conversion.
+    auto normalBB = TAI->getNormalBB();
+    if (oldResultTy != newResultTy) {
+      normalBB = AI.getFunction()->createBasicBlockBefore(TAI->getNormalBB());
+      Builder.setInsertionPoint(normalBB);
+      SmallVector<SILValue, 4> branchArgs;
+      
+      auto oldOpResultTypes = substConventions.getDirectSILResultTypes(context);
+      auto newOpResultTypes = convertConventions.getDirectSILResultTypes(context);
+      
+      auto oldRetI = oldOpResultTypes.begin();
+      auto newRetI = newOpResultTypes.begin();
+      auto origArgs = TAI->getNormalBB()->getArguments();
+      auto origArgI = origArgs.begin();
+      for (auto e = newOpResultTypes.end(); newRetI != e;
+           ++oldRetI, ++newRetI, ++origArgI) {
+        auto arg = normalBB->createPhiArgument(*newRetI, (*origArgI)->getOwnershipKind());
+        auto converted = Builder.createUncheckedBitCast(AI.getLoc(),
+                                                                arg, *oldRetI);
+        branchArgs.push_back(converted);
+      }
+      
+      Builder.createBranch(AI.getLoc(), TAI->getNormalBB(), branchArgs);
+    }
+    
     return Builder.createTryApply(AI.getLoc(), FRI, SubstitutionMap(), Args,
-                                  TAI->getNormalBB(), TAI->getErrorBB(),
+                                  normalBB, TAI->getErrorBB(),
                                   TAI->getApplyOptions());
   }
 
@@ -213,12 +242,13 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
     Options |= ApplyFlags::DoesNotThrow;
   ApplyInst *NAI = Builder.createApply(AI.getLoc(), FRI, SubstitutionMap(),
                                        Args, Options);
-  assert(FullApplySite(NAI).getSubstCalleeType()->getAllResultsSubstType(
-             AI.getModule(), AI.getFunction()->getTypeExpansionContext()) ==
-             AI.getSubstCalleeType()->getAllResultsSubstType(
-                 AI.getModule(), AI.getFunction()->getTypeExpansionContext()) &&
-         "Function types should be the same");
-  return NAI;
+  SILInstruction *result = NAI;
+  
+  if (oldResultTy != newResultTy) {
+    result = Builder.createUncheckedBitCast(AI.getLoc(), NAI, oldResultTy);
+  }
+  
+  return result;
 }
 
 /// Try to optimize a keypath application with an apply instruction.
