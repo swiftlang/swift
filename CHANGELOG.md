@@ -330,7 +330,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
 * [SE-0328][]:
 
-  Opaque types (expressed with 'some') can now be used in structural positions
+  Opaque types (expressed with `some`) can now be used in structural positions
   within a result type, including having multiple opaque types in the same
   result. For example:
 
@@ -942,7 +942,7 @@ Swift 5.5
   }
   ```
 
-* The 'lazy' keyword now works in local contexts, making the following valid:
+* The `lazy` keyword now works in local contexts, making the following valid:
 
   ```swift
   func test(useIt: Bool) {
@@ -2901,7 +2901,7 @@ Swift 3.0
 
 * [SE-0101][]:
 
- The functions `sizeof()`, `strideof()`, and `alignof()` have been removed.
+  The functions `sizeof()`, `strideof()`, and `alignof()` have been removed.
   Memory layout properties for a type `T` are now spelled
   `MemoryLayout<T>.size`, `MemoryLayout<T>.stride`, and
   `MemoryLayout<T>.alignment`, respectively.
@@ -2943,7 +2943,7 @@ Swift 3.0
 
 * [SE-0124][]:
 
- Initializers on `Int` and `UInt` that accept an `ObjectIdentifier` must now use an explicit `bitPattern` label.
+  Initializers on `Int` and `UInt` that accept an `ObjectIdentifier` must now use an explicit `bitPattern` label.
 
   ```swift
   let x: ObjectIdentifier = ...
@@ -3199,7 +3199,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
     didFailToRegisterForRemoteNotificationsWithError error: NSError)
   ```
 
- Now it accepts an `Error` argument:
+  Now it accepts an `Error` argument:
 
   ```swift
   optional func application(_ application: UIApplication,
@@ -3422,7 +3422,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
   foo/* comment */! // no longer works
   ```
 
- Parse errors resulting from this change can be resolved by moving the comment outside the expression.
+  Parse errors resulting from this change can be resolved by moving the comment outside the expression.
 
 * [SE-0031][]:
 
@@ -3483,7 +3483,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
   Attributes change from using `=` in parameters lists
   to using `:`, aligning with function call syntax.
 
-  ```
+  ```swift
   // before
   @available(*, unavailable, renamed="MyRenamedProtocol")
 
@@ -3524,13 +3524,13 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 
   Curried function syntax (with successive parenthesized groups of arguments) is removed, and now produces a compile-time error. Use chained functional return types instead.
 
-```
-// Before
-public func project(function f: FunctionType)(p0: CGPoint, p1: CGPoint)(x: CGFloat) -> CGPoint
+  ```swift
+  // Before
+  public func project(function f: FunctionType)(p0: CGPoint, p1: CGPoint)(x: CGFloat) -> CGPoint
 
-// After
-public func project(function f: FunctionType) -> (p0: CGPoint, p1: CGPoint) -> (x: CGFloat) -> CGPoint
-```
+  // After
+  public func project(function f: FunctionType) -> (p0: CGPoint, p1: CGPoint) -> (x: CGFloat) -> CGPoint
+  ```
 
 * Generic signatures can now contain superclass requirements with generic parameter types, for example:
 
@@ -4877,11 +4877,15 @@ Swift 1.2
 * The `@autoclosure` attribute is now an attribute on a parameter, not an
   attribute on the parameter's type.
 
-  Where before you might have used:
+  Where before you might have used
 
   ```swift
   func assert(predicate : @autoclosure () -> Bool) {...}
-  you now write this as:
+  ```
+
+  you now write this as
+
+  ```swift
   func assert(@autoclosure predicate : () -> Bool) {...}
   ```
 
@@ -4923,7 +4927,11 @@ Swift 1.2
       // redeclares Objective-C method
       //'setProperty:'
   }
+  ```
+
   Similar checking applies to accidental overrides in the Objective-C runtime:
+
+  ```swift
   class B : NSObject {
   func method(arg: String) { }     // note: overridden declaration
       // here has type '(String) -> ()'
@@ -4934,7 +4942,11 @@ Swift 1.2
       // selector 'method:' has incompatible
       // type '([String]) -> ()'
   }
+  ```
+
   as well as protocol conformances:
+
+  ```swift
   class MyDelegate : NSObject, NSURLSessionDelegate {
   func URLSession(session: NSURLSession, didBecomeInvalidWithError:
       Bool){ } // error: Objective-C method 'URLSession:didBecomeInvalidWithError:'
@@ -5022,13 +5034,17 @@ Swift 1.2
   that used `unsafeBitCast` as a workaround for this issue can be written to
   use the raw value initializer.
 
-  For example:
+  For example,
 
   ```swift
   let animationCurve =
     unsafeBitCast(userInfo[UIKeyboardAnimationCurveUserInfoKey].integerValue,
     UIViewAnimationCurve.self)
-  can now be written instead as:
+  ```
+
+  can now be written instead as
+
+  ```swift
   let animationCurve = UIViewAnimationCurve(rawValue:
     userInfo[UIKeyboardAnimationCurveUserInfoKey].integerValue)!
   ```
