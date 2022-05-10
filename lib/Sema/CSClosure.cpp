@@ -18,7 +18,9 @@
 
 #include "MiscDiagnostics.h"
 #include "TypeChecker.h"
+#include "TypeCheckAvailability.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/IDETypeChecking.h"
 
 using namespace swift;
 using namespace swift::constraints;
@@ -1679,12 +1681,15 @@ public:
 };
 
 class ResultBuilderRewriter : public SyntacticElementSolutionApplication {
+  const AppliedBuilderTransform &Transform;
+
 public:
   ResultBuilderRewriter(Solution &solution, AnyFunctionRef context,
                         const AppliedBuilderTransform &transform,
                         RewriteTargetFn rewriteTarget)
       : SyntacticElementSolutionApplication(
-            solution, context, transform.bodyResultType, rewriteTarget) {}
+            solution, context, transform.bodyResultType, rewriteTarget),
+        Transform(transform) {}
 
   bool apply() {
     auto body = visit(context.getBody());
@@ -1758,6 +1763,9 @@ private:
 
   NullablePtr<Stmt> transformIf(IfStmt *ifStmt, TypeJoinExpr *join,
                                 unsigned index) {
+    // FIXME: Turn this into a condition once warning is an error.
+    (void)diagnoseMissingBuildWithAvailability(ifStmt);
+
     auto *joinVar = join->getVar();
 
     // First, let's add assignment to the end of `then` branch
@@ -1845,6 +1853,109 @@ private:
 
   ASTContext &getASTContext() const {
     return context.getAsDeclContext()->getASTContext();
+  }
+
+private:
+  /// Look for a #available condition. If there is one, we need to check
+  /// that the resulting type of the "then" doesn't refer to any types that
+  /// are unavailable in the enclosing context.
+  ///
+  /// Note that this is for staging in support for buildLimitedAvailability();
+  /// the diagnostic is currently a warning, so that existing code that
+  /// compiles today will continue to compile. Once result builder types
+  /// have had the chance to adopt buildLimitedAvailability(), we'll upgrade
+  /// this warning to an error.
+  LLVM_NODISCARD
+  bool diagnoseMissingBuildWithAvailability(IfStmt *ifStmt) {
+    auto findAvailabilityCondition =
+        [](StmtCondition stmtCond) -> const StmtConditionElement * {
+      for (const auto &cond : stmtCond) {
+        switch (cond.getKind()) {
+        case StmtConditionElement::CK_Boolean:
+        case StmtConditionElement::CK_PatternBinding:
+          continue;
+
+        case StmtConditionElement::CK_Availability:
+          return &cond;
+          break;
+        }
+      }
+
+      return nullptr;
+    };
+
+    auto availabilityCond = findAvailabilityCondition(ifStmt->getCond());
+    if (!availabilityCond)
+      return false;
+
+    SourceLoc loc = availabilityCond->getStartLoc();
+    Type bodyType;
+    if (availabilityCond->getAvailability()->isUnavailability()) {
+      BraceStmt *elseBody = nullptr;
+      // For #unavailable, we need to check the "else".
+      if (auto *innerIf = getAsStmt<IfStmt>(ifStmt->getElseStmt())) {
+        elseBody = castToStmt<BraceStmt>(innerIf->getThenStmt());
+      } else {
+        elseBody = castToStmt<BraceStmt>(ifStmt->getElseStmt());
+      }
+
+      Type elseBodyType =
+        solution.simplifyType(solution.getType(elseBody->getLastElement()));
+      bodyType = elseBodyType;
+    } else {
+      auto *thenBody = castToStmt<BraceStmt>(ifStmt->getThenStmt());
+      Type thenBodyType =
+          solution.simplifyType(solution.getType(thenBody->getLastElement()));
+      bodyType = thenBodyType;
+    }
+
+    auto builderType = solution.simplifyType(Transform.builderType);
+
+    return bodyType.findIf([&](Type type) {
+      auto nominal = type->getAnyNominal();
+      if (!nominal)
+        return false;
+
+      ExportContext where =
+          ExportContext::forFunctionBody(context.getAsDeclContext(), loc);
+      if (auto reason =
+              TypeChecker::checkDeclarationAvailability(nominal, where)) {
+        auto &ctx = getASTContext();
+        ctx.Diags.diagnose(loc,
+                           diag::result_builder_missing_limited_availability,
+                           builderType);
+
+        // Add a note to the result builder with a stub for
+        // buildLimitedAvailability().
+        if (auto builder = builderType->getAnyNominal()) {
+          SourceLoc buildInsertionLoc;
+          std::string stubIndent;
+          Type componentType;
+          std::tie(buildInsertionLoc, stubIndent, componentType) =
+              determineResultBuilderBuildFixItInfo(builder);
+          if (buildInsertionLoc.isValid()) {
+            std::string fixItString;
+            {
+              llvm::raw_string_ostream out(fixItString);
+              printResultBuilderBuildFunction(
+                  builder, componentType,
+                  ResultBuilderBuildFunction::BuildLimitedAvailability,
+                  stubIndent, out);
+
+              builder
+                  ->diagnose(
+                      diag::result_builder_missing_build_limited_availability,
+                      builderType)
+                  .fixItInsert(buildInsertionLoc, fixItString);
+            }
+          }
+        }
+
+        return true;
+      }
+
+      return false;
+    });
   }
 };
 } // namespace
