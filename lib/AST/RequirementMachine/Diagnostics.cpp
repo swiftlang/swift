@@ -351,7 +351,7 @@ void RewriteSystem::computeRedundantRequirementDiagnostics(
   }
 }
 
-static Optional<Requirement>
+static Requirement
 getRequirementForDiagnostics(Type subject, Symbol property,
                              const PropertyMap &map,
                              TypeArrayView<GenericTypeParamType> genericParams,
@@ -380,7 +380,8 @@ getRequirementForDiagnostics(Type subject, Symbol property,
                        property.getLayoutConstraint());
 
   default:
-    return None;
+    llvm::errs() << "Bad property symbol: " << property << "\n";
+    abort();
   }
 }
 
@@ -413,10 +414,10 @@ void RewriteSystem::computeConflictDiagnostics(
     Type subject = propertyMap.getTypeForTerm(subjectTerm, genericParams);
     MutableTerm prefix(subjectTerm.begin(), subjectTerm.end() - suffixTerm.size());
     errors.push_back(RequirementError::forConflictingRequirement(
-        *getRequirementForDiagnostics(subject, *subjectRule.isPropertyRule(),
-                                      propertyMap, genericParams, MutableTerm()),
-        *getRequirementForDiagnostics(subject, *suffixRule.isPropertyRule(),
-                                      propertyMap, genericParams, prefix),
+        getRequirementForDiagnostics(subject, *subjectRule.isPropertyRule(),
+                                     propertyMap, genericParams, MutableTerm()),
+        getRequirementForDiagnostics(subject, *suffixRule.isPropertyRule(),
+                                     propertyMap, genericParams, prefix),
         signatureLoc));
   }
 }
