@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 4 -requirement-machine-protocol-signatures=on -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift -swift-version 4 -warn-redundant-requirements
 
 func needsSameType<T>(_: T.Type, _: T.Type) {}
 

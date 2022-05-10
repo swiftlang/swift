@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-inferred-signatures=on
-// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-inferred-signatures=on 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift
+// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
 class S<T, U> where T : P, U == T.T {}
 

@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-ir -verify -requirement-machine-abstract-signatures=on %s
-// RUN: %target-swift-frontend -emit-ir -verify -requirement-machine-abstract-signatures=on -disable-requirement-machine-concrete-contraction %s
+// RUN: %target-swift-frontend -emit-ir -verify %s
+// RUN: %target-swift-frontend -emit-ir -verify -disable-requirement-machine-concrete-contraction %s
 
 protocol P1 {
   associatedtype A2 : P2 where A2.A1 == Self

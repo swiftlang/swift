@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=on -requirement-machine-inferred-signatures=on -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
 
 func testInvalidConformance() {
   // expected-error@+1 {{type 'T' constrained to non-protocol, non-class type 'Int'}}

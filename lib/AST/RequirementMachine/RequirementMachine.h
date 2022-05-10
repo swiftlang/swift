@@ -29,16 +29,16 @@ class raw_ostream;
 
 namespace swift {
 
-class AbstractGenericSignatureRequestRQM;
+class AbstractGenericSignatureRequest;
 class ASTContext;
 class AssociatedTypeDecl;
 class CanType;
 class GenericTypeParamType;
-class InferredGenericSignatureRequestRQM;
+class InferredGenericSignatureRequest;
 class LayoutConstraint;
 class ProtocolDecl;
 class Requirement;
-class RequirementSignatureRequestRQM;
+class RequirementSignatureRequest;
 class Type;
 class UnifiedStatsReporter;
 
@@ -50,9 +50,9 @@ class RewriteContext;
 class RequirementMachine final {
   friend class swift::ASTContext;
   friend class swift::rewriting::RewriteContext;
-  friend class swift::RequirementSignatureRequestRQM;
-  friend class swift::AbstractGenericSignatureRequestRQM;
-  friend class swift::InferredGenericSignatureRequestRQM;
+  friend class swift::RequirementSignatureRequest;
+  friend class swift::AbstractGenericSignatureRequest;
+  friend class swift::InferredGenericSignatureRequest;
 
   CanGenericSignature Sig;
   SmallVector<Type, 2> Params;

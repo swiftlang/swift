@@ -768,11 +768,8 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
     }
   }
 
-  if (ctx.LangOpts.RequirementMachineProtocolSignatures ==
-      RequirementMachineMode::Enabled) {
-    diagnoseRequirementErrors(ctx, errors,
-                              AllowConcreteTypePolicy::NestedAssocTypes);
-  }
+  diagnoseRequirementErrors(ctx, errors,
+                            AllowConcreteTypePolicy::NestedAssocTypes);
 
   return ctx.AllocateCopy(result);
 }
@@ -799,11 +796,6 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
   SmallVector<RequirementError, 2> errors;
 
   auto &ctx = proto->getASTContext();
-
-  // In Verify mode, the GenericSignatureBuilder will emit the same diagnostics.
-  bool emitDiagnostics =
-    (ctx.LangOpts.RequirementMachineProtocolSignatures ==
-     RequirementMachineMode::Enabled);
 
   auto getStructuralType = [](TypeDecl *typeDecl) -> Type {
     if (auto typealias = dyn_cast<TypeAliasDecl>(typeDecl)) {
@@ -915,7 +907,6 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
     if (knownInherited == inheritedTypeDecls.end()) continue;
 
     bool shouldWarnAboutRedeclaration =
-      emitDiagnostics &&
       !assocTypeDecl->getAttrs().hasAttribute<NonOverrideAttr>() &&
       !assocTypeDecl->getAttrs().hasAttribute<OverrideAttr>() &&
       !assocTypeDecl->hasDefaultDefinitionType() &&
@@ -948,17 +939,15 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
         continue;
       }
 
-      if (emitDiagnostics) {
-        // We inherited a type; this associated type will be identical
-        // to that typealias.
-        auto inheritedOwningDecl =
-            inheritedType->getDeclContext()->getSelfNominalTypeDecl();
-        ctx.Diags.diagnose(assocTypeDecl,
-                           diag::associated_type_override_typealias,
-                           assocTypeDecl->getName(),
-                           inheritedOwningDecl->getDescriptiveKind(),
-                           inheritedOwningDecl->getDeclaredInterfaceType());
-      }
+      // We inherited a type; this associated type will be identical
+      // to that typealias.
+      auto inheritedOwningDecl =
+          inheritedType->getDeclContext()->getSelfNominalTypeDecl();
+      ctx.Diags.diagnose(assocTypeDecl,
+                         diag::associated_type_override_typealias,
+                         assocTypeDecl->getName(),
+                         inheritedOwningDecl->getDescriptiveKind(),
+                         inheritedOwningDecl->getDeclaredInterfaceType());
 
       recordInheritedTypeRequirement(assocTypeDecl, inheritedType);
     }
@@ -991,7 +980,7 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
         }
 
         // We found something.
-        bool shouldWarnAboutRedeclaration = emitDiagnostics;
+        bool shouldWarnAboutRedeclaration = true;
 
         for (auto inheritedType : inherited.second) {
           // If we have inherited associated type...
@@ -1042,11 +1031,8 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
     }
   }
 
-  if (ctx.LangOpts.RequirementMachineProtocolSignatures ==
-      RequirementMachineMode::Enabled) {
-    diagnoseRequirementErrors(ctx, errors,
-                              AllowConcreteTypePolicy::NestedAssocTypes);
-  }
+  diagnoseRequirementErrors(ctx, errors,
+                            AllowConcreteTypePolicy::NestedAssocTypes);
 
   return ctx.AllocateCopy(result);
 }
@@ -1059,12 +1045,7 @@ ProtocolDependenciesRequest::evaluate(Evaluator &evaluator,
 
   // If we have a serialized requirement signature, deserialize it and
   // look at conformance requirements.
-  //
-  // FIXME: For now we just fall back to the GSB for all protocols
-  // unless -requirement-machine-protocol-signatures=on is passed.
-  if (proto->hasLazyRequirementSignature() ||
-      (ctx.LangOpts.RequirementMachineProtocolSignatures
-        == RequirementMachineMode::Disabled)) {
+  if (proto->hasLazyRequirementSignature()) {
     for (auto req : proto->getRequirementSignature().getRequirements()) {
       if (req.getKind() == RequirementKind::Conformance) {
         result.insert(req.getProtocolDecl());

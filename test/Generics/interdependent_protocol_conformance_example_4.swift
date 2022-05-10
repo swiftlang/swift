@@ -1,6 +1,6 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=on -requirement-machine-inferred-signatures=on
-// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-protocol-signatures=on -requirement-machine-inferred-signatures=on 2>&1 | %FileCheck %s
-// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -disable-requirement-machine-reuse -requirement-machine-protocol-signatures=on -requirement-machine-inferred-signatures=on 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift
+// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -disable-requirement-machine-reuse 2>&1 | %FileCheck %s
 
 // CHECK-LABEL: .NonEmptyProtocol@
 // CHECK-NEXT: Requirement signature: <Self where Self : Collection, Self.[NonEmptyProtocol]C : Collection, Self.[Sequence]Element == Self.[NonEmptyProtocol]C.[Sequence]Element, Self.[Collection]Index == Self.[NonEmptyProtocol]C.[Collection]Index>

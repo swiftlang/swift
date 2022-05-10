@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -requirement-machine-abstract-signatures=on
+// RUN: %target-typecheck-verify-swift -disable-availability-checking
 
 //===----------------------------------------------------------------------===//
 // Use of protocols with Self or associated type requirements
