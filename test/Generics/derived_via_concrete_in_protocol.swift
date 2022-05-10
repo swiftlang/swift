@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=on
+// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=on -warn-redundant-requirements
 // RUN: %target-swift-frontend -debug-generic-signatures -typecheck %s -requirement-machine-protocol-signatures=on 2>&1 | %FileCheck %s
 
 protocol P24 {

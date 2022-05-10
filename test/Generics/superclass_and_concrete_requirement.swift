@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=on
+// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=on -warn-redundant-requirements
 // RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-protocol-signatures=on 2>&1 | %FileCheck %s
 
 class C {}
