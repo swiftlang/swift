@@ -1,6 +1,6 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=on -requirement-machine-inferred-signatures=on
+// RUN: %target-typecheck-verify-swift
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/abi %s -emit-ir -requirement-machine-protocol-signatures=on -requirement-machine-inferred-signatures=on | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/abi %s -emit-ir | %FileCheck %s
 
 // REQUIRES: objc_interop
 import Foundation

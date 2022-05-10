@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-inferred-signatures=on -warn-redundant-requirements
-// RUN: not %target-swift-frontend -typecheck -debug-generic-signatures -requirement-machine-inferred-signatures=on %s 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: not %target-swift-frontend -typecheck -debug-generic-signatures %s 2>&1 | %FileCheck %s
 
 struct S {}
 class C {}

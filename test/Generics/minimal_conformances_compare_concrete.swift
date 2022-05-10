@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-inferred-signatures=on 2>&1 | %FileCheck %s
-// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-inferred-signatures=on -disable-requirement-machine-concrete-contraction 2>&1 | %FileCheck %s
-// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-inferred-signatures=on -disable-requirement-machine-concrete-contraction -dump-requirement-machine 2>&1 | %FileCheck %s --check-prefix=RULE
+// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -disable-requirement-machine-concrete-contraction 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -disable-requirement-machine-concrete-contraction -dump-requirement-machine 2>&1 | %FileCheck %s --check-prefix=RULE
 
 protocol P {}
 

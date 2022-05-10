@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-inferred-signatures=on -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
 
 // The GenericSignatureBuilder did not diagnose the first two.
 

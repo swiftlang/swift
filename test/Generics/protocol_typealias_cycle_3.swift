@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck %s -requirement-machine-protocol-signatures=on
+// RUN: %target-swift-frontend -typecheck %s
 
 protocol P {
   typealias MyFunction =

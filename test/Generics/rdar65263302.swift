@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -typecheck -debug-generic-signatures %s -requirement-machine-inferred-signatures=on -warn-redundant-requirements 2>&1 | %FileCheck %s
-// RUN: %target-swift-frontend -verify -emit-ir %s -requirement-machine-inferred-signatures=on -warn-redundant-requirements
+// RUN: %target-swift-frontend -typecheck -debug-generic-signatures %s -warn-redundant-requirements 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -verify -emit-ir %s -warn-redundant-requirements
 
 public protocol P {
     associatedtype Element

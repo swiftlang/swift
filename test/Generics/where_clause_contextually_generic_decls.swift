@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 4 -requirement-machine-inferred-signatures=on
+// RUN: %target-typecheck-verify-swift -swift-version 4
 
 func bet() where A : B {} // expected-error {{'where' clause cannot be applied to a non-generic top-level declaration}}
 

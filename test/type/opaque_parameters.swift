@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -requirement-machine-inferred-signatures=on -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -warn-redundant-requirements
 
 protocol P { }
 

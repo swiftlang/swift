@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -requirement-machine-protocol-signatures=on -requirement-machine-inferred-signatures=on %s
+// RUN: %target-swift-frontend -emit-silgen %s
 
 // When a protocol has a superclass requirement on 'Self' and the class
 // itself conforms concretely, the forwarding substitution map will have
