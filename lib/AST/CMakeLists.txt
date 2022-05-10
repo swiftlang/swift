@@ -79,6 +79,7 @@ add_swift_host_library(swiftAST STATIC
   RequirementEnvironment.cpp
   RequirementMachine/ConcreteContraction.cpp
   RequirementMachine/ConcreteTypeWitness.cpp
+  RequirementMachine/Diagnostics.cpp
   RequirementMachine/GenericSignatureQueries.cpp
   RequirementMachine/HomotopyReduction.cpp
   RequirementMachine/InterfaceType.cpp

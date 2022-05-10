@@ -1,7 +1,7 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=on -requirement-machine-inferred-signatures=on
+// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=on -requirement-machine-inferred-signatures=on -warn-redundant-requirements
 // RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-protocol-signatures=on -requirement-machine-inferred-signatures=on 2>&1 | %FileCheck %s
 
-// FIXME: The redundant conformance warnings here should not be emitted, since
+// FIXME(rqm-diagnostics): The redundant conformance warnings here should not be emitted, since
 // these requirements participate in conditional requirement inference.
 
 // CHECK-LABEL: conditional_requirement_inference_in_protocol.(file).Good@
