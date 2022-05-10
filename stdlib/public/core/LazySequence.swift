@@ -128,7 +128,7 @@
 /// and discards the resulting array. Instead, use `reduce` for summing 
 /// operations, or `forEach` or a `for`-`in` loop for operations with side 
 /// effects.
-public protocol LazySequenceProtocol<Elements>: Sequence {
+public protocol LazySequenceProtocol: Sequence {
   /// A `Sequence` that can contain the same elements as this one,
   /// possibly with a simpler type.
   ///
