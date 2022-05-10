@@ -2,9 +2,11 @@
 // REQUIRES: swift_in_compiler
 // REQUIRES: concurrency
 
-prefix operator /  // expected-error {{prefix operator may not contain '/'}}
-prefix operator ^/ // expected-error {{prefix operator may not contain '/'}}
-prefix operator /^/ // expected-error {{prefix operator may not contain '/'}}
+prefix operator /
+prefix operator ^/
+prefix operator /^/
+
+prefix func ^/ <T> (_ x: T) -> T { x } // expected-note {{'^/' declared here}}
 
 prefix operator !!
 prefix func !! <T>(_ x: T) -> T { x }
@@ -53,8 +55,9 @@ do {
   // expected-error@-3 {{'/' is not a postfix unary operator}}
 }
 
+// No closing '/' so a prefix operator.
 _ = /x
-// expected-error@-1 {{unterminated regex literal}}
+// expected-error@-1 {{'/' is not a prefix unary operator}}
 
 _ = !/x/
 // expected-error@-1 {{cannot convert value of type 'Regex<Substring>' to expected argument type 'Bool'}}
@@ -250,13 +253,15 @@ _ = await /x / // expected-warning {{no 'async' operations occur within 'await' 
 // written a comment and is still in the middle of writing the characters before
 // it.
 _ = /x// comment
-// expected-error@-1 {{unterminated regex literal}}
+// expected-error@-1 {{'/' is not a prefix unary operator}}
 
 _ = /x // comment
-// expected-error@-1 {{unterminated regex literal}}
+// expected-error@-1 {{'/' is not a prefix unary operator}}
 
 _ = /x/*comment*/
-// expected-error@-1 {{unterminated regex literal}}
+// expected-error@-1 {{'/' is not a prefix unary operator}}
+
+// MARK: Unapplied operators
 
 // These become regex literals, unless surrounded in parens.
 func baz(_ x: (Int, Int) -> Int, _ y: (Int, Int) -> Int) {} // expected-note 4{{'baz' declared here}}
@@ -319,6 +324,26 @@ do {
 let arr: [Double] = [2, 3, 4]
 _ = arr.reduce(1, /) / 3
 _ = arr.reduce(1, /) + arr.reduce(1, /)
+
+// MARK: Backticks behavior
+
+// This is a prefix operator, even if there is a closing '/'.
+_ = `/`x
+// expected-error@-1 {{'/' is not a prefix unary operator}}
+
+_ = `/`x/
+// expected-error@-1 {{'/' is not a prefix unary operator}}
+// expected-error@-2 {{'/' is not a postfix unary operator}}
+
+_ = ^/x/
+// expected-error@-1 {{'^' is not a prefix unary operator}}
+
+_ = `^/`x/
+// expected-error@-1 {{'/' is not a postfix unary operator}}
+
+_ = `!!`/x/
+
+// MARK: Starting characters
 
 // Fine.
 _ = /./
