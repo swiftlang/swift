@@ -14,7 +14,6 @@ public struct S {
 // CHECK:        vendor
 // CHECK-NEXT:   operatingSystem
 // CHECK-NEXT:     name
-// CHECK-NEXT:     minimumVersion 
+// CHECK-NEXT:     minimumVersion
 // CHECK-NEXT:       major
 // CHECK-NEXT:       minor
-// CHECK-NEXT:       patch
