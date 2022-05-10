@@ -119,7 +119,6 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
     genericParams->setDepth(opaqueSignatureDepth);
 
     InferredGenericSignatureRequest request{
-        originatingDC->getParentModule(),
         outerGenericSignature.getPointer(),
         genericParams,
         WhereClauseOwner(),
@@ -739,7 +738,7 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
   }
 
   auto request = InferredGenericSignatureRequest{
-      GC->getParentModule(), parentSig.getPointer(),
+      parentSig.getPointer(),
       GC->getGenericParams(), WhereClauseOwner(GC),
       sameTypeReqs, inferenceSources,
       allowConcreteGenericParams};

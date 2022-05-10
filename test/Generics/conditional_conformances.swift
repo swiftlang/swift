@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-inferred-signatures=on -warn-redundant-requirements
-// RUN: %target-typecheck-verify-swift -debug-generic-signatures -requirement-machine-inferred-signatures=on -warn-redundant-requirements > %t.dump 2>&1
+// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift -debug-generic-signatures -warn-redundant-requirements > %t.dump 2>&1
 // RUN: %FileCheck %s < %t.dump
 
 protocol P1 {}

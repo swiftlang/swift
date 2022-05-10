@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s -requirement-machine-abstract-signatures=on | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s | %FileCheck %s
 
 // This is a GenericSignatureBuilder bug fixed with the Requirement Machine, from
 // https://bugs.swift.org/browse/SR-15917.

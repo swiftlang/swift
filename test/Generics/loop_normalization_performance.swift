@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-inferred-signatures=on
+// RUN: %target-typecheck-verify-swift
 
 // This test was reduced from the NonEmpty open-source project; it motivated enabling
 // loop normalization by default, since without it, it takes too long to complete.

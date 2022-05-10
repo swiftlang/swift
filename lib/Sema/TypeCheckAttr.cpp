@@ -2443,7 +2443,6 @@ static void checkSpecializeAttrRequirements(SpecializeAttr *attr,
 /// Type check that a set of requirements provided by @_specialize.
 /// Store the set of requirements in the attribute.
 void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
-  DeclContext *DC = D->getDeclContext();
   auto *FD = cast<AbstractFunctionDecl>(D);
   auto genericSig = FD->getGenericSignature();
   auto *trailingWhereClause = attr->getTrailingWhereClause();
@@ -2469,7 +2468,6 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   }
 
   InferredGenericSignatureRequest request{
-      DC->getParentModule(),
       genericSig.getPointer(),
       /*genericParams=*/nullptr,
       WhereClauseOwner(FD, attr),
@@ -4675,7 +4673,6 @@ bool resolveDifferentiableAttrDerivativeGenericSignature(
     }
 
     InferredGenericSignatureRequest request{
-        original->getParentModule(),
         originalGenSig.getPointer(),
         /*genericParams=*/nullptr,
         WhereClauseOwner(original, attr),

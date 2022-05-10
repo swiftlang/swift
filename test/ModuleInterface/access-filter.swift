@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name AccessFilter -requirement-machine-inferred-signatures=on
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name AccessFilter
 // RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name AccessFilter
 // RUN: %FileCheck %s < %t.swiftinterface
 // RUN: %FileCheck -check-prefix NEGATIVE %s < %t.swiftinterface
