@@ -139,7 +139,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Decl.h"
-#include "swift/AST/GenericParamKey.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/Type.h"
@@ -152,24 +151,48 @@
 using namespace swift;
 using namespace rewriting;
 
+/// Strip associated types from types used as keys to erase differences between
+/// resolved types coming from the parent generic signature and unresolved types
+/// coming from user-written requirements.
+static CanType stripBoundDependentMemberTypes(Type t) {
+  if (auto *depMemTy = t->getAs<DependentMemberType>()) {
+    return CanType(DependentMemberType::get(
+      stripBoundDependentMemberTypes(depMemTy->getBase()),
+      depMemTy->getName()));
+  }
+
+  return t->getCanonicalType();
+}
+
 namespace {
 
 /// Utility class to store some shared state.
 class ConcreteContraction {
   bool Debug;
 
-  llvm::SmallDenseMap<GenericParamKey,
-                      llvm::SmallDenseSet<Type, 1>> ConcreteTypes;
-  llvm::SmallDenseMap<GenericParamKey,
-                      llvm::SmallDenseSet<Type, 1>> Superclasses;
-  llvm::SmallDenseMap<GenericParamKey,
-                      llvm::SmallVector<ProtocolDecl *, 1>> Conformances;
+  llvm::SmallDenseMap<CanType, llvm::SmallDenseSet<Type, 1>> ConcreteTypes;
+  llvm::SmallDenseMap<CanType, llvm::SmallDenseSet<Type, 1>> Superclasses;
+  llvm::SmallDenseMap<CanType, llvm::SmallVector<ProtocolDecl *, 1>> Conformances;
 
-  Optional<Type> substTypeParameter(GenericTypeParamType *rootParam,
-                                    DependentMemberType *memberType,
-                                    Type concreteType) const;
-  Type substTypeParameter(Type type,
-                          bool subjectTypeOfConformance=false) const;
+  enum Position {
+    /// Base type of some other type appearing in a requirement.
+    BaseType,
+
+    /// Subject type of a conformance requirement.
+    ConformanceRequirement,
+
+    /// Subject type of a superclass requirement.
+    SuperclassRequirement,
+
+    /// Subject type of a same-type requirement.
+    SameTypeRequirement,
+
+    /// Some other position.
+    Other
+  };
+
+  Optional<Type> substTypeParameterRec(Type type, Position position) const;
+  Type substTypeParameter(Type type, Position position) const;
   Type substType(Type type) const;
   Requirement substRequirement(const Requirement &req) const;
 
@@ -201,67 +224,99 @@ public:
 /// to be some subclass of SomeClass which does conform to Sequence;
 /// this is perfectly valid, and we cannot substitute the 'T.Element'
 /// requirement. In this case, this method returns None.
-Optional<Type> ConcreteContraction::substTypeParameter(
-    GenericTypeParamType *rootParam,
-    DependentMemberType *memberType,
-    Type concreteType) const {
-  if (memberType == nullptr)
-    return concreteType;
+Optional<Type> ConcreteContraction::substTypeParameterRec(
+    Type type, Position position) const {
 
-  auto baseType = memberType->getBase()->getAs<DependentMemberType>();
-  auto substBaseType = substTypeParameter(rootParam, baseType, concreteType);
-  if (!substBaseType)
-    return None;
+  // If the requirement is of the form 'T == C' or 'T : C', don't
+  // substitute T, since then we end up with 'C == C' or 'C : C',
+  // losing the requirement.
+  if (position == Position::BaseType ||
+      position == Position::ConformanceRequirement) {
 
-  // A resolved DependentMemberType stores an associated type declaration.
-  //
-  // Handle this by looking up the corresponding type witness in the base
-  // type's conformance to the associated type's protocol.
-  if (auto *assocType = memberType->getAssocType()) {
-    auto *proto = assocType->getProtocol();
-    auto *module = proto->getParentModule();
+    Type concreteType;
+    {
+      auto found = ConcreteTypes.find(stripBoundDependentMemberTypes(type));
+      if (found != ConcreteTypes.end() && found->second.size() == 1)
+        concreteType = *found->second.begin();
+    }
 
-    auto conformance = ((*substBaseType)->isTypeParameter()
-                        ? ProtocolConformanceRef(proto)
-                        : module->lookupConformance(*substBaseType, proto,
-                                                    /*allowMissing=*/true));
+    Type superclass;
+    {
+      auto found = Superclasses.find(stripBoundDependentMemberTypes(type));
+      if (found != Superclasses.end() && found->second.size() == 1)
+        superclass = *found->second.begin();
+    }
 
-    // The base type doesn't conform, in which case the requirement remains
-    // unsubstituted.
-    if (!conformance) {
+    // If we have both, prefer the concrete type requirement since it is more
+    // specific.
+    if (!concreteType && superclass)
+      concreteType = superclass;
+
+    if (concreteType) {
+      return concreteType;
+    }
+  }
+
+  if (auto *memberType = type->getAs<DependentMemberType>()) {
+    auto baseType = memberType->getBase();
+    auto substBaseType = substTypeParameterRec(baseType, Position::BaseType);
+    if (!substBaseType)
+      return None;
+
+    // A resolved DependentMemberType stores an associated type declaration.
+    //
+    // Handle this by looking up the corresponding type witness in the base
+    // type's conformance to the associated type's protocol.
+    if (auto *assocType = memberType->getAssocType()) {
+      auto *proto = assocType->getProtocol();
+      auto *module = proto->getParentModule();
+
+      // The 'Sendable' protocol does not declare any associated types, so the
+      // 'allowMissing' value here is actually irrelevant.
+      auto conformance = ((*substBaseType)->isTypeParameter()
+                          ? ProtocolConformanceRef(proto)
+                          : module->lookupConformance(*substBaseType, proto,
+                                                      /*allowMissing=*/false));
+
+      // The base type doesn't conform, in which case the requirement remains
+      // unsubstituted.
+      if (!conformance) {
+        if (Debug) {
+          llvm::dbgs() << "@@@ " << substBaseType << " does not conform to "
+                       << proto->getName() << "\n";
+        }
+        return None;
+      }
+
+      return assocType->getDeclaredInterfaceType()
+                      ->castTo<DependentMemberType>()
+                      ->substBaseType(module, *substBaseType);
+    }
+
+    // An unresolved DependentMemberType stores an identifier. Handle this
+    // by performing a name lookup into the base type.
+    SmallVector<TypeDecl *, 2> concreteDecls;
+    lookupConcreteNestedType(*substBaseType, memberType->getName(), concreteDecls);
+
+    auto *typeDecl = findBestConcreteNestedType(concreteDecls);
+    if (typeDecl == nullptr) {
+      // The base type doesn't contain a member type with this name, in which
+      // case the requirement remains unsubstituted.
       if (Debug) {
-        llvm::dbgs() << "@@@ " << substBaseType << " does not conform to "
-                     << proto->getName() << "\n";
+        llvm::dbgs() << "@@@ Lookup of " << memberType->getName() << " failed on "
+                     << *substBaseType << "\n";
       }
       return None;
     }
 
-    return assocType->getDeclaredInterfaceType()
-                    ->castTo<DependentMemberType>()
-                    ->substBaseType(module, *substBaseType);
+    // Substitute the base type into the member type.
+    auto *dc = typeDecl->getDeclContext();
+    auto subMap = (*substBaseType)->getContextSubstitutionMap(
+        dc->getParentModule(), dc);
+    return typeDecl->getDeclaredInterfaceType().subst(subMap);
   }
 
-  // An unresolved DependentMemberType stores an identifier. Handle this
-  // by performing a name lookup into the base type.
-  SmallVector<TypeDecl *, 2> concreteDecls;
-  lookupConcreteNestedType(*substBaseType, memberType->getName(), concreteDecls);
-
-  auto *typeDecl = findBestConcreteNestedType(concreteDecls);
-  if (typeDecl == nullptr) {
-    // The base type doesn't contain a member type with this name, in which
-    // case the requirement remains unsubstituted.
-    if (Debug) {
-      llvm::dbgs() << "@@@ Lookup of " << memberType->getName() << " failed on "
-                   << *substBaseType << "\n";
-    }
-    return None;
-  }
-
-  // Substitute the base type into the member type.
-  auto *dc = typeDecl->getDeclContext();
-  auto subMap = (*substBaseType)->getContextSubstitutionMap(
-      dc->getParentModule(), dc);
-  return typeDecl->getDeclaredInterfaceType().subst(subMap);
+  return None;
 }
 
 /// Replace the generic parameter at the root of \p type, which must be a
@@ -273,48 +328,10 @@ Optional<Type> ConcreteContraction::substTypeParameter(
 /// itself does not become concrete when it's superclass-constrained, unless
 /// it is the subject of a conformance requirement.
 Type ConcreteContraction::substTypeParameter(
-    Type type, bool subjectTypeOfConformance) const {
+    Type type, Position position) const {
   assert(type->isTypeParameter());
 
-  auto rootParam = type->getRootGenericParam();
-  auto key = GenericParamKey(rootParam);
-
-  Type concreteType;
-  {
-    auto found = ConcreteTypes.find(key);
-    if (found != ConcreteTypes.end() && found->second.size() == 1)
-      concreteType = *found->second.begin();
-  }
-
-  Type superclass;
-  {
-    auto found = Superclasses.find(key);
-    if (found != Superclasses.end() && found->second.size() == 1)
-      superclass = *found->second.begin();
-  }
-
-  if (!concreteType && !superclass)
-    return type;
-
-  // If we have both, prefer the concrete type requirement since it is more
-  // specific.
-  if (!concreteType) {
-    assert(superclass);
-
-    // For a superclass requirement, don't substitute the generic parameter
-    // itself, only nested types thereof -- unless it's the subject type of
-    // a conformance requirement.
-    if (type->is<GenericTypeParamType>() &&
-        !subjectTypeOfConformance)
-      return type;
-
-    concreteType = superclass;
-  }
-
-  auto result = substTypeParameter(
-      rootParam, type->getAs<DependentMemberType>(),
-      concreteType);
-
+  auto result = substTypeParameterRec(type, position);
   if (!result)
     return type;
 
@@ -328,7 +345,7 @@ Type ConcreteContraction::substType(Type type) const {
         if (!type->isTypeParameter())
           return None;
 
-        return substTypeParameter(type);
+        return substTypeParameter(type, Position::Other);
       });
 }
 
@@ -340,14 +357,10 @@ ConcreteContraction::substRequirement(const Requirement &req) const {
   switch (req.getKind()) {
   case RequirementKind::Superclass:
   case RequirementKind::SameType: {
-    auto substFirstType = firstType;
-
-    // If the requirement is of the form 'T == C' or 'T : C', don't
-    // substitute T, since then we end up with 'C == C' or 'C : C',
-    // losing the requirement.
-    if (!firstType->is<GenericTypeParamType>()) {
-      substFirstType = substTypeParameter(firstType);
-    }
+    auto position = (req.getKind() == RequirementKind::Superclass
+                     ? Position::SuperclassRequirement
+                     : Position::SameTypeRequirement);
+    auto substFirstType = substTypeParameter(firstType, position);
 
     auto secondType = req.getSecondType();
     auto substSecondType = substType(secondType);
@@ -359,7 +372,7 @@ ConcreteContraction::substRequirement(const Requirement &req) const {
 
   case RequirementKind::Conformance: {
     auto substFirstType = substTypeParameter(
-        firstType, /*subjectTypeOfConformance=*/true);
+        firstType, Position::ConformanceRequirement);
 
     auto *proto = req.getProtocolDecl();
     auto *module = proto->getParentModule();
@@ -373,11 +386,8 @@ ConcreteContraction::substRequirement(const Requirement &req) const {
     // 'T : Sendable' would be incorrect; we want to ensure that we only admit
     // subclasses of 'C' which are 'Sendable'.
     bool allowMissing = false;
-    if (auto *rootParam = firstType->getAs<GenericTypeParamType>()) {
-      auto key = GenericParamKey(rootParam);
-      if (ConcreteTypes.count(key) > 0)
-        allowMissing = true;
-    }
+    if (ConcreteTypes.count(stripBoundDependentMemberTypes(firstType)) > 0)
+      allowMissing = true;
 
     if (!substFirstType->isTypeParameter() &&
         !module->lookupConformance(substFirstType, proto,
@@ -398,7 +408,7 @@ ConcreteContraction::substRequirement(const Requirement &req) const {
   }
 
   case RequirementKind::Layout: {
-    auto substFirstType = substTypeParameter(firstType);
+    auto substFirstType = substTypeParameter(firstType, Position::Other);
     if (!substFirstType->isTypeParameter() &&
         !substFirstType->satisfiesClassConstraint() &&
         req.getLayoutConstraint()->isClass()) {
@@ -422,22 +432,18 @@ hasResolvedMemberTypeOfInterestingParameter(Type type) const {
         return false;
 
       auto baseTy = memberTy->getBase();
-      if (auto *genericParam = baseTy->getAs<GenericTypeParamType>()) {
-        GenericParamKey key(genericParam);
+      Type concreteType;
+      {
+        auto found = ConcreteTypes.find(stripBoundDependentMemberTypes(baseTy));
+        if (found != ConcreteTypes.end() && found->second.size() == 1)
+          return true;
+      }
 
-        Type concreteType;
-        {
-          auto found = ConcreteTypes.find(key);
-          if (found != ConcreteTypes.end() && found->second.size() == 1)
-            return true;
-        }
-
-        Type superclass;
-        {
-          auto found = Superclasses.find(key);
-          if (found != Superclasses.end() && found->second.size() == 1)
-            return true;
-        }
+      Type superclass;
+      {
+        auto found = Superclasses.find(stripBoundDependentMemberTypes(baseTy));
+        if (found != Superclasses.end() && found->second.size() == 1)
+          return true;
       }
     }
 
@@ -470,9 +476,21 @@ bool ConcreteContraction::preserveSameTypeRequirement(
   if (req.getKind() != RequirementKind::SameType)
     return false;
 
-  if (Superclasses.find(req.getFirstType()->getRootGenericParam())
-      == Superclasses.end())
+  // One of the parent types of this type parameter should be subject
+  // to a superclass requirement.
+  auto type = req.getFirstType();
+  while (true) {
+    if (Superclasses.find(stripBoundDependentMemberTypes(type))
+        != Superclasses.end())
+      break;
+
+    if (auto *memberType = type->getAs<DependentMemberType>()) {
+      type = memberType->getBase();
+      continue;
+    }
+
     return false;
+  }
 
   if (hasResolvedMemberTypeOfInterestingParameter(req.getFirstType()) ||
       hasResolvedMemberTypeOfInterestingParameter(req.getSecondType()))
@@ -500,10 +518,6 @@ bool ConcreteContraction::performConcreteContraction(
     assert(subjectType->isTypeParameter() &&
            "You forgot to call desugarRequirement()");
 
-    auto genericParam = subjectType->getAs<GenericTypeParamType>();
-    if (!genericParam)
-      continue;
-
     auto kind = req.req.getKind();
     switch (kind) {
     case RequirementKind::SameType: {
@@ -514,7 +528,8 @@ bool ConcreteContraction::performConcreteContraction(
       if (constraintType->isTypeParameter())
         break;
 
-      ConcreteTypes[GenericParamKey(genericParam)].insert(constraintType);
+      ConcreteTypes[stripBoundDependentMemberTypes(subjectType)]
+          .insert(constraintType);
       break;
     }
     case RequirementKind::Superclass: {
@@ -522,12 +537,14 @@ bool ConcreteContraction::performConcreteContraction(
       assert(!constraintType->isTypeParameter() &&
              "You forgot to call desugarRequirement()");
 
-      Superclasses[GenericParamKey(genericParam)].insert(constraintType);
+      Superclasses[stripBoundDependentMemberTypes(subjectType)]
+          .insert(constraintType);
       break;
     }
     case RequirementKind::Conformance: {
       auto *protoDecl = req.req.getProtocolDecl();
-      Conformances[GenericParamKey(genericParam)].push_back(protoDecl);
+      Conformances[stripBoundDependentMemberTypes(subjectType)]
+          .push_back(protoDecl);
 
       break;
     }
@@ -553,9 +570,9 @@ bool ConcreteContraction::performConcreteContraction(
       if (auto otherSuperclassTy = proto->getSuperclass()) {
         if (Debug) {
           llvm::dbgs() << "@ Subject type of superclass requirement "
-                       << "τ_" << subjectType.Depth << "_" << subjectType.Index
-                       << " : " << superclassTy << " conforms to "
-                       << proto->getName() << " which has a superclass bound "
+                       << "τ_" << subjectType << " : " << superclassTy
+                       << " conforms to "<< proto->getName()
+                       << " which has a superclass bound "
                        << otherSuperclassTy << "\n";
         }
 
@@ -574,8 +591,7 @@ bool ConcreteContraction::performConcreteContraction(
   if (Debug) {
     llvm::dbgs() << "@ Concrete types: @\n";
     for (auto pair : ConcreteTypes) {
-      llvm::dbgs() << "- τ_" << pair.first.Depth
-                   << "_" << pair.first.Index;
+      llvm::dbgs() << pair.first;
       if (pair.second.size() == 1) {
         llvm::dbgs() << " == " << *pair.second.begin() << "\n";
       } else {
@@ -585,8 +601,7 @@ bool ConcreteContraction::performConcreteContraction(
 
     llvm::dbgs() << "@ Superclasses: @\n";
     for (auto pair : Superclasses) {
-      llvm::dbgs() << "- τ_" << pair.first.Depth
-                   << "_" << pair.first.Index;
+      llvm::dbgs() << pair.first;
       if (pair.second.size() == 1) {
         llvm::dbgs() << " : " << *pair.second.begin() << "\n";
       } else {

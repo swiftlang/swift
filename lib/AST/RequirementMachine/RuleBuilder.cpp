@@ -101,6 +101,21 @@ void RuleBuilder::initWithProtocolSignatureRequirements(
     addPermanentProtocolRules(proto);
 
     auto reqs = proto->getRequirementSignature();
+
+    // If completion failed, we'll have a totally empty requirement signature,
+    // but to maintain invariants around what constitutes a valid rewrite term
+    // between getTypeForTerm() and isValidTypeInContext(), we need to add rules
+    // for inherited protocols.
+    if (reqs.getErrors().contains(GenericSignatureErrorFlags::CompletionFailed)) {
+      for (auto *inheritedProto : Context.getInheritedProtocols(proto)) {
+        Requirement req(RequirementKind::Conformance,
+                        proto->getSelfInterfaceType(),
+                        inheritedProto->getDeclaredInterfaceType());
+
+        addRequirement(req.getCanonical(), proto);
+      }
+    }
+
     for (auto req : reqs.getRequirements())
       addRequirement(req.getCanonical(), proto);
     for (auto alias : reqs.getTypeAliases())
