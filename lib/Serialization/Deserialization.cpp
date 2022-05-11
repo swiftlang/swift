@@ -15,6 +15,7 @@
 #include "ModuleFile.h"
 #include "ModuleFormat.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Expr.h"
@@ -2589,6 +2590,10 @@ static void setOriginalDeclarationAndParameterIndicesInDifferentiableAttributes(
     auto *diffAttr = const_cast<DifferentiableAttr *>(attr);
     diffAttr->setOriginalDeclaration(decl);
     diffAttr->setParameterIndices(diffAttrParamIndicesMap[diffAttr]);
+  }
+  for (auto *attr : tempAttrs.getAttributes<DerivativeAttr>()) {
+    auto *derAttr = const_cast<DerivativeAttr *>(attr);
+    derAttr->setOriginalDeclaration(decl);
   }
 }
 

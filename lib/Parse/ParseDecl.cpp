@@ -4457,6 +4457,8 @@ setOriginalDeclarationForDifferentiableAttributes(DeclAttributes attrs,
                                                   Decl *D) {
   for (auto *attr : attrs.getAttributes<DifferentiableAttr>())
     const_cast<DifferentiableAttr *>(attr)->setOriginalDeclaration(D);
+  for (auto *attr : attrs.getAttributes<DerivativeAttr>())
+    const_cast<DerivativeAttr *>(attr)->setOriginalDeclaration(D);
 }
 
 /// Parse a single syntactic declaration and return a list of decl
