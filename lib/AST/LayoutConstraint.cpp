@@ -51,16 +51,16 @@ LayoutConstraint getLayoutConstraint(Identifier ID, ASTContext &Ctx) {
       LayoutConstraintKind::UnknownLayout, Ctx);
 }
 
-StringRef LayoutConstraintInfo::getName() const {
-  return getName(getKind());
+StringRef LayoutConstraintInfo::getName(bool useClassLayoutName) const {
+  return getName(getKind(), useClassLayoutName);
 }
 
-StringRef LayoutConstraintInfo::getName(LayoutConstraintKind Kind) {
+StringRef LayoutConstraintInfo::getName(LayoutConstraintKind Kind, bool useClassLayoutName) {
   switch (Kind) {
   case LayoutConstraintKind::UnknownLayout:
     return "_UnknownLayout";
   case LayoutConstraintKind::Class:
-    return "AnyObject";
+    return useClassLayoutName ? "_Class" : "AnyObject";
   case LayoutConstraintKind::NativeClass:
     return "_NativeClass";
   case LayoutConstraintKind::RefCountedObject:

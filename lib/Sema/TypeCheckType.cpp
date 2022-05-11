@@ -3098,6 +3098,11 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
     attrs.clearAttribute(TAK_noDerivative);
   }
 
+  if (attrs.has(TAK__noMetadata)) {
+    // TODO: add proper validation
+    attrs.clearAttribute(TAK__noMetadata);
+  }
+
   // In SIL files *only*, permit @weak and @unowned to apply directly to types.
   if (attrs.hasOwnership()) {
     if (auto SF = getDeclContext()->getParentSourceFile()) {

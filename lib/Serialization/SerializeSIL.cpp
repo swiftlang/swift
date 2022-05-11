@@ -558,12 +558,18 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
     }
     ENCODE_VER_TUPLE(available, available)
 
+    llvm::SmallVector<IdentifierID, 4> typeErasedParamsIDs;
+    for (auto ty : SA->getTypeErasedParams()) {
+      typeErasedParamsIDs.push_back(S.addTypeRef(ty));
+    }
+
     SILSpecializeAttrLayout::emitRecord(
         Out, ScratchRecord, specAttrAbbrCode, (unsigned)SA->isExported(),
         (unsigned)SA->getSpecializationKind(),
         S.addGenericSignatureRef(SA->getSpecializedSignature()),
         targetFunctionNameID, spiGroupID, spiModuleDeclID,
-        LIST_VER_TUPLE_PIECES(available));
+        LIST_VER_TUPLE_PIECES(available), typeErasedParamsIDs
+        );
   }
 
   // Assign a unique ID to each basic block of the SILFunction.

@@ -166,7 +166,8 @@ namespace swift {
                                GenericParamList *GenericParams) const;
 
     void convertRequirements(ArrayRef<RequirementRepr> From,
-                             SmallVectorImpl<Requirement> &To);
+                             SmallVectorImpl<Requirement> &To,
+                             SmallVectorImpl<Type> &typeErasedParams);
 
     ProtocolConformanceRef parseProtocolConformanceHelper(
         ProtocolDecl *&proto,
@@ -918,7 +919,8 @@ bool SILParser::parseSILQualifier(
 
 /// Remap RequirementReps to Requirements.
 void SILParser::convertRequirements(ArrayRef<RequirementRepr> From,
-                                    SmallVectorImpl<Requirement> &To) {
+                                    SmallVectorImpl<Requirement> &To,
+                                    SmallVectorImpl<Type> &typeErasedParams) {
   if (From.empty()) {
     To.clear();
     return;
@@ -955,8 +957,16 @@ void SILParser::convertRequirements(ArrayRef<RequirementRepr> From,
       Requirement ConvertedRequirement(RequirementKind::Layout, Subject,
                                        Req.getLayoutConstraint());
       To.push_back(ConvertedRequirement);
+
+      if (auto *attributedTy = dyn_cast<AttributedTypeRepr>(Req.getSubjectRepr())) {
+        if (attributedTy->getAttrs().has(TAK__noMetadata)) {
+          typeErasedParams.push_back(Subject);
+        }
+      }
+
       continue;
     }
+
     llvm_unreachable("Unsupported requirement kind");
   }
 }
@@ -6630,14 +6640,14 @@ bool SILParserState::parseDeclSIL(Parser &P) {
           for (auto &Attr : SpecAttrs) {
             SmallVector<Requirement, 2> requirements;
             // Resolve types and convert requirements.
-            FunctionState.convertRequirements(Attr.requirements, requirements);
+            FunctionState.convertRequirements(Attr.requirements, requirements, typeErasedParams);
             auto *fenv = FunctionState.F->getGenericEnvironment();
             auto genericSig = buildGenericSignature(P.Context,
                                                     fenv->getGenericSignature(),
                                                     /*addedGenericParams=*/{ },
                                                     std::move(requirements));
             FunctionState.F->addSpecializeAttr(SILSpecializeAttr::create(
-                FunctionState.F->getModule(), genericSig, Attr.exported,
+                FunctionState.F->getModule(), genericSig, typeErasedParams, Attr.exported,
                 Attr.kind, Attr.target, Attr.spiGroupID, Attr.spiModule, Attr.availability));
           }
         }

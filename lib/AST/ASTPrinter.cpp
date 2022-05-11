@@ -1473,9 +1473,10 @@ void PrintAST::printInheritedFromRequirementSignature(ProtocolDecl *proto,
       [&](const Requirement &req) {
         // Skip the inferred 'Self : AnyObject' constraint if this is an
         // @objc protocol.
-        if (req.getKind() == RequirementKind::Layout &&
+        if ((req.getKind() == RequirementKind::Layout) &&
             req.getFirstType()->isEqual(proto->getProtocolSelfType()) &&
-            req.getLayoutConstraint()->getKind() == LayoutConstraintKind::Class &&
+            req.getLayoutConstraint()->getKind() ==
+                LayoutConstraintKind::Class &&
             proto->isObjC()) {
           return false;
         }
@@ -6626,7 +6627,7 @@ void LayoutConstraint::print(raw_ostream &OS,
 
 void LayoutConstraintInfo::print(ASTPrinter &Printer,
                                  const PrintOptions &PO) const {
-  Printer << getName();
+  Printer << getName(PO.PrintClassLayoutName);
   switch (getKind()) {
   case LayoutConstraintKind::UnknownLayout:
   case LayoutConstraintKind::RefCountedObject:
@@ -6667,6 +6668,43 @@ void GenericSignature::print(ASTPrinter &Printer,
   PrintAST(Printer, Opts).printGenericSignature(*this,
                                                 PrintAST::PrintParams |
                                                 PrintAST::PrintRequirements);
+}
+
+void GenericSignature::dump() const {
+  print(llvm::errs());
+  llvm::errs() << '\n';
+}
+
+void Requirement::dump() const {
+  dump(llvm::errs());
+  llvm::errs() << '\n';
+}
+void Requirement::dump(raw_ostream &out) const {
+  switch (getKind()) {
+  case RequirementKind::Conformance:
+    out << "conforms_to: ";
+    break;
+  case RequirementKind::Layout:
+    out << "layout: ";
+    break;
+  case RequirementKind::Superclass:
+    out << "superclass: ";
+    break;
+  case RequirementKind::SameType:
+    out << "same_type: ";
+    break;
+  }
+
+  PrintOptions opts;
+  opts.ProtocolQualifiedDependentMemberTypes = true;
+
+  getFirstType().print(out, opts);
+  out << " ";
+
+  if (getKind() != RequirementKind::Layout && getSecondType()) {
+    getSecondType().print(out, opts);
+  } else if (getLayoutConstraint())
+    out << getLayoutConstraint();
 }
 
 void Requirement::print(raw_ostream &os, const PrintOptions &opts) const {

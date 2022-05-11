@@ -1396,7 +1396,7 @@ public:
 class SpecializeAttr final
     : public DeclAttribute,
       private llvm::TrailingObjects<SpecializeAttr, Identifier,
-                                    AvailableAttr *> {
+                                    AvailableAttr *, Type> {
   friend class SpecializeAttrTargetDeclRequest;
   friend TrailingObjects;
 
@@ -1416,12 +1416,15 @@ private:
   uint64_t resolverContextData;
   size_t numSPIGroups;
   size_t numAvailableAttrs;
+  size_t numTypeErasedParams;
+  bool typeErasedParamsInitialized;
 
   SpecializeAttr(SourceLoc atLoc, SourceRange Range,
                  TrailingWhereClause *clause, bool exported,
                  SpecializationKind kind, GenericSignature specializedSignature,
                  DeclNameRef targetFunctionName, ArrayRef<Identifier> spiGroups,
-                 ArrayRef<AvailableAttr *> availabilityAttrs);
+                 ArrayRef<AvailableAttr *> availabilityAttrs,
+                 size_t typeErasedParamsCount);
 
 public:
   static SpecializeAttr *
@@ -1429,6 +1432,7 @@ public:
          TrailingWhereClause *clause, bool exported, SpecializationKind kind,
          DeclNameRef targetFunctionName, ArrayRef<Identifier> spiGroups,
          ArrayRef<AvailableAttr *> availabilityAttrs,
+         size_t typeErasedParamsCount,
          GenericSignature specializedSignature = nullptr);
 
   static SpecializeAttr *create(ASTContext &ctx, bool exported,
@@ -1442,6 +1446,7 @@ public:
                                 SpecializationKind kind,
                                 ArrayRef<Identifier> spiGroups,
                                 ArrayRef<AvailableAttr *> availabilityAttrs,
+                                ArrayRef<Type> typeErasedParams,
                                 GenericSignature specializedSignature,
                                 DeclNameRef replacedFunction,
                                 LazyMemberLoader *resolver, uint64_t data);
@@ -1465,6 +1470,22 @@ public:
   ArrayRef<AvailableAttr *> getAvailableAttrs() const {
     return {this->template getTrailingObjects<AvailableAttr *>(),
             numAvailableAttrs};
+  }
+
+  ArrayRef<Type> getTypeErasedParams() const {
+    if (!typeErasedParamsInitialized)
+      return {};
+
+    return {this->template getTrailingObjects<Type>(),
+            numTypeErasedParams};
+  }
+
+  void setTypeErasedParams(const ArrayRef<Type> typeErasedParams) {
+    assert(typeErasedParams.size() == numTypeErasedParams);
+    if (!typeErasedParamsInitialized) {
+      std::uninitialized_copy(typeErasedParams.begin(), typeErasedParams.end(), getTrailingObjects<Type>());
+      typeErasedParamsInitialized = true;
+    }
   }
 
   TrailingWhereClause *getTrailingWhereClause() const;
@@ -2180,6 +2201,19 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_TypeSequence;
+  }
+};
+
+/// The @_noMetadata attribute, which marks a generic param as not providing metadata
+class NoMetadataAttr : public DeclAttribute {
+  NoMetadataAttr(SourceLoc atLoc, SourceRange Range);
+
+public:
+  static NoMetadataAttr *create(ASTContext &Ctx, SourceLoc atLoc,
+                                SourceRange Range);
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_NoMetadata;
   }
 };
 
