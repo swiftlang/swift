@@ -6203,19 +6203,6 @@ void SkipUnhandledConstructInResultBuilderFailure::diagnosePrimary(
   }
 
   if (auto stmt = unhandled.dyn_cast<Stmt *>()) {
-    if (auto *switchStmt = getAsStmt<SwitchStmt>(stmt)) {
-      auto caseStmts = switchStmt->getCases();
-      if (caseStmts.empty())
-        return;
-    }
-
-    // Empty case statements are diagnosed by parser.
-    if (auto *caseStmt = getAsStmt<CaseStmt>(stmt)) {
-      auto *body = caseStmt->getBody();
-      if (body->getNumElements() == 0)
-        return;
-    }
-
     emitDiagnostic(asNote ? diag::note_result_builder_control_flow
                           : diag::result_builder_control_flow,
                    builder->getName());
@@ -6287,6 +6274,27 @@ void SkipUnhandledConstructInResultBuilderFailure::diagnosePrimary(
 }
 
 bool SkipUnhandledConstructInResultBuilderFailure::diagnoseAsError() {
+  // Following errors are already diagnosed:
+  //  - brace statement - error related to absence of appropriate buildBlock
+  //  - switch/case statements - empty body
+  if (auto *stmt = unhandled.dyn_cast<Stmt *>()) {
+    if (isa<BraceStmt>(stmt))
+      return true;
+
+    if (auto *switchStmt = getAsStmt<SwitchStmt>(stmt)) {
+      auto caseStmts = switchStmt->getCases();
+      if (caseStmts.empty())
+        return true;
+    }
+
+    // Empty case statements are diagnosed by parser.
+    if (auto *caseStmt = getAsStmt<CaseStmt>(stmt)) {
+      auto *body = caseStmt->getBody();
+      if (body->getNumElements() == 0)
+        return true;
+    }
+  }
+
   diagnosePrimary(/*asNote=*/false);
   emitDiagnosticAt(builder, diag::kind_declname_declared_here,
                    builder->getDescriptiveKind(), builder->getName());
