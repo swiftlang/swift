@@ -2,6 +2,9 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name main
 // RUN: %FileCheck %s < %t.swiftinterface
 
+// Verify that `any` is not required in swiftinterfaces.
+// RUN: %target-swift-typecheck-module-from-interface(%S/Inputs/existential-any-ignore-missing-in-interface.swiftinterface) -module-name ExistentialAnyMissing
+
 // CHECK: public protocol P
 public protocol P { }
 
