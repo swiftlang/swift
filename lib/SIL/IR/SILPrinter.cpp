@@ -2774,6 +2774,10 @@ void SILInstruction::print(raw_ostream &OS) const {
   SILPrinter(Ctx).print(this);
 }
 
+void NonSingleValueInstruction::dump() const {
+  SILNode::dump();
+}
+
 /// Pretty-print the SILBasicBlock to errs.
 void SILBasicBlock::dump() const {
   print(llvm::errs());
