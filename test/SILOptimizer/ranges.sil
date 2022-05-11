@@ -2,6 +2,8 @@
 
 // REQUIRES: swift_in_compiler
 
+// REQUIRES: rdar92963081
+
 sil_stage canonical
 
 // CHECK-LABEL: Instruction range in basic_test:
