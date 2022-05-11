@@ -311,6 +311,7 @@ static ValidationInfo validateControlBlock(
       // Tagged compilers should only load modules if they were
       // produced by the exact same compiler tag.
 
+#ifndef NDEBUG
       // Disable this restriction for compiler testing by setting this
       // env var to any value.
       static const char* ignoreRevision =
@@ -323,14 +324,16 @@ static ValidationInfo validateControlBlock(
       // revision.
       static const char* forcedDebugRevision =
         ::getenv("SWIFT_DEBUG_FORCE_SWIFTMODULE_REVISION");
+#else // NDEBUG
+      static const char* forcedDebugRevision = nullptr;
+#endif
 
       bool isCompilerTagged = forcedDebugRevision ||
         !version::Version::getCurrentCompilerVersion().empty();
-
-      StringRef moduleRevision = blobData;
       if (isCompilerTagged) {
         StringRef compilerRevision = forcedDebugRevision ?
           forcedDebugRevision : version::getSwiftRevision();
+        StringRef moduleRevision = blobData;
         if (moduleRevision != compilerRevision)
           result.status = Status::RevisionIncompatible;
       }

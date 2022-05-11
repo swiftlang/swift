@@ -1,3 +1,6 @@
+/// Tagged compilers should only load swiftmodules built by the same compiler tag.
+// REQUIRES: asserts
+
 // RUN: %empty-directory(%t/cache)
 // RUN: %empty-directory(%t/build)
 // RUN: %{python} %utils/split_file.py -o %t %s
