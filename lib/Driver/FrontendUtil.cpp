@@ -46,7 +46,7 @@ static void removeSupplementaryOutputs(llvm::opt::ArgList &ArgList) {
 
   for (llvm::opt::Arg *Arg : ArgList.getArgs()) {
     if (!Arg)
-      return;
+      continue;
 
     const llvm::opt::Option &Opt = Arg->getOption();
     if (Opt.hasFlag(options::SupplementaryOutput))
@@ -57,6 +57,7 @@ static void removeSupplementaryOutputs(llvm::opt::ArgList &ArgList) {
     ArgList.eraseArg(Specifier);
   }
 }
+
 bool swift::driver::getSingleFrontendInvocationFromDriverArguments(
     ArrayRef<const char *> Argv, DiagnosticEngine &Diags,
     llvm::function_ref<bool(ArrayRef<const char *> FrontendArgs)> Action,
