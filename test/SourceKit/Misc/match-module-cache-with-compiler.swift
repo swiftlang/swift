@@ -2,6 +2,10 @@
 // NOTE: Do not change this test without a review from @akyrtzi
 
 // REQUIRES: shell
+
+// https://github.com/apple/swift/issues/58786
+// UNSUPPORTED: OS=linux-gnu
+
 // RUN: %empty-directory(%t)
 
 // RUN: COMPILER_ARGS=( \
