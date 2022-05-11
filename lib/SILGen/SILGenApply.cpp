@@ -3119,7 +3119,7 @@ private:
     auto emissionKind = SGFAccessKind::BorrowedObjectRead;
     for (auto param : claimedParams) {
       assert(!param.isConsumed());
-      if (param.isIndirectInGuaranteed()) {
+      if (param.isIndirectInGuaranteed() && SGF.silConv.useLoweredAddresses()) {
         emissionKind = SGFAccessKind::BorrowedAddressRead;
         break;
       }
@@ -3497,8 +3497,10 @@ static void emitBorrowedLValueRecursive(SILGenFunction &SGF,
 
   // Load if necessary.
   assert(!param.isConsumed() && "emitting borrow into consumed parameter?");
-  if (!param.isIndirectInGuaranteed() && value.getType().isAddress()) {
-    value = SGF.B.createFormalAccessLoadBorrow(loc, value);
+  if (value.getType().isAddress()) {
+    if (!param.isIndirectInGuaranteed() || !SGF.silConv.useLoweredAddresses()) {
+      value = SGF.B.createFormalAccessLoadBorrow(loc, value);
+    }
   }
 
   assert(param.getInterfaceType() == value.getType().getASTType());
