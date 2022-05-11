@@ -2652,7 +2652,8 @@ namespace {
         func->diagnose(
             diag::local_function_executed_concurrently,
             func->getDescriptiveKind(), func->getName())
-          .fixItInsert(func->getAttributeInsertionLoc(false), "@Sendable ");
+          .fixItInsert(func->getAttributeInsertionLoc(false), "@Sendable ")
+          .warnUntilSwiftVersion(6);
 
         // Add the @Sendable attribute implicitly, so we don't diagnose
         // again.
