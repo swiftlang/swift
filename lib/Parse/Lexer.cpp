@@ -2677,6 +2677,16 @@ Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc,
   // we need to lex just the comment token.
   Lexer L(FakeLangOpts, SM, BufferID, nullptr, LexerMode::Swift,
           HashbangMode::Allowed, CRM);
+
+  if (SM.isRegexLiteralStart(Loc)) {
+    // HACK: If this was previously lexed as a regex literal, make sure we
+    // re-lex with forward slash regex literals enabled to make sure we get an
+    // accurate length. We can force EnableExperimentalStringProcessing on, as
+    // we know it must have been enabled to parse the regex in the first place.
+    FakeLangOpts.EnableExperimentalStringProcessing = true;
+    L.ForwardSlashRegexMode = LexerForwardSlashRegexMode::Always;
+  }
+
   L.restoreState(State(Loc));
   return L.peekNextToken();
 }
