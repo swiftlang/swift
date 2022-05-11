@@ -1938,6 +1938,10 @@ class DerivativeAttr final
   friend TrailingObjects;
   friend class DerivativeAttrOriginalDeclRequest;
 
+  /// The declaration on which the `@derivative` attribute is declared.
+  /// May not be a valid declaration for `@derivative` attributes.
+  /// Resolved during parsing and deserialization.
+  Decl *OriginalDeclaration = nullptr;
   /// The base type for the referenced original declaration. This field is
   /// non-null only for parsed attributes that reference a qualified original
   /// declaration. This field is not serialized; type-checking uses it to
@@ -1990,6 +1994,12 @@ public:
                                 TypeRepr *baseTypeRepr,
                                 DeclNameRefWithLoc original,
                                 IndexSubset *parameterIndices);
+
+  Decl *getOriginalDeclaration() const { return OriginalDeclaration; }
+
+  /// Sets the original declaration on which this attribute is declared.
+  /// Should only be used by parsing and deserialization.
+  void setOriginalDeclaration(Decl *originalDeclaration);
 
   TypeRepr *getBaseTypeRepr() const { return BaseTypeRepr; }
   DeclNameRefWithLoc getOriginalFunctionName() const {
