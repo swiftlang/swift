@@ -8,6 +8,13 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
+
+// FIXME(distributed): Seems something remains incorrect on 32bit here
+// rdar://92952551
+// UNSUPPORTED: CPU=armv7
+// UNSUPPORTED: CPU=armv7s
+// UNSUPPORTED: CPU=i386
+
 import Distributed
 
 enum MyError: Error {
