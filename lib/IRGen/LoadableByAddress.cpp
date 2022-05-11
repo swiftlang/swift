@@ -1894,8 +1894,8 @@ static void allocateAndSetAll(StructLoweringState &pass,
   }
 }
 
-static void castTupleInstr(SingleValueInstruction *instr, IRGenModule &Mod,
-                           LargeSILTypeMapper &Mapper) {
+static void retypeTupleInstr(SingleValueInstruction *instr, IRGenModule &Mod,
+                             LargeSILTypeMapper &Mapper) {
   SILType currSILType = instr->getType();
   auto funcType = getInnerFunctionType(currSILType);
   assert(funcType && "Expected a function Type");
@@ -1910,25 +1910,31 @@ static void castTupleInstr(SingleValueInstruction *instr, IRGenModule &Mod,
 
   auto II = instr->getIterator();
   ++II;
-  SILBuilderWithScope castBuilder(II);
-  SingleValueInstruction *castInstr = nullptr;
+  SILBuilderWithScope Builder(II);
+  SingleValueInstruction *newInstr = nullptr;
   switch (instr->getKind()) {
   // Add cast to the new sil function type:
   case SILInstructionKind::TupleExtractInst: {
-    castInstr = castBuilder.createUncheckedReinterpretCast(
-        instr->getLoc(), instr, newSILType.getObjectType());
+    auto extractInst = cast<TupleExtractInst>(instr);
+    newInstr = Builder.createTupleExtract(
+      extractInst->getLoc(), extractInst->getOperand(),
+      extractInst->getFieldIndex(),
+      newSILType.getObjectType());
     break;
   }
   case SILInstructionKind::TupleElementAddrInst: {
-    castInstr = castBuilder.createUncheckedAddrCast(
-        instr->getLoc(), instr, newSILType.getAddressType());
+    auto elementAddrInst = cast<TupleElementAddrInst>(instr);
+    newInstr = Builder.createTupleElementAddr(
+      elementAddrInst->getLoc(), elementAddrInst->getOperand(),
+      elementAddrInst->getFieldIndex(),
+      newSILType.getAddressType());
     break;
   }
   default:
     llvm_unreachable("Unexpected instruction inside tupleInstsToMod");
   }
-  instr->replaceAllUsesWith(castInstr);
-  castInstr->setOperand(0, instr);
+  instr->replaceAllUsesWith(newInstr);
+  instr->eraseFromParent();
 }
 
 static SILValue createCopyOfEnum(StructLoweringState &pass,
@@ -2090,7 +2096,7 @@ static void rewriteFunction(StructLoweringState &pass,
   }
 
   for (SingleValueInstruction *instr : pass.tupleInstsToMod) {
-    castTupleInstr(instr, pass.Mod, pass.Mapper);
+    retypeTupleInstr(instr, pass.Mod, pass.Mapper);
   }
 
   while (!pass.allocStackInstsToMod.empty()) {
