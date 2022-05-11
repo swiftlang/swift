@@ -1,3 +1,4 @@
+// RUN: %target-build-swift %s
 // RUN: %target-swift-frontend -emit-sil -O -g %s | %FileCheck %s
 
 // Issue #58660: Specifically-shaped differentiable functions yield "conflicting debug info for argument" assertion failure
@@ -40,7 +41,7 @@ struct MyModel: Differentiable {
 
   @differentiable(reverse)
   mutating func member4() {
-// CHECK-LABEL: sil private @$s4main7MyModelV7member4yyFTJpSpSr : $@convention(thin) (@inout MyModel.TangentVector, @owned _AD__$s4main7MyModelV7member4yyF_bb3__PB__src_0_wrt_0) -> () {
+// CHECK-LABEL: // pullback of MyModel.member4()
 // CHECK-NOT: debug_value %{{.*}} : $MyModel.TangentVector, var, name "self", argno 1, implicit, scope
 // CHECK: bb1(%{{.*}} : $_AD__$s4main7MyModelV7member4yyF_bb1__PB__src_0_wrt_0):
 // CHECK: debug_value %{{.*}} : $MyModel.TangentVector, var, name "self", argno 1, implicit, loc
