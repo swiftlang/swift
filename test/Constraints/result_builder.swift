@@ -1174,3 +1174,27 @@ let list3 = list {
 }
 print(list3)
 // CHECK: (cons "4" (cons (cons "3" (cons 2.0 nil)) (cons 1 nil)))
+
+func test_callAsFunction_with_resultBuilder() {
+  struct CallableTest {
+    func callAsFunction<T>(@TupleBuilder _ body: (Bool) -> T) {
+      print(body(true))
+    }
+  }
+
+  CallableTest() {
+    0
+    "with parens"
+    $0
+  }
+
+  CallableTest {
+    1
+    "without parens"
+    $0
+  }
+}
+
+test_callAsFunction_with_resultBuilder()
+// CHECK: (0, "with parens", true)
+// CHECK: (1, "without parens", true)
