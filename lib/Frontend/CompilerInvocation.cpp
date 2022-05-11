@@ -1284,6 +1284,8 @@ static void ParseSymbolGraphArgs(symbolgraphgen::SymbolGraphOptions &Opts,
 
   Opts.SkipInheritedDocs = Args.hasArg(OPT_skip_inherited_docs);
   Opts.IncludeSPISymbols = Args.hasArg(OPT_include_spi_symbols);
+  Opts.EmitExtensionBlockSymbols =
+      Args.hasArg(OPT_emit_extension_block_symbols);
 
   if (auto *A = Args.getLastArg(OPT_symbol_graph_minimum_access_level)) {
     Opts.MinimumAccessLevel =
