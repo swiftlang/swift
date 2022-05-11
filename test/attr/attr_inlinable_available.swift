@@ -528,7 +528,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add @available attri
   _: AtInliningTarget,
   _: BetweenTargets,
   _: AtDeploymentTarget,
-  _: AfterDeploymentTarget, // FIXME: Why isn't this diagnosed?
+  _: AfterDeploymentTarget,
   _: Unavailable
 ) {
   defer {
@@ -543,12 +543,6 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add @available attri
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
   _ = Unavailable()
 
-  if #available(macOS 10.14.5, iOS 12.3, tvOS 12.3, watchOS 5.3, *) {
-    _ = BetweenTargets()
-  }
-  if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
-    _ = AtDeploymentTarget()
-  }
   if #available(macOS 11, iOS 14, tvOS 14, watchOS 7, *) {
     _ = AfterDeploymentTarget()
   }
@@ -693,45 +687,58 @@ public func spiDefaultArgsUseNoAvailable( // expected-note 1 {{add @available at
 public struct PropertyWrapper<T> {
   public var wrappedValue: T
 
-  public init(_ value: T) {
-      self.wrappedValue = value
-  }
+  public init(wrappedValue value: T) { self.wrappedValue = value }
+  public init(_ value: T) { self.wrappedValue = value }
 }
 
 public struct PublicStruct { // expected-note 13 {{add @available attribute}}
-  // Public declarations act like @inlinable.
-  public var aPublic: NoAvailable
-  public var bPublic: BeforeInliningTarget
-  public var cPublic: AtInliningTarget
-  public var dPublic: BetweenTargets // expected-error {{'BetweenTargets' is only available in}}
-  public var ePublic: AtDeploymentTarget // expected-error {{'AtDeploymentTarget' is only available in}}
-  public var fPublic: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in}}
+  // Public property declarations are exposed.
+  public var aPublic: NoAvailable,
+             bPublic: BeforeInliningTarget,
+             cPublic: AtInliningTarget,
+             dPublic: BetweenTargets, // expected-error {{'BetweenTargets' is only available in}}
+             ePublic: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in}}
+             fPublic: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in}}
+
+  @available(macOS 10.14.5, iOS 12.3, tvOS 12.3, watchOS 5.3, *)
+  public var aPublicAvailBetween: NoAvailable,
+             bPublicAvailBetween: BeforeInliningTarget,
+             cPublicAvailBetween: AtInliningTarget,
+             dPublicAvailBetween: BetweenTargets,
+             ePublicAvailBetween: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in}}
+             fPublicAvailBetween: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in}}
+
+  // The inferred types of public properties are exposed.
+  public var aPublicInferred = NoAvailable(),
+             bPublicInferred = BeforeInliningTarget(),
+             cPublicInferred = AtInliningTarget(),
+             dPublicInferred = BetweenTargets(), // FIXME: Inferred type should be diagnosed
+             ePublicInferred = AtDeploymentTarget(), // FIXME: Inferred type should be diagnosed
+             fPublicInferred = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}}
+
+  @available(macOS 10.14.5, iOS 12.3, tvOS 12.3, watchOS 5.3, *)
+  public var aPublicInferredAvailBetween = NoAvailable(),
+             bPublicInferredAvailBetween = BeforeInliningTarget(),
+             cPublicInferredAvailBetween = AtInliningTarget(),
+             dPublicInferredAvailBetween = BetweenTargets(),
+             ePublicInferredAvailBetween = AtDeploymentTarget(), // FIXME: Inferred type should be diagnosed
+             fPublicInferredAvailBetween = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}}
   
-  // The initializers of property wrappers are not inlined
-  @PropertyWrapper(NoAvailable()) public var aPublicWrapped: Any
-  @PropertyWrapper(BeforeInliningTarget()) public var bPublicWrapped: Any
-  @PropertyWrapper(AtInliningTarget()) public var cPublicWrapped: Any
-  // FIXME: The next two should not be diagnosed, the property wrapper inits are not inlined
-  @PropertyWrapper(BetweenTargets()) public var dPublicWrapped: Any // expected-error {{'BetweenTargets' is only available in}}
-  @PropertyWrapper(AtDeploymentTarget()) public var ePublicWrapped: Any // expected-error {{'AtDeploymentTarget' is only available in}}
-  @PropertyWrapper(AfterDeploymentTarget()) public var fPublicWrapped: Any // expected-error {{'AfterDeploymentTarget' is only available in}}
-
-  // Property initializers in resilient structs are non-inlinable.
-  public var aPublicInit: Any = NoAvailable()
-  public var bPublicInit: Any = BeforeInliningTarget()
-  public var cPublicInit: Any = AtInliningTarget()
-  // FIXME: The next two should not be diagnosed, the initializers are not inlined
-  public var dPublicInit: Any = BetweenTargets() // expected-error {{'BetweenTargets' is only available in}}
-  public var ePublicInit: Any = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in}}
-  public var fPublicInit: Any = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}}
-
-  // Internal declarations act like non-inlinable.
-  var aInternal: NoAvailable = .init()
-  var bInternal: BeforeInliningTarget = .init()
-  var cInternal: AtInliningTarget = .init()
-  var dInternal: BetweenTargets = .init()
-  var eInternal: AtDeploymentTarget = .init()
-  var fInternal: AfterDeploymentTarget = .init() // expected-error {{'AfterDeploymentTarget' is only available in}}
+  // Property initializers are not exposed.
+  public var aPublicInit: Any = NoAvailable(),
+             bPublicInit: Any = BeforeInliningTarget(),
+             cPublicInit: Any = AtInliningTarget(),
+             dPublicInit: Any = BetweenTargets(),
+             ePublicInit: Any = AtDeploymentTarget(),
+             fPublicInit: Any = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}}
+  
+  // Internal declarations are not exposed.
+  var aInternal: NoAvailable = .init(),
+      bInternal: BeforeInliningTarget = .init(),
+      cInternal: AtInliningTarget = .init(),
+      dInternal: BetweenTargets = .init(),
+      eInternal: AtDeploymentTarget = .init(),
+      fInternal: AfterDeploymentTarget = .init() // expected-error {{'AfterDeploymentTarget' is only available in}}
 
   @available(macOS 10.14.5, iOS 12.3, tvOS 12.3, watchOS 5.3, *)
   public internal(set) var internalSetter: Void {
@@ -744,6 +751,12 @@ public struct PublicStruct { // expected-note 13 {{add @available attribute}}
       _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
       _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
 
+      if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
+        _ = AtDeploymentTarget()
+      }
+      if #available(macOS 11, iOS 14, tvOS 14, watchOS 7, *) {
+        _ = AfterDeploymentTarget()
+      }
     }
     set {
       // Private setter acts like non-inlinable
@@ -753,41 +766,90 @@ public struct PublicStruct { // expected-note 13 {{add @available attribute}}
       _ = BetweenTargets()
       _ = AtDeploymentTarget()
       _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
+
+      if #available(macOS 11, iOS 14, tvOS 14, watchOS 7, *) {
+        _ = AfterDeploymentTarget()
+      }
+    }
+  }
+  
+  public var block: () -> () = {
+    // The body of a block assigned to a public property acts like non-@inlinable
+    _ = NoAvailable()
+    _ = BeforeInliningTarget()
+    _ = AtInliningTarget()
+    _ = BetweenTargets()
+    _ = AtDeploymentTarget()
+    _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
+    
+    if #available(macOS 11, iOS 14, tvOS 14, watchOS 7, *) {
+      _ = AfterDeploymentTarget()
     }
   }
 }
 
-@frozen public struct FrozenPublicStruct { // expected-note 12 {{add @available attribute}}
-  // Public declarations act like @inlinable.
-  public var aPublic: NoAvailable
-  public var bPublic: BeforeInliningTarget
-  public var cPublic: AtInliningTarget
-  public var dPublic: BetweenTargets // expected-error {{'BetweenTargets' is only available in}}
-  public var ePublic: AtDeploymentTarget // expected-error {{'AtDeploymentTarget' is only available in}}
-  public var fPublic: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in}}
-
-  // Property initializers in frozen structs act like @inlinable.
-  public var aPublicInit: Any = NoAvailable()
-  public var bPublicInit: Any = BeforeInliningTarget()
-  public var cPublicInit: Any = AtInliningTarget()
-  public var dPublicInit: Any = BetweenTargets() // expected-error {{'BetweenTargets' is only available in}}
-  public var ePublicInit: Any = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in}}
-  public var fPublicInit: Any = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}}
-
-  // Internal declarations act like @inlinable in a frozen struct.
-  var aInternal: NoAvailable = .init()
-  var bInternal: BeforeInliningTarget = .init()
-  var cInternal: AtInliningTarget = .init()
-  var dInternal: BetweenTargets = .init() // expected-error {{'BetweenTargets' is only available in}}
-  var eInternal: AtDeploymentTarget = .init() // expected-error {{'AtDeploymentTarget' is only available in}}
-  var fInternal: AfterDeploymentTarget = .init() // expected-error {{'AfterDeploymentTarget' is only available in}}
+public struct PublicStructWithWrappers { // expected-note 4 {{add @available attribute}}
+  // The property type is inferred from the initializer expression. The
+  // expressions themselves will not be exposed.
+  @PropertyWrapper public var aExplicitInit = NoAvailable()
+  @PropertyWrapper public var bExplicitInit = BeforeInliningTarget()
+  @PropertyWrapper public var cExplicitInit = AtInliningTarget()
+  @PropertyWrapper public var dExplicitInit = BetweenTargets() // FIXME: Inferred type should be diagnosed
+  @PropertyWrapper public var eExplicitInit = AtDeploymentTarget() // FIXME: Inferred type should be diagnosed
+  @PropertyWrapper public var fExplicitInit = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}}
   
-  @PropertyWrapper(NoAvailable()) var aInternalWrapped: Any
-  @PropertyWrapper(BeforeInliningTarget()) var bInternalWrapped: Any
-  @PropertyWrapper(AtInliningTarget()) var cInternalWrapped: Any
-  @PropertyWrapper(BetweenTargets()) var dInternalWrapped: Any // expected-error {{'BetweenTargets' is only available in}}
-  @PropertyWrapper(AtDeploymentTarget()) var eInternalWrapped: Any // expected-error {{'AtDeploymentTarget' is only available in}}
-  @PropertyWrapper(AfterDeploymentTarget()) var fInternalWrapped: Any // expected-error {{'AfterDeploymentTarget' is only available in}}
+  // The property type is inferred from the initializer expression. The
+  // expressions themselves will not be exposed.
+  @PropertyWrapper(NoAvailable()) public var aExplicitInitAlt
+  @PropertyWrapper(BeforeInliningTarget()) public var bExplicitInitAlt
+  @PropertyWrapper(AtInliningTarget()) public var cExplicitInitAlt
+  @PropertyWrapper(BetweenTargets()) public var dExplicitInitAlt  // FIXME: Inferred type should be diagnosed
+  @PropertyWrapper(AtDeploymentTarget()) public var ePExplicitInitAlt  // FIXME: Inferred type should be diagnosed
+  @PropertyWrapper(AfterDeploymentTarget()) public var fExplicitInitAlt // expected-error {{'AfterDeploymentTarget' is only available in}}
+
+  // The property type is explicitly `Any` and the initializer expressions are
+  // not exposed.
+  @PropertyWrapper public var aAny: Any = NoAvailable()
+  @PropertyWrapper public var bAny: Any = BeforeInliningTarget()
+  @PropertyWrapper public var cAny: Any = AtInliningTarget()
+  @PropertyWrapper public var dAny: Any = BetweenTargets()
+  @PropertyWrapper public var eAny: Any = AtDeploymentTarget()
+  @PropertyWrapper public var fAny: Any = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}}
+
+  // The property type is explicitly `Any` and the initializer expressions are
+  // not exposed.
+  @PropertyWrapper(NoAvailable()) public var aAnyAlt: Any
+  @PropertyWrapper(BeforeInliningTarget()) public var bAnyAlt: Any
+  @PropertyWrapper(AtInliningTarget()) public var cAnyAlt: Any
+  @PropertyWrapper(BetweenTargets()) public var dAnyAlt: Any
+  @PropertyWrapper(AtDeploymentTarget()) public var eAnyAlt: Any
+  @PropertyWrapper(AfterDeploymentTarget()) public var fAnyAlt: Any // expected-error {{'AfterDeploymentTarget' is only available in}}
+}
+
+@frozen public struct FrozenPublicStruct { // expected-note 9 {{add @available attribute}}
+  // Public declarations are exposed.
+  public var aPublic: NoAvailable,
+             bPublic: BeforeInliningTarget,
+             cPublic: AtInliningTarget,
+             dPublic: BetweenTargets, // expected-error {{'BetweenTargets' is only available in}}
+             ePublic: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in}}
+             fPublic: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in}}
+
+  // Property initializers are exposed in frozen structs.
+  public var aPublicInit: Any = NoAvailable(),
+             bPublicInit: Any = BeforeInliningTarget(),
+             cPublicInit: Any = AtInliningTarget(),
+             dPublicInit: Any = BetweenTargets(), // expected-error {{'BetweenTargets' is only available in}}
+             ePublicInit: Any = AtDeploymentTarget(), // expected-error {{'AtDeploymentTarget' is only available in}}
+             fPublicInit: Any = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}}
+
+  // Internal declarations are also exposed in frozen structs.
+  var aInternal: NoAvailable = .init(),
+      bInternal: BeforeInliningTarget = .init(),
+      cInternal: AtInliningTarget = .init(),
+      dInternal: BetweenTargets = .init(), // expected-error {{'BetweenTargets' is only available in}}
+      eInternal: AtDeploymentTarget = .init(), // expected-error {{'AtDeploymentTarget' is only available in}}
+      fInternal: AfterDeploymentTarget = .init() // expected-error {{'AfterDeploymentTarget' is only available in}}
 }
 
 @available(macOS, unavailable)
@@ -795,63 +857,70 @@ public struct PublicStruct { // expected-note 13 {{add @available attribute}}
 @available(tvOS, unavailable)
 @available(watchOS, unavailable)
 public struct UnavailablePublicStruct {
-  public var aPublic: NoAvailable
-  public var bPublic: BeforeInliningTarget
-  public var cPublic: AtInliningTarget
-  public var dPublic: BetweenTargets
-  public var ePublic: AtDeploymentTarget
-  public var fPublic: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in}}
-  public var gPublic: Unavailable
-  
-  public var aPublicInit: Any = NoAvailable()
-  public var bPublicInit: Any = BeforeInliningTarget()
-  public var cPublicInit: Any = AtInliningTarget()
-  public var dPublicInit: Any = BetweenTargets()
-  public var ePublicInit: Any = AtDeploymentTarget()
-  public var fPublicInit: Any = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}}
-  public var gPublicInit: Any = Unavailable()
+  public var aPublic: NoAvailable,
+             bPublic: BeforeInliningTarget,
+             cPublic: AtInliningTarget,
+             dPublic: BetweenTargets,
+             ePublic: AtDeploymentTarget,
+             fPublic: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in}}
+             gPublic: Unavailable
 
-  var aInternal: NoAvailable = .init()
-  var bInternal: BeforeInliningTarget = .init()
-  var cInternal: AtInliningTarget = .init()
-  var dInternal: BetweenTargets = .init()
-  var eInternal: AtDeploymentTarget = .init()
-  var fInternal: AfterDeploymentTarget = .init() // expected-error {{'AfterDeploymentTarget' is only available in}}
-  var gInternal: Unavailable = .init()
+  public var aPublicInit: Any = NoAvailable(),
+             bPublicInit: Any = BeforeInliningTarget(),
+             cPublicInit: Any = AtInliningTarget(),
+             dPublicInit: Any = BetweenTargets(),
+             ePublicInit: Any = AtDeploymentTarget(),
+             fPublicInit: Any = AfterDeploymentTarget(), // expected-error {{'AfterDeploymentTarget' is only available in}}
+             gPublicInit: Any = Unavailable()
+
+  var aInternal: NoAvailable = .init(),
+      bInternal: BeforeInliningTarget = .init(),
+      cInternal: AtInliningTarget = .init(),
+      dInternal: BetweenTargets = .init(),
+      eInternal: AtDeploymentTarget = .init(),
+      fInternal: AfterDeploymentTarget = .init(), // expected-error {{'AfterDeploymentTarget' is only available in}}
+      gInternal: Unavailable = .init()
 }
 
 @_spi(Private)
 public struct SPIStruct { // expected-note 3 {{add @available attribute}}
-  public var aPublic: NoAvailable
-  public var bPublic: BeforeInliningTarget
-  public var cPublic: AtInliningTarget
-  public var dPublic: BetweenTargets
-  public var ePublic: AtDeploymentTarget
-  public var fPublic: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in}}
-  
-  public var aPublicInit: Any = NoAvailable()
-  public var bPublicInit: Any = BeforeInliningTarget()
-  public var cPublicInit: Any = AtInliningTarget()
-  public var dPublicInit: Any = BetweenTargets()
-  public var ePublicInit: Any = AtDeploymentTarget()
-  public var fPublicInit: Any = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}}
+  public var aPublic: NoAvailable,
+             bPublic: BeforeInliningTarget,
+             cPublic: AtInliningTarget,
+             dPublic: BetweenTargets,
+             ePublic: AtDeploymentTarget,
+             fPublic: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in}}
 
-  var aInternal: NoAvailable = .init()
-  var bInternal: BeforeInliningTarget = .init()
-  var cInternal: AtInliningTarget = .init()
-  var dInternal: BetweenTargets = .init()
-  var eInternal: AtDeploymentTarget = .init()
-  var fInternal: AfterDeploymentTarget = .init() // expected-error {{'AfterDeploymentTarget' is only available in}}
+  public var aPublicInit: Any = NoAvailable(),
+             bPublicInit: Any = BeforeInliningTarget(),
+             cPublicInit: Any = AtInliningTarget(),
+             dPublicInit: Any = BetweenTargets(),
+             ePublicInit: Any = AtDeploymentTarget(),
+             fPublicInit: Any = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}}
+
+  var aInternal: NoAvailable = .init(),
+      bInternal: BeforeInliningTarget = .init(),
+      cInternal: AtInliningTarget = .init(),
+      dInternal: BetweenTargets = .init(),
+      eInternal: AtDeploymentTarget = .init(),
+      fInternal: AfterDeploymentTarget = .init() // expected-error {{'AfterDeploymentTarget' is only available in}}
 }
 
-internal struct InternalStruct { // expected-note {{add @available attribute}}
+internal struct InternalStruct { // expected-note 2 {{add @available attribute}}
   // Internal declarations act like non-inlinable.
-  var aInternal: NoAvailable
-  var bInternal: BeforeInliningTarget
-  var cInternal: AtInliningTarget
-  var dInternal: BetweenTargets
-  var eInternal: AtDeploymentTarget
-  var fInternal: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in}}
+  var aInternal: NoAvailable = .init(),
+      bInternal: BeforeInliningTarget = .init(),
+      cInternal: AtInliningTarget = .init(),
+      dInternal: BetweenTargets = .init(),
+      eInternal: AtDeploymentTarget = .init(),
+      fInternal: AfterDeploymentTarget = .init() // expected-error {{'AfterDeploymentTarget' is only available in}}
+
+  @PropertyWrapper(NoAvailable()) var aWrapped: Any
+  @PropertyWrapper(BeforeInliningTarget()) var bWrapped: Any
+  @PropertyWrapper(AtInliningTarget()) var cWrapped: Any
+  @PropertyWrapper(BetweenTargets()) var dWrapped: Any
+  @PropertyWrapper(AtDeploymentTarget()) var eWrapped: Any
+  @PropertyWrapper(AfterDeploymentTarget()) var fWrapped: Any // expected-error {{'AfterDeploymentTarget' is only available in}}
 }
 
 
@@ -931,7 +1000,7 @@ extension BetweenTargets {
     _: AtInliningTarget,
     _: BetweenTargets,
     _: AtDeploymentTarget,
-    _: AfterDeploymentTarget, // FIXME: Should be diagnosed
+    _: AfterDeploymentTarget,
     _: Unavailable
   ) { }
 }
