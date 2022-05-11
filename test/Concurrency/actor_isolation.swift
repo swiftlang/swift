@@ -690,7 +690,7 @@ func checkLocalFunctions() async {
     i = 17
   }
 
-  func local2() { // expected-error{{concurrently-executed local function 'local2()' must be marked as '@Sendable'}}{{3-3=@Sendable }}
+  func local2() { // expected-warning{{concurrently-executed local function 'local2()' must be marked as '@Sendable'}}{{3-3=@Sendable }}
     j = 42
   }
 
@@ -721,7 +721,7 @@ func checkLocalFunctions() async {
     }
   }
 
-  func local3() { // expected-error{{concurrently-executed local function 'local3()' must be marked as '@Sendable'}}
+  func local3() { // expected-warning{{concurrently-executed local function 'local3()' must be marked as '@Sendable'}}
     k = 25 // expected-error{{mutation of captured var 'k' in concurrently-executing code}}
   }
 
