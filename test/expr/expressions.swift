@@ -502,6 +502,10 @@ func stringliterals(_ d: [String: Int]) {
   // expected-error @+1 {{unterminated string literal}}
   var x2 : () = ("hello" + "
   ;
+
+  // expected-note @+2 {{Add an ending quote to string literal}}
+  // expected-error @+1 {{unterminated string literal}}
+  var tri = "ice crea
 }
 
 func testSingleQuoteStringLiterals() {
