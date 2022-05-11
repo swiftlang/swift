@@ -20,6 +20,15 @@
 // RUN: not %target-swift-frontend -typecheck %t/Client.swift -swift-version 5 -target-sdk-name C -I %t/build -parse-stdlib -module-cache-path %t/cache 2>&1 | %FileCheck %s -check-prefix=CHECK-C
 // CHECK-C: cannot load module 'Lib' built with SDK 'C.Secret' when using SDK 'C': {{.*}}Lib.swiftmodule
 
+/// Build a resilient Lib against SDK A, and a client against SDK B.
+/// This should succeed after rebuilding from the swiftinterface.
+// RUN: %empty-directory(%t/cache)
+// RUN: %target-swift-frontend -emit-module %t/Lib.swift -swift-version 5 -target-sdk-name A -o %t/build -parse-stdlib -module-cache-path %t/cache \
+// RUN:   -enable-library-evolution -emit-module-interface-path %t/build/Lib.swiftinterface
+// RUN: %target-swift-frontend -typecheck %t/Client.swift -swift-version 5 -target-sdk-name B -I %t/build -parse-stdlib -module-cache-path %t/cache \
+// RUN:   -Rmodule-interface-rebuild 2>&1 | %FileCheck %s -check-prefix=CHECK-AvsB-REBUILD
+// CHECK-AvsB-REBUILD: remark: rebuilding module 'Lib' from interface
+
 // BEGIN Lib.swift
 public func foo() {}
 
