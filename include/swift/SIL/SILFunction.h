@@ -390,11 +390,11 @@ private:
 
   SILFunction(SILModule &module, SILLinkage linkage, StringRef mangledName,
               CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
-              Optional<SILLocation> loc, IsBare_t isBareSILFunction,
-              IsTransparent_t isTrans, IsSerialized_t isSerialized,
-              ProfileCounter entryCount, IsThunk_t isThunk,
-              SubclassScope classSubclassScope, Inline_t inlineStrategy,
-              EffectsKind E, const SILDebugScope *debugScope,
+              IsBare_t isBareSILFunction, IsTransparent_t isTrans,
+              IsSerialized_t isSerialized, ProfileCounter entryCount,
+              IsThunk_t isThunk, SubclassScope classSubclassScope,
+              Inline_t inlineStrategy, EffectsKind E,
+              const SILDebugScope *debugScope,
               IsDynamicallyReplaceable_t isDynamic,
               IsExactSelfClass_t isExactSelfClass,
               IsDistributed_t isDistributed);
@@ -402,11 +402,9 @@ private:
   static SILFunction *
   create(SILModule &M, SILLinkage linkage, StringRef name,
          CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
-         Optional<SILLocation> loc, IsBare_t isBareSILFunction,
-         IsTransparent_t isTrans, IsSerialized_t isSerialized,
+         IsBare_t isBareSILFunction, IsTransparent_t isTrans, IsSerialized_t isSerialized,
          ProfileCounter entryCount, IsDynamicallyReplaceable_t isDynamic,
-         IsDistributed_t isDistributed,
-         IsExactSelfClass_t isExactSelfClass,
+         IsDistributed_t isDistributed, IsExactSelfClass_t isExactSelfClass,
          IsThunk_t isThunk = IsNotThunk,
          SubclassScope classSubclassScope = SubclassScope::NotApplicable,
          Inline_t inlineStrategy = InlineDefault,
@@ -414,18 +412,14 @@ private:
          SILFunction *InsertBefore = nullptr,
          const SILDebugScope *DebugScope = nullptr);
 
-  void init(SILLinkage Linkage, StringRef Name,
-                         CanSILFunctionType LoweredType,
-                         GenericEnvironment *genericEnv,
-                         Optional<SILLocation> Loc, IsBare_t isBareSILFunction,
-                         IsTransparent_t isTrans, IsSerialized_t isSerialized,
-                         ProfileCounter entryCount, IsThunk_t isThunk,
-                         SubclassScope classSubclassScope,
-                         Inline_t inlineStrategy, EffectsKind E,
-                         const SILDebugScope *DebugScope,
-                         IsDynamicallyReplaceable_t isDynamic,
-                         IsExactSelfClass_t isExactSelfClass,
-                         IsDistributed_t isDistributed);
+  void init(SILLinkage Linkage, StringRef Name, CanSILFunctionType LoweredType,
+            GenericEnvironment *genericEnv, IsBare_t isBareSILFunction,
+            IsTransparent_t isTrans, IsSerialized_t isSerialized,
+            ProfileCounter entryCount, IsThunk_t isThunk,
+            SubclassScope classSubclassScope, Inline_t inlineStrategy,
+            EffectsKind E, const SILDebugScope *DebugScope,
+            IsDynamicallyReplaceable_t isDynamic,
+            IsExactSelfClass_t isExactSelfClass, IsDistributed_t isDistributed);
 
   /// Set has ownership to the given value. True means that the function has
   /// ownership, false means it does not.
@@ -1333,7 +1327,6 @@ public:
   void viewCFG() const;
   /// Like ViewCFG, but the graph does not show the contents of basic blocks.
   void viewCFGOnly() const;
-
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
