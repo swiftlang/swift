@@ -1888,10 +1888,14 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
         // The only case we reach here is unterminated single line string in the
         // interpolation. For better recovery, go on after emitting an error.
         diagnose(CurPtr, diag::lex_unterminated_string);
+        diagnose(CurPtr, diag::lex_unterminated_string_fix_it)
+          .fixItInsert(Lexer::getSourceLoc(CurPtr), "\"");
         wasErroneous = true;
         continue;
       } else {
         diagnose(TokStart, diag::lex_unterminated_string);
+        diagnose(TokStart, diag::lex_unterminated_string_fix_it)
+          .fixItInsert(Lexer::getSourceLoc(TokStart), "\"");
         return formToken(tok::unknown, TokStart);
       }
     }
@@ -1900,6 +1904,8 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
     if (((*CurPtr == '\r' || *CurPtr == '\n') && !IsMultilineString)
         || CurPtr == BufferEnd) {
       diagnose(TokStart, diag::lex_unterminated_string);
+      diagnose(TokStart, diag::lex_unterminated_string_fix_it)
+        .fixItInsert(Lexer::getSourceLoc(TokStart), "\"");
       return formToken(tok::unknown, TokStart);
     }
 
