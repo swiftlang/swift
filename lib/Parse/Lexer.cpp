@@ -1852,6 +1852,12 @@ void Lexer::diagnoseSingleQuoteStringLiteral(const char *TokStart,
       .fixItReplaceChars(startLoc, endLoc, replacement);
 }
 
+/// Returns the end quote to be used for a String, 
+/// depending on whether its a multi line string or not
+const char* Lexer::stringEndQuote(bool isMultiLine) {
+  return isMultiLine ? "\"\"\"" : "\""
+}
+
 /// lexStringLiteral:
 ///   string_literal ::= ["]([^"\\\n\r]|character_escape)*["]
 ///   string_literal ::= ["]["]["].*["]["]["] - approximately
@@ -1889,13 +1895,13 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
         // interpolation. For better recovery, go on after emitting an error.
         diagnose(CurPtr, diag::lex_unterminated_string);
         diagnose(CurPtr, diag::lex_unterminated_string_fix_it)
-          .fixItInsert(Lexer::getSourceLoc(CurPtr), "\"");
+          .fixItInsert(Lexer::getSourceLoc(CurPtr), Lexer::stringEndQuote(IsMultilineString));
         wasErroneous = true;
         continue;
       } else {
         diagnose(TokStart, diag::lex_unterminated_string);
         diagnose(TokStart, diag::lex_unterminated_string_fix_it)
-          .fixItInsert(Lexer::getSourceLoc(TokStart), "\"");
+          .fixItInsert(Lexer::getSourceLoc(TokStart), Lexer::stringEndQuote(IsMultilineString));
         return formToken(tok::unknown, TokStart);
       }
     }
@@ -1905,7 +1911,7 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
         || CurPtr == BufferEnd) {
       diagnose(TokStart, diag::lex_unterminated_string);
       diagnose(TokStart, diag::lex_unterminated_string_fix_it)
-        .fixItInsert(Lexer::getSourceLoc(TokStart), "\"");
+        .fixItInsert(Lexer::getSourceLoc(TokStart), Lexer::stringEndQuote(IsMultilineString));
       return formToken(tok::unknown, TokStart);
     }
 

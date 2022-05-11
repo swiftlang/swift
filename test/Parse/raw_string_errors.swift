@@ -15,7 +15,7 @@ let _ = ###"""invalid"######
 // expected-error@-3{{expected expression}}
 
 let _ = ####"invalid"###
-// expected-error@-1{{unterminated string literal}}
+// expected-error@-1{{unterminated string literal}} expected-note@-1 {{add an ending quote to string literal}}
 
 let _ = ###"invalid"######
 // expected-error@-1{{too many '#' characters in closing delimiter}}{{24-27=}}
