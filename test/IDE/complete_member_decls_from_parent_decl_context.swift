@@ -607,13 +607,13 @@ class SR627_BaseClass<T> {
 class SR627_Subclass: SR627_BaseClass<String> {
   #^SR627_SUBCLASS^#
 // SR627_SUBCLASS: Begin completions
-// SR627_SUBCLASS-DAG: Decl[InstanceMethod]/Super:         override func myFunction(_ x: String) -> String? {|}; name=myFunction(_:)
+// SR627_SUBCLASS-DAG: Decl[InstanceMethod]/Super:         override func myFunction(_ x: String) -> String? {|}; name=myFunction(:)
 // SR627_SUBCLASS: End completions
 }
 
 class SR627_SubSubclass: SR627_Subclass {
   #^SR627_SUB_SUBCLASS^#
   // SR627_SUB_SUBCLASS: Begin completions
-  // SR627_SUB_SUBCLASS-DAG: Decl[InstanceMethod]/Super:         override func myFunction(_ x: String) -> String? {|}; name=myFunction(_:)
+  // SR627_SUB_SUBCLASS-DAG: Decl[InstanceMethod]/Super:         override func myFunction(_ x: String) -> String? {|}; name=myFunction(:)
   // SR627_SUB_SUBCLASS: End completions
 }
