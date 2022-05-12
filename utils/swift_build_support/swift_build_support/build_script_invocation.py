@@ -358,6 +358,18 @@ class BuildScriptInvocation(object):
                 "--native-swift-tools-path=%s" % args.native_swift_tools_path
             ]
 
+        if args.custom_native_toolchain is not None:
+            if self.toolchain.swiftc is not None:
+                swift_path = os.path.dirname(self.toolchain.swiftc)
+                impl_args += [
+                    "--native-swift-tools-path=%s" % swift_path
+                ]
+            if self.toolchain.cc is not None:
+                clang_path = os.path.dirname(self.toolchain.cc)
+                impl_args += [
+                    "--native-clang-tools-path=%s" % clang_path
+                ]
+
         # If we have extra_swift_args, combine all of them together and then
         # add them as one command.
         if args.extra_swift_args:
