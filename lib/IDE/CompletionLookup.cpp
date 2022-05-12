@@ -1555,6 +1555,11 @@ void CompletionLookup::addConstructorCallsForType(
   if (!Sink.addInitsToTopLevel)
     return;
 
+  // 'AnyObject' is not initializable.
+  // FIXME: Should we do this in 'AnyObjectLookupRequest'?
+  if (type->isAnyObject())
+    return;
+
   assert(CurrDeclContext);
 
   auto results =
