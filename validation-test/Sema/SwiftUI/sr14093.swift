@@ -14,7 +14,6 @@ struct ContentView: View {
       DatePicker("Enter a date", selection: $date, displayedComponents: .date, in: Date())
       // expected-error@-1 {{argument 'in' must precede argument 'displayedComponents'}} {{78-90=}} {{52-52=in: Date(), }}
       DatePicker("Enter a date", selection: $date, displayedComponents: .date, in: Date() ... Date().addingTimeInterval(100))
-      // expected-error@-1 {{argument 'in' must precede argument 'displayedComponents'}} {{78-125=}} {{52-52=in: Date() ... Date().addingTimeInterval(100), }}
     }
   }
 }

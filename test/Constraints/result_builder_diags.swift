@@ -78,7 +78,7 @@ struct TupleBuilderWithoutIf { // expected-note 3{{struct 'TupleBuilderWithoutIf
   static func buildDo<T>(_ value: T) -> T { return value }
 }
 
-func tuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) -> T) { // expected-note {{in call to function 'tuplify(_:body:)'}}
+func tuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) -> T) {
   print(body(cond))
 }
 
@@ -194,7 +194,7 @@ struct TupleP<U> : P {
 
 @resultBuilder
 struct Builder {
-  static func buildBlock<S0, S1>(_ stmt1: S0, _ stmt2: S1) // expected-note {{required by static method 'buildBlock' where 'S1' = 'Label<_>.Type'}}
+  static func buildBlock<S0, S1>(_ stmt1: S0, _ stmt2: S1)
            -> TupleP<(S0, S1)> where S0: P, S1: P {
     return TupleP((stmt1, stmt2))
   }
@@ -216,7 +216,7 @@ struct Label<L> : P where L : P { // expected-note 2 {{'L' declared as parameter
 }
 
 func test_51167632() -> some P {
-  AnyP(G { // expected-error {{type 'Label<_>.Type' cannot conform to 'P'}} expected-note {{only concrete types such as structs, enums and classes can conform to protocols}}
+  AnyP(G {
     Text("hello")
     Label  // expected-error {{generic parameter 'L' could not be inferred}}
     // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}} {{10-10=<<#L: P#>>}}
@@ -507,7 +507,7 @@ enum E3 {
 }
 
 func testCaseMutabilityMismatches(e: E3) {
-   tuplify(true) { c in // expected-error {{generic parameter 'T' could not be inferred}}
+   tuplify(true) { c in
     "testSwitch"
     switch e {
     case .a(let x, var y),
@@ -657,6 +657,8 @@ struct MyView {
   }
 
   @TupleBuilder var invalidCaseWithoutDot: some P {
+  // expected-error@-1 {{return type of property 'invalidCaseWithoutDot' requires that 'Either<Int, Int>' conform to 'P'}}
+  // expected-note@-2 {{opaque return type declared here}}
     switch Optional.some(1) {
     case none: 42 // expected-error {{cannot find 'none' in scope}}
     case .some(let x):
@@ -664,7 +666,7 @@ struct MyView {
     }
   }
 
-  @TupleBuilder var invalidConversion: Int { // expected-error {{cannot convert value of type 'String' to specified type 'Int'}}
+  @TupleBuilder var invalidConversion: Int { // expected-error {{cannot convert return expression of type 'String' to return type 'Int'}}
     ""
   }
 }
@@ -682,7 +684,7 @@ do {
 }
 
 struct TuplifiedStructWithInvalidClosure {
-  var condition: Bool
+  var condition: Bool?
 
   @TupleBuilder var unknownParameter: some Any {
     if let cond = condition {
@@ -695,7 +697,7 @@ struct TuplifiedStructWithInvalidClosure {
   }
 
   @TupleBuilder var unknownResult: some Any {
-    if let cond = condition {
+    if let _ = condition {
       let _ = { () -> UnknownType in // expected-error {{cannot find type 'UnknownType' in scope}}
       }
       42
@@ -705,7 +707,7 @@ struct TuplifiedStructWithInvalidClosure {
   }
 
   @TupleBuilder var multipleLevelsDeep: some Any {
-    if let cond = condition {
+    if let _ = condition {
       switch MyError.boom {
       case .boom:
         let _ = { () -> UnknownType in // expected-error {{cannot find type 'UnknownType' in scope}}
@@ -719,7 +721,7 @@ struct TuplifiedStructWithInvalidClosure {
   }
 
   @TupleBuilder var errorsDiagnosedByParser: some Any {
-    if let cond = condition {
+    if let _ = condition {
       tuplify { _ in
         self. // expected-error {{expected member name following '.'}}
       }
@@ -757,9 +759,10 @@ func test_rdar65667992() {
     var entry: E
 
     @Builder var body: S {
-      switch entry { // expected-error {{type 'E' has no member 'unset'}}
+      switch entry {
       case .set(_, _): S()
-      case .unset(_): S() // expected-error {{'_' can only appear in a pattern or on the left side of an assignment}}
+      case .unset(_): S() // expected-error {{type 'E' has no member 'unset'}}
+      // expected-error@-1 {{'_' can only appear in a pattern or on the left side of an assignment}}
       default: S()
       }
     }
@@ -794,7 +797,9 @@ func test_missing_member_in_optional_context() {
     if let prop = test?.prop { // expected-error {{value of type 'Test' has no member 'prop'}}
       0
     }
+  }
 
+  tuplify(true) { c in
     if let method = test?.method() { // expected-error {{value of type 'Test' has no member 'method'}}
       1
     }

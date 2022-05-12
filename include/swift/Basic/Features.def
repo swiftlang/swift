@@ -82,6 +82,7 @@ LANGUAGE_FEATURE(BuiltinCreateAsyncTaskInGroup, 0, "MainActor executor building 
 LANGUAGE_FEATURE(BuiltinMove, 0, "Builtin.move()", true)
 LANGUAGE_FEATURE(BuiltinCopy, 0, "Builtin.copy()", true)
 LANGUAGE_FEATURE(BuiltinStackAlloc, 0, "Builtin.stackAlloc", true)
+LANGUAGE_FEATURE(ResultBuilderASTTransform, 0, "result builders as AST transform", true)
 SUPPRESSIBLE_LANGUAGE_FEATURE(SpecializeAttributeWithAvailability, 0, "@_specialize attribute with availability", true)
 LANGUAGE_FEATURE(BuiltinAssumeAlignment, 0, "Builtin.assumeAlignment", true)
 SUPPRESSIBLE_LANGUAGE_FEATURE(UnsafeInheritExecutor, 0, "@_unsafeInheritExecutor", true)
@@ -100,7 +101,6 @@ EXPERIMENTAL_FEATURE(FlowSensitiveConcurrencyCaptures)
 EXPERIMENTAL_FEATURE(MoveOnly)
 EXPERIMENTAL_FEATURE(OneWayClosureParameters)
 EXPERIMENTAL_FEATURE(TypeWitnessSystemInference)
-EXPERIMENTAL_FEATURE(ResultBuilderASTTransform)
 
 /// Enable extensions of (sugared) bound generic types
 ///
