@@ -119,7 +119,7 @@ Double-check that running `pwd` prints a path ending with `swift`.
 - If `update-checkout` failed, double-check that the absolute path to your
   working directory does not have non-ASCII characters.
 - If `update-checkout` failed and the absolute path to your working directory
-  had spaces in it, please [file a bug report][Swift JIRA] and change the path
+  had spaces in it, please [file a bug report][Swift Issues] and change the path
   to work around it.
 - Before running `update-checkout`, double-check that `swift` is the only
   repository inside the `swift-project` directory. Otherwise,
@@ -293,9 +293,8 @@ care when moving across branches.
   [meet the minimum required versions](#spot-check-dependencies).
 - Check if there are spaces in the paths being used by `build-script` in
   the log. While `build-script` should work with paths containing spaces,
-  sometimes bugs do slip through, such as
-  [SR-13441](https://bugs.swift.org/browse/SR-13441).
-  If this is the case, please [file a bug report][Swift JIRA] and change the path
+  sometimes bugs do slip through, such as [#55883](https://github.com/apple/swift/issues/55883).
+  If this is the case, please [file a bug report][Swift Issues] and change the path
   to work around it.
 - Check that your `build-script` invocation doesn't have typos. You can compare
   the flags you passed against the supported flags listed by
@@ -305,7 +304,7 @@ care when moving across branches.
   and looking at the first error may be more helpful than simply looking
   at the last error.
 - Check if others have encountered the same issue on the Swift forums or on
-  [Swift JIRA][].
+  [Swift repository 'Issues' tab][Swift Issues].
 - Create a new Swift forums thread in the Development category. Include
   information about your configuration and the errors you are seeing.
   - You can [create a gist](https://gist.github.com) with the entire build
@@ -313,7 +312,7 @@ care when moving across branches.
     build log in the post.
   - Include the output of `utils/update-checkout --dump-hashes`.
 
-[Swift JIRA]: https://bugs.swift.org
+[Swift Issues]: https://github.com/apple/swift/issues
 
 ## Editing code
 
@@ -621,4 +620,4 @@ Make sure you check out the following resources:
 If you see mistakes in the documentation (including typos, not just major
 errors) or identify gaps that you could potentially improve the contributing
 experience, please start a discussion on the forums, submit a pull request
-or file a bug report on [Swift JIRA][]. Thanks!
+or file a bug report on [Swift repository 'Issues' tab][Swift Issues]. Thanks!
