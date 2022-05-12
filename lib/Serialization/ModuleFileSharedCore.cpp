@@ -172,12 +172,14 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
 static ValidationInfo validateControlBlock(
     llvm::BitstreamCursor &cursor, SmallVectorImpl<uint64_t> &scratch,
     std::pair<uint16_t, uint16_t> expectedVersion, bool requiresOSSAModules,
+    bool requiresRevisionMatch,
     ExtendedValidationInfo *extendedInfo,
     PathObfuscator &pathRecoverer) {
   // The control block is malformed until we've at least read a major version
   // number.
   ValidationInfo result;
   bool versionSeen = false;
+  bool revisionSeen = false;
 
   while (!cursor.AtEndOfStream()) {
     Expected<llvm::BitstreamEntry> maybeEntry = cursor.advance();
@@ -308,6 +310,8 @@ static ValidationInfo validateControlBlock(
       break;
     }
     case control_block::REVISION: {
+      revisionSeen = true;
+
       // Tagged compilers should only load modules if they were
       // produced by the exact same compiler tag.
 
@@ -331,8 +335,12 @@ static ValidationInfo validateControlBlock(
       if (isCompilerTagged) {
         StringRef compilerRevision = forcedDebugRevision ?
           forcedDebugRevision : version::getSwiftRevision();
-        if (moduleRevision != compilerRevision)
+        if (moduleRevision != compilerRevision) {
           result.status = Status::RevisionIncompatible;
+
+          // We can't trust this module format at this point.
+          return result;
+        }
       }
       break;
     }
@@ -348,6 +356,13 @@ static ValidationInfo validateControlBlock(
       break;
     }
   }
+
+  // Last resort check in cases where the format is broken enough that
+  // we didn't read the REVISION block, report such a case as incompatible.
+  if (requiresRevisionMatch &&
+      !revisionSeen &&
+      result.status == Status::Valid)
+    result.status = Status::RevisionIncompatible;
 
   return result;
 }
@@ -471,7 +486,8 @@ ValidationInfo serialization::validateSerializedAST(
       result = validateControlBlock(
           cursor, scratch,
           {SWIFTMODULE_VERSION_MAJOR, SWIFTMODULE_VERSION_MINOR},
-          requiresOSSAModules, extendedInfo, localObfuscator);
+          requiresOSSAModules, /*requiresRevisionMatch=*/true,
+          extendedInfo, localObfuscator);
       if (result.status == Status::Malformed)
         return result;
     } else if (dependencies &&
@@ -979,7 +995,7 @@ bool ModuleFileSharedCore::readModuleDocIfPresent(PathObfuscator &pathRecoverer)
 
       info = validateControlBlock(
           docCursor, scratch, {SWIFTDOC_VERSION_MAJOR, SWIFTDOC_VERSION_MINOR},
-          RequiresOSSAModules,
+          RequiresOSSAModules, /*requiresRevisionMatch=*/false,
           /*extendedInfo*/ nullptr, pathRecoverer);
       if (info.status != Status::Valid)
         return false;
@@ -1123,7 +1139,7 @@ bool ModuleFileSharedCore::readModuleSourceInfoIfPresent(PathObfuscator &pathRec
       info = validateControlBlock(
           infoCursor, scratch,
           {SWIFTSOURCEINFO_VERSION_MAJOR, SWIFTSOURCEINFO_VERSION_MINOR},
-          RequiresOSSAModules,
+          RequiresOSSAModules, /*requiresRevisionMatch=*/false,
           /*extendedInfo*/ nullptr,
           pathRecoverer);
       if (info.status != Status::Valid)
@@ -1251,7 +1267,8 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       info = validateControlBlock(
           cursor, scratch,
           {SWIFTMODULE_VERSION_MAJOR, SWIFTMODULE_VERSION_MINOR},
-          RequiresOSSAModules, &extInfo, pathRecoverer);
+          RequiresOSSAModules, /*requiresRevisionMatch=*/true,
+          &extInfo, pathRecoverer);
       if (info.status != Status::Valid) {
         error(info.status);
         return;
