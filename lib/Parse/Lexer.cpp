@@ -1894,14 +1894,10 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
         // The only case we reach here is unterminated single line string in the
         // interpolation. For better recovery, go on after emitting an error.
         diagnose(CurPtr, diag::lex_unterminated_string);
-        diagnose(CurPtr, diag::lex_unterminated_string_fix_it)
-          .fixItInsert(Lexer::getSourceLoc(CurPtr), Lexer::stringEndQuote(IsMultilineString));
         wasErroneous = true;
         continue;
       } else {
         diagnose(TokStart, diag::lex_unterminated_string);
-        diagnose(TokStart, diag::lex_unterminated_string_fix_it)
-          .fixItInsert(Lexer::getSourceLoc(TokStart), Lexer::stringEndQuote(IsMultilineString));
         return formToken(tok::unknown, TokStart);
       }
     }
