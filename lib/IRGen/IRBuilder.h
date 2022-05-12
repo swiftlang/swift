@@ -120,6 +120,40 @@ public:
     return ClearedIP->getModule();
   }
 
+  using IRBuilderBase::CreateAnd;
+  llvm::Value *CreateAnd(llvm::Value *LHS, llvm::Value *RHS,
+                         const Twine &Name = "") {
+    if (auto *RC = dyn_cast<llvm::Constant>(RHS))
+      if (isa<llvm::ConstantInt>(RC) &&
+          cast<llvm::ConstantInt>(RC)->isMinusOne())
+        return LHS;  // LHS & -1 -> LHS
+     return IRBuilderBase::CreateAnd(LHS, RHS, Name);
+  }
+  llvm::Value *CreateAnd(llvm::Value *LHS, const APInt &RHS,
+                         const Twine &Name = "") {
+    return CreateAnd(LHS, llvm::ConstantInt::get(LHS->getType(), RHS), Name);
+  }
+  llvm::Value *CreateAnd(llvm::Value *LHS, uint64_t RHS, const Twine &Name = "") {
+    return CreateAnd(LHS, llvm::ConstantInt::get(LHS->getType(), RHS), Name);
+  }
+
+  using IRBuilderBase::CreateOr;
+  llvm::Value *CreateOr(llvm::Value *LHS, llvm::Value *RHS,
+                        const Twine &Name = "") {
+    if (auto *RC = dyn_cast<llvm::Constant>(RHS))
+      if (RC->isNullValue())
+        return LHS;  // LHS | 0 -> LHS
+    return IRBuilderBase::CreateOr(LHS, RHS, Name);
+  }
+  llvm::Value *CreateOr(llvm::Value *LHS, const APInt &RHS,
+                        const Twine &Name = "") {
+    return CreateOr(LHS, llvm::ConstantInt::get(LHS->getType(), RHS), Name);
+  }
+  llvm::Value *CreateOr(llvm::Value *LHS, uint64_t RHS,
+                        const Twine &Name = "") {
+    return CreateOr(LHS, llvm::ConstantInt::get(LHS->getType(), RHS), Name);
+  }
+
   /// Don't create allocas this way; you'll get a dynamic alloca.
   /// Use IGF::createAlloca or IGF::emitDynamicAlloca.
   llvm::Value *CreateAlloca(llvm::Type *type, llvm::Value *arraySize,
