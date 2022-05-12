@@ -295,7 +295,7 @@ Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
 void checkExistentialTypes(Decl *decl);
 
 /// Check for invalid existential types in the given statement.
-void checkExistentialTypes(ASTContext &ctx, Stmt *stmt);
+void checkExistentialTypes(ASTContext &ctx, Stmt *stmt, DeclContext *DC);
 
 /// Check for invalid existential types in the underlying type of
 /// the given type alias.

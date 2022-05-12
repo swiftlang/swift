@@ -6,7 +6,7 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 
-// RUN: not %target-swift-frontend %s -emit-ir -requirement-machine-protocol-signatures=on
+// RUN: not %target-swift-frontend %s -emit-ir
 class a{
 class a<a:A
 protocol A:a{typealias wh:Self.a

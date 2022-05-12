@@ -435,3 +435,29 @@ func testCastClassArchetypeToClass<T : AnyObject>(_ o: T) -> C {
     break
   }
 }
+
+class TestGeneric<T> {
+  init() {}
+
+  var generic: T
+  @_borrowed
+  var borrowedGeneric: T
+}
+
+// CHECK-LABEL: sil hidden [transparent] [ossa] @$s20opaque_values_silgen11TestGenericC08borrowedE0xvr :
+// CHECK: bb0(%0 : @guaranteed $TestGeneric<T>):
+// CHECK:   [[REF:%.*]] = ref_element_addr %0 : $TestGeneric<T>, #TestGeneric.borrowedGeneric
+// CHECK:   [[ACCESS:%.*]] = begin_access [read] [dynamic] [[REF]] : $*T
+// CHECK:   [[LD:%.*]] = load_borrow [[ACCESS]] : $*T
+// CHECK:   yield [[LD]] : $T, resume bb1, unwind bb2
+// CHECK: bb1:
+// CHECK:   end_borrow [[LD]] : $T
+// CHECK:   end_access [[ACCESS]] : $*T
+// CHECK:   [[RES:%.*]] = tuple ()
+// CHECK:   return [[RES]] : $()
+// CHECK: bb2:
+// CHECK:   end_borrow [[LD]] : $T
+// CHECK:   end_access [[ACCESS]] : $*T
+// CHECK:   unwind
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen11TestGenericC08borrowedE0xvr'
+

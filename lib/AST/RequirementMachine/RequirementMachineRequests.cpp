@@ -255,8 +255,8 @@ RequirementMachine::computeMinimalProtocolRequirements() {
 }
 
 RequirementSignature
-RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
-                                         ProtocolDecl *proto) const {
+RequirementSignatureRequest::evaluate(Evaluator &evaluator,
+                                      ProtocolDecl *proto) const {
   ASTContext &ctx = proto->getASTContext();
 
   // First check if we have a deserializable requirement signature.
@@ -358,7 +358,7 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
 
         if (otherProto != proto) {
           ctx.evaluator.cacheOutput(
-            RequirementSignatureRequestRQM{const_cast<ProtocolDecl *>(otherProto)},
+            RequirementSignatureRequest{const_cast<ProtocolDecl *>(otherProto)},
             RequirementSignature(GenericSignatureErrorFlags::CompletionFailed));
         }
       }
@@ -417,29 +417,26 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
       else {
         auto temp = reqs;
         ctx.evaluator.cacheOutput(
-          RequirementSignatureRequestRQM{const_cast<ProtocolDecl *>(otherProto)},
+          RequirementSignatureRequest{const_cast<ProtocolDecl *>(otherProto)},
           std::move(temp));
       }
     }
 
     // Diagnose redundant requirements and conflicting requirements.
-    if (ctx.LangOpts.RequirementMachineProtocolSignatures ==
-        RequirementMachineMode::Enabled) {
-      machine->computeRequirementDiagnostics(errors, proto->getLoc());
-      diagnoseRequirementErrors(ctx, errors,
-                                AllowConcreteTypePolicy::NestedAssocTypes);
+    machine->computeRequirementDiagnostics(errors, proto->getLoc());
+    diagnoseRequirementErrors(ctx, errors,
+                              AllowConcreteTypePolicy::NestedAssocTypes);
 
-      for (auto *protocol : machine->System.getProtocols()) {
-        auto selfType = protocol->getSelfInterfaceType();
-        auto concrete = machine->getConcreteType(selfType,
-                                                 machine->getGenericParams(),
-                                                 protocol);
-        if (!concrete || concrete->hasError())
-          continue;
+    for (auto *protocol : machine->System.getProtocols()) {
+      auto selfType = protocol->getSelfInterfaceType();
+      auto concrete = machine->getConcreteType(selfType,
+                                               machine->getGenericParams(),
+                                               protocol);
+      if (!concrete || concrete->hasError())
+        continue;
 
-        protocol->diagnose(diag::requires_generic_param_made_equal_to_concrete,
-                           selfType);
-      }
+      protocol->diagnose(diag::requires_generic_param_made_equal_to_concrete,
+                         selfType);
     }
 
     if (!machine->getErrors()) {
@@ -514,7 +511,7 @@ static bool isCanonicalRequest(GenericSignature baseSignature,
 }
 
 GenericSignatureWithError
-AbstractGenericSignatureRequestRQM::evaluate(
+AbstractGenericSignatureRequest::evaluate(
          Evaluator &evaluator,
          const GenericSignatureImpl *baseSignatureImpl,
          SmallVector<GenericTypeParamType *, 2> addedParameters,
@@ -566,7 +563,7 @@ AbstractGenericSignatureRequestRQM::evaluate(
     // Build the canonical signature.
     auto canSignatureResult = evaluateOrDefault(
         ctx.evaluator,
-        AbstractGenericSignatureRequestRQM{
+        AbstractGenericSignatureRequest{
           canBaseSignature.getPointer(), std::move(canAddedParameters),
           std::move(canAddedRequirements)},
         GenericSignatureWithError());
@@ -710,7 +707,7 @@ AbstractGenericSignatureRequestRQM::evaluate(
 }
 
 GenericSignatureWithError
-InferredGenericSignatureRequestRQM::evaluate(
+InferredGenericSignatureRequest::evaluate(
         Evaluator &evaluator,
         const GenericSignatureImpl *parentSigImpl,
         GenericParamList *genericParamList,
@@ -816,6 +813,15 @@ InferredGenericSignatureRequestRQM::evaluate(
   for (const auto &req : addedRequirements)
     requirements.push_back({req, SourceLoc(), /*wasInferred=*/true});
 
+  // Re-order requirements so that inferred requirements appear last. This
+  // ensures that if an inferred requirement is redundant with some other
+  // requirement, it is the inferred requirement that becomes redundant,
+  // which muffles the redundancy diagnostic.
+  std::stable_partition(requirements.begin(), requirements.end(),
+                        [](const StructuralRequirement &req) {
+                          return !req.inferred;
+                        });
+
   auto &ctx = moduleForInference->getASTContext();
   auto &rewriteCtx = ctx.getRewriteContext();
 
@@ -878,9 +884,7 @@ InferredGenericSignatureRequestRQM::evaluate(
     auto errorFlags = machine->getErrors();
 
     // Diagnose redundant requirements and conflicting requirements.
-    if (attempt == 0 &&
-        ctx.LangOpts.RequirementMachineInferredSignatures ==
-        RequirementMachineMode::Enabled) {
+    if (attempt == 0) {
       machine->computeRequirementDiagnostics(errors, loc);
       diagnoseRequirementErrors(ctx, errors,
                                 allowConcreteGenericParams
@@ -914,9 +918,7 @@ InferredGenericSignatureRequestRQM::evaluate(
                                            std::move(machine));
     }
 
-    if (!allowConcreteGenericParams &&
-        ctx.LangOpts.RequirementMachineInferredSignatures ==
-        RequirementMachineMode::Enabled) {
+    if (!allowConcreteGenericParams) {
       for (auto genericParam : result.getInnermostGenericParams()) {
         auto canonical = result.getCanonicalTypeInContext(genericParam);
 

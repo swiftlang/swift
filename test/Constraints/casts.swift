@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-objc-interop -requirement-machine-inferred-signatures=on
+// RUN: %target-typecheck-verify-swift -enable-objc-interop
 
 class B { 
   init() {} 

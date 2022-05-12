@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-inferred-signatures=on
-// RUN: %target-typecheck-verify-swift -debug-generic-signatures -requirement-machine-inferred-signatures=on 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift -debug-generic-signatures -warn-redundant-requirements 2>&1 | %FileCheck %s
 
 struct G<T> { }
 

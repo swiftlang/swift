@@ -10946,6 +10946,24 @@ bool ConstraintSystem::simplifyAppliedOverloadsImpl(
 
   auto *argList = getArgumentList(getConstraintLocator(locator));
 
+  // If argument list has trailing closures and this is `init` call to
+  // a callable type, let's not filter anything since there is a possibility
+  // that it needs an implicit `.callAsFunction` to work.
+  if (argList && argList->hasAnyTrailingClosures()) {
+    if (disjunction->getLocator()
+            ->isLastElement<LocatorPathElt::ConstructorMember>()) {
+      auto choice = disjunction->getNestedConstraints()[0]->getOverloadChoice();
+      if (auto *decl = choice.getDeclOrNull()) {
+        auto *dc = decl->getDeclContext();
+        if (auto *parent = dc->getSelfNominalTypeDecl()) {
+          auto type = parent->getDeclaredInterfaceType();
+          if (type->isCallableNominalType(DC))
+            return false;
+        }
+      }
+    }
+  }
+
   // Consider each of the constraints in the disjunction.
 retry_after_fail:
   bool hasUnhandledConstraints = false;

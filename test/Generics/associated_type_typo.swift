@@ -1,6 +1,6 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=verify
+// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
 
-// RUN: not %target-swift-frontend -typecheck -debug-generic-signatures %s -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=verify > %t.dump 2>&1 
+// RUN: not %target-swift-frontend -typecheck -debug-generic-signatures %s > %t.dump 2>&1 
 // RUN: %FileCheck -check-prefix CHECK-GENERIC %s < %t.dump
 
 protocol P1 {
@@ -62,8 +62,9 @@ protocol Pattern {
 
   // FIXME: This works for all of the wrong reasons, but it is correct that
   // it works.
+  // FIXME(rqm-diagnostics): Bogus warning here.
   func matched<C: Indexable>(atStartOf c: C)
-  where Element_<C> == Element
+  where Element_<C> == Element // expected-warning {{redundant same-type constraint 'Element_<C>' (aka 'C.Iterator.Element') == 'Self.Element'}}
   , Element_<C.Slice> == Element
 }
 

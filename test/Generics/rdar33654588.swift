@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=on 2>&1
+// RUN: %target-typecheck-verify-swift 2>&1
 
 protocol FP {}
 

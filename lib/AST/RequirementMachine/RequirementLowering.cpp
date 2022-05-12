@@ -159,6 +159,7 @@
 #include "swift/AST/TypeRepr.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/SetVector.h"
+#include "Diagnostics.h"
 #include "RewriteContext.h"
 #include "NameLookup.h"
 
@@ -668,157 +669,6 @@ void swift::rewriting::realizeInheritedRequirements(
   }
 }
 
-static bool shouldSuggestConcreteTypeFixit(
-    Type type, AllowConcreteTypePolicy concreteTypePolicy) {
-  switch (concreteTypePolicy) {
-  case AllowConcreteTypePolicy::All:
-    return true;
-
-  case AllowConcreteTypePolicy::AssocTypes:
-    return type->is<DependentMemberType>();
-
-  case AllowConcreteTypePolicy::NestedAssocTypes:
-    if (auto *memberType = type->getAs<DependentMemberType>())
-      return memberType->getBase()->is<DependentMemberType>();
-
-    return false;
-  }
-}
-
-/// Emit diagnostics for the given \c RequirementErrors.
-///
-/// \param ctx The AST context in which to emit diagnostics.
-/// \param errors The set of requirement diagnostics to be emitted.
-/// \param concreteTypePolicy Whether fix-its should be offered to turn
-/// invalid type requirements, e.g. T: Int, into same-type requirements.
-///
-/// \returns true if any errors were emitted, and false otherwise (including
-/// when only warnings were emitted).
-bool swift::rewriting::diagnoseRequirementErrors(
-    ASTContext &ctx, ArrayRef<RequirementError> errors,
-    AllowConcreteTypePolicy concreteTypePolicy) {
-  bool diagnosedError = false;
-
-  for (auto error : errors) {
-    SourceLoc loc = error.loc;
-    if (!loc.isValid())
-      continue;
-
-    switch (error.kind) {
-    case RequirementError::Kind::InvalidTypeRequirement: {
-      if (error.requirement.hasError())
-        break;
-
-      Type subjectType = error.requirement.getFirstType();
-      Type constraint = error.requirement.getSecondType();
-
-      ctx.Diags.diagnose(loc, diag::requires_conformance_nonprotocol,
-                         subjectType, constraint);
-      diagnosedError = true;
-
-      auto getNameWithoutSelf = [&](std::string subjectTypeName) {
-        std::string selfSubstring = "Self.";
-
-        if (subjectTypeName.rfind(selfSubstring, 0) == 0) {
-          return subjectTypeName.erase(0, selfSubstring.length());
-        }
-
-        return subjectTypeName;
-      };
-
-      if (shouldSuggestConcreteTypeFixit(subjectType, concreteTypePolicy)) {
-        auto options = PrintOptions::forDiagnosticArguments();
-        auto subjectTypeName = subjectType.getString(options);
-        auto subjectTypeNameWithoutSelf = getNameWithoutSelf(subjectTypeName);
-        ctx.Diags.diagnose(loc, diag::requires_conformance_nonprotocol_fixit,
-                           subjectTypeNameWithoutSelf,
-                           constraint.getString(options))
-             .fixItReplace(loc, " == ");
-      }
-
-      break;
-    }
-
-    case RequirementError::Kind::InvalidRequirementSubject: {
-      if (error.requirement.hasError())
-        break;
-
-      auto subjectType = error.requirement.getFirstType();
-
-      ctx.Diags.diagnose(loc, diag::requires_not_suitable_archetype,
-                         subjectType);
-      diagnosedError = true;
-      break;
-    }
-
-    case RequirementError::Kind::ConflictingRequirement: {
-      auto requirement = error.requirement;
-      auto conflict = error.conflictingRequirement;
-
-      if (requirement.hasError())
-        break;
-
-      if (!conflict) {
-        ctx.Diags.diagnose(loc, diag::requires_same_concrete_type,
-                           requirement.getFirstType(),
-                           requirement.getSecondType());
-      } else {
-        if (conflict->hasError())
-          break;
-
-        auto options = PrintOptions::forDiagnosticArguments();
-        std::string requirements;
-        llvm::raw_string_ostream OS(requirements);
-        OS << "'";
-        requirement.print(OS, options);
-        OS << "' and '";
-        conflict->print(OS, options);
-        OS << "'";
-
-        ctx.Diags.diagnose(loc, diag::requirement_conflict,
-                           requirement.getFirstType(), requirements);
-      }
-
-      diagnosedError = true;
-      break;
-    }
-
-    case RequirementError::Kind::RedundantRequirement: {
-      auto requirement = error.requirement;
-      if (requirement.hasError())
-        break;
-
-      switch (requirement.getKind()) {
-      case RequirementKind::SameType:
-        ctx.Diags.diagnose(loc, diag::redundant_same_type_to_concrete,
-                           requirement.getFirstType(),
-                           requirement.getSecondType());
-        break;
-      case RequirementKind::Conformance:
-        ctx.Diags.diagnose(loc, diag::redundant_conformance_constraint,
-                           requirement.getFirstType(),
-                           requirement.getProtocolDecl());
-        break;
-      case RequirementKind::Superclass:
-        ctx.Diags.diagnose(loc, diag::redundant_superclass_constraint,
-                           requirement.getFirstType(),
-                           requirement.getSecondType());
-        break;
-      case RequirementKind::Layout:
-        ctx.Diags.diagnose(loc, diag::redundant_layout_constraint,
-                           requirement.getFirstType(),
-                           requirement.getLayoutConstraint());
-        break;
-      }
-
-      break;
-    }
-    }
-  }
-
-  return diagnosedError;
-}
-
 /// StructuralRequirementsRequest realizes all the user-written requirements
 /// on the associated type declarations inside of a protocol.
 ///
@@ -918,11 +768,8 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
     }
   }
 
-  if (ctx.LangOpts.RequirementMachineProtocolSignatures ==
-      RequirementMachineMode::Enabled) {
-    diagnoseRequirementErrors(ctx, errors,
-                              AllowConcreteTypePolicy::NestedAssocTypes);
-  }
+  diagnoseRequirementErrors(ctx, errors,
+                            AllowConcreteTypePolicy::NestedAssocTypes);
 
   return ctx.AllocateCopy(result);
 }
@@ -949,11 +796,6 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
   SmallVector<RequirementError, 2> errors;
 
   auto &ctx = proto->getASTContext();
-
-  // In Verify mode, the GenericSignatureBuilder will emit the same diagnostics.
-  bool emitDiagnostics =
-    (ctx.LangOpts.RequirementMachineProtocolSignatures ==
-     RequirementMachineMode::Enabled);
 
   auto getStructuralType = [](TypeDecl *typeDecl) -> Type {
     if (auto typealias = dyn_cast<TypeAliasDecl>(typeDecl)) {
@@ -1065,7 +907,6 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
     if (knownInherited == inheritedTypeDecls.end()) continue;
 
     bool shouldWarnAboutRedeclaration =
-      emitDiagnostics &&
       !assocTypeDecl->getAttrs().hasAttribute<NonOverrideAttr>() &&
       !assocTypeDecl->getAttrs().hasAttribute<OverrideAttr>() &&
       !assocTypeDecl->hasDefaultDefinitionType() &&
@@ -1098,17 +939,15 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
         continue;
       }
 
-      if (emitDiagnostics) {
-        // We inherited a type; this associated type will be identical
-        // to that typealias.
-        auto inheritedOwningDecl =
-            inheritedType->getDeclContext()->getSelfNominalTypeDecl();
-        ctx.Diags.diagnose(assocTypeDecl,
-                           diag::associated_type_override_typealias,
-                           assocTypeDecl->getName(),
-                           inheritedOwningDecl->getDescriptiveKind(),
-                           inheritedOwningDecl->getDeclaredInterfaceType());
-      }
+      // We inherited a type; this associated type will be identical
+      // to that typealias.
+      auto inheritedOwningDecl =
+          inheritedType->getDeclContext()->getSelfNominalTypeDecl();
+      ctx.Diags.diagnose(assocTypeDecl,
+                         diag::associated_type_override_typealias,
+                         assocTypeDecl->getName(),
+                         inheritedOwningDecl->getDescriptiveKind(),
+                         inheritedOwningDecl->getDeclaredInterfaceType());
 
       recordInheritedTypeRequirement(assocTypeDecl, inheritedType);
     }
@@ -1141,7 +980,7 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
         }
 
         // We found something.
-        bool shouldWarnAboutRedeclaration = emitDiagnostics;
+        bool shouldWarnAboutRedeclaration = true;
 
         for (auto inheritedType : inherited.second) {
           // If we have inherited associated type...
@@ -1192,11 +1031,8 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
     }
   }
 
-  if (ctx.LangOpts.RequirementMachineProtocolSignatures ==
-      RequirementMachineMode::Enabled) {
-    diagnoseRequirementErrors(ctx, errors,
-                              AllowConcreteTypePolicy::NestedAssocTypes);
-  }
+  diagnoseRequirementErrors(ctx, errors,
+                            AllowConcreteTypePolicy::NestedAssocTypes);
 
   return ctx.AllocateCopy(result);
 }
@@ -1209,12 +1045,7 @@ ProtocolDependenciesRequest::evaluate(Evaluator &evaluator,
 
   // If we have a serialized requirement signature, deserialize it and
   // look at conformance requirements.
-  //
-  // FIXME: For now we just fall back to the GSB for all protocols
-  // unless -requirement-machine-protocol-signatures=on is passed.
-  if (proto->hasLazyRequirementSignature() ||
-      (ctx.LangOpts.RequirementMachineProtocolSignatures
-        == RequirementMachineMode::Disabled)) {
+  if (proto->hasLazyRequirementSignature()) {
     for (auto req : proto->getRequirementSignature().getRequirements()) {
       if (req.getKind() == RequirementKind::Conformance) {
         result.insert(req.getProtocolDecl());

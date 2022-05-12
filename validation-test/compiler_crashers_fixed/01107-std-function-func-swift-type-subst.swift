@@ -5,7 +5,7 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not %target-swift-frontend %s -typecheck -requirement-machine-inferred-signatures=on
+// RUN: not %target-swift-frontend %s -typecheck
 func b<d {
 class d<j : i, f : i where j.i == f> : e {
 }

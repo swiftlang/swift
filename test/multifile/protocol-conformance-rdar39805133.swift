@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-ir -o - -primary-file %s %S/Inputs/protocol-conformance-rdar39805133-other.swift -module-name foo -requirement-machine-protocol-signatures=on -requirement-machine-inferred-signatures=on
-// RUN: %target-swift-frontend -emit-ir -o - %s -primary-file %S/Inputs/protocol-conformance-rdar39805133-other.swift -module-name foo -requirement-machine-protocol-signatures=on -requirement-machine-inferred-signatures=on
+// RUN: %target-swift-frontend -emit-ir -o - -primary-file %s %S/Inputs/protocol-conformance-rdar39805133-other.swift -module-name foo
+// RUN: %target-swift-frontend -emit-ir -o - %s -primary-file %S/Inputs/protocol-conformance-rdar39805133-other.swift -module-name foo
 
 protocol _Int : DefaultInit {
     associatedtype Minus1 : _Int

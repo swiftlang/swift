@@ -1746,8 +1746,12 @@ static ManagedValue manageYield(SILGenFunction &SGF, SILValue value,
     if (value.getOwnershipKind() == OwnershipKind::None)
       return ManagedValue::forUnmanaged(value);
     return ManagedValue::forBorrowedObjectRValue(value);
-  case ParameterConvention::Indirect_In_Guaranteed:
-    return ManagedValue::forBorrowedAddressRValue(value);
+  case ParameterConvention::Indirect_In_Guaranteed: {
+    bool isOpaque = SGF.getTypeLowering(value->getType()).isAddressOnly() &&
+                    !SGF.silConv.useLoweredAddresses();
+    return isOpaque ? ManagedValue::forBorrowedObjectRValue(value)
+                    : ManagedValue::forBorrowedAddressRValue(value);
+  }
   }
   llvm_unreachable("bad kind");
 }

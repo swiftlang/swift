@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-protocol-signatures=on 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
 // CHECK-LABEL: rdar77683844.(file).P1@
 // CHECK-LABEL: Requirement signature: <Self where Self.[P1]T1 : P2, Self.[P1]T1 == Self.[P1]T3.[P3]T1, Self.[P1]T2 == Self.[P1]T1.[P2]T2, Self.[P1]T3 == Self.[P1]T1.[P2]T3, Self.[P1]T1.[P2]T2 == Self.[P1]T1.[P2]T4.[P5]T2, Self.[P1]T1.[P2]T3 == Self.[P1]T2.[P4]T3>

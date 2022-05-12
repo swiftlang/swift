@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 4 -requirement-machine-protocol-signatures=on
+// RUN: %target-typecheck-verify-swift -swift-version 4 -warn-redundant-requirements
 
 protocol P0 { }
 protocol Q0: P0 { }
