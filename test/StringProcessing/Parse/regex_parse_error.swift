@@ -30,17 +30,15 @@ _ = #/\(?'abc/#
 do {
   _ = /\
   /
-  // expected-error@-2:7 {{unterminated regex literal}}
-  // expected-error@-3:9 {{expected escape sequence}}
-} // expected-error@:1 {{expected expression after operator}}
+  // expected-error@-1:3 {{expected expression path in Swift key path}}
+}
 
 do {
   _ = #/\
   /#
   // expected-error@-2:7 {{unterminated regex literal}}
   // expected-error@-3:10 {{expected escape sequence}}
-  // expected-error@-3:3 {{unterminated regex literal}}
-  // expected-warning@-4:3 {{regular expression literal is unused}}
+  // expected-error@-3:4 {{expected expression}}
 }
 
 func foo<T>(_ x: T, _ y: T) {}
