@@ -134,6 +134,8 @@ public:
     return BuilderType->getAnyNominal();
   }
 
+  VarDecl *getBuilderSelf() const { return BuilderSelf; }
+
   Identifier getBuildOptionalId() const { return BuildOptionalId; }
 
   bool supports(Identifier fnBaseName, ArrayRef<Identifier> argLabels = {},
@@ -2734,6 +2736,14 @@ private:
   /// diagnostics when result builder has multiple overloads.
   llvm::SmallDenseSet<AnyFunctionRef> InvalidResultBuilderBodies;
 
+  /// The *global* set of all functions that have a particular result builder
+  /// applied.
+  ///
+  /// The value here is `$__builderSelf` variable and a transformed body.
+  llvm::DenseMap<std::pair<AnyFunctionRef, NominalTypeDecl *>,
+                 std::pair<VarDecl *, BraceStmt *>>
+      BuilderTransformedBodies;
+
   /// Arguments after the code completion token that were thus ignored (i.e.
   /// assigned fresh type variables) for type checking.
   llvm::SetVector<Expr *> IgnoredArguments;
@@ -3744,6 +3754,27 @@ public:
     if (transformed != resultBuilderTransformed.end())
       return transformed->second;
     return None;
+  }
+
+  void setBuilderTransformedBody(AnyFunctionRef fn, NominalTypeDecl *builder,
+                                 NullablePtr<VarDecl> builderSelf,
+                                 NullablePtr<BraceStmt> body) {
+    assert(builder->getAttrs().hasAttribute<ResultBuilderAttr>());
+    assert(body);
+    assert(builderSelf);
+
+    auto existing = BuilderTransformedBodies.insert(
+        {{fn, builder}, {builderSelf.get(), body.get()}});
+    assert(existing.second && "Duplicate result builder transform");
+    (void)existing;
+  }
+
+  Optional<std::pair<VarDecl *, BraceStmt *>>
+  getBuilderTransformedBody(AnyFunctionRef fn, NominalTypeDecl *builder) const {
+    auto result = BuilderTransformedBodies.find({fn, builder});
+    if (result == BuilderTransformedBodies.end())
+      return None;
+    return result->second;
   }
 
   void setCaseLabelItemInfo(const CaseLabelItem *item, CaseLabelItemInfo info) {
