@@ -18,6 +18,7 @@ import SILBridging
 /// Maps to both, SILPhiArgument and SILFunctionArgument.
 public class Argument : Value, Equatable {
   public var definingInstruction: Instruction? { nil }
+  public var definingBlock: BasicBlock { block }
 
   public var block: BasicBlock {
     return SILArgument_getParent(bridged).block

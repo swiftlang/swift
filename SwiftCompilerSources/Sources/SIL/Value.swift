@@ -17,7 +17,16 @@ public protocol Value : AnyObject, CustomStringConvertible {
   var uses: UseList { get }
   var type: Type { get }
   var ownership: Ownership { get }
+  
+  /// The instruction which defines the value.
+  ///
+  /// This is nil if the value is not defined by an instruction, e.g. an `Argument`.
   var definingInstruction: Instruction? { get }
+  
+  /// The block where the value is defined.
+  ///
+  /// It's not legal to get the definingBlock of an `Undef` value.
+  var definingBlock: BasicBlock { get }
 }
 
 public enum Ownership {
@@ -80,32 +89,10 @@ extension Value {
     UseList(SILValue_firstUse(bridged))
   }
   
-  public var function: Function {
-    SILNode_getFunction(bridgedNode).function
-  }
+  public var function: Function { definingBlock.function }
 
   public var type: Type { SILValue_getType(bridged).type }
 
-  public var definingInstruction: Instruction? {
-    switch self {
-      case let inst as SingleValueInstruction:
-        return inst
-      case let mvi as MultipleValueInstructionResult:
-        return mvi.instruction
-      default:
-        return nil
-    }
-  }
-
-  public var definingBlock: BasicBlock? {
-    if let inst = definingInstruction {
-      return inst.block
-    }
-    if let arg = self as? Argument {
-      return arg.block
-    }
-    return nil
-  }
   public var ownership: Ownership { SILValue_getOwnership(bridged).ownership }
 
   public var hashable: HashableValue { ObjectIdentifier(self) }
@@ -154,10 +141,16 @@ extension BridgedValue {
 
 final class Undef : Value {
   public var definingInstruction: Instruction? { nil }
+  public var definingBlock: BasicBlock {
+    fatalError("undef has no defining block")
+  }
 }
 
 final class PlaceholderValue : Value {
   public var definingInstruction: Instruction? { nil }
+  public var definingBlock: BasicBlock {
+    fatalError("PlaceholderValue has no defining block")
+  }
 }
 
 extension OptionalBridgedValue {

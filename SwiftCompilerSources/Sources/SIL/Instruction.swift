@@ -135,6 +135,7 @@ extension OptionalBridgedInstruction {
 
 public class SingleValueInstruction : Instruction, Value {
   final public var definingInstruction: Instruction? { self }
+  final public var definingBlock: BasicBlock { block }
 
   fileprivate final override var resultCount: Int { 1 }
   fileprivate final override func getResult(index: Int) -> Value { self }
@@ -151,6 +152,7 @@ public final class MultipleValueInstructionResult : Value {
   }
 
   public var definingInstruction: Instruction? { instruction }
+  public var definingBlock: BasicBlock { instruction.block }
 
   public var index: Int { MultiValueInstResult_getIndex(bridged) }
 

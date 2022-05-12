@@ -229,7 +229,6 @@ BridgedInstruction Operand_getUser(BridgedOperand);
 SwiftInt Operand_isTypeDependent(BridgedOperand);
 
 std::string SILNode_debugDescription(BridgedNode node);
-BridgedFunction SILNode_getFunction(BridgedNode node);
 OptionalBridgedOperand SILValue_firstUse(BridgedValue value);
 BridgedType SILValue_getType(BridgedValue value);
 BridgedOwnership SILValue_getOwnership(BridgedValue value);

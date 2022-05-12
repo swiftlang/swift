@@ -334,10 +334,6 @@ std::string SILNode_debugDescription(BridgedNode node) {
   return str;
 }
 
-BridgedFunction SILNode_getFunction(BridgedNode node) {
-  return {castToSILNode(node)->getFunction()};
-}
-
 static Operand *castToOperand(BridgedOperand operand) {
   return const_cast<Operand *>(static_cast<const Operand *>(operand.op));
 }
