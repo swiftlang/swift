@@ -6,6 +6,8 @@ prefix operator /
 prefix operator ^/
 prefix operator /^/
 
+prefix func ^/ <T> (_ x: T) -> T { x } // expected-note {{'^/' declared here}}
+
 prefix operator !!
 prefix func !! <T>(_ x: T) -> T { x }
 
@@ -261,6 +263,8 @@ _ = /x // comment
 _ = /x/*comment*/
 // expected-error@-1 {{'/' is not a prefix unary operator}}
 
+// MARK: Unapplied operators
+
 // These become regex literals, unless surrounded in parens.
 func baz(_ x: (Int, Int) -> Int, _ y: (Int, Int) -> Int) {} // expected-note 4{{'baz' declared here}}
 baz(/, /)
@@ -275,11 +279,7 @@ baz(/^, /)
 // expected-error@-1 {{cannot convert value of type 'Regex<Substring>' to expected argument type '(Int, Int) -> Int'}}
 // expected-error@-2 {{missing argument for parameter #2 in call}}
 
-do {
-  baz((/^), /)
-  // expected-error@-1 {{closing ')' does not balance any groups openings}}
-  // expected-note@-2 {{to match this opening '('}}
-} // expected-error {{expected ')' in expression list}}
+baz((/^), /)
 
 baz(^^/, /) // expected-error {{missing argument for parameter #2 in call}}
 baz((^^/), /)
@@ -289,20 +289,18 @@ bazbaz(/, 0)
 bazbaz(^^/, 0)
 
 func qux<T>(_ x: (Int, Int) -> Int, _ y: T) -> Int { 0 }
-do {
-  _ = qux(/, 1) / 2
-  // expected-error@-1 {{cannot parse regular expression: closing ')' does not balance any groups openings}}
-  // expected-error@-2 {{expected ',' separator}}
-}
+_ = qux(/, 1) / 2
 do {
   _ = qux(/, "(") / 2
   // expected-error@-1 {{cannot convert value of type 'Regex<(Substring, Substring)>' to expected argument type '(Int, Int) -> Int'}}
   // expected-error@-2 {{expected ',' separator}}
 }
+_ = qux((/), "(") / 2
 _ = qux(/, 1) // this comment tests to make sure we don't try and end the regex on the starting '/' of '//'.
 _ = qux(/, 1) /* same thing with a block comment */
 
-func quxqux(_ x: (Int, Int) -> Int) {}
+@discardableResult
+func quxqux(_ x: (Int, Int) -> Int) -> Int { 0 }
 quxqux(/^/) // expected-error {{cannot convert value of type 'Regex<Substring>' to expected argument type '(Int, Int) -> Int'}}
 quxqux((/^/)) // expected-error {{cannot convert value of type 'Regex<Substring>' to expected argument type '(Int, Int) -> Int'}}
 quxqux({ $0 /^/ $1 })
@@ -312,16 +310,87 @@ quxqux(!/^/)
 // expected-error@-2 {{cannot convert value of type 'Regex<Substring>' to expected argument type 'Bool'}}
 
 quxqux(/^)
-
-do {
-  quxqux(/^) / 1
-  // expected-error@-1 {{closing ')' does not balance any groups openings}}
-  // expected-error@-2 {{expected ',' separator}}
-}
+_ = quxqux(/^) / 1
 
 let arr: [Double] = [2, 3, 4]
 _ = arr.reduce(1, /) / 3
 _ = arr.reduce(1, /) + arr.reduce(1, /)
+
+// MARK: ')' disambiguation behavior
+
+_ = (/x)
+// expected-error@-1 {{'/' is not a prefix unary operator}}
+
+_ = (/x)/
+// expected-error@-1 {{'/' is not a prefix unary operator}}
+// expected-error@-2 {{'/' is not a postfix unary operator}}
+
+_ = (/[(0)])/
+// expected-error@-1 {{'/' is not a prefix unary operator}}
+// expected-error@-2 {{'/' is not a postfix unary operator}}
+
+_ = /[(0)]/
+_ = /(x)/
+_ = /[)]/
+_ = /[a\])]/
+_ = /([)])/
+_ = /]]][)]/
+
+_ = /
+// expected-error@-1 {{unterminated regex literal}}
+
+_ = /)
+// expected-error@-1 {{unterminated regex literal}}
+// expected-error@-2 {{closing ')' does not balance any groups openings}}
+
+let fn: (Int, Int) -> Int = (/)
+
+_ = /\()/
+// expected-error@-1 {{'/' is not a prefix unary operator}}
+// expected-error@-2 {{'/' is not a postfix unary operator}}
+// expected-error@-3 {{invalid component of Swift key path}}
+
+do {
+  let _: Regex = (/whatever\)/
+  // expected-note@-1 {{to match this opening '('}}
+} // expected-error {{expected ')' in expression list}}
+do {
+  _ = /(()()))/
+  // expected-error@-1 {{'/' is not a prefix unary operator}}
+  // expected-error@-2 {{consecutive statements on a line must be separated by ';'}}
+  // expected-error@-3 {{expected expression}}
+}
+do {
+  _ = /[x])/
+  // expected-error@-1 {{'/' is not a prefix unary operator}}
+  // expected-error@-2 {{consecutive statements on a line must be separated by ';'}}
+  // expected-error@-3 {{expected expression}}
+}
+do {
+  _ = /[\]])/
+  // expected-error@-1 {{expected expression path in Swift key path}}
+}
+
+_ = ^/x/
+// expected-error@-1 {{'^' is not a prefix unary operator}}
+
+_ = (^/x)/
+// expected-error@-1 {{'/' is not a postfix unary operator}}
+
+_ = (!!/x/)
+
+_ = ^/"/"
+// expected-error@-1 {{'^' is not a prefix unary operator}}
+// expected-error@-2 {{unterminated string literal}}
+
+_ = ^/"[/"
+// expected-error@-1 {{'^' is not a prefix unary operator}}
+// expected-error@-2 {{unterminated string literal}}
+// expected-error@-3 {{expected custom character class members}}
+
+_ = (^/)("/")
+
+// MARK: Starting characters
 
 // Fine.
 _ = /./
