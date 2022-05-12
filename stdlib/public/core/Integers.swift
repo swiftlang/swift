@@ -1878,7 +1878,7 @@ extension BinaryInteger {
 ///     print(Int16.max.binaryString)
 ///     // Prints "0b01111111_11111111"
 ///     print((101 as UInt8).binaryString)
-///     // Prints "0b11001001"
+///     // Prints "0b01100101"
 ///
 /// The `binaryString` implementation uses the static `bitWidth` property and
 /// the right shift operator (`>>`), both of which are available to any type
