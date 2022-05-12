@@ -20,6 +20,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/CaptureInfo.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -8311,7 +8312,7 @@ void AbstractFunctionDecl::prepareDerivativeFunctionConfigurations() {
 }
 
 ArrayRef<AutoDiffConfig>
-AbstractFunctionDecl::getDerivativeFunctionConfigurations() {
+AbstractFunctionDecl::getDerivativeFunctionConfigurations(bool lookInNonPrimarySources) {
   prepareDerivativeFunctionConfigurations();
 
   // Resolve derivative function configurations from `@differentiable`
@@ -8334,6 +8335,37 @@ AbstractFunctionDecl::getDerivativeFunctionConfigurations() {
     ctx.loadDerivativeFunctionConfigurations(this, previousGeneration,
                                              *DerivativeFunctionConfigs);
   }
+
+  class DerivativeFinder : public ASTWalker {
+    const AbstractFunctionDecl *AFD;
+  public:
+    DerivativeFinder(const AbstractFunctionDecl *afd) : AFD(afd) {}
+
+    bool walkToDeclPre(Decl *D) override {
+      if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
+        for (auto *derAttr : afd->getAttrs().getAttributes<DerivativeAttr>()) {
+          // Resolve derivative function configurations from `@derivative`
+          // attributes by type-checking them.
+          if (AFD->getName().matchesRef(
+                derAttr->getOriginalFunctionName().Name.getFullName())) {
+            (void)derAttr->getOriginalFunction(afd->getASTContext());
+            return false;
+          }
+        }
+      }
+
+      return true;
+    }
+  };
+
+  // Load derivative configurations from @derivative attributes defined in
+  // non-primary sources. Note that it might trigger lookup cycles if called
+  // from inside Sema stages.
+  if (lookInNonPrimarySources) {
+    DerivativeFinder finder(this);
+    getParent()->walkContext(finder);
+  }
+
   return DerivativeFunctionConfigs->getArrayRef();
 }
 

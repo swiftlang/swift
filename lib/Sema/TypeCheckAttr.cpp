@@ -4956,10 +4956,11 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
 /// - Stores the attribute in `ASTContext::DerivativeAttrs`.
 ///
 /// \returns true on error, false on success.
-static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
-                                    DerivativeAttr *attr) {
+static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
   // Note: Implementation must be idempotent because it may be called multiple
   // times for the same attribute.
+  Decl *D = attr->getOriginalDeclaration();
+  auto &Ctx = D->getASTContext();
   auto &diags = Ctx.Diags;
   // `@derivative` attribute requires experimental differentiable programming
   // to be enabled.
@@ -5372,13 +5373,18 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
 }
 
 void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
-  if (typeCheckDerivativeAttr(Ctx, D, attr))
+  if (typeCheckDerivativeAttr(attr))
     attr->setInvalid();
 }
 
 AbstractFunctionDecl *
 DerivativeAttrOriginalDeclRequest::evaluate(Evaluator &evaluator,
                                             DerivativeAttr *attr) const {
+  // Try to resolve the original function.
+  if (attr->isValid() && attr->OriginalFunction.isNull())
+    if (typeCheckDerivativeAttr(attr))
+      attr->setInvalid();
+
   // If the typechecker has resolved the original function, return it.
   if (auto *FD = attr->OriginalFunction.dyn_cast<AbstractFunctionDecl *>())
     return FD;

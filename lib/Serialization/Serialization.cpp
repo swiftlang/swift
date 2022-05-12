@@ -2780,7 +2780,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       auto abbrCode = S.DeclTypeAbbrCodes[DerivativeDeclAttrLayout::Code];
       auto *attr = cast<DerivativeAttr>(DA);
       auto &ctx = S.getASTContext();
-      assert(attr->getOriginalFunction(ctx) &&
+      assert(attr->getOriginalFunction(ctx) && attr->getOriginalDeclaration() &&
              "`@derivative` attribute should have original declaration set "
              "during construction or parsing");
       auto origDeclNameRef = attr->getOriginalFunctionName();

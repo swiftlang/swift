@@ -2107,6 +2107,13 @@ void DerivativeAttr::setOriginalFunctionResolver(
   ResolverContextData = resolverContextData;
 }
 
+void DerivativeAttr::setOriginalDeclaration(Decl *originalDeclaration) {
+  assert(originalDeclaration && "Original declaration must be non-null");
+  assert(!OriginalDeclaration &&
+         "Original declaration cannot have already been set");
+  OriginalDeclaration = originalDeclaration;
+}
+
 TransposeAttr::TransposeAttr(bool implicit, SourceLoc atLoc,
                              SourceRange baseRange, TypeRepr *baseTypeRepr,
                              DeclNameRefWithLoc originalName,
