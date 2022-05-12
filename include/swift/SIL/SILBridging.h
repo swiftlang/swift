@@ -147,6 +147,18 @@ typedef enum {
   Ownership_None
 } BridgedOwnership;
 
+typedef enum {
+  ArgumentConvention_Indirect_In,
+  ArgumentConvention_Indirect_In_Constant,
+  ArgumentConvention_Indirect_In_Guaranteed,
+  ArgumentConvention_Indirect_Inout,
+  ArgumentConvention_Indirect_InoutAliasable,
+  ArgumentConvention_Indirect_Out,
+  ArgumentConvention_Direct_Owned,
+  ArgumentConvention_Direct_Unowned,
+  ArgumentConvention_Direct_Guaranteed,
+} BridgedArgumentConvention;
+
 // AST bridging
 
 typedef struct {
@@ -312,6 +324,10 @@ SwiftInt CopyAddrInst_isInitializationOfDest(BridgedInstruction copyAddr);
 void RefCountingInst_setIsAtomic(BridgedInstruction rc, bool isAtomic);
 bool RefCountingInst_getIsAtomic(BridgedInstruction rc);
 SwiftInt CondBranchInst_getNumTrueArgs(BridgedInstruction cbr);
+
+BridgedSubstitutionMap ApplySite_getSubstitutionMap(BridgedInstruction inst);
+BridgedArgumentConvention
+ApplySite_getArgumentConvention(BridgedInstruction inst, SwiftInt calleeArgIdx);
 
 BridgedInstruction SILBuilder_createBuiltinBinaryFunction(
           BridgedBuilder builder, BridgedStringRef name,

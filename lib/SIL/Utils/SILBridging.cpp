@@ -746,6 +746,37 @@ SwiftInt CondBranchInst_getNumTrueArgs(BridgedInstruction cbr) {
   return castToInst<CondBranchInst>(cbr)->getNumTrueArgs();
 }
 
+BridgedSubstitutionMap ApplySite_getSubstitutionMap(BridgedInstruction inst) {
+  auto as = ApplySite(castToInst(inst));
+  return {as.getSubstitutionMap().getOpaqueValue()};
+}
+
+BridgedArgumentConvention
+ApplySite_getArgumentConvention(BridgedInstruction inst, SwiftInt calleeArgIdx) {
+  auto as = ApplySite(castToInst(inst));
+  auto conv = as.getSubstCalleeConv().getSILArgumentConvention(calleeArgIdx);
+  switch (conv.Value) {
+    case SILArgumentConvention::Indirect_Inout:
+      return ArgumentConvention_Indirect_In;
+    case SILArgumentConvention::Indirect_InoutAliasable:
+      return ArgumentConvention_Indirect_In_Constant;
+    case SILArgumentConvention::Indirect_In_Guaranteed:
+      return ArgumentConvention_Indirect_In_Guaranteed;
+    case SILArgumentConvention::Indirect_In:
+      return ArgumentConvention_Indirect_Inout;
+    case SILArgumentConvention::Indirect_In_Constant:
+      return ArgumentConvention_Indirect_InoutAliasable;
+    case SILArgumentConvention::Indirect_Out:
+      return ArgumentConvention_Indirect_Out;
+    case SILArgumentConvention::Direct_Unowned:
+      return ArgumentConvention_Direct_Owned;
+    case SILArgumentConvention::Direct_Owned:
+      return ArgumentConvention_Direct_Unowned;
+    case SILArgumentConvention::Direct_Guaranteed:
+      return ArgumentConvention_Direct_Guaranteed;
+  }
+}
+
 //===----------------------------------------------------------------------===//
 //                                SILBuilder
 //===----------------------------------------------------------------------===//
