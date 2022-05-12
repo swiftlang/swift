@@ -126,14 +126,14 @@ _ = "hello\("""
             world
             """
             )!"
-            // expected-error@-4 {{string interpolation needs to be closed by a )}}
+            // expected-error@-4 {{expected ')' at end of string interpolation}}
             // expected-error@-2 {{unterminated string literal}}
 
 _ = "hello\(
             """
             world
             """)!"
-            // expected-error@-4 {{string interpolation needs to be closed by a )}}
+            // expected-error@-4 {{expected ')' at end of string interpolation}}
             // expected-error@-2 {{unterminated string literal}}
 
 _ = """
@@ -190,4 +190,4 @@ let _ = """
   \("bar
   baz
   """
-  // expected-error@-3 {{string interpolation needs to be closed by a )}}
+  // expected-error@-3 {{expected ')' at end of string interpolation}}
