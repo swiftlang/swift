@@ -2598,6 +2598,12 @@ protected:
     yield->setOperand(0, addr);
   }
 
+  void visitValueMetatypeInst(ValueMetatypeInst *vmi) {
+    auto opAddr =
+        pass.valueStorageMap.getStorage(vmi->getOperand()).storageAddress;
+    vmi->setOperand(opAddr);
+  }
+
   void visitAssignInst(AssignInst *assignInst);
 
   void visitBeginBorrowInst(BeginBorrowInst *borrow);
