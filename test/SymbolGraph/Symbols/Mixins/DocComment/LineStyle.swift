@@ -47,6 +47,8 @@ public struct BoundBlank {}
 
 // SINGLELINE-LABEL: "precise": "s:9LineStyle06SingleA0V"
 // SINGLELINE:       "docComment": {
+// SINGLELINE-NEXT:    "uri": "file://{{.*}}LineStyle.swift",
+// SINGLELINE-NEXT:    "module": "LineStyle",
 // SINGLELINE-NEXT:    "lines": [
 // SINGLELINE-NEXT:      {
 // SINGLELINE-NEXT:        "range": {
@@ -66,6 +68,8 @@ public struct BoundBlank {}
 
 // TWOLINES-LABEL: "precise": "s:9LineStyle8TwoLinesV"
 // TWOLINES:       "docComment": {
+// TWOLINES-NEXT:    "uri": "file://{{.*}}LineStyle.swift",
+// TWOLINES-NEXT:    "module": "LineStyle",
 // TWOLINES-NEXT:    "lines": [
 // TWOLINES-NEXT:      {
 // TWOLINES-NEXT:        "range": {
@@ -98,6 +102,8 @@ public struct BoundBlank {}
 
 // TWOLINESAROUNDBLANK-LABEL: "precise": "s:9LineStyle19TwoLinesAroundBlankV"
 // TWOLINESAROUNDBLANK:       "docComment": {
+// TWOLINESAROUNDBLANK-NEXT:    "uri": "file://{{.*}}LineStyle.swift",
+// TWOLINESAROUNDBLANK-NEXT:    "module": "LineStyle",
 // TWOLINESAROUNDBLANK-NEXT:    "lines": [
 // TWOLINESAROUNDBLANK-NEXT:      {
 // TWOLINESAROUNDBLANK-NEXT:        "range": {
@@ -143,6 +149,8 @@ public struct BoundBlank {}
 
 // EMPTY-LABEL: "precise": "s:9LineStyle5EmptyV"
 // EMPTY:       "docComment": {
+// EMPTY-NEXT:    "uri": "file://{{.*}}LineStyle.swift",
+// EMPTY-NEXT:    "module": "LineStyle",
 // EMPTY-NEXT:    "lines": [
 // EMPTY-NEXT:      {
 // EMPTY-NEXT:        "range": {
@@ -162,6 +170,8 @@ public struct BoundBlank {}
 
 // MULTIEMPTY-LABEL: "precise": "s:9LineStyle10MultiEmptyV"
 // MULTIEMPTY:       "docComment": {
+// MULTIEMPTY-NEXT:    "uri": "file://{{.*}}LineStyle.swift",
+// MULTIEMPTY-NEXT:    "module": "LineStyle",
 // MULTIEMPTY-NEXT:    "lines": [
 // MULTIEMPTY-NEXT:      {
 // MULTIEMPTY-NEXT:        "range": {
@@ -207,6 +217,8 @@ public struct BoundBlank {}
 
 // LEADINGBLANK-LABEL: "precise": "s:9LineStyle12LeadingBlankV",
 // LEADINGBLANK:       "docComment": {
+// LEADINGBLANK-NEXT:    "uri": "file://{{.*}}LineStyle.swift",
+// LEADINGBLANK-NEXT:    "module": "LineStyle",
 // LEADINGBLANK-NEXT:    "lines": [
 // LEADINGBLANK-NEXT:      {
 // LEADINGBLANK-NEXT:        "range": {
@@ -239,6 +251,8 @@ public struct BoundBlank {}
 
 // TRAILINGBLANK-LABEL: "precise": "s:9LineStyle13TrailingBlankV"
 // TRAILINGBLANK:       "docComment": {
+// TRAILINGBLANK-NEXT:    "uri": "file://{{.*}}LineStyle.swift",
+// TRAILINGBLANK-NEXT:    "module": "LineStyle",
 // TRAILINGBLANK-NEXT:    "lines": [
 // TRAILINGBLANK-NEXT:      {
 // TRAILINGBLANK-NEXT:        "range": {
@@ -271,6 +285,8 @@ public struct BoundBlank {}
 
 // BOUNDBLANK-LABEL: "precise": "s:9LineStyle10BoundBlankV"
 // BOUNDBLANK:       "docComment": {
+// BOUNDBLANK-NEXT:    "uri": "file://{{.*}}LineStyle.swift",
+// BOUNDBLANK-NEXT:    "module": "LineStyle",
 // BOUNDBLANK-NEXT:    "lines": [
 // BOUNDBLANK-NEXT:      {
 // BOUNDBLANK-NEXT:        "range": {
