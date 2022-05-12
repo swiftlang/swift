@@ -942,6 +942,8 @@ public:
     return castToStmt<BraceStmt>(newBody.get());
   }
 
+  VarDecl *getBuilderSelf() const { return builder.getBuilderSelf(); }
+
 protected:
   NullablePtr<Stmt> failTransform(UnsupportedElt unsupported) {
     recordUnsupported(unsupported);
@@ -2426,6 +2428,7 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
                                      Type bodyResultType,
                                      ConstraintKind bodyResultConstraintKind,
                                      ConstraintLocatorBuilder locator) {
+  builderType = simplifyType(builderType);
   auto builder = builderType->getAnyNominal();
   assert(builder && "Bad result builder type");
   assert(builder->getAttrs().hasAttribute<ResultBuilderAttr>());
@@ -2477,50 +2480,64 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
     return None;
   }
 
-  if (Context.TypeCheckerOpts.ResultBuilderASTTransform) {
-    ResultBuilderTransform transform(*this, fn.getAsDeclContext(), builderType,
-                                     bodyResultType);
-    auto *body = transform.apply(fn.getBody());
+  if (Context.LangOpts.hasFeature(Feature::ResultBuilderASTTransform)) {
+    auto transformedBody = getBuilderTransformedBody(fn, builder);
+    // If this builder transform has not yet been applied to this function,
+    // let's do it and cache the result.
+    if (!transformedBody) {
+      ResultBuilderTransform transform(*this, fn.getAsDeclContext(),
+                                       builderType, bodyResultType);
+      auto *body = transform.apply(fn.getBody());
 
-    if (auto unsupported = transform.getUnsupportedElement()) {
-      assert(!body);
+      if (auto unsupported = transform.getUnsupportedElement()) {
+        assert(!body);
 
-      // If we aren't supposed to attempt fixes, fail.
-      if (!shouldAttemptFixes()) {
-        return getTypeMatchFailure(locator);
+        // If we aren't supposed to attempt fixes, fail.
+        if (!shouldAttemptFixes()) {
+          return getTypeMatchFailure(locator);
+        }
+
+        // If we're solving for code completion and the body contains the code
+        // completion location, skipping it won't get us to a useful solution so
+        // just bail.
+        if (isForCodeCompletion() && containsCodeCompletionLoc(fn.getBody())) {
+          return getTypeMatchFailure(locator);
+        }
+
+        // Record the first unhandled construct as a fix.
+        if (recordFix(SkipUnhandledConstructInResultBuilder::create(
+                *this, unsupported, builder, getConstraintLocator(locator)))) {
+          return getTypeMatchFailure(locator);
+        }
+
+        if (auto *closure =
+                getAsExpr<ClosureExpr>(fn.getAbstractClosureExpr())) {
+          auto closureTy = getClosureType(closure);
+          simplifyType(closureTy).visit([&](Type componentTy) {
+            if (auto *typeVar = componentTy->getAs<TypeVariableType>()) {
+              assignFixedType(typeVar,
+                              PlaceholderType::get(getASTContext(), typeVar));
+            }
+          });
+        }
+
+        return getTypeMatchSuccess();
       }
 
-      // If we're solving for code completion and the body contains the code
-      // completion location, skipping it won't get us to a useful solution so
-      // just bail.
-      if (isForCodeCompletion() && containsCodeCompletionLoc(fn.getBody())) {
-        return getTypeMatchFailure(locator);
-      }
-
-      // Record the first unhandled construct as a fix.
-      if (recordFix(SkipUnhandledConstructInResultBuilder::create(
-              *this, unsupported, builder, getConstraintLocator(locator)))) {
-        return getTypeMatchFailure(locator);
-      }
-
-      if (auto *closure = getAsExpr<ClosureExpr>(fn.getAbstractClosureExpr())) {
-        auto closureTy = getClosureType(closure);
-        simplifyType(closureTy).visit([&](Type componentTy) {
-          if (auto *typeVar = componentTy->getAs<TypeVariableType>()) {
-            assignFixedType(typeVar,
-                            PlaceholderType::get(getASTContext(), typeVar));
-          }
-        });
-      }
-
-      return getTypeMatchSuccess();
+      transformedBody = std::make_pair(transform.getBuilderSelf(), body);
+      // Record the transformation so it could be re-used if needed.
+      setBuilderTransformedBody(fn, builder, transformedBody->first,
+                                transformedBody->second);
     }
+
+    // Set the type of `$__builderSelf` variable before constraint generation.
+    setType(transformedBody->first, MetatypeType::get(builderType));
 
     if (isDebugMode()) {
       auto &log = llvm::errs();
       auto indent = solverState ? solverState->depth * 2 : 0;
       log.indent(indent) << "------- Transfomed Body -------\n";
-      body->dump(log);
+      transformedBody->second->dump(log);
       log << '\n';
     }
 
@@ -2528,7 +2545,7 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
 
     transformInfo.builderType = builderType;
     transformInfo.bodyResultType = bodyResultType;
-    transformInfo.transformedBody = body;
+    transformInfo.transformedBody = transformedBody->second;
 
     // Record the transformation.
     assert(
@@ -2541,7 +2558,7 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
     resultBuilderTransformed.insert(
         std::make_pair(fn, std::move(transformInfo)));
 
-    if (generateConstraints(fn, body))
+    if (generateConstraints(fn, transformInfo.transformedBody.get()))
       return getTypeMatchFailure(locator);
 
     return getTypeMatchSuccess();
