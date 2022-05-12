@@ -2,9 +2,9 @@
 // REQUIRES: swift_in_compiler
 // REQUIRES: concurrency
 
-prefix operator /  // expected-error {{prefix operator may not contain '/'}}
-prefix operator ^/ // expected-error {{prefix operator may not contain '/'}}
-prefix operator /^/ // expected-error {{prefix operator may not contain '/'}}
+prefix operator /
+prefix operator ^/
+prefix operator /^/
 
 prefix operator !!
 prefix func !! <T>(_ x: T) -> T { x }
