@@ -453,7 +453,7 @@ var fl_bad_separator2: Double = 0x1p_ // expected-error {{'_' is not a valid fir
 
 var st_a = ""
 var st_b: String = ""
-var st_c = "asdfasd    // expected-error {{unterminated string literal}} expected-note {{add an ending quote to string literal}}
+var st_c = "asdfasd    // expected-error {{unterminated string literal}} expected-note {{add an ending quote to string literal}} {{20-20="}}
 
 var st_d = " \t\n\r\"\'\\  "  // Valid simple escapes
 var st_e = " \u{12}\u{0012}\u{00000078} "  // Valid unicode escapes
@@ -475,9 +475,9 @@ func stringliterals(_ d: [String: Int]) {
   let x = 4
   "Hello \(x+1) world"  // expected-warning {{string literal is unused}}
   
-  "Error: \(x+1"; // expected-error {{unterminated string literal}} expected-note {{add an ending quote to string literal}}
+  "Error: \(x+1"; // expected-error {{unterminated string literal}}
   
-  "Error: \(x+1   // expected-error {{unterminated string literal}} expected-note {{add an ending quote to string literal}}
+  "Error: \(x+1   // expected-error {{unterminated string literal}} expected-note {{add an ending quote to string literal}} {{16-16="}}
   ;    // expected-error {{';' statements are not allowed}}
 
   // rdar://14050788 [DF] String Interpolations can't contain quotes
@@ -494,18 +494,18 @@ func stringliterals(_ d: [String: Int]) {
   // expected-error @-1 {{unterminated string literal}} expected-error @-1 {{invalid escape sequence in literal}} expected-note @-1 {{add an ending quote to string literal}}
   "test \("\
   // expected-error @-1 {{unterminated string literal}} expected-note @-1 {{add an ending quote to string literal}}
-  // expected-note @-2 {{add an ending quote to string literal}}
+  // expected-note @-2 {{add an ending quote to string literal}} {{13-13="}}
   "test newline \("something" +
     "something else")"
-  // expected-error @-2 {{unterminated string literal}} expected-error @-1 {{unterminated string literal}} expected-note @-1 {{add an ending quote to string literal}} expected-note @-2 {{add an ending quote to string literal}}
+  // expected-error @-2 {{unterminated string literal}} expected-error @-1 {{unterminated string literal}} expected-note @-1 {{add an ending quote to string literal}} {{23-23="}} expected-note @-2 {{add an ending quote to string literal}} {{32-32="}}
 
-  // expected-note @+3 {{add an ending quote to string literal}}
+  // expected-note @+3 {{add an ending quote to string literal}} {{29-29="}}
   // expected-warning @+2 {{variable 'x2' was never used; consider replacing with '_' or removing it}}
   // expected-error @+1 {{unterminated string literal}}
   var x2 : () = ("hello" + "
   ;
 
-  // expected-note @+2 {{add an ending quote to string literal}}
+  // expected-note @+2 {{add an ending quote to string literal}} {{22-22="}}
   // expected-error @+1 {{unterminated string literal}}
   var tri = "ice crea
 }
@@ -521,8 +521,8 @@ func testSingleQuoteStringLiterals() {
   _ = 'a\('b')c' // expected-error{{single-quoted string literal found, use '"'}}{{7-17="a\\('b')c"}}
                  // expected-error@-1{{single-quoted string literal found, use '"'}}{{11-14="b"}}
 
-  _ = "abc' // expected-error{{unterminated string literal}} expected-note {{add an ending quote to string literal}}
-  _ = 'abc" // expected-error{{unterminated string literal}} expected-note {{add an ending quote to string literal}}
+  _ = "abc' // expected-error{{unterminated string literal}} expected-note {{add an ending quote to string literal}} {{12-12="}}
+  _ = 'abc" // expected-error{{unterminated string literal}} expected-note {{add an ending quote to string literal}} {{12-12="}}
   _ = "a'c"
 
   _ = 'ab\'c' // expected-error{{single-quoted string literal found, use '"'}}{{7-14="ab'c"}}
@@ -945,10 +945,10 @@ let _ = 0xFFF_FFFF_FFFF_FFFF as Int64
 
 // rdar://problem/20289969 - string interpolation with comment containing ')' or '"'
 let _ = "foo \(42 /* ) " ) */)"
-let _ = "foo \(foo // )  " // expected-error {{unterminated string literal}} expected-note {{add an ending quote to string literal}}
+let _ = "foo \(foo // )  " // expected-error {{unterminated string literal}}
 let _ = "foo \(42 /*
                    * multiline comment
                    */)end"
-// expected-error @-3 {{unterminated string literal}} expected-note @-3 {{add an ending quote to string literal}}
+// expected-error @-3 {{unterminated string literal}} 
 // expected-error @-2 {{expected expression}}
-// expected-error @-3 {{unterminated string literal}} expected-note @-3 {{add an ending quote to string literal}}
+// expected-error @-3 {{unterminated string literal}}

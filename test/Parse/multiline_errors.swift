@@ -126,15 +126,15 @@ _ = "hello\("""
             world
             """
             )!"
-            // expected-error@-4 {{unterminated string literal}} expected-note@-4 {{add an ending quote to string literal}}
-            // expected-error@-2 {{unterminated string literal}} expected-note@-2 {{add an ending quote to string literal}}
+            // expected-error@-4 {{unterminated string literal}}
+            // expected-error@-2 {{unterminated string literal}}
 
 _ = "hello\(
             """
             world
             """)!"
-            // expected-error@-4 {{unterminated string literal}} expected-note@-4 {{add an ending quote to string literal}}
-            // expected-error@-2 {{unterminated string literal}} expected-note@-2 {{add an ending quote to string literal}}
+            // expected-error@-4 {{unterminated string literal}}
+            // expected-error@-2 {{unterminated string literal}} 
 
 _ = """
   line one \ non-whitespace
