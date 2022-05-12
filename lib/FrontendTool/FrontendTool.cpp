@@ -588,6 +588,29 @@ mapFrontendInvocationToAction(const CompilerInvocation &Invocation) {
   // StaticLinkJob, DynamicLinkJob
 }
 
+// TODO: Apply elsewhere in the compiler
+static swift::file_types::ID computeFileTypeForPath(const StringRef Path) {
+  if (!llvm::sys::path::has_extension(Path))
+    return swift::file_types::ID::TY_INVALID;
+
+  auto Extension = llvm::sys::path::extension(Path).str();
+  auto FileType = file_types::lookupTypeForExtension(Extension);
+  if (FileType == swift::file_types::ID::TY_INVALID) {
+    auto PathStem = llvm::sys::path::stem(Path);
+    // If this path has a multiple '.' extension (e.g. .abi.json),
+    // then iterate over all preceeding possible extension variants.
+    while (llvm::sys::path::has_extension(PathStem)) {
+      auto NextExtension = llvm::sys::path::extension(PathStem);
+      Extension = NextExtension.str() + Extension;
+      FileType = file_types::lookupTypeForExtension(Extension);
+      if (FileType != swift::file_types::ID::TY_INVALID)
+        break;
+    }
+  }
+
+  return FileType;
+}
+
 static DetailedTaskDescription
 constructDetailedTaskDescription(const CompilerInvocation &Invocation,
                                  const InputFile &PrimaryInput,
@@ -607,21 +630,20 @@ constructDetailedTaskDescription(const CompilerInvocation &Invocation,
   // Primary Input only
   Inputs.push_back(CommandInput(PrimaryInput.getFileName()));
 
-  // Output for this Primary
-  auto OutputFile = PrimaryInput.outputFilename();
-  Outputs.push_back(OutputPair(file_types::lookupTypeForExtension(
-                                   llvm::sys::path::extension(OutputFile)),
-                               OutputFile));
+  for (const auto &input : PrimaryInputs) {
+    // Main outputs
+    auto OutputFile = input.outputFilename();
+    if (!OutputFile.empty())
+      Outputs.push_back(OutputPair(computeFileTypeForPath(OutputFile), OutputFile));
 
-  // Supplementary outputs
-  const auto &primarySpecificFiles = PrimaryInput.getPrimarySpecificPaths();
-  const auto &supplementaryOutputPaths =
-      primarySpecificFiles.SupplementaryOutputs;
-  supplementaryOutputPaths.forEachSetOutput([&](const std::string &output) {
-    Outputs.push_back(OutputPair(
-        file_types::lookupTypeForExtension(llvm::sys::path::extension(output)),
-        output));
-  });
+    // Supplementary outputs
+    const auto &primarySpecificFiles = input.getPrimarySpecificPaths();
+    const auto &supplementaryOutputPaths =
+        primarySpecificFiles.SupplementaryOutputs;
+    supplementaryOutputPaths.forEachSetOutput([&](const std::string &output) {
+      Outputs.push_back(OutputPair(computeFileTypeForPath(output), output));
+    });
+  }
   return DetailedTaskDescription{Executable, Arguments, CommandLine, Inputs,
                                  Outputs};
 }
