@@ -295,18 +295,18 @@ func sameTypeConflicts() {
     fatalError()
   }
 
-  // expected-error@+1{{no type for 'T.Bar.Foo' can satisfy both 'T.Bar.Foo == X' and 'T.Bar.Foo == Z'}}
   func fail4<T: Barrable>(_ t: T) -> (Y, Z)
     where
     T.Bar == Y,
     T.Bar.Foo == Z {
+    // expected-error@-1{{generic signature requires types 'Y.Foo' (aka 'X') and 'Z' to be the same}}
     fatalError()
   }
 
-  // expected-error@+1{{no type for 'T.Bar.Foo' can satisfy both 'T.Bar.Foo == X' and 'T.Bar.Foo == Z'}}
   func fail5<T: Barrable>(_ t: T) -> (Y, Z)
     where
     T.Bar.Foo == Z,
+    // expected-error@-1{{generic signature requires types 'Y.Foo' (aka 'X') and 'Z' to be the same}}
     T.Bar == Y {
     fatalError()
   }
