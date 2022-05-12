@@ -13,17 +13,19 @@
 import Basic
 import SILBridging
 
-final public class Function : CustomStringConvertible, HasName {
+final public class Function : CustomStringConvertible, HasShortDescription {
   public private(set) var effects = FunctionEffects()
 
-  public var name: String {
-    return SILFunction_getName(bridged).string
+  public var name: StringRef {
+    return StringRef(bridged: SILFunction_getName(bridged))
   }
 
   final public var description: String {
     var s = SILFunction_debugDescription(bridged)
     return String(cString: s.c_str())
   }
+
+  public var shortDescription: String { name.string }
 
   public var entryBlock: BasicBlock {
     SILFunction_firstBlock(bridged).block!

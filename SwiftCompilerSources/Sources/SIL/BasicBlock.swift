@@ -13,7 +13,7 @@
 import Basic
 import SILBridging
 
-final public class BasicBlock : ListNode, CustomStringConvertible, HasName {
+final public class BasicBlock : ListNode, CustomStringConvertible, HasShortDescription {
   public var next: BasicBlock? { SILBasicBlock_next(bridged).block }
   public var previous: BasicBlock? { SILBasicBlock_previous(bridged).block }
 
@@ -28,6 +28,7 @@ final public class BasicBlock : ListNode, CustomStringConvertible, HasName {
     var s = SILBasicBlock_debugDescription(bridged)
     return String(cString: s.c_str())
   }
+  public var shortDescription: String { name }
 
   public var arguments: ArgumentArray { ArgumentArray(block: self) }
 
