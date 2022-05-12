@@ -122,9 +122,21 @@ public struct PredecessorList : CollectionLikeSequence, IteratorProtocol {
 // Bridging utilities
 
 extension BridgedBasicBlock {
-  var block: BasicBlock { obj.getAs(BasicBlock.self) }
+  public var block: BasicBlock { obj.getAs(BasicBlock.self) }
+  public var optional: OptionalBridgedBasicBlock {
+    OptionalBridgedBasicBlock(obj: self.obj)
+  }
 }
 
 extension OptionalBridgedBasicBlock {
-  var block: BasicBlock? { obj.getAs(BasicBlock.self) }
+  public var block: BasicBlock? { obj.getAs(BasicBlock.self) }
+  public static var none: OptionalBridgedBasicBlock {
+    OptionalBridgedBasicBlock(obj: nil)
+  }
+}
+
+extension Optional where Wrapped == BasicBlock {
+  public var bridged: OptionalBridgedBasicBlock {
+    OptionalBridgedBasicBlock(obj: self?.bridged.obj)
+  }
 }

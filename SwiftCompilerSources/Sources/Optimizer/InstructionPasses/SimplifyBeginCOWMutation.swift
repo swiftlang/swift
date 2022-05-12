@@ -67,7 +67,7 @@ private func optimizeEmptySingleton(_ beginCOW: BeginCOWMutationInst,
   }
   let builder = Builder(at: beginCOW, location: beginCOW.location, context)
   let zero = builder.createIntegerLiteral(0, type: beginCOW.uniquenessResult.type);
-  context.replaceAllUses(of: beginCOW.uniquenessResult, with: zero)
+  beginCOW.uniquenessResult.uses.replaceAll(with: zero, context)
 }
 
 private func isEmptyCOWSingleton(_ value: Value) -> Bool {
@@ -103,7 +103,7 @@ private func optimizeEmptyBeginEndPair(_ beginCOW: BeginCOWMutationInst,
 
   for use in buffer.nonDebugUses {
     let endCOW = use.instruction as! EndCOWMutationInst
-    context.replaceAllUses(of: endCOW, with: beginCOW.operand)
+    endCOW.uses.replaceAll(with: beginCOW.operand, context)
     context.erase(instruction: endCOW)
   }
   context.erase(instruction: beginCOW, .includingDebugUses)
@@ -122,7 +122,7 @@ private func optimizeEmptyEndBeginPair(_ beginCOW: BeginCOWMutationInst,
     return false
   }
 
-  context.replaceAllUses(of: beginCOW.bufferResult, with: endCOW.operand)
+  beginCOW.bufferResult.uses.replaceAll(with: endCOW.operand, context)
   context.erase(instruction: beginCOW, .includingDebugUses)
   context.erase(instruction: endCOW, .includingDebugUses)
   return true

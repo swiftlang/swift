@@ -14,6 +14,7 @@
 
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/AST/SILOptimizerRequests.h"
+#include "swift/Basic/BridgingUtils.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILBridgingUtils.h"
@@ -1308,6 +1309,12 @@ void PassContext_notifyChanges(BridgedPassContext passContext,
   }
 }
 
+BridgedBasicBlock PassContext_splitBlock(BridgedInstruction bridgedInst) {
+  SILInstruction *inst = castToInst(bridgedInst);
+  SILBasicBlock *block = inst->getParent();
+  return {block->split(inst->getIterator())};
+}
+
 void PassContext_eraseInstruction(BridgedPassContext passContext,
                                   BridgedInstruction inst) {
   castToPassInvocation(passContext)->eraseInstruction(castToInst(inst));
@@ -1410,4 +1417,12 @@ PassContext_getContextSubstitutionMap(BridgedPassContext context,
   auto *m = pm->getModule()->getSwiftModule();
   
   return {type.getASTType()->getContextSubstitutionMap(m, ntd).getOpaqueValue()};
+}
+
+OptionalBridgedFunction
+PassContext_loadFunction(BridgedPassContext context, BridgedStringRef name) {
+  SILModule *mod = castToPassInvocation(context)->getPassManager()->getModule();
+  SILFunction *f = mod->loadFunction(getStringRef(name),
+                                     SILModule::LinkingMode::LinkNormal);
+  return {f};
 }

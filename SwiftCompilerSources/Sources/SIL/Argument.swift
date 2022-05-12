@@ -77,6 +77,7 @@ final public class BlockArgument : Argument {
 // Bridging utilities
 
 extension BridgedArgument {
-  var argument: Argument { obj.getAs(Argument.self) }
-  var functionArgument: FunctionArgument { obj.getAs(FunctionArgument.self) }
+  public var argument: Argument { obj.getAs(Argument.self) }
+  public var blockArgument: BlockArgument { obj.getAs(BlockArgument.self) }
+  public var functionArgument: FunctionArgument { obj.getAs(FunctionArgument.self) }
 }

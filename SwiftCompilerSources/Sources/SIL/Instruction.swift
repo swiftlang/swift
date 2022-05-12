@@ -63,7 +63,7 @@ public class Instruction : ListNode, CustomStringConvertible, Hashable {
   }
 
   final public var location: Location {
-    return Location(bridgedLocation: SILInstruction_getLocation(bridged))
+    return Location(bridged: SILInstruction_getLocation(bridged))
   }
 
   public var mayTrap: Bool { false }
@@ -121,10 +121,16 @@ public class Instruction : ListNode, CustomStringConvertible, Hashable {
 extension BridgedInstruction {
   public var instruction: Instruction { obj.getAs(Instruction.self) }
   public func getAs<T: Instruction>(_ instType: T.Type) -> T { obj.getAs(T.self) }
+  public var optional: OptionalBridgedInstruction {
+    OptionalBridgedInstruction(obj: self.obj)
+  }
 }
 
 extension OptionalBridgedInstruction {
   var instruction: Instruction? { obj.getAs(Instruction.self) }
+  public static var none: OptionalBridgedInstruction {
+    OptionalBridgedInstruction(obj: nil)
+  }
 }
 
 public class SingleValueInstruction : Instruction, Value {

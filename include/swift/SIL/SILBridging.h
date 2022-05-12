@@ -124,6 +124,12 @@ typedef struct {
   SwiftInt position;
 } BridgedParsingError;
 
+typedef struct {
+  OptionalBridgedInstruction insertBefore;
+  OptionalBridgedBasicBlock insertAtEnd;
+  BridgedLocation loc;
+} BridgedBuilder;
+
 // Must be in sync with SILInstruction::MemoryBehavior
 // TODO: do this less hacky.
 typedef enum {
@@ -181,6 +187,7 @@ SwiftInt PassContext_continueWithNextSubpassRun(BridgedPassContext passContext,
                                                 OptionalBridgedInstruction inst);
 void PassContext_notifyChanges(BridgedPassContext passContext,
                                enum ChangeNotificationKind changeKind);
+BridgedBasicBlock PassContext_splitBlock(BridgedInstruction bridgedInst);
 void PassContext_eraseInstruction(BridgedPassContext passContext,
                                   BridgedInstruction inst);
 
@@ -207,6 +214,10 @@ OptionalBridgedInstruction SILBasicBlock_firstInst(BridgedBasicBlock block);
 OptionalBridgedInstruction SILBasicBlock_lastInst(BridgedBasicBlock block);
 SwiftInt SILBasicBlock_getNumArguments(BridgedBasicBlock block);
 BridgedArgument SILBasicBlock_getArgument(BridgedBasicBlock block, SwiftInt index);
+BridgedArgument SILBasicBlock_addBlockArgument(BridgedBasicBlock block,
+                                               BridgedType type,
+                                               BridgedOwnership ownership);
+void SILBasicBlock_eraseArgument(BridgedBasicBlock block, SwiftInt index);
 OptionalBridgedSuccessor SILBasicBlock_getFirstPred(BridgedBasicBlock block);
 OptionalBridgedSuccessor SILSuccessor_getNext(BridgedSuccessor succ);
 BridgedBasicBlock SILSuccessor_getTargetBlock(BridgedSuccessor succ);
@@ -299,31 +310,37 @@ bool RefCountingInst_getIsAtomic(BridgedInstruction rc);
 SwiftInt CondBranchInst_getNumTrueArgs(BridgedInstruction cbr);
 
 BridgedInstruction SILBuilder_createBuiltinBinaryFunction(
-          BridgedInstruction insertionPoint,
-          BridgedLocation loc, BridgedStringRef name,
-          BridgedType operandType, BridgedType resultType, BridgedValueArray arguments);
-BridgedInstruction SILBuilder_createCondFail(BridgedInstruction insertionPoint,
-          BridgedLocation loc, BridgedValue condition, BridgedStringRef message);
-BridgedInstruction SILBuilder_createIntegerLiteral(BridgedInstruction insertionPoint,
-          BridgedLocation loc, BridgedType type, SwiftInt value);
-BridgedInstruction SILBuilder_createDeallocStackRef(BridgedInstruction insertionPoint,
-          BridgedLocation loc, BridgedValue operand);
-BridgedInstruction SILBuilder_createUncheckedRefCast(BridgedInstruction insertionPoint,
-                                                     BridgedLocation loc,
-                                                     BridgedValue op,
-                                                     BridgedType type);
-BridgedInstruction
-SILBuilder_createSetDeallocating(BridgedInstruction insertionPoint,
-                                 BridgedLocation loc, BridgedValue op,
-                                 bool isAtomic);
-BridgedInstruction
-SILBuilder_createFunctionRef(BridgedInstruction insertionPoint,
-                             BridgedLocation loc, BridgedFunction function);
-BridgedInstruction SILBuilder_createApply(BridgedInstruction insertionPoint,
-                                          BridgedLocation loc,
-                                          BridgedValue function,
-                                          BridgedSubstitutionMap subMap,
-                                          BridgedValueArray arguments);
+          BridgedBuilder builder, BridgedStringRef name,
+          BridgedType operandType, BridgedType resultType,
+          BridgedValueArray arguments);
+BridgedInstruction SILBuilder_createCondFail(BridgedBuilder builder,
+          BridgedValue condition, BridgedStringRef message);
+BridgedInstruction SILBuilder_createIntegerLiteral(BridgedBuilder builder,
+          BridgedType type, SwiftInt value);
+BridgedInstruction SILBuilder_createDeallocStackRef(BridgedBuilder builder,
+          BridgedValue operand);
+BridgedInstruction SILBuilder_createUncheckedRefCast(BridgedBuilder builder,
+          BridgedValue op, BridgedType type);
+BridgedInstruction SILBuilder_createSetDeallocating(BridgedBuilder builder,
+          BridgedValue op, bool isAtomic);
+BridgedInstruction SILBuilder_createFunctionRef(BridgedBuilder builder,
+          BridgedFunction function);
+BridgedInstruction SILBuilder_createCopyValue(BridgedBuilder builder,
+          BridgedValue op);
+BridgedInstruction SILBuilder_createDestroyValue(BridgedBuilder builder,
+          BridgedValue op);
+BridgedInstruction SILBuilder_createApply(BridgedBuilder builder,
+          BridgedValue function, BridgedSubstitutionMap subMap,
+          BridgedValueArray arguments);
+BridgedInstruction SILBuilder_createSwitchEnumInst(BridgedBuilder builder,
+          BridgedValue enumVal, OptionalBridgedBasicBlock defaultBlock,
+          const void * _Nullable enumCases, SwiftInt numEnumCases);
+BridgedInstruction SILBuilder_createUncheckedEnumData(BridgedBuilder builder,
+          BridgedValue enumVal, SwiftInt caseIdx,
+          BridgedType resultType);
+BridgedInstruction SILBuilder_createBranch(
+          BridgedBuilder builder, BridgedBasicBlock destBlock,
+          BridgedValueArray arguments);
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
 
