@@ -544,10 +544,11 @@ struct SwiftASTManager::Implementation {
       std::shared_ptr<SwiftEditorDocumentFileMap> EditorDocs,
       std::shared_ptr<GlobalConfig> Config,
       std::shared_ptr<SwiftStatistics> Stats,
-      std::shared_ptr<RequestTracker> ReqTracker, StringRef RuntimeResourcePath,
-      StringRef DiagnosticDocumentationPath)
+      std::shared_ptr<RequestTracker> ReqTracker, StringRef SwiftExecutablePath,
+      StringRef RuntimeResourcePath, StringRef DiagnosticDocumentationPath)
       : EditorDocs(EditorDocs), Config(Config), Stats(Stats),
-        ReqTracker(ReqTracker), RuntimeResourcePath(RuntimeResourcePath),
+        ReqTracker(ReqTracker), SwiftExecutablePath(SwiftExecutablePath),
+        RuntimeResourcePath(RuntimeResourcePath),
         DiagnosticDocumentationPath(DiagnosticDocumentationPath),
         SessionTimestamp(llvm::sys::toTimeT(std::chrono::system_clock::now())) {
   }
@@ -556,6 +557,9 @@ struct SwiftASTManager::Implementation {
   std::shared_ptr<GlobalConfig> Config;
   std::shared_ptr<SwiftStatistics> Stats;
   std::shared_ptr<RequestTracker> ReqTracker;
+  /// The path of the swift-frontend executable.
+  /// Used to find clang relative to it.
+  std::string SwiftExecutablePath;
   std::string RuntimeResourcePath;
   std::string DiagnosticDocumentationPath;
   SourceManager SourceMgr;
@@ -625,10 +629,10 @@ SwiftASTManager::SwiftASTManager(
     std::shared_ptr<SwiftEditorDocumentFileMap> EditorDocs,
     std::shared_ptr<GlobalConfig> Config,
     std::shared_ptr<SwiftStatistics> Stats,
-    std::shared_ptr<RequestTracker> ReqTracker, StringRef RuntimeResourcePath,
-    StringRef DiagnosticDocumentationPath)
+    std::shared_ptr<RequestTracker> ReqTracker, StringRef SwiftExecutablePath,
+    StringRef RuntimeResourcePath, StringRef DiagnosticDocumentationPath)
     : Impl(*new Implementation(EditorDocs, Config, Stats, ReqTracker,
-                               RuntimeResourcePath,
+                               SwiftExecutablePath, RuntimeResourcePath,
                                DiagnosticDocumentationPath)) {}
 
 SwiftASTManager::~SwiftASTManager() {
@@ -665,8 +669,8 @@ bool SwiftASTManager::initCompilerInvocation(
     std::string &Error) {
   return ide::initCompilerInvocation(
       Invocation, OrigArgs, Action, Diags, UnresolvedPrimaryFile, FileSystem,
-      Impl.RuntimeResourcePath, Impl.DiagnosticDocumentationPath,
-      Impl.SessionTimestamp, Error);
+      Impl.SwiftExecutablePath, Impl.RuntimeResourcePath,
+      Impl.DiagnosticDocumentationPath, Impl.SessionTimestamp, Error);
 }
 
 bool SwiftASTManager::initCompilerInvocation(

@@ -89,6 +89,7 @@ bool initCompilerInvocation(
     FrontendOptions::ActionType Action, DiagnosticEngine &Diags,
     StringRef UnresolvedPrimaryFile,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    const std::string &swiftExecutablePath,
     const std::string &runtimeResourcePath,
     const std::string &diagnosticDocumentationPath, time_t sessionTimestamp,
     std::string &Error);
