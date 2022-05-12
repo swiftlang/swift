@@ -489,6 +489,23 @@ SwiftInt SILType_getFieldIdxOfNominalType(BridgedType type,
   return -1;
 }
 
+SwiftInt SILType_getCaseIdxOfEnumType(BridgedType type,
+                                      BridgedStringRef caseName) {
+  SILType ty = castToSILType(type);
+  auto *enumDecl = ty.getEnumOrBoundGenericEnum();
+  if (!enumDecl)
+    return -1;
+
+  SwiftInt idx = 0;
+  for (EnumElementDecl *elem : enumDecl->getAllElements()) {
+    if (elem->getNameStr() == getStringRef(caseName))
+      return idx;
+    idx++;
+  }
+  return -1;
+}
+
+
 //===----------------------------------------------------------------------===//
 //                            SubstitutionMap
 //===----------------------------------------------------------------------===//

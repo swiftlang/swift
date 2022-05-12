@@ -252,6 +252,8 @@ BridgedType SILType_getNominalFieldType(BridgedType type, SwiftInt index,
                                         BridgedFunction function);
 SwiftInt SILType_getFieldIdxOfNominalType(BridgedType type,
                                           BridgedStringRef fieldName);
+SwiftInt SILType_getCaseIdxOfEnumType(BridgedType type,
+                                      BridgedStringRef caseName);
 
 BridgedSubstitutionMap SubstitutionMap_getEmpty();
 
