@@ -252,7 +252,8 @@ BridgedType SILType_getNominalFieldType(BridgedType type, SwiftInt index,
                                         BridgedFunction function);
 SwiftInt SILType_getFieldIdxOfNominalType(BridgedType type,
                                           BridgedStringRef fieldName);
-BridgedSubstitutionMap SILType_getContextSubstitutionMap(BridgedType);
+
+BridgedSubstitutionMap SubstitutionMap_getEmpty();
 
 BridgedBasicBlock SILArgument_getParent(BridgedArgument argument);
 SwiftInt SILArgument_isExclusiveIndirectParameter(BridgedArgument argument);

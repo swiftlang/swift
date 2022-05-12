@@ -490,6 +490,14 @@ SwiftInt SILType_getFieldIdxOfNominalType(BridgedType type,
 }
 
 //===----------------------------------------------------------------------===//
+//                            SubstitutionMap
+//===----------------------------------------------------------------------===//
+
+BridgedSubstitutionMap SubstitutionMap_getEmpty() {
+  return {SubstitutionMap().getOpaqueValue()};
+}
+
+//===----------------------------------------------------------------------===//
 //                            SILGlobalVariable
 //===----------------------------------------------------------------------===//
 
