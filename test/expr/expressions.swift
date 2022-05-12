@@ -475,9 +475,9 @@ func stringliterals(_ d: [String: Int]) {
   let x = 4
   "Hello \(x+1) world"  // expected-warning {{string literal is unused}}
   
-  "Error: \(x+1"; // expected-error {{unterminated string literal}}
+  "Error: \(x+1"; // expected-error {{string interpolation needs to be closed by a )}}
   
-  "Error: \(x+1   // expected-error {{unterminated string literal}}
+  "Error: \(x+1   // expected-error {{string interpolation needs to be closed by a )}}
   ;    // expected-error {{';' statements are not allowed}}
 
   // rdar://14050788 [DF] String Interpolations can't contain quotes
@@ -488,15 +488,15 @@ func stringliterals(_ d: [String: Int]) {
   "test \("quoted-paren (")"
   "test \("\\")"
   "test \("\n")"
-  "test \("\")" // expected-error {{unterminated string literal}}
+  "test \("\")" // expected-error {{string interpolation needs to be closed by a )}}
 
   "test \
   // expected-error @-1 {{unterminated string literal}} expected-error @-1 {{invalid escape sequence in literal}}
   "test \("\
-  // expected-error @-1 {{unterminated string literal}}
+  // expected-error @-1 {{string interpolation needs to be closed by a )}}
   "test newline \("something" +
     "something else")"
-  // expected-error @-2 {{unterminated string literal}} expected-error @-1 {{unterminated string literal}}
+  // expected-error @-2 {{string interpolation needs to be closed by a )}} expected-error @-1 {{unterminated string literal}}
 
   // expected-warning @+2 {{variable 'x2' was never used; consider replacing with '_' or removing it}}
   // expected-error @+1 {{unterminated string literal}}
@@ -939,10 +939,10 @@ let _ = 0xFFF_FFFF_FFFF_FFFF as Int64
 
 // rdar://problem/20289969 - string interpolation with comment containing ')' or '"'
 let _ = "foo \(42 /* ) " ) */)"
-let _ = "foo \(foo // )  " // expected-error {{unterminated string literal}}
+let _ = "foo \(foo // )  " // expected-error {{string interpolation needs to be closed by a )}}
 let _ = "foo \(42 /*
                    * multiline comment
                    */)end"
-// expected-error @-3 {{unterminated string literal}}
+// expected-error @-3 {{string interpolation needs to be closed by a )}}
 // expected-error @-2 {{expected expression}}
 // expected-error @-3 {{unterminated string literal}}

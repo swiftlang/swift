@@ -1356,6 +1356,11 @@ ERROR(expected_type_after_as,none,
 ERROR(string_interpolation_extra,none,
       "extra tokens after interpolated string expression", ())
 
+// String interpolation isnt closed by a )
+// ie: `let west = "ye \("`
+ERROR(string_interpolation_unclosed, none,
+      "string interpolation needs to be closed by a )", ())
+
 // Interpolations with parameter labels or multiple values
 WARNING(string_interpolation_list_changing,none,
       "interpolating multiple values will not form a tuple in Swift 5", ())

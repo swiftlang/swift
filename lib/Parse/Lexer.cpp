@@ -1887,11 +1887,11 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
       } else if ((*CurPtr == '\r' || *CurPtr == '\n') && IsMultilineString) {
         // The only case we reach here is unterminated single line string in the
         // interpolation. For better recovery, go on after emitting an error.
-        diagnose(CurPtr, diag::lex_unterminated_string);
+        diagnose(CurPtr, diag::string_interpolation_unclosed);
         wasErroneous = true;
         continue;
       } else {
-        diagnose(TokStart, diag::lex_unterminated_string);
+        diagnose(TokStart, diag::string_interpolation_unclosed);
         return formToken(tok::unknown, TokStart);
       }
     }
