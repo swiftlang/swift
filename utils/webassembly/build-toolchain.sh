@@ -136,6 +136,7 @@ build_target_toolchain() {
     -D SWIFT_WASI_wasm32_ICU_I18N="$BUILD_SDK_PATH/icu/lib/libicui18n.a" \
     -D SWIFT_WASI_wasm32_ICU_DATA="$BUILD_SDK_PATH/icu/lib/libicudata.a" \
     -D SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING=YES \
+    -D SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED=YES \
     -G Ninja \
     -S "$SOURCE_PATH/swift"
 
