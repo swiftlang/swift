@@ -52,6 +52,8 @@ ParserResult<Expr> Parser::parseExprRegexLiteral() {
                         /*captureStructureOut*/ capturesBuf.data(),
                         /*captureStructureSize*/ capturesBuf.size());
   auto loc = consumeToken();
+  SourceMgr.recordRegexLiteralStartLoc(loc);
+
   if (errorStr) {
     diagnose(loc, diag::regex_literal_parsing_error, errorStr);
     return makeParserResult(new (Context) ErrorExpr(loc));
