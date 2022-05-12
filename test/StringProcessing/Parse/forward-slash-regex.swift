@@ -53,8 +53,9 @@ do {
   // expected-error@-3 {{'/' is not a postfix unary operator}}
 }
 
+// No closing '/' so a prefix operator.
 _ = /x
-// expected-error@-1 {{unterminated regex literal}}
+// expected-error@-1 {{'/' is not a prefix unary operator}}
 
 _ = !/x/
 // expected-error@-1 {{cannot convert value of type 'Regex<Substring>' to expected argument type 'Bool'}}
@@ -252,13 +253,13 @@ _ = await /x / // expected-warning {{no 'async' operations occur within 'await' 
 // written a comment and is still in the middle of writing the characters before
 // it.
 _ = /x// comment
-// expected-error@-1 {{unterminated regex literal}}
+// expected-error@-1 {{'/' is not a prefix unary operator}}
 
 _ = /x // comment
-// expected-error@-1 {{unterminated regex literal}}
+// expected-error@-1 {{'/' is not a prefix unary operator}}
 
 _ = /x/*comment*/
-// expected-error@-1 {{unterminated regex literal}}
+// expected-error@-1 {{'/' is not a prefix unary operator}}
 
 // These become regex literals, unless surrounded in parens.
 func baz(_ x: (Int, Int) -> Int, _ y: (Int, Int) -> Int) {} // expected-note 4{{'baz' declared here}}
