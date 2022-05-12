@@ -80,6 +80,15 @@ inline SILGlobalVariable *castToGlobal(BridgedGlobalVar global) {
   return static_cast<SILGlobalVariable *>(global.obj);
 }
 
+inline ValueOwnershipKind castToOwnership(BridgedOwnership ownership) {
+  switch (ownership) {
+    case Ownership_Unowned:    return OwnershipKind::Unowned;
+    case Ownership_Owned:      return OwnershipKind::Owned;
+    case Ownership_Guaranteed: return OwnershipKind::Guaranteed;
+    case Ownership_None:       return OwnershipKind::None;
+  }
+}
+
 ArrayRef<SILValue> getSILValues(BridgedValueArray values,
                                 SmallVectorImpl<SILValue> &storage);
 

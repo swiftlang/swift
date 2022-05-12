@@ -158,6 +158,10 @@ std::string SILFunction_debugDescription(BridgedFunction function) {
   return str;
 }
 
+SwiftInt SILFunction_hasOwnership(BridgedFunction function) {
+  return castToFunction(function)->hasOwnership() ? 1 : 0;
+}
+
 OptionalBridgedBasicBlock SILFunction_firstBlock(BridgedFunction function) {
   SILFunction *f = castToFunction(function);
   if (f->empty())
@@ -349,6 +353,17 @@ OptionalBridgedOperand SILValue_firstUse(BridgedValue value) {
 
 BridgedType SILValue_getType(BridgedValue value) {
   return { castToSILValue(value)->getType().getOpaqueValue() };
+}
+
+BridgedOwnership SILValue_getOwnership(BridgedValue value) {
+  switch (castToSILValue(value)->getOwnershipKind()) {
+    case OwnershipKind::Any:
+      llvm_unreachable("Invalid ownership for value");
+    case OwnershipKind::Unowned:    return Ownership_Unowned;
+    case OwnershipKind::Owned:      return Ownership_Owned;
+    case OwnershipKind::Guaranteed: return Ownership_Guaranteed;
+    case OwnershipKind::None:       return Ownership_None;
+  }
 }
 
 //===----------------------------------------------------------------------===//

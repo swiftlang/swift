@@ -27,6 +27,8 @@ final public class Function : CustomStringConvertible, HasShortDescription {
 
   public var shortDescription: String { name.string }
 
+  public var hasOwnership: Bool { SILFunction_hasOwnership(bridged) != 0 }
+
   public var entryBlock: BasicBlock {
     SILFunction_firstBlock(bridged).block!
   }

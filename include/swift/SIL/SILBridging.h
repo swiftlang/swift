@@ -134,6 +134,13 @@ typedef enum {
   MayHaveSideEffectsBehavior
 } BridgedMemoryBehavior;
 
+typedef enum {
+  Ownership_Unowned,
+  Ownership_Owned,
+  Ownership_Guaranteed,
+  Ownership_None
+} BridgedOwnership;
+
 // AST bridging
 
 typedef struct {
@@ -179,6 +186,7 @@ void PassContext_eraseInstruction(BridgedPassContext passContext,
 
 BridgedStringRef SILFunction_getName(BridgedFunction function);
 std::string SILFunction_debugDescription(BridgedFunction function);
+SwiftInt SILFunction_hasOwnership(BridgedFunction function);
 OptionalBridgedBasicBlock SILFunction_firstBlock(BridgedFunction function);
 OptionalBridgedBasicBlock SILFunction_lastBlock(BridgedFunction function);
 SwiftInt SILFunction_numIndirectResultArguments(BridgedFunction function);
@@ -213,6 +221,7 @@ std::string SILNode_debugDescription(BridgedNode node);
 BridgedFunction SILNode_getFunction(BridgedNode node);
 OptionalBridgedOperand SILValue_firstUse(BridgedValue value);
 BridgedType SILValue_getType(BridgedValue value);
+BridgedOwnership SILValue_getOwnership(BridgedValue value);
 
 BridgedStringRef SILType_debugDescription(BridgedType);
 SwiftInt SILType_isAddress(BridgedType);
