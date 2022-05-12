@@ -308,12 +308,20 @@ class ASTBuildOperation
   /// can be determined at construction time of the \c ASTBuildOperation.
   const std::vector<FileContent> FileContents;
 
+  /// Guards \c DependencyStamps. This prevents reading from \c DependencyStamps
+  /// while it is being modified. It does not provide any ordering gurantees
+  /// that \c DependencyStamps have been computed in \c buildASTUnit before they
+  /// are accessed in \c matchesSourceState but that's fine (see comment on
+  /// \c DependencyStamps).
+  llvm::sys::Mutex DependencyStampsMtx;
+
   /// \c DependencyStamps contains the stamps of all module depenecies needed
   /// for the AST build. These stamps are only known after the AST is built.
   /// Before the AST has been built, we thus assume that all dependency stamps
   /// match. This seems to be a reasonable assumption since the dependencies
   /// shouldn't change (much) in the time between an \c ASTBuildOperation is
   /// created and until it produced an AST.
+  /// Must only be accessed if \c DependencyStampsMtx has been claimed.
   SmallVector<std::pair<std::string, BufferStamp>, 8> DependencyStamps = {};
 
   /// The ASTManager from which this operation got scheduled. Used to update
@@ -898,6 +906,8 @@ bool ASTBuildOperation::matchesSourceState(
     }
   }
 
+  llvm::sys::ScopedLock L(DependencyStampsMtx);
+
   for (auto &Dependency : DependencyStamps) {
     if (Dependency.second !=
         ASTManager->Impl.getBufferStamp(Dependency.first, OtherFileSystem))
@@ -1070,9 +1080,12 @@ ASTUnitRef ASTBuildOperation::buildASTUnit(std::string &Error) {
   collectModuleDependencies(CompIns.getMainModule(), Visited, Filenames);
   // FIXME: There exists a small window where the module file may have been
   // modified after compilation finished and before we get its stamp.
-  for (auto &Filename : Filenames) {
-    DependencyStamps.push_back(std::make_pair(
-        Filename, ASTManager->Impl.getBufferStamp(Filename, FileSystem)));
+  {
+    llvm::sys::ScopedLock L(DependencyStampsMtx);
+    for (auto &Filename : Filenames) {
+      DependencyStamps.push_back(std::make_pair(
+          Filename, ASTManager->Impl.getBufferStamp(Filename, FileSystem)));
+    }
   }
 
   // Since we only typecheck the primary file (plus referenced constructs
