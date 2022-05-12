@@ -79,6 +79,8 @@ public struct BoundBlank {}
 
 // SINGLESAMELINE-LABEL: "precise": "s:10BlockStyle14SingleSameLineV"
 // SINGLESAMELINE:       "docComment": {
+// SINGLESAMELINE-NEXT:    "uri": "file://{{.*}}BlockStyle.swift",
+// SINGLESAMELINE-NEXT:    "module": "BlockStyle",
 // SINGLESAMELINE-NEXT:    "lines": [
 // SINGLESAMELINE-NEXT:      {
 // SINGLESAMELINE-NEXT:        "range": {
@@ -98,11 +100,15 @@ public struct BoundBlank {}
 
 // EMPTY-LABEL: "precise": "s:10BlockStyle5EmptyV"
 // EMPTY:       "docComment": {
+// EMPTY-NEXT:    "uri": "file://{{.*}}BlockStyle.swift",
+// EMPTY-NEXT:    "module": "BlockStyle",
 // EMPTY-NEXT:    "lines": []
 // EMPTY-NEXT:  },
 
 // EMPTYWITHNEWLINE-LABEL: "precise": "s:10BlockStyle16EmptyWithNewLineV"
 // EMPTYWITHNEWLINE:       "docComment": {
+// EMPTYWITHNEWLINE-NEXT:    "uri": "file://{{.*}}BlockStyle.swift",
+// EMPTYWITHNEWLINE-NEXT:    "module": "BlockStyle",
 // EMPTYWITHNEWLINE-NEXT:    "lines": [
 // EMPTYWITHNEWLINE-NEXT:      {
 // EMPTYWITHNEWLINE-NEXT:        "range": {
@@ -122,6 +128,8 @@ public struct BoundBlank {}
 
 // SINGLELINE-LABEL: "precise": "s:10BlockStyle10SingleLineV"
 // SINGLELINE:       "docComment": {
+// SINGLELINE-NEXT:    "uri": "file://{{.*}}BlockStyle.swift",
+// SINGLELINE-NEXT:    "module": "BlockStyle",
 // SINGLELINE-NEXT:    "lines": [
 // SINGLELINE-NEXT:      {
 // SINGLELINE-NEXT:        "range": {
@@ -154,6 +162,8 @@ public struct BoundBlank {}
 
 // SINGLELINEWITHART-LABEL: "precise": "s:10BlockStyle17SingleLineWithArtV"
 // SINGLELINEWITHART:       "docComment": {
+// SINGLELINEWITHART-NEXT:    "uri": "file://{{.*}}BlockStyle.swift",
+// SINGLELINEWITHART-NEXT:    "module": "BlockStyle",
 // SINGLELINEWITHART-NEXT:    "lines": [
 // SINGLELINEWITHART-NEXT:      {
 // SINGLELINEWITHART-NEXT:        "range": {
@@ -186,6 +196,8 @@ public struct BoundBlank {}
 
 // TWOLINES-LABEL: "precise": "s:10BlockStyle8TwoLinesV"
 // TWOLINES:       "docComment": {
+// TWOLINES-NEXT:    "uri": "file://{{.*}}BlockStyle.swift",
+// TWOLINES-NEXT:    "module": "BlockStyle",
 // TWOLINES-NEXT:    "lines": [
 // TWOLINES-NEXT:      {
 // TWOLINES-NEXT:        "range": {
@@ -231,6 +243,8 @@ public struct BoundBlank {}
 
 // LARGEINDENT-LABEL: "precise": "s:10BlockStyle11LargeIndentV"
 // LARGEINDENT:       "docComment": {
+// LARGEINDENT-NEXT:    "uri": "file://{{.*}}BlockStyle.swift",
+// LARGEINDENT-NEXT:    "module": "BlockStyle",
 // LARGEINDENT-NEXT:    "lines": [
 // LARGEINDENT-NEXT:      {
 // LARGEINDENT-NEXT:        "range": {
@@ -263,6 +277,8 @@ public struct BoundBlank {}
 
 // TWOLINESBETWEENBLANK-LABEL: "precise": "s:10BlockStyle20TwoLinesBetweenBlankV"
 // TWOLINESBETWEENBLANK:       "docComment": {
+// TWOLINESBETWEENBLANK-NEXT:    "uri": "file://{{.*}}BlockStyle.swift",
+// TWOLINESBETWEENBLANK-NEXT:    "module": "BlockStyle",
 // TWOLINESBETWEENBLANK-NEXT:    "lines": [
 // TWOLINESBETWEENBLANK-NEXT:      {
 // TWOLINESBETWEENBLANK-NEXT:        "range": {
@@ -321,6 +337,8 @@ public struct BoundBlank {}
 
 // LEADINGBLANK-LABEL: "precise": "s:10BlockStyle12LeadingBlankV"
 // LEADINGBLANK:       "docComment": {
+// LEADINGBLANK-NEXT:    "uri": "file://{{.*}}BlockStyle.swift",
+// LEADINGBLANK-NEXT:    "module": "BlockStyle",
 // LEADINGBLANK-NEXT:    "lines": [
 // LEADINGBLANK-NEXT:      {
 // LEADINGBLANK-NEXT:        "range": {
@@ -366,6 +384,8 @@ public struct BoundBlank {}
 
 // TRAILINGBLANK-LABEL: "precise": "s:10BlockStyle13TrailingBlankV"
 // TRAILINGBLANK:       "docComment": {
+// TRAILINGBLANK-NEXT:    "uri": "file://{{.*}}BlockStyle.swift",
+// TRAILINGBLANK-NEXT:    "module": "BlockStyle",
 // TRAILINGBLANK-NEXT:    "lines": [
 // TRAILINGBLANK-NEXT:      {
 // TRAILINGBLANK-NEXT:        "range": {
@@ -411,6 +431,8 @@ public struct BoundBlank {}
 
 // BOUNDBLANK-LABEL: "precise": "s:10BlockStyle10BoundBlankV"
 // BOUNDBLANK:       "docComment": {
+// BOUNDBLANK-NEXT:    "uri": "file://{{.*}}BlockStyle.swift",
+// BOUNDBLANK-NEXT:    "module": "BlockStyle",
 // BOUNDBLANK-NEXT:    "lines": [
 // BOUNDBLANK-NEXT:      {
 // BOUNDBLANK-NEXT:        "range": {
@@ -469,6 +491,8 @@ public struct BoundBlank {}
 
 // ALLINDENTED-LABEL: "precise": "s:10BlockStyle11AllIndentedV"
 // ALLINDENTED:       "docComment": {
+// ALLINDENTED-NEXT:    "uri": "file://{{.*}}BlockStyle.swift",
+// ALLINDENTED-NEXT:    "module": "BlockStyle",
 // ALLINDENTED-NEXT:    "lines": [
 // ALLINDENTED-NEXT:      {
 // ALLINDENTED-NEXT:        "range": {

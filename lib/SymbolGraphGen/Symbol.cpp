@@ -204,6 +204,7 @@ void Symbol::serializeDocComment(llvm::json::OStream &OS) const {
 
     if (auto *ClangD = ClangN.getAsDecl()) {
       const clang::ASTContext &ClangContext = ClangD->getASTContext();
+      const clang::SourceManager &ClangSourceMgr = ClangContext.getSourceManager();
       const clang::RawComment *RC =
           ClangContext.getRawCommentForAnyRedecl(ClangD);
       if (!RC || !RC->isDocumentation())
@@ -213,7 +214,7 @@ void Symbol::serializeDocComment(llvm::json::OStream &OS) const {
       // line and column ranges. Also consider handling cross-language
       // hierarchies, ie. if there's no comment on the ObjC decl we should
       // look up the hierarchy (and vice versa).
-      std::string Text = RC->getFormattedText(ClangContext.getSourceManager(),
+      std::string Text = RC->getFormattedText(ClangSourceMgr,
                                               ClangContext.getDiagnostics());
       Text = unicode::sanitizeUTF8(Text);
 
@@ -221,6 +222,15 @@ void Symbol::serializeDocComment(llvm::json::OStream &OS) const {
       splitIntoLines(Text, Lines);
 
       OS.attributeObject("docComment", [&]() {
+        clang::PresumedLoc Loc = ClangSourceMgr.getPresumedLoc(ClangD->getLocation());
+        if (Loc.isValid()) {
+          SmallString<1024> FileURI("file://");
+          FileURI.append(Loc.getFilename());
+          OS.attribute("uri", FileURI.str());
+        }
+        if (const auto *ModuleD = VD->getModuleContext()) {
+          OS.attribute("module", ModuleD->getNameStr());
+        }
         OS.attributeArray("lines", [&]() {
           for (StringRef Line : Lines) {
             OS.object([&](){
@@ -247,6 +257,18 @@ void Symbol::serializeDocComment(llvm::json::OStream &OS) const {
   }
 
   OS.attributeObject("docComment", [&](){
+    auto Loc = DocCommentProvidingDecl->getLoc(/*SerializedOK=*/true);
+    if (Loc.isValid()) {
+      auto FileName = DocCommentProvidingDecl->getASTContext().SourceMgr.getDisplayNameForLoc(Loc);
+      if (!FileName.empty()) {
+        SmallString<1024> FileURI("file://");
+        FileURI.append(FileName);
+        OS.attribute("uri", FileURI.str());
+      }
+    }
+    if (const auto *ModuleD = DocCommentProvidingDecl->getModuleContext()) {
+      OS.attribute("module", ModuleD->getNameStr());
+    }
     auto LL = Graph->Ctx.getLineList(RC);
     StringRef FirstNonBlankLine;
     for (const auto &Line : LL.getLines()) {
