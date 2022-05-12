@@ -1971,9 +1971,7 @@ const char *Lexer::findEndOfCurlyQuoteStringLiteral(const char *Body,
 }
 
 bool Lexer::tryLexRegexLiteral(const char *TokStart) {
-  // We need to have experimental string processing enabled, and have the
-  // parsing logic for regex literals available.
-  if (!LangOpts.EnableExperimentalStringProcessing || !regexLiteralLexingFn)
+  if (!regexLiteralLexingFn)
     return false;
 
   bool MustBeRegex = true;

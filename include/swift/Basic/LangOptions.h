@@ -550,7 +550,7 @@ namespace swift {
 
     /// Enables `/.../` syntax regular-expression literals. This requires
     /// experimental string processing. Note this does not affect `#/.../#`.
-    bool EnableBareSlashRegexLiterals = false;
+    bool EnableBareSlashRegexLiterals = true;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.

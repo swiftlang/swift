@@ -1,6 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-string-processing -disable-availability-checking
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: forward_slash_regex_be_disabled_by_default
 
 prefix operator /
 prefix operator ^/

@@ -2,6 +2,8 @@
 // RUN: %target-typecheck-verify-swift -disable-experimental-string-processing -enable-bare-slash-regex
 // RUN: %target-typecheck-verify-swift -enable-experimental-string-processing -disable-experimental-string-processing -enable-bare-slash-regex
 
+// REQUIRES: forward_slash_regex_be_disabled_by_default
+
 prefix operator /
 
 _ = /x/
