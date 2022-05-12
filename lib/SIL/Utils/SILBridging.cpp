@@ -218,6 +218,12 @@ SwiftInt SILFunction_isSwift51RuntimeAvailable(BridgedFunction function) {
     ctxt.getSwift51Availability());
 }
 
+SwiftInt SILFunction_hasSemanticsAttr(BridgedFunction function,
+                                     BridgedStringRef attrName) {
+  SILFunction *f = castToFunction(function);
+  return f->hasSemanticsAttr(getStringRef(attrName)) ? 1 : 0;
+}
+
 //===----------------------------------------------------------------------===//
 //                               SILBasicBlock
 //===----------------------------------------------------------------------===//

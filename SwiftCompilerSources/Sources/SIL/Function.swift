@@ -65,6 +65,12 @@ final public class Function : CustomStringConvertible, HasShortDescription {
     return nil
   }
 
+  public func hasSemanticsAttribute(_ attr: StaticString) -> Bool {
+    attr.withUTF8Buffer { (buffer: UnsafeBufferPointer<UInt8>) in
+      SILFunction_hasSemanticsAttr(bridged, BridgedStringRef(data: buffer.baseAddress!, length: buffer.count)) != 0
+    }
+  }
+
   /// True, if the function runs with a swift 5.1 runtime.
   /// Note that this is function specific, because inlinable functions are de-serialized
   /// in a client module, which might be compiled with a different deployment target.
