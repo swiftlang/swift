@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-inferred-signatures=on
+// RUN: %target-typecheck-verify-swift -requirement-machine-inferred-signatures=on -warn-redundant-requirements
 
 // ----------------------------------------------------------------------------
 // Using protocol requirements from inside protocol extensions

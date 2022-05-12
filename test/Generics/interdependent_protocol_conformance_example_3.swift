@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=on -requirement-machine-inferred-signatures=on
+// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=on -requirement-machine-inferred-signatures=on -warn-redundant-requirements
 // RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-protocol-signatures=on -requirement-machine-inferred-signatures=on 2>&1 | %FileCheck %s
 // RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -disable-requirement-machine-reuse -requirement-machine-protocol-signatures=on -requirement-machine-inferred-signatures=on 2>&1 | %FileCheck %s
 
@@ -19,7 +19,7 @@ public protocol MultiPoint {
 
   typealias P = Self.C.P
   // expected-warning@-1 {{redundant same-type constraint 'Self.P' == 'Self.C.P'}}
-  // FIXME: This is bogus
+  // FIXME(rqm-diagnostics): This is bogus
 
   associatedtype X: NonEmptyProtocol
     where X.C: NonEmptyProtocol,

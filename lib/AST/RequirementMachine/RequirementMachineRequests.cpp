@@ -816,6 +816,15 @@ InferredGenericSignatureRequestRQM::evaluate(
   for (const auto &req : addedRequirements)
     requirements.push_back({req, SourceLoc(), /*wasInferred=*/true});
 
+  // Re-order requirements so that inferred requirements appear last. This
+  // ensures that if an inferred requirement is redundant with some other
+  // requirement, it is the inferred requirement that becomes redundant,
+  // which muffles the redundancy diagnostic.
+  std::stable_partition(requirements.begin(), requirements.end(),
+                        [](const StructuralRequirement &req) {
+                          return !req.inferred;
+                        });
+
   auto &ctx = moduleForInference->getASTContext();
   auto &rewriteCtx = ctx.getRewriteContext();
 

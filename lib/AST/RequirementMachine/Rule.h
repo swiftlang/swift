@@ -38,7 +38,10 @@ class Rule final {
   /// The written requirement ID, which can be used to index into the
   /// \c WrittenRequirements array in the rewrite system to retrieve
   /// the structural requirement.
-  Optional<unsigned> requirementID;
+  ///
+  /// This uses a biased representation where an ID of 0 means 'no ID',
+  /// otherwise the value is the actual ID plus one.
+  unsigned RequirementID : 16;
 
   /// A 'permanent' rule cannot be deleted by homotopy reduction. These
   /// do not correspond to generic requirements and are re-added when the
@@ -83,6 +86,7 @@ class Rule final {
 public:
   Rule(Term lhs, Term rhs)
       : LHS(lhs), RHS(rhs) {
+    RequirementID = 0;
     Permanent = false;
     Explicit = false;
     LHSSimplified = false;
@@ -97,12 +101,18 @@ public:
   const Term &getRHS() const { return RHS; }
 
   Optional<unsigned> getRequirementID() const {
-    return requirementID;
+    if (RequirementID == 0)
+      return None;
+    else
+      return RequirementID - 1;
   }
 
   void setRequirementID(Optional<unsigned> requirementID) {
     assert(!Frozen);
-    this->requirementID = requirementID;
+    if (!requirementID)
+      RequirementID = 0;
+    else
+      RequirementID = *requirementID + 1;
   }
 
   Optional<Symbol> isPropertyRule() const;
@@ -209,7 +219,7 @@ public:
 
   void freeze() {
     Redundant = false;
-    requirementID = None;
+    RequirementID = 0;
     Frozen = true;
   }
 

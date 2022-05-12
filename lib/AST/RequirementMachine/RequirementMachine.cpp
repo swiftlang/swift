@@ -530,23 +530,6 @@ void RequirementMachine::freeze() {
   System.freeze();
 }
 
-void RequirementMachine::computeRequirementDiagnostics(
-    SmallVectorImpl<RequirementError> &errors, SourceLoc signatureLoc) {
-  System.computeRedundantRequirementDiagnostics(errors);
-  System.computeConflictDiagnostics(errors, signatureLoc, Map,
-                                    getGenericParams());
-}
-
-std::string RequirementMachine::getRuleAsStringForDiagnostics(
-    unsigned ruleID) const {
-  const auto &rule = System.getRule(ruleID);
-
-  std::string result;
-  llvm::raw_string_ostream out(result);
-  out << rule;
-  return out.str();
-}
-
 ArrayRef<Rule> RequirementMachine::getLocalRules() const {
   return System.getLocalRules();
 }
