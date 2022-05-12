@@ -132,8 +132,6 @@ NOTE(lex_comment_start,none,
 
 ERROR(lex_unterminated_string,none,
       "unterminated string literal", ())
-NOTE(lex_unterminated_string_fix_it, none, 
-      "add an ending quote to string literal", ())
 ERROR(lex_invalid_escape,none,
        "invalid escape sequence in literal", ())
 ERROR(lex_invalid_u_escape,none,

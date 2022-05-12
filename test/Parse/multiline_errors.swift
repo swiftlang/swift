@@ -134,7 +134,7 @@ _ = "hello\(
             world
             """)!"
             // expected-error@-4 {{unterminated string literal}}
-            // expected-error@-2 {{unterminated string literal}} 
+            // expected-error@-2 {{unterminated string literal}}
 
 _ = """
   line one \ non-whitespace
@@ -164,14 +164,12 @@ _ = """
   // expected-error@-2 {{escaped newline at the last line is not allowed}} {{6-7=}}
 
 _ = """
-  foo\
-  """
+  foo\  """
   // expected-error@-1 {{escaped newline at the last line is not allowed}} {{6-7=}}
 
 _ = """
   foo\
-
-  """ // OK because LF + CR is two new lines.
+  """ // OK because LF + CR is two new lines.
 
 _ = """
 \
@@ -192,4 +190,4 @@ let _ = """
   \("bar
   baz
   """
-  // expected-error@-3 {{unterminated string literal}} expected-note@-3{{add an ending quote to string literal}}
+  // expected-error@-3 {{unterminated string literal}}

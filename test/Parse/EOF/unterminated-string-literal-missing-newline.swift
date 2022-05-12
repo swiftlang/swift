@@ -4,4 +4,4 @@
 
 // This file does not end in a trailing newline; this is deliberate, don't fix it!
 
-/* expected-error {{unterminated string literal}} expected-note {{add an ending quote to string literal}} */ "
+/* expected-error {{unterminated string literal}} */ "
