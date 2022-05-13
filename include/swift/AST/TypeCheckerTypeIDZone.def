@@ -312,7 +312,7 @@ SWIFT_REQUEST(TypeChecker, TypeCheckFunctionBodyRequest,
               BraceStmt *(AbstractFunctionDecl *), SeparatelyCached,
               NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, TypeCheckASTNodeAtLocRequest,
-              bool(DeclContext *, SourceLoc),
+              bool(TypeCheckASTNodeAtLocContext, SourceLoc),
               Uncached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, UnderlyingTypeRequest, Type(TypeAliasDecl *),
               SeparatelyCached, NoLocationInfo)

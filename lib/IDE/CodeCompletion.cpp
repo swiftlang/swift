@@ -115,6 +115,12 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   DeclContext *CurDeclContext = nullptr;
   DeclAttrKind AttrKind;
 
+  /// When the code completion token occurs in a custom attribute, the attribute
+  /// it occurs in. Used so we can complete inside the attribute even if it's
+  /// not attached to the AST, e.g. because there is no var decl it could be
+  /// attached to.
+  CustomAttr *AttrWithCompletion = nullptr;
+
   /// In situations when \c SyntaxKind hints or determines
   /// completions, i.e. a precedence group attribute, this
   /// can be set and used to control the code completion scenario.
@@ -225,6 +231,11 @@ public:
 
     if (!AttTargetIsIndependent)
       AttTargetDK = DK;
+  }
+
+  void setCompletingInAttribute(CustomAttr *Attr) override {
+    AttrWithCompletion = Attr;
+    CurDeclContext = P.CurDeclContext;
   }
 
   void completeDotExpr(CodeCompletionExpr *E, SourceLoc DotLoc) override;
@@ -1358,16 +1369,24 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
     ? ParsedExpr->getLoc()
     : CurDeclContext->getASTContext().SourceMgr.getCodeCompletionLoc();
 
-  switch (Kind) {
-  case CompletionKind::DotExpr: {
-    assert(CodeCompleteTokenExpr);
-    assert(CurDeclContext);
-
-    DotExprTypeCheckCompletionCallback Lookup(CodeCompleteTokenExpr,
-                                              CurDeclContext);
+  auto typeCheckWithLookup = [this, &CompletionLoc](
+                                 TypeCheckCompletionCallback &Lookup) {
     llvm::SaveAndRestore<TypeCheckCompletionCallback*>
       CompletionCollector(Context.CompletionCallback, &Lookup);
-    typeCheckContextAt(CurDeclContext, CompletionLoc);
+    if (AttrWithCompletion) {
+      /// The attribute might not be attached to the AST if there is no var decl
+      /// it could be attached to. Type check it standalone.
+      ASTNode Call = CallExpr::create(
+          CurDeclContext->getASTContext(), AttrWithCompletion->getTypeExpr(),
+          AttrWithCompletion->getArgs(), /*implicit=*/true);
+      typeCheckContextAt(
+          TypeCheckASTNodeAtLocContext::node(CurDeclContext, Call),
+          CompletionLoc);
+    } else {
+      typeCheckContextAt(
+          TypeCheckASTNodeAtLocContext::declContext(CurDeclContext),
+          CompletionLoc);
+    }
 
     // This (hopefully) only happens in cases where the expression isn't
     // typechecked during normal compilation either (e.g. member completion in a
@@ -1376,6 +1395,16 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
     // tooling in general though.
     if (!Lookup.gotCallback())
       Lookup.fallbackTypeCheck(CurDeclContext);
+  };
+
+  switch (Kind) {
+  case CompletionKind::DotExpr: {
+    assert(CodeCompleteTokenExpr);
+    assert(CurDeclContext);
+
+    DotExprTypeCheckCompletionCallback Lookup(CodeCompleteTokenExpr,
+                                              CurDeclContext);
+    typeCheckWithLookup(Lookup);
 
     addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
 
@@ -1390,12 +1419,7 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
 
     UnresolvedMemberTypeCheckCompletionCallback Lookup(CodeCompleteTokenExpr,
                                                        CurDeclContext);
-    llvm::SaveAndRestore<TypeCheckCompletionCallback*>
-      CompletionCollector(Context.CompletionCallback, &Lookup);
-    typeCheckContextAt(CurDeclContext, CompletionLoc);
-
-    if (!Lookup.gotCallback())
-      Lookup.fallbackTypeCheck(CurDeclContext);
+    typeCheckWithLookup(Lookup);
 
     addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
     Lookup.deliverResults(CurDeclContext, DotLoc, CompletionContext, Consumer);
@@ -1408,9 +1432,7 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
     // so we can safely cast the \c ParsedExpr back to a \c KeyPathExpr.
     auto KeyPath = cast<KeyPathExpr>(ParsedExpr);
     KeyPathTypeCheckCompletionCallback Lookup(KeyPath);
-    llvm::SaveAndRestore<TypeCheckCompletionCallback *> CompletionCollector(
-        Context.CompletionCallback, &Lookup);
-    typeCheckContextAt(CurDeclContext, CompletionLoc);
+    typeCheckWithLookup(Lookup);
 
     Lookup.deliverResults(CurDeclContext, DotLoc, CompletionContext, Consumer);
     return true;
@@ -1420,13 +1442,7 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
     assert(CurDeclContext);
     ArgumentTypeCheckCompletionCallback Lookup(CodeCompleteTokenExpr,
                                                CurDeclContext);
-    llvm::SaveAndRestore<TypeCheckCompletionCallback *> CompletionCollector(
-        Context.CompletionCallback, &Lookup);
-    typeCheckContextAt(CurDeclContext, CompletionLoc);
-
-    if (!Lookup.gotCallback()) {
-      Lookup.fallbackTypeCheck(CurDeclContext);
-    }
+    typeCheckWithLookup(Lookup);
 
     Lookup.deliverResults(ShouldCompleteCallPatternAfterParen, CompletionLoc,
                           CurDeclContext, CompletionContext, Consumer);
@@ -1453,13 +1469,7 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
       // need to have a TypeCheckCompletionCallback so we can call
       // deliverResults on it to deliver the keyword results from the completion
       // context's result sink to the consumer.
-      llvm::SaveAndRestore<TypeCheckCompletionCallback *> CompletionCollector(
-          Context.CompletionCallback, &Lookup);
-      typeCheckContextAt(CurDeclContext, CompletionLoc);
-
-      if (!Lookup.gotCallback()) {
-        Lookup.fallbackTypeCheck(CurDeclContext);
-      }
+      typeCheckWithLookup(Lookup);
     }
 
     addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
@@ -1474,13 +1484,7 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
 
     AfterPoundExprCompletion Lookup(CodeCompleteTokenExpr, CurDeclContext,
                                     ParentStmtKind);
-    llvm::SaveAndRestore<TypeCheckCompletionCallback *> CompletionCollector(
-        Context.CompletionCallback, &Lookup);
-    typeCheckContextAt(CurDeclContext, CompletionLoc);
-
-    if (!Lookup.gotCallback()) {
-      Lookup.fallbackTypeCheck(CurDeclContext);
-    }
+    typeCheckWithLookup(Lookup);
 
     addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
 
@@ -1550,7 +1554,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   undoSingleExpressionReturn(CurDeclContext);
   typeCheckContextAt(
-      CurDeclContext,
+      TypeCheckASTNodeAtLocContext::declContext(CurDeclContext),
       ParsedExpr
           ? ParsedExpr->getLoc()
           : CurDeclContext->getASTContext().SourceMgr.getCodeCompletionLoc());
