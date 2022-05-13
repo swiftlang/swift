@@ -85,8 +85,8 @@ public struct ReverseList<NodeType: ListNode> :
 /// full object) in collection descriptions.
 ///
 /// This is useful to make collections, e.g. of BasicBlocks or Functions, readable.
-public protocol HasName {
-  var name: String { get }
+public protocol HasShortDescription {
+  var shortDescription: String { get }
 }
 
 private struct CustomMirrorChild : CustomStringConvertible, CustomReflectable {
@@ -104,8 +104,8 @@ extension FormattedLikeArray {
   /// Display a Sequence in an array like format, e.g. [a, b, c]
   public var description: String {
     "[" + map {
-      if let named = $0 as? HasName {
-        return named.name
+      if let named = $0 as? HasShortDescription {
+        return named.shortDescription
       }
       return String(describing: $0)
     }.joined(separator: ", ") + "]"
@@ -120,8 +120,8 @@ extension FormattedLikeArray {
     }
     let c: [Mirror.Child] = map {
       let val: Any
-      if let named = $0 as? HasName {
-        val = CustomMirrorChild(description: named.name)
+      if let named = $0 as? HasShortDescription {
+        val = CustomMirrorChild(description: named.shortDescription)
       } else {
         val = $0
       }
