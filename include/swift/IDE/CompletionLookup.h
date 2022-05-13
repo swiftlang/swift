@@ -240,13 +240,16 @@ public:
 
   void setIsStaticMetatype(bool value) { IsStaticMetatype = value; }
 
-  void setExpectedTypes(ArrayRef<Type> Types,
-                        bool isImplicitSingleExpressionReturn,
-                        bool preferNonVoid = false) {
+  void setExpectedTypes(
+      ArrayRef<Type> Types, bool isImplicitSingleExpressionReturn,
+      bool preferNonVoid = false,
+      OptionSet<CustomAttributeKind> expectedCustomAttributeKinds = {}) {
     expectedTypeContext.setIsImplicitSingleExpressionReturn(
         isImplicitSingleExpressionReturn);
     expectedTypeContext.setPreferNonVoid(preferNonVoid);
     expectedTypeContext.setPossibleTypes(Types);
+    expectedTypeContext.setExpectedCustomAttributeKinds(
+        expectedCustomAttributeKinds);
   }
 
   void setIdealExpectedType(Type Ty) { expectedTypeContext.setIdealType(Ty); }
