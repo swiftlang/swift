@@ -64,3 +64,7 @@ enum A {
     case namedArguments(param1: String, param2: Int)
     case mutedArguments(String, Int)
 }
+
+protocol AsyncPropTest {
+  var protoAsyncProp: Int { get async }
+}
