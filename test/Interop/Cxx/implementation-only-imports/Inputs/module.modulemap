@@ -27,3 +27,5 @@ module DeclB {
     export *
     requires cplusplus
 }
+
+

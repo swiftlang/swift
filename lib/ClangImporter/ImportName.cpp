@@ -1514,14 +1514,14 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       completionHandlerParamIndex =
           swiftAsyncAttr->getCompletionHandlerIndex().getASTIndex();
     }
-    
+
     if (const auto *asyncErrorAttr = D->getAttr<clang::SwiftAsyncErrorAttr>()) {
       switch (auto convention = asyncErrorAttr->getConvention()) {
       // No flag parameter in these cases.
       case clang::SwiftAsyncErrorAttr::NonNullError:
       case clang::SwiftAsyncErrorAttr::None:
         break;
-      
+
       // Get the flag argument index and polarity from the attribute.
       case clang::SwiftAsyncErrorAttr::NonZeroArgument:
       case clang::SwiftAsyncErrorAttr::ZeroArgument:
@@ -1856,7 +1856,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     case clang::OverloadedOperatorKind::OO_GreaterEqual:
     case clang::OverloadedOperatorKind::OO_AmpAmp:
     case clang::OverloadedOperatorKind::OO_PipePipe:
-      baseName = StringRef{"__operator" + std::string{getOperatorName(op)}};
+      baseName = isa<clang::CXXMethodDecl>(functionDecl) ? StringRef{"__operator" + std::string{getOperatorName(op)}} : clang::getOperatorSpelling(op);
       isFunction = true;
       addEmptyArgNamesForClangFunction(functionDecl, argumentNames);
       break;

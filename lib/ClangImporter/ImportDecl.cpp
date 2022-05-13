@@ -3602,14 +3602,6 @@ namespace {
                 cxxOperatorKind != clang::OverloadedOperatorKind::OO_Subscript) {
 
               auto d = makeOperator(MD, cxxMethod);
-              result->addMember(d);
-              result->addMemberToLookupTable(d);
-
-              result->addMemberToLookupTable(member);
-
-              // Make a note that we've imported this method into this context.
-              recordMemberInContext(d, result);
-
               Impl.addAlternateDecl(MD, d);
 
               Impl.markUnavailable(MD, "use - operator");
@@ -8116,8 +8108,17 @@ synthesizeOperatorMethodBody(AbstractFunctionDecl *afd, void *context) {
   // We start from +1 since the first param is our lhs. All other params are forwarded
   for(auto itr = funcDecl->getParameters()->begin() + 1; itr != funcDecl->getParameters()->end(); itr++) {
       auto param = *itr;
-      auto paramRefExpr = new (ctx) DeclRefExpr(param, DeclNameLoc(), /*Implicit=*/true);
+      Expr *paramRefExpr = new (ctx) DeclRefExpr(param, DeclNameLoc(), /*Implicit=*/true);
       paramRefExpr->setType(param->getType());
+
+      if (param->isInOut()) {
+          paramRefExpr->setType(LValueType::get(param->getType()));
+
+          paramRefExpr = new (ctx) InOutExpr(
+                  SourceLoc(), paramRefExpr, param->getType(), /*isImplicit*/ true);
+          paramRefExpr->setType(InOutType::get(param->getType()));
+      }
+
       forwardingParams.push_back(paramRefExpr);
   }
 
@@ -8126,8 +8127,15 @@ synthesizeOperatorMethodBody(AbstractFunctionDecl *afd, void *context) {
 
   // Lhs parameter
   auto baseParam = funcDecl->getParameters()->front();
-  auto baseExpr = new (ctx) DeclRefExpr(baseParam, DeclNameLoc(), /*implicit*/ true);
+  Expr *baseExpr = new (ctx) DeclRefExpr(baseParam, DeclNameLoc(), /*implicit*/ true);
   baseExpr->setType(baseParam->getType());
+  if (baseParam->isInOut()) {
+      baseExpr->setType(LValueType::get(baseParam->getType()));
+
+      baseExpr = new (ctx) InOutExpr(SourceLoc(), baseExpr, baseParam->getType(), /*isImplicit*/ true);
+      baseExpr->setType(InOutType::get(baseParam->getType()));
+  }
+
   auto dotCallExpr = DotSyntaxCallExpr::create(ctx, methodExpr, SourceLoc(), baseExpr);
   dotCallExpr->setType(methodDecl->getMethodInterfaceType());
   dotCallExpr->setThrows(false);

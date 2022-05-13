@@ -75,6 +75,7 @@
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include <algorithm>
+#include <string>
 #include <memory>
 
 using namespace swift;
@@ -85,6 +86,17 @@ using clang::CompilerInstance;
 using clang::CompilerInvocation;
 
 #pragma mark Internal data structures
+
+namespace {
+    static std::string getOperatorNameForToken(std::string OperatorToken) {
+#define OVERLOADED_OPERATOR(Name,Spelling,Token,Unary,Binary,MemberOnly) \
+   if(OperatorToken == Spelling) {                                         \
+    return #Name;                                                        \
+   };
+#include "clang/Basic/OperatorKinds.def"
+   return "None";
+    }
+}
 
 namespace {
   class HeaderImportCallbacks : public clang::PPCallbacks {
@@ -4104,25 +4116,47 @@ bool ClangImporter::Implementation::forEachLookupTable(
 bool ClangImporter::Implementation::lookupValue(SwiftLookupTable &table,
                                                 DeclName name,
                                                 VisibleDeclConsumer &consumer) {
+
   auto &clangCtx = getClangASTContext();
   auto clangTU = clangCtx.getTranslationUnitDecl();
 
   bool declFound = false;
-
   // For operators we have to look up static member functions in addition to the
   // top-level function lookup below.
+  auto declBaseName = (SwiftContext.LangOpts.EnableCXXInterop && name.isOperator())
+          ? DeclBaseName(SwiftContext.getIdentifier("__operator" + getOperatorNameForToken(std::string{name.getBaseName().getIdentifier()})))
+          : name.getBaseName();
+
   if (name.isOperator()) {
-    auto declBaseName = SwiftContext.LangOpts.EnableCXXInterop
-            ? name.getBaseName()
-            : DeclBaseName(SwiftContext.getIdentifier("__operatorMinus"));
-    for (auto entry : table.lookupMemberOperators( declBaseName)) {
-      if (isVisibleClangEntry(entry)) {
-        if (auto decl = dyn_cast_or_null<ValueDecl>(
-                importDeclReal(entry->getMostRecentDecl(), CurrentVersion))) {
-          consumer.foundDecl(decl, DeclVisibilityKind::VisibleAtTopLevel);
-          declFound = true;
+    for (auto entry : table.lookupMemberOperators(declBaseName)) {
+        if (isVisibleClangEntry(entry)) {
+            if (auto decl = dyn_cast_or_null<ValueDecl>(
+                    importDeclReal(entry->getMostRecentDecl(), CurrentVersion))) {
+                consumer.foundDecl(decl, DeclVisibilityKind::VisibleAtTopLevel);
+                declFound = true;
+                for (auto alternate: getAlternateDecls(decl)) {
+                    if (alternate->getName().matchesRef(name)) {
+                        consumer.foundDecl(alternate, DeclVisibilityKind::DynamicLookup,
+                                           DynamicLookupInfo::AnyObject);
+                    }
+                }
+            }
         }
-      }
+    }
+        for (auto entry : table.lookupMemberOperators(name.getBaseName())) {
+            if (isVisibleClangEntry(entry)) {
+                if (auto decl = dyn_cast_or_null<ValueDecl>(
+                        importDeclReal(entry->getMostRecentDecl(), CurrentVersion))) {
+                    consumer.foundDecl(decl, DeclVisibilityKind::VisibleAtTopLevel);
+                    declFound = true;
+                    for (auto alternate : getAlternateDecls(decl)) {
+                        if (alternate->getName().matchesRef(name)) {
+                            consumer.foundDecl(alternate, DeclVisibilityKind::DynamicLookup,
+                                               DynamicLookupInfo::AnyObject);
+                        }
+                    }
+                }
+            }
     }
   }
 

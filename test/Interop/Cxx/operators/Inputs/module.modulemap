@@ -1,9 +1,3 @@
-module ClassMembers {
-  header "class-members.h"
-  requires cplusplus
-}
-
-
 module MemberInline {
   header "member-inline.h"
   requires cplusplus
