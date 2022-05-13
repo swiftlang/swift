@@ -576,20 +576,9 @@ importer::getNormalInvocationArguments(
 
   {
     const clang::LangStandard &stdcxx =
-#if defined(CLANG_DEFAULT_STD_CXX)
-        *clang::LangStandard::getLangStandardForName(CLANG_DEFAULT_STD_CXX);
-#else
-        clang::LangStandard::getLangStandardForKind(
-            clang::LangStandard::lang_gnucxx14);
-#endif
-
+        clang::LangStandard::getDefaultLanguageStandard(clang::Language::ObjCXX, triple);
     const clang::LangStandard &stdc =
-#if defined(CLANG_DEFAULT_STD_C)
-        *clang::LangStandard::getLangStandardForName(CLANG_DEFAULT_STD_C);
-#else
-        clang::LangStandard::getLangStandardForKind(
-            clang::LangStandard::lang_gnu11);
-#endif
+        clang::LangStandard::getDefaultLanguageStandard(clang::Language::ObjC, triple);
 
     invocationArgStrs.insert(invocationArgStrs.end(), {
       (Twine("-std=") + StringRef(EnableCXXInterop ? stdcxx.getName()
