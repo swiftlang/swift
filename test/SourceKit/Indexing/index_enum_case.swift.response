@@ -139,7 +139,8 @@
       key.name: "two(a:)",
       key.usr: "s:15index_enum_case1EO3twoyACSS_tcACmF",
       key.line: 21,
-      key.column: 13
+      key.column: 13,
+      key.receiver_usr: "s:15index_enum_case1EO"
     },
     {
       key.kind: source.lang.swift.decl.function.free,
