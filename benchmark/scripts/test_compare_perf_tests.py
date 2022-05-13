@@ -205,7 +205,7 @@ class TestPerformanceTestResult(unittest.TestCase):
         self.assertEqual(r.samples, None)
 
         log_line = "1,AngryPhonebook,1,12045,12045,12045,0,12045,10510336"
-        r = PerformanceTestResult(log_line.split(","))
+        r = PerformanceTestResult(log_line.split(","), memory=True)
         self.assertEqual(r.max_rss, 10510336)
 
     def test_init_quantiles(self):
@@ -379,7 +379,11 @@ class TestPerformanceTestResult(unittest.TestCase):
         )[
             1:
         ]
-        results = list(map(PerformanceTestResult, [line.split(",") for line in tests]))
+
+        def makeResult(csv_row):
+            return PerformanceTestResult(csv_row, memory=True)
+
+        results = list(map(makeResult, [line.split(",") for line in tests]))
         results[2].setup = 9
         results[3].setup = 7
 
@@ -489,11 +493,14 @@ class OldAndNewLog(unittest.TestCase):
 3,Array2D,20,335831,400221,346622,0,346622
 1,AngryPhonebook,20,10458,12714,11000,0,11000"""
 
+    def makeResult(csv_row):
+        return PerformanceTestResult(csv_row, memory=True)
+
     old_results = dict(
         [
             (r.name, r)
             for r in map(
-                PerformanceTestResult,
+                makeResult,
                 [line.split(",") for line in old_log_content.splitlines()],
             )
         ]
@@ -503,7 +510,7 @@ class OldAndNewLog(unittest.TestCase):
         [
             (r.name, r)
             for r in map(
-                PerformanceTestResult,
+                makeResult,
                 [line.split(",") for line in new_log_content.splitlines()],
             )
         ]
@@ -557,14 +564,14 @@ Total performance tests executed: 1
     def test_parse_quantiles(self):
         """Gathers samples from reported quantiles. Handles optional memory."""
         r = LogParser.results_from_string(
-            """#,TEST,SAMPLES,MIN(μs),MEDIAN(μs),MAX(μs)
+            """#,TEST,SAMPLES,QMIN(μs),MEDIAN(μs),MAX(μs)
 1,Ackermann,3,54383,54512,54601"""
         )["Ackermann"]
         self.assertEqual(
             [s.runtime for s in r.samples.all_samples], [54383, 54512, 54601]
         )
         r = LogParser.results_from_string(
-            """#,TEST,SAMPLES,MIN(μs),MEDIAN(μs),MAX(μs),MAX_RSS(B)
+            """#,TEST,SAMPLES,QMIN(μs),MEDIAN(μs),MAX(μs),MAX_RSS(B)
 1,Ackermann,3,54529,54760,55807,266240"""
         )["Ackermann"]
         self.assertEqual(
@@ -574,21 +581,21 @@ Total performance tests executed: 1
 
     def test_parse_delta_quantiles(self):
         r = LogParser.results_from_string(  # 2-quantile aka. median
-            "#,TEST,SAMPLES,MIN(μs),𝚫MEDIAN,𝚫MAX\n0,B,1,101,,"
+            "#,TEST,SAMPLES,QMIN(μs),𝚫MEDIAN,𝚫MAX\n0,B,1,101,,"
         )["B"]
         self.assertEqual(
             (r.num_samples, r.min, r.median, r.max, r.samples.count),
             (1, 101, 101, 101, 1),
         )
         r = LogParser.results_from_string(
-            "#,TEST,SAMPLES,MIN(μs),𝚫MEDIAN,𝚫MAX\n0,B,2,101,,1"
+            "#,TEST,SAMPLES,QMIN(μs),𝚫MEDIAN,𝚫MAX\n0,B,2,101,,1"
         )["B"]
         self.assertEqual(
             (r.num_samples, r.min, r.median, r.max, r.samples.count),
             (2, 101, 101, 102, 2),
         )
         r = LogParser.results_from_string(  # 20-quantiles aka. ventiles
-            "#,TEST,SAMPLES,MIN(μs),𝚫V1,𝚫V2,𝚫V3,𝚫V4,𝚫V5,𝚫V6,𝚫V7,𝚫V8,"
+            "#,TEST,SAMPLES,QMIN(μs),𝚫V1,𝚫V2,𝚫V3,𝚫V4,𝚫V5,𝚫V6,𝚫V7,𝚫V8,"
             + "𝚫V9,𝚫VA,𝚫VB,𝚫VC,𝚫VD,𝚫VE,𝚫VF,𝚫VG,𝚫VH,𝚫VI,𝚫VJ,𝚫MAX\n"
             + "202,DropWhileArray,200,214,,,,,,,,,,,,1,,,,,,2,16,464"
         )["DropWhileArray"]
@@ -617,13 +624,13 @@ Total performance tests executed: 1
             (3, 9, 50, 15, 36864),
         )
         r = LogParser.results_from_string(
-            "#,TEST,SAMPLES,MIN(μs),MAX(μs),PAGES,ICS,YIELD\n" + "0,B,1,4,4,8,31,15"
+            "#,TEST,SAMPLES,QMIN(μs),MAX(μs),PAGES,ICS,YIELD\n" + "0,B,1,4,4,8,31,15"
         )["B"]
         self.assertEqual(
             (r.min, r.mem_pages, r.involuntary_cs, r.yield_count), (4, 8, 31, 15)
         )
         r = LogParser.results_from_string(
-            "#,TEST,SAMPLES,MIN(μs),MAX(μs),MAX_RSS(B),PAGES,ICS,YIELD\n"
+            "#,TEST,SAMPLES,QMIN(μs),MAX(μs),MAX_RSS(B),PAGES,ICS,YIELD\n"
             + "0,B,1,5,5,32768,8,28,15"
         )["B"]
         self.assertEqual(
@@ -831,7 +838,8 @@ class TestReportFormatter(OldAndNewLog):
         self.assertEqual(
             ReportFormatter.values(
                 PerformanceTestResult(
-                    "1,AngryPhonebook,1,12045,12045,12045,0,12045,10510336".split(",")
+                    "1,AngryPhonebook,1,12045,12045,12045,0,12045,10510336".split(","),
+                    memory=True
                 )
             ),
             ("AngryPhonebook", "12045", "12045", "12045", "10510336"),
