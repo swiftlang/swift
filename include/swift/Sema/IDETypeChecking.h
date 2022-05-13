@@ -29,6 +29,7 @@
 namespace swift {
   class AbstractFunctionDecl;
   class ASTContext;
+  class CaptureListExpr;
   class ConcreteDeclRef;
   class Decl;
   class DeclContext;
@@ -37,6 +38,7 @@ namespace swift {
   class Expr;
   class ExtensionDecl;
   class FunctionType;
+  class LabeledConditionalStmt;
   class LookupResult;
   class NominalTypeDecl;
   class PatternBindingDecl;
@@ -322,6 +324,19 @@ namespace swift {
 
   /// Just a proxy to swift::contextUsesConcurrencyFeatures() from lib/IDE code.
   bool completionContextUsesConcurrencyFeatures(const DeclContext *dc);
+
+  /// If the capture list shadows any declarations using shorthand syntax, i.e.
+  /// syntax that names both the newly declared variable and the referenced
+  /// variable by the same identifier in the source text, i.e. `[foo]`, return
+  /// these shorthand shadows.
+  /// The first element in the pair is the implicitly declared variable and the
+  /// second variable is the shadowed one.
+  SmallVector<std::pair<ValueDecl *, ValueDecl *>, 1>
+  getShorthandShadows(CaptureListExpr *CaptureList);
+
+  /// Same as above but for shorthand `if let foo {` syntax.
+  SmallVector<std::pair<ValueDecl *, ValueDecl *>, 1>
+  getShorthandShadows(LabeledConditionalStmt *CondStmt);
 }
 
 #endif
