@@ -23,7 +23,7 @@ foreach(sdk ${SWIFT_SDKS})
         COMMAND
         "${CMAKE_COMMAND}" "-E" "make_directory" ${module_dir}
         COMMAND
-        "${CMAKE_COMMAND}" "-E" "copy" "${CMAKE_CURRENT_SOURCE_DIR}/${libstdcxx_modulemap}" "${libstdcxx_modulemap_out}"
+        "${CMAKE_COMMAND}" "-E" "copy_if_different" "${CMAKE_CURRENT_SOURCE_DIR}/${libstdcxx_modulemap}" "${libstdcxx_modulemap_out}"
         OUTPUT ${libstdcxx_modulemap_out}
         DEPENDS ${libstdcxx_modulemap}
         COMMENT "Copying libstdcxx modulemap to resources")
@@ -35,7 +35,7 @@ foreach(sdk ${SWIFT_SDKS})
         COMMAND
         "${CMAKE_COMMAND}" "-E" "make_directory" ${module_dir}
         COMMAND
-        "${CMAKE_COMMAND}" "-E" "copy" "${CMAKE_CURRENT_SOURCE_DIR}/${libstdcxx_header}" "${libstdcxx_header_out}"
+        "${CMAKE_COMMAND}" "-E" "copy_if_different" "${CMAKE_CURRENT_SOURCE_DIR}/${libstdcxx_header}" "${libstdcxx_header_out}"
         OUTPUT ${libstdcxx_header_out}
         DEPENDS ${libstdcxx_header}
         COMMENT "Copying libstdcxx header to resources")
@@ -48,7 +48,7 @@ foreach(sdk ${SWIFT_SDKS})
           COMMAND
           "${CMAKE_COMMAND}" "-E" "make_directory" ${module_dir_static}
           COMMAND
-          "${CMAKE_COMMAND}" "-E" "copy"
+          "${CMAKE_COMMAND}" "-E" "copy_if_different"
           "${libstdcxx_modulemap_out}" "${libstdcxx_modulemap_out_static}"
           OUTPUT ${libstdcxx_modulemap_out_static}
           DEPENDS ${copy_libstdcxx_modulemap}
@@ -61,7 +61,7 @@ foreach(sdk ${SWIFT_SDKS})
           COMMAND
           "${CMAKE_COMMAND}" "-E" "make_directory" ${module_dir_static}
           COMMAND
-          "${CMAKE_COMMAND}" "-E" "copy"
+          "${CMAKE_COMMAND}" "-E" "copy_if_different"
           "${libstdcxx_header_out}" "${libstdcxx_header_out_static}"
           OUTPUT ${libstdcxx_header_out_static}
           DEPENDS ${copy_libstdcxx_header}
@@ -96,7 +96,7 @@ foreach(sdk ${SWIFT_SDKS})
             COMMAND
             "${CMAKE_COMMAND}" "-E" "make_directory" "${bootstrapping_dir}"
             COMMAND
-            "${CMAKE_COMMAND}" "-E" "copy"
+            "${CMAKE_COMMAND}" "-E" "copy_if_different"
             "${CMAKE_CURRENT_SOURCE_DIR}/${libstdcxx_modulemap}" "${libstdcxx_modulemap_out_bootstrapping}"
 
             CUSTOM_TARGET_NAME "copy-libstdcxx-modulemap-bootstrapping${bootstrapping}"
@@ -108,7 +108,7 @@ foreach(sdk ${SWIFT_SDKS})
             COMMAND
             "${CMAKE_COMMAND}" "-E" "make_directory" "${bootstrapping_dir}"
             COMMAND
-            "${CMAKE_COMMAND}" "-E" "copy"
+            "${CMAKE_COMMAND}" "-E" "copy_if_different"
             "${CMAKE_CURRENT_SOURCE_DIR}/${libstdcxx_header}" "${libstdcxx_header_out_bootstrapping}"
 
             CUSTOM_TARGET_NAME "copy-libstdcxx-header-bootstrapping${bootstrapping}"
