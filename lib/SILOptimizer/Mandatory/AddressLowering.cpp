@@ -2367,8 +2367,11 @@ private:
   /// Return the storageAddress if \p value is opaque, otherwise create and
   /// return a stack temporary.
   SILValue getAddressForCastEntity(SILValue value, bool needsInit) {
-    if (value->getType().isAddressOnly(*func))
-      return pass.valueStorageMap.getStorage(value).storageAddress;
+    if (value->getType().isAddressOnly(*func)) {
+      auto builder = pass.getBuilder(ccb->getIterator());
+      AddressMaterialization addrMat(pass, builder);
+      return addrMat.materializeAddress(value);
+    }
 
     // Create a stack temporary for a loadable value
     auto *addr = termBuilder.createAllocStack(castLoc, value->getType());
@@ -2593,14 +2596,12 @@ protected:
   }
 
   void visitYieldInst(YieldInst *yield) {
-    SILValue addr =
-        pass.valueStorageMap.getStorage(yield->getOperand(0)).storageAddress;
+    SILValue addr = addrMat.materializeAddress(use->get());
     yield->setOperand(0, addr);
   }
 
   void visitValueMetatypeInst(ValueMetatypeInst *vmi) {
-    auto opAddr =
-        pass.valueStorageMap.getStorage(vmi->getOperand()).storageAddress;
+    SILValue opAddr = addrMat.materializeAddress(use->get());
     vmi->setOperand(opAddr);
   }
 
