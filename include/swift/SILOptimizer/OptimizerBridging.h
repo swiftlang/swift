@@ -145,6 +145,9 @@ BridgedSubstitutionMap
 PassContext_getContextSubstitutionMap(BridgedPassContext context,
                                       BridgedType bridgedType);
 
+OptionalBridgedFunction
+PassContext_loadFunction(BridgedPassContext context, BridgedStringRef name);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif
