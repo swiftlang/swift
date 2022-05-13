@@ -475,9 +475,9 @@ func stringliterals(_ d: [String: Int]) {
   let x = 4
   "Hello \(x+1) world"  // expected-warning {{string literal is unused}}
   
-  "Error: \(x+1"; // expected-error {{expected ')' at end of string interpolation}} expected-note {{add ')' to end of interpolation statement}} {{16-16=)}}
+  "Error: \(x+1"; // expected-error {{expected ')' at end of string interpolation}} expected-note {{add ')' to end of interpolation statement}} {{156-156=)}}
   
-  "Error: \(x+1   // expected-error {{expected ')' at end of string interpolation}} expected-note {{add ')' to end of interpolation statement}} {{16-16=)}}
+  "Error: \(x+1   // expected-error {{expected ')' at end of string interpolation}} expected-note {{add ')' to end of interpolation statement}} {{19-19=)}}
   ;    // expected-error {{';' statements are not allowed}}
 
   // rdar://14050788 [DF] String Interpolations can't contain quotes
@@ -488,7 +488,7 @@ func stringliterals(_ d: [String: Int]) {
   "test \("quoted-paren (")"
   "test \("\\")"
   "test \("\n")"
-  "test \("\")" // expected-error {{expected ')' at end of string interpolation}} expected-note {{add ')' to end of interpolation statement}} {{16-16=)}}
+  "test \("\")" // expected-error {{expected ')' at end of string interpolation}} expected-note {{add ')' to end of interpolation statement}} {{17-17=)}}
 
   "test \
   // expected-error @-1 {{unterminated string literal}} expected-error @-1 {{invalid escape sequence in literal}}
@@ -940,10 +940,10 @@ let _ = 0xFFF_FFFF_FFFF_FFFF as Int64
 
 // rdar://problem/20289969 - string interpolation with comment containing ')' or '"'
 let _ = "foo \(42 /* ) " ) */)"
-let _ = "foo \(foo // )  " // expected-error {{expected ')' at end of string interpolation}} expected-note {{add ')' to end of interpolation statement}} {{19-19=)}}
+let _ = "foo \(foo // )  " // expected-error {{expected ')' at end of string interpolation}} expected-note {{add ')' to end of interpolation statement}} {{20-20=)}}
 let _ = "foo \(42 /*
                    * multiline comment
                    */)end"
-// expected-error @-3 {{expected ')' at end of string interpolation}} expected-note @-3 {{add ')' to end of interpolation statement}} {{18-18=)}}
+// expected-error @-3 {{expected ')' at end of string interpolation}} expected-note @-3 {{add ')' to end of interpolation statement}} {{19-19=)}}
 // expected-error @-2 {{expected expression}}
 // expected-error @-3 {{unterminated string literal}}
