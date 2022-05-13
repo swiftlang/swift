@@ -43,7 +43,9 @@ inline void actor_note_job_queue(HeapObject *actor, Job *first,
                                  Job *(*getNext)(Job *)) {}
 
 inline void task_create(AsyncTask *task, AsyncTask *parent, TaskGroup *group,
-                        AsyncLet *asyncLet) {}
+                        AsyncLet *asyncLet, uint8_t jobPriority,
+                        bool isChildTask, bool isFuture, bool isGroupChildTask,
+                        bool isAsyncLetTask) {}
 
 inline void task_destroy(AsyncTask *task) {}
 
@@ -74,10 +76,9 @@ inline void job_enqueue_global_with_delay(unsigned long long delay, Job *job) {}
 
 inline void job_enqueue_main_executor(Job *job) {}
 
-inline job_run_info job_run_begin(Job *job, ExecutorRef *executor) { return {}; }
+inline job_run_info job_run_begin(Job *job) { return {}; }
 
-inline void job_run_end(ExecutorRef *executor, job_run_info info) {
-}
+inline void job_run_end(job_run_info info) {}
 
 } // namespace trace
 } // namespace concurrency
