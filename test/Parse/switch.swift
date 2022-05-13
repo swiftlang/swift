@@ -1,4 +1,5 @@
 // RUN: %target-typecheck-verify-swift
+// REQUIRES: rdar93124601
 
 // TODO: Implement tuple equality in the library.
 // BLOCKED: <rdar://problem/13822406>
