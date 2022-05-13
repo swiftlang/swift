@@ -1793,40 +1793,58 @@ static void checkClassConstructorBody(ClassDecl *classDecl,
   }
 }
 
-bool TypeCheckASTNodeAtLocRequest::evaluate(Evaluator &evaluator,
-                                            DeclContext *DC,
-                                            SourceLoc Loc) const {
-  auto &ctx = DC->getASTContext();
+void swift::simple_display(llvm::raw_ostream &out,
+                           const TypeCheckASTNodeAtLocContext &ctx) {
+  if (ctx.isForUnattachedNode()) {
+    llvm::errs() << "(unattached_node: ";
+    simple_display(out, ctx.getUnattachedNode());
+    llvm::errs() << " decl_context: ";
+    simple_display(out, ctx.getDeclContext());
+    llvm::errs() << ")";
+  } else {
+    llvm::errs() << "(decl_context: ";
+    simple_display(out, ctx.getDeclContext());
+    llvm::errs() << ")";
+  }
+}
+
+bool TypeCheckASTNodeAtLocRequest::evaluate(
+    Evaluator &evaluator, TypeCheckASTNodeAtLocContext typeCheckCtx,
+    SourceLoc Loc) const {
+  auto &ctx = typeCheckCtx.getDeclContext()->getASTContext();
   assert(DiagnosticSuppression::isEnabled(ctx.Diags) &&
          "Diagnosing and Single ASTNode type checking don't mix");
 
-  // Initializers aren't walked by ASTWalker and thus we don't find the context
-  // to type check using ASTNodeFinder. Also, initializers aren't representable
-  // by ASTNodes that can be type checked using typeCheckASTNode.
-  // Handle them specifically here.
-  if (auto *patternInit = dyn_cast<PatternBindingInitializer>(DC)) {
-    if (auto *PBD = patternInit->getBinding()) {
-      auto i = patternInit->getBindingIndex();
-      PBD->getPattern(i)->forEachVariable(
-          [](VarDecl *VD) { (void)VD->getInterfaceType(); });
-      if (PBD->getInit(i)) {
-        if (!PBD->isInitializerChecked(i)) {
-          typeCheckPatternBinding(PBD, i,
-                                  /*LeaveClosureBodyUnchecked=*/true);
-          return false;
+  if (!typeCheckCtx.isForUnattachedNode()) {
+    auto DC = typeCheckCtx.getDeclContext();
+    // Initializers aren't walked by ASTWalker and thus we don't find the
+    // context to type check using ASTNodeFinder. Also, initializers aren't
+    // representable by ASTNodes that can be type checked using
+    // typeCheckASTNode. Handle them specifically here.
+    if (auto *patternInit = dyn_cast<PatternBindingInitializer>(DC)) {
+      if (auto *PBD = patternInit->getBinding()) {
+        auto i = patternInit->getBindingIndex();
+        PBD->getPattern(i)->forEachVariable(
+            [](VarDecl *VD) { (void)VD->getInterfaceType(); });
+        if (PBD->getInit(i)) {
+          if (!PBD->isInitializerChecked(i)) {
+            typeCheckPatternBinding(PBD, i,
+                                    /*LeaveClosureBodyUnchecked=*/true);
+            return false;
+          }
         }
       }
-    }
-  } else if (auto *defaultArg = dyn_cast<DefaultArgumentInitializer>(DC)) {
-    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(defaultArg->getParent())) {
-      auto *Param = AFD->getParameters()->get(defaultArg->getIndex());
-      (void)Param->getTypeCheckedDefaultExpr();
-      return false;
-    }
-    if (auto *SD = dyn_cast<SubscriptDecl>(defaultArg->getParent())) {
-      auto *Param = SD->getIndices()->get(defaultArg->getIndex());
-      (void)Param->getTypeCheckedDefaultExpr();
-      return false;
+    } else if (auto *defaultArg = dyn_cast<DefaultArgumentInitializer>(DC)) {
+      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(defaultArg->getParent())) {
+        auto *Param = AFD->getParameters()->get(defaultArg->getIndex());
+        (void)Param->getTypeCheckedDefaultExpr();
+        return false;
+      }
+      if (auto *SD = dyn_cast<SubscriptDecl>(defaultArg->getParent())) {
+        auto *Param = SD->getIndices()->get(defaultArg->getIndex());
+        (void)Param->getTypeCheckedDefaultExpr();
+        return false;
+      }
     }
   }
 
@@ -1836,10 +1854,19 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(Evaluator &evaluator,
     SourceManager &SM;
     SourceLoc Loc;
     ASTNode *FoundNode = nullptr;
+
+    /// The innermost DeclContext that contains \c FoundNode.
     DeclContext *DC = nullptr;
 
   public:
     ASTNodeFinder(SourceManager &SM, SourceLoc Loc) : SM(SM), Loc(Loc) {}
+
+    /// Set an \c ASTNode and \c DeclContext to type check if we don't find a
+    /// more nested node.
+    void setInitialFind(ASTNode &FoundNode, DeclContext *DC) {
+      this->FoundNode = &FoundNode;
+      this->DC = DC;
+    }
 
     bool isNull() const { return !FoundNode; }
     ASTNode &getRef() const {
@@ -1919,13 +1946,19 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(Evaluator &evaluator,
     }
 
   } finder(ctx.SourceMgr, Loc);
-  DC->walkContext(finder);
+  if (typeCheckCtx.isForUnattachedNode()) {
+    finder.setInitialFind(typeCheckCtx.getUnattachedNode(),
+                          typeCheckCtx.getDeclContext());
+    typeCheckCtx.getUnattachedNode().walk(finder);
+  } else {
+    typeCheckCtx.getDeclContext()->walkContext(finder);
+  }
 
   // Nothing found at the location, or the decl context does not own the 'Loc'.
   if (finder.isNull())
     return true;
 
-  DC = finder.getDeclContext();
+  DeclContext *DC = finder.getDeclContext();
 
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
     if (AFD->isBodyTypeChecked())
@@ -1965,7 +1998,9 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(Evaluator &evaluator,
   // signature first unless it has already been type checked.
   if (auto CE = dyn_cast<ClosureExpr>(DC)) {
     if (CE->getBodyState() == ClosureExpr::BodyState::Parsed) {
-      swift::typeCheckASTNodeAtLoc(CE->getParent(), CE->getLoc());
+      swift::typeCheckASTNodeAtLoc(
+          TypeCheckASTNodeAtLocContext::declContext(CE->getParent()),
+          CE->getLoc());
       // We need the actor isolation of the closure to be set so that we can
       // annotate results that are on the same global actor.
       // Since we are evaluating TypeCheckASTNodeAtLocRequest for every closure
