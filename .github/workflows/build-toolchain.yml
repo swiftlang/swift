@@ -8,6 +8,7 @@ on:
       - swiftwasm-release/5.4
       - swiftwasm-release/5.5
       - swiftwasm-release/5.6
+      - swiftwasm-release/5.7
   pull_request:
     branches:
       - swiftwasm
@@ -15,6 +16,7 @@ on:
       - swiftwasm-release/5.4
       - swiftwasm-release/5.5
       - swiftwasm-release/5.6
+      - swiftwasm-release/5.7
     types: [opened, synchronize, reopened, labeled]
 jobs:
   start-runner:
@@ -118,6 +120,17 @@ jobs:
             "free_disk_space": true
           },
           {
+            "build_os": "ubuntu-22.04",
+            "agent_query": "ubuntu-22.04",
+            "target": "ubuntu22.04_x86_64",
+            "run_stdlib_test": true,
+            "run_full_test": false,
+            "run_e2e_test": true,
+            "build_hello_wasm": true,
+            "clean_build_dir": false,
+            "free_disk_space": true
+          },
+          {
             "build_os": "macos-11",
             "agent_query": "macos-11",
             "target": "macos_x86_64",
@@ -201,13 +214,16 @@ jobs:
         if: ${{ matrix.free_disk_space }}
         run: |
           df -h
-          sudo apt-get purge libgcc-9-dev gcc-9 libstdc++-9-dev libgcc-10-dev gcc-10 libstdc++-10-dev clang-6.0 llvm-6.0
+          sudo apt-get purge libgcc-9-dev gcc-9 libstdc++-9-dev libgcc-10-dev gcc-10 libstdc++-10-dev
           sudo swapoff -a
           sudo rm -f /swapfile
           sudo rm -rf /opt/hostedtoolcache
           sudo rm -rf /usr/share/dotnet
           sudo apt clean
-          docker rmi $(docker image ls -aq)
+          
+          if docker info > /dev/null 2>&1; then
+            docker rmi $(docker image ls -aq)
+          fi
           df -h
 
       - uses: actions/checkout@v2
@@ -247,7 +263,7 @@ jobs:
         run: |
 
           case "${{ matrix.target }}" in
-            "amazonlinux2_x86_64" | "ubuntu20.04_x86_64" | "ubuntu18.04_x86_64" | "ubuntu20.04_aarch64" | "macos_x86_64" | "macos_arm64")
+            "amazonlinux2_x86_64" | "ubuntu22.04_x86_64" | "ubuntu20.04_x86_64" | "ubuntu18.04_x86_64" | "ubuntu20.04_aarch64" | "macos_x86_64" | "macos_arm64")
               ./swift/utils/webassembly/ci.sh
             ;;
             *)

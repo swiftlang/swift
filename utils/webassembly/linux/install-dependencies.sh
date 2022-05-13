@@ -57,6 +57,14 @@ else
       libpython2-dev libncurses5 libncurses5-dev pkg-config \
       libblocksruntime-dev libcurl4-openssl-dev \
       make systemtap-sdt-dev tzdata rsync wget llvm zip unzip
+  elif [ $(grep RELEASE /etc/lsb-release) == "DISTRIB_RELEASE=22.04" ]; then
+    sudo apt install -y \
+      git ninja-build clang python3 python-six \
+      uuid-dev libicu-dev icu-devtools libbsd-dev \
+      libedit-dev libxml2-dev libsqlite3-dev swig \
+      libpython2-dev libncurses5 libncurses5-dev pkg-config \
+      libblocksruntime-dev libcurl4-openssl-dev \
+      make systemtap-sdt-dev tzdata rsync wget llvm zip unzip
   else
     echo "Unknown Ubuntu version"
     exit 1
