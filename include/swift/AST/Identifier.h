@@ -134,7 +134,7 @@ public:
     if (C < 0x80)
       return memchr(OpChars, C, sizeof(OpChars) - 1) != 0;
     
-    // Unicode math, arrow, dingbat, and line/box drawing chars.
+    // Unicode math, symbol, arrow, dingbat, and line/box drawing chars.
     return (C >= 0x00A1 && C <= 0x00A7)
         || C == 0x00A9 || C == 0x00AB || C == 0x00AC || C == 0x00AE
         || C == 0x00B0 || C == 0x00B1 || C == 0x00B6 || C == 0x00BB
