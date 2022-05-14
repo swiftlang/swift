@@ -242,6 +242,7 @@ jobs:
           xcodebuild -version
 
       - uses: actions/cache@v3
+        timeout-minutes: 30
         with:
           path: build-cache
           key: ${{ matrix.target }}-sccache-v12-${{ steps.cache_timestamp.outputs.timestamp }}
