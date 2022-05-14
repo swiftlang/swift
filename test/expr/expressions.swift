@@ -475,7 +475,7 @@ func stringliterals(_ d: [String: Int]) {
   let x = 4
   "Hello \(x+1) world"  // expected-warning {{string literal is unused}}
   
-  "Error: \(x+1"; // expected-error {{expected ')' at end of string interpolation}} expected-note {{add ')' to end of interpolation statement}} {{156-156=)}}
+  "Error: \(x+1"; // expected-error {{expected ')' at end of string interpolation}} expected-note {{add ')' to end of interpolation statement}} {{158-158=)}}
   
   "Error: \(x+1   // expected-error {{expected ')' at end of string interpolation}} expected-note {{add ')' to end of interpolation statement}} {{19-19=)}}
   ;    // expected-error {{';' statements are not allowed}}

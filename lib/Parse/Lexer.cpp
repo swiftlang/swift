@@ -1902,6 +1902,7 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
     if (((*CurPtr == '\r' || *CurPtr == '\n') && !IsMultilineString)
         || CurPtr == BufferEnd) {
       diagnose(TokStart, diag::lex_unterminated_string);
+      char* endQuotes[] = isMultilineString ? "\"\"\"" : "\"";
       return formToken(tok::unknown, TokStart);
     }
 
