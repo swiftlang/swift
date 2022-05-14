@@ -235,6 +235,7 @@ public:
                            std::shared_ptr<GlobalConfig> Config,
                            std::shared_ptr<SwiftStatistics> Stats,
                            std::shared_ptr<RequestTracker> ReqTracker,
+                           StringRef SwiftExecutablePath,
                            StringRef RuntimeResourcePath,
                            StringRef DiagnosticDocumentationPath);
   ~SwiftASTManager();
