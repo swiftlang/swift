@@ -146,7 +146,6 @@ extension Dictionary._Variant {
     availability: SwiftStdlib 5.5, *;
     where Key == String, Value == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   mutating func __specialize_setValue(_: __owned Value, forKey: Key) {
     Builtin.unreachable()
   }
@@ -177,7 +176,6 @@ extension Dictionary._Variant {
     availability: SwiftStdlib 5.5, *;
     where Key == String, Value == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   mutating func __specialize_removeValue(forKey: Key) -> Value? {
     Builtin.unreachable()
   }
@@ -208,7 +206,6 @@ extension Dictionary._Variant {
     availability: SwiftStdlib 5.5, *;
     where Key == String, Value == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   mutating func __specialize_isUniquelyReferenced() -> Bool {
     Builtin.unreachable()
   }
@@ -276,7 +273,6 @@ extension _NativeDictionary {
     availability: SwiftStdlib 5.5, *;
     where Key == String, Value == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   mutating func __specialize__copyOrMoveAndResize(
     capacity: Swift.Int, moveElements: Swift.Bool
   ) { Builtin.unreachable() }
@@ -307,7 +303,6 @@ extension _NativeDictionary {
     availability: SwiftStdlib 5.5, *;
     where Key == String, Value == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   mutating func __specialize_copy() { Builtin.unreachable() }
 
   @_specialize(
@@ -336,7 +331,6 @@ extension _NativeDictionary {
     availability: SwiftStdlib 5.5, *;
     where Key == String, Value == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   mutating func __specialize_mutatingFind(
     _ key: Key, isUnique: Bool
   ) -> (bucket: _HashTable.Bucket, found: Bool) {
@@ -369,7 +363,6 @@ extension _NativeDictionary {
     availability: SwiftStdlib 5.5, *;
     where Key == String, Value == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   func __specialize__insert(
     at: Bucket, key: __owned Key, value: __owned Value
   ) {
@@ -402,7 +395,6 @@ extension _NativeDictionary {
     availability: SwiftStdlib 5.5, *;
     where Key == String, Value == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   mutating func __specialize_ensureUnique(
     isUnique: Bool, capacity: Int
   ) -> Bool {
@@ -435,7 +427,6 @@ extension _NativeDictionary {
     availability: SwiftStdlib 5.5, *;
     where Key == String, Value == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   mutating func __specialize_uncheckedRemove(
     at: _HashTable.Bucket, isUnique: Bool
   ) -> (key: Key, value: Value) {
@@ -456,7 +447,6 @@ extension __RawDictionaryStorage {
     availability: SwiftStdlib 5.5, *;
     where T == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   func __specialize_find<T: Hashable>(
     _: T, hashValue: Int
   ) -> (bucket: Swift._HashTable.Bucket, found: Swift.Bool) {
@@ -474,7 +464,6 @@ extension __RawDictionaryStorage {
     availability: SwiftStdlib 5.5, *;
     where T == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   func __specialize_find<T: Hashable>(
     _: T
   ) -> (bucket: Swift._HashTable.Bucket, found: Swift.Bool) {
@@ -495,7 +484,6 @@ extension Array {
     availability: SwiftStdlib 5.5, *;
     where Element == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   func __specialize__checkSubscript(
     _: Int, wasNativeTypeChecked: Bool
   ) -> _DependenceToken {
@@ -513,7 +501,6 @@ extension Array {
     availability: SwiftStdlib 5.5, *;
     where Element == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   mutating func __specialize__endMutation(){ Builtin.unreachable() }
 
   @_specialize(
@@ -527,7 +514,6 @@ extension Array {
     availability: SwiftStdlib 5.5, *;
     where Element == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   mutating func __specialize__createNewBuffer(
     bufferIsUnique: Bool, minimumCapacity: Int, growForAppend: Bool
   ) {
@@ -545,7 +531,6 @@ extension Array {
     availability: SwiftStdlib 5.5, *;
     where Element == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   mutating func __specialize__makeUniqueAndReserveCapacityIfNotUnique() {
     Builtin.unreachable()
   }
@@ -561,7 +546,6 @@ extension Array {
     availability: SwiftStdlib 5.5, *;
     where Element == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   mutating func __specialize__appendElementAssumeUniqueAndCapacity(
     _: Int, newElement: __owned Element
   ) {
@@ -579,7 +563,6 @@ extension Array {
     availability: SwiftStdlib 5.5, *;
     where Element == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   mutating func __specialize_append(_: __owned Element) {
     Builtin.unreachable()
   }
@@ -595,7 +578,6 @@ extension Array {
     availability: SwiftStdlib 5.5, *;
     where Element == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   static func __specialize__adoptStorage(
     _: __owned _ContiguousArrayStorage<Element>, count: Int
   ) -> ([Element], UnsafeMutablePointer<Element>) {
@@ -618,7 +600,6 @@ extension Array {
     availability: SwiftStdlib 5.5, *;
     where Element == String, S == Set<String>)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   mutating func __specialize_append<S: Sequence>(contentsOf: __owned S)
   where S.Element == Element
   {
@@ -636,7 +617,6 @@ extension Array {
     availability: SwiftStdlib 5.5, *;
     where Element == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   mutating func __specialize__reserveCapacityImpl(
     minimumCapacity: Int, growForAppend: Bool
   ) {
@@ -658,7 +638,6 @@ extension _ArrayBuffer {
     availability: SwiftStdlib 5.5, *;
     where Element == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   func __specialize__consumeAndCreateNew(
     bufferIsUnique: Bool, minimumCapacity: Int, growForAppend: Bool
   ) -> _ArrayBuffer<Element> {
@@ -676,7 +655,6 @@ extension _ArrayBuffer {
     availability: SwiftStdlib 5.5, *;
     where Element == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   mutating func __specialize_isMutableAndUniquelyReferenced() -> Bool {
     Builtin.unreachable()
   }
@@ -692,7 +670,6 @@ extension _ArrayBuffer {
     availability: SwiftStdlib 5.5, *;
     where Element == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   mutating func __specialize_isUniquelyReferenced() -> Bool {
     Builtin.unreachable()
   }
@@ -708,13 +685,11 @@ extension _ArrayBuffer {
     availability: SwiftStdlib 5.5, *;
     where Element == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   mutating func __specialize_beginCOWMutation() -> Bool {
     Builtin.unreachable()
   }
 
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   var __specialize_firstElementAddress: UnsafeMutablePointer<Element> {
     @_specialize(
       exported: true,
@@ -730,7 +705,6 @@ extension _ArrayBuffer {
   }
 
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   var __specialize__native: _ContiguousArrayBuffer<Element> {
     @_specialize(
       exported: true,
@@ -746,7 +720,6 @@ extension _ArrayBuffer {
   }
 
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   var __specialize_immutableCount: Int {
     @_specialize(
       exported: true,
@@ -773,7 +746,6 @@ extension _ArrayBuffer {
   //   availability: SwiftStdlib x.y;
   //   where Element == Any)
   // @available(SwiftStdlib x.y, *)
-  // @usableFromInline
   // init(
   //   specialized_buffer: _ContiguousArrayBuffer<Element>,
   //   shiftedToStartIndex: Int
@@ -796,7 +768,6 @@ extension ContiguousArray {
     availability: SwiftStdlib 5.5, *;
     where Element == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   mutating func __specialize__endMutation(){ Builtin.unreachable() }
   @_specialize(
     exported: true,
@@ -809,7 +780,6 @@ extension ContiguousArray {
     availability: SwiftStdlib 5.5, *;
     where Element == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   mutating func __specialize__createNewBuffer(
     bufferIsUnique: Bool, minimumCapacity: Int, growForAppend: Bool
   ) {
@@ -827,7 +797,6 @@ extension ContiguousArray {
     availability: SwiftStdlib 5.5, *;
     where Element == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   mutating func __specialize__makeUniqueAndReserveCapacityIfNotUnique() {
     Builtin.unreachable()
   }
@@ -843,7 +812,6 @@ extension ContiguousArray {
     availability: SwiftStdlib 5.5, *;
     where Element == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   mutating func __specialize__appendElementAssumeUniqueAndCapacity(
     _: Int, newElement: __owned Element
   ) {
@@ -861,7 +829,6 @@ extension ContiguousArray {
     availability: SwiftStdlib 5.5, *;
     where Element == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   mutating func __specialize_append(_: __owned Element) {
     Builtin.unreachable()
   }
@@ -882,7 +849,6 @@ extension ContiguousArray {
     availability: SwiftStdlib 5.5, *;
     where Element == String, S == Set<String>)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   mutating func __specialize_append<S: Sequence>(contentsOf: __owned S)
   where S.Element == Element
   {
@@ -900,7 +866,6 @@ extension ContiguousArray {
     availability: SwiftStdlib 5.5, *;
     where Element == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   mutating func __specialize__reserveCapacityImpl(
     minimumCapacity: Int, growForAppend: Bool
   ) {
@@ -921,7 +886,6 @@ extension _ContiguousArrayBuffer {
     availability: SwiftStdlib 5.5, *;
     where Element == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   func __specialize__consumeAndCreateNew(
     bufferIsUnique: Bool, minimumCapacity: Int, growForAppend: Bool
   ) -> _ContiguousArrayBuffer<Element> {
@@ -939,7 +903,6 @@ extension _ContiguousArrayBuffer {
     availability: SwiftStdlib 5.5, *;
     where Element == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   mutating func __specialize_isMutableAndUniquelyReferenced() -> Bool {
     Builtin.unreachable()
   }
@@ -956,7 +919,6 @@ extension _ContiguousArrayBuffer {
   //   availability: SwiftStdlib x.y;
   //   where Element == Any)
   // @available(SwiftStdlib x.y, *)
-  // @usableFromInline
   // init(
   //   specialized_buffer: _ContiguousArrayBuffer<Element>,
   //   shiftedToStartIndex: Int
@@ -978,7 +940,6 @@ extension Set {
     availability: SwiftStdlib 5.5, *;
     where Element == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   func __specialize_contains(_: Element) -> Bool { Builtin.unreachable() }
 }
 
@@ -995,7 +956,6 @@ extension Set._Variant {
     availability: SwiftStdlib 5.5, *;
     where Element == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   mutating func __specialize_insert(
     _: __owned Element
   ) -> (inserted: Bool, memberAfterInsert: Element) {
@@ -1013,7 +973,6 @@ extension Set._Variant {
     availability: SwiftStdlib 5.5, *;
     where Element == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   mutating func __specialize_remove(_: Element) -> Element? {
     Builtin.unreachable()
   }
@@ -1032,7 +991,6 @@ extension Sequence {
     availability: SwiftStdlib 5.5, *;
     where Self == Set<String>)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   __consuming func __specialize__copyContents(
     initializing: Swift.UnsafeMutableBufferPointer<Element>
   ) -> (Iterator, Int) {
@@ -1053,7 +1011,6 @@ extension _NativeSet {
     availability: SwiftStdlib 5.5, *;
     where Element == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   mutating func __specialize_copyAndResize(capacity: Int) {
     Builtin.unreachable()
   }
@@ -1069,7 +1026,6 @@ extension _NativeSet {
     availability: SwiftStdlib 5.5, *;
     where Element == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   mutating func __specialize_copy() { Builtin.unreachable() }
 
   @_specialize(
@@ -1083,7 +1039,6 @@ extension _NativeSet {
     availability: SwiftStdlib 5.5, *;
     where Element == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   func __specialize_index(after: Set<Element>.Index) -> Set<Element>.Index {
     Builtin.unreachable()
   }
@@ -1099,7 +1054,6 @@ extension _NativeSet {
     availability: SwiftStdlib 5.5, *;
     where Element == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   mutating func __specialize_resize(capacity: Int) { Builtin.unreachable() }
 
   @_specialize(
@@ -1113,7 +1067,6 @@ extension _NativeSet {
     availability: SwiftStdlib 5.5, *;
     where Element == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   mutating func __specialize__delete(at: _HashTable.Bucket) {
     Builtin.unreachable()
   }
@@ -1129,7 +1082,6 @@ extension _NativeSet {
     availability: SwiftStdlib 5.5, *;
     where Element == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   mutating func __specialize_insertNew(
     _: __owned Element, at: _HashTable.Bucket, isUnique: Bool
   ) {
@@ -1147,7 +1099,6 @@ extension _NativeSet {
     availability: SwiftStdlib 5.5, *;
     where Element == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   func __specialize__unsafeInsertNew(
     _: __owned Element, at: _HashTable.Bucket
   ) {
@@ -1168,7 +1119,6 @@ extension Optional {
     availability: SwiftStdlib 5.5, *;
     where Wrapped == String)
   @available(SwiftStdlib 5.5, *)
-  @usableFromInline
   static func __specialize_equals(lhs: Wrapped?, rhs: Wrapped?) -> Bool {
     Builtin.unreachable()
   }
@@ -1193,7 +1143,6 @@ extension Optional {
     BaseKey == String,
     BaseValue == Any)
 @available(SwiftStdlib 5.5, *)
-@usableFromInline
 func __specialize_dictionaryUpCast<
   DerivedKey, DerivedValue, BaseKey, BaseValue
 >(
@@ -1213,7 +1162,6 @@ func __specialize_dictionaryUpCast<
   availability: SwiftStdlib 5.5, *;
   where C == Set<String>)
 @available(SwiftStdlib 5.5, *)
-@usableFromInline
 func __specialize_copyCollectionToContiguousArray<C: Collection>(
   _ source: C
 ) -> ContiguousArray<C.Element> {
