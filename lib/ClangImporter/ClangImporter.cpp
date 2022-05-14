@@ -866,7 +866,7 @@ importer::addCommonInvocationArguments(
 /// On Linux, some platform libraries (glibc, libstdc++) are not modularized.
 /// We inject modulemaps for those libraries into their include directories
 /// to allow using them from Swift.
-static SmallVector<std::pair<std::string, std::string>>
+static SmallVector<std::pair<std::string, std::string>, 16>
 getClangInvocationFileMapping(ASTContext &ctx) {
   using Path = SmallString<128>;
 
@@ -923,7 +923,7 @@ getClangInvocationFileMapping(ASTContext &ctx) {
     cxxStdlibDirs.push_back(Path(iter->path()));
   }
 
-  SmallVector<std::pair<std::string, std::string>> result;
+  SmallVector<std::pair<std::string, std::string>, 16> result;
   // Inject a modulemap into the VFS for each of the libstdc++ versions.
   for (const Path &cxxStdlibDir : cxxStdlibDirs) {
     // Only inject the module map if the module does not already exist at
