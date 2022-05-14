@@ -536,10 +536,12 @@ BeginApplyInst::create(SILDebugLocation loc, SILValue callee,
 
   for (auto &yield : substCalleeType->getYields()) {
     auto yieldType = conv.getSILType(yield, F.getTypeExpansionContext());
-    auto convention = SILArgumentConvention(yield.getConvention());
+    auto argConvention = SILArgumentConvention(yield.getConvention());
     resultTypes.push_back(yieldType);
-    resultOwnerships.push_back(
-      ValueOwnershipKind(F, yieldType, convention));
+    resultOwnerships.push_back(ValueOwnershipKind(
+        F, yieldType, argConvention,
+        moduleConventions.hasValue() ? moduleConventions.getValue()
+                                     : SILModuleConventions(F.getModule())));
   }
 
   resultTypes.push_back(SILType::getSILTokenType(F.getASTContext()));

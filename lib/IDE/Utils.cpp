@@ -276,6 +276,7 @@ bool ide::initCompilerInvocation(
     FrontendOptions::ActionType Action, DiagnosticEngine &Diags,
     StringRef UnresolvedPrimaryFile,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    const std::string &swiftExecutablePath,
     const std::string &runtimeResourcePath,
     const std::string &diagnosticDocumentationPath, time_t sessionTimestamp,
     std::string &Error) {
@@ -299,7 +300,9 @@ bool ide::initCompilerInvocation(
       driver::getSingleFrontendInvocationFromDriverArguments(
           Args, Diags,
           [&](ArrayRef<const char *> FrontendArgs) {
-            return Invocation.parseArgs(FrontendArgs, Diags);
+            return Invocation.parseArgs(
+                FrontendArgs, Diags, /*ConfigurationFileBuffers=*/nullptr,
+                /*workingDirectory=*/"", swiftExecutablePath);
           },
           /*ForceNoOutputs=*/true);
 

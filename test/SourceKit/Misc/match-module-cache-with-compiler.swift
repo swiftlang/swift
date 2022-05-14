@@ -3,9 +3,6 @@
 
 // REQUIRES: shell
 
-// https://github.com/apple/swift/issues/58786
-// UNSUPPORTED: OS=linux-gnu
-
 // RUN: %empty-directory(%t)
 
 // RUN: COMPILER_ARGS=( \
