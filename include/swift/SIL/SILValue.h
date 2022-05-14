@@ -256,6 +256,9 @@ struct ValueOwnershipKind {
   explicit ValueOwnershipKind(unsigned newValue) : value(innerty(newValue)) {}
   ValueOwnershipKind(const SILFunction &f, SILType type,
                      SILArgumentConvention convention);
+  ValueOwnershipKind(const SILFunction &f, SILType type,
+                     SILArgumentConvention convention,
+                     SILModuleConventions moduleConventions);
 
   /// Parse Value into a ValueOwnershipKind.
   ///
