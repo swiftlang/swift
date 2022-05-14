@@ -85,8 +85,9 @@ call :build_lldb %exitOnError%
 path %PATH%;C:\Program Files\Git\usr\bin
 call :build_libdispatch %exitOnError%
 
+path %source_root%\icu-%icu_version%\bin64;%install_directory%\bin;%build_root%\swift\bin;%build_root%\swift\libdispatch-prefix\bin;%PATH%
+
 if %RunTest%==1 (
-  path %source_root%\icu-%icu_version%\bin64;%install_directory%\bin;%build_root%\swift\bin;%build_root%\swift\libdispatch-prefix\bin;%PATH%
   call :test_swift %exitOnError%
   call :test_libdispatch %exitOnError%
 )
