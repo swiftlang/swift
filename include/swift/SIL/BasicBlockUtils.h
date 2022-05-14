@@ -13,8 +13,9 @@
 #ifndef SWIFT_SIL_BASICBLOCKUTILS_H
 #define SWIFT_SIL_BASICBLOCKUTILS_H
 
-#include "swift/SIL/SILValue.h"
 #include "swift/SIL/BasicBlockBits.h"
+#include "swift/SIL/BasicBlockDatastructures.h"
+#include "swift/SIL/SILValue.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -155,6 +156,76 @@ void findJointPostDominatingSet(
 bool checkDominates(SILBasicBlock *sourceBlock, SILBasicBlock *destBlock);
 #endif
 
+/// Given a region, specified via \p visitor's \p isInRegion member function,
+/// backwards-reachable from \r root, traverse the region backwards, depth-first
+/// and visit its nodes in the associated post-order.
+///
+/// interface Visitor {
+///     /// Whether the indicated basic block is within the region of the graph
+///     /// that should be traversed.
+///     bool isInRegion(SILBasicBlock *)
+///
+///     /// Visit each block in post-order.
+///     void visit(SILBasicBlock *)
+/// }
+template <typename Visitor>
+void visitPostOrderBackwards(SILFunction *function, SILBasicBlock *root,
+                             Visitor visitor) {
+  SmallVector<std::pair<SILBasicBlock *, SILBasicBlock::pred_iterator>, 32>
+      stack;
+  BasicBlockSet visited(function);
+  stack.push_back({root, root->pred_begin()});
+  while (!stack.empty()) {
+    while (stack.back().second != stack.back().first->pred_end()) {
+      auto predecessor = *stack.back().second;
+      stack.back().second++;
+      if (!visitor.isInRegion(predecessor))
+        continue;
+      if (visited.insert(predecessor))
+        stack.push_back({predecessor, predecessor->pred_begin()});
+    }
+    visitor.visit(stack.back().first);
+    stack.pop_back();
+  }
+}
+
+/// Given a region, specified via \p visitor's \p isInRegion member function,
+/// backwards-reachable from \r roots, traverse the region in topological order.
+/// Node M shall be visited before node N if and only if there is an edge from
+/// M to N, except for backedges*.
+///
+/// * The backedges in question are backedges according to backwards depth-first
+/// searches from roots.
+///
+/// interface Visitor {
+///     /// Whether the indicated basic block is within the region of the graph
+///     /// that should be traversed.
+///     bool isInRegion(SILBasicBlock *)
+///
+///     /// Visit each block in topological order.
+///     void visit(SILBasicBlock *)
+/// }
+template <typename Visitor>
+void visitSortedTopologicallyBackwards(SILFunction *function,
+                                       ArrayRef<SILBasicBlock *> roots,
+                                       Visitor &visitor) {
+  BasicBlockSet visited(function);
+  for (auto *root : roots) {
+    struct Inner {
+      Visitor &outer;
+      BasicBlockSet &visited;
+      int offset = 0;
+      Inner(Visitor &outer, BasicBlockSet &visited)
+          : outer(outer), visited(visited) {}
+      bool isInRegion(SILBasicBlock *block) {
+        return !visited.contains(block) && outer.isInRegion(block);
+      }
+      void visit(SILBasicBlock *block) { outer.visit(block); }
+    };
+    Inner inner(visitor, visited);
+    visitPostOrderBackwards(function, root, inner);
+  }
+}
 } // namespace swift
 
 #endif
