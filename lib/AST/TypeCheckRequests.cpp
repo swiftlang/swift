@@ -62,6 +62,14 @@ void swift::simple_display(llvm::raw_ostream &out,
   }
 }
 
+void swift::simple_display(llvm::raw_ostream &out, ASTNode node) {
+  if (node) {
+    node.dump(out);
+  } else {
+    out << "null";
+  }
+}
+
 void swift::simple_display(llvm::raw_ostream &out, Type type) {
   if (type)
     type.print(out);

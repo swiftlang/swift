@@ -1162,7 +1162,19 @@ static bool passCursorInfoForDecl(
                                   AddSymbolGraph, Lang, Invoc, PreviousSnaps,
                                   Allocator)) {
       // Ignore but make sure to remove the partially-filled symbol
-      llvm::handleAllErrors(std::move(Err), [&](const llvm::StringError &E) {});
+      llvm::handleAllErrors(std::move(Err), [](const llvm::StringError &E) {});
+      Symbols.pop_back();
+    }
+  }
+  for (auto D : Info.ShorthandShadowedDecls) {
+    CursorSymbolInfo &SymbolInfo = Symbols.emplace_back();
+    DeclInfo DInfo(D, Type(), /*IsRef=*/true, /*IsDynamic=*/false,
+                   ArrayRef<NominalTypeDecl *>(), Invoc);
+    if (auto Err = fillSymbolInfo(SymbolInfo, DInfo, MainModule, Info.Loc,
+                                  AddSymbolGraph, Lang, Invoc, PreviousSnaps,
+                                  Allocator)) {
+      // Ignore but make sure to remove the partially-filled symbol
+      llvm::handleAllErrors(std::move(Err), [](const llvm::StringError &E) {});
       Symbols.pop_back();
     }
   }
@@ -2202,32 +2214,11 @@ private:
     // Check if there are closure captures like `[foo]` where the caputred
     // variable should also be renamed
     if (auto CaptureList = dyn_cast<CaptureListExpr>(E)) {
-      for (auto Capture : CaptureList->getCaptureList()) {
-        if (Capture.PBD->getPatternList().size() != 1) {
-          continue;
-        }
-        auto *DRE = dyn_cast_or_null<DeclRefExpr>(Capture.PBD->getInit(0));
-        if (!DRE) {
-          continue;
-        }
-
-        auto DeclaredVar = Capture.getVar();
-        if (DeclaredVar->getLoc() != DRE->getLoc()) {
-          // We have a capture like `[foo]` if the declared var and the
-          // reference share the same location.
-          continue;
-        }
-
-        auto *ReferencedVar = dyn_cast_or_null<VarDecl>(DRE->getDecl());
-        if (!ReferencedVar) {
-          continue;
-        }
-
-        assert(DeclaredVar->getName() == ReferencedVar->getName());
-        if (DeclaredVar == Dcl) {
-          RelatedDecls.push_back(ReferencedVar);
-        } else if (ReferencedVar == Dcl) {
-          RelatedDecls.push_back(DeclaredVar);
+      for (auto ShorthandShadow : getShorthandShadows(CaptureList)) {
+        if (ShorthandShadow.first == Dcl) {
+          RelatedDecls.push_back(ShorthandShadow.second);
+        } else if (ShorthandShadow.second == Dcl) {
+          RelatedDecls.push_back(ShorthandShadow.first);
         }
       }
     }
@@ -2239,31 +2230,12 @@ private:
       return false;
 
     if (auto CondStmt = dyn_cast<LabeledConditionalStmt>(S)) {
-      for (const StmtConditionElement &Cond : CondStmt->getCond()) {
-        if (Cond.getKind() != StmtConditionElement::CK_PatternBinding) {
-          continue;
+      for (auto ShorthandShadow : getShorthandShadows(CondStmt)) {
+        if (ShorthandShadow.first == Dcl) {
+          RelatedDecls.push_back(ShorthandShadow.second);
+        } else if (ShorthandShadow.second == Dcl) {
+          RelatedDecls.push_back(ShorthandShadow.first);
         }
-        auto Init = dyn_cast<DeclRefExpr>(Cond.getInitializer());
-        if (!Init) {
-          continue;
-        }
-        auto ReferencedVar = dyn_cast_or_null<VarDecl>(Init->getDecl());
-        if (!ReferencedVar) {
-          continue;
-        }
-
-        Cond.getPattern()->forEachVariable([&](VarDecl *DeclaredVar) {
-          if (DeclaredVar->getLoc() != Init->getLoc()) {
-            return;
-          }
-          assert(DeclaredVar->getName() == ReferencedVar->getName());
-          if (DeclaredVar == Dcl) {
-            RelatedDecls.push_back(ReferencedVar);
-          }
-          if (ReferencedVar == Dcl) {
-            RelatedDecls.push_back(DeclaredVar);
-          }
-        });
       }
     }
     return true;

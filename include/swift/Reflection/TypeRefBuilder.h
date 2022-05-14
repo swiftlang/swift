@@ -100,6 +100,12 @@ public:
     : OriginalSize(Size), Cur(Cur), Size(Size), Name(Name) {
     if (Size != 0) {
       auto NextRecord = this->operator*();
+      if (!NextRecord) {
+        // NULL record pointer, don't attempt to proceed. Setting size to 0 will
+        // make this iterator compare equal to the end iterator.
+        this->Size = 0;
+        return;
+      }
       auto NextSize = Self::getCurrentRecordSize(NextRecord);
       if (NextSize > Size) {
         std::cerr << "!!! Reflection section too small to contain first record\n" << std::endl;
@@ -109,7 +115,9 @@ public:
                   << ", size of first record: "
                   << NextSize
                   << std::endl;
-        abort();
+        // Set this iterator equal to the end. This section is effectively
+        // empty.
+        this->Size = 0;
       }
     }
   }
@@ -149,7 +157,7 @@ public:
           std::cerr << std::hex << std::setw(2) << (int)p[i] << " ";
         }
         std::cerr << std::endl;
-        abort();
+        Size = 0; // Set this iterator equal to the end.
       }
     }
 
@@ -157,6 +165,10 @@ public:
   }
 
   bool operator==(const Self &other) const {
+    // Size = 0 means we're at the end even if Cur doesn't match. This allows
+    // iterators that encounter an incorrect size to safely end iteration.
+    if (Size == 0 && other.Size == 0)
+      return true;
     return Cur == other.Cur && Size == other.Size;
   }
 

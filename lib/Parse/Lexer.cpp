@@ -2000,23 +2000,11 @@ bool Lexer::tryLexRegexLiteral(const char *TokStart) {
     //   2
     // }
     //
-    // This takes advantage of the consistent operator spacing rule. We also
-    // need to ban ')' to avoid ambiguity with unapplied operator references e.g
-    // `reduce(1, /)`. This would be invalid regex syntax anyways. Note this
-    // doesn't totally save us from e.g `foo(/, 0)`, but it should at least
-    // help, and it ensures users can always surround their operator ref in
-    // parens `(/)` to fix the issue.
+    // This takes advantage of the consistent operator spacing rule.
     // TODO: This heuristic should be sunk into the Swift library once we have a
     // way of doing fix-its from there.
     auto *RegexContentStart = TokStart + 1;
     switch (*RegexContentStart) {
-    case ')': {
-      if (!MustBeRegex)
-        return false;
-
-      // ')' is invalid anyway, so we can let the parser diagnose it.
-      break;
-    }
     case ' ':
     case '\t': {
       if (!MustBeRegex)
@@ -2070,6 +2058,48 @@ bool Lexer::tryLexRegexLiteral(const char *TokStart) {
 
     // Move the pointer back to the '/' of the comment.
     Ptr--;
+  }
+
+  // If we're tentatively lexing `/.../`, scan to make sure we don't have any
+  // unbalanced ')'s. This helps avoid ambiguity with unapplied operator
+  // references e.g `reduce(1, /)` and `foo(/, 0) / 2`. This would be invalid
+  // regex syntax anyways. This ensures users can surround their operator ref
+  // in parens `(/)` to fix the issue. This also applies to prefix operators
+  // that can be disambiguated as e.g `(/S.foo)`. Note we need to track whether
+  // or not we're in a custom character class `[...]`, as parens are literal
+  // there.
+  // TODO: This should be sunk into the Swift library.
+  if (IsForwardSlash && !MustBeRegex) {
+    unsigned CharClassDepth = 0;
+    unsigned GroupDepth = 0;
+    for (auto *Cursor = TokStart + 1; Cursor < Ptr - 1; Cursor++) {
+      switch (*Cursor) {
+      case '\\':
+        // Skip over the next character of an escape.
+        Cursor++;
+        break;
+      case '(':
+        if (CharClassDepth == 0)
+          GroupDepth += 1;
+        break;
+      case ')':
+        if (CharClassDepth != 0)
+          break;
+
+        // Invalid, so bail.
+        if (GroupDepth == 0)
+          return false;
+
+        GroupDepth -= 1;
+        break;
+      case '[':
+        CharClassDepth += 1;
+        break;
+      case ']':
+        if (CharClassDepth != 0)
+          CharClassDepth -= 1;
+      }
+    }
   }
 
   // Update to point to where we ended regex lexing.

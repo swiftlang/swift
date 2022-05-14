@@ -68,6 +68,10 @@ inline SILBasicBlock *castToBasicBlock(BridgedBasicBlock block) {
   return static_cast<SILBasicBlock *>(block.obj);
 }
 
+inline SILBasicBlock *castToBasicBlock(OptionalBridgedBasicBlock block) {
+  return block.obj ? static_cast<SILBasicBlock *>(block.obj) : nullptr;
+}
+
 template <class A = SILArgument> A *castToArgument(BridgedArgument argument) {
   return cast<A>(static_cast<SILArgument *>(argument.obj));
 }
@@ -78,6 +82,15 @@ inline SILFunction *castToFunction(BridgedFunction function) {
 
 inline SILGlobalVariable *castToGlobal(BridgedGlobalVar global) {
   return static_cast<SILGlobalVariable *>(global.obj);
+}
+
+inline ValueOwnershipKind castToOwnership(BridgedOwnership ownership) {
+  switch (ownership) {
+    case Ownership_Unowned:    return OwnershipKind::Unowned;
+    case Ownership_Owned:      return OwnershipKind::Owned;
+    case Ownership_Guaranteed: return OwnershipKind::Guaranteed;
+    case Ownership_None:       return OwnershipKind::None;
+  }
 }
 
 ArrayRef<SILValue> getSILValues(BridgedValueArray values,

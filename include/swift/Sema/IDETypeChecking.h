@@ -19,7 +19,9 @@
 #ifndef SWIFT_SEMA_IDETYPECHECKING_H
 #define SWIFT_SEMA_IDETYPECHECKING_H
 
+#include "swift/AST/ASTNode.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/SourceLoc.h"
 #include <memory>
 #include <tuple>
@@ -27,6 +29,7 @@
 namespace swift {
   class AbstractFunctionDecl;
   class ASTContext;
+  class CaptureListExpr;
   class ConcreteDeclRef;
   class Decl;
   class DeclContext;
@@ -35,6 +38,7 @@ namespace swift {
   class Expr;
   class ExtensionDecl;
   class FunctionType;
+  class LabeledConditionalStmt;
   class LookupResult;
   class NominalTypeDecl;
   class PatternBindingDecl;
@@ -140,8 +144,9 @@ namespace swift {
   /// Typecheck the given expression.
   bool typeCheckExpression(DeclContext *DC, Expr *&parsedExpr);
 
-  /// Type check a function body element which is at \p TargetLoc .
-  bool typeCheckASTNodeAtLoc(DeclContext *DC, SourceLoc TargetLoc);
+  /// Type check a function body element which is at \p TagetLoc.
+  bool typeCheckASTNodeAtLoc(TypeCheckASTNodeAtLocContext TypeCheckCtx,
+                             SourceLoc TargetLoc);
 
   /// Thunk around \c TypeChecker::typeCheckForCodeCompletion to make it
   /// available to \c swift::ide.
@@ -319,6 +324,19 @@ namespace swift {
 
   /// Just a proxy to swift::contextUsesConcurrencyFeatures() from lib/IDE code.
   bool completionContextUsesConcurrencyFeatures(const DeclContext *dc);
+
+  /// If the capture list shadows any declarations using shorthand syntax, i.e.
+  /// syntax that names both the newly declared variable and the referenced
+  /// variable by the same identifier in the source text, i.e. `[foo]`, return
+  /// these shorthand shadows.
+  /// The first element in the pair is the implicitly declared variable and the
+  /// second variable is the shadowed one.
+  SmallVector<std::pair<ValueDecl *, ValueDecl *>, 1>
+  getShorthandShadows(CaptureListExpr *CaptureList);
+
+  /// Same as above but for shorthand `if let foo {` syntax.
+  SmallVector<std::pair<ValueDecl *, ValueDecl *>, 1>
+  getShorthandShadows(LabeledConditionalStmt *CondStmt);
 }
 
 #endif
