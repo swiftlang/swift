@@ -645,8 +645,10 @@ void OpaqueValueVisitor::checkForIndirectApply(FullApplySite applySite) {
     }
     ++calleeArgIdx;
   }
-  if (applySite.getSubstCalleeType()->hasIndirectFormalResults())
+
+  if (applySite.getSubstCalleeType()->hasIndirectFormalResults()) {
     pass.indirectApplies.insert(applySite);
+  }
 }
 
 /// If `value` is address-only, add it to the `valueStorageMap`.
@@ -883,6 +885,16 @@ static SILValue getProjectedUseValue(Operand *operand) {
   return SILValue();
 }
 
+static bool doesNotNeedStackAllocation(SILValue value) {
+  auto *defInst = value->getDefiningInstruction();
+  if (!defInst)
+    return false;
+
+  if (isa<LoadBorrowInst>(defInst) || isa<BeginApplyInst>(defInst))
+    return true;
+
+  return false;
+}
 //===----------------------------------------------------------------------===//
 //                          OpaqueStorageAllocation
 //
@@ -1042,11 +1054,15 @@ void OpaqueStorageAllocation::allocateValue(SILValue value) {
   if (getReusedStorageOperand(value))
     return;
 
+  if (doesNotNeedStackAllocation(value))
+    return;
+
   // Check for values that inherently project storage from their operand.
   if (auto *storageOper = getProjectedDefOperand(value)) {
     pass.valueStorageMap.recordDefProjection(storageOper, value);
     return;
   }
+
   if (value->getOwnershipKind() == OwnershipKind::Guaranteed) {
     value->dump();
     llvm::report_fatal_error("^^^ guaranteed values must reuse storage");
@@ -1183,7 +1199,6 @@ void OpaqueStorageAllocation::removeAllocation(SILValue value) {
 AllocStackInst *OpaqueStorageAllocation::createStackAllocation(SILValue value) {
   assert(value.getOwnershipKind() != OwnershipKind::Guaranteed &&
          "creating storage for a guaranteed value implies a copy");
-
   // Instructions that produce an opened type never reach here because they
   // have guaranteed ownership--they project their storage. We reach this
   // point after the opened value has been copied.
@@ -1822,10 +1837,11 @@ public:
         loweredCalleeConv(getLoweredCallConv(oldCall)) {}
 
   void convertApplyWithIndirectResults();
+  void convertBeginApplyWithOpaqueYield();
 
 protected:
   SILBasicBlock::iterator getCallResultInsertionPoint() {
-    if (isa<ApplyInst>(apply))
+    if (isa<ApplyInst>(apply) || isa<BeginApplyInst>(apply))
       return std::next(SILBasicBlock::iterator(apply.getInstruction()));
 
     auto *bb = cast<TryApplyInst>(apply)->getNormalBB();
@@ -2078,6 +2094,35 @@ void ApplyRewriter::rewriteApply(ArrayRef<SILValue> newCallArgs) {
   // No need to delete this apply. It either has a single address-only result
   // and will be deleted at the end of the pass. Or it has multiple results and
   // will be deleted with its destructure_tuple.
+}
+
+void ApplyRewriter::convertBeginApplyWithOpaqueYield() {
+  auto *origCall = cast<BeginApplyInst>(apply.getInstruction());
+  SmallVector<SILValue, 4> opValues;
+
+  for (auto &oper : origCall->getArgumentOperands()) {
+    opValues.push_back(oper.get());
+  }
+
+  // Recreate the begin_apply so that the instruction results have the right
+  // ownership kind as per the lowered addresses convention.
+  auto *newCall = argBuilder.createBeginApply(
+      callLoc, apply.getCallee(), apply.getSubstitutionMap(), opValues,
+      origCall->getApplyOptions(), origCall->getSpecializationInfo());
+  this->apply = FullApplySite(newCall);
+
+  // Replace uses of orig begin_apply with the new begin_apply
+  auto oldResults = origCall->getAllResultsBuffer();
+  auto newResults = newCall->getAllResultsBuffer();
+  assert(oldResults.size() == newResults.size());
+  for (auto i : indices(oldResults)) {
+    if (oldResults[i].getType().isAddressOnly(*pass.function)) {
+      pass.valueStorageMap.setStorageAddress(&oldResults[i], &newResults[i]);
+      pass.valueStorageMap.getStorage(&oldResults[i]).markRewritten();
+    } else {
+      oldResults[i].replaceAllUsesWith(&newResults[i]);
+    }
+  }
 }
 
 // Replace \p tryApply with a new try_apply using \p newCallArgs.
@@ -2543,6 +2588,16 @@ protected:
   // Opaque call argument.
   void visitApplyInst(ApplyInst *applyInst) {
     CallArgRewriter(applyInst, pass).rewriteIndirectArgument(use);
+  }
+
+  void visitBeginApplyInst(BeginApplyInst *bai) {
+    CallArgRewriter(bai, pass).rewriteIndirectArgument(use);
+  }
+
+  void visitYieldInst(YieldInst *yield) {
+    SILValue addr =
+        pass.valueStorageMap.getStorage(yield->getOperand(0)).storageAddress;
+    yield->setOperand(0, addr);
   }
 
   void visitAssignInst(AssignInst *assignInst);
@@ -3039,6 +3094,11 @@ protected:
     ApplyRewriter(applyInst, pass).convertApplyWithIndirectResults();
   }
 
+  void visitBeginApplyInst(BeginApplyInst *bai) {
+    CallArgRewriter(bai, pass).rewriteArguments();
+    ApplyRewriter(bai, pass).convertBeginApplyWithOpaqueYield();
+  }
+
   // Rewrite the apply for an indirect result.
   void visitDestructureTupleInst(DestructureTupleInst *destructure) {
     SILValue srcVal = destructure->getOperand();
@@ -3107,6 +3167,10 @@ protected:
     }
   }
 
+  void visitLoadBorrowInst(LoadBorrowInst *lbi) {
+    pass.valueStorageMap.setStorageAddress(lbi, lbi->getOperand());
+  }
+
   // Define an opaque struct.
   void visitStructInst(StructInst *structInst) {
     // For each element, initialize the operand's memory. Some struct elements
@@ -3159,8 +3223,9 @@ static void rewriteIndirectApply(FullApplySite apply,
   // If all indirect args were loadable, then they still need to be rewritten.
   CallArgRewriter(apply, pass).rewriteArguments();
 
-  if (!apply.getSubstCalleeType()->hasIndirectFormalResults())
+  if (!apply.getSubstCalleeType()->hasIndirectFormalResults()) {
     return;
+  }
 
   // If the call has indirect results and wasn't already rewritten, rewrite it
   // now. This handles try_apply, which is not rewritten when DefRewriter visits

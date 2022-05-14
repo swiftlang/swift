@@ -4460,6 +4460,32 @@ public:
   SILType getDirectFormalResultsType(SILModule &M,
                                      TypeExpansionContext expansion);
 
+  unsigned getNumIndirectFormalYields() const {
+    return isCoroutine() ? NumAnyIndirectFormalResults : 0;
+  }
+  /// Does this function have any formally indirect yields?
+  bool hasIndirectFormalYields() const {
+    return getNumIndirectFormalYields() != 0;
+  }
+  unsigned getNumDirectFormalYields() const {
+    return isCoroutine() ? NumAnyResults - NumAnyIndirectFormalResults : 0;
+  }
+
+  struct IndirectFormalYieldFilter {
+    bool operator()(SILYieldInfo yield) const {
+      return !yield.isFormalIndirect();
+    }
+  };
+
+  using IndirectFormalYieldIter =
+      llvm::filter_iterator<const SILYieldInfo *, IndirectFormalYieldFilter>;
+  using IndirectFormalYieldRange = iterator_range<IndirectFormalYieldIter>;
+
+  /// A range of SILYieldInfo for all formally Indirect Yields.
+  IndirectFormalYieldRange getIndirectFormalYields() const {
+    return llvm::make_filter_range(getYields(), IndirectFormalYieldFilter());
+  }
+
   /// Get a single non-address SILType for all SIL results regardless of whether
   /// they are formally indirect. The actual SIL result type of an apply
   /// instruction that calls this function depends on the current SIL stage and
