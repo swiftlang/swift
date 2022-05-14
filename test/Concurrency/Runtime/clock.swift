@@ -9,9 +9,6 @@
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: back_deploy_concurrency
 
-// This is XFAILed on cooperative executor due to missing implementations
-// XFAIL: single_threaded_runtime
-
 import _Concurrency
 import StdlibUnittest
 
