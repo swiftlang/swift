@@ -1886,20 +1886,20 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
         continue;
       } else if (*CurPtr == '\r' || *CurPtr == '\n') {
         if (IsMultilineString) {
-        // The only case we reach here is unterminated single line string in the
-        // interpolation. For better recovery, go on after emitting an error.
-        diagnose(CurPtr, diag::string_interpolation_unclosed);
-        diagnose(CurPtr, diag::lex_unterminated_string);
-        wasErroneous = true;
-        continue;
+          // The only case we reach here is unterminated single line string in the
+          // interpolation. For better recovery, go on after emitting an error.
+          diagnose(CurPtr, diag::string_interpolation_unclosed);
+          diagnose(CurPtr, diag::lex_unterminated_string);
+          wasErroneous = true;
+          continue;
         } else {
-        const char *fixItLoc = CurPtr - 1;
-        if (*fixItLoc == QuoteChar) {
-          fixItLoc -= CustomDelimiterLen;
-        }
-        diagnose(fixItLoc, diag::string_interpolation_unclosed);
-            .fixItInsert(Lexer::getSourceLoc(fixItLoc), ")");
-        return formToken(tok::unknown, TokStart);
+          const char *fixItLoc = CurPtr - 1;
+          if (*fixItLoc == QuoteChar) {
+            fixItLoc -= CustomDelimiterLen;
+          }
+          diagnose(fixItLoc, diag::string_interpolation_unclosed);
+              .fixItInsert(Lexer::getSourceLoc(fixItLoc), ")");
+          return formToken(tok::unknown, TokStart);
         }
       } else {
         diagnose(TokStart, diag::lex_unterminated_string);
