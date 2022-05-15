@@ -1892,7 +1892,7 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
         continue;
       } else {
         diagnose(CurPtr, diag::string_interpolation_unclosed);
-        char *fixItLoc = CurPtr - 1;
+        char *fixItLoc = (char *)CurPtr - 1;
         if (*fixItLoc == QuoteChar) {
           fixItLoc -= CustomDelimiterLen;
         }
