@@ -1893,12 +1893,12 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
           wasErroneous = true;
           continue;
         } else {
-          const char *fixItLoc = CurPtr - 1;
-          if (*fixItLoc == QuoteChar) {
-            fixItLoc -= CustomDelimiterLen;
+          // location of the end of the interpolation expression
+          const char *interpolationEndLoc = CurPtr - 1;
+          if (*interpolationEndLoc == QuoteChar) {
+            interpolationEndLoc -= CustomDelimiterLen;
           }
-          diagnose(fixItLoc, diag::string_interpolation_unclosed);
-              .fixItInsert(Lexer::getSourceLoc(fixItLoc), ")");
+          diagnose(interpolationEndLoc, diag::string_interpolation_unclosed);
           return formToken(tok::unknown, TokStart);
         }
       } else {

@@ -126,14 +126,14 @@ _ = "hello\("""
             world
             """
             )!"
-            // expected-error@-2 {{expected ')' at end of string interpolation}} {{15-15=)}}
+            // expected-error@-2 {{expected ')' at end of string interpolation}}
             // expected-error@-2 {{unterminated string literal}}
 
 _ = "hello\(
             """
             world
             """)!"
-            // expected-error@-4 {{expected ')' at end of string interpolation}} {{12-12=)}}
+            // expected-error@-4 {{expected ')' at end of string interpolation}}
             // expected-error@-2 {{unterminated string literal}}
 
 _ = """
