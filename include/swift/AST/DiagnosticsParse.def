@@ -1362,8 +1362,6 @@ ERROR(string_interpolation_extra,none,
 // ie: `let west = "ye \("`
 ERROR(string_interpolation_unclosed, none,
       "expected ')' at end of string interpolation", ())
-NOTE(string_interpolation_unclosed_fix_it, none,
-      "add ')' to end of interpolation statement", ())
 
 // Interpolations with parameter labels or multiple values
 WARNING(string_interpolation_list_changing,none,
