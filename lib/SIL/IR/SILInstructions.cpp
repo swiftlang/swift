@@ -1378,26 +1378,6 @@ bool TupleExtractInst::isEltOnlyNonTrivialElt() const {
   return true;
 }
 
-/// Get a unique index for a struct or class field in layout order.
-unsigned swift::getFieldIndex(NominalTypeDecl *decl, VarDecl *field) {
-  unsigned index = 0;
-  if (auto *classDecl = dyn_cast<ClassDecl>(decl)) {
-    for (auto *superDecl = classDecl->getSuperclassDecl(); superDecl != nullptr;
-         superDecl = superDecl->getSuperclassDecl()) {
-      index += superDecl->getStoredProperties().size();
-    }
-  }
-  for (VarDecl *property : decl->getStoredProperties()) {
-    if (field == property) {
-      return index;
-    }
-    ++index;
-  }
-  llvm_unreachable("The field decl for a struct_extract, struct_element_addr, "
-                   "or ref_element_addr must be an accessible stored "
-                   "property of the operand type");
-}
-
 unsigned swift::getNumFieldsInNominal(NominalTypeDecl *decl) {
   unsigned count = 0;
   if (auto *classDecl = dyn_cast<ClassDecl>(decl)) {
@@ -1407,16 +1387,6 @@ unsigned swift::getNumFieldsInNominal(NominalTypeDecl *decl) {
     }
   }
   return count + decl->getStoredProperties().size();
-}
-
-unsigned swift::getCaseIndex(EnumElementDecl *enumElement) {
-  unsigned idx = 0;
-  for (EnumElementDecl *e : enumElement->getParentEnum()->getAllElements()) {
-    if (e == enumElement)
-      return idx;
-    ++idx;
-  }
-  llvm_unreachable("enum element not found in enum decl");
 }
 
 /// Get the property for a struct or class by its unique index.
