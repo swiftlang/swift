@@ -1889,11 +1889,13 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
           // The only case we reach here is unterminated single line string in the
           // interpolation. For better recovery, go on after emitting an error.
           diagnose(CurPtr, diag::string_interpolation_unclosed);
+          diagnose(--TmpPtr, diagnose::opening_paren);
           diagnose(CurPtr, diag::lex_unterminated_string);
           wasErroneous = true;
           continue;
         } else {
           diagnose(CurPtr, diag::string_interpolation_unclosed);
+          diagnose(--TmpPtr, diagnose::opening_paren);
           return formToken(tok::unknown, TokStart);
         }
       } else {

@@ -475,9 +475,9 @@ func stringliterals(_ d: [String: Int]) {
   let x = 4
   "Hello \(x+1) world"  // expected-warning {{string literal is unused}}
   
-  "Error: \(x+1"; // expected-error {{expected ')' at end of string interpolation}}
+  "Error: \(x+1"; // expected-error {{expected ')' at end of string interpolation}} expected-note {{to match this opening '('}}
   
-  "Error: \(x+1   // expected-error {{expected ')' at end of string interpolation}} 
+  "Error: \(x+1   // expected-error {{expected ')' at end of string interpolation}} expected-note {{to match this opening '('}}
   ;    // expected-error {{';' statements are not allowed}}
 
   // rdar://14050788 [DF] String Interpolations can't contain quotes
@@ -488,15 +488,15 @@ func stringliterals(_ d: [String: Int]) {
   "test \("quoted-paren (")"
   "test \("\\")"
   "test \("\n")"
-  "test \("\")" // expected-error {{expected ')' at end of string interpolation}}
+  "test \("\")" // expected-error {{expected ')' at end of string interpolation}} expected-note {{to match this opening '('}}
 
   "test \
   // expected-error @-1 {{unterminated string literal}} expected-error @-1 {{invalid escape sequence in literal}}
   "test \("\
-  // expected-error @-1 {{expected ')' at end of string interpolation}}
+  // expected-error @-1 {{expected ')' at end of string interpolation}} expected-note @-1 {{to match this opening '('}}
   "test newline \("something" +
     "something else")"
-  // expected-error @-2 {{expected ')' at end of string interpolation}}
+  // expected-error @-2 {{expected ')' at end of string interpolation}} expected-note @-2 {{to match this opening '('}}
   // expected-error @-2 {{unterminated string literal}}
 
   // expected-warning @+2 {{variable 'x2' was never used; consider replacing with '_' or removing it}}
@@ -940,10 +940,10 @@ let _ = 0xFFF_FFFF_FFFF_FFFF as Int64
 
 // rdar://problem/20289969 - string interpolation with comment containing ')' or '"'
 let _ = "foo \(42 /* ) " ) */)"
-let _ = "foo \(foo // )  " // expected-error {{expected ')' at end of string interpolation}}
+let _ = "foo \(foo // )  " // expected-error {{expected ')' at end of string interpolation}} expected-note {{to match this opening '('}}
 let _ = "foo \(42 /*
                    * multiline comment
                    */)end"
-// expected-error @-3 {{expected ')' at end of string interpolation}}
+// expected-error @-3 {{expected ')' at end of string interpolation}} expected-note @-3 {{to match this opening '('}}
 // expected-error @-2 {{expected expression}}
 // expected-error @-3 {{unterminated string literal}}
