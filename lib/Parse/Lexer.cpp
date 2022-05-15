@@ -1892,9 +1892,12 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
         continue;
       } else {
         diagnose(CurPtr, diag::string_interpolation_unclosed);
-        char* tmpDiagnosePtr = CurPtr - CustomDelimiterLen;
-        diagnose(tmpDiagnosePtr, diag::string_interpolation_unclosed_fix_it)
-            .fixItInsert(Lexer::getSourceLoc(tmpDiagnosePtr), ")");
+        char *fixItLoc = CurPtr - 1;
+        if (*fixItLoc == QuoteChar) {
+          fixItLoc -= CustomDelimiterLen;
+        }
+        diagnose(fixItLoc, diag::string_interpolation_unclosed_fix_it)
+            .fixItInsert(Lexer::getSourceLoc(fixItLoc), ")");
         return formToken(tok::unknown, TokStart);
       }
     }
