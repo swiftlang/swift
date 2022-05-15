@@ -4275,8 +4275,8 @@ class Kp2 {
   init()
 }
 
-sil @kpgetter : $@convention(thin) (@in_guaranteed Kp2) -> @out String
-sil @kpsetter : $@convention(thin) (@in_guaranteed String, @in_guaranteed Kp2) -> ()
+sil @kpgetter : $@convention(keypath_accessor_getter) (@in_guaranteed Kp2) -> @out String
+sil @kpsetter : $@convention(keypath_accessor_setter) (@in_guaranteed String, @in_guaranteed Kp2) -> ()
 sil @swift_getAtKeyPath : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @guaranteed KeyPath<τ_0_0, τ_0_1>) -> @out τ_0_1
 
 // Test keypath optimization for optional chaining with accesses scopes.
@@ -4294,7 +4294,7 @@ sil @swift_getAtKeyPath : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ
 // CHECK:     } // end sil function 'test_optional_chaining_keypath'
 sil @test_optional_chaining_keypath : $@convention(thin) (@in_guaranteed Kp1) -> @out Optional<String> {
 bb0(%0 : $*Optional<String>, %1 : $*Kp1):
-  %kp = keypath $KeyPath<Kp1, Optional<String>>, (root $Kp1; stored_property #Kp1.b : $Optional<Kp2>; optional_chain : $Kp2; settable_property $String,  id #Kp2.s!getter : (Kp2) -> () -> String, getter @kpgetter : $@convention(thin) (@in_guaranteed Kp2) -> @out String, setter @kpsetter : $@convention(thin) (@in_guaranteed String, @in_guaranteed Kp2) -> (); optional_wrap : $Optional<String>)
+  %kp = keypath $KeyPath<Kp1, Optional<String>>, (root $Kp1; stored_property #Kp1.b : $Optional<Kp2>; optional_chain : $Kp2; settable_property $String,  id #Kp2.s!getter : (Kp2) -> () -> String, getter @kpgetter : $@convention(keypath_accessor_getter) (@in_guaranteed Kp2) -> @out String, setter @kpsetter : $@convention(keypath_accessor_setter) (@in_guaranteed String, @in_guaranteed Kp2) -> (); optional_wrap : $Optional<String>)
   %f = function_ref @swift_getAtKeyPath : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @guaranteed KeyPath<τ_0_0, τ_0_1>) -> @out τ_0_1
   %a = apply %f<Kp1, Optional<String>>(%0, %1, %kp) : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @guaranteed KeyPath<τ_0_0, τ_0_1>) -> @out τ_0_1
   strong_release %kp : $KeyPath<Kp1, Optional<String>>
