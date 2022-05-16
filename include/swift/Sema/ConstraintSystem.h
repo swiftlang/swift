@@ -1929,6 +1929,39 @@ public:
     return {expr, dc, pattern, patternTy};
   }
 
+  /// This is useful for code completion.
+  ASTNode getAsASTNode() const {
+    switch (kind) {
+    case Kind::expression:
+      return expression.expression;
+
+    case Kind::closure:
+      return closure.closure;
+
+    case Kind::function: {
+      auto ref = *getAsFunction();
+      if (auto *func = ref.getAbstractFunctionDecl())
+        return func;
+      return ref.getAbstractClosureExpr();
+    }
+
+    case Kind::forEachStmt:
+      return getAsForEachStmt();
+
+    case Kind::stmtCondition:
+      return ASTNode();
+
+    case Kind::caseLabelItem:
+      return *getAsCaseLabelItem();
+
+    case Kind::patternBinding:
+      return getAsPatternBinding();
+
+    case Kind::uninitializedVar:
+      return getAsUninitializedVar();
+    }
+  }
+
   Expr *getAsExpr() const {
     switch (kind) {
     case Kind::expression:
