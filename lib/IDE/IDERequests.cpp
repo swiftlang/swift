@@ -125,9 +125,9 @@ bool CursorInfoResolver::tryResolve(ValueDecl *D, TypeDecl *CtorTyRef,
     }
   }
 
-  if (isBeingCalled(ExprStack)) {
-    if (Expr *BaseE = getBase(ExprStack)) {
-      CursorInfo.IsDynamic = isDynamicCall(BaseE, D);
+  if (Expr *BaseE = getBase(ExprStack)) {
+    if (isDynamicRef(BaseE, D)) {
+      CursorInfo.IsDynamic = true;
       ide::getReceiverType(BaseE, CursorInfo.ReceiverTypes);
     }
   }
