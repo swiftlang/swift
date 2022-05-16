@@ -1895,7 +1895,7 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
           continue;
         } else {
           diagnose(CurPtr, diag::string_interpolation_unclosed);
-          diagnose(--TmpPtr, diagnose::opening_paren);
+          diagnose(--TmpPtr, diag::opening_paren);
           return formToken(tok::unknown, TokStart);
         }
       } else {
