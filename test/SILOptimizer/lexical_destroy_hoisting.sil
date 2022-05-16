@@ -237,11 +237,11 @@ exit(%thing : @owned $C):
 
 // Don't hoist over loop without uses.
 //
-// TODO: Eventually, we should hoist over such loops.
 // CHECK-LABEL: sil [ossa] @hoist_over_loop_1 : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
 // CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
 // CHECK:         apply [[CALLEE_GUARANTEED]]([[INSTANCE]])
+// CHECK:         destroy_value [[INSTANCE]]
 // CHECK:         br [[LOOP_HEADER:bb[0-9]+]]
 // CHECK:       [[LOOP_HEADER]]:
 // CHECK:         br [[LOOP_BODY:bb[0-9]+]]
@@ -252,7 +252,6 @@ exit(%thing : @owned $C):
 // CHECK:       [[LOOP_BACKEDGE]]:
 // CHECK:         br [[LOOP_HEADER]]
 // CHECK:       [[EXIT]]:
-// CHECK:         destroy_value [[INSTANCE]]
 // CHECK-LABEL: } // end sil function 'hoist_over_loop_1'
 sil [ossa] @hoist_over_loop_1 : $@convention(thin) (@owned C) -> () {
 entry(%instance: @owned $C):
