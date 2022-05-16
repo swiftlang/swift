@@ -80,6 +80,10 @@ class NodeFactory {
 #endif
 
 public:
+#ifndef NDEBUG
+  /// Enabled only by the unit tests to test the failure paths.
+  bool disableAssertionsForUnitTest = false;
+#endif
 
   NodeFactory() {
 #ifdef NODE_FACTORY_DEBUGGING
