@@ -1165,14 +1165,23 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
     Opts.ExtraArgs.push_back(A->getValue());
   }
 
-  for (auto A : Args.getAllArgValues(OPT_debug_prefix_map)) {
+  for (const Arg *A : Args.filtered(OPT_file_prefix_map,
+                                    OPT_debug_prefix_map)) {
+    std::string Val(A->getValue());
     // Forward -debug-prefix-map arguments from Swift to Clang as
-    // -fdebug-prefix-map. This is required to ensure DIFiles created there,
-    // like "<swift-imported-modules>", have their paths remapped properly.
+    // -fdebug-prefix-map= and -file-prefix-map as -ffile-prefix-map=.
+    //
+    // This is required to ensure DIFiles created there, like
+    /// "<swift-imported-modules>", as well as index data, have their paths
+    // remapped properly.
+    //
     // (Note, however, that Clang's usage of std::map means that the remapping
     // may not be applied in the same order, which can matter if one mapping is
     // a prefix of another.)
-    Opts.ExtraArgs.push_back("-fdebug-prefix-map=" + A);
+    if (A->getOption().matches(OPT_file_prefix_map))
+      Opts.ExtraArgs.push_back("-ffile-prefix-map=" + Val);
+    else
+      Opts.ExtraArgs.push_back("-fdebug-prefix-map=" + Val);
   }
 
   if (!workingDirectory.empty()) {
@@ -1955,6 +1964,13 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                    Opts.DebugInfoLevel == IRGenDebugInfoLevel::LineTables
                      ? "-gline-tables-only"
                      : "-gdwarf_types");
+  }
+
+  for (auto A : Args.getAllArgValues(options::OPT_file_prefix_map)) {
+    auto SplitMap = StringRef(A).split('=');
+    Opts.FilePrefixMap.addMapping(SplitMap.first, SplitMap.second);
+    Opts.DebugPrefixMap.addMapping(SplitMap.first, SplitMap.second);
+    Opts.CoveragePrefixMap.addMapping(SplitMap.first, SplitMap.second);
   }
 
   for (auto A : Args.getAllArgValues(options::OPT_debug_prefix_map)) {
