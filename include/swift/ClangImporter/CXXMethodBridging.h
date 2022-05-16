@@ -18,12 +18,12 @@ struct CXXMethodBridging {
     if (nameIsBlacklist())
       return Kind::unknown;
 
-    // this should be handled as snake case. See: rdar://89453010
+    // This should be handled as snake case. See: rdar://89453010
     // case. In the future we could
     //  import these too, though.
     auto nameKind = classifyNameKind();
     if (nameKind != NameKind::title && nameKind != NameKind::camel &&
-        nameKind != NameKind::lower)
+        nameKind != NameKind::lower && nameKind != NameKind::snake)
       return Kind::unknown;
 
     if (getClangName().startswith_insensitive("set")) {
@@ -62,16 +62,18 @@ struct CXXMethodBridging {
   }
 
   NameKind classifyNameKind() {
-    bool allLower = llvm::all_of(getClangName(), islower);
+    bool hasUpper = llvm::any_of(
+        getClangName(), [](unsigned char ch) { return std::isupper(ch); });
 
-    if (getClangName().empty())
+    if (getClangName().empty()) {
       return NameKind::unknown;
+    }
 
-    if (getClangName().contains('_'))
-      return allLower ? NameKind::snake : NameKind::unknown;
-
-    if (allLower)
+    if (getClangName().contains('_')) {
+      return hasUpper ? NameKind::unknown : NameKind::snake;
+    } else if (!hasUpper) {
       return NameKind::lower;
+    }
 
     return islower(getClangName().front()) ? NameKind::camel : NameKind::title;
   }
@@ -83,7 +85,7 @@ struct CXXMethodBridging {
     return method->getName();
   }
 
-  // this should be handled as snake case. See: rdar://89453010
+  // This should be handled as snake case. See: rdar://89453010
   std::string importNameAsCamelCaseName() {
     std::string output;
     auto kind = classify();
@@ -102,6 +104,24 @@ struct CXXMethodBridging {
 
     // The first character is always lowercase.
     output.front() = std::tolower(output.front());
+
+    if (classifyNameKind() == NameKind::snake) {
+      for (std::size_t i = 0; i < output.size(); i++) {
+        size_t next = i + 1;
+        if (output[i] == '_') {
+          // If the first or last element is an underscore, remove it.
+          if (i == 0 || next == output.size()) {
+            output.erase(i, 1);
+          } else if (next < output.size()) {
+            // If the current element is an underscore, capitalize the element
+            // next to it, and remove the extra element.
+            output[i] = std::toupper(output[next]);
+            output.erase(next, 1);
+          }
+        }
+      }
+      return output;
+    }
 
     // We already lowercased the first element, so start at one. Look at the
     // current element and the next one. To handle cases like UTF8String, start
