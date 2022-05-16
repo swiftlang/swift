@@ -651,23 +651,23 @@ SwiftInt ProjectBoxInst_fieldIndex(BridgedInstruction pbi) {
 }
 
 SwiftInt EnumInst_caseIndex(BridgedInstruction ei) {
-  return getCaseIndex(castToInst<EnumInst>(ei)->getElement());
+  return castToInst<EnumInst>(ei)->getCaseIndex();
 }
 
 SwiftInt UncheckedEnumDataInst_caseIndex(BridgedInstruction uedi) {
-  return getCaseIndex(castToInst<UncheckedEnumDataInst>(uedi)->getElement());
+  return castToInst<UncheckedEnumDataInst>(uedi)->getCaseIndex();
 }
 
 SwiftInt InitEnumDataAddrInst_caseIndex(BridgedInstruction ieda) {
-  return getCaseIndex(castToInst<InitEnumDataAddrInst>(ieda)->getElement());
+  return castToInst<InitEnumDataAddrInst>(ieda)->getCaseIndex();
 }
 
 SwiftInt UncheckedTakeEnumDataAddrInst_caseIndex(BridgedInstruction utedi) {
-  return getCaseIndex(castToInst<UncheckedTakeEnumDataAddrInst>(utedi)->getElement());
+  return castToInst<UncheckedTakeEnumDataAddrInst>(utedi)->getCaseIndex();
 }
 
 SwiftInt InjectEnumAddrInst_caseIndex(BridgedInstruction ieai) {
-  return getCaseIndex(castToInst<InjectEnumAddrInst>(ieai)->getElement());
+  return castToInst<InjectEnumAddrInst>(ieai)->getCaseIndex();
 }
 
 SwiftInt RefElementAddrInst_fieldIndex(BridgedInstruction reai) {
@@ -716,7 +716,8 @@ SwiftInt SwitchEnumInst_getNumCases(BridgedInstruction se) {
 }
 
 SwiftInt SwitchEnumInst_getCaseIndex(BridgedInstruction se, SwiftInt idx) {
-  return getCaseIndex(castToInst<SwitchEnumInst>(se)->getCase(idx).first);
+	auto *seInst = castToInst<SwitchEnumInst>(se);
+  return seInst->getModule().getCaseIndex(seInst->getCase(idx).first);
 }
 
 SwiftInt StoreInst_getStoreOwnership(BridgedInstruction store) {

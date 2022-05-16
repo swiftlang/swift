@@ -1387,6 +1387,15 @@ bool SILInstruction::isMetaInstruction() const {
   llvm_unreachable("Instruction not handled in isMetaInstruction()!");
 }
 
+unsigned SILInstruction::getCachedFieldIndex(NominalTypeDecl *decl,
+                                             VarDecl *property) {
+  return getModule().getFieldIndex(decl, property);
+}
+
+unsigned SILInstruction::getCachedCaseIndex(EnumElementDecl *enumElement) {
+  return getModule().getCaseIndex(enumElement);
+}
+
 //===----------------------------------------------------------------------===//
 //                                 Utilities
 //===----------------------------------------------------------------------===//
