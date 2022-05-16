@@ -19,16 +19,16 @@ DependentTypesTestSuite.test("Different dependent arg and return type.") {
 }
 
 DependentTypesTestSuite.test("Different dependent inferred by arg.") {
-  let m = dependantReturnTypeInffered(42) as! M<Int>
+  let m = dependantReturnTypeInferred(42) as! M<Int>
   expectEqual(m.getValue(), 42)
 }
 
 DependentTypesTestSuite.test("Instantiate the same function twice") {
   // Intentionally test the same thing twice.
-  let m = dependantReturnTypeInffered(42) as! M<Int>
+  let m = dependantReturnTypeInferred(42) as! M<Int>
   expectEqual(m.getValue(), 42)
 
-  let m2 = dependantReturnTypeInffered(42) as! M<Int>
+  let m2 = dependantReturnTypeInferred(42) as! M<Int>
   expectEqual(m2.getValue(), 42)
 }
 
@@ -58,7 +58,6 @@ DependentTypesTestSuite.test("Takes const ref and returns dependent type.") {
   expectEqual(m.getValue(), 42)
 }
 
-
 // We still have some problems calling methods on Windows: SR-13129 and rdar://88391102
 #if !os(Windows)
 DependentTypesTestSuite.test("Function template methods") {
@@ -83,6 +82,40 @@ DependentTypesTestSuite.test("Function template methods (static)") {
   let m2 = M<Int>.memberDependentReturnTypeStatic(CInt(32)) as! M<CInt>
   expectEqual(m2.getValue(), 32)
 }
+
+DependentTypesTestSuite.test("Complex different dependent return type inferrd.") {
+  let m = complexDependantReturnTypeInferred(M<Int>(value: 42)) as! M<Int>
+  expectEqual(m.getValue(), 42)
+}
+
+// TODO: Currently still failing: Could not cast value of type '__C.__CxxTemplateInst1MIlE' to 'Swift.Int'
+DependentTypesTestSuite.test("Complex different dependent argument and return type") {
+  let m = complexDifferentDependentArgAndRet(42, T: Int.self, U: Int.self) as! Int
+  expectEqual(m, 42)
+
+  let m2 = complexDependantReturnTypeSameAsArg(42, T: Int.self) as! Int
+  expectEqual(m2, 42)
+}
+
 #endif // Windows
+
+//TODO: Import issue: rdar://89028943
+// DependentTypesTestSuite.test("Dependent to Reference") {
+//   var x = 42
+//   let m = dependentToRef(x) as! M<Int>
+//   expectEqual(m.getValue(), 42)
+// }
+
+//TODO: Not imported: rdar://89034440
+// DependentTypesTestSuite.test("Dependent Reference.") {
+//   let m = dependentRef()
+//   expectEqual(m.getValue(), 42)
+// }
+
+//TODO: Not imported: rdar://89034440
+// DependentTypesTestSuite.test("Dependent reference and reference inferred") {
+  // let m = dependentRefAndRefInferred(M<Int>(value: 40), 2) as! M<Int>
+  // expectEqual(m.getValue(), 42)
+// }
 
 runAllTests()
