@@ -30,15 +30,15 @@ extension AsyncSequence {
   /// returns `nil` in this case, which `compactMap(_:)` omits from the
   /// transformed asynchronous sequence.
   ///
-  ///     let romanNumeralDict: [Int : String] =
+  ///     let romanNumeralDict: [Int: String] =
   ///         [1: "I", 2: "II", 3: "III", 5: "V"]
   ///         
   ///     let stream = Counter(howHigh: 5)
   ///         .compactMap { romanNumeralDict[$0] }
   ///     for await numeral in stream {
-  ///         print("\(numeral) ", terminator: " ")
+  ///         print(numeral, terminator: " ")
   ///     }
-  ///     // Prints: I  II  III  V
+  ///     // Prints "I II III V"
   ///
   /// - Parameter transform: A mapping closure. `transform` accepts an element
   ///   of this sequence as its parameter and returns a transformed value of the
