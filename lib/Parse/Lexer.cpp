@@ -1890,7 +1890,7 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
           // interpolation. For better recovery, go on after emitting an error.
           diagnose(CurPtr, diag::string_interpolation_unclosed);
           diagnose(--TmpPtr, diag::opening_paren);
-          diagnose(CurPtr, diag::lex_unterminated_string);
+          if (CurPtr == BufferEnd) diagnose(CurPtr, diag::lex_unterminated_string);
           wasErroneous = true;
           continue;
         } else {
