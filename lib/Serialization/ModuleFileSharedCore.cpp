@@ -309,6 +309,15 @@ static ValidationInfo validateControlBlock(
     case control_block::SDK_NAME: {
       result.sdkName = blobData;
 
+      // Enable this check for tagged compiler or when the
+      // env var is set (for testing).
+      static const char* forceDebugPreSDKRestriction =
+        ::getenv("SWIFT_DEBUG_FORCE_SWIFTMODULE_PER_SDK");
+      if (version::Version::getCurrentCompilerVersion().empty() &&
+          !forceDebugPreSDKRestriction) {
+        break;
+      }
+
       // The loaded module was built with a compatible SDK if either:
       // * it was the same SDK
       // * or one who's name is a prefix of the clients' SDK name. This expects
