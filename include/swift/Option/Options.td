@@ -845,6 +845,9 @@ def debug_prefix_map : Separate<["-"], "debug-prefix-map">,
 def coverage_prefix_map : Separate<["-"], "coverage-prefix-map">,
   Flags<[FrontendOption]>,
   HelpText<"Remap source paths in coverage info">, MetaVarName<"<prefix=replacement>">;
+def file_prefix_map : Separate<["-"], "file-prefix-map">,
+  Flags<[FrontendOption]>,
+  HelpText<"Remap source paths in debug, coverage, and index info">, MetaVarName<"<prefix=replacement>">;
 
 def file_compilation_dir : Separate<["-"], "file-compilation-dir">,
   Flags<[FrontendOption]>, MetaVarName<"<path>">,
