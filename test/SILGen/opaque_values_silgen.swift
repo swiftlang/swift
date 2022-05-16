@@ -461,3 +461,20 @@ class TestGeneric<T> {
 // CHECK:   unwind
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen11TestGenericC08borrowedE0xvr'
 
+// CHECK-LABEL: sil hidden [ossa] @$s20opaque_values_silgen8TestEnumO5_codeSivg :
+// CHECK: bb0(%0 : @guaranteed $TestEnum<T>):
+// CHECK:   [[COPY:%.*]] = copy_value %0 : $TestEnum<T>
+// CHECK:   switch_enum [[COPY]] : $TestEnum<T>, case #TestEnum.invalidValue!enumelt: bb1
+// CHECK: bb1([[VAL:%.*]] : @owned $Any):
+// CHECK:   destroy_value [[VAL]] : $Any
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen8TestEnumO5_codeSivg'
+enum TestEnum<T> {
+  case invalidValue(Any)
+
+  var _code: Int {
+     switch self {
+     case .invalidValue: return 4866
+     }
+  }
+}
+

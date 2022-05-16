@@ -3962,15 +3962,20 @@ SILGenFunction::emitBeginApply(SILLocation loc, ManagedValue fn,
   // Manage all the yielded values.
   auto yieldInfos = substFnType->getYields();
   assert(yieldValues.size() == yieldInfos.size());
+  bool useLoweredAddresses = silConv.useLoweredAddresses();
   for (auto i : indices(yieldValues)) {
     auto value = yieldValues[i];
     auto info = yieldInfos[i];
     if (info.isIndirectInOut()) {
       yields.push_back(ManagedValue::forLValue(value));
     } else if (info.isConsumed()) {
-      yields.push_back(emitManagedRValueWithCleanup(value));
+      !useLoweredAddresses && value->getType().isTrivial(getFunction())
+          ? yields.push_back(ManagedValue::forTrivialRValue(value))
+          : yields.push_back(emitManagedRValueWithCleanup(value));
     } else if (info.isGuaranteed()) {
-      yields.push_back(ManagedValue::forBorrowedRValue(value));
+      !useLoweredAddresses && value->getType().isTrivial(getFunction())
+          ? yields.push_back(ManagedValue::forTrivialRValue(value))
+          : yields.push_back(ManagedValue::forBorrowedRValue(value));
     } else {
       yields.push_back(ManagedValue::forTrivialRValue(value));
     }
