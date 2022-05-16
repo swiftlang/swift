@@ -5,13 +5,13 @@
 protocol SwiftProto {
 // CHECK: [[@LINE-1]]:10 | protocol/Swift | SwiftProto | [[Proto_USR:.*]] | Def | rel: 0
   static func staticMethod()
-  // CHECK: [[@LINE-1]]:15 | static-method/Swift | staticMethod() | [[ProtoStaticMethod_USR:.*]] | Def,RelChild | rel: 1
+  // CHECK: [[@LINE-1]]:15 | static-method/Swift | staticMethod() | [[ProtoStaticMethod_USR:.*]] | Def,Dyn,RelChild | rel: 1
 }
 
 protocol SwiftProtoSame {
 // CHECK: [[@LINE-1]]:10 | protocol/Swift | SwiftProtoSame | [[ProtoSame_USR:.*]] | Def | rel: 0
   static func staticMethod()
-  // CHECK: [[@LINE-1]]:15 | static-method/Swift | staticMethod() | [[ProtoSameStaticMethod_USR:.*]] | Def,RelChild | rel: 1
+  // CHECK: [[@LINE-1]]:15 | static-method/Swift | staticMethod() | [[ProtoSameStaticMethod_USR:.*]] | Def,Dyn,RelChild | rel: 1
 }
 
 protocol SwiftProtoOther {}
@@ -40,25 +40,20 @@ enum SwiftEnum: SwiftProtoComposed {
 
 func directCalls() {
   SwiftClass.staticMethod()
-  // CHECK: [[@LINE-1]]:14 | static-method/Swift | staticMethod() | [[ClassStaticMethod_USR]] | Ref,Call,RelRec,RelCall,RelCont | rel: 2
-  // CHECK-DAG: RelRec | class/Swift | SwiftClass | [[Class_USR]]
+  // CHECK: [[@LINE-1]]:14 | static-method/Swift | staticMethod() | [[ClassStaticMethod_USR]] | Ref,Call,RelCall,RelCont | rel: 1
   SwiftClass.classMethod()
-  // CHECK: [[@LINE-1]]:14 | class-method/Swift | classMethod() | [[ClassClassMethod_USR]] | Ref,Call,RelRec,RelCall,RelCont | rel: 2
-  // CHECK-DAG: RelRec | class/Swift | SwiftClass | [[Class_USR]]
+  // CHECK: [[@LINE-1]]:14 | class-method/Swift | classMethod() | [[ClassClassMethod_USR]] | Ref,Call,RelCall,RelCont | rel: 1
 
   SwiftStruct.staticMethod()
-  // CHECK: [[@LINE-1]]:15 | static-method/Swift | staticMethod() | [[StructStaticMethod_USR]] | Ref,Call,RelRec,RelCall,RelCont | rel: 2
-  // CHECK-DAG: RelRec | struct/Swift | SwiftStruct | [[Struct_USR]]
+  // CHECK: [[@LINE-1]]:15 | static-method/Swift | staticMethod() | [[StructStaticMethod_USR]] | Ref,Call,RelCall,RelCont | rel: 1
 
   SwiftEnum.staticMethod()
-  // CHECK: [[@LINE-1]]:13 | static-method/Swift | staticMethod() | [[EnumStaticMethod_USR]] | Ref,Call,RelRec,RelCall,RelCont | rel: 2
-  // CHECK-DAG: RelRec | enum/Swift | SwiftEnum | [[Enum_USR]]
+  // CHECK: [[@LINE-1]]:13 | static-method/Swift | staticMethod() | [[EnumStaticMethod_USR]] | Ref,Call,RelCall,RelCont | rel: 1
 }
 
 func typeofClass(c: SwiftClass) {
   type(of: c).staticMethod()
-  // CHECK: [[@LINE-1]]:15 | static-method/Swift | staticMethod() | [[ClassStaticMethod_USR]] | Ref,Call,RelRec,RelCall,RelCont | rel: 2
-  // CHECK: RelRec | class/Swift | SwiftClass | [[Class_USR]]
+  // CHECK: [[@LINE-1]]:15 | static-method/Swift | staticMethod() | [[ClassStaticMethod_USR]] | Ref,Call,RelCall,RelCont | rel: 1
   type(of: c).classMethod()
   // CHECK: [[@LINE-1]]:15 | class-method/Swift | classMethod() | [[ClassClassMethod_USR]] | Ref,Call,Dyn,RelRec,RelCall,RelCont | rel: 2
   // CHECK: RelRec | class/Swift | SwiftClass | [[Class_USR]]
@@ -66,14 +61,12 @@ func typeofClass(c: SwiftClass) {
 
 func typeofStruct(s: SwiftStruct) {
   type(of: s).staticMethod()
-  // CHECK: [[@LINE-1]]:15 | static-method/Swift | staticMethod() | [[StructStaticMethod_USR]] | Ref,Call,RelRec,RelCall,RelCont | rel: 2
-  // CHECK: RelRec | struct/Swift | SwiftStruct | [[Struct_USR]]
+  // CHECK: [[@LINE-1]]:15 | static-method/Swift | staticMethod() | [[StructStaticMethod_USR]] | Ref,Call,RelCall,RelCont | rel: 1
 }
 
 func typeofEnum(e: SwiftEnum) {
   type(of: e).staticMethod()
-  // CHECK: [[@LINE-1]]:15 | static-method/Swift | staticMethod() | [[EnumStaticMethod_USR]] | Ref,Call,RelRec,RelCall,RelCont | rel: 2
-  // CHECK: RelRec | enum/Swift | SwiftEnum | [[Enum_USR]]
+  // CHECK: [[@LINE-1]]:15 | static-method/Swift | staticMethod() | [[EnumStaticMethod_USR]] | Ref,Call,RelCall,RelCont | rel: 1
 }
 
 func typeofProtocol(proto: SwiftProto) {

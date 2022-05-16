@@ -1255,12 +1255,44 @@ Expr *swift::ide::getBase(ArrayRef<Expr *> ExprStack) {
   return Base;
 }
 
-bool swift::ide::isDynamicCall(Expr *Base, ValueDecl *D) {
-  auto TyD = D->getDeclContext()->getSelfNominalTypeDecl();
-  if (!TyD)
+bool swift::ide::isDeclOverridable(ValueDecl *D) {
+  auto *NTD = D->getDeclContext()->getSelfNominalTypeDecl();
+  if (!NTD)
     return false;
 
-  if (isa<StructDecl>(TyD) || isa<EnumDecl>(TyD) || D->isFinal())
+  // Only classes and protocols support overridding by subtypes.
+  if (!(isa<ClassDecl>(NTD) || isa<ProtocolDecl>(NTD)))
+    return false;
+
+  // Decls where either they themselves are final or their containing type is
+  // final cannot be overridden. Actors cannot be subclassed and thus the given
+  // decl also can't be overridden.
+  if (D->isFinal() || NTD->isFinal() || NTD->isActor())
+    return false;
+
+  // No need to check accessors here - willSet/didSet are not "overridable",
+  // but that's already covered by the `isFinal` check above (they are both
+  // final).
+
+  // Static functions on classes cannot be overridden. Static functions on
+  // structs and enums are already covered by the more general check above.
+  if (isa<ClassDecl>(NTD)) {
+    if (auto *FD = dyn_cast<FuncDecl>(D)) {
+      if (FD->isStatic() &&
+          FD->getCorrectStaticSpelling() == StaticSpellingKind::KeywordStatic)
+        return false;
+    } else if (auto *ASD = dyn_cast<AbstractStorageDecl>(D)) {
+      if (ASD->isStatic() &&
+          ASD->getCorrectStaticSpelling() == StaticSpellingKind::KeywordStatic)
+        return false;
+    }
+  }
+
+  return true;
+}
+
+bool swift::ide::isDynamicRef(Expr *Base, ValueDecl *D) {
+  if (!isDeclOverridable(D))
     return false;
 
   // super.method()
@@ -1271,19 +1303,17 @@ bool swift::ide::isDynamicCall(Expr *Base, ValueDecl *D) {
   if (Base->isSuperExpr())
     return false;
 
-  // `SomeType.staticOrClassMethod()`
+  // `SomeType.staticOrClassMethod()` spelled directly, so this must be a ref
+  // to this exact decl.
   if (isa<TypeExpr>(Base))
     return false;
 
-  // `type(of: foo).staticOrClassMethod()`, not "dynamic" if the instance type
-  // is a struct/enum or if it is a class and the function is a static method
-  // (rather than a class method).
+  // `type(of: foo).staticOrClassMethod()`. A static method may be "dynamic"
+  // here, but not if the instance type is a struct/enum.
   if (auto IT = Base->getType()->getAs<MetatypeType>()) {
     auto InstanceType = IT->getInstanceType();
     if (InstanceType->getStructOrBoundGenericStruct() ||
         InstanceType->getEnumOrBoundGenericEnum())
-      return false;
-    if (InstanceType->getClassOrBoundGenericClass() && D->isFinal())
       return false;
   }
 
