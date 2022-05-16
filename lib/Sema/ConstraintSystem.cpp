@@ -6123,17 +6123,11 @@ SolutionApplicationTarget SolutionApplicationTarget::forInitialization(
     return result;
 }
 
-SolutionApplicationTarget SolutionApplicationTarget::forForEachStmt(
-    ForEachStmt *stmt, ProtocolDecl *sequenceProto, DeclContext *dc,
-    bool bindPatternVarsOneWay, ContextualTypePurpose purpose) {
+SolutionApplicationTarget
+SolutionApplicationTarget::forForEachStmt(ForEachStmt *stmt, DeclContext *dc,
+                                          bool bindPatternVarsOneWay) {
   SolutionApplicationTarget target(
-      stmt->getSequence(), dc, purpose,
-      sequenceProto->getDeclaredInterfaceType(), /*isDiscarded=*/false);
-  target.expression.pattern = stmt->getPattern();
-  target.expression.bindPatternVarsOneWay =
-    bindPatternVarsOneWay || (stmt->getWhere() != nullptr);
-  target.expression.forEachStmt.stmt = stmt;
-  target.expression.forEachStmt.whereExpr = stmt->getWhere();
+      stmt, dc, bindPatternVarsOneWay || bool(stmt->getWhere()));
   return target;
 }
 
@@ -6162,10 +6156,13 @@ SolutionApplicationTarget::getContextualPattern() const {
                                                     uninitializedVar.index);
   }
 
+  if (isForEachStmt()) {
+    return ContextualPattern::forRawPattern(forEachStmt.pattern,
+                                            forEachStmt.dc);
+  }
+
   assert(kind == Kind::expression);
-  assert(expression.contextualPurpose == CTP_Initialization ||
-         expression.contextualPurpose == CTP_ForEachStmt ||
-         expression.contextualPurpose == CTP_ForEachSequence);
+  assert(expression.contextualPurpose == CTP_Initialization);
   if (expression.contextualPurpose == CTP_Initialization &&
       expression.initialization.patternBinding) {
     return ContextualPattern::forPatternBindingDecl(
@@ -6282,6 +6279,8 @@ void ConstraintSystem::diagnoseFailureFor(SolutionApplicationTarget target) {
                         nominal->getName());
     }
   } else if (auto *var = target.getAsUninitializedVar()) {
+    DE.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
+  } else if (target.isForEachStmt()) {
     DE.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
   } else {
     // Emit a poor fallback message.

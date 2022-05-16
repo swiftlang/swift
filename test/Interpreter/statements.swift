@@ -51,3 +51,13 @@ print(guardvalue)
 print("done");
 // CHECK-LABEL: done
 
+func testAnyCollection(_ c: any Collection) {
+  for v in c {
+    print(v)
+  }
+}
+
+testAnyCollection([1, 2.0, "Hello"])
+// CHECK-NEXT: 1
+// CHECK-NEXT: 2.0
+// CHECK-NEXT: Hello
