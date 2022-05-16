@@ -68,7 +68,7 @@ func test() {
 // FILE1-PCM: Unit | user | ClangModuleB | {{.*}}ClangModuleB-{{[A-Z0-9]*}}.pcm | ClangModuleB-{{[A-Z0-9]*}}.pcm-
 // FILE1-PCM: Unit | user | ClangModuleC | {{.*}}ClangModuleC-{{[A-Z0-9]*}}.pcm | ClangModuleC-{{[A-Z0-9]*}}.pcm-
 // FILE1-IGNORE: Unit | user | ClangModuleB | {{.*}}ClangModuleB-{{[A-Z0-9]*}}.pcm
-// FILE1-IGNORE: Unit | user | Sub1 | {{.*}}ClangModuleC-{{[A-Z0-9]*}}.pcm
+// FILE1-IGNORE: Unit | user | ClangModuleC | {{.*}}ClangModuleC-{{[A-Z0-9]*}}.pcm
 // FILE1-NOT: Unit |{{.*}}ClangModuleA
 // FILE1: Record | user | {{.*}}unit-pcm-dependency.swift | unit-pcm-dependency.swift-
 // FILE1-NOT: Unit |{{.*}}ClangModuleA

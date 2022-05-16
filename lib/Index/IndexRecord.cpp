@@ -426,15 +426,15 @@ static void addModuleDependencies(ArrayRef<ImportedModule> imports,
           bool withoutUnitName = true;
           if (FU->getKind() == FileUnitKind::ClangModule) {
             auto clangModUnit = cast<ClangModuleUnit>(LFU);
-            if ((!clangModUnit->isSystemModule() || indexSystemModules)
-                && indexClangModules) {
-              withoutUnitName = false;
+            if ((!clangModUnit->isSystemModule() || indexSystemModules)) {
+              withoutUnitName = !indexClangModules;
               if (auto clangMod = clangModUnit->getUnderlyingClangModule()) {
                 moduleName = clangMod->getTopLevelModuleName();
                 // FIXME: clang's -Rremarks do not seem to go through Swift's
                 // diagnostic emitter.
-                clang::index::emitIndexDataForModuleFile(clangMod,
-                                                         clangCI, unitWriter);
+                if (indexClangModules)
+                  clang::index::emitIndexDataForModuleFile(clangMod,
+                                                           clangCI, unitWriter);
               }
             }
           } else {
