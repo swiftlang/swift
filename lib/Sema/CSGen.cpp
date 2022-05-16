@@ -3882,14 +3882,11 @@ static bool generateInitPatternConstraints(
 /// Generate constraints for a for-each statement.
 static Optional<SolutionApplicationTarget>
 generateForEachStmtConstraints(
-    ConstraintSystem &cs, SolutionApplicationTarget target, Expr *sequence) {
+    ConstraintSystem &cs, SolutionApplicationTarget target) {
+  auto *stmt = target.getAsForEachStmt();
+  auto *dc = target.getDeclContext();
   auto forEachStmtInfo = target.getForEachStmtInfo();
-  ForEachStmt *stmt = forEachStmtInfo.stmt;
   bool isAsync = stmt->getAwaitLoc().isValid();
-
-  auto locator = cs.getConstraintLocator(sequence);
-  auto contextualLocator = cs.getConstraintLocator(
-      sequence, LocatorPathElt::ContextualType(CTP_ForEachStmt));
 
   // The expression type must conform to the Sequence protocol.
   auto sequenceProto = TypeChecker::getProtocol(
@@ -3900,6 +3897,29 @@ generateForEachStmtConstraints(
     return None;
   }
 
+  // First, let's generate constraints for sequence expression and store
+  // it in the for-in info.
+  SolutionApplicationTarget sequenceTarget(stmt->getSequence(), dc, CTP_Unused,
+                                           /*contextualType=*/Type(),
+                                           /*isDiscarded=*/false);
+  {
+    if (cs.generateConstraints(sequenceTarget,
+                               FreeTypeVariableBinding::Disallow))
+      return None;
+
+    cs.setSolutionApplicationTarget(stmt->getSequence(), sequenceTarget);
+    cs.setContextualType(
+        sequenceTarget.getAsExpr(),
+        TypeLoc::withoutLoc(sequenceProto->getDeclaredInterfaceType()),
+        CTP_ForEachSequence);
+  }
+
+  auto *sequence = sequenceTarget.getAsExpr();
+
+  auto locator = cs.getConstraintLocator(sequence);
+  auto contextualLocator = cs.getConstraintLocator(
+      sequence, LocatorPathElt::ContextualType(CTP_ForEachStmt));
+
   Type sequenceType = cs.createTypeVariable(locator, TVO_CanBindToNoEscape);
   cs.addConstraint(ConstraintKind::Conversion, cs.getType(sequence),
                    sequenceType, locator);
@@ -3909,7 +3929,6 @@ generateForEachStmtConstraints(
 
   // Check the element pattern.
   ASTContext &ctx = cs.getASTContext();
-  auto dc = target.getDeclContext();
   Pattern *pattern = TypeChecker::resolvePattern(stmt->getPattern(), dc,
                                                  /*isStmtCondition*/false);
   if (!pattern)
@@ -3965,7 +3984,7 @@ generateForEachStmtConstraints(
       contextualLocator);
 
   // Generate constraints for the "where" expression, if there is one.
-  if (forEachStmtInfo.whereExpr) {
+  if (auto *whereExpr = stmt->getWhere()) {
     auto *boolDecl = dc->getASTContext().getBoolDecl();
     if (!boolDecl)
       return None;
@@ -3974,16 +3993,16 @@ generateForEachStmtConstraints(
     if (!boolType)
       return None;
 
-    SolutionApplicationTarget whereTarget(
-        forEachStmtInfo.whereExpr, dc, CTP_Condition, boolType,
-        /*isDiscarded=*/false);
+    SolutionApplicationTarget whereTarget(whereExpr, dc, CTP_Condition,
+                                          boolType,
+                                          /*isDiscarded=*/false);
+
     if (cs.generateConstraints(whereTarget, FreeTypeVariableBinding::Disallow))
       return None;
 
-    cs.setContextualType(forEachStmtInfo.whereExpr,
-                         TypeLoc::withoutLoc(boolType), CTP_Condition);
-
-    forEachStmtInfo.whereExpr = whereTarget.getAsExpr();
+    cs.setSolutionApplicationTarget(whereExpr, whereTarget);
+    cs.setContextualType(whereExpr, TypeLoc::withoutLoc(boolType),
+                         CTP_Condition);
   }
 
   // Populate all of the information for a for-each loop.
@@ -4073,16 +4092,6 @@ bool ConstraintSystem::generateConstraints(
     if (target.getExprContextualTypePurpose() == CTP_Initialization &&
         generateInitPatternConstraints(*this, target, expr)) {
       return true;
-    }
-
-    // For a for-each statement, generate constraints for the pattern, where
-    // clause, and sequence traversal.
-    if (target.getExprContextualTypePurpose() == CTP_ForEachStmt) {
-      auto resultTarget = generateForEachStmtConstraints(*this, target, expr);
-      if (!resultTarget)
-        return true;
-
-      target = *resultTarget;
     }
 
     if (isDebugMode()) {
@@ -4179,6 +4188,17 @@ bool ConstraintSystem::generateConstraints(
 
       return !patternType;
     }
+  }
+
+  case SolutionApplicationTarget::Kind::forEachStmt: {
+    // For a for-each statement, generate constraints for the pattern, where
+    // clause, and sequence traversal.
+    auto resultTarget = generateForEachStmtConstraints(*this, target);
+    if (!resultTarget)
+      return true;
+
+    target = *resultTarget;
+    return false;
   }
   }
 }

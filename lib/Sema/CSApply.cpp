@@ -8549,9 +8549,13 @@ static Optional<SolutionApplicationTarget> applySolutionToInitialization(
 ///
 /// \returns the resulting initialization expression.
 static Optional<SolutionApplicationTarget> applySolutionToForEachStmt(
-    Solution &solution, SolutionApplicationTarget target, Expr *sequence) {
+    Solution &solution, SolutionApplicationTarget target,
+    llvm::function_ref<
+        Optional<SolutionApplicationTarget>(SolutionApplicationTarget)>
+        rewriteTarget) {
   auto resultTarget = target;
   auto &forEachStmtInfo = resultTarget.getForEachStmtInfo();
+  auto *stmt = target.getAsForEachStmt();
 
   // Simplify the various types.
   forEachStmtInfo.elementType =
@@ -8563,23 +8567,24 @@ static Optional<SolutionApplicationTarget> applySolutionToForEachStmt(
   forEachStmtInfo.sequenceType =
       solution.simplifyType(forEachStmtInfo.sequenceType);
 
-  // Coerce the sequence to the sequence type.
   auto &cs = solution.getConstraintSystem();
-  auto locator = cs.getConstraintLocator(target.getAsExpr());
-  sequence = solution.coerceToType(
-     sequence, forEachStmtInfo.sequenceType, locator);
-  if (!sequence)
-    return None;
-
-  resultTarget.setExpr(sequence);
-
   auto *dc = target.getDeclContext();
 
+  // First, let's apply the solution to the sequence expression.
+  {
+    auto sequenceTarget = *cs.getSolutionApplicationTarget(stmt->getSequence());
+
+    auto rewrittenTarget = rewriteTarget(sequenceTarget);
+    if (!rewrittenTarget)
+      return None;
+
+    stmt->setSequence(rewrittenTarget->getAsExpr());
+  }
+
   // Get the conformance of the sequence type to the Sequence protocol.
-  auto stmt = forEachStmtInfo.stmt;
   auto sequenceProto = TypeChecker::getProtocol(
-      cs.getASTContext(), stmt->getForLoc(), 
-      stmt->getAwaitLoc().isValid() ? 
+      cs.getASTContext(), stmt->getForLoc(),
+      stmt->getAwaitLoc().isValid() ?
         KnownProtocolKind::AsyncSequence : KnownProtocolKind::Sequence);
   auto sequenceConformance = TypeChecker::conformsToProtocol(
       forEachStmtInfo.sequenceType, sequenceProto, dc->getParentModule());
@@ -8600,20 +8605,14 @@ static Optional<SolutionApplicationTarget> applySolutionToForEachStmt(
   }
 
   // Apply the solution to the filtering condition, if there is one.
-  if (forEachStmtInfo.whereExpr) {
-    auto *boolDecl = dc->getASTContext().getBoolDecl();
-    assert(boolDecl);
-    Type boolType = boolDecl->getDeclaredInterfaceType();
-    assert(boolType);
+  if (auto *whereExpr = stmt->getWhere()) {
+    auto whereTarget = *cs.getSolutionApplicationTarget(whereExpr);
 
-    SolutionApplicationTarget whereTarget(
-        forEachStmtInfo.whereExpr, dc, CTP_Condition, boolType,
-        /*isDiscarded=*/false);
-    auto newWhereTarget = cs.applySolution(solution, whereTarget);
-    if (!newWhereTarget)
+    auto rewrittenTarget = rewriteTarget(whereTarget);
+    if (!rewrittenTarget)
       return None;
 
-    forEachStmtInfo.whereExpr = newWhereTarget->getAsExpr();
+    stmt->setWhere(rewrittenTarget->getAsExpr());
   }
 
   // Invoke iterator() to get an iterator from the sequence.
@@ -8668,10 +8667,8 @@ static Optional<SolutionApplicationTarget> applySolutionToForEachStmt(
   }
 
   // Write the result back into the AST.
-  stmt->setSequence(resultTarget.getAsExpr());
   stmt->setPattern(resultTarget.getContextualPattern().getPattern());
   stmt->setSequenceConformance(sequenceConformance);
-  stmt->setWhere(forEachStmtInfo.whereExpr);
   stmt->setIteratorVar(iterator);
   stmt->setIteratorVarRef(varRef);
 
@@ -8712,21 +8709,12 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
       break;
     }
 
-    case CTP_ForEachStmt:
-    case CTP_ForEachSequence: {
-      auto forEachResultTarget = applySolutionToForEachStmt(
-          solution, target, rewrittenExpr);
-      if (!forEachResultTarget)
-        return None;
-
-      result = *forEachResultTarget;
-      break;
-    }
-
     case CTP_Unused:
     case CTP_CaseStmt:
     case CTP_ReturnStmt:
     case CTP_ExprPattern:
+    case CTP_ForEachStmt:
+    case CTP_ForEachSequence:
     case swift::CTP_ReturnSingleExpr:
     case swift::CTP_YieldByValue:
     case swift::CTP_YieldByReference:
@@ -8905,6 +8893,21 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
     }
 
     return None;
+  } else if (auto *forEach = target.getAsForEachStmt()) {
+    auto forEachResultTarget = applySolutionToForEachStmt(
+        solution, target, [&](SolutionApplicationTarget target) {
+          auto resultTarget = rewriteTarget(target);
+          if (resultTarget) {
+            if (auto expr = resultTarget->getAsExpr())
+              solution.setExprTypes(expr);
+          }
+
+          return resultTarget;
+        });
+    if (!forEachResultTarget)
+      return None;
+
+    result = *forEachResultTarget;
   } else {
     auto fn = *target.getAsFunction();
     if (rewriteFunction(fn))
@@ -9183,6 +9186,9 @@ SolutionApplicationTarget SolutionApplicationTarget::walk(ASTWalker &walker) {
     return *this;
 
   case Kind::uninitializedVar:
+    return *this;
+
+  case Kind::forEachStmt:
     return *this;
   }
 

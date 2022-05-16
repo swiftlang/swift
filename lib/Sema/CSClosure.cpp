@@ -482,9 +482,8 @@ private:
     // solution application target with all relevant information.
     {
       auto target = SolutionApplicationTarget::forForEachStmt(
-          forEachStmt, sequenceProto, context.getAsDeclContext(),
-          /*bindTypeVarsOneWay=*/false,
-          /*contextualPurpose=*/CTP_ForEachSequence);
+          forEachStmt, context.getAsDeclContext(),
+          /*bindTypeVarsOneWay=*/false);
 
       auto &targetInfo = target.getForEachStmtInfo();
 
