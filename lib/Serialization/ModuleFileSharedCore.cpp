@@ -313,7 +313,7 @@ static ValidationInfo validateControlBlock(
       // env var is set (for testing).
       static const char* forceDebugPreSDKRestriction =
         ::getenv("SWIFT_DEBUG_FORCE_SWIFTMODULE_PER_SDK");
-      if (version::Version::getCurrentCompilerVersion().empty() &&
+      if (!version::isCurrentCompilerTagged() &&
           !forceDebugPreSDKRestriction) {
         break;
       }
@@ -354,7 +354,7 @@ static ValidationInfo validateControlBlock(
         ::getenv("SWIFT_DEBUG_FORCE_SWIFTMODULE_REVISION");
 
       bool isCompilerTagged = forcedDebugRevision ||
-        !version::Version::getCurrentCompilerVersion().empty();
+        version::isCurrentCompilerTagged();
 
       StringRef moduleRevision = blobData;
       if (isCompilerTagged) {
