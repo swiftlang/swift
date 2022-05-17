@@ -21,6 +21,7 @@
 #include "Explosion.h"
 #include "GenClass.h"
 #include "GenDecl.h"
+#include "GenEnum.h"
 #include "GenMeta.h"
 #include "GenPointerAuth.h"
 #include "GenProto.h"
@@ -1158,7 +1159,7 @@ emitKeyPathComponent(IRGenModule &IGM,
   case KeyPathPatternComponent::Kind::OptionalWrap:
     fields.addInt32(KeyPathComponentHeader::forOptionalWrap().getData());
     break;
-  case KeyPathPatternComponent::Kind::TupleElement:
+  case KeyPathPatternComponent::Kind::TupleElement: {
     assert(baseTy->is<TupleType>() && "not a tuple");
 
     SILType loweredTy = IGM.getLoweredType(AbstractionPattern::getOpaque(),
@@ -1193,6 +1194,23 @@ emitKeyPathComponent(IRGenModule &IGM,
     break;
 
     llvm_unreachable("could not get tuple element offset");
+  }
+
+  case KeyPathPatternComponent::Kind::PayloadCase: {
+    SILType loweredTy = IGM.getLoweredType(AbstractionPattern::getOpaque(),
+                                           baseTy);
+
+    auto enumElement = component.getEnumElement();
+    auto enumTy = enumElement->getParentEnum()->getDeclaredTypeInContext()
+                             ->getCanonicalType();
+
+    auto &strategy = getEnumImplStrategy(IGM, enumTy);
+    auto tag = strategy.getTagIndex(enumElement);
+
+    auto header = KeyPathComponentHeader::forPayloadCase(tag);
+    fields.addInt32(header.getData());
+    break;
+  }
   }
 }
 
@@ -1286,6 +1304,7 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
     case KeyPathPatternComponent::Kind::OptionalForce:
     case KeyPathPatternComponent::Kind::OptionalWrap:
     case KeyPathPatternComponent::Kind::TupleElement:
+    case KeyPathPatternComponent::Kind::PayloadCase:
       break;
     }
   }

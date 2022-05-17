@@ -898,6 +898,9 @@ public:
   /// needed to place array buffers into constant data sections.
   AvailabilityContext getImmortalRefCountSymbolsAvailability();
 
+  /// Get the runtime availability of payload case keypaths in the stdlib.
+  AvailabilityContext getPayloadCaseKeyPathAvailability();
+
   /// Get the runtime availability of features introduced in the Swift 5.2
   /// compiler for the target platform.
   AvailabilityContext getSwift52Availability();

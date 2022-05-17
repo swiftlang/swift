@@ -8542,6 +8542,20 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
 
       return;
     } else {
+      // If we're handling with keypath components, check if the candiate is
+      // from an enum and is a case with associated values. If it is, then we
+      // will accept the candidate.
+      if (memberLocator &&
+          memberLocator->isLastElement<LocatorPathElt::KeyPathComponent>()) {
+        if (auto enumElement = 
+              dyn_cast_or_null<EnumElementDecl>(candidate.getDecl())) {
+          if (enumElement->hasAssociatedValues()) {
+            result.addViable(candidate);
+            return;
+          }
+        }
+      }
+
       if (!hasStaticMembers) {
         result.addUnviable(candidate,
                            MemberLookupResult::UR_TypeMemberOnInstance);
@@ -10904,6 +10918,11 @@ ConstraintSystem::simplifyKeyPathConstraint(
         }
       }
 
+      if (isa<EnumElementDecl>(choice.getDecl())) {
+        capability = ReadOnly;
+        continue;
+      }
+
       if (!storage)
         return SolutionKind::Error;
 
@@ -10938,8 +10957,13 @@ ConstraintSystem::simplifyKeyPathConstraint(
     case KeyPathExpr::Component::Kind::TupleElement:
       llvm_unreachable("not implemented");
       break;
+
     case KeyPathExpr::Component::Kind::DictionaryKey:
       llvm_unreachable("DictionaryKey only valid in #keyPath");
+      break;
+
+    case KeyPathExpr::Component::Kind::PayloadCase:
+      llvm_unreachable("not implemented");
       break;
     }
   }

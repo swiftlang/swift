@@ -33,3 +33,18 @@ public func conditionalAvailableSetterContext() {
     }
 }
 
+public func payloadCaseNotAvailable() { // expected-note {{add @available attribute to enclosing global function}}
+    let _ = \Int?.some // expected-error {{key paths to enum cases with associated values are only available in macOS 99.99.0 or newer}}
+                       // expected-note@-1 {{add 'if #available' version check}}
+
+    guard #available(macOS 99.99.0, *) else {
+        return
+    }
+
+    let _ = \Double?.some // ok
+}
+
+@available(macOS 99.99.0, *)
+public func payloadCaseAvailable() {
+    let _ = \Bool?.some // ok
+}

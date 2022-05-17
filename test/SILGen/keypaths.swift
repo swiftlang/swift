@@ -49,6 +49,13 @@ struct T {
   let c: (x: C<Int>, y: C<String>)
 }
 
+enum Color {
+  case red
+  case green
+  case blue
+  case generic(String)
+}
+
 /* TODO: When we support superclass requirements on protocols, we should test
  * this case as well.
 protocol PoC : C<Int> {}
@@ -594,6 +601,16 @@ func tuples_generic<T, U, V>(_: T, _: U, _: V) {
   let _: ReferenceWritableKeyPath<TUC, V> = \TUC.2.x
   // CHECK: keypath $KeyPath<(T, U, C<V>), String>, <τ_0_0, τ_0_1, τ_0_2> (root $(τ_0_0, τ_0_1, C<τ_0_2>); tuple_element #2 : $C<τ_0_2>; stored_property #C.y : $String) <T, U, V>
   let _: KeyPath<TUC, String> = \TUC.2.y
+}
+
+func payloadCases(_: Color) {
+  // CHECK: keypath $KeyPath<Color, Optional<String>>, (root $Color; payload_case #Color.generic : $Optional<String>)
+  let _ = \Color.generic
+}
+
+func payloadCasesGeneric<T, U>(_: T, _: U) {
+  // CHECK: keypath $KeyPath<Optional<(T, U)>, Optional<U>>, <τ_0_0, τ_0_1> (root $Optional<(τ_0_0, τ_0_1)>; payload_case #Optional.some : $Optional<(τ_0_0, τ_0_1)>; optional_chain : $(τ_0_0, τ_0_1); tuple_element #1 : $τ_0_1; optional_wrap : $Optional<τ_0_1>) <T, U>
+  let _ = \(T, U)?.some?.1
 }
 
 protocol DefineSomeType {

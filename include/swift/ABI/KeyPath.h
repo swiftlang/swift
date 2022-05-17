@@ -177,7 +177,7 @@ public:
       << _SwiftKeyPathComponentHeader_DiscriminatorShift)
       | _SwiftKeyPathComponentHeader_OptionalForcePayload);
   }
-  
+
   enum ComputedPropertyKind {
     GetOnly,
     SettableNonmutating,
@@ -230,6 +230,14 @@ public:
         (_SwiftKeyPathComponentHeader_ExternalTag
           << _SwiftKeyPathComponentHeader_DiscriminatorShift)
         | numSubstitutions);
+  }
+  
+  constexpr static KeyPathComponentHeader
+  forPayloadCase(unsigned caseTag) {
+    return KeyPathComponentHeader(
+    (_SwiftKeyPathComponentHeader_PayloadCaseTag
+     << _SwiftKeyPathComponentHeader_DiscriminatorShift)
+    | validateInlineOffset(caseTag));
   }
   
   constexpr uint32_t getData() const { return Data; }

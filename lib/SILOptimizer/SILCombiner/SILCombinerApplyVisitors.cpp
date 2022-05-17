@@ -365,6 +365,7 @@ bool SILCombiner::tryOptimizeKeypathOffsetOf(ApplyInst *AI,
       break;
     }
     case KeyPathPatternComponent::Kind::TupleElement:
+    case KeyPathPatternComponent::Kind::PayloadCase:
       break;
     case KeyPathPatternComponent::Kind::GettableProperty:
     case KeyPathPatternComponent::Kind::SettableProperty:

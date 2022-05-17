@@ -866,6 +866,10 @@ SILSerializer::writeKeyPathPatternComponent(
     handleComponentCommon(KeyPathComponentKindEncoding::TupleElement);
     ListOfValues.push_back((unsigned)component.getTupleIndex());
     break;
+  case KeyPathPatternComponent::Kind::PayloadCase:
+    handleComponentCommon(KeyPathComponentKindEncoding::PayloadCase);
+    ListOfValues.push_back(S.addDeclRef(component.getEnumElement()));
+    break;
   }
 }
 

@@ -3905,6 +3905,22 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
       break;
     }
 
+    case KeyPathExpr::Component::Kind::PayloadCase: {
+      auto enumElement = cast<EnumElementDecl>(component.getDeclRef().getDecl());
+
+      auto componentTy = component.getComponentType()->mapTypeOutOfContext()
+          ->getCanonicalType();
+
+      auto loweredComponent =
+          KeyPathPatternComponent::forPayloadCase(enumElement, componentTy);
+
+      loweredComponents.push_back(loweredComponent);
+
+      baseTy = loweredComponents.back().getComponentType();
+
+      break;
+    }
+
     case KeyPathExpr::Component::Kind::OptionalChain:
     case KeyPathExpr::Component::Kind::OptionalForce:
     case KeyPathExpr::Component::Kind::OptionalWrap: {

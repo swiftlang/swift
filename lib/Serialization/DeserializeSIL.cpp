@@ -1096,6 +1096,11 @@ SILDeserializer::readKeyPathComponent(ArrayRef<uint64_t> ListOfValues,
   case KeyPathComponentKindEncoding::TupleElement:
     return KeyPathPatternComponent::forTupleElement(
         ListOfValues[nextValue++], type);
+  case KeyPathComponentKindEncoding::PayloadCase: {
+    auto enumElement =
+        cast<EnumElementDecl>(MF->getDecl(ListOfValues[nextValue++]));
+    return KeyPathPatternComponent::forPayloadCase(enumElement, type);
+  }
   case KeyPathComponentKindEncoding::Trivial:
     llvm_unreachable("handled above");
   }

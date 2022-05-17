@@ -3493,6 +3493,11 @@ namespace {
         case KeyPathExpr::Component::Kind::DictionaryKey:
           llvm_unreachable("DictionaryKey only valid in #keyPath");
           break;
+
+        case KeyPathExpr::Component::Kind::PayloadCase:
+          // Comment here explaining why this is not implemented.
+          llvm_unreachable("not implemented");
+          break;
         }
 
         // By now, `base` is the result type of this component. Set it in the
