@@ -347,6 +347,9 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   return expr->getType();
 }
 
+/// FIXME: In order to remote this function both \c FrontendStatsTracer
+/// and \c PrettyStackTrace* have to be updated to accept `ASTNode`
+// instead of each individual syntactic element types.
 Optional<SolutionApplicationTarget>
 TypeChecker::typeCheckExpression(SolutionApplicationTarget &target,
                                  TypeCheckExprOptions options) {
@@ -356,84 +359,7 @@ TypeChecker::typeCheckExpression(SolutionApplicationTarget &target,
                                   target.getAsExpr());
   PrettyStackTraceExpr stackTrace(Context, "type-checking", target.getAsExpr());
 
-  // First, pre-check the expression, validating any types that occur in the
-  // expression and folding sequence expressions.
-  if (ConstraintSystem::preCheckTarget(
-          target, /*replaceInvalidRefsWithErrors=*/true,
-          options.contains(TypeCheckExprFlags::LeaveClosureBodyUnchecked))) {
-    return None;
-  }
-
-  auto *expr = target.getAsExpr();
-
-  // Check whether given expression has a code completion token which requires
-  // special handling.
-  if (Context.CompletionCallback &&
-      typeCheckForCodeCompletion(target, /*needsPrecheck*/false,
-                                 [&](const constraints::Solution &S) {
-        Context.CompletionCallback->sawSolution(S);
-      }))
-    return None;
-
-  // Construct a constraint system from this expression.
-  ConstraintSystemOptions csOptions = ConstraintSystemFlags::AllowFixes;
-
-  if (DiagnosticSuppression::isEnabled(Context.Diags))
-    csOptions |= ConstraintSystemFlags::SuppressDiagnostics;
-
-  if (options.contains(TypeCheckExprFlags::LeaveClosureBodyUnchecked))
-    csOptions |= ConstraintSystemFlags::LeaveClosureBodyUnchecked;
-
-  ConstraintSystem cs(dc, csOptions);
-
-  // Tell the constraint system what the contextual type is.  This informs
-  // diagnostics and is a hint for various performance optimizations.
-  cs.setContextualType(
-      expr,
-      target.getExprContextualTypeLoc(),
-      target.getExprContextualTypePurpose());
-
-  // Try to shrink the system by reducing disjunction domains. This
-  // goes through every sub-expression and generate its own sub-system, to
-  // try to reduce the domains of those subexpressions.
-  cs.shrink(expr);
-  target.setExpr(expr);
-
-  // If the client can handle unresolved type variables, leave them in the
-  // system.
-  auto allowFreeTypeVariables = FreeTypeVariableBinding::Disallow;
-
-  // Attempt to solve the constraint system.
-  auto viable = cs.solve(target, allowFreeTypeVariables);
-  if (!viable) {
-    target.setExpr(expr);
-    return None;
-  }
-
-  // Apply this solution to the constraint system.
-  // FIXME: This shouldn't be necessary.
-  auto &solution = (*viable)[0];
-  cs.applySolution(solution);
-
-  // Apply the solution to the expression.
-  auto resultTarget = cs.applySolution(solution, target);
-  if (!resultTarget) {
-    // Failure already diagnosed, above, as part of applying the solution.
-    return None;
-  }
-  Expr *result = resultTarget->getAsExpr();
-
-  // Unless the client has disabled them, perform syntactic checks on the
-  // expression now.
-  if (!cs.shouldSuppressDiagnostics()) {
-    bool isExprStmt = options.contains(TypeCheckExprFlags::IsExprStmt);
-    performSyntacticDiagnosticsForTarget(
-        *resultTarget, isExprStmt,
-        options.contains(TypeCheckExprFlags::DisableExprAvailabilityChecking));
-  }
-
-  resultTarget->setExpr(result);
-  return *resultTarget;
+  return typeCheckTarget(target, options);
 }
 
 Optional<SolutionApplicationTarget>
@@ -471,6 +397,19 @@ TypeChecker::typeCheckTarget(SolutionApplicationTarget &target,
     csOptions |= ConstraintSystemFlags::LeaveClosureBodyUnchecked;
 
   ConstraintSystem cs(dc, csOptions);
+
+  if (auto *expr = target.getAsExpr()) {
+    // Tell the constraint system what the contextual type is.  This informs
+    // diagnostics and is a hint for various performance optimizations.
+    cs.setContextualType(expr, target.getExprContextualTypeLoc(),
+                         target.getExprContextualTypePurpose());
+
+    // Try to shrink the system by reducing disjunction domains. This
+    // goes through every sub-expression and generate its own sub-system, to
+    // try to reduce the domains of those subexpressions.
+    cs.shrink(expr);
+    target.setExpr(expr);
+  }
 
   // If the client can handle unresolved type variables, leave them in the
   // system.
