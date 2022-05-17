@@ -28,6 +28,9 @@
 // REQUIRES: objc_interop
 // XFAIL: CPU=arm64e
 
+// rdar://92102119
+// REQUIRES: swift_test_mode_optimize_none
+
 import Darwin
 
 class Base {
