@@ -3921,6 +3921,15 @@ generateForEachStmtConstraints(
       sequence, LocatorPathElt::ContextualType(CTP_ForEachStmt));
 
   Type sequenceType = cs.createTypeVariable(locator, TVO_CanBindToNoEscape);
+  // This "workaround" warrants an explanation for posterity.
+  //
+  // The reason why we can't simplify use \c getType(sequenceExpr) here
+  // is due to how dependent member types are handled by \c simplifyTypeImpl
+  // - if the base type didn't change (and it wouldn't because it's a fully
+  // resolved concrete type) after simplification attempt the
+  // whole dependent member type would be just re-created without attempting
+  // to resolve it, so we have to use an intermediary here so that
+  // \c elementType and \c iteratorType can be resolved correctly.
   cs.addConstraint(ConstraintKind::Conversion, cs.getType(sequence),
                    sequenceType, locator);
   cs.addConstraint(ConstraintKind::ConformsTo, sequenceType,
