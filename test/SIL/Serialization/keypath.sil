@@ -63,6 +63,13 @@ public struct GenT<A, B> {
   public let z: (e0: External<A>, e1: External<B>)
 }
 
+enum Color {
+  case red
+  case green
+  case blue
+  case generic(String)
+}
+
 // CHECK-LABEL: sil shared [serialized] @AA_stored_properties
 sil shared [serialized] @AA_stored_properties : $@convention(thin) () -> () {
 entry:
@@ -212,6 +219,22 @@ entry:
   return undef : $()
 }
 
+sil shared [serialized] @JJ_payload_case : $@convention(thin) () -> () {
+entry:
+  // CHECK: keypath $KeyPath<Color, Optional<String>>, (root $Color; payload_case #Color.generic : $Optional<String>)
+  %a = keypath $KeyPath<Color, Optional<String>>, (root $Color; payload_case #Color.generic : $Optional<String>)
+
+  return undef : $()
+}
+
+sil shared [serialized] @KK_payload_case_generic : $@convention(thin) <T, U> () -> () {
+entry:
+  // CHECK: keypath $KeyPath<Optional<(T, U)>, Optional<U>>, <τ_0_0, τ_0_1> (root $Optional<(τ_0_0, τ_0_1)>; payload_case #Optional.some : $Optional<(τ_0_0, τ_0_1)>; optional_chain : $(τ_0_0, τ_0_1); tuple_element #1 : $τ_0_1; optional_wrap : $Optional<τ_0_1>) <T, U>
+  %a = keypath $KeyPath<Optional<(T, U)>, Optional<U>>, <τ_0_0, τ_0_1> (root $Optional<(τ_0_0, τ_0_1)>; payload_case #Optional.some : $Optional<(τ_0_0, τ_0_1)>; optional_chain : $(τ_0_0, τ_0_1); tuple_element #1 : $τ_0_1; optional_wrap : $Optional<τ_0_1>) <T, U>
+
+  return undef : $()
+}
+
 sil [serialized] @serialize_all : $@convention(thin) () -> () {
 entry:
   %0 = function_ref @AA_stored_properties : $@convention(thin) () -> ()
@@ -223,6 +246,8 @@ entry:
   %6 = function_ref @GG_optional : $@convention(thin) () -> ()
   %7 = function_ref @HH_indexes : $@convention(thin) (S, C) -> ()
   %8 = function_ref @II_external : $@convention(thin) <D: P, E: Q, F: R> () -> ()
+  %9 = function_ref @JJ_payload_case : $@convention(thin) () -> ()
+  %10 = function_ref @KK_payload_case_generic : $@convention(thin) <T, U> () -> ()
 
   unreachable
 }

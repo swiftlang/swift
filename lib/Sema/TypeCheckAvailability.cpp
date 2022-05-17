@@ -2085,6 +2085,32 @@ static Diagnostic getPotentialUnavailabilityDiagnostic(
                     Platform, Version);
 }
 
+void TypeChecker::diagnosePotentialPayloadCaseKeyPathUnavailability(
+    SourceRange ReferenceRange, const DeclContext *ReferenceDC,
+    const UnavailabilityReason &Reason) {
+  ASTContext &context = ReferenceDC->getASTContext();
+
+  auto requiredRange = Reason.getRequiredOSVersionRange();
+
+  {
+    auto err =
+      context.Diags.diagnose(
+        ReferenceRange.Start,
+        diag::availability_payload_case_keypath_only_version_newer,
+        prettyPlatformString(targetPlatform(context.LangOpts)),
+        Reason.getRequiredOSVersionRange().getLowerEndpoint());
+
+    if (fixAvailabilityByNarrowingNearbyVersionCheck(ReferenceRange,
+                                                     ReferenceDC,
+                                                     requiredRange,
+                                                     context, err)) {
+      return;
+    }
+  }
+
+  fixAvailability(ReferenceRange, ReferenceDC, requiredRange, context);
+}
+
 bool TypeChecker::diagnosePotentialUnavailability(
     const ValueDecl *D, SourceRange ReferenceRange,
     const DeclContext *ReferenceDC,
@@ -3432,8 +3458,24 @@ private:
         break;
       }
 
-      case KeyPathExpr::Component::Kind::TupleElement:
+      // Payload case keypaths were introduced in Swift 5.*
+      case KeyPathExpr::Component::Kind::PayloadCase: {
+        auto enumElement = component.getDeclRef();
+        auto loc = component.getLoc();
+        auto runningOS = Where.getAvailabilityContext();
+        auto availability = Context.getPayloadCaseKeyPathAvailability();
+
+        if (!runningOS.isContainedIn(availability)) {
+          TypeChecker::diagnosePotentialPayloadCaseKeyPathUnavailability(
+            KP->getSourceRange(),
+            Where.getDeclContext(),
+            UnavailabilityReason::requiresVersionRange(availability.getOSVersion()));
+        }
+
+        // Otherwise, diagnose potential availability issues with the enum decl.
+        diagnoseDeclRefAvailability(enumElement, loc, nullptr, flags);
         break;
+      }
 
       case KeyPathExpr::Component::Kind::Invalid:
       case KeyPathExpr::Component::Kind::UnresolvedProperty:
@@ -3444,6 +3486,7 @@ private:
       case KeyPathExpr::Component::Kind::Identity:
       case KeyPathExpr::Component::Kind::DictionaryKey:
       case KeyPathExpr::Component::Kind::CodeCompletion:
+      case KeyPathExpr::Component::Kind::TupleElement:
         break;
       }
     }

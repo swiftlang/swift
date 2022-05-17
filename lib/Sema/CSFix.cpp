@@ -1204,9 +1204,11 @@ AllowInvalidRefInKeyPath::forRef(ConstraintSystem &cs, ValueDecl *member,
                                             locator);
 
   // Referencing enum cases in key path is not currently allowed.
-  if (isa<EnumElementDecl>(member)) {
-    return AllowInvalidRefInKeyPath::create(cs, RefKind::EnumCase, member,
+  if (auto enumElement = dyn_cast<EnumElementDecl>(member)) {
+    if (!enumElement->hasAssociatedValues()) {
+      return AllowInvalidRefInKeyPath::create(cs, RefKind::EnumCase, member,
                                             locator);
+    }
   }
 
   // Referencing initializers in key path is not currently allowed.

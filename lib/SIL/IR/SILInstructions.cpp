@@ -2414,6 +2414,7 @@ bool KeyPathPatternComponent::isComputedSettablePropertyMutating() const {
   case Kind::OptionalWrap:
   case Kind::OptionalForce:
   case Kind::TupleElement:
+  case Kind::PayloadCase:
     llvm_unreachable("not a settable computed property");
   case Kind::SettableProperty: {
     auto setter = getComputedPropertySetter();
@@ -2433,6 +2434,7 @@ forEachRefcountableReference(const KeyPathPatternComponent &component,
   case KeyPathPatternComponent::Kind::OptionalWrap:
   case KeyPathPatternComponent::Kind::OptionalForce:
   case KeyPathPatternComponent::Kind::TupleElement:
+  case KeyPathPatternComponent::Kind::PayloadCase:
     return;
   case KeyPathPatternComponent::Kind::SettableProperty:
     forFunction(component.getComputedPropertySetter());
@@ -2490,6 +2492,7 @@ KeyPathPattern::get(SILModule &M, CanGenericSignature signature,
     case KeyPathPatternComponent::Kind::OptionalWrap:
     case KeyPathPatternComponent::Kind::OptionalForce:
     case KeyPathPatternComponent::Kind::TupleElement:
+    case KeyPathPatternComponent::Kind::PayloadCase:
       break;
     
     case KeyPathPatternComponent::Kind::GettableProperty:
@@ -2573,7 +2576,11 @@ void KeyPathPattern::Profile(llvm::FoldingSetNodeID &ID,
     case KeyPathPatternComponent::Kind::TupleElement:
       ID.AddInteger(component.getTupleIndex());
       break;
-    
+
+    case KeyPathPatternComponent::Kind::PayloadCase:
+      ID.AddPointer(component.getEnumElement());
+      break;
+
     case KeyPathPatternComponent::Kind::SettableProperty:
       ID.AddPointer(component.getComputedPropertySetter());
       LLVM_FALLTHROUGH;
@@ -2708,6 +2715,7 @@ visitReferencedFunctionsAndMethods(
   case KeyPathPatternComponent::Kind::OptionalForce:
   case KeyPathPatternComponent::Kind::OptionalWrap:
   case KeyPathPatternComponent::Kind::TupleElement:
+  case KeyPathPatternComponent::Kind::PayloadCase:
     break;
   }
 }

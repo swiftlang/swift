@@ -2731,6 +2731,13 @@ public:
       *this << " : $" << component.getComponentType();
       break;
     }
+    case KeyPathPatternComponent::Kind::PayloadCase: {
+      auto enumElement = component.getEnumElement();
+      *this << "payload_case #";
+      printValueDecl(enumElement, PrintState.OS);
+      *this << " : $" << component.getComponentType();
+      break;
+    }
     }
   }
 

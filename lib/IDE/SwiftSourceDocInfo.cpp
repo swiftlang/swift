@@ -434,6 +434,7 @@ ASTWalker::PreWalkResult<Expr *> NameMatcher::walkToExprPre(Expr *E) {
           case KeyPathExpr::Component::Kind::Subscript:
           case KeyPathExpr::Component::Kind::Identity:
           case KeyPathExpr::Component::Kind::TupleElement:
+          case KeyPathExpr::Component::Kind::PayloadCase:
             llvm_unreachable("Unexpected component in ObjC KeyPath expression");
             break;
           }

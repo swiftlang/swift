@@ -199,6 +199,109 @@ public:
   }
 };
 
+class PayloadCaseProjector : public ComponentProjector {
+public:
+  PayloadCaseProjector(KeyPathInst *keyPath,
+                       const KeyPathPatternComponent &component,
+                       std::unique_ptr<KeyPathProjector> parent,
+                       BeginAccessInst *&beginAccess,
+                       SILLocation loc, SILBuilder &builder)
+      : ComponentProjector(component, std::move(parent), loc, builder),
+        keyPath(keyPath),
+        beginAccess(beginAccess) {}
+
+  void project(AccessType accessType,
+               std::function<void(SILValue addr)> callback) override {
+    assert(component.getKind() == KeyPathPatternComponent::Kind::PayloadCase);
+    assert(accessType == AccessType::Get &&
+           "payload case components are only gettable");
+
+    // Our projection is a switch over the enum value with a single case
+    // statement. We'll match the key path component enum element, and if it
+    // succeeds proceed to take out the payload and continue projecting.
+    // However, if we fail we'll go down the default case path of projecting a
+    // nil value.
+    parent->project(AccessType::Get, [&](SILValue parentValue) {
+      auto &ctx = builder.getASTContext();
+
+      auto someCase = ctx.getOptionalSomeDecl();
+      auto noneCase = ctx.getOptionalNoneDecl();
+
+      auto enumElement = component.getEnumElement();
+
+      auto &function = builder.getFunction();
+      auto substType = component.getComponentType().subst(keyPath->getSubstitutions(),
+                                                           None);
+      SILType optType = function.getLoweredType(
+                         Lowering::AbstractionPattern::getOpaque(), substType);
+      SILType objType = optType.getOptionalObjectType().getAddressType();
+
+      // Create our switch over the equals case and default case.
+      auto continuation = builder.splitBlockForFallthrough();
+      auto equalsCase = builder.getFunction()
+          .createBasicBlockAfter(builder.getInsertionBB());
+      auto defaultCase = builder.getFunction().createBasicBlockAfter(equalsCase);
+      builder.createSwitchEnumAddr(loc, parentValue, defaultCase,
+                                   {{enumElement, equalsCase}});
+
+      // First, create our case equals branch.
+      builder.setInsertionPoint(equalsCase);
+
+      // Create the resulting optional value.
+      auto resultAddr = builder.createAllocStack(loc, optType);
+      auto resultPayloadAddr = builder.createInitEnumDataAddr(loc, resultAddr,
+                                                              someCase,
+                                                              objType);
+
+      // We have to create a copy of the parentValue because
+      // unchecked_take_enum_data is destructive and invalidates the original
+      // memory.
+      auto enumCopy = builder.createAllocStack(loc,
+                                        parentValue->getType().getObjectType());
+      builder.createCopyAddr(loc, parentValue, enumCopy, IsNotTake, IsInitialization);
+
+      auto payload = builder.createUncheckedTakeEnumDataAddr(loc, enumCopy,
+                                                             enumElement);
+
+      // Move the payload value into the optional result payload.
+      builder.createCopyAddr(loc, payload, resultPayloadAddr, IsNotTake, IsInitialization);
+
+      builder.createInjectEnumAddr(loc, resultAddr, someCase);
+
+      BeginAccessInst *origBeginAccess = beginAccess;
+
+      callback(resultAddr);
+
+      builder.createDestroyAddr(loc, enumCopy);
+      builder.createDeallocStack(loc, enumCopy);
+      builder.createDestroyAddr(loc, resultAddr);
+      builder.createDeallocStack(loc, resultAddr);
+
+      builder.createBranch(loc, continuation);
+
+      // Finally, handle the nil case.
+      builder.setInsertionPoint(defaultCase);
+
+      // If the sub-projection ended the access in the some-branch, we also
+      // have to end the access in the none-branch.
+      if (origBeginAccess && origBeginAccess != beginAccess)
+        builder.createEndAccess(loc, origBeginAccess, /*aborted*/ false);
+
+      auto nil = builder.createAllocStack(loc, optType);
+      builder.createInjectEnumAddr(loc, nil, noneCase);
+
+      callback(nil);
+
+      builder.createBranch(loc, continuation);
+      builder.setInsertionPoint(continuation, continuation->begin());
+    });
+  }
+
+private:
+  KeyPathInst *keyPath;
+  BeginAccessInst *&beginAccess;
+};
+
 class GettablePropertyProjector : public ComponentProjector {
 public:
     GettablePropertyProjector(KeyPathInst *keyPath,
@@ -657,6 +760,12 @@ private:
         projector = std::make_unique<OptionalChainProjector>
             (comp, std::move(parent), beginAccess, optionalChainResult, loc,
              builder);
+        break;
+      case KeyPathPatternComponent::Kind::PayloadCase:
+        projector = std::make_unique<PayloadCaseProjector>(keyPath, comp,
+                                                           std::move(parent),
+                                                           beginAccess,
+                                                           loc, builder);
         break;
     }
     

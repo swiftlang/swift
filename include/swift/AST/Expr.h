@@ -5407,6 +5407,7 @@ public:
       TupleElement,
       DictionaryKey,
       CodeCompletion,
+      PayloadCase,
     };
   
   private:
@@ -5436,7 +5437,7 @@ public:
     explicit Component(DeclNameOrRef decl, Kind kind, Type type, SourceLoc loc)
         : Component(kind, type, loc) {
       assert(kind == Kind::Property || kind == Kind::UnresolvedProperty ||
-             kind == Kind::DictionaryKey);
+             kind == Kind::DictionaryKey || kind == Kind::PayloadCase);
       Decl = decl;
     }
 
@@ -5525,6 +5526,12 @@ public:
       return Component(Kind::CodeCompletion, Type(), Loc);
     }
 
+    static Component forPayloadCase(ConcreteDeclRef payloadCase,
+                                    Type payloadType,
+                                    SourceLoc loc) {
+      return Component(payloadCase, Kind::PayloadCase, payloadType, loc);
+    }
+
     SourceLoc getLoc() const {
       return Loc;
     }
@@ -5557,6 +5564,7 @@ public:
       case Kind::Identity:
       case Kind::TupleElement:
       case Kind::DictionaryKey:
+      case Kind::PayloadCase:
         return true;
 
       case Kind::UnresolvedSubscript:
@@ -5584,6 +5592,7 @@ public:
       case Kind::TupleElement:
       case Kind::DictionaryKey:
       case Kind::CodeCompletion:
+      case Kind::PayloadCase:
         return nullptr;
       }
       llvm_unreachable("unhandled kind");
@@ -5613,6 +5622,7 @@ public:
       case Kind::TupleElement:
       case Kind::DictionaryKey:
       case Kind::CodeCompletion:
+      case Kind::PayloadCase:
         return {};
       }
       llvm_unreachable("unhandled kind");
@@ -5634,6 +5644,7 @@ public:
       case Kind::Identity:
       case Kind::TupleElement:
       case Kind::CodeCompletion:
+      case Kind::PayloadCase:
         llvm_unreachable("no unresolved name for this kind");
       }
       llvm_unreachable("unhandled kind");
@@ -5643,6 +5654,7 @@ public:
       switch (getKind()) {
       case Kind::Property:
       case Kind::Subscript:
+      case Kind::PayloadCase:
         return true;
 
       case Kind::Invalid:
@@ -5664,6 +5676,7 @@ public:
       switch (getKind()) {
       case Kind::Property:
       case Kind::Subscript:
+      case Kind::PayloadCase:
         return Decl.ResolvedDecl;
 
       case Kind::Invalid:
@@ -5697,6 +5710,7 @@ public:
         case Kind::Subscript:
         case Kind::DictionaryKey:
         case Kind::CodeCompletion:
+        case Kind::PayloadCase:
           llvm_unreachable("no field number for this kind");
       }
       llvm_unreachable("unhandled kind");

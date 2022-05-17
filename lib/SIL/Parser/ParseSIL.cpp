@@ -2724,6 +2724,22 @@ SILParser::parseKeyPathPatternComponent(KeyPathPatternComponent &component,
       
     component = KeyPathPatternComponent::forTupleElement(tupleIndex, ty);
     return false;
+  } else if (componentKind.str() == "payload_case")  {
+    ValueDecl *enumElement;
+    CanType ty;
+
+    if (parseSILDottedPath(enumElement)
+        || P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":")
+        || P.parseToken(tok::sil_dollar,
+                        diag::expected_tok_in_sil_instr, "$")
+        || parseASTType(ty, patternEnv, patternParams)) {
+      return true;
+    }
+
+    component =
+      KeyPathPatternComponent::forPayloadCase(cast<EnumElementDecl>(enumElement),
+                                              ty);
+    return false;
   } else {
     P.diagnose(componentLoc, diag::sil_keypath_unknown_component_kind,
                componentKind);

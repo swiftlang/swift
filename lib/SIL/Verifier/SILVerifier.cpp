@@ -435,6 +435,11 @@ void verifyKeyPathComponent(SILModule &M,
 
     break;
   }
+  case KeyPathPatternComponent::Kind::PayloadCase: {
+    require((bool)leafTy->getOptionalObjectType(),
+            "key path with payload case component should have option result");
+    break;
+  }
   }
   
   baseTy = componentTy;
@@ -5143,6 +5148,7 @@ public:
         case KeyPathPatternComponent::Kind::OptionalWrap:
         case KeyPathPatternComponent::Kind::OptionalForce:
         case KeyPathPatternComponent::Kind::TupleElement:
+        case KeyPathPatternComponent::Kind::PayloadCase:
           hasIndices = false;
           break;
         }

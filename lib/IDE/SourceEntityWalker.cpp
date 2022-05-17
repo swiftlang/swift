@@ -491,6 +491,7 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       case KeyPathExpr::Component::Kind::Identity:
       case KeyPathExpr::Component::Kind::DictionaryKey:
       case KeyPathExpr::Component::Kind::CodeCompletion:
+      case KeyPathExpr::Component::Kind::PayloadCase:
         break;
       }
     }

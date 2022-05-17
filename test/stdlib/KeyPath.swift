@@ -93,6 +93,14 @@ struct ComputedB {
 
 typealias Tuple<T: Equatable, U> = (S<T>, C<U>)
 
+enum Color {
+  case red
+  case green
+  case blue
+  case generic(String)
+  case extraGeneric(String, Int)
+}
+
 keyPath.test("key path in-place instantiation") {
   for _ in 1...2 {
     let s_x = (\S<Int>.x as AnyKeyPath) as! WritableKeyPath<S<Int>, Int>
@@ -1063,6 +1071,48 @@ keyPath.test("ReferenceWritableKeyPath statically typed as WritableKeyPath") {
   expectEqual(outer[keyPath: upcastKeyPath], 45)
   setWithInout(&outer[keyPath: upcastKeyPath], 46)
   expectEqual(outer[keyPath: upcastKeyPath], 46)
+}
+
+keyPath.test("payload case keypaths") {
+  guard #available(SwiftStdlib 9999, *) else {
+    return
+  }
+
+  let genericKeyPath = \Color.generic
+
+  let red = Color.red
+  let green = Color.green
+  let blue = Color.blue
+
+  expectNil(red[keyPath: genericKeyPath])
+  expectNil(green[keyPath: genericKeyPath])
+  expectNil(blue[keyPath: genericKeyPath])
+
+  let extraGeneric = Color.extraGeneric("Pink", 100)
+
+  expectNil(extraGeneric[keyPath: genericKeyPath])
+
+  let justPink = Color.generic("Pink")
+
+  expectEqual(justPink[keyPath: genericKeyPath], "Pink")
+}
+
+keyPath.test("payload case generic keypaths") {
+  guard #available(SwiftStdlib 9999, *) else {
+    return
+  }
+
+  func something<T, U>(with x: T, and y: U) -> KeyPath<(T, U)?, U?> {
+    \(T, U)?.some?.1
+  }
+
+  let intBoolKp = something(with: 128, and: true)
+
+  let combo: (Int, Bool)? = (316, false)
+  let notGoodCombo: (Int, Bool)? = nil
+
+  expectEqual(combo[keyPath: intBoolKp], false)
+  expectNil(notGoodCombo[keyPath: intBoolKp])
 }
 
 runAllTests()
