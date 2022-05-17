@@ -278,6 +278,10 @@ def enable_experimental_concurrency :
   Flag<["-"], "enable-experimental-concurrency">,
   HelpText<"Enable experimental concurrency model">;
 
+def enable_experimental_cxx_interop :
+  Flag<["-"], "enable-experimental-cxx-interop">,
+  HelpText<"Enable C++ interop code generation and config directives">;
+
 def enable_lexical_borrow_scopes :
   Joined<["-"], "enable-lexical-borrow-scopes=">,
   HelpText<"Whether to emit lexical borrow scopes (default: true)">,
@@ -824,11 +828,6 @@ def emit_sorted_sil : Flag<["-"], "emit-sorted-sil">,
 
 def emit_syntax : Flag<["-"], "emit-syntax">,
   HelpText<"Parse input file(s) and emit the Syntax tree(s) as JSON">, ModeOpt;
-
-def enable_experimental_cxx_interop :
-  Flag<["-"], "enable-experimental-cxx-interop">,
-  HelpText<"Enable C++ interop code generation and config directives">,
-  Flags<[FrontendOption, HelpHidden]>;
 
 def enable_cxx_interop :
   Flag<["-"], "enable-cxx-interop">,

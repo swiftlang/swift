@@ -1941,11 +1941,14 @@ RValue RValueEmitter::visitAnyHashableErasureExpr(AnyHashableErasureExpr *E,
                                                   SGFContext C) {
   // Emit the source value into a temporary.
   auto sourceOrigType = AbstractionPattern::getOpaque();
+  auto subExpr = E->getSubExpr();
+  auto &sourceOrigTL = SGF.getTypeLowering(sourceOrigType, subExpr->getType());
   auto source =
-    SGF.emitMaterializedRValueAsOrig(E->getSubExpr(), sourceOrigType);
+      SGF.silConv.useLoweredAddresses()
+          ? SGF.emitMaterializedRValueAsOrig(subExpr, sourceOrigType)
+          : SGF.emitRValueAsOrig(subExpr, sourceOrigType, sourceOrigTL, C);
 
-  return SGF.emitAnyHashableErasure(E, source,
-                                    E->getSubExpr()->getType(),
+  return SGF.emitAnyHashableErasure(E, source, subExpr->getType(),
                                     E->getConformance(), C);
 }
 

@@ -111,6 +111,7 @@
 // CHECK:      struct IntGetterSetterSnakeCase {
 // CHECK-NEXT:    init()
 // CHECK-NEXT:    init(val: Int32)
+// CHECK-NEXT:    var x: Int32
 // CHECK-NEXT:    func get_x() -> Int32
 // CHECK-NEXT:    mutating func set_x(_ v: Int32)
 // CHECK-NEXT:    var val: Int32
@@ -265,4 +266,31 @@
 // CHECK-NEXT:    var value: Int32
 // CHECK-NEXT:    func getValue() -> Int32
 // CHECK-NEXT:    mutating func setValue(_ i: Int32)
+// CHECK-NEXT: }
+
+// CHECK:      struct SnakeCaseGetterSetter {
+// CHECK-NEXT:    init()
+// CHECK-NEXT:    init(value: Int32)
+// CHECK-NEXT:    var foo: Int32
+// CHECK-NEXT:    func get_foo() -> Int32
+// CHECK-NEXT:    mutating func set_foo(_ v: Int32)
+// CHECK-NEXT:    var value: Int32
+// CHECK-NEXT: }
+
+// CHECK:      struct SnakeCaseUTF8Str {
+// CHECK-NEXT:    init()
+// CHECK-NEXT:    init(value: Int32)
+// CHECK-NEXT:    var utf8String: Int32
+// CHECK-NEXT:    func get_utf8_string() -> Int32
+// CHECK-NEXT:    mutating func set_utf8_string(_ v: Int32)
+// CHECK-NEXT:    var value: Int32
+// CHECK-NEXT: }
+
+// CHECK:      struct SnakeCaseTrailing {
+// CHECK-NEXT:    init()
+// CHECK-NEXT:    init(value: Int32)
+// CHECK-NEXT:    var x: Int32
+// CHECK-NEXT:    func get_x_() -> Int32
+// CHECK-NEXT:    mutating func set_x_(_ v: Int32)
+// CHECK-NEXT:    var value: Int32
 // CHECK-NEXT: }

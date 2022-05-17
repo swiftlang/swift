@@ -812,6 +812,10 @@ public:
 
   /// This is supportable but usually suggests a logic mistake.
   static bool classof(const ValueBase *) = delete;
+  
+protected:
+  unsigned getCachedFieldIndex(NominalTypeDecl *decl, VarDecl *property);
+  unsigned getCachedCaseIndex(EnumElementDecl *enumElement);
 };
 
 inline SILNodePointer::SILNodePointer(const SILInstruction *inst) :
@@ -6010,6 +6014,7 @@ class EnumInst
     : public InstructionBase<SILInstructionKind::EnumInst,
                              FirstArgOwnershipForwardingSingleValueInst> {
   friend SILBuilder;
+  enum : unsigned { InvalidCaseIndex = ~unsigned(0) };
 
   Optional<FixedOperandList<1>> OptionalOperand;
   EnumElementDecl *Element;
@@ -6019,6 +6024,8 @@ class EnumInst
            ValueOwnershipKind forwardingOwnershipKind)
       : InstructionBase(DebugLoc, ResultTy, forwardingOwnershipKind),
         Element(Element) {
+    SILNode::Bits.EnumInst.CaseIndex = InvalidCaseIndex;
+
     if (Operand) {
       OptionalOperand.emplace(this, Operand);
     }
@@ -6026,6 +6033,16 @@ class EnumInst
 
 public:
   EnumElementDecl *getElement() const { return Element; }
+
+  unsigned getCaseIndex() {
+    unsigned idx = SILNode::Bits.EnumInst.CaseIndex;
+    if (idx != InvalidCaseIndex)
+      return idx;
+
+    unsigned index = getCachedCaseIndex(getElement());
+    SILNode::Bits.EnumInst.CaseIndex = index;
+    return index;
+  }
 
   bool hasOperand() const { return OptionalOperand.hasValue(); }
   SILValue getOperand() const { return OptionalOperand->asValueArray()[0]; }
@@ -6048,6 +6065,7 @@ class UncheckedEnumDataInst
     : public UnaryInstructionBase<SILInstructionKind::UncheckedEnumDataInst,
                                   FirstArgOwnershipForwardingSingleValueInst> {
   friend SILBuilder;
+  enum : unsigned { InvalidCaseIndex = ~unsigned(0) };
 
   EnumElementDecl *Element;
 
@@ -6056,10 +6074,22 @@ class UncheckedEnumDataInst
                         ValueOwnershipKind forwardingOwnershipKind)
       : UnaryInstructionBase(DebugLoc, Operand, ResultTy,
                              forwardingOwnershipKind),
-        Element(Element) {}
+        Element(Element) {
+    SILNode::Bits.UncheckedEnumDataInst.CaseIndex = InvalidCaseIndex;
+  }
 
 public:
   EnumElementDecl *getElement() const { return Element; }
+
+  unsigned getCaseIndex() {
+    unsigned idx = SILNode::Bits.UncheckedEnumDataInst.CaseIndex;
+    if (idx != InvalidCaseIndex)
+      return idx;
+
+    unsigned index = getCachedCaseIndex(getElement());
+    SILNode::Bits.UncheckedEnumDataInst.CaseIndex = index;
+    return index;
+  }
 
   EnumDecl *getEnumDecl() const {
     auto *E = getOperand()->getType().getEnumOrBoundGenericEnum();
@@ -6086,15 +6116,28 @@ class InitEnumDataAddrInst
                                 SingleValueInstruction>
 {
   friend SILBuilder;
+  enum : unsigned { InvalidCaseIndex = ~unsigned(0) };
 
   EnumElementDecl *Element;
 
   InitEnumDataAddrInst(SILDebugLocation DebugLoc, SILValue Operand,
                        EnumElementDecl *Element, SILType ResultTy)
-      : UnaryInstructionBase(DebugLoc, Operand, ResultTy), Element(Element) {}
+      : UnaryInstructionBase(DebugLoc, Operand, ResultTy), Element(Element) {
+    SILNode::Bits.InitEnumDataAddrInst.CaseIndex = InvalidCaseIndex;
+  }
 
 public:
   EnumElementDecl *getElement() const { return Element; }
+
+  unsigned getCaseIndex() {
+    unsigned idx = SILNode::Bits.InitEnumDataAddrInst.CaseIndex;
+    if (idx != InvalidCaseIndex)
+      return idx;
+
+    unsigned index = getCachedCaseIndex(getElement());
+    SILNode::Bits.InitEnumDataAddrInst.CaseIndex = index;
+    return index;
+  }
 };
 
 /// InjectEnumAddrInst - Tags an enum as containing a case. The data for
@@ -6104,15 +6147,28 @@ class InjectEnumAddrInst
                                 NonValueInstruction>
 {
   friend SILBuilder;
+  enum : unsigned { InvalidCaseIndex = ~unsigned(0) };
 
   EnumElementDecl *Element;
 
   InjectEnumAddrInst(SILDebugLocation DebugLoc, SILValue Operand,
                      EnumElementDecl *Element)
-      : UnaryInstructionBase(DebugLoc, Operand), Element(Element) {}
+      : UnaryInstructionBase(DebugLoc, Operand), Element(Element) {
+    SILNode::Bits.InjectEnumAddrInst.CaseIndex = InvalidCaseIndex;
+  }
 
 public:
   EnumElementDecl *getElement() const { return Element; }
+
+  unsigned getCaseIndex() {
+    unsigned idx = SILNode::Bits.InjectEnumAddrInst.CaseIndex;
+    if (idx != InvalidCaseIndex)
+      return idx;
+
+    unsigned index = getCachedCaseIndex(getElement());
+    SILNode::Bits.InjectEnumAddrInst.CaseIndex = index;
+    return index;
+  }
 };
 
 /// Invalidate an enum value and take ownership of its payload data
@@ -6122,33 +6178,34 @@ class UncheckedTakeEnumDataAddrInst
                                 SingleValueInstruction>
 {
   friend SILBuilder;
+  enum : unsigned { InvalidCaseIndex = ~unsigned(0) };
 
   EnumElementDecl *Element;
 
   UncheckedTakeEnumDataAddrInst(SILDebugLocation DebugLoc, SILValue Operand,
                                 EnumElementDecl *Element, SILType ResultTy)
-      : UnaryInstructionBase(DebugLoc, Operand, ResultTy), Element(Element) {}
+      : UnaryInstructionBase(DebugLoc, Operand, ResultTy), Element(Element) {
+    SILNode::Bits.UncheckedTakeEnumDataAddrInst.CaseIndex = InvalidCaseIndex;
+  }
 
 public:
   EnumElementDecl *getElement() const { return Element; }
+
+  unsigned getCaseIndex() {
+    unsigned idx = SILNode::Bits.UncheckedTakeEnumDataAddrInst.CaseIndex;
+    if (idx != InvalidCaseIndex)
+      return idx;
+
+    unsigned index = getCachedCaseIndex(getElement());
+    SILNode::Bits.UncheckedTakeEnumDataAddrInst.CaseIndex = index;
+    return index;
+  }
 
   EnumDecl *getEnumDecl() const {
     auto *E = getOperand()->getType().getEnumOrBoundGenericEnum();
     assert(E && "Operand of unchecked_take_enum_data_addr must be of enum"
                 " type");
     return E;
-  }
-
-  unsigned getElementNo() const {
-    unsigned i = 0;
-    for (EnumElementDecl *E : getEnumDecl()->getAllElements()) {
-      if (E == Element)
-        return i;
-      ++i;
-    }
-    llvm_unreachable(
-        "An unchecked_enum_data_addr's enumdecl should have at least "
-        "on element, the element that is being extracted");
   }
 };
 
@@ -6520,19 +6577,6 @@ public:
   }
 };
 
-/// Get a unique index for a struct or class field in layout order.
-///
-/// Precondition: \p decl must be a non-resilient struct or class.
-///
-/// Precondition: \p field must be a stored property declared in \p decl,
-///               not in a superclass.
-///
-/// Postcondition: The returned index is unique across all properties in the
-///                object, including properties declared in a superclass.
-unsigned getFieldIndex(NominalTypeDecl *decl, VarDecl *property);
-
-unsigned getCaseIndex(EnumElementDecl *enumElement);
-
 unsigned getNumFieldsInNominal(NominalTypeDecl *decl);
 
 /// Get the property for a struct or class by its unique index, or nullptr if
@@ -6579,12 +6623,14 @@ public:
 
   VarDecl *getField() const { return field; }
 
-  unsigned getFieldIndex() const {
+  unsigned getFieldIndex() {
     unsigned idx = SILNode::Bits.FieldIndexCacheBase.FieldIndex;
     if (idx != InvalidFieldIndex)
       return idx;
-
-    return const_cast<FieldIndexCacheBase *>(this)->cacheFieldIndex();
+      
+    idx = ParentTy::getCachedFieldIndex(getParentDecl(), getField());
+    SILNode::Bits.FieldIndexCacheBase.FieldIndex = idx;
+    return idx;
   }
 
   NominalTypeDecl *getParentDecl() const {
@@ -6599,13 +6645,6 @@ public:
     return kind == SILNodeKind::StructExtractInst ||
            kind == SILNodeKind::StructElementAddrInst ||
            kind == SILNodeKind::RefElementAddrInst;
-  }
-
-private:
-  unsigned cacheFieldIndex() {
-    unsigned index = swift::getFieldIndex(getParentDecl(), getField());
-    SILNode::Bits.FieldIndexCacheBase.FieldIndex = index;
-    return index;
   }
 };
 
