@@ -14,34 +14,46 @@ import Foundation
 
 var StringViewHashingTests = TestSuite("StringViewHashingTests")
 
-let testString: String = "dogs"
-let UTF8View = testString.utf8
-let UTF16View = testString.utf16
-let unicodeScalarView = testString.unicodeScalars
+let taggedNSString = "dog" as NSString //up to 11 ascii bytes can be stored in a tagged NSString
+let asciiNSString = "The quick brown fox jumps over the lazy dog" as NSString
+let nonAsciiNSString = "The quick brown fox jumps over the lazy dög" as NSString
+let testStrings = [
+  "" /* empty */,
+  "dog" /* short ascii */,
+  "dög" /* short non-ascii*/,
+  "The quick brown fox jumps over the lazy dog" /* long ascii (long is defined as >15 bytes) */,
+  "The quick brown fox jumps over the lazy dög" /* long non-ascii */,
+  "👩‍👧" /* short multi-scalar */,
+  "👩‍👩‍👧‍👧" /* long multi-scalar */,
+  taggedNSString as String,
+  asciiNSString as String,
+  nonAsciiNSString as String
+]
 
-let testSubstring = testString.suffix(3)
-let substringUTF8View = testSubstring.utf8
-let substringUTF16View = testSubstring.utf16
-let substringUnicodeScalarView = testSubstring.unicodeScalars
+let testSubstrings = testStrings.map { $0.prefix($0.count)) }
 
 if #available(SwiftStdlib 5.7, *) {
-    StringViewHashingTests.test("StringViewEquatable") {
-        expectEqual(UTF8View, UTF8View)
-        expectEqual(UTF16View, UTF16View)
-        expectEqual(unicodeScalarView, unicodeScalarView)
-        expectEqual(substringUTF8View, substringUTF8View)
-        expectEqual(substringUTF16View, substringUTF16View)
-        expectEqual(substringUnicodeScalarView, substringUnicodeScalarView)
+  StringViewHashingTests.test("StringViewEquatableHashable") {
+    testStrings.forEach { string in
+      expectEqual(string.utf8, string.utf8)
+      expectEqual(string.utf16, string.utf16)
+      expectEqual(string.unicodeScalars, string.unicodeScalars)
+
+      checkHashable(string.utf8, equalityOracle: { $0 == $1 })
+      checkHashable(string.utf16, equalityOracle: { $0 == $1 })
+      checkHashable(string.unicodeScalars, equalityOracle: { $0 == $1 })
     }
 
-    StringViewHashingTests.test("StringViewHashable") {
-        checkHashable(UTF8View, equalityOracle: { $0 == $1 })
-        checkHashable(UTF16View, equalityOracle: { $0 == $1 })
-        checkHashable(unicodeScalarView, equalityOracle: { $0 == $1 })
-        checkHashable(substringUTF8View, equalityOracle: { $0 == $1 })
-        checkHashable(substringUTF16View, equalityOracle: { $0 == $1 })
-        checkHashable(substringUnicodeScalarView, equalityOracle: { $0 == $1 })
+    testSubstrings.forEach { substring in
+      expectEqual(substring.utf8, substring.utf8)
+      expectEqual(substring.utf16, substring.utf16)
+      expectEqual(substring.unicodeScalars, substring.unicodeScalars)
+
+      checkHashable(substring.utf8, equalityOracle: { $0 == $1 })
+      checkHashable(substring.utf16, equalityOracle: { $0 == $1 })
+      checkHashable(substring.unicodeScalars, equalityOracle: { $0 == $1 })
     }
+  }
 }
 
 runAllTests()

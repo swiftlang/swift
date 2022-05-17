@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Darwin
+
 extension String {
   // FIXME(strings): at least temporarily remove it to see where it was applied
   /// Creates a new string from the given substring.
@@ -1251,69 +1253,69 @@ extension Substring {
 
 //Adds Hashable and Equatable conformance. Prevents compiler from synthesizing hashValue
 extension Substring.UTF8View {
-    @_alwaysEmitIntoClient
-    public static func ==(lhs: Self, rhs: Self) -> Bool {
-        lhs.elementsEqual(rhs)
-    }
+  @_alwaysEmitIntoClient
+  public static func ==(lhs: Self, rhs: Self) -> Bool {
+    lhs.elementsEqual(rhs)
+  }
 
-    @_alwaysEmitIntoClient
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(count)
-        for element in self {
-            hasher.combine(element)
-        }
+  @_alwaysEmitIntoClient
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(0xFF as UInt8) //terminator
+    for element in self {
+      hasher.combine(element)
     }
+  }
 
-    @_alwaysEmitIntoClient
-    public var hashValue: Int {
-        var hasher = Hasher()
-        self.hash(into: &hasher)
-        return hasher.finalize()
-      }
+  @_alwaysEmitIntoClient
+  public var hashValue: Int {
+    var hasher = Hasher()
+    self.hash(into: &hasher)
+    return hasher.finalize()
+  }
 }
 
 extension Substring.UTF16View {
-    @_alwaysEmitIntoClient
-    public static func ==(lhs: Self, rhs: Self) -> Bool {
-        lhs.elementsEqual(rhs)
-    }
+  @_alwaysEmitIntoClient
+  public static func ==(lhs: Self, rhs: Self) -> Bool {
+    lhs.elementsEqual(rhs)
+  }
 
-    @_alwaysEmitIntoClient
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(count)
-        for element in self {
-            hasher.combine(element)
-        }
+  @_alwaysEmitIntoClient
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(0xFF as UInt16) //terminator
+    for element in self {
+      hasher.combine(element)
     }
+  }
 
-    @_alwaysEmitIntoClient
-    public var hashValue: Int {
-        var hasher = Hasher()
-        self.hash(into: &hasher)
-        return hasher.finalize()
-      }
+  @_alwaysEmitIntoClient
+  public var hashValue: Int {
+    var hasher = Hasher()
+    self.hash(into: &hasher)
+    return hasher.finalize()
+  }
 }
 
 extension Substring.UnicodeScalarView {
-    @_alwaysEmitIntoClient
-    public static func ==(lhs: Self, rhs: Self) -> Bool {
-        lhs.elementsEqual(rhs)
-    }
+  @_alwaysEmitIntoClient
+  public static func ==(lhs: Self, rhs: Self) -> Bool {
+    lhs.elementsEqual(rhs)
+  }
 
-    @_alwaysEmitIntoClient
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(count)
-        for element in self {
-            hasher.combine(element)
-        }
+  @_alwaysEmitIntoClient
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(0xFF) //terminator
+    for element in self {
+      hasher.combine(element)
     }
+  }
 
-    @_alwaysEmitIntoClient
-    public var hashValue: Int {
-        var hasher = Hasher()
-        self.hash(into: &hasher)
-        return hasher.finalize()
-      }
+  @_alwaysEmitIntoClient
+  public var hashValue: Int {
+    var hasher = Hasher()
+    self.hash(into: &hasher)
+    return hasher.finalize()
+  }
 }
 
 @available(SwiftStdlib 5.7, *)
