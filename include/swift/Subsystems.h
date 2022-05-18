@@ -157,6 +157,10 @@ namespace swift {
   /// emitted.
   void performWholeModuleTypeChecking(SourceFile &SF);
 
+  /// Load derivative configurations from @derivative attributes (including
+  /// those defined in non-primary sources).
+  void loadDerivativeConfigurations(SourceFile &SF);
+
   /// Resolve the given \c TypeRepr to an interface type.
   ///
   /// This is used when dealing with partial source files (e.g. SIL parsing,

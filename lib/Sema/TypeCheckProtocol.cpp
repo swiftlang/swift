@@ -379,8 +379,7 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
     bool foundExactConfig = false;
     Optional<AutoDiffConfig> supersetConfig = None;
     for (auto witnessConfig :
-           witnessAFD->getDerivativeFunctionConfigurations(
-             /*lookInNonPrimarySources*/ false)) {
+           witnessAFD->getDerivativeFunctionConfigurations()) {
       // All the witness's derivative generic requirements must be satisfied
       // by the requirement's derivative generic requirements OR by the
       // conditional conformance requirements.
