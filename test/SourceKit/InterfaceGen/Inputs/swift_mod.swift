@@ -9,3 +9,7 @@ public func pub_function() {}
 internal func int_function() {}
 fileprivate func fp_function() {}
 private func priv_function() {}
+
+public protocol MyProto<Assoc> {
+  associatedtype Assoc
+}

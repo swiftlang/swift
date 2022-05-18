@@ -180,6 +180,21 @@ bool SemaAnnotator::walkToDeclPreProper(Decl *D) {
       if (!ReportParamList(ParamList))
         return false;
     }
+
+    if (auto proto = dyn_cast<ProtocolDecl>(VD)) {
+      // Report a primary associated type as a references to the associated type
+      // declaration.
+      for (auto parsedName : proto->getPrimaryAssociatedTypeNames()) {
+        Identifier name = parsedName.first;
+        SourceLoc loc = parsedName.second;
+        if (auto assocTypeDecl = proto->getAssociatedType(name)) {
+          passReference(assocTypeDecl,
+                        assocTypeDecl->getDeclaredInterfaceType(),
+                        DeclNameLoc(loc),
+                        ReferenceMetaData(SemaReferenceKind::TypeRef, None));
+        }
+      }
+    }
   } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
     SourceRange SR = SourceRange();
     if (auto *repr = ED->getExtendedTypeRepr())
