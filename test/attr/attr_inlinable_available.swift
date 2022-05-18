@@ -97,6 +97,28 @@ public protocol AfterDeploymentTargetProto {}
 @available(macOS, unavailable)
 public protocol UnavailableProto {}
 
+// MARK: - Class definitions
+
+public class NoAvailableClass {}
+
+@available(macOS 10.9, *)
+public class BeforeInliningTargetClass {}
+
+@available(macOS 10.10, *)
+public class AtInliningTargetClass {}
+
+@available(macOS 10.14.5, *)
+public class BetweenTargetsClass {}
+
+@available(macOS 10.15, *)
+public class AtDeploymentTargetClass {}
+
+@available(macOS 11, *)
+public class AfterDeploymentTargetClass {}
+
+@available(macOS, unavailable)
+public class UnavailableClass {}
+
 
 // MARK: - Internal functions
 
@@ -1163,6 +1185,40 @@ enum InternalNoAvailableEnumWithTypeAliases { // expected-note {{add @available 
   public typealias F = AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add @available attribute to enclosing type alias}}
 }
 
+// MARK: - Class inheritance
+
+// FIXME: Duplicate 'add @available' emitted when classes are nested in a decl
+
+public enum NoAvailableEnumWithClasses {
+  public class InheritsNoAvailable: NoAvailableClass {}
+  public class InheritsBeforeInliningTarget: BeforeInliningTargetClass {}
+  public class InheritsAtInliningTarget: AtInliningTargetClass {}
+  public class InheritsBetweenTargets: BetweenTargetsClass {} // expected-error {{'BetweenTargetsClass' is only available in macOS 10.14.5 or newer}} expected-note 2 {{add @available attribute to enclosing class}}
+  public class InheritsAtDeploymentTarget: AtDeploymentTargetClass {} // expected-error {{'AtDeploymentTargetClass' is only available in macOS 10.15 or newer}} expected-note 2 {{add @available attribute to enclosing class}}
+  public class InheritsAfterDeploymentTarget: AfterDeploymentTargetClass {} // expected-error {{'AfterDeploymentTargetClass' is only available in macOS 11 or newer}} expected-note 2 {{add @available attribute to enclosing class}}
+}
+
+@_spi(Private)
+public enum SPIEnumWithClasses {
+  public class InheritsNoAvailable: NoAvailableClass {}
+  public class InheritsBeforeInliningTarget: BeforeInliningTargetClass {}
+  public class InheritsAtInliningTarget: AtInliningTargetClass {}
+  public class InheritsBetweenTargets: BetweenTargetsClass {}
+  public class InheritsAtDeploymentTarget: AtDeploymentTargetClass {}
+  // FIXME: Duplicate 'add @available' note is emitted
+  public class InheritsAfterDeploymentTarget: AfterDeploymentTargetClass {} // expected-error {{'AfterDeploymentTargetClass' is only available in}} expected-note 2 {{add @available attribute to enclosing class}}
+}
+
+@available(macOS, unavailable)
+public enum UnavailableEnumWithClasses {
+  public class InheritsNoAvailable: NoAvailableClass {}
+  public class InheritsBeforeInliningTarget: BeforeInliningTargetClass {}
+  public class InheritsAtInliningTarget: AtInliningTargetClass {}
+  public class InheritsBetweenTargets: BetweenTargetsClass {}
+  public class InheritsAtDeploymentTarget: AtDeploymentTargetClass {}
+  public class InheritsAfterDeploymentTarget: AfterDeploymentTargetClass {} // expected-error {{'AfterDeploymentTargetClass' is only available in}} expected-note 2 {{add @available attribute to enclosing class}}
+  public class InheritsUnavailable: UnavailableClass {}
+}
 
 // MARK: - Top-level code
 
