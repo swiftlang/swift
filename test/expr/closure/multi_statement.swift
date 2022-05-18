@@ -350,3 +350,18 @@ func test_no_crash_with_circular_ref_due_to_error() {
     return 0
   }
 }
+
+func test_diagnosing_on_missing_member_in_case() {
+  enum E {
+    case one
+  }
+
+  func test(_: (E) -> Void) {}
+
+  test {
+    switch $0 {
+    case .one: break
+    case .unknown: break // expected-error {{type 'E' has no member 'unknown'}}
+    }
+  }
+}
