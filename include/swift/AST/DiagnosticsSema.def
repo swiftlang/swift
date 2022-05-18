@@ -5547,9 +5547,15 @@ ERROR(availability_decl_only_version_newer, none,
       "%0 is only available in %1 %2 or newer",
       (DeclName, StringRef, llvm::VersionTuple))
 
-WARNING(availability_decl_only_version_newer_warn, none,
-        "%0 is only available in %1 %2 or newer",
-        (DeclName, StringRef, llvm::VersionTuple))
+ERROR(availability_decl_only_version_newer_for_clients, none,
+      "%0 is only available in %1 %2 or newer; clients of %3 may have a lower"
+      " deployment target",
+      (DeclName, StringRef, llvm::VersionTuple, ModuleDecl *))
+
+WARNING(availability_decl_only_version_newer_for_clients_warn, none,
+        "%0 is only available in %1 %2 or newer; clients of %3 may have a lower"
+        " deployment target",
+        (DeclName, StringRef, llvm::VersionTuple, ModuleDecl *))
 
 ERROR(availability_opaque_types_only_version_newer, none,
       "'some' return types are only available in %0 %1 or newer",
