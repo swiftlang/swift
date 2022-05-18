@@ -239,9 +239,16 @@ extension String.UTF16View: BidirectionalCollection {
     let start = _guts.ensureMatchingEncoding(start)
     let end = _guts.ensureMatchingEncoding(end)
 
-    _precondition(start._encodedOffset <= _guts.count,
+    // FIXME: This method used to not properly validate indices before 5.7;
+    // temporarily allow older binaries to keep invoking undefined behavior as
+    // before.
+    _precondition(
+      ifLinkedOnOrAfter: .v5_7_0,
+      start._encodedOffset <= _guts.count,
       "String index is out of bounds")
-    _precondition(end._encodedOffset <= _guts.count,
+    _precondition(
+      ifLinkedOnOrAfter: .v5_7_0,
+      end._encodedOffset <= _guts.count,
       "String index is out of bounds")
 
     if _slowPath(_guts.isForeign) {
@@ -403,15 +410,13 @@ extension String.UTF16View.Index {
     _ idx: String.Index, within target: String.UTF16View
   ) {
     // As a special exception, we allow `idx` to be an UTF-16 index when `self`
-    // is a UTF-8 string, to preserve compatibility with (broken) code that
-    // keeps using indices from a bridged string after converting the string to
-    // a native representation. Such indices are invalid, but returning nil here
-    // can break code that appeared to work fine for ASCII strings in Swift
-    // releases prior to 5.7.
-    guard
-      let idx = target._guts.ensureMatchingEncodingNoTrap(idx),
-      idx._encodedOffset <= target._guts.count
-    else { return nil }
+    // is a UTF-8 string (or vice versa), to preserve compatibility with
+    // (broken) code that keeps using indices from a bridged string after
+    // converting the string to a native representation. Such indices are
+    // invalid, but returning nil here can break code that appeared to work fine
+    // for ASCII strings in Swift releases prior to 5.7.
+    let idx = target._guts.ensureMatchingEncoding(idx)
+    guard idx._encodedOffset <= target._guts.count else { return nil }
 
     if _slowPath(target._guts.isForeign) {
       guard idx._foreignIsWithin(target) else { return nil }

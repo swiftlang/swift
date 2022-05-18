@@ -14,7 +14,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Runtime/Config.h"
 #include "swift/Runtime/Bincompat.h"
+#include "swift/Runtime/Once.h"
+#include "swift/Runtime/EnvironmentVariables.h"
+#include "../SwiftShims/RuntimeShims.h"
 #include <stdint.h>
 
 // If this is an Apple OS, use the Apple binary compatibility rules
@@ -57,6 +61,57 @@ static enum sdk_test isAppAtLeastSpring2021() {
     return isAppAtLeast(spring_2021_os_versions);
 }
 #endif
+
+static _SwiftStdlibVersion binCompatVersionOverride = { 0 };
+
+static _SwiftStdlibVersion const knownVersions[] = {
+  { /* 5.6.0 */0x050600 },
+  { /* 5.7.0 */0x050700 },
+  { 0 },
+};
+
+static bool isKnownBinCompatVersion(_SwiftStdlibVersion version) {
+  for (int i = 0; knownVersions[i]._value != 0; ++i) {
+    if (knownVersions[i]._value == version._value) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static void checkBinCompatEnvironmentVariable(void *context) {
+  _SwiftStdlibVersion version =
+    { runtime::environment::SWIFT_BINARY_COMPATIBILITY_VERSION() };
+
+  if (version._value > 0 && !isKnownBinCompatVersion(version)) {
+    swift::warning(RuntimeErrorFlagNone,
+                   "Warning: ignoring unknown SWIFT_BINARY_COMPATIBILITY_VERSION %x.\n",
+                   version._value);
+    return;
+  }
+
+  binCompatVersionOverride = version;
+}
+
+extern "C" __swift_bool _swift_stdlib_isExecutableLinkedOnOrAfter(
+  _SwiftStdlibVersion version
+) {
+  static OnceToken_t getenvToken;
+  SWIFT_ONCE_F(getenvToken, checkBinCompatEnvironmentVariable, nullptr);
+
+  if (binCompatVersionOverride._value > 0) {
+    return version._value <= binCompatVersionOverride._value;
+  }
+
+#if BINARY_COMPATIBILITY_APPLE
+  // Return true for all known versions for now -- we can't map them to OS
+  // versions at this time.
+  return isKnownBinCompatVersion(version);
+
+#else // !BINARY_COMPATIBILITY_APPLE
+  return isKnownBinCompatVersion(version);
+#endif
+}
 
 // Should we mimic the old override behavior when scanning protocol conformance records?
 
