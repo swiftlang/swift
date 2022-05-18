@@ -8688,7 +8688,7 @@ getSwiftNameFromClangName(StringRef replacement) {
   clang::LookupResult lookupResult(clangSema, identifier,
                                    clang::SourceLocation(),
                                    clang::Sema::LookupOrdinaryName);
-  if (!clangSema.LookupName(lookupResult, nullptr))
+  if (!clangSema.LookupName(lookupResult, clangSema.TUScope))
     return "";
 
   auto clangDecl = lookupResult.getAsSingle<clang::NamedDecl>();

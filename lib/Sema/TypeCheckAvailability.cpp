@@ -24,6 +24,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeDeclFinder.h"
@@ -320,21 +321,6 @@ static bool hasActiveAvailableAttribute(Decl *D,
   return getActiveAvailableAttribute(D, AC);
 }
 
-static bool shouldConstrainBodyToDeploymentTarget(Decl *D) {
-  // The declaration contains code...
-  if (auto afd = dyn_cast<AbstractFunctionDecl>(D)) {
-    // And it has a location so we can check it...
-    if (!afd->isImplicit() && afd->getBodySourceRange().isValid()) {
-      // And the code is within our resilience domain, so it should be
-      // compiled with the minimum deployment target, not the minimum inlining
-      // target.
-      return afd->getResilienceExpansion() != ResilienceExpansion::Minimal;
-    }
-  }
-
-  return false;
-}
-
 static bool computeContainedByDeploymentTarget(TypeRefinementContext *TRC,
                                                ASTContext &ctx) {
   return TRC->getAvailabilityInfo()
@@ -393,6 +379,13 @@ class TypeRefinementContextBuilder : private ASTWalker {
   llvm::DenseMap<AbstractStorageDecl *, TypeRefinementContext *>
       StorageContexts;
 
+  /// A mapping from pattern binding storage declarations to the type refinement
+  /// contexts for those declarations. We refer to this map to determine the
+  /// appropriate parent TRC to use when walking a var decl that belongs to a
+  /// pattern containing multiple vars.
+  llvm::DenseMap<PatternBindingDecl *, TypeRefinementContext *>
+      PatternBindingContexts;
+
   TypeRefinementContext *getCurrentTRC() {
     return ContextStack.back().TRC;
   }
@@ -418,6 +411,10 @@ class TypeRefinementContextBuilder : private ASTWalker {
     ContextStack.push_back(Info);
   }
 
+  const char *stackTraceAction() const {
+    return "building type refinement context for";
+  }
+
 public:
   TypeRefinementContextBuilder(TypeRefinementContext *TRC, ASTContext &Context)
       : Context(Context) {
@@ -426,6 +423,7 @@ public:
   }
 
   void build(Decl *D) {
+    PrettyStackTraceDecl trace(stackTraceAction(), D);
     unsigned StackHeight = ContextStack.size();
     D->walk(*this);
     assert(ContextStack.size() == StackHeight);
@@ -433,6 +431,7 @@ public:
   }
 
   void build(Stmt *S) {
+    PrettyStackTraceStmt trace(Context, stackTraceAction(), S);
     unsigned StackHeight = ContextStack.size();
     S->walk(*this);
     assert(ContextStack.size() == StackHeight);
@@ -440,6 +439,7 @@ public:
   }
 
   void build(Expr *E) {
+    PrettyStackTraceExpr trace(Context, stackTraceAction(), E);
     unsigned StackHeight = ContextStack.size();
     E->walk(*this);
     assert(ContextStack.size() == StackHeight);
@@ -448,6 +448,8 @@ public:
 
 private:
   bool walkToDeclPre(Decl *D) override {
+    PrettyStackTraceDecl trace(stackTraceAction(), D);
+
     // Adds in a parent TRC for decls which are syntactically nested but are not
     // represented that way in the AST. (Particularly, AbstractStorageDecl
     // parents for AccessorDecl children.)
@@ -460,17 +462,12 @@ private:
       pushContext(DeclTRC, D);
     }
 
-    // Adds in a TRC that covers only the body of the declaration.
-    if (auto BodyTRC = getNewContextForBodyOfDecl(D)) {
-      pushContext(BodyTRC, D);
-    }
-
+    // Create TRCs that cover only the body of the declaration.
+    buildContextsForBodyOfDecl(D);
     return true;
   }
 
   bool walkToDeclPost(Decl *D) override {
-    // As seen above, we could have up to three TRCs in the stack for a single
-    // declaration.
     while (ContextStack.back().ScopeNode.getAsDecl() == D) {
       ContextStack.pop_back();
     }
@@ -478,29 +475,44 @@ private:
   }
 
   TypeRefinementContext *getEffectiveParentContextForDecl(Decl *D) {
-    if (auto accessor = dyn_cast<AccessorDecl>(D)) {
+    // FIXME: Can we assert that we won't walk parent decls later that should
+    //        have been returned here?
+    if (auto *accessor = dyn_cast<AccessorDecl>(D)) {
       // Use TRC of the storage rather the current TRC when walking this
       // function.
-      // FIXME: Can we assert that we won't process storage later that should
-      //        have been returned now?
       auto it = StorageContexts.find(accessor->getStorage());
       if (it != StorageContexts.end()) {
         return it->second;
       }
+    } else if (auto *VD = dyn_cast<VarDecl>(D)) {
+      // Use the TRC of the pattern binding decl as the parent for var decls.
+      if (auto *PBD = VD->getParentPatternBinding()) {
+        auto it = PatternBindingContexts.find(PBD);
+        if (it != PatternBindingContexts.end()) {
+          return it->second;
+        }
+      }
     }
+
     return nullptr;
   }
 
   /// If necessary, records a TRC so it can be returned by subsequent calls to
   /// `getEffectiveParentContextForDecl()`.
   void recordEffectiveParentContext(Decl *D, TypeRefinementContext *NewTRC) {
-    // Record the TRC for this storage declaration so that
-    // when we process the accessor, we can use this TRC as the
-    // parent in `getEffectiveParentContextForDecl()`.
     if (auto *StorageDecl = dyn_cast<AbstractStorageDecl>(D)) {
-      if (StorageDecl->hasParsedAccessors()) {
-        // FIXME: Can we assert that we've never queried for this storage?
+      // Stash the TRC for the storage declaration to use as the parent of
+      // accessor decls later.
+      if (StorageDecl->hasParsedAccessors())
         StorageContexts[StorageDecl] = NewTRC;
+    }
+
+    if (auto *VD = dyn_cast<VarDecl>(D)) {
+      // Stash the TRC for the var decl if its parent pattern binding decl has
+      // more than one entry so that the sibling var decls can reuse it.
+      if (auto *PBD = VD->getParentPatternBinding()) {
+        if (PBD->getNumPatternEntries() > 1)
+          PatternBindingContexts[PBD] = NewTRC;
       }
     }
   }
@@ -508,15 +520,36 @@ private:
   /// Returns a new context to be introduced for the declaration, or nullptr
   /// if no new context should be introduced.
   TypeRefinementContext *getNewContextForSignatureOfDecl(Decl *D) {
-    if (declarationIntroducesNewContext(D)) {
-      return buildDeclarationRefinementContext(D);
+    if (!isa<ValueDecl>(D) && !isa<ExtensionDecl>(D))
+      return nullptr;
+
+    // Only introduce for an AbstractStorageDecl if it is not local. We
+    // introduce for the non-local case because these may have getters and
+    // setters (and these may be synthesized, so they might not even exist yet).
+    if (isa<AbstractStorageDecl>(D) && D->getDeclContext()->isLocalContext())
+      return nullptr;
+
+    // Ignore implicit declarations (mainly skips over `DeferStmt` functions).
+    if (D->isImplicit())
+      return nullptr;
+
+    // Skip introducing additional contexts for var decls past the first in a
+    // pattern. The context necessary for the pattern as a whole was already
+    // introduced if necessary by the first var decl.
+    if (auto *VD = dyn_cast<VarDecl>(D)) {
+      if (auto *PBD = VD->getParentPatternBinding())
+        if (VD != PBD->getAnchoringVarDecl(0))
+          return nullptr;
     }
 
-    return nullptr;
-  }
+    // A decl only introduces a new context when it either has explicit
+    // availability or requires the deployment target.
+    bool HasExplicitAvailability = hasActiveAvailableAttribute(D, Context);
+    bool ConstrainToDeploymentTarget =
+        shouldConstrainSignatureToDeploymentTarget(D);
+    if (!HasExplicitAvailability && !ConstrainToDeploymentTarget)
+      return nullptr;
 
-  /// Builds the type refinement hierarchy for the body of the function.
-  TypeRefinementContext *buildDeclarationRefinementContext(Decl *D) {
     // We require a valid range in order to be able to query for the TRC
     // corresponding to a given SourceLoc.
     // If this assert fires, it means we have probably synthesized an implicit
@@ -533,15 +566,14 @@ private:
     AvailabilityContext DeclInfo = ExplicitDeclInfo;
     DeclInfo.intersectWith(getCurrentTRC()->getAvailabilityInfo());
 
-    if (shouldConstrainSignatureToDeploymentTarget(D))
+    if (ConstrainToDeploymentTarget)
       DeclInfo.intersectWith(AvailabilityContext::forDeploymentTarget(Context));
 
     SourceRange Range = refinementSourceRangeForDecl(D);
     TypeRefinementContext *NewTRC;
-    if (hasActiveAvailableAttribute(D, Context))
-      NewTRC = TypeRefinementContext::createForDecl(Context, D, getCurrentTRC(),
-                                                    DeclInfo, ExplicitDeclInfo,
-                                                    Range);
+    if (HasExplicitAvailability)
+      NewTRC = TypeRefinementContext::createForDecl(
+          Context, D, getCurrentTRC(), DeclInfo, ExplicitDeclInfo, Range);
     else
       NewTRC = TypeRefinementContext::createForAPIBoundary(
           Context, D, getCurrentTRC(), DeclInfo, Range);
@@ -550,39 +582,6 @@ private:
     recordEffectiveParentContext(D, NewTRC);
 
     return NewTRC;
-  }
-
-  /// Returns true if the declaration should introduce a new refinement context.
-  bool declarationIntroducesNewContext(Decl *D) {
-    if (!isa<ValueDecl>(D) && !isa<ExtensionDecl>(D)) {
-      return false;
-    }
-
-    // Ignore implicit declarations. This mainly skips over the functions in
-    // `DeferStmt`s.
-    if (D->isImplicit()) {
-      return false;
-    }
-
-    // No need to introduce a context if the declaration does not have an
-    // availability attribute and the signature does not constrain availability
-    // to the deployment target.
-    if (!hasActiveAvailableAttribute(D, Context) &&
-        !shouldConstrainSignatureToDeploymentTarget(D)) {
-      return false;
-    }
-
-    // Only introduce for an AbstractStorageDecl if it is not local.
-    // We introduce for the non-local case because these may
-    // have getters and setters (and these may be synthesized, so they might
-    // not even exist yet).
-    if (auto *storageDecl = dyn_cast<AbstractStorageDecl>(D)) {
-      if (storageDecl->getDeclContext()->isLocalContext()) {
-        return false;
-      }
-    }
-
-    return true;
   }
 
   /// Checks whether the entire declaration, including its signature, should be
@@ -611,15 +610,19 @@ private:
     if (auto *storageDecl = dyn_cast<AbstractStorageDecl>(D)) {
       // Use the declaration's availability for the context when checking
       // the bodies of its accessors.
+      SourceRange Range = storageDecl->getSourceRange();
 
-      Decl *locDecl = D;
       // For a variable declaration (without accessors) we use the range of the
       // containing pattern binding declaration to make sure that we include
-      // any type annotation in the type refinement context range.
-      if (auto varDecl = dyn_cast<VarDecl>(storageDecl)) {
-        auto *PBD = varDecl->getParentPatternBinding();
-        if (PBD)
-          locDecl = PBD;
+      // any type annotation in the type refinement context range. We also
+      // need to include any attached property wrappers.
+      if (auto *varDecl = dyn_cast<VarDecl>(storageDecl)) {
+        if (auto *PBD = varDecl->getParentPatternBinding())
+          Range = PBD->getSourceRange();
+
+        for (auto *propertyWrapper : varDecl->getAttachedPropertyWrappers()) {
+          Range.widen(propertyWrapper->getRange());
+        }
       }
 
       // HACK: For synthesized trivial accessors we may have not a valid
@@ -628,49 +631,18 @@ private:
       // to update AbstractStorageDecl::addTrivialAccessors() to take brace
       // locations and have callers of that method provide appropriate source
       // locations.
-      SourceLoc BracesEnd = storageDecl->getBracesRange().End;
-      if (storageDecl->hasParsedAccessors() && BracesEnd.isValid()) {
-        return SourceRange(locDecl->getStartLoc(),
-                           BracesEnd);
+      SourceRange BracesRange = storageDecl->getBracesRange();
+      if (storageDecl->hasParsedAccessors() && BracesRange.isValid()) {
+        Range.widen(BracesRange);
       }
-      
-      return locDecl->getSourceRange();
+
+      return Range;
     }
     
     return D->getSourceRange();
   }
 
-  TypeRefinementContext *getNewContextForBodyOfDecl(Decl *D) {
-    if (bodyIntroducesNewContext(D))
-      return buildBodyRefinementContext(D);
-
-    return nullptr;
-  }
-
-  bool bodyIntroducesNewContext(Decl *D) {
-    // Are we already constrained by the deployment target? If not, adding a
-    // new context wouldn't change availability.
-    if (isCurrentTRCContainedByDeploymentTarget())
-      return false;
-
-    // If we're in a function, check if it ought to use the deployment target.
-    if (auto afd = dyn_cast<AbstractFunctionDecl>(D))
-      return shouldConstrainBodyToDeploymentTarget(afd);
-
-    // The only other case we care about is top-level code.
-    return isa<TopLevelCodeDecl>(D);
-  }
-
-  TypeRefinementContext *buildBodyRefinementContext(Decl *D) {
-    SourceRange range;
-    if (auto tlcd = dyn_cast<TopLevelCodeDecl>(D)) {
-      range = tlcd->getSourceRange();
-    } else if (auto afd = dyn_cast<AbstractFunctionDecl>(D)) {
-      range = afd->getBodySourceRange();
-    } else {
-      llvm_unreachable("unknown decl");
-    }
-
+  TypeRefinementContext *createAPIBoundaryContext(Decl *D, SourceRange range) {
     AvailabilityContext DeploymentTargetInfo =
         AvailabilityContext::forDeploymentTarget(Context);
     DeploymentTargetInfo.intersectWith(getCurrentTRC()->getAvailabilityInfo());
@@ -679,7 +651,76 @@ private:
         Context, D, getCurrentTRC(), DeploymentTargetInfo, range);
   }
 
+  void buildContextsForBodyOfDecl(Decl *D) {
+    // Are we already constrained by the deployment target? If not, adding
+    // new contexts won't change availability.
+    if (isCurrentTRCContainedByDeploymentTarget())
+      return;
+
+    // Top level code always uses the deployment target.
+    if (auto tlcd = dyn_cast<TopLevelCodeDecl>(D)) {
+      auto *topLevelTRC =
+          createAPIBoundaryContext(tlcd, tlcd->getSourceRange());
+      pushContext(topLevelTRC, D);
+      return;
+    }
+
+    // Function bodies use the deployment target if they are within the module's
+    // resilience domain.
+    if (auto afd = dyn_cast<AbstractFunctionDecl>(D)) {
+      if (!afd->isImplicit() && afd->getBodySourceRange().isValid() &&
+          afd->getResilienceExpansion() != ResilienceExpansion::Minimal) {
+        auto *functionBodyTRC =
+            createAPIBoundaryContext(afd, afd->getBodySourceRange());
+        pushContext(functionBodyTRC, D);
+      }
+      return;
+    }
+
+    // Var decls may have associated pattern binding decls or property wrappers
+    // with init expressions. Those expressions need to be constrained to the
+    // deployment target unless they are exposed to clients.
+    if (auto vd = dyn_cast<VarDecl>(D)) {
+      if (!vd->hasInitialValue() || vd->isInitExposedToClients())
+        return;
+
+      if (auto *pbd = vd->getParentPatternBinding()) {
+        int idx = pbd->getPatternEntryIndexForVarDecl(vd);
+        auto *initExpr = pbd->getInit(idx);
+        if (initExpr && !initExpr->isImplicit()) {
+          assert(initExpr->getSourceRange().isValid());
+
+          // Create a TRC for the init written in the source. The ASTWalker
+          // won't visit these expressions so instead of pushing these onto the
+          // stack we build them directly.
+          auto *initTRC =
+              createAPIBoundaryContext(vd, initExpr->getSourceRange());
+          TypeRefinementContextBuilder(initTRC, Context).build(initExpr);
+        }
+
+        // Ideally any init expression would be returned by `getInit()` above.
+        // However, for property wrappers it doesn't get populated until
+        // typechecking completes (which is too late). Instead, we find the
+        // the property wrapper attribute and use its source range to create a
+        // TRC for the initializer expression.
+        //
+        // FIXME: Since we don't have an expression here, we can't build out its
+        // TRC. If the Expr that will eventually be created contains a closure
+        // expression, then it might have AST nodes that need to be refined. For
+        // example, property wrapper initializers that takes block arguments
+        // are not handled correctly because of this (rdar://77841331).
+        for (auto *wrapper : vd->getAttachedPropertyWrappers()) {
+          createAPIBoundaryContext(vd, wrapper->getRange());
+        }
+      }
+
+      return;
+    }
+  }
+
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+    PrettyStackTraceStmt trace(Context, stackTraceAction(), S);
+
     if (auto *IS = dyn_cast<IfStmt>(S)) {
       buildIfStmtRefinementContext(IS);
       return std::make_pair(false, S);

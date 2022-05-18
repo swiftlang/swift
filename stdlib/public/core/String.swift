@@ -946,10 +946,11 @@ extension _StringGutsSlice {
   }
 
   internal func _withNFCCodeUnits(_ f: (UInt8) throws -> Void) rethrows {
+    let substring = String(_guts)[range]
     // Fast path: If we're already NFC (or ASCII), then we don't need to do
     // anything at all.
     if _fastPath(_guts.isNFC) {
-      try String(_guts).utf8.forEach(f)
+      try substring.utf8.forEach(f)
       return
     }
 
@@ -962,7 +963,7 @@ extension _StringGutsSlice {
       // Because we have access to the fastUTF8, we can go through that instead
       // of accessing the UTF8 view on String.
       if isNFCQC {
-        try _guts.withFastUTF8 {
+        try withFastUTF8 {
           for byte in $0 {
             try f(byte)
           }
@@ -971,7 +972,7 @@ extension _StringGutsSlice {
         return
       }
     } else {
-      for scalar in String(_guts).unicodeScalars {
+      for scalar in substring.unicodeScalars {
         if !_isScalarNFCQC(scalar, &prevCCC) {
           isNFCQC = false
           break
@@ -979,7 +980,7 @@ extension _StringGutsSlice {
       }
 
       if isNFCQC {
-        for byte in String(_guts).utf8 {
+        for byte in substring.utf8 {
           try f(byte)
         }
 
@@ -987,7 +988,7 @@ extension _StringGutsSlice {
       }
     }
 
-    for scalar in String(_guts)._internalNFC {
+    for scalar in substring._internalNFC {
       try scalar.withUTF8CodeUnits {
         for byte in $0 {
           try f(byte)
