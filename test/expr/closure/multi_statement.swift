@@ -234,6 +234,20 @@ func test_local_function_capturing_vars() {
   }
 }
 
+func test_test_invalid_redeclaration() {
+  func test(_: () -> Void) {
+  }
+
+  test {
+    let foo = 0 // expected-note {{'foo' previously declared here}}
+    let foo = foo // expected-error {{invalid redeclaration of 'foo'}}
+  }
+
+  test {
+    let (foo, foo) = (5, 6) // expected-error {{invalid redeclaration of 'foo'}} expected-note {{'foo' previously declared here}}
+  }
+}
+
 func test_pattern_ambiguity_doesnot_crash_compiler() {
   enum E {
   case hello(result: Int) // expected-note 2 {{found this candidate}}

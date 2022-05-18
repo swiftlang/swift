@@ -1189,10 +1189,6 @@ private:
     if (isa<IfConfigDecl>(decl))
       return;
 
-    // Variable declaration would be handled by a pattern binding.
-    if (isa<VarDecl>(decl))
-      return;
-
     // Generate constraints for pattern binding declarations.
     if (auto patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
       SolutionApplicationTarget target(patternBinding);
