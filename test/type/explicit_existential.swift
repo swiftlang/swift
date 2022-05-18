@@ -320,3 +320,12 @@ func testNestedMetatype() {
   let _: (any (P.Type)).Type = (any P.Type).self
   let _: ((any (P.Type))).Type = (any P.Type).self
 }
+
+func testEnumAssociatedValue() {
+  enum E {
+    case c1((any HasAssoc) -> Void)
+    // expected-error@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
+    case c2((HasAssoc) -> Void)
+    case c3((P) -> Void)
+  }
+}
