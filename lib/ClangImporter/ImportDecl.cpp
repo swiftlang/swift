@@ -54,6 +54,7 @@
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjCCommon.h"
+#include "clang/AST/Type.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/Specifiers.h"
 #include "clang/Basic/TargetInfo.h"
@@ -2856,14 +2857,46 @@ namespace {
         return nullptr;
 
       auto Loc = Impl.importSourceLoc(Decl->getLocation());
-      auto Result = Impl.createDeclWithClangNode<TypeAliasDecl>(Decl,
-                                      AccessLevel::Public,
-                                      Impl.importSourceLoc(Decl->getBeginLoc()),
-                                      SourceLoc(), Name,
-                                      Loc,
-                                      /*genericparams*/nullptr, DC);
 
-      Result->setUnderlyingType(SwiftType);
+      swift::Decl *Result = nullptr;
+      if (importer::isUnavailableInSwift(Decl, nullptr, true) &&
+          Impl.SwiftContext.LangOpts.EnableCXXInterop) {
+        ASTContext &ctx = Impl.SwiftContext;
+
+        // Compute the underlying type.
+        clang::QualType ClangType = Decl->getUnderlyingType();
+        auto underlyingType = Impl.importTypeIgnoreIUO(
+            ClangType, ImportTypeKind::Enum,
+            ImportDiagnosticAdder(Impl, Decl, Decl->getLocation()),
+            isInSystemModule(DC), Bridgeability::None, ImportTypeAttrs());
+        if (!underlyingType)
+          return nullptr;
+
+        auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
+            Decl, AccessLevel::Public, Loc, Name, Loc, None, nullptr, DC);
+
+        addSynthesizedProtocolAttrs(Impl, structDecl,
+                                    {KnownProtocolKind::Sendable},
+                                    /*isUnchecked=*/true);
+
+        makeStructRawValued(Impl, structDecl, underlyingType,
+                            {KnownProtocolKind::OptionSet});
+        auto selfType = structDecl->getDeclaredInterfaceType();
+        addSynthesizedTypealias(structDecl, ctx.Id_Element, selfType);
+        addSynthesizedTypealias(structDecl, ctx.Id_ArrayLiteralElement,
+                                selfType);
+        Impl.DeclsWithSuperfluousTypedefs.insert(Decl);
+
+        Result = structDecl;
+      } else {
+        auto TypeAliasResult = Impl.createDeclWithClangNode<TypeAliasDecl>(
+            Decl, AccessLevel::Public,
+            Impl.importSourceLoc(Decl->getBeginLoc()), SourceLoc(), Name, Loc,
+            /*genericparams*/ nullptr, DC);
+
+        TypeAliasResult->setUnderlyingType(SwiftType);
+        Result = TypeAliasResult;
+      }
 
       // Make Objective-C's 'id' unavailable.
       if (Impl.SwiftContext.LangOpts.EnableObjCInterop && isObjCId(Decl)) {
@@ -3903,6 +3936,24 @@ namespace {
 
     Decl *VisitEnumConstantDecl(const clang::EnumConstantDecl *decl) {
       auto clangEnum = cast<clang::EnumDecl>(decl->getDeclContext());
+
+
+
+      // Note: for NSArray with C++-Interop mode it seems the anon enum is not getting 
+      //       handled by VisitEnumDecl, but the enum constant decls are getting handled here.
+      //       I am not entirely sure why this is the case. It seems it is possible to get to the EnumDecl from the EnumConstantDecl.
+      
+
+
+      llvm::errs() << "Trying to import enum constant decl:\n";
+      decl->dump();
+      clangEnum->dump();
+      llvm::errs() << "CLANG ENUM NAME AS STRING: " << clangEnum->getTypedefNameForAnonDecl() << "\n";
+
+      clang::QualType T = clangEnum->getIntegerType();
+      clang::SplitQualType T_split = T.split();
+      clang::PrintingPolicy PrintPolicy = clang::LangOptions();
+      llvm::errs() << "ENUM TYPE!!! " << clang::QualType::getAsString(T_split, PrintPolicy) << "\n";
 
       ImportedName importedName;
       Optional<ImportedName> correctSwiftName;

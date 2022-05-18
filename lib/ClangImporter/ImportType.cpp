@@ -39,6 +39,7 @@
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjCCommon.h"
 #include "clang/AST/DeclTemplate.h"
+#include "clang/AST/Type.h"
 #include "clang/AST/TypeVisitor.h"
 #include "clang/Basic/Builtins.h"
 #include "clang/Lex/Preprocessor.h"

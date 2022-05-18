@@ -3,6 +3,13 @@
 
 import CenumsWithOptionsOmit
 
+// CHECK: struct NSEnumerationOptions : OptionSet {
+// CHECK-NEXT:   init(rawValue: Int32)
+// CHECK-NEXT:   let rawValue: Int32
+// CHECK-NEXT:   typealias RawValue = Int32
+// CHECK-NEXT:   typealias Element = NSEnumerationOptions
+// CHECK-NEXT:   typealias ArrayLiteralElement = NSEnumerationOptions
+
 // CHECK: class NSSet {
 // CHECK-NEXT: class func enumerateObjects(options
 // CHECK-NEXT: func enumerateObjects(options
