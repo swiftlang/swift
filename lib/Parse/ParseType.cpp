@@ -1643,8 +1643,7 @@ bool Parser::canParseTypeTupleBody() {
 
       // If the tuple element starts with "ident :", then it is followed
       // by a type annotation.
-      if (Tok.canBeArgumentLabel() && 
-          (peekToken().is(tok::colon) || peekToken().canBeArgumentLabel())) {
+      if (startsParameterName(/*isClosure=*/false)) {
         consumeToken();
         if (Tok.canBeArgumentLabel()) {
           consumeToken();
