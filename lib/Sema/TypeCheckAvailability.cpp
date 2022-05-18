@@ -1967,6 +1967,35 @@ void TypeChecker::checkConcurrencyAvailability(SourceRange ReferenceRange,
   }
 }
 
+/// Returns the diagnostic to emit for the potentially unavailable decl and sets
+/// \p IsError accordingly.
+static Diagnostic getPotentialUnavailabilityDiagnostic(
+    const ValueDecl *D, const DeclContext *ReferenceDC,
+    const UnavailabilityReason &Reason, bool WarnBeforeDeploymentTarget,
+    bool &IsError) {
+  ASTContext &Context = ReferenceDC->getASTContext();
+  auto Platform = prettyPlatformString(targetPlatform(Context.LangOpts));
+  auto Version = Reason.getRequiredOSVersionRange().getLowerEndpoint();
+
+  if (Version <= AvailabilityContext::forDeploymentTarget(Context)
+                     .getOSVersion()
+                     .getLowerEndpoint()) {
+    // The required OS version is at or before the deployment target so this
+    // diagnostic should indicate that the decl could be unavailable to clients
+    // of the module containing the reference.
+    IsError = !WarnBeforeDeploymentTarget;
+
+    return Diagnostic(
+        IsError ? diag::availability_decl_only_version_newer_for_clients
+                : diag::availability_decl_only_version_newer_for_clients_warn,
+        D->getName(), Platform, Version, ReferenceDC->getParentModule());
+  }
+
+  IsError = true;
+  return Diagnostic(diag::availability_decl_only_version_newer, D->getName(),
+                    Platform, Version);
+}
+
 bool TypeChecker::diagnosePotentialUnavailability(
     const ValueDecl *D, SourceRange ReferenceRange,
     const DeclContext *ReferenceDC,
@@ -1974,29 +2003,22 @@ bool TypeChecker::diagnosePotentialUnavailability(
     bool WarnBeforeDeploymentTarget) {
   ASTContext &Context = ReferenceDC->getASTContext();
 
-  bool AsError = true;
   auto RequiredRange = Reason.getRequiredOSVersionRange();
+  bool IsError;
   {
-    if (WarnBeforeDeploymentTarget &&
-        !RequiredRange.isContainedIn(
-            AvailabilityContext::forDeploymentTarget(Context).getOSVersion()))
-      AsError = false;
-
     auto Diag = Context.Diags.diagnose(
         ReferenceRange.Start,
-        AsError ? diag::availability_decl_only_version_newer
-                : diag::availability_decl_only_version_newer_warn,
-        D->getName(), prettyPlatformString(targetPlatform(Context.LangOpts)),
-        Reason.getRequiredOSVersionRange().getLowerEndpoint());
+        getPotentialUnavailabilityDiagnostic(
+            D, ReferenceDC, Reason, WarnBeforeDeploymentTarget, IsError));
 
     // Direct a fixit to the error if an existing guard is nearly-correct
     if (fixAvailabilityByNarrowingNearbyVersionCheck(
             ReferenceRange, ReferenceDC, RequiredRange, Context, Diag))
-      return AsError;
+      return IsError;
   }
 
   fixAvailability(ReferenceRange, ReferenceDC, RequiredRange, Context);
-  return AsError;
+  return IsError;
 }
 
 void TypeChecker::diagnosePotentialAccessorUnavailability(
