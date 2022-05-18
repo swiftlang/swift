@@ -3602,6 +3602,8 @@ namespace {
                 cxxOperatorKind != clang::OverloadedOperatorKind::OO_Subscript) {
 
               auto d = makeOperator(MD, cxxMethod);
+              result->addMember(d);
+
               Impl.addAlternateDecl(MD, d);
 
               Impl.markUnavailable(MD, "use - operator");
