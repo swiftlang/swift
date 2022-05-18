@@ -116,6 +116,20 @@ SWIFT_RUNTIME_STDLIB_SPI
 __swift_bool _swift_stdlib_getCurrentStackBounds(__swift_uintptr_t *outBegin,
                                                  __swift_uintptr_t *outEnd);
 
+/// A value representing a version number for the Standard Library.
+typedef struct {
+  __swift_uint32_t _value;
+} _SwiftStdlibVersion;
+
+/// Checks if the currently running executable was built using a Swift release
+/// matching or exceeding the specified Standard Library version number. This
+/// can be used to stage behavioral changes in the Standard Library, preventing
+/// them from causing compatibility issues with existing binaries.
+SWIFT_RUNTIME_STDLIB_INTERNAL
+__swift_bool _swift_stdlib_isExecutableLinkedOnOrAfter(
+  _SwiftStdlibVersion version
+) __attribute__((const));
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

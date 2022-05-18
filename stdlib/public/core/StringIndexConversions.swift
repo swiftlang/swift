@@ -51,15 +51,13 @@ extension String.Index {
   ///   - target: The string referenced by the resulting index.
   public init?(_ sourcePosition: String.Index, within target: String) {
     // As a special exception, we allow `sourcePosition` to be an UTF-16 index
-    // when `self` is a UTF-8 string, to preserve compatibility with (broken)
-    // code that keeps using indices from a bridged string after converting the
-    // string to a native representation. Such indices are invalid, but
-    // returning nil here can break code that appeared to work fine for ASCII
-    // strings in Swift releases prior to 5.7.
-    guard
-      let i = target._guts.ensureMatchingEncodingNoTrap(sourcePosition),
-      target._isValidIndex(i)
-    else { return nil }
+    // when `self` is a UTF-8 string (or vice versa), to preserve compatibility
+    // with (broken) code that keeps using indices from a bridged string after
+    // converting the string to a native representation. Such indices are
+    // invalid, but returning nil here can break code that appeared to work fine
+    // for ASCII strings in Swift releases prior to 5.7.
+    let i = target._guts.ensureMatchingEncoding(sourcePosition)
+    guard target._isValidIndex(i) else { return nil }
     self = i._characterAligned
   }
 
@@ -111,15 +109,13 @@ extension String.Index {
     }
     if let str = target as? Substring {
       // As a special exception, we allow `sourcePosition` to be an UTF-16 index
-      // when `self` is a UTF-8 string, to preserve compatibility with (broken)
-      // code that keeps using indices from a bridged string after converting
-      // the string to a native representation. Such indices are invalid, but
-      // returning nil here can break code that appeared to work fine for ASCII
-      // strings in Swift releases prior to 5.7.
-      guard
-        let i = str._wholeGuts.ensureMatchingEncodingNoTrap(sourcePosition),
-        str._isValidIndex(i)
-      else { return nil }
+      // when `self` is a UTF-8 string (or vice versa), to preserve
+      // compatibility with (broken) code that keeps using indices from a
+      // bridged string after converting the string to a native representation.
+      // Such indices are invalid, but returning nil here can break code that
+      // appeared to work fine for ASCII strings in Swift releases prior to 5.7.
+      let i = str._wholeGuts.ensureMatchingEncoding(sourcePosition)
+      guard str._isValidIndex(i) else { return nil }
       self = i
       return
     }

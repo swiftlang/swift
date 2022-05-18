@@ -83,10 +83,16 @@ extension String: BidirectionalCollection {
   ///   `startIndex`.
   /// - Returns: The index value immediately before `i`.
   public func index(before i: Index) -> Index {
-    let i = _guts.validateInclusiveCharacterIndex(i)
+    // FIXME: This method used to not properly validate indices before 5.7;
+    // temporarily allow older binaries to keep invoking undefined behavior as
+    // before.
+    let i = _guts.validateInclusiveCharacterIndex_5_7(i)
+
     // Note: Aligning an index may move it closer towards the `startIndex`, so
     // the `i > startIndex` check needs to come after rounding.
-    _precondition(i > startIndex, "String index is out of bounds")
+    _precondition(
+      ifLinkedOnOrAfter: .v5_7_0,
+      i > startIndex, "String index is out of bounds")
 
     return _uncheckedIndex(before: i)
   }
@@ -137,7 +143,10 @@ extension String: BidirectionalCollection {
 
     // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
 
-    var i = _guts.validateInclusiveCharacterIndex(i)
+    // FIXME: This method used to not properly validate indices before 5.7;
+    // temporarily allow older binaries to keep invoking undefined behavior as
+    // before.
+    var i = _guts.validateInclusiveCharacterIndex_5_7(i)
 
     if distance >= 0 {
       for _ in stride(from: 0, to: distance, by: 1) {
@@ -209,10 +218,14 @@ extension String: BidirectionalCollection {
     // ensure our behavior exactly matches the documentation above. We do need
     // to ensure it has a matching encoding, though. The same goes for `start`,
     // which is used to determine whether the limit applies at all.
+
     let limit = _guts.ensureMatchingEncoding(limit)
     let start = _guts.ensureMatchingEncoding(i)
 
-    var i = _guts.validateInclusiveCharacterIndex(i)
+    // FIXME: This method used to not properly validate indices before 5.7;
+    // temporarily allow older binaries to keep invoking undefined behavior as
+    // before.
+    var i = _guts.validateInclusiveCharacterIndex_5_7(i)
 
     if distance >= 0 {
       for _ in stride(from: 0, to: distance, by: 1) {
@@ -245,8 +258,11 @@ extension String: BidirectionalCollection {
     // Note: Prior to Swift 5.7, this function used to be inlinable, forwarding
     // to `BidirectionalCollection._distance(from:to:)`.
 
-    let start = _guts.validateInclusiveCharacterIndex(start)
-    let end = _guts.validateInclusiveCharacterIndex(end)
+    // FIXME: This method used to not properly validate indices before 5.7;
+    // temporarily allow older binaries to keep invoking undefined behavior as
+    // before.
+    let start = _guts.validateInclusiveCharacterIndex_5_7(start)
+    let end = _guts.validateInclusiveCharacterIndex_5_7(end)
 
     // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
 
