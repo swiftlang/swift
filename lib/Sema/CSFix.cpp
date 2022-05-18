@@ -241,6 +241,38 @@ bool RelabelArguments::diagnose(const Solution &solution, bool asNote) const {
   return failure.diagnose(asNote);
 }
 
+bool RelabelArguments::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  SmallPtrSet<ValueDecl *, 4> overloadChoices;
+
+  // First, let's find overload choice associated with each
+  // re-labeling fix.
+  for (const auto &fix : commonFixes) {
+    auto &solution = *fix.first;
+
+    auto calleeLocator = solution.getCalleeLocator(getLocator());
+    if (!calleeLocator)
+      return false;
+
+    auto overloadChoice = solution.getOverloadChoiceIfAvailable(calleeLocator);
+    if (!overloadChoice)
+      return false;
+
+    auto *decl = overloadChoice->choice.getDeclOrNull();
+    if (!decl)
+      return false;
+
+    (void)overloadChoices.insert(decl);
+  }
+
+  // If all of the fixes point to the same overload choice then it's
+  // exactly the same issue since the call site is static.
+  if (overloadChoices.size() == 1)
+    return diagnose(*commonFixes.front().first);
+
+  return false;
+}
+
 RelabelArguments *
 RelabelArguments::create(ConstraintSystem &cs,
                          llvm::ArrayRef<Identifier> correctLabels,
