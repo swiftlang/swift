@@ -48,10 +48,6 @@ from swift_build_support.swift_build_support.utils import fatal_error
 # These versions are community sourced. At any given time only the Xcode
 # version used by Swift CI is officially supported. See ci.swift.org
 _SUPPORTED_XCODE_BUILDS = [
-    ("12.3", "12C33"),
-    ("12.4", "12D4e"),
-    ("12.5", "12E262"),
-    ("13.0 beta", "13A5154h"),
     ("13.0 beta 4", "13A5201i"),
     ("13.0", "13A233"),
     ("13.1 RC 1", "13A1030d"),
