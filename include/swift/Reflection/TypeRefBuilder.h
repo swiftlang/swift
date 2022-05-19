@@ -855,6 +855,7 @@ private:
   using ByteReader = std::function<remote::MemoryReader::ReadBytesResult (remote::RemoteAddress, unsigned)>;
   using StringReader = std::function<bool (remote::RemoteAddress, std::string &)>;
   using PointerReader = std::function<llvm::Optional<remote::RemoteAbsolutePointer> (remote::RemoteAddress, unsigned)>;
+  using DynamicSymbolResolver = std::function<llvm::Optional<remote::RemoteAbsolutePointer> (remote::RemoteAddress)>;
   using IntVariableReader = std::function<llvm::Optional<uint64_t> (std::string, unsigned)>;
 
   // These fields are captured from the MetadataReader template passed into the
@@ -868,6 +869,7 @@ private:
   ByteReader OpaqueByteReader;
   StringReader OpaqueStringReader;
   PointerReader OpaquePointerReader;
+  DynamicSymbolResolver OpaqueDynamicSymbolResolver;
   IntVariableReader OpaqueIntVariableReader;
 
 public:
@@ -894,6 +896,9 @@ public:
       }),
       OpaquePointerReader([&reader](remote::RemoteAddress address, unsigned size) -> llvm::Optional<remote::RemoteAbsolutePointer> {
         return reader.Reader->readPointer(address, size);
+      }),
+      OpaqueDynamicSymbolResolver([&reader](remote::RemoteAddress address) -> llvm::Optional<remote::RemoteAbsolutePointer> {
+        return reader.Reader->getDynamicSymbol(address);
       }),
       OpaqueIntVariableReader(
         [&reader](std::string symbol, unsigned size) -> llvm::Optional<uint64_t> {
@@ -1019,13 +1024,16 @@ private:
     ByteReader OpaqueByteReader;
     StringReader OpaqueStringReader;
     PointerReader OpaquePointerReader;
+    DynamicSymbolResolver OpaqueDynamicSymbolResolver;
 
     ProtocolConformanceDescriptorReader(ByteReader byteReader,
                                         StringReader stringReader,
-                                        PointerReader pointerReader)
+                                        PointerReader pointerReader,
+                                        DynamicSymbolResolver dynamicSymbolResolver)
         : Error(""), OpaqueByteReader(byteReader),
-          OpaqueStringReader(stringReader), OpaquePointerReader(pointerReader) {
-    }
+          OpaqueStringReader(stringReader),
+          OpaquePointerReader(pointerReader),
+          OpaqueDynamicSymbolResolver(dynamicSymbolResolver) {}
 
     llvm::Optional<std::string>
     getParentContextName(uintptr_t contextDescriptorAddress) {
@@ -1248,17 +1256,16 @@ private:
         return llvm::None;
       }
       auto contextDescriptorOffset =
-          (const uint32_t *)contextDescriptorOffsetBytes.get();
+          (const int32_t *)contextDescriptorOffsetBytes.get();
 
       // Read the type descriptor itself using the address computed above
       auto contextTypeDescriptorAddress = detail::applyRelativeOffset(
           (const char *)contextDescriptorFieldAddress,
-          (int32_t)*contextDescriptorOffset);
+          *contextDescriptorOffset);
 
       // Instead of a type descriptor this may just be a symbol reference, check that first
-      if (auto symbol = OpaquePointerReader(remote::RemoteAddress(contextTypeDescriptorAddress),
-                                            PointerSize)) {
-        if (!symbol->getSymbol().empty()) {
+      if (auto symbol = OpaqueDynamicSymbolResolver(remote::RemoteAddress(contextTypeDescriptorAddress))) {
+        if (!symbol->isResolved()) {
           mangledTypeName = symbol->getSymbol().str();
           Demangle::Context Ctx;
           auto demangledRoot =
@@ -1267,6 +1274,9 @@ private:
           typeName =
               nodeToString(demangledRoot->getChild(0)->getChild(0));
           return std::make_pair(mangledTypeName, typeName);
+        } else if (symbol->getOffset()) {
+          // If symbol is empty and has an offset, this is the resolved remote address
+          contextTypeDescriptorAddress = symbol->getOffset();
         }
       }
 
@@ -1462,7 +1472,7 @@ public:
     std::unordered_map<std::string, std::vector<std::string>> typeConformances;
     ProtocolConformanceDescriptorReader<ObjCInteropKind, PointerSize>
         conformanceReader(OpaqueByteReader, OpaqueStringReader,
-                          OpaquePointerReader);
+                          OpaquePointerReader, OpaqueDynamicSymbolResolver);
     for (const auto &section : ReflectionInfos) {
       auto ConformanceBegin = section.Conformance.startAddress();
       auto ConformanceEnd = section.Conformance.endAddress();
