@@ -53,10 +53,11 @@ void swift::symbolgraphgen::serialize(const llvm::Triple &T,
       OS.attribute("name", T.getOSTypeName(T.getOS()));
 
       llvm::VersionTuple OSVersion = T.getOSVersion();
-
-      OS.attributeBegin("minimumVersion");
-      serialize(OSVersion, OS);
-      OS.attributeEnd();
+      if (!OSVersion.empty()) {
+        OS.attributeBegin("minimumVersion");
+        serialize(OSVersion, OS);
+        OS.attributeEnd();
+      }
     });
   });
 }
