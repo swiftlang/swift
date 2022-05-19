@@ -119,17 +119,17 @@ struct DeinitBarriers final {
 /// place they can be hoisted to.
 ///
 /// Implements BackwardReachability::BlockReachability.
-class DataFlow final {
+class Dataflow final {
   Context const &context;
   Usage const &uses;
   DeinitBarriers &result;
 
   enum class Classification { Barrier, Other };
 
-  BackwardReachability<DataFlow> reachability;
+  BackwardReachability<Dataflow> reachability;
 
 public:
-  DataFlow(Context const &context, Usage const &uses, DeinitBarriers &result)
+  Dataflow(Context const &context, Usage const &uses, DeinitBarriers &result)
       : context(context), uses(uses), result(result),
         reachability(&context.function, *this) {
     // Seed reachability with the scope ending uses from which the backwards
@@ -138,13 +138,13 @@ public:
       reachability.initLastUse(end);
     }
   }
-  DataFlow(DataFlow const &) = delete;
-  DataFlow &operator=(DataFlow const &) = delete;
+  Dataflow(Dataflow const &) = delete;
+  Dataflow &operator=(Dataflow const &) = delete;
 
   void run() { reachability.solveBackward(); }
 
 private:
-  friend class BackwardReachability<DataFlow>;
+  friend class BackwardReachability<Dataflow>;
 
   bool hasReachableBegin(SILBasicBlock *block) {
     return result.hoistingReachesBeginBlocks.contains(block);
@@ -169,8 +169,8 @@ private:
   bool checkReachablePhiBarrier(SILBasicBlock *);
 };
 
-DataFlow::Classification
-DataFlow::classifyInstruction(SILInstruction *instruction) {
+Dataflow::Classification
+Dataflow::classifyInstruction(SILInstruction *instruction) {
   if (instruction == context.definition) {
     return Classification::Barrier;
   }
@@ -183,7 +183,7 @@ DataFlow::classifyInstruction(SILInstruction *instruction) {
   return Classification::Other;
 }
 
-bool DataFlow::classificationIsBarrier(Classification classification) {
+bool Dataflow::classificationIsBarrier(Classification classification) {
   switch (classification) {
   case Classification::Barrier:
     return true;
@@ -193,7 +193,7 @@ bool DataFlow::classificationIsBarrier(Classification classification) {
   llvm_unreachable("exhaustive switch not exhaustive?!");
 }
 
-void DataFlow::visitedInstruction(SILInstruction *instruction,
+void Dataflow::visitedInstruction(SILInstruction *instruction,
                                   Classification classification) {
   assert(classifyInstruction(instruction) == classification);
   switch (classification) {
@@ -206,13 +206,13 @@ void DataFlow::visitedInstruction(SILInstruction *instruction,
   llvm_unreachable("exhaustive switch not exhaustive?!");
 }
 
-bool DataFlow::checkReachableBarrier(SILInstruction *instruction) {
+bool Dataflow::checkReachableBarrier(SILInstruction *instruction) {
   auto classification = classifyInstruction(instruction);
   visitedInstruction(instruction, classification);
   return classificationIsBarrier(classification);
 }
 
-bool DataFlow::checkReachablePhiBarrier(SILBasicBlock *block) {
+bool Dataflow::checkReachablePhiBarrier(SILBasicBlock *block) {
   assert(llvm::all_of(block->getArguments(),
                       [&](auto argument) { return PhiValue(argument); }));
 
@@ -342,7 +342,7 @@ bool run(Context &context) {
     return false;
 
   DeinitBarriers barriers(context);
-  DataFlow flow(context, usage, barriers);
+  Dataflow flow(context, usage, barriers);
   flow.run();
 
   Rewriter rewriter(context, usage, barriers);
