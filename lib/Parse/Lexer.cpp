@@ -1885,11 +1885,11 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
         ++CurPtr;
         continue;
       } else if (!isMultilineString) {
-        diagnose(CurPtr, diag::lex_unterminated_string);
+        diagnose(TokStart, diag::lex_unterminated_string);
         diagnose(CurPtr, diag::string_interpolation_unclosed);
         diagnose(--TmpPtr, diag::opening_paren);
 
-        continue;
+        return formToken(tok::unknown, TokStart);
       } else if (*CurPtr == '\r' || *CurPtr == '\n' || CurPtr == BufferEnd) {
         // The only case we reach here is unterminated single line string in the
         // interpolation. For better recovery, go on after emitting an error.
@@ -1901,8 +1901,7 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
         continue;
       } else {
         // As a fallback, just emit an unterminated string error.
-        diagnose(CurPtr, diag::lex_unterminated_string);
-        wasErroneous = true;
+        diagnose(Tokstart, diag::lex_unterminated_string);
 
         return formToken(tok::unknown, TokStart);
       }
