@@ -8,9 +8,8 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-// FIXME(distributed): 5.7 branches seem to be missing something; as `main + 32bit watch` does not crash on DA usage with the local testing actor system, but 5.7 does.
-// rdar://92952551
-// UNSUPPORTED: OS=watchos
+// FIXME(distributed): Seems something remains incorrect here
+// REQUIRES: rdar92952551
 
 import Distributed
 
