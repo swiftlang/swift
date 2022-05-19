@@ -52,6 +52,7 @@
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Basic/Version.h"
 #include "clang/CodeGen/ObjectFilePCHContainerOperations.h"
+#include "clang/Driver/Driver.h"
 #include "clang/Frontend/FrontendActions.h"
 #include "clang/Frontend/Utils.h"
 #include "clang/Index/IndexingAction.h"
@@ -875,11 +876,19 @@ getClangInvocationFileMapping(ASTContext &ctx) {
   if (!triple.isOSLinux())
     return {};
 
-  SearchPathOptions &searchPathOpts = ctx.SearchPathOpts;
-
-  Path sdkPath(searchPathOpts.getSDKPath());
-  if (sdkPath.empty())
-    sdkPath = "/";
+  auto clangDiags = clang::CompilerInstance::createDiagnostics(
+      new clang::DiagnosticOptions());
+  clang::driver::Driver clangDriver(ctx.ClangImporterOpts.clangPath,
+                                    triple.str(), *clangDiags);
+  auto cxxStdlibDirs =
+      clangDriver.getLibStdCxxIncludePaths(llvm::opt::InputArgList(), triple);
+  if (cxxStdlibDirs.empty()) {
+    ctx.Diags.diagnose(SourceLoc(), diag::libstdcxx_not_found, triple.str());
+    return {};
+  }
+  Path cxxStdlibDir(cxxStdlibDirs.front());
+  // VFS does not allow mapping paths that contain `../` or `./`.
+  llvm::sys::path::remove_dots(cxxStdlibDir, /*remove_dot_dot=*/true);
 
   // Currently only a modulemap for libstdc++ is injected.
   if (!ctx.LangOpts.EnableCXXInterop)
@@ -887,7 +896,7 @@ getClangInvocationFileMapping(ASTContext &ctx) {
 
   Path actualModuleMapPath;
   Path buffer;
-  if (auto path = getLibStdCxxModuleMapPath(searchPathOpts, triple, buffer))
+  if (auto path = getLibStdCxxModuleMapPath(ctx.SearchPathOpts, triple, buffer))
     actualModuleMapPath = path.getValue();
   else
     return {};
@@ -905,48 +914,26 @@ getClangInvocationFileMapping(ASTContext &ctx) {
   llvm::sys::path::remove_filename(actualHeaderPath);
   llvm::sys::path::append(actualHeaderPath, "libstdcxx.h");
 
-  Path cxxStdlibsRoot(sdkPath);
-  llvm::sys::path::append(cxxStdlibsRoot, "usr", "include", "c++");
-  if (!llvm::sys::fs::exists(cxxStdlibsRoot))
+  // Inject a modulemap into VFS for the libstdc++ directory.
+  // Only inject the module map if the module does not already exist at
+  // {sysroot}/usr/include/module.{map,modulemap}.
+  Path injectedModuleMapLegacyPath(cxxStdlibDir);
+  llvm::sys::path::append(injectedModuleMapLegacyPath, "module.map");
+  if (llvm::sys::fs::exists(injectedModuleMapLegacyPath))
     return {};
 
-  // Collect all installed versions of libstdc++. We currently have no way to
-  // know which libstdc++ version will be used for this Clang invocation.
-  // TODO: extract this information from the Clang driver.
-  SmallVector<Path, 1> cxxStdlibDirs;
-  std::error_code errorCode;
-  for (llvm::vfs::directory_iterator
-           iter = ctx.SourceMgr.getFileSystem()->dir_begin(cxxStdlibsRoot,
-                                                           errorCode),
-           endIter;
-       !errorCode && iter != endIter; iter = iter.increment(errorCode)) {
-    cxxStdlibDirs.push_back(Path(iter->path()));
-  }
+  Path injectedModuleMapPath(cxxStdlibDir);
+  llvm::sys::path::append(injectedModuleMapPath, "module.modulemap");
+  if (llvm::sys::fs::exists(injectedModuleMapPath))
+    return {};
 
-  SmallVector<std::pair<std::string, std::string>, 16> result;
-  // Inject a modulemap into the VFS for each of the libstdc++ versions.
-  for (const Path &cxxStdlibDir : cxxStdlibDirs) {
-    // Only inject the module map if the module does not already exist at
-    // {sysroot}/usr/include/module.{map,modulemap}.
-    Path injectedModuleMapLegacyPath(cxxStdlibDir);
-    llvm::sys::path::append(injectedModuleMapLegacyPath, "module.map");
-    if (llvm::sys::fs::exists(injectedModuleMapLegacyPath))
-      continue;
+  Path injectedHeaderPath(cxxStdlibDir);
+  llvm::sys::path::append(injectedHeaderPath, "libstdcxx.h");
 
-    Path injectedModuleMapPath = cxxStdlibDir;
-    llvm::sys::path::append(injectedModuleMapPath, "module.modulemap");
-    if (llvm::sys::fs::exists(injectedModuleMapPath))
-      continue;
-
-    Path injectedHeaderPath = cxxStdlibDir;
-    llvm::sys::path::append(injectedHeaderPath, "libstdcxx.h");
-
-    result.push_back(
-        {std::string(injectedModuleMapPath), std::string(actualModuleMapPath)});
-    result.push_back(
-        {std::string(injectedHeaderPath), std::string(actualHeaderPath)});
-  }
-  return result;
+  return {
+      {std::string(injectedModuleMapPath), std::string(actualModuleMapPath)},
+      {std::string(injectedHeaderPath), std::string(actualHeaderPath)},
+  };
 }
 
 bool ClangImporter::canReadPCH(StringRef PCHFilename) {
