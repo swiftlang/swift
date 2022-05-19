@@ -1900,10 +1900,11 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
         wasErroneous = true;
         return formToken(tok::unknown, TokStart);
       } else {
-        // As a fallback, just emit an unterminated string error
+        // As a fallback, just emit an unterminated string error.
         diagnose(CurPtr, diag::lex_unterminated_string);
         wasErroneous = true;
 
+        continue;
         return formToken(tok::unknown, TokStart)
       }
     }
