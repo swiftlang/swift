@@ -249,6 +249,17 @@ sil_vtable C2 {}
 // CHECK-SAME: <i32 0x8000_0004>
 // CHECK-SAME: <i32 0x0500_0000> }>
 
+// This is a resilient enum
+// -- %pc1: Mirror.AncestorRepresentation.customized
+// CHECK: [[KP_PC1:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK-SAME: [[WORD]]* @keypath_once
+// CHECK-SAME: @"symbolic
+// CHECK-SAME: @"symbolic
+// CHECK-SAME: i32 0
+// CHECK-SAME: <i32 0x8000_0008>
+// CHECK-SAME: <i32 0x057F_FFFF>
+// CHECK-SAME: @"got.$ss6MirrorV22AncestorRepresentationO10customizedyAdByccADmFWC
+
 // -- %pcg0: Optional<(T, U)>.some?.1
 // CHECK: [[KP_PCG0:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
 // CHECK-SAME: i32 0
@@ -415,6 +426,9 @@ sil @m2_set : $@convention(thin) (@in_guaranteed @callee_guaranteed @substituted
 sil @payload_cases : $@convention(thin) () -> () {
   // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_PC0]] to i8*), i8* undef)
   %pc0 = keypath $KeyPath<Color, Optional<String>>, (root $Color; payload_case #Color.generic : $Optional<String>)
+
+  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_PC1]] to i8*), i8* undef)
+  %pc1 = keypath $KeyPath<Mirror.AncestorRepresentation, Optional<() -> Mirror>>, (root $Mirror.AncestorRepresentation; payload_case #Mirror.AncestorRepresentation.customized : $Optional<() -> Mirror>)
 
   return undef : $()
 }
