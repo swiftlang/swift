@@ -9270,6 +9270,35 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
         return type;
       });
 
+      auto success = [&]() -> SolutionKind {
+        // Record a hole for memberTy to make it possible to form solutions
+        // when contextual result type cannot be deduced e.g. `let _ = x.foo`.
+        if (auto *memberTypeVar = memberTy->getAs<TypeVariableType>()) {
+          if (getFixedType(memberTypeVar)) {
+            // If member has been bound before the base and the base was
+            // incorrect at that (e.g. fallback to default `Any` type),
+            // then we need to re-activate all of the constraints
+            // associated with this member reference otherwise some of
+            // the constraints could be left unchecked in inactive state.
+            // This is especially important for key path expressions because
+            // `key path` constraint can't be retired until all components
+            // are simplified.
+            addTypeVariableConstraintsToWorkList(memberTypeVar);
+          } else if (locator->isLastElement<LocatorPathElt::PatternMatch>()) {
+            // Let's handle member patterns specifically because they use
+            // equality instead of argument application constraint, so allowing
+            // them to bind member could mean missing valid hole positions in
+            // the pattern.
+            assignFixedType(memberTypeVar, PlaceholderType::get(getASTContext(),
+                                                                memberTypeVar));
+          } else {
+            recordPotentialHole(memberTypeVar);
+          }
+        }
+
+        return SolutionKind::Solved;
+      };
+
       bool alreadyDiagnosed = (result.OverallResult ==
                                MemberLookupResult::ErrorAlreadyDiagnosed);
       auto *fix = DefineMemberBasedOnUse::create(*this, baseTy, member,
@@ -9287,42 +9316,26 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       if (instanceTy->isAny() || instanceTy->isAnyObject())
         impact += 5;
 
-      // Increasing the impact for missing member in any argument position so it
-      // doesn't affect situations where there are another fixes involved.
       auto *anchorExpr = getAsExpr(locator->getAnchor());
-      if (anchorExpr && getArgumentLocator(anchorExpr)) {
-        impact += 5;
+      if (anchorExpr) {
+        // If this is a missing `makeIterator` then the issue is related
+        // to a missing `Sequence` conformance in for-in context.
+        if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchorExpr)) {
+          if (UDE->isImplicit() &&
+              getContextualTypePurpose(UDE->getBase()) == CTP_ForEachSequence)
+            return success();
+        }
+
+        // Increasing the impact for missing member in any argument position so
+        // it doesn't affect situations where there are another fixes involved.
+        if (getArgumentLocator(anchorExpr))
+          impact += 5;
       }
 
       if (recordFix(fix, impact))
         return SolutionKind::Error;
 
-      // Record a hole for memberTy to make it possible to form solutions
-      // when contextual result type cannot be deduced e.g. `let _ = x.foo`.
-      if (auto *memberTypeVar = memberTy->getAs<TypeVariableType>()) {
-        if (getFixedType(memberTypeVar)) {
-          // If member has been bound before the base and the base was
-          // incorrect at that (e.g. fallback to default `Any` type),
-          // then we need to re-activate all of the constraints
-          // associated with this member reference otherwise some of
-          // the constraints could be left unchecked in inactive state.
-          // This is especially important for key path expressions because
-          // `key path` constraint can't be retired until all components
-          // are simplified.
-          addTypeVariableConstraintsToWorkList(memberTypeVar);
-        } else if (locator->isLastElement<LocatorPathElt::PatternMatch>()) {
-          // Let's handle member patterns specifically because they use
-          // equality instead of argument application constraint, so allowing
-          // them to bind member could mean missing valid hole positions in
-          // the pattern.
-          assignFixedType(memberTypeVar,
-                          PlaceholderType::get(getASTContext(), memberTypeVar));
-        } else {
-          recordPotentialHole(memberTypeVar);
-        }
-      }
-
-      return SolutionKind::Solved;
+      return success();
     };
 
     if (baseObjTy->getOptionalObjectType()) {
