@@ -5355,6 +5355,19 @@ bool ConstraintSystem::repairFailures(
     if (isFixedRequirement(reqLoc, rhs))
       return true;
 
+    // If this is a requirement on sequence of for-in statement where one
+    // of the sides is a completely resolved dependent member, skip it
+    // since the issue is with the conformance to `Sequence`, otherwise
+    // dependent member would have been substituted.
+    if (auto *UDE = getAsExpr<UnresolvedDotExpr>(anchor)) {
+      if (UDE->isImplicit() &&
+          getContextualTypePurpose(UDE->getBase()) == CTP_ForEachSequence) {
+        if ((lhs->is<DependentMemberType>() && !lhs->hasTypeVariable()) ||
+            (rhs->is<DependentMemberType>() && !rhs->hasTypeVariable()))
+          return true;
+      }
+    }
+
     if (auto *fix = fixRequirementFailure(*this, lhs, rhs, anchor, path)) {
       recordFixedRequirement(reqLoc, rhs);
       conversionsOrFixes.push_back(fix);
