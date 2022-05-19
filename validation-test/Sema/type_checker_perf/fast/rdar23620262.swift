@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift -solver-expression-time-threshold=1
 // REQUIRES: tools-release,no_asan
 
-// UNSUPPORTED: linux
+// UNSUPPORTED: OS=linux-gnu
 
 // expected-no-diagnostics
 
