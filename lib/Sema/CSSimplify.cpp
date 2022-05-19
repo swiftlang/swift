@@ -9323,12 +9323,23 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
 
       auto *anchorExpr = getAsExpr(locator->getAnchor());
       if (anchorExpr) {
-        // If this is a missing `makeIterator` then the issue is related
-        // to a missing `Sequence` conformance in for-in context.
         if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchorExpr)) {
-          if (UDE->isImplicit() &&
-              getContextualTypePurpose(UDE->getBase()) == CTP_ForEachSequence)
-            return success();
+          // The issue is related to a missing `Sequence` protocol
+          // conformance if either `makeIterator` or `next` are missing.
+          if (UDE->isImplicit()) {
+            // Missing `makeIterator` since the base is sequence expression.
+            if (getContextualTypePurpose(UDE->getBase()) == CTP_ForEachSequence)
+              return success();
+
+            // Missing `next` where the base is result of `makeIterator`.
+            if (auto *base = dyn_cast<DeclRefExpr>(UDE->getBase())) {
+              if (auto var = dyn_cast_or_null<VarDecl>(base->getDecl())) {
+                if (var->getNameStr().contains("$generator") &&
+                    UDE->getName().getBaseIdentifier() == Context.Id_next)
+                  return success();
+              }
+            }
+          }
         }
 
         // Increasing the impact for missing member in any argument position so
