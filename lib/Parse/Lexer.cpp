@@ -1905,7 +1905,7 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
         wasErroneous = true;
 
         continue;
-        return formToken(tok::unknown, TokStart)
+        return formToken(tok::unknown, TokStart);
       }
     }
 
