@@ -10957,7 +10957,7 @@ bool ConstraintSystem::simplifyAppliedOverloadsImpl(
         auto *dc = decl->getDeclContext();
         if (auto *parent = dc->getSelfNominalTypeDecl()) {
           auto type = parent->getDeclaredInterfaceType();
-          if (type->isCallableNominalType(DC))
+          if (type->isCallAsFunctionNominalType(DC))
             return false;
         }
       }
@@ -11281,7 +11281,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   // Handle applications of types with `callAsFunction` methods.
   // Do this before stripping optional types below, when `shouldAttemptFixes()`
   // is true.
-  if (desugar2->isCallableNominalType(DC)) {
+  if (desugar2->isCallAsFunctionNominalType(DC)) {
     auto memberLoc = getConstraintLocator(
         locator.withPathElement(ConstraintLocator::ImplicitCallAsFunction));
     // Add a `callAsFunction` member constraint, binding the member type to a
@@ -11342,7 +11342,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
       // trailing closure(s), closure(s) might not belong to
       // the constructor but rather to implicit `callAsFunction`,
       // there is no way to determine that without trying.
-      if (resultTy->isCallableNominalType(DC) &&
+      if (resultTy->isCallAsFunctionNominalType(DC) &&
           argumentList->hasAnyTrailingClosures()) {
         auto *calleeLoc = getCalleeLocator(argumentsLoc);
 
@@ -11492,7 +11492,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
     // once constraint generation is done.
     if (getPhase() == ConstraintSystemPhase::ConstraintGeneration &&
         argumentList->hasAnyTrailingClosures() &&
-        instance2->isCallableNominalType(DC)) {
+        instance2->isCallAsFunctionNominalType(DC)) {
       return formUnsolved(/*activate=*/true);
     }
 
