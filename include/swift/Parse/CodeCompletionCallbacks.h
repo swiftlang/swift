@@ -118,6 +118,11 @@ public:
   /// Set target decl for attribute if the CC token is in attribute of the decl.
   virtual void setAttrTargetDeclKind(Optional<DeclKind> DK) {}
 
+  /// Set that the code completion token occurred in a custom attribute. This
+  /// allows us to type check the custom attribute even if it is not attached to
+  /// the AST, e.g. because there is no var declaration following it.
+  virtual void setCompletingInAttribute(CustomAttr *Attr){};
+
   /// Complete expr-dot after we have consumed the dot.
   virtual void completeDotExpr(CodeCompletionExpr *E, SourceLoc DotLoc) {};
 

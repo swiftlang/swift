@@ -89,7 +89,8 @@ void ContextInfoCallbacks::doneParsing() {
   if (!ParsedExpr)
     return;
 
-  typeCheckContextAt(CurDeclContext, ParsedExpr->getLoc());
+  typeCheckContextAt(TypeCheckASTNodeAtLocContext::declContext(CurDeclContext),
+                     ParsedExpr->getLoc());
 
   ExprContextInfo Info(CurDeclContext, ParsedExpr);
 
