@@ -978,7 +978,6 @@ ParserStatus Parser::parseEffectsSpecifiers(SourceLoc existingArrowLoc,
             .fixItInsert(throwsLoc, isReasync ? "reasync " : "async ");
       }
       if (asyncLoc.isInvalid()) {
-        Tok.setKind(tok::contextual_keyword);
         if (reasync)
           *reasync = isReasync;
         asyncLoc = Tok.getLoc();
