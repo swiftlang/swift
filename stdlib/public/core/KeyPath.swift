@@ -1222,7 +1222,12 @@ internal struct RawKeyPathComponent {
         return 0
 
       case .payloadCase:
-        // There is never a body with payload cases.
+        // If the enum in question was resilient, we would have stored a
+        // relative reference to the enum case symbol.
+        if payload == Header.outOfLineOffsetPayload {
+          return 4
+        }
+
         return 0
       }
     }
@@ -1315,8 +1320,6 @@ internal struct RawKeyPathComponent {
       _internalInvariantFailure("should be instantiated away")
     case .optionalChain, .optionalForce, .optionalWrap:
       return 0
-    case .payloadCase:
-      return 0
     case .computed:
       // align to pointer, minimum two pointers for id and get
       var total = Header.pointerAlignmentSkew + ptrSize * 2
@@ -1335,6 +1338,14 @@ internal struct RawKeyPathComponent {
         }
       }
       return total
+    case .payloadCase:
+      // If the enum in question was resilient, we would have stored a
+      // relative reference to the enum case symbol.
+      if header.payload == Header.outOfLineOffsetPayload {
+        return 4
+      }
+
+      return 0
     }
   }
 
@@ -3052,7 +3063,23 @@ internal func _walkKeyPathPattern<W: KeyPathPatternVisitor>(
     case .optionalForce:
       walker.visitOptionalForceComponent()
     case .payloadCase:
-      walker.visitPayloadCaseComponent(tag: Int(header.payload))
+      var tag = header.payload
+
+      // If our payload is equal to the out of line payload, then it means our
+      // enum was resilient and that there is a 4 byte indirect reference
+      // immediately following the component header.
+      if header.payload == RawKeyPathComponent.Header.outOfLineOffsetPayload {
+        let enumCaseBase = buffer.baseAddress.unsafelyUnwrapped
+        let offset = _pop(from: &buffer, as: Int32.self)
+        let enumCase = _resolveRelativeIndirectableAddress(
+          enumCaseBase,
+          offset
+        )
+
+        tag = enumCase.load(as: UInt32.self)
+      }
+
+      walker.visitPayloadCaseComponent(tag: Int(tag))
     case .external:
       // Look at the external property descriptor to see if we should take it
       // over the component given in the pattern.

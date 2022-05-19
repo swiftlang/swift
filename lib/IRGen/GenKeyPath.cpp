@@ -1189,14 +1189,34 @@ emitKeyPathComponent(IRGenModule &IGM,
                                            baseTy);
 
     auto enumElement = component.getEnumElement();
-    auto enumTy = enumElement->getParentEnum()->getDeclaredTypeInContext()
-                             ->getCanonicalType();
+    auto enumDecl = enumElement->getParentEnum();
+    auto enumTy = enumDecl->getDeclaredTypeInContext()->getCanonicalType();
 
-    auto &strategy = getEnumImplStrategy(IGM, enumTy);
-    auto tag = strategy.getTagIndex(enumElement);
+    // If our enum is resilient, it may reorder and add cases as it pleases.
+    // In light of that, we cannot emit a hard coded case tag into clients
+    // because future versions of this enum may not be identical as when the
+    // client compiled their code. Emit a relative indirect pointer to the
+    // enum's case global which stores its tag.
+    if (IGM.isResilient(enumDecl, ResilienceExpansion::Maximal)) {
+      auto enumCase = IGM.getAddrOfLLVMVariableOrGOTEquivalent(
+          LinkEntity::forEnumCase(enumElement));
 
-    auto header = KeyPathComponentHeader::forPayloadCase(tag);
-    fields.addInt32(header.getData());
+      auto header = KeyPathComponentHeader::forPayloadCase();
+
+      fields.addInt32(header.getData());
+      fields.addRelativeAddress(enumCase);
+    } else {
+      // Otherwise, this enum is either part of a library not participating in
+      // library evolution, we're in said library/executable and will always
+      // be compiled with new tags, or the enum is marked '@frozen'.
+      auto &strategy = getEnumImplStrategy(IGM, enumTy);
+      auto tag = strategy.getTagIndex(enumElement);
+
+      auto header = KeyPathComponentHeader::forPayloadCase(tag);
+
+      fields.addInt32(header.getData());
+    }
+
     break;
   }
   }

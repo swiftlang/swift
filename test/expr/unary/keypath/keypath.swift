@@ -1181,3 +1181,21 @@ func f_56854() {
     // expected-note@-1 2 {{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}
   }
 }
+
+// Payload case keypaths
+
+enum Color {
+  case red
+  case green
+  case blue
+  case generic(String)
+  case generic(String, Int)
+  case generic(name: String)
+}
+
+@available(SwiftStdlib 9999, *)
+func testPayloadKeyPaths() {
+  let _ = \Color.red // expected-error {{key path cannot refer to static member 'red'}}
+
+  //let _ = 
+}

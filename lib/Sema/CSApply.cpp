@@ -4911,6 +4911,14 @@ namespace {
           buildKeyPathPropertyComponent(solution.getOverloadChoice(calleeLoc),
                                         origComponent.getLoc(), calleeLoc,
                                         resolvedComponents);
+
+          // We may have potentially optional chained if the property in
+          // question was referring to Optional.some.
+          if (resolvedComponents.back().getKind() ==
+              KeyPathExpr::Component::Kind::OptionalChain) {
+            didOptionalChain = true;
+          }
+
           break;
         }
         case KeyPathExpr::Component::Kind::UnresolvedSubscript: {
@@ -4921,6 +4929,13 @@ namespace {
           break;
         }
         case KeyPathExpr::Component::Kind::OptionalChain: {
+          // If we have already chained, do not add another chain. This can
+          // occur if we had an unresolved property resolve to Optional.some.
+          // E.g. \(Int, Int)?.some?.1 resolves the .some to an optional chain.
+          if (didOptionalChain) {
+            continue;
+          }
+
           didOptionalChain = true;
           // Chaining always forces the element to be an rvalue.
           auto objectTy =
@@ -5155,9 +5170,23 @@ namespace {
           assert(enumElement->hasAssociatedValues());
 
           auto ref = resolveConcreteDeclRef(decl, locator);
-          components.push_back(
-              KeyPathExpr::Component::forPayloadCase(ref, resolvedTy,
-                                                     componentLoc));
+
+          // If our ref is Optional.some, lower that as the start of an optional
+          // chain.
+          if (auto type =
+                dyn_cast<NominalTypeDecl>(ref.getDecl()->getDeclContext())) {
+            if (type->isOptionalDecl()) {
+              auto objectTy = resolvedTy->getWithoutSpecifierType()
+                                        ->getOptionalObjectType();
+              components.push_back(
+                KeyPathExpr::Component::forOptionalChain(objectTy,
+                                                         componentLoc));
+            } else {
+              components.push_back(
+                  KeyPathExpr::Component::forPayloadCase(ref, resolvedTy,
+                                                         componentLoc));
+            }
+          }
         } else {
           llvm_unreachable("Unknown keypath property decl kind");
         }

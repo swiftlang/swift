@@ -114,4 +114,16 @@ tests.test("AlwaysEmitIntoClient") {
 }
 #endif
 
+tests.test("Payload Case Resilient Enums") {
+  let fromModule = ResilientEnum.keyPath_generic
+  let formedLocally = \ResilientEnum.generic
+
+  let value = ResilientEnum.generic("Hello")
+
+  expectEqual(fromModule, formedLocally)
+
+  expectEqual(value[keyPath: fromModule], "Hello")
+  expectEqual(value[keyPath: formedLocally], "Hello")
+}
+
 runAllTests()

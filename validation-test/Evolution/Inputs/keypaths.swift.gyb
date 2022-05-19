@@ -129,3 +129,18 @@ public struct AEIC {
     public var aeic: Int { return 0 }
 #endif
 }
+
+// Test the reordering of cases in a resilient enum
+public enum ResilientEnum {
+#if BEFORE
+  case generic(String)
+  case otherThing(Int)
+#else
+  case otherThing(Int)
+  case generic(String)
+#endif
+
+  public static var keyPath_generic: KeyPath<ResilientEnum, String?> {
+    \ResilientEnum.generic
+  }
+}

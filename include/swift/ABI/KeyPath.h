@@ -232,6 +232,15 @@ public:
         | numSubstitutions);
   }
   
+  // Use this initializer for resilient enums.
+  constexpr static KeyPathComponentHeader
+  forPayloadCase() {
+    return KeyPathComponentHeader(
+    (_SwiftKeyPathComponentHeader_PayloadCaseTag
+     << _SwiftKeyPathComponentHeader_DiscriminatorShift)
+    | _SwiftKeyPathComponentHeader_OutOfLineOffsetPayload);
+  }
+
   constexpr static KeyPathComponentHeader
   forPayloadCase(unsigned caseTag) {
     return KeyPathComponentHeader(
