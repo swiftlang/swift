@@ -1891,18 +1891,20 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
 
         return formToken(tok::unknown, TokStart);
       } else if (*CurPtr == '\r' || *CurPtr == '\n') {
+        // The only case we reach here is unterminated single line string in the
+        // interpolation. For better recovery, go on after emitting an error.
         diagnose(CurPtr, diag::lex_unterminated_string);
         diagnose(CurPtr, diag::string_interpolation_unclosed);
         diagnose(--TmpPtr, diag::opening_paren);
 
         wasErroneous = true;
-        continue;
         return formToken(tok::unknown, TokStart);
       } else {
-        // as a fallback, just emit an unterminated string error
+        // As a fallback, just emit an unterminated string error
         diagnose(CurPtr, diag::lex_unterminated_string);
         wasErroneous = true;
-        continue;
+
+        return formToken(tok::unknown, TokStart)
       }
     }
 
