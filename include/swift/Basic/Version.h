@@ -184,6 +184,11 @@ std::string getSwiftFullVersion(Version effectiveLanguageVersion =
 /// this Swift was built.
 StringRef getSwiftRevision();
 
+/// Is the running compiler built with a version tag for distribution?
+/// When true, \c Version::getCurrentCompilerVersion returns a valid version
+/// and \c getSwiftRevision returns the version tuple in string format.
+bool isCurrentCompilerTagged();
+
 } // end namespace version
 } // end namespace swift
 
