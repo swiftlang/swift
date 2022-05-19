@@ -1616,9 +1616,9 @@ Stmt *Traversal::visitForEachStmt(ForEachStmt *S) {
       return nullptr;
   }
 
-  if (auto IteratorVarRef = S->getIteratorVarRef()) {
-    if ((IteratorVarRef = doIt(IteratorVarRef)))
-      S->setIteratorVarRef(IteratorVarRef);
+  if (auto NextCall = S->getNextCall()) {
+    if ((NextCall = doIt(NextCall)))
+      S->setNextCall(NextCall);
     else
       return nullptr;
   }

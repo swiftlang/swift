@@ -744,7 +744,7 @@ class ForEachStmt : public LabeledStmt {
   // Set by Sema:
   ProtocolConformanceRef sequenceConformance = ProtocolConformanceRef();
   VarDecl *iteratorVar = nullptr;
-  Expr *iteratorVarRef = nullptr;
+  Expr *nextCall = nullptr;
   OpaqueValueExpr *elementExpr = nullptr;
   Expr *convertElementExpr = nullptr;
 
@@ -762,8 +762,8 @@ public:
   void setIteratorVar(VarDecl *var) { iteratorVar = var; }
   VarDecl *getIteratorVar() const { return iteratorVar; }
 
-  void setIteratorVarRef(Expr *var) { iteratorVarRef = var; }
-  Expr *getIteratorVarRef() const { return iteratorVarRef; }
+  void setNextCall(Expr *next) { nextCall = next; }
+  Expr *getNextCall() const { return nextCall; }
 
   void setElementExpr(OpaqueValueExpr *expr) { elementExpr = expr; }
   OpaqueValueExpr *getElementExpr() const { return elementExpr; }

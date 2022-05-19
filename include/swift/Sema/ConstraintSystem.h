@@ -1004,14 +1004,17 @@ struct ForEachStmtInfo {
   /// The type of the sequence.
   Type sequenceType;
 
-  /// The type of the iterator.
-  Type iteratorType;
-
   /// The type of an element in the sequence.
   Type elementType;
 
   /// The type of the pattern that matches the elements.
   Type initType;
+
+  /// Implicit `$iterator = <sequence>.makeIterator()`
+  VarDecl *makeIteratorVar;
+
+  /// Implicit `$iterator.next()` call.
+  Expr *nextCall;
 };
 
 /// Key to the constraint solver's mapping from AST nodes to their corresponding
