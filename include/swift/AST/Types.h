@@ -163,7 +163,10 @@ public:
     /// type sequence
     HasTypeSequence = 0x1000,
 
-    Last_Property = HasTypeSequence
+    /// This type contains a parameterized existential type \c any P<T>.
+    HasParameterizedExistential = 0x2000,
+
+    Last_Property = HasParameterizedExistential
   };
   enum { BitWidth = countBitsUsed(Property::Last_Property) };
 
@@ -222,6 +225,12 @@ public:
   bool hasPlaceholder() const { return Bits & HasPlaceholder; }
 
   bool hasTypeSequence() const { return Bits & HasTypeSequence; }
+
+  /// Does a type with these properties structurally contain a
+  /// parameterized existential type?
+  bool hasParameterizedExistential() const {
+    return Bits & HasParameterizedExistential;
+  }
 
   /// Returns the set of properties present in either set.
   friend RecursiveTypeProperties operator|(Property lhs, Property rhs) {
@@ -624,6 +633,11 @@ public:
 
   bool hasTypeSequence() const {
     return getRecursiveProperties().hasTypeSequence();
+  }
+
+  /// Determine whether the type involves a parameterized existential type.
+  bool hasParameterizedExistential() const {
+    return getRecursiveProperties().hasParameterizedExistential();
   }
 
   /// Determine whether the type involves the given opened existential

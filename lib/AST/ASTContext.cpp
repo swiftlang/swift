@@ -3440,6 +3440,8 @@ ExistentialMetatypeType::get(Type T, Optional<MetatypeRepresentation> repr,
     T = existential->getConstraintType();
 
   auto properties = T->getRecursiveProperties();
+  if (T->is<ParameterizedProtocolType>())
+    properties |= RecursiveTypeProperties::HasParameterizedExistential;
   auto arena = getArena(properties);
 
   unsigned reprKey;
@@ -3535,7 +3537,7 @@ isAnyFunctionTypeCanonical(ArrayRef<AnyFunctionType::Param> params,
 static RecursiveTypeProperties
 getGenericFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
                                       Type result) {
-  static_assert(RecursiveTypeProperties::BitWidth == 13,
+  static_assert(RecursiveTypeProperties::BitWidth == 14,
                 "revisit this if you add new recursive type properties");
   RecursiveTypeProperties properties;
 
@@ -4124,7 +4126,7 @@ CanSILFunctionType SILFunctionType::get(
   void *mem = ctx.Allocate(bytes, alignof(SILFunctionType));
 
   RecursiveTypeProperties properties;
-  static_assert(RecursiveTypeProperties::BitWidth == 13,
+  static_assert(RecursiveTypeProperties::BitWidth == 14,
                 "revisit this if you add new recursive type properties");
   for (auto &param : params)
     properties |= param.getInterfaceType()->getRecursiveProperties();
@@ -4242,6 +4244,8 @@ Type ExistentialType::get(Type constraint, bool forceExistential) {
   assert(constraint->isConstraintType());
 
   auto properties = constraint->getRecursiveProperties();
+  if (constraint->is<ParameterizedProtocolType>())
+    properties |= RecursiveTypeProperties::HasParameterizedExistential;
   auto arena = getArena(properties);
 
   auto &entry = C.getImpl().getArena(arena).ExistentialTypes[constraint];
