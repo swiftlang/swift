@@ -1889,7 +1889,8 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
         diagnose(CurPtr, diag::string_interpolation_unclosed);
         diagnose(--TmpPtr, diag::opening_paren);
 
-        return formToken(tok::unknown, TokStart);
+        wasErroneous = true;
+        continue;
       } else if (*CurPtr == '\r' || *CurPtr == '\n' || CurPtr == BufferEnd) {
         // The only case we reach here is unterminated single line string in the
         // interpolation. For better recovery, go on after emitting an error.
@@ -1898,13 +1899,13 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
         diagnose(--TmpPtr, diag::opening_paren);
 
         wasErroneous = true;
-        return formToken(tok::unknown, TokStart);
+        continue;
       } else {
         // As a fallback, just emit an unterminated string error.
         diagnose(CurPtr, diag::lex_unterminated_string);
         wasErroneous = true;
 
-        continue;
+        return formToken(tok::unknown, TokStart);
       }
     }
 
