@@ -1761,7 +1761,8 @@ static void emitIndexDataForSourceFile(SourceFile *PrimarySourceFile,
                                  opts.IndexStorePath, opts.IndexSystemModules,
                                  opts.IndexIgnoreStdlib, isDebugCompilation,
                                  Invocation.getTargetTriple(),
-                                 *Instance.getDependencyTracker());
+                                 *Instance.getDependencyTracker(),
+                                 Invocation.getIRGenOptions().FilePrefixMap);
   } else {
     std::string moduleToken =
         Invocation.getModuleOutputPathForAtMostOnePrimary();
@@ -1776,7 +1777,8 @@ static void emitIndexDataForSourceFile(SourceFile *PrimarySourceFile,
                                  opts.IndexIgnoreStdlib,
                                  isDebugCompilation,
                                  Invocation.getTargetTriple(),
-                                 *Instance.getDependencyTracker());
+                                 *Instance.getDependencyTracker(),
+                                 Invocation.getIRGenOptions().FilePrefixMap);
   }
 }
 
