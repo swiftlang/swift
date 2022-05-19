@@ -1889,7 +1889,6 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
         diagnose(CurPtr, diag::string_interpolation_unclosed);
         diagnose(--TmpPtr, diag::opening_paren);
 
-        wasErroneous = true;
         continue;
       } else if (*CurPtr == '\r' || *CurPtr == '\n' || CurPtr == BufferEnd) {
         // The only case we reach here is unterminated single line string in the
