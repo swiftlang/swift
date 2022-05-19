@@ -6387,10 +6387,27 @@ public:
 
       // Print based on the type.
       Printer << "some ";
-      if (auto inheritedType = decl->getInherited().front().getType())
-        inheritedType->print(Printer, Options);
-      else
-        Printer << "Any";
+      if (!decl->getConformingProtocols().empty()) {
+        ArrayRef<ProtocolDecl *> protocols = decl->getConformingProtocols();
+        bool printed = false;
+        for (unsigned i = 0, e = protocols.size(); i < e; i++) {
+          if (auto printType = protocols[i]->getDeclaredType()) {
+            if (printed)
+              Printer << " & ";
+
+            printType->print(Printer, Options);
+
+            printed = true;
+          }
+        }
+
+        // Short-circuit if we printed anything - it's still possible that the protocol(s) didn't
+        // have a valid type, so we still want to print *something*
+        if (printed)
+          return;
+      }
+
+      Printer << "Any";
       return;
     }
 
