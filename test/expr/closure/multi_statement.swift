@@ -379,3 +379,28 @@ func test_diagnosing_on_missing_member_in_case() {
     }
   }
 }
+
+// Type finder shouldn't bring external closure result type
+// into the scope of an inner closure e.g. while solving
+// init of pattern binding `x`.
+func test_type_finder_doesnt_walk_into_inner_closures() {
+  func test<T>(fn: () -> T) -> T { fn() }
+
+  _ = test { // Ok
+    let x = test {
+      42
+    }
+
+    let _ = test {
+      test { "" }
+    }
+
+    // multi-statement
+    let _ = test {
+      _ = 42
+      return test { "" }
+    }
+
+    return x
+  }
+}
