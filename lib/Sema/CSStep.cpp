@@ -960,7 +960,7 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
 
           // Transform all of the unbound outer variables into
           // placeholders since we are not going to solve for
-          // each ambguous solution.
+          // each ambiguous solution.
           {
             unsigned numHoles = 0;
             for (auto *typeVar : CS.getTypeVariables()) {
