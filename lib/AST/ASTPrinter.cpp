@@ -57,6 +57,7 @@
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/Module.h"
 #include "clang/Basic/SourceManager.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ConvertUTF.h"
@@ -6388,26 +6389,15 @@ public:
       // Print based on the type.
       Printer << "some ";
       if (!decl->getConformingProtocols().empty()) {
-        ArrayRef<ProtocolDecl *> protocols = decl->getConformingProtocols();
-        bool printed = false;
-        for (unsigned i = 0, e = protocols.size(); i < e; i++) {
-          if (auto printType = protocols[i]->getDeclaredType()) {
-            if (printed)
-              Printer << " & ";
-
+        llvm::interleave(decl->getConformingProtocols(), Printer, [&](ProtocolDecl *proto){
+          if (auto printType = proto->getDeclaredType())
             printType->print(Printer, Options);
-
-            printed = true;
-          }
-        }
-
-        // Short-circuit if we printed anything - it's still possible that the protocol(s) didn't
-        // have a valid type, so we still want to print *something*
-        if (printed)
-          return;
+          else
+            Printer << proto->getNameStr();
+        }, " & ");
+      } else {
+        Printer << "Any";
       }
-
-      Printer << "Any";
       return;
     }
 
