@@ -191,3 +191,4 @@ let _ = """
   baz
   """
   // expected-error@-3 {{expected ')' at end of string interpolation}} expected-note @-3 {{to match this opening '('}}
+  // expected-error@-4 {{unterminated string literal}}
