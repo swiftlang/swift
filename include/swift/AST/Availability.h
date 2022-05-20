@@ -93,6 +93,18 @@ public:
     return getLowerEndpoint() >= Other.getLowerEndpoint();
   }
 
+  // Returns true if all the versions in the Other range are versions in this
+  // range and the ranges are not equal.
+  bool isSupersetOf(const VersionRange &Other) const {
+    if (isEmpty() || Other.isAll())
+      return false;
+
+    if (isAll() || Other.isEmpty())
+      return true;
+
+    return getLowerEndpoint() < Other.getLowerEndpoint();
+  }
+
   /// Mutates this range to be a best-effort underapproximation of
   /// the intersection of itself and Other. This is the
   /// meet operation (greatest lower bound) in the version range lattice.
@@ -244,8 +256,15 @@ public:
   /// Returns true if \p other makes stronger guarantees than this context.
   ///
   /// That is, `a.isContainedIn(b)` implies `a.union(b) == b`.
-  bool isContainedIn(AvailabilityContext other) const {
+  bool isContainedIn(const AvailabilityContext &other) const {
     return OSVersion.isContainedIn(other.OSVersion);
+  }
+
+  /// Returns true if \p other is a strict subset of this context.
+  ///
+  /// That is, `a.isSupersetOf(b)` implies `a != b` and `a.union(b) == a`.
+  bool isSupersetOf(const AvailabilityContext &other) const {
+    return OSVersion.isSupersetOf(other.OSVersion);
   }
 
   /// Returns true if this context has constraints that make it impossible to
@@ -272,7 +291,7 @@ public:
   ///
   /// As an example, this is used when figuring out the required availability
   /// for a type that references multiple nominal decls.
-  void intersectWith(AvailabilityContext other) {
+  void intersectWith(const AvailabilityContext &other) {
     OSVersion.intersectWith(other.getOSVersion());
   }
 
@@ -283,7 +302,7 @@ public:
   /// treating some invalid deployment environments as available.
   ///
   /// As an example, this is used for the true branch of `#available`.
-  void constrainWith(AvailabilityContext other) {
+  void constrainWith(const AvailabilityContext &other) {
     OSVersion.constrainWith(other.getOSVersion());
   }
 
@@ -295,7 +314,7 @@ public:
   ///
   /// As an example, this is used for the else branch of a conditional with
   /// multiple `#available` checks.
-  void unionWith(AvailabilityContext other) {
+  void unionWith(const AvailabilityContext &other) {
     OSVersion.unionWith(other.getOSVersion());
   }
 
