@@ -1899,10 +1899,10 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
           diagnose(CurPtr, diag::string_interpolation_unclosed);
           diagnose(--TmpPtr, diag::opening_paren);
         }
-            
-      // As a fallback, just emit an unterminated string error.
-      diagnose(TokStart, diag::lex_unterminated_string);
-      return formToken(tok::unknown, TokStart);
+
+        // As a fallback, just emit an unterminated string error.
+        diagnose(TokStart, diag::lex_unterminated_string);
+        return formToken(tok::unknown, TokStart);
       }
     }
 
