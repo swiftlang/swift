@@ -34,6 +34,7 @@
 
 #include <limits>
 
+// Regex lexing delivered via libSwift.
 static RegexLiteralLexingFn regexLiteralLexingFn = nullptr;
 void Parser_registerRegexLiteralLexingFn(RegexLiteralLexingFn fn) {
   regexLiteralLexingFn = fn;
@@ -1972,7 +1973,7 @@ const char *Lexer::findEndOfCurlyQuoteStringLiteral(const char *Body,
 bool Lexer::tryLexRegexLiteral(const char *TokStart) {
   // We need to have experimental string processing enabled, and have the
   // parsing logic for regex literals available.
-  if (!LangOpts.EnableExperimentalStringProcessing)
+  if (!LangOpts.EnableExperimentalStringProcessing || !regexLiteralLexingFn)
     return false;
 
   bool MustBeRegex = true;
@@ -2036,14 +2037,9 @@ bool Lexer::tryLexRegexLiteral(const char *TokStart) {
   // - CompletelyErroneous will be set if there was an error that cannot be
   //   recovered from.
   auto *Ptr = TokStart;
-  bool CompletelyErroneous;
-  if (regexLiteralLexingFn) {
-    CompletelyErroneous = regexLiteralLexingFn(&Ptr, BufferEnd, MustBeRegex,
-                         getBridgedOptionalDiagnosticEngine(getTokenDiags()));
-  } else {
-    // FIXME: lib_InternalSwiftSyntaxParser is not linking SwiftCompilerModules.
-    CompletelyErroneous = _fallback_lexRegexLiteral(&Ptr, MustBeRegex);
-  }
+  bool CompletelyErroneous = regexLiteralLexingFn(
+      &Ptr, BufferEnd, MustBeRegex,
+      getBridgedOptionalDiagnosticEngine(getTokenDiags()));
 
   // If we didn't make any lexing progress, this isn't a regex literal and we
   // should fallback to lexing as something else.
@@ -3191,93 +3187,4 @@ slice_token_array(ArrayRef<Token> AllTokens, SourceLoc StartLoc,
   auto EndIt = token_lower_bound(AllTokens, EndLoc);
   assert(StartIt->getLoc() == StartLoc && EndIt->getLoc() == EndLoc);
   return AllTokens.slice(StartIt - AllTokens.begin(), EndIt - StartIt + 1);
-}
-
-bool Lexer::_fallback_lexRegexLiteral(const char **InputPtr, bool MustBeRegex) {
-  const char *Ptr = *InputPtr;
-
-  // Count leading '#'.
-  while (*Ptr == '#')
-    ++Ptr;
-  if (*Ptr != '/')
-    // This wasn't a regex literal.
-    return true;
-
-  unsigned customDelimiterLen = Ptr - *InputPtr;
-
-  bool allowsMultiline = customDelimiterLen != 0;
-  const char *firstNewline = nullptr;
-  if (allowsMultiline) {
-    while (Ptr != BufferEnd) {
-      switch (*Ptr) {
-        case ' ':
-        case '\t':
-          ++Ptr;
-          continue;
-        case '\r':
-        case '\n':
-          firstNewline = Ptr;
-          break;
-        default:
-          break;
-      }
-      break;
-    }
-  }
-
-  while (true) {
-    switch (*Ptr++) {
-    case '\r':
-    case '\n':
-      if (/* isMultiline */(firstNewline != nullptr)) {
-        diagnose(Ptr, diag::lex_regex_literal_unterminated);
-        *InputPtr = Ptr - 1;
-        return false;
-      }
-      break;
-    case '\\':
-      if (Ptr != BufferEnd) {
-        if (validateUTF8CharacterAndAdvance(Ptr, BufferEnd) == ~0U)
-          diagnose(Ptr, diag::lex_invalid_utf8);
-      }
-      break;
-    case '/': {
-      unsigned endDelimiterLen = 0;
-
-      // Eat '#' up to the open delimeter length.
-      while (*Ptr == '#' && endDelimiterLen != customDelimiterLen)
-        ++endDelimiterLen;
-
-      if (endDelimiterLen != customDelimiterLen) {
-        // '#' count didn't match. Reset the cursor after the '/' and move on.
-        Ptr -= endDelimiterLen;
-        break;
-      }
-
-      // Found the closing delimiter. Finish.
-      *InputPtr = Ptr;
-      return false;
-    }
-    case '\0': {
-      if (Ptr - 1 == BufferEnd) {
-        // Reached to EOF.
-        diagnose(Ptr, diag::lex_regex_literal_unterminated);
-        // In multi-line mode, we don't want to skip over what is likely
-        // otherwise valid Swift code, so resume from the first newline.
-        *InputPtr = firstNewline ? firstNewline : (Ptr - 1);
-        return false;
-      }
-
-      // TODO: Warn to match the behavior of String literal lexer?
-      // Just ignore them for now.
-      break;
-    }
-    default: {
-      --Ptr;
-      if (validateUTF8CharacterAndAdvance(Ptr, BufferEnd) == ~0U)
-        diagnose(Ptr, diag::lex_invalid_utf8);
-      break;
-    }
-    }
-  }
 }

@@ -478,7 +478,10 @@ struct SynParserDiagConsumer: public DiagnosticConsumer {
   }
 };
 
+void registerRegexParser();
+
 swiftparse_client_node_t SynParser::parse(const char *source, size_t len) {
+  registerRegexParser();
   SourceManager SM;
   unsigned bufID = SM.addNewSourceBuffer(llvm::MemoryBuffer::getMemBuffer(
       StringRef(source, len), "syntax_parse_source"));
@@ -491,6 +494,7 @@ swiftparse_client_node_t SynParser::parse(const char *source, size_t len) {
   // langOpts.EnableASTScopeLookup = true;
 
   // Always enable bare /.../ regex literal in syntax parser.
+  langOpts.EnableExperimentalStringProcessing = true;
   langOpts.EnableBareSlashRegexLiterals = true;
 
   auto parseActions =
@@ -507,6 +511,130 @@ swiftparse_client_node_t SynParser::parse(const char *source, size_t len) {
   }
   return const_cast<swiftparse_client_node_t>(PU.parse());
 }
+
+//===--------------------- Regex parsing for SwiftSyntax -----------------====//
+
+template<typename ...DiagArgTypes, typename ...ArgTypes>
+static void diagnose(BridgedOptionalDiagnosticEngine bridgedDiag,
+                     const char *ptr, Diag<DiagArgTypes...> DiagID,
+                     ArgTypes &&...Args) {
+  if (auto *Diag = static_cast<DiagnosticEngine *>(bridgedDiag.object)) {
+    Diag->diagnose(SourceLoc(llvm::SMLoc::getFromPointer(ptr)),
+                   DiagID, std::forward<ArgTypes>(Args)...);
+  }
+}
+
+bool syntaxparse_lexRegexLiteral(const char **InputPtr, const char *BufferEnd,
+                                 bool MustBeRegex,
+                                 BridgedOptionalDiagnosticEngine BridgedDiagEngine) {
+
+  const char *Ptr = *InputPtr;
+
+  // Count leading '#'.
+  while (*Ptr == '#')
+    ++Ptr;
+  if (*Ptr != '/')
+    // This wasn't a regex literal.
+    return true;
+
+  unsigned customDelimiterLen = Ptr - *InputPtr;
+
+  bool allowsMultiline = customDelimiterLen != 0;
+  const char *firstNewline = nullptr;
+  if (allowsMultiline) {
+    while (Ptr != BufferEnd) {
+      switch (*Ptr) {
+        case ' ':
+        case '\t':
+          ++Ptr;
+          continue;
+        case '\r':
+        case '\n':
+          firstNewline = Ptr;
+          break;
+        default:
+          break;
+      }
+      break;
+    }
+  }
+
+  while (true) {
+    switch (*Ptr++) {
+    case '\r':
+    case '\n':
+      if (/* isMultiline */(firstNewline != nullptr)) {
+        diagnose(BridgedDiagEngine, Ptr, diag::lex_regex_literal_unterminated);
+        *InputPtr = Ptr - 1;
+        return false;
+      }
+      break;
+    case '\\':
+      if (Ptr != BufferEnd) {
+        if (validateUTF8CharacterAndAdvance(Ptr, BufferEnd) == ~0U)
+          diagnose(BridgedDiagEngine, Ptr, diag::lex_invalid_utf8);
+      }
+      break;
+    case '/': {
+      unsigned endDelimiterLen = 0;
+
+      // Eat '#' up to the open delimeter length.
+      while (*Ptr == '#' && endDelimiterLen != customDelimiterLen)
+        ++endDelimiterLen;
+
+      if (endDelimiterLen != customDelimiterLen) {
+        // '#' count didn't match. Reset the cursor after the '/' and move on.
+        Ptr -= endDelimiterLen;
+        break;
+      }
+
+      // Found the closing delimiter. Finish.
+      *InputPtr = Ptr;
+      return false;
+    }
+    case '\0': {
+      if (Ptr - 1 == BufferEnd) {
+        // Reached to EOF.
+        diagnose(BridgedDiagEngine, Ptr, diag::lex_regex_literal_unterminated);
+        // In multi-line mode, we don't want to skip over what is likely
+        // otherwise valid Swift code, so resume from the first newline.
+        *InputPtr = firstNewline ? firstNewline : (Ptr - 1);
+        return false;
+      }
+
+      // TODO: Warn to match the behavior of String literal lexer?
+      // For now, just ignore them.
+      break;
+    }
+    default: {
+      --Ptr;
+      if (validateUTF8CharacterAndAdvance(Ptr, BufferEnd) == ~0U)
+        diagnose(BridgedDiagEngine, Ptr, diag::lex_invalid_utf8);
+      break;
+    }
+    }
+  }
+}
+
+bool syntaxparse_parseRegexLiteral(const char *InputPtr,
+                              unsigned *VersionOut,
+                              void *CaptureStructureOut,
+                              unsigned CaptureStructureSize,
+                              BridgedSourceLoc DiagnosticBaseLoc,
+                              BridgedDiagnosticEngine BridgedDiagEngine) {
+  *VersionOut = ~0u;
+  return /*hasError*/false;
+}
+
+void registerRegexParser() {
+  static std::once_flag flag;
+  std::call_once(flag, []() {
+    llvm::errs() << "----Registering libswift Parsing functions!!!!!";
+    Parser_registerRegexLiteralLexingFn(syntaxparse_lexRegexLiteral);
+    Parser_registerRegexLiteralParsingFn(syntaxparse_parseRegexLiteral);
+  });
+}
+
 }
 //===--- C API ------------------------------------------------------------===//
 

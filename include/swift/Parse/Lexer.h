@@ -663,7 +663,6 @@ private:
   void diagnoseSingleQuoteStringLiteral(const char *TokStart,
                                         const char *TokEnd);
 
-  bool _fallback_lexRegexLiteral(const char **Ptr, bool MustBeRegex);
 };
 
 /// A lexer that can lex trivia into its pieces
