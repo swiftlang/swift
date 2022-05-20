@@ -306,7 +306,8 @@ void constraints::performSyntacticDiagnosticsForTarget(
     auto *stmt = target.getAsForEachStmt();
 
     // First emit diagnostics for the main expression.
-    performSyntacticExprDiagnostics(stmt->getSequence(), dc, isExprStmt,
+    performSyntacticExprDiagnostics(stmt->getTypeCheckedSequence(), dc,
+                                    isExprStmt,
                                     disableExprAvailabilityChecking);
 
     if (auto *whereExpr = stmt->getWhere())

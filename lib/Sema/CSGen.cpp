@@ -3886,7 +3886,7 @@ generateForEachStmtConstraints(
   auto forEachStmtInfo = target.getForEachStmtInfo();
   ForEachStmt *stmt = target.getAsForEachStmt();
   bool isAsync = stmt->getAwaitLoc().isValid();
-  auto *sequenceExpr = stmt->getSequence();
+  auto *sequenceExpr = stmt->getParsedSequence();
   auto *dc = target.getDeclContext();
   auto contextualLocator = cs.getConstraintLocator(
       sequenceExpr, LocatorPathElt::ContextualType(CTP_ForEachSequence));
@@ -3940,7 +3940,7 @@ generateForEachStmtConstraints(
                                FreeTypeVariableBinding::Disallow))
       return None;
 
-    forEachStmtInfo.makeIteratorVar = makeIteratorVar;
+    forEachStmtInfo.makeIteratorVar = PB;
 
     // Type of sequence expression has to conform to Sequence protocol.
     {
@@ -3951,7 +3951,7 @@ generateForEachStmtConstraints(
       forEachStmtInfo.sequenceType = cs.getType(sequenceExpr);
     }
 
-    cs.setSolutionApplicationTarget(makeIteratorVar, makeIteratorTarget);
+    cs.setSolutionApplicationTarget({PB, /*index=*/0}, makeIteratorTarget);
   }
 
   // Now, result type of `.makeIterator()` is used to form a call to

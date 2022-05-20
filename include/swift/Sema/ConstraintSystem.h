@@ -1011,7 +1011,7 @@ struct ForEachStmtInfo {
   Type initType;
 
   /// Implicit `$iterator = <sequence>.makeIterator()`
-  VarDecl *makeIteratorVar;
+  PatternBindingDecl *makeIteratorVar;
 
   /// Implicit `$iterator.next()` call.
   Expr *nextCall;
@@ -2434,7 +2434,7 @@ public:
     case Kind::forEachStmt:
       auto *stmt = forEachStmt.stmt;
       SourceLoc startLoc = stmt->getForLoc();
-      SourceLoc endLoc = stmt->getSequence()->getEndLoc();
+      SourceLoc endLoc = stmt->getParsedSequence()->getEndLoc();
 
       if (auto *whereExpr = stmt->getWhere()) {
         endLoc = whereExpr->getEndLoc();

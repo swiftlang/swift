@@ -8556,7 +8556,7 @@ static Optional<SolutionApplicationTarget> applySolutionToForEachStmt(
   auto resultTarget = target;
   auto &forEachStmtInfo = resultTarget.getForEachStmtInfo();
   auto *stmt = target.getAsForEachStmt();
-  auto *parsedSequence = stmt->getSequence();
+  auto *parsedSequence = stmt->getParsedSequence();
   bool isAsync = stmt->getAwaitLoc().isValid();
 
   // Simplify the various types.
@@ -8572,21 +8572,22 @@ static Optional<SolutionApplicationTarget> applySolutionToForEachStmt(
 
   // First, let's apply the solution to the sequence expression.
   {
+    auto *makeIteratorVar = forEachStmtInfo.makeIteratorVar;
+
     auto makeIteratorTarget =
-        *cs.getSolutionApplicationTarget(forEachStmtInfo.makeIteratorVar);
+        *cs.getSolutionApplicationTarget({makeIteratorVar, /*index=*/0});
 
     auto rewrittenTarget = rewriteTarget(makeIteratorTarget);
     if (!rewrittenTarget)
       return None;
 
-    stmt->setSequence(rewrittenTarget->getAsExpr());
-    stmt->setIteratorVar(forEachStmtInfo.makeIteratorVar);
-
-    auto *PB = forEachStmtInfo.makeIteratorVar->getParentPatternBinding();
+    // Set type-checked initializer and mark it as such.
     {
-      PB->setInit(/*index=*/0, stmt->getSequence());
-      PB->setInitializerChecked(/*index=*/0);
+      makeIteratorVar->setInit(/*index=*/0, rewrittenTarget->getAsExpr());
+      makeIteratorVar->setInitializerChecked(/*index=*/0);
     }
+
+    stmt->setIteratorVar(makeIteratorVar);
   }
 
   // Now, `$iterator.next()` call.

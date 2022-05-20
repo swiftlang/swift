@@ -1022,7 +1022,7 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   // Emit the 'iterator' variable that we'll be using for iteration.
   LexicalScope OuterForScope(SGF, CleanupLocation(S));
   {
-    SGF.emitPatternBinding(S->getIteratorVar()->getParentPatternBinding(),
+    SGF.emitPatternBinding(S->getIteratorVar(),
                            /*index=*/0);
   }
 
@@ -1074,7 +1074,7 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
       SILLocation loc = SILLocation(S);
       RValue result = buildElementRValue(SGFContext(nextInit.get()));
       if (!result.isInContext()) {
-        ArgumentSource(SILLocation(S->getSequence()),
+        ArgumentSource(SILLocation(S->getTypeCheckedSequence()),
                        std::move(result).ensurePlusOne(SGF, loc))
             .forwardInto(SGF, nextInit.get());
       }

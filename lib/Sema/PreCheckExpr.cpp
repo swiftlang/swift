@@ -2126,7 +2126,7 @@ bool ConstraintSystem::preCheckTarget(SolutionApplicationTarget &target,
   if (target.isForEachStmt()) {
     auto *stmt = target.getAsForEachStmt();
 
-    auto *sequenceExpr = stmt->getSequence();
+    auto *sequenceExpr = stmt->getParsedSequence();
     auto *whereExpr = stmt->getWhere();
 
     hadErrors |= preCheckExpression(sequenceExpr, DC,
@@ -2141,7 +2141,7 @@ bool ConstraintSystem::preCheckTarget(SolutionApplicationTarget &target,
 
     // Update sequence and where expressions to pre-checked versions.
     if (!hadErrors) {
-      stmt->setSequence(sequenceExpr);
+      stmt->setParsedSequence(sequenceExpr);
 
       if (whereExpr)
         stmt->setWhere(whereExpr);
