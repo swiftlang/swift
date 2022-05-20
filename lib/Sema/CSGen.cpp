@@ -3889,7 +3889,7 @@ generateForEachStmtConstraints(
   auto *sequenceExpr = stmt->getSequence();
   auto *dc = target.getDeclContext();
   auto contextualLocator = cs.getConstraintLocator(
-      sequenceExpr, LocatorPathElt::ContextualType(CTP_ForEachStmt));
+      sequenceExpr, LocatorPathElt::ContextualType(CTP_ForEachSequence));
 
   // The expression type must conform to the Sequence protocol.
   auto sequenceProto = TypeChecker::getProtocol(

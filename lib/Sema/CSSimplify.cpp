@@ -7153,6 +7153,16 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   } break;
   case ConstraintKind::ConformsTo:
   case ConstraintKind::LiteralConformsTo: {
+    // If existential type is used as a for-in sequence, let's open it
+    // and check whether underlying type conforms to `Sequence`.
+    if (type->isExistentialType()) {
+      if (auto elt = loc->getLastElementAs<LocatorPathElt::ContextualType>()) {
+        if (elt->getPurpose() == CTP_ForEachSequence) {
+          type = openExistentialType(type, loc).first;
+        }
+      }
+    }
+
     // Check whether this type conforms to the protocol.
     auto conformance = DC->getParentModule()->lookupConformance(
         type, protocol, /*allowMissing=*/true);

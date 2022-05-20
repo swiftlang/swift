@@ -1275,7 +1275,7 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
         auto &solution = getSolution();
         auto *baseLoc = solution.getConstraintLocator(
             UDE->getBase(),
-            LocatorPathElt::ContextualType(CTP_ForEachStmt));
+            LocatorPathElt::ContextualType(CTP_ForEachSequence));
 
         if (hasFixFor(solution, baseLoc))
           return false;

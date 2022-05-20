@@ -175,10 +175,16 @@ func testOptionalSequence() {
   }
 }
 
-// FIXME: Should this be allowed?
 func testExistentialSequence(s: any Sequence) {
-  for x in s { // expected-error {{type 'any Sequence' cannot conform to 'Sequence'}} expected-note {{only concrete types such as structs, enums and classes can conform to protocols}}
+  for x in s {
     _ = x
+  }
+}
+
+// rdar://92177656 - implicit existential opening should work with for-in loops
+func testForEachWithAnyCollection(c: any Collection) {
+  for v in c {
+    print(v)
   }
 }
 
@@ -238,3 +244,4 @@ func testForEachWhereWithClosure(_ x: [Int]) {
   for i in x where foo({ i.byteSwapped == 5 }) {}
   for i in x where x.contains(where: { $0.byteSwapped == i }) {}
 }
+

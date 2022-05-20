@@ -8556,6 +8556,7 @@ static Optional<SolutionApplicationTarget> applySolutionToForEachStmt(
   auto resultTarget = target;
   auto &forEachStmtInfo = resultTarget.getForEachStmtInfo();
   auto *stmt = target.getAsForEachStmt();
+  auto *parsedSequence = stmt->getSequence();
   bool isAsync = stmt->getAwaitLoc().isValid();
 
   // Simplify the various types.
@@ -8673,9 +8674,14 @@ static Optional<SolutionApplicationTarget> applySolutionToForEachStmt(
         stmt->getAwaitLoc().isValid() ? KnownProtocolKind::AsyncSequence
                                       : KnownProtocolKind::Sequence);
 
+    auto type = forEachStmtInfo.sequenceType->getRValueType();
+    if (type->isExistentialType()) {
+      auto *contextualLoc = solution.getConstraintLocator(
+          parsedSequence, LocatorPathElt::ContextualType(CTP_ForEachSequence));
+      type = Type(solution.OpenedExistentialTypes[contextualLoc]);
+    }
     auto sequenceConformance = TypeChecker::conformsToProtocol(
-        forEachStmtInfo.sequenceType->getRValueType(), sequenceProto,
-        dc->getParentModule());
+        type, sequenceProto, dc->getParentModule());
     assert(!sequenceConformance.isInvalid() &&
            "Couldn't find sequence conformance");
     stmt->setSequenceConformance(sequenceConformance);
