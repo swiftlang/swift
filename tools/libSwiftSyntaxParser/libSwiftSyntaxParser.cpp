@@ -24,6 +24,7 @@
 #include "swift/Syntax/Serialization/SyntaxSerialization.h"
 #include "swift/Syntax/SyntaxNodes.h"
 #include "swift/Subsystems.h"
+#include "swift/Parse/RegexParserBridging.h"
 #include <Block.h>
 
 using namespace swift;
@@ -488,6 +489,9 @@ swiftparse_client_node_t SynParser::parse(const char *source, size_t len) {
   // Disable name lookups during parsing.
   // Not ready yet:
   // langOpts.EnableASTScopeLookup = true;
+
+  // Always enable bare /.../ regex literal in syntax parser.
+  langOpts.EnableBareSlashRegexLiterals = true;
 
   auto parseActions =
     std::make_shared<CLibParseActions>(*this, SM, bufID);

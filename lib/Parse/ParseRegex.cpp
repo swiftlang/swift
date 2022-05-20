@@ -34,7 +34,6 @@ using namespace swift::syntax;
 
 ParserResult<Expr> Parser::parseExprRegexLiteral() {
   assert(Tok.is(tok::regex_literal));
-  assert(regexLiteralParsingFn);
 
   SyntaxParsingContext LocalContext(SyntaxContext,
                                     SyntaxKind::RegexLiteralExpr);
@@ -47,6 +46,16 @@ ParserResult<Expr> Parser::parseExprRegexLiteral() {
   auto capturesBuf = Context.AllocateUninitialized<uint8_t>(
       RegexLiteralExpr::getCaptureStructureSerializationAllocationSize(
           regexText.size()));
+
+  if (!regexLiteralParsingFn) {
+    // In case the parsing function is not registered, we don't care the
+    // actual content of the literal. Create an empty regex literal expression.
+    auto loc = consumeToken();
+    SourceMgr.recordRegexLiteralStartLoc(loc);
+    return makeParserResult(RegexLiteralExpr::createParsed(
+        Context, loc, regexText, version, capturesBuf));
+  }
+
   bool hadError =
       regexLiteralParsingFn(regexText.str().c_str(), &version,
                             /*captureStructureOut*/ capturesBuf.data(),
