@@ -220,13 +220,13 @@ OpenedArchetypeInfo::OpenedArchetypeInfo(Operand &use) {
     }
   }
   if (auto *Open = dyn_cast<OpenExistentialAddrInst>(openedVal)) {
-    OpenedArchetype = Open->getType().castTo<ArchetypeType>();
+    OpenedArchetype = Open->getType().castTo<OpenedArchetypeType>();
     OpenedArchetypeValue = Open;
     ExistentialValue = Open->getOperand();
     return;
   }
   if (auto *Open = dyn_cast<OpenExistentialRefInst>(openedVal)) {
-    OpenedArchetype = Open->getType().castTo<ArchetypeType>();
+    OpenedArchetype = Open->getType().castTo<OpenedArchetypeType>();
     OpenedArchetypeValue = Open;
     ExistentialValue = Open->getOperand();
     return;
@@ -235,7 +235,7 @@ OpenedArchetypeInfo::OpenedArchetypeInfo(Operand &use) {
     auto Ty = Open->getType().getASTType();
     while (auto Metatype = dyn_cast<MetatypeType>(Ty))
       Ty = Metatype.getInstanceType();
-    OpenedArchetype = cast<ArchetypeType>(Ty);
+    OpenedArchetype = cast<OpenedArchetypeType>(Ty);
     OpenedArchetypeValue = Open;
     ExistentialValue = Open->getOperand();
   }
