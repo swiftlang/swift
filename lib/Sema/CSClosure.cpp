@@ -37,6 +37,9 @@ Expr *getVoidExpr(ASTContext &ctx) {
 
 /// Find any type variable references inside of an AST node.
 class TypeVariableRefFinder : public ASTWalker {
+  /// A stack of all closures the walker encountered so far.
+  SmallVector<DeclContext *> ClosureDCs;
+
   ConstraintSystem &CS;
   ASTNode Parent;
 
@@ -46,9 +49,16 @@ public:
   TypeVariableRefFinder(
       ConstraintSystem &cs, ASTNode parent,
       llvm::SmallPtrSetImpl<TypeVariableType *> &referencedVars)
-      : CS(cs), Parent(parent), ReferencedVars(referencedVars) {}
+      : CS(cs), Parent(parent), ReferencedVars(referencedVars) {
+    if (auto *closure = getAsExpr<ClosureExpr>(Parent))
+      ClosureDCs.push_back(closure);
+  }
 
   std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+    if (auto *closure = dyn_cast<ClosureExpr>(expr)) {
+      ClosureDCs.push_back(closure);
+    }
+
     if (auto *DRE = dyn_cast<DeclRefExpr>(expr)) {
       auto *decl = DRE->getDecl();
 
@@ -81,13 +91,22 @@ public:
     return {true, expr};
   }
 
+  Expr *walkToExprPost(Expr *expr) override {
+    if (auto *closure = dyn_cast<ClosureExpr>(expr)) {
+      ClosureDCs.pop_back();
+    }
+    return expr;
+  }
+
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
     // Return statements have to reference outside result type
     // since all of them are joined by it if it's not specified
     // explicitly.
     if (isa<ReturnStmt>(stmt)) {
       if (auto *closure = getAsExpr<ClosureExpr>(Parent)) {
-        inferVariables(CS.getClosureType(closure)->getResult());
+        // Return is only viable if it belongs to a parent closure.
+        if (currentClosureDC() == closure)
+          inferVariables(CS.getClosureType(closure)->getResult());
       }
     }
 
@@ -95,6 +114,10 @@ public:
   }
 
 private:
+  DeclContext *currentClosureDC() const {
+    return ClosureDCs.empty() ? nullptr : ClosureDCs.back();
+  }
+
   void inferVariables(Type type) {
     type = type->getWithoutSpecifierType();
     // Record the type variable itself because it has to
@@ -441,7 +464,7 @@ private:
 
     cs.addConstraint(
         ConstraintKind::Conversion, elementType, initType,
-        cs.getConstraintLocator(contextualLocator,
+        cs.getConstraintLocator(sequenceLocator,
                                 ConstraintLocator::SequenceElementType));
 
     // Reference the makeIterator witness.
@@ -450,9 +473,10 @@ private:
 
     Type makeIteratorType =
         cs.createTypeVariable(locator, TVO_CanBindToNoEscape);
-    cs.addValueWitnessConstraint(LValueType::get(sequenceType), makeIterator,
-                                 makeIteratorType, context.getAsDeclContext(),
-                                 FunctionRefKind::Compound, contextualLocator);
+    cs.addValueWitnessConstraint(
+        LValueType::get(sequenceType), makeIterator, makeIteratorType,
+        context.getAsDeclContext(), FunctionRefKind::Compound,
+        cs.getConstraintLocator(sequenceLocator, ConstraintLocator::Witness));
 
     // After successful constraint generation, let's record
     // solution application target with all relevant information.
@@ -1186,10 +1210,6 @@ private:
 
   void visitDecl(Decl *decl) {
     if (isa<IfConfigDecl>(decl))
-      return;
-
-    // Variable declaration would be handled by a pattern binding.
-    if (isa<VarDecl>(decl))
       return;
 
     // Generate constraints for pattern binding declarations.

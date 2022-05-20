@@ -196,13 +196,15 @@ public:
 /// refers directly into this buffer.
 /// \param requiresOSSAModules If true, necessitates the module to be
 /// compiled with -enable-ossa-modules.
+/// \param requiredSDK If not empty, only accept modules built with
+/// a compatible SDK. The StringRef represents the canonical SDK name.
 /// \param[out] extendedInfo If present, will be populated with additional
 /// compilation options serialized into the AST at build time that may be
 /// necessary to load it properly.
 /// \param[out] dependencies If present, will be populated with list of
 /// input files the module depends on, if present in INPUT_BLOCK.
 ValidationInfo validateSerializedAST(
-    StringRef data, bool requiresOSSAModules,
+    StringRef data, bool requiresOSSAModules, StringRef requiredSDK,
     ExtendedValidationInfo *extendedInfo = nullptr,
     SmallVectorImpl<SerializationOptions::FileDependency> *dependencies =
         nullptr);
