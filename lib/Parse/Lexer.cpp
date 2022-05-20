@@ -1880,31 +1880,30 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
       // Consume tokens until we hit the corresponding ')'.
       CurPtr = skipToEndOfInterpolatedExpression(TmpPtr, BufferEnd,
                                                  IsMultilineString);
-      if (*CurPtr == ')') {
-        // Successfully scanned the body of the expression literal.
-        ++CurPtr;
-        continue;
-      } else if (!isMultilineString) {
-        diagnose(TokStart, diag::lex_unterminated_string);
-        diagnose(CurPtr, diag::string_interpolation_unclosed);
-        diagnose(--TmpPtr, diag::opening_paren);
-
-        return formToken(tok::unknown, TokStart);
-      } else if (*CurPtr == '\r' || *CurPtr == '\n' || CurPtr == BufferEnd) {
-        // The only case we reach here is unterminated single line string in the
-        // interpolation. For better recovery, go on after emitting an error.
-        diagnose(CurPtr, diag::lex_unterminated_string);
-        diagnose(CurPtr, diag::string_interpolation_unclosed);
-        diagnose(--TmpPtr, diag::opening_paren);
-
-        wasErroneous = true;
-        continue;
-      } else {
-        // As a fallback, just emit an unterminated string error.
-        diagnose(Tokstart, diag::lex_unterminated_string);
-
-        return formToken(tok::unknown, TokStart);
-      }
+        if (*CurPtr == ')') {
+            // Successfully scanned the body of the expression literal.
+            ++CurPtr;
+            continue;
+        } else {
+            if ((*CurPtr == '\r' || *CurPtr == '\n') && IsMultilineString) {
+                diagnose(CurPtr, diag::string_interpolation_unclosed);
+                diagnose(--TmpPtr, diag::opening_paren);
+                
+                // The only case we reach here is unterminated single line string in
+                // the interpolation. For better recovery, go on after emitting
+                // an error.
+                diagnose(CurPtr, diag::lex_unterminated_string);
+                wasErroneous = true;
+                continue;
+            } else if (!IsMultilineString || CurPtr == BufferEnd) {
+                diagnose(CurPtr, diag::string_interpolation_unclosed);
+                diagnose(--TmpPtr, diag::opening_paren);
+            }
+            
+            // As a fallback, just emit an unterminated string error.
+            diagnose(TokStart, diag::lex_unterminated_string);
+            return formToken(tok::unknown, TokStart);
+        }
     }
 
     // String literals cannot have \n or \r in them (unless multiline).
