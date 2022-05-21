@@ -171,19 +171,16 @@ function(add_swift_compiler_modules_library name)
   endforeach()
 
   # Create a static library containing all module object files.
+  if (XCODE)
+    # Xcode does not compile libraries that contain only object files.
+    # Therefore, it fails to create the static library. As a workaround,
+    # we add an empty source file force_lib.c to the target.
+    set(all_obj_files force_lib.c ${all_obj_files})
+  endif()
   add_library(${name} STATIC ${all_obj_files})
   add_dependencies(${name} ${all_module_targets})
   set_target_properties(${name} PROPERTIES LINKER_LANGUAGE CXX)
   set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${name})
-
-  # Xcode does not compile libraries that contain only object files.
-  # Therefore, it fails to create the static library. As a workaround,
-  # we add a dummy script phase to the target.
-  if (XCODE)
-    add_custom_command(TARGET ${name} POST_BUILD 
-      COMMAND ""
-      COMMENT "Dummy script phase to force building this target")
-  endif()
 endfunction()
 
 
