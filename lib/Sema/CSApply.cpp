@@ -2175,23 +2175,18 @@ namespace {
 
       // The constructor was opened with the allocating type, not the
       // initializer type. Map the former into the latter.
-      auto resultTy = solution.simplifyType(openedFullType);
+      auto *resultTy =
+          solution.simplifyType(openedFullType)->castTo<FunctionType>();
 
-      auto selfTy = getBaseType(resultTy->castTo<FunctionType>());
-
-      // Also replace the result type with the base type, so that calls
-      // to constructors defined in a superclass will know to cast the
-      // result to the derived type.
-      resultTy = resultTy->replaceCovariantResultType(selfTy, 2);
+      const auto selfTy = getBaseType(resultTy);
 
       ParameterTypeFlags flags;
       if (!selfTy->hasReferenceSemantics())
         flags = flags.withInOut(true);
 
       auto selfParam = AnyFunctionType::Param(selfTy, Identifier(), flags);
-      resultTy = FunctionType::get({selfParam},
-                                   resultTy->castTo<FunctionType>()->getResult(),
-                                   resultTy->castTo<FunctionType>()->getExtInfo());
+      resultTy = FunctionType::get({selfParam}, resultTy->getResult(),
+                                   resultTy->getExtInfo());
 
       // Build the constructor reference.
       Expr *ctorRef = cs.cacheType(
