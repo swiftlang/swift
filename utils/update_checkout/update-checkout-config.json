@@ -177,7 +177,7 @@
                 "llbuild": "release/5.7",
                 "swift-tools-support-core": "release/5.7",
                 "swiftpm": "release/5.7",
-                "swift-argument-parser": "1.1.2",
+                "swift-argument-parser": "1.0.3",
                 "swift-atomics": "1.0.2",
                 "swift-collections": "1.0.1",
                 "swift-crypto": "1.1.5",
