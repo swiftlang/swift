@@ -920,6 +920,31 @@ static bool canReplaceCopiedArg(FullApplySite Apply, SILValue Arg,
   return true;
 }
 
+/// Determine if the result type or argument types of the given apply, except
+/// for the argument at \p SkipArgIdx, contain an opened archetype rooted
+/// on \p RootOA.
+static bool applyInvolvesOpenedArchetypeWithRoot(FullApplySite Apply,
+                                                 OpenedArchetypeType *RootOA,
+                                                 unsigned SkipArgIdx) {
+  if (Apply.getType().getASTType()->hasOpenedExistentialWithRoot(RootOA)) {
+    return true;
+  }
+
+  const auto NumApplyArgs = Apply.getNumArguments();
+  for (unsigned Idx = 0; Idx < NumApplyArgs; ++Idx) {
+    if (Idx == SkipArgIdx)
+      continue;
+    if (Apply.getArgument(Idx)
+            ->getType()
+            .getASTType()
+            ->hasOpenedExistentialWithRoot(RootOA)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 // Check the legal conditions under which a Arg parameter (specified as ArgIdx)
 // can be replaced with a concrete type. Concrete type info is passed as CEI
 // argument.
@@ -927,38 +952,24 @@ bool SILCombiner::canReplaceArg(FullApplySite Apply,
                                 const OpenedArchetypeInfo &OAI,
                                 const ConcreteExistentialInfo &CEI,
                                 unsigned ArgIdx) {
-
-  // Don't specialize apply instructions that return the callee's Arg type,
-  // because this optimization does not know how to substitute types in the
-  // users of this apply. In the function type substitution below, all
-  // references to OpenedArchetype will be substituted. So walk to type to
-  // find all possible references, such as returning Optional<Arg>.
-  if (Apply.getType().getASTType().findIf(
-          [&OAI](Type t) -> bool { return t->isEqual(OAI.OpenedArchetype); })) {
-    return false;
-  }
-  // Bail out if any other arguments or indirect result that refer to the
-  // OpenedArchetype. The following optimization substitutes all occurrences
-  // of OpenedArchetype in the function signature, but will only rewrite the
-  // Arg operand.
+  // Don't specialize apply instructions if the result type references
+  // OpenedArchetype, because this optimization does not know how to substitute
+  // types in the users of this apply. In the function type substitution below,
+  // all references to OpenedArchetype will be substituted. So walk the type to
+  // find all possible references, such as returning Optional<OpenedArchetype>.
+  // The same holds for other arguments or indirect result that refer to the
+  // OpenedArchetype, because the following optimization will rewrite only the
+  // argument at ArgIdx.
   //
   // Note that the language does not allow Self to occur in contravariant
   // position. However, SIL does allow this and it can happen as a result of
   // upstream transformations. Since this is bail-out logic, it must handle
   // all verifiable SIL.
-
-  // This bailout check is also needed for non-Self arguments [including Self].
-  unsigned NumApplyArgs = Apply.getNumArguments();
-  for (unsigned Idx = 0; Idx < NumApplyArgs; ++Idx) {
-    if (Idx == ArgIdx)
-      continue;
-    if (Apply.getArgument(Idx)->getType().getASTType().findIf(
-            [&OAI](Type t) -> bool {
-              return t->isEqual(OAI.OpenedArchetype);
-            })) {
-      return false;
-    }
+  if (applyInvolvesOpenedArchetypeWithRoot(Apply, OAI.OpenedArchetype,
+                                           ArgIdx)) {
+    return false;
   }
+
   // If the convention is mutating, then the existential must have been
   // initialized by copying the concrete value (regardless of whether
   // CEI.isConcreteValueCopied is true). Replacing the existential address with
@@ -1052,37 +1063,24 @@ SILValue SILCombiner::canCastArg(FullApplySite Apply,
       !CEI.ConcreteValue->getType().isAddress())
     return SILValue();
 
-  // Don't specialize apply instructions that return the callee's Arg type,
-  // because this optimization does not know how to substitute types in the
-  // users of this apply. In the function type substitution below, all
-  // references to OpenedArchetype will be substituted. So walk to type to
-  // find all possible references, such as returning Optional<Arg>.
-  if (Apply.getType().getASTType().findIf(
-          [&OAI](Type t) -> bool { return t->isEqual(OAI.OpenedArchetype); })) {
-    return SILValue();
-  }
-  // Bail out if any other arguments or indirect result that refer to the
-  // OpenedArchetype. The following optimization substitutes all occurrences
-  // of OpenedArchetype in the function signature, but will only rewrite the
-  // Arg operand.
+  // Don't specialize apply instructions if the result type references
+  // OpenedArchetype, because this optimization does not know how to substitute
+  // types in the users of this apply. In the function type substitution below,
+  // all references to OpenedArchetype will be substituted. So walk the type to
+  // find all possible references, such as returning Optional<OpenedArchetype>.
+  // The same holds for other arguments or indirect result that refer to the
+  // OpenedArchetype, because the following optimization will rewrite only the
+  // argument at ArgIdx.
   //
   // Note that the language does not allow Self to occur in contravariant
   // position. However, SIL does allow this and it can happen as a result of
   // upstream transformations. Since this is bail-out logic, it must handle
   // all verifiable SIL.
-
-  // This bailout check is also needed for non-Self arguments [including Self].
-  unsigned NumApplyArgs = Apply.getNumArguments();
-  for (unsigned Idx = 0; Idx < NumApplyArgs; ++Idx) {
-    if (Idx == ArgIdx)
-      continue;
-    if (Apply.getArgument(Idx)->getType().getASTType().findIf(
-            [&OAI](Type t) -> bool {
-              return t->isEqual(OAI.OpenedArchetype);
-            })) {
-      return SILValue();
-    }
+  if (applyInvolvesOpenedArchetypeWithRoot(Apply, OAI.OpenedArchetype,
+                                           ArgIdx)) {
+    return SILValue();
   }
+
   return Builder.createUncheckedAddrCast(
       Apply.getLoc(), Apply.getArgument(ArgIdx), CEI.ConcreteValue->getType());
 }
@@ -1293,10 +1291,11 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
 ///   %existential = alloc_stack $Protocol
 ///   %value = init_existential_addr %existential : $Concrete
 ///   copy_addr ... to %value
-///   %witness = witness_method $@opened
-///   apply %witness<T : Protocol>(%existential)
+///   %opened = open_existential_addr %existential
+///   %witness = witness_method $@opened(...) Protocol
+///   apply %witness<$@opened(...) Protocol>(%opened)
 ///
-/// ==> apply %witness<Concrete : Protocol>(%existential)
+/// ==> apply %witness<$Concrete>(%existential)
 SILInstruction *
 SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply,
                                                     WitnessMethodInst *WMI) {
