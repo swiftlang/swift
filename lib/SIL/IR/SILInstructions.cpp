@@ -56,7 +56,7 @@ static void collectDependentTypeInfo(
     return;
   Ty.visit([&](CanType t) {
     if (const auto opened = dyn_cast<OpenedArchetypeType>(t)) {
-      const auto root = cast<OpenedArchetypeType>(CanType(opened->getRoot()));
+      const auto root = opened.getRoot();
 
       // Add this root opened archetype if it was not seen yet.
       // We don't use a set here, because the number of open archetypes

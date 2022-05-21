@@ -65,6 +65,13 @@ Type QueryTypeSubstitutionMap::operator()(SubstitutableType *type) const {
 
 Type
 QueryTypeSubstitutionMapOrIdentity::operator()(SubstitutableType *type) const {
+  // FIXME: Type::subst should not be pass in non-root archetypes.
+  // Consider only root archetypes.
+  if (auto *archetype = dyn_cast<ArchetypeType>(type)) {
+    if (!archetype->isRoot())
+      return Type();
+  }
+
   auto key = type->getCanonicalType()->castTo<SubstitutableType>();
   auto known = substitutions.find(key);
   if (known != substitutions.end() && known->second)
