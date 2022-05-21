@@ -55,11 +55,10 @@ foreach(sdk ${SWIFT_SDKS})
   endforeach()
 endforeach()
 
-# Bootstrapping - level 0
+if(${BOOTSTRAPPING_MODE} MATCHES "BOOTSTRAPPING.*")
+  # Bootstrapping - level 0
+  add_layout_copying( ${SWIFT_HOST_VARIANT_SDK} ${SWIFT_HOST_VARIANT_ARCH} "0")
 
-add_layout_copying( ${SWIFT_HOST_VARIANT_SDK} ${SWIFT_HOST_VARIANT_ARCH} "0")
-
-# Bootstrapping - level 1
-
-add_layout_copying( ${SWIFT_HOST_VARIANT_SDK} ${SWIFT_HOST_VARIANT_ARCH} "1")
-
+  # Bootstrapping - level 1
+  add_layout_copying( ${SWIFT_HOST_VARIANT_SDK} ${SWIFT_HOST_VARIANT_ARCH} "1")
+endif()
