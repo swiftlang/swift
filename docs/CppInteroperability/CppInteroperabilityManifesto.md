@@ -184,7 +184,7 @@ that pick different sides, forcing the user to choose.
 
 Swift/C++ interoperability builds on top of the Swift/C interoperability, so it
 helps to be familiar with [Swift's strategy for importing C
-modules](HowSwiftImportsCAPIs.md).
+modules](../HowSwiftImportsCAPIs.md).
 
 # Importing C++ APIs into Swift
 
