@@ -9,11 +9,8 @@
 // UNSUPPORTED: back_deployment_runtime
 
 
-// FIXME(distributed): Seems something remains incorrect on 32bit here
-// rdar://92952551
-// UNSUPPORTED: CPU=armv7
-// UNSUPPORTED: CPU=armv7s
-// UNSUPPORTED: CPU=i386
+// FIXME(distributed): Seems something remains incorrect here
+// REQUIRES: rdar92952551
 
 import Distributed
 

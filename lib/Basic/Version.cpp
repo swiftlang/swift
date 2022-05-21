@@ -446,5 +446,13 @@ StringRef getSwiftRevision() {
 #endif
 }
 
+bool isCurrentCompilerTagged() {
+#ifdef SWIFT_COMPILER_VERSION
+  return true;
+#else
+  return false;
+#endif
+}
+
 } // end namespace version
 } // end namespace swift
