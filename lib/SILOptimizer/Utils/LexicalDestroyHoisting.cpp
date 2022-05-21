@@ -20,6 +20,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SILOptimizer/Analysis/Reachability.h"
+#include "swift/SILOptimizer/Analysis/VisitBarrierAccessScopes.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeBorrowScope.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
@@ -112,11 +113,14 @@ struct DeinitBarriers final {
   DeinitBarriers &operator=(DeinitBarriers const &) = delete;
 };
 
+class BarrierAccessScopeFinder;
+
 /// Works backwards from the current location of destroy_values to the earliest
 /// place they can be hoisted to.
 ///
 /// Implements IterativeBackwardReachability::Effects
 /// Implements IterativeBackwardReachability::bindBarriers::Visitor
+/// Implements VisitBarrierAccessScopes::Effects
 class Dataflow final {
   using Reachability = IterativeBackwardReachability<Dataflow>;
   using Effect = Reachability::Effect;
@@ -125,6 +129,7 @@ class Dataflow final {
   DeinitBarriers &barriers;
   Reachability::Result result;
   Reachability reachability;
+  SmallPtrSet<BeginAccessInst *, 8> barrierAccessScopes;
 
   enum class Classification { Barrier, Other };
 
@@ -140,17 +145,28 @@ public:
 
 private:
   friend Reachability;
+  friend class BarrierAccessScopeFinder;
+  friend class VisitBarrierAccessScopes<Dataflow, BarrierAccessScopeFinder>;
 
   Classification classifyInstruction(SILInstruction *);
 
   bool classificationIsBarrier(Classification);
 
   /// IterativeBackwardReachability::Effects
+  /// VisitBarrierAccessScopes::Effects
 
   ArrayRef<SILInstruction *> gens() { return uses.ends; }
 
   Effect effectForInstruction(SILInstruction *);
   Effect effectForPhi(SILBasicBlock *);
+
+  /// VisitBarrierAccessScopes::Effects
+
+  auto localGens() { return result.localGens; }
+
+  bool isLocalGen(SILInstruction *instruction) {
+    return result.localGens.contains(instruction);
+  }
 
   /// IterativeBackwardReachability::bindBarriers::Visitor
 
@@ -172,6 +188,11 @@ Dataflow::classifyInstruction(SILInstruction *instruction) {
   }
   if (uses.users.contains(instruction)) {
     return Classification::Barrier;
+  }
+  if (auto *eai = dyn_cast<EndAccessInst>(instruction)) {
+    return barrierAccessScopes.contains(eai->getBeginAccess())
+               ? Classification::Barrier
+               : Classification::Other;
   }
   if (isDeinitBarrier(instruction)) {
     return Classification::Barrier;
@@ -209,8 +230,41 @@ Dataflow::Effect Dataflow::effectForPhi(SILBasicBlock *block) {
   return isBarrier ? Effect::Kill() : Effect::NoEffect();
 }
 
+/// Finds end_access instructions which are barriers to hoisting because the
+/// access scopes they contain barriers to hoisting.  Hoisting destroy_values
+/// into such access scopes could introduce exclusivity violations.
+///
+/// Implements BarrierAccessScopeFinder::Visitor
+class BarrierAccessScopeFinder final {
+  using Impl = VisitBarrierAccessScopes<Dataflow, BarrierAccessScopeFinder>;
+  Impl impl;
+  Dataflow &dataflow;
+
+public:
+  BarrierAccessScopeFinder(Context const &context, Dataflow &dataflow)
+      : impl(&context.function, dataflow, *this), dataflow(dataflow) {}
+
+  void find() { impl.visit(); }
+
+private:
+  friend Impl;
+
+  bool isInRegion(SILBasicBlock *block) {
+    return dataflow.result.discoveredBlocks.contains(block);
+  }
+
+  void visitBarrierAccessScope(BeginAccessInst *bai) {
+    dataflow.barrierAccessScopes.insert(bai);
+    for (auto *eai : bai->getEndAccesses()) {
+      dataflow.reachability.addKill(eai);
+    }
+  }
+};
+
 void Dataflow::run() {
   reachability.initialize();
+  BarrierAccessScopeFinder finder(context, *this);
+  finder.find();
   reachability.solve();
   reachability.findBarriers(*this);
 }
