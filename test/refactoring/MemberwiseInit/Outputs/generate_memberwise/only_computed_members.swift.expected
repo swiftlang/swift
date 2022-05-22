@@ -1,0 +1,60 @@
+class Person {
+  var firstName: String!
+  var lastName: String!
+  var age: Int!
+  var planet = "Earth", solarSystem = "Milky Way"
+  var avgHeight = 175
+  let line = #line, file = #file, handle = #dsohandle
+  lazy var idea: Idea = { fatalError() }()
+  var location: () -> Place = { fatalError() }
+  var secondLocation: (() -> Place)!
+  @MyWrapper var wrapped: String = ""
+  var computed: String { "hi" }
+  var getSet: String {
+    get { "hi" }
+    set {}
+  }
+  var didSet: String = "ds" {
+    didSet { print("didSet") }
+  }
+}
+
+struct Place {
+  typealias Callback = () -> ()
+  let person: Person
+  let street: String
+  let apartment: Optional<String>
+  let city: String
+  let state: String
+  let postalCode: Int
+  let plusFour: Int?
+  let callback: Callback
+  @MyWrapper var wrapped: String
+  var `protocol`: String
+}
+
+protocol Thing {
+  var idea: Idea { get }
+}
+
+enum Idea {
+  var subject: String { fatalError() }
+}
+
+struct OnlyComputed {
+internal init() {
+}
+
+  lazy var idea: Idea = { fatalError() }()
+  var computed: String { "hi" }
+}
+
+@propertyWrapper
+struct MyWrapper {
+  let wrappedValue: String
+}
+
+
+
+
+

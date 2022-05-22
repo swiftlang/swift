@@ -11,10 +11,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-// NOTE: This 'Package.swift.in' file is for CMake configure_file().
-// Generated 'Package.swift' can be found in
-// '${swift_build_dir}/SwiftCompilerSources/Package.swift'.
-
 import PackageDescription
 
 private extension Target {
@@ -23,9 +19,7 @@ private extension Target {
       "-Xfrontend", "-validate-tbd-against-ir=none",
       "-Xfrontend", "-enable-cxx-interop",
       // Bridging modules and headers
-      "-Xcc", "-I", "-Xcc", "@SWIFT_SOURCE_DIR@/include",
-      // Generated C headers
-      "-Xcc", "-I", "-Xcc", "@CMAKE_BINARY_DIR@/include",
+      "-Xcc", "-I", "-Xcc", "../include",
       "-cross-module-optimization"
     ]),
   ]

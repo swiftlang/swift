@@ -3949,7 +3949,10 @@ SILFunctionType::SILFunctionType(
   } else {
     assert(normalResults.empty());    
     NumAnyResults = yields.size();
-    NumAnyIndirectFormalResults = 0; // unused
+    NumAnyIndirectFormalResults = std::count_if(
+        yields.begin(), yields.end(), [](const SILYieldInfo &yieldInfo) {
+          return yieldInfo.isFormalIndirect();
+        });
     memcpy(getMutableYields().data(), yields.data(),
            yields.size() * sizeof(SILYieldInfo));
   }

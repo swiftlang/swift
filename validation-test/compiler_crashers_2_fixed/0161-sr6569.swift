@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=on -requirement-machine-inferred-signatures=on
+// RUN: %target-typecheck-verify-swift
 
 protocol P {
     associatedtype A: P // expected-note {{protocol requires nested type 'A'; do you want to add it?}}

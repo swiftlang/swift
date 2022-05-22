@@ -18,7 +18,7 @@ extension MutableCollection where Self: BidirectionalCollection {
   ///     var characters: [Character] = ["C", "a", "f", "é"]
   ///     characters.reverse()
   ///     print(characters)
-  ///     // Prints "["é", "f", "a", "C"]
+  ///     // Prints "["é", "f", "a", "C"]"
   ///
   /// - Complexity: O(*n*), where *n* is the number of elements in the
   ///   collection.

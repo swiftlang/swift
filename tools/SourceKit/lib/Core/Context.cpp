@@ -36,11 +36,12 @@ GlobalConfig::getCompletionOpts() const {
 }
 
 SourceKit::Context::Context(
-    StringRef RuntimeLibPath, StringRef DiagnosticDocumentationPath,
+    StringRef SwiftExecutablePath, StringRef RuntimeLibPath,
+    StringRef DiagnosticDocumentationPath,
     llvm::function_ref<std::unique_ptr<LangSupport>(Context &)>
         LangSupportFactoryFn,
     bool shouldDispatchNotificationsOnMain)
-    : RuntimeLibPath(RuntimeLibPath),
+    : SwiftExecutablePath(SwiftExecutablePath), RuntimeLibPath(RuntimeLibPath),
       DiagnosticDocumentationPath(DiagnosticDocumentationPath),
       NotificationCtr(
           new NotificationCenter(shouldDispatchNotificationsOnMain)),

@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-inferred-signatures=on
-// RUN: not %target-swift-frontend -typecheck -debug-generic-signatures -requirement-machine-inferred-signatures=on %s 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: not %target-swift-frontend -typecheck -debug-generic-signatures %s 2>&1 | %FileCheck %s
 
 struct S {}
 class C {}
@@ -25,7 +25,7 @@ extension G2 where U == S, U : AnyObject {}
 // CHECK: ExtensionDecl line={{.*}} base=G2
 // CHECK-NEXT: Generic signature: <U where U == C>
 extension G2 where U == C, U : AnyObject {}
-// expected-warning@-1 {{redundant constraint 'C' : 'AnyObject'}}
+// expected-warning@-1 {{redundant constraint 'U' : 'AnyObject'}}
 
 // CHECK: ExtensionDecl line={{.*}} base=G2
 // CHECK-NEXT: Generic signature: <U where U : C>

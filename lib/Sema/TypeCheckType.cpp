@@ -4382,6 +4382,11 @@ void TypeChecker::checkExistentialTypes(Decl *decl) {
   if (!decl || decl->isInvalid())
     return;
 
+  // Skip diagnosing existential `any` requirements in swiftinterfaces.
+  auto sourceFile = decl->getDeclContext()->getParentSourceFile();
+  if (sourceFile && sourceFile->Kind == SourceFileKind::Interface)
+    return;
+
   auto &ctx = decl->getASTContext();
   if (auto *protocolDecl = dyn_cast<ProtocolDecl>(decl)) {
     checkExistentialTypes(ctx, protocolDecl->getTrailingWhereClause());
@@ -4412,8 +4417,14 @@ void TypeChecker::checkExistentialTypes(Decl *decl) {
   decl->walk(visitor);
 }
 
-void TypeChecker::checkExistentialTypes(ASTContext &ctx, Stmt *stmt) {
+void TypeChecker::checkExistentialTypes(ASTContext &ctx, Stmt *stmt,
+                                        DeclContext *DC) {
   if (!stmt)
+    return;
+
+  // Skip diagnosing existential `any` requirements in swiftinterfaces.
+  auto sourceFile = DC->getParentSourceFile();
+  if (sourceFile && sourceFile->Kind == SourceFileKind::Interface)
     return;
 
   ExistentialTypeVisitor visitor(ctx, /*checkStatements=*/true);

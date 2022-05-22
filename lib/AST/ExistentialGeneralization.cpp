@@ -15,9 +15,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "GenericSignatureBuilder.h"
-#include "swift/AST/Types.h"
 #include "swift/AST/CanTypeVisitor.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/GenericSignature.h"
+#include "swift/AST/Requirement.h"
+#include "swift/AST/Types.h"
 #include "llvm/ADT/DenseMap.h"
 
 using namespace swift;
@@ -34,13 +36,8 @@ class Generalizer : public CanTypeVisitor<Generalizer, Type> {
   llvm::DenseMap<std::pair<CanType, ProtocolDecl*>,
                  ProtocolConformanceRef> substConformances;
 
-  Optional<GenericSignatureBuilder> sigBuilderStorage;
-
-  GenericSignatureBuilder &sigBuilder() {
-    if (!sigBuilderStorage)
-      sigBuilderStorage.emplace(ctx);
-    return *sigBuilderStorage;
-  }
+  SmallVector<GenericTypeParamType *, 2> addedParameters;
+  SmallVector<Requirement, 2> addedRequirements;
 
 public:
   Generalizer(ASTContext &ctx) : ctx(ctx) {}
@@ -53,11 +50,13 @@ public:
 
   SubstitutionMap getGeneralizationSubstitutions() {
     // If we never introduced a generalization parameter, we're done.
-    if (!sigBuilderStorage) return SubstitutionMap();
+    if (addedParameters.empty() && addedRequirements.empty())
+      return SubstitutionMap();
 
     // Finish the signature.
-    auto sig = std::move(*sigBuilderStorage).computeGenericSignature();
-    sigBuilderStorage.reset();
+    auto sig = buildGenericSignature(ctx, GenericSignature(),
+                                     addedParameters,
+                                     addedRequirements);
 
     // TODO: minimize the signature by removing redundant generic
     // parameters.
@@ -217,10 +216,7 @@ private:
         assert(optNewReq && "generalization substitution failed");
         auto &newReq = *optNewReq;
 
-        auto source = GenericSignatureBuilder::
-          FloatingRequirementSource::forInferred(SourceLoc());
-
-        sigBuilder().addRequirement(newReq, source, nullptr);
+        addedRequirements.push_back(newReq);
 
         substConformances.insert({{newReq.getFirstType()->getCanonicalType(),
                                    newReq.getProtocolDecl()},
@@ -259,7 +255,8 @@ private:
                                               /*depth*/ 0,
                                               /*index*/ substTypes.size(),
                                               ctx);
-    sigBuilder().addGenericParameter(newParam);
+    addedParameters.push_back(newParam);
+
     substTypes.insert({CanType(newParam), origArg});
     return newParam;
   }

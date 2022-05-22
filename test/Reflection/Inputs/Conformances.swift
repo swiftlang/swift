@@ -31,3 +31,5 @@ struct foo {
         }
     }
 }
+
+extension foo : MyProto {}

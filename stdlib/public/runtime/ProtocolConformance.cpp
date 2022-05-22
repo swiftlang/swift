@@ -802,6 +802,19 @@ static _dyld_protocol_conformance_result getDyldSharedCacheConformance(
     ConformanceState &C, const ProtocolDescriptor *protocol,
     const ClassMetadata *objcClassMetadata,
     const ContextDescriptor *description, llvm::StringRef foreignTypeIdentity) {
+  // Protocols, classes, and descriptions that aren't in the shared cache will
+  // never be found in the shared cache conformances. Foreign types are
+  // non-unique so those can still be found in the shared cache regardless of
+  // where the we got the identity.
+  if (!C.inSharedCache(protocol) ||
+      (objcClassMetadata && !C.inSharedCache(objcClassMetadata)) ||
+      (description && !C.inSharedCache(description))) {
+    DYLD_CONFORMANCES_LOG("Skipping shared cache lookup, protocol %p, class "
+                          "%p, or description %p is not in shared cache.",
+                          protocol, objcClassMetadata, description);
+    return {_dyld_protocol_conformance_result_kind_not_found, nullptr};
+  }
+
   if (!foreignTypeIdentity.empty()) {
     DYLD_CONFORMANCES_LOG(
         "_dyld_find_foreign_type_protocol_conformance(%p, %.*s, %zu)", protocol,

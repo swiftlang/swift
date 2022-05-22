@@ -1,9 +1,5 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=off
-// RUN: %target-swift-frontend -debug-generic-signatures -typecheck %s -requirement-machine-protocol-signatures=off 2>&1 | %FileCheck %s
-
-// FIXME: Implement concrete contraction for the Requirement Machine's
-// RequirementSignatureRequest to get this to pass without turning off
-// -requirement-machine-protocol-signatures.
+// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: %target-swift-frontend -debug-generic-signatures -typecheck %s 2>&1 | %FileCheck %s
 
 protocol P24 {
   associatedtype C: P20
@@ -29,8 +25,8 @@ class X3 { }
 // CHECK-NEXT: Requirement signature: <Self where Self.[P25a]A == X24<Self.[P25a]B>, Self.[P25a]B : P20>
 // CHECK-NEXT: Canonical requirement signature: <τ_0_0 where τ_0_0.[P25a]A == X24<τ_0_0.[P25a]B>, τ_0_0.[P25a]B : P20>
 protocol P25a {
-  associatedtype A: P24 // expected-warning{{redundant conformance constraint 'Self.A' : 'P24'}}
-  associatedtype B: P20 where A == X24<B> // expected-note{{conformance constraint 'Self.A' : 'P24' implied here}}
+  associatedtype A: P24 // expected-warning{{redundant conformance constraint 'X24<Self.B>' : 'P24'}}
+  associatedtype B: P20 where A == X24<B>
 }
 
 // CHECK-LABEL: .P25b@
@@ -45,9 +41,9 @@ protocol P25b {
 // CHECK-NEXT: Requirement signature: <Self where Self.[P27a]A == X26<Self.[P27a]B>, Self.[P27a]B : X3>
 // CHECK-NEXT: Canonical requirement signature: <τ_0_0 where τ_0_0.[P27a]A == X26<τ_0_0.[P27a]B>, τ_0_0.[P27a]B : X3>
 protocol P27a {
-  associatedtype A: P26 // expected-warning{{redundant conformance constraint 'Self.A' : 'P26'}}
+  associatedtype A: P26 // expected-warning{{redundant conformance constraint 'X26<Self.B>' : 'P26'}}
 
-  associatedtype B: X3 where A == X26<B> // expected-note{{conformance constraint 'Self.A' : 'P26' implied here}}
+  associatedtype B: X3 where A == X26<B>
 }
 
 // CHECK-LABEL: .P27b@

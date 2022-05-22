@@ -56,7 +56,7 @@ static void collectDependentTypeInfo(
     return;
   Ty.visit([&](CanType t) {
     if (const auto opened = dyn_cast<OpenedArchetypeType>(t)) {
-      const auto root = cast<OpenedArchetypeType>(CanType(opened->getRoot()));
+      const auto root = opened.getRoot();
 
       // Add this root opened archetype if it was not seen yet.
       // We don't use a set here, because the number of open archetypes
@@ -536,10 +536,12 @@ BeginApplyInst::create(SILDebugLocation loc, SILValue callee,
 
   for (auto &yield : substCalleeType->getYields()) {
     auto yieldType = conv.getSILType(yield, F.getTypeExpansionContext());
-    auto convention = SILArgumentConvention(yield.getConvention());
+    auto argConvention = SILArgumentConvention(yield.getConvention());
     resultTypes.push_back(yieldType);
-    resultOwnerships.push_back(
-      ValueOwnershipKind(F, yieldType, convention));
+    resultOwnerships.push_back(ValueOwnershipKind(
+        F, yieldType, argConvention,
+        moduleConventions.hasValue() ? moduleConventions.getValue()
+                                     : SILModuleConventions(F.getModule())));
   }
 
   resultTypes.push_back(SILType::getSILTokenType(F.getASTContext()));
@@ -1376,26 +1378,6 @@ bool TupleExtractInst::isEltOnlyNonTrivialElt() const {
   return true;
 }
 
-/// Get a unique index for a struct or class field in layout order.
-unsigned swift::getFieldIndex(NominalTypeDecl *decl, VarDecl *field) {
-  unsigned index = 0;
-  if (auto *classDecl = dyn_cast<ClassDecl>(decl)) {
-    for (auto *superDecl = classDecl->getSuperclassDecl(); superDecl != nullptr;
-         superDecl = superDecl->getSuperclassDecl()) {
-      index += superDecl->getStoredProperties().size();
-    }
-  }
-  for (VarDecl *property : decl->getStoredProperties()) {
-    if (field == property) {
-      return index;
-    }
-    ++index;
-  }
-  llvm_unreachable("The field decl for a struct_extract, struct_element_addr, "
-                   "or ref_element_addr must be an accessible stored "
-                   "property of the operand type");
-}
-
 unsigned swift::getNumFieldsInNominal(NominalTypeDecl *decl) {
   unsigned count = 0;
   if (auto *classDecl = dyn_cast<ClassDecl>(decl)) {
@@ -1405,16 +1387,6 @@ unsigned swift::getNumFieldsInNominal(NominalTypeDecl *decl) {
     }
   }
   return count + decl->getStoredProperties().size();
-}
-
-unsigned swift::getCaseIndex(EnumElementDecl *enumElement) {
-  unsigned idx = 0;
-  for (EnumElementDecl *e : enumElement->getParentEnum()->getAllElements()) {
-    if (e == enumElement)
-      return idx;
-    ++idx;
-  }
-  llvm_unreachable("enum element not found in enum decl");
 }
 
 /// Get the property for a struct or class by its unique index.

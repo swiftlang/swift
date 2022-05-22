@@ -2850,7 +2850,11 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
     }
 
     // If then we have an object, return it at +0.
+    // For opaque values, return at +1
     if (subjectMV.getType().isObject()) {
+      if (subjectMV.getType().isAddressOnly(F)) {
+        return {subjectMV.copy(*this, S), CastConsumptionKind::TakeAlways};
+      }
       return {subjectMV, CastConsumptionKind::BorrowAlways};
     }
 

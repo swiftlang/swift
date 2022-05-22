@@ -186,9 +186,13 @@ StringRef OwnershipKind::asString() const {
 
 ValueOwnershipKind::ValueOwnershipKind(const SILFunction &F, SILType Type,
                                        SILArgumentConvention Convention)
-    : value(OwnershipKind::Any) {
-  auto &M = F.getModule();
+    : ValueOwnershipKind(F, Type, Convention,
+                         SILModuleConventions(F.getModule())) {}
 
+ValueOwnershipKind::ValueOwnershipKind(const SILFunction &F, SILType Type,
+                                       SILArgumentConvention Convention,
+                                       SILModuleConventions moduleConventions)
+    : value(OwnershipKind::Any) {
   // Trivial types can be passed using a variety of conventions. They always
   // have trivial ownership.
   if (Type.isTrivial(F)) {
@@ -199,14 +203,12 @@ ValueOwnershipKind::ValueOwnershipKind(const SILFunction &F, SILType Type,
   switch (Convention) {
   case SILArgumentConvention::Indirect_In:
   case SILArgumentConvention::Indirect_In_Constant:
-    value = SILModuleConventions(M).useLoweredAddresses()
-                ? OwnershipKind::None
-                : OwnershipKind::Owned;
+    value = moduleConventions.useLoweredAddresses() ? OwnershipKind::None
+                                                    : OwnershipKind::Owned;
     break;
   case SILArgumentConvention::Indirect_In_Guaranteed:
-    value = SILModuleConventions(M).useLoweredAddresses()
-                ? OwnershipKind::None
-                : OwnershipKind::Guaranteed;
+    value = moduleConventions.useLoweredAddresses() ? OwnershipKind::None
+                                                    : OwnershipKind::Guaranteed;
     break;
   case SILArgumentConvention::Indirect_Inout:
   case SILArgumentConvention::Indirect_InoutAliasable:

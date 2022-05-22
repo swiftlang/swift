@@ -107,6 +107,17 @@ static bool isPublicOrUsableFromInline(Type ty) {
   });
 }
 
+static bool isPrespecilizationDeclWithTarget(const ValueDecl *vd) {
+  // Add exported prespecialized symbols.
+  for (auto *attr : vd->getAttrs().getAttributes<SpecializeAttr>()) {
+    if (!attr->isExported())
+      continue;
+    if (auto *targetFun = attr->getTargetFunctionDecl(vd))
+      return true;
+  }
+  return false;
+}
+
 static bool contributesToParentTypeStorage(const AbstractStorageDecl *ASD) {
   auto *DC = ASD->getDeclContext()->getAsDecl();
   if (!DC) return false;
@@ -144,6 +155,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
       PrintOptions::FunctionRepresentationMode::Full;
   result.AlwaysTryPrintParameterLabels = true;
   result.PrintSPIs = printSPIs;
+  result.PrintExplicitAny = true;
 
   // We should print __consuming, __owned, etc for the module interface file.
   result.SkipUnderscoredKeywords = false;
@@ -177,9 +189,11 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
       if (!options.PrintSPIs && D->isSPI())
         return false;
 
-      // Skip anything that isn't 'public' or '@usableFromInline'.
+      // Skip anything that isn't 'public' or '@usableFromInline' or has a
+      // _specialize attribute with a targetFunction parameter.
       if (auto *VD = dyn_cast<ValueDecl>(D)) {
-        if (!isPublicOrUsableFromInline(VD)) {
+        if (!isPublicOrUsableFromInline(VD) &&
+            !isPrespecilizationDeclWithTarget(VD)) {
           // We do want to print private stored properties, without their
           // original names present.
           if (auto *ASD = dyn_cast<AbstractStorageDecl>(VD))

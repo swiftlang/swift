@@ -566,7 +566,7 @@ def main():
     parser.add_argument("--verbose", action="store_true",
                         help="Report activity verbosely")
     parser.add_argument("--output", default="-",
-                        type=argparse.FileType('wb', 0),
+                        type=argparse.FileType('w', 0),
                         help="Write output to file")
     parser.add_argument("--paired", action="store_true",
                         help="Process two dirs-of-stats-dirs, pairwise")

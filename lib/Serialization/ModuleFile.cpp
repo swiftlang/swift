@@ -156,22 +156,6 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
       return error(status);
   }
 
-  // The loaded module was built with a compatible SDK if either:
-  // * it was the same SDK
-  // * or one who's name is a prefix of the clients' SDK name. This expects
-  // that a module built with macOS11 can be used with the macOS11.secret SDK.
-  // This is generally the case as SDKs with suffixes are a superset of the
-  // short SDK name equivalent. While this is accepted, this is still not a
-  // recommended configuration and may lead to unreadable swiftmodules.
-  StringRef moduleSDK = Core->SDKName;
-  StringRef clientSDK = ctx.LangOpts.SDKName;
-  if (ctx.SearchPathOpts.EnableSameSDKCheck &&
-      !moduleSDK.empty() && !clientSDK.empty() &&
-      !clientSDK.startswith(moduleSDK)) {
-    status = Status::SDKMismatch;
-    return error(status);
-  }
-
   StringRef SDKPath = ctx.SearchPathOpts.getSDKPath();
   if (SDKPath.empty() ||
       !Core->ModuleInputBuffer->getBufferIdentifier().startswith(SDKPath)) {
@@ -372,7 +356,7 @@ ModuleFile::getModuleName(ASTContext &Ctx, StringRef modulePath,
   bool isFramework = false;
   serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
       modulePath.str(), std::move(newBuf), nullptr, nullptr,
-      /*isFramework*/ isFramework, Ctx.SILOpts.EnableOSSAModules,
+      /*isFramework*/ isFramework, Ctx.SILOpts.EnableOSSAModules, Ctx.LangOpts.SDKName,
       Ctx.SearchPathOpts.DeserializedPathRecoverer,
       loadedModuleFile);
   Name = loadedModuleFile->Name.str();

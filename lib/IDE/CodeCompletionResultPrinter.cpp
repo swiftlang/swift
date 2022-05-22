@@ -496,6 +496,10 @@ static void printCodeCompletionResultFilterName(
       case ChunkKind::DeclIntroducer:
         ++i;
         continue;
+      case ChunkKind::ParameterDeclExternalName:
+        // Skip '_' parameter external name.
+        shouldPrint = shouldPrint && C.hasText() && C.getText() != "_";
+        break;
       case ChunkKind::CallArgumentTypeBegin:
       case ChunkKind::ParameterDeclTypeBegin:
       case ChunkKind::TypeAnnotationBegin:

@@ -509,3 +509,6 @@ func rdar85166519() {
     v?.addingReportingOverflow(0) // expected-error {{cannot convert value of type '(partialValue: Int, overflow: Bool)?' to expected dictionary key type 'Int'}}
   ]
 }
+
+// https://github.com/apple/swift/issues/58539
+if let x = nil {} // expected-error{{'nil' requires a contextual type}}

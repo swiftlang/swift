@@ -171,19 +171,16 @@ function(add_swift_compiler_modules_library name)
   endforeach()
 
   # Create a static library containing all module object files.
+  if (XCODE)
+    # Xcode does not compile libraries that contain only object files.
+    # Therefore, it fails to create the static library. As a workaround,
+    # we add an empty source file force_lib.c to the target.
+    set(all_obj_files force_lib.c ${all_obj_files})
+  endif()
   add_library(${name} STATIC ${all_obj_files})
   add_dependencies(${name} ${all_module_targets})
   set_target_properties(${name} PROPERTIES LINKER_LANGUAGE CXX)
   set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${name})
-
-  # Xcode does not compile libraries that contain only object files.
-  # Therefore, it fails to create the static library. As a workaround,
-  # we add a dummy script phase to the target.
-  if (XCODE)
-    add_custom_command(TARGET ${name} POST_BUILD 
-      COMMAND ""
-      COMMENT "Dummy script phase to force building this target")
-  endif()
 endfunction()
 
 
@@ -266,26 +263,4 @@ else()
     message(FATAL_ERROR "Unknown BOOTSTRAPPING_MODE '${BOOTSTRAPPING_MODE}'")
   endif()
 
-endif()
-
-# Configure 'SwiftCompilerModules' SwiftPM package. The 'Package.swift' will
-# be created at '${build_dir}/SwiftCompilerModulesPackage/Package.swift' and can
-# be built with 'swift-build'.
-# Note that this SwiftPM package itself is just for development purposes, and
-# is not actually used for the compiler building. 
-set(swiftcompiler_modules_package_directory
-    "${SWIFT_BINARY_DIR}/SwiftCompilerModulesPackage")
-configure_file(Package.swift.in
-  "${swiftcompiler_modules_package_directory}/Package.swift" @ONLY)
-# SwiftPM requires all sources are inside the directory of 'Package.swift'.
-# Create symlinks to the actual source directories.
-execute_process(COMMAND
-  "${CMAKE_COMMAND}" -E create_symlink
-  "${CMAKE_CURRENT_SOURCE_DIR}/Sources"
-  "${swiftcompiler_modules_package_directory}/Sources")
-if(SWIFT_BUILD_REGEX_PARSER_IN_COMPILER)
-  execute_process(COMMAND
-    "${CMAKE_COMMAND}" -E create_symlink
-    "${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}/Sources/_RegexParser"
-    "${swiftcompiler_modules_package_directory}/_RegexParser_Sources")
 endif()

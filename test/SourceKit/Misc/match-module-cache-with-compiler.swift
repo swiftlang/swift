@@ -2,6 +2,7 @@
 // NOTE: Do not change this test without a review from @akyrtzi
 
 // REQUIRES: shell
+
 // RUN: %empty-directory(%t)
 
 // RUN: COMPILER_ARGS=( \

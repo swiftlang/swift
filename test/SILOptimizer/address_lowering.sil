@@ -48,6 +48,11 @@ enum Mixed<T> {
   case o(AnyObject)
 };
 
+class TestGeneric<T> {
+  init()
+  @_borrowed @_hasStorage var borrowedGeneric: T { get set }
+}
+
 precedencegroup ComparisonPrecedence {
   assignment: true
   associativity: right
@@ -1169,6 +1174,87 @@ bb1(%3 : @owned $(T, Int, Int, T)):
 
 bb2(%9 : $Error):
   throw %9 : $Error
+}
+
+sil hidden [ossa] @testBeginApplyDeadYield : $@convention(thin) <T> (@guaranteed TestGeneric<T>) -> () {
+bb0(%0 : @guaranteed $TestGeneric<T>):
+  %2 = class_method %0 : $TestGeneric<T>, #TestGeneric.borrowedGeneric!read : <T> (TestGeneric<T>) -> () -> (), $@yield_once @convention(method) <τ_0_0> (@guaranteed TestGeneric<τ_0_0>) -> @yields @in_guaranteed τ_0_0
+  (%3, %4) = begin_apply %2<T>(%0) : $@yield_once @convention(method) <τ_0_0> (@guaranteed TestGeneric<τ_0_0>) -> @yields @in_guaranteed τ_0_0
+  end_apply %4
+  %10 = tuple ()
+  return %10 : $()
+}
+
+class Klass {}
+
+// CHECK-LABEL: sil hidden [ossa] @testBeginApplyLoadableYieldWithIndirectConv :
+// CHECK: bb0(%0 : @guaranteed $TestGeneric<Klass>):
+// CHECK:   [[STK:%.*]] = alloc_stack $Klass
+// CHECK:   [[METH:%.*]] = class_method %0 : $TestGeneric<Klass>, #TestGeneric.borrowedGeneric!read : <T> (TestGeneric<T>) -> () -> (), $@yield_once @convention(method) <τ_0_0> (@guaranteed TestGeneric<τ_0_0>) -> @yields @in_guaranteed τ_0_0
+// CHECK:   ([[Y:%.*]], [[TOK:%.*]]) = begin_apply [[METH]]<Klass>(%0) : $@yield_once @convention(method) <τ_0_0> (@guaranteed TestGeneric<τ_0_0>) -> @yields @in_guaranteed τ_0_0
+// CHECK:   copy_addr [[Y]] to [initialization] [[STK]] : $*Klass
+// CHECK:   end_apply [[TOK]]
+// CHECK:   destroy_addr [[STK]] : $*Klass
+// CHECK-LABEL: }
+sil hidden [ossa] @testBeginApplyLoadableYieldWithIndirectConv : $@convention(thin) <Klass> (@guaranteed TestGeneric<Klass>) -> () {
+bb0(%0 : @guaranteed $TestGeneric<Klass>):
+  %2 = class_method %0 : $TestGeneric<Klass>, #TestGeneric.borrowedGeneric!read : <Klass> (TestGeneric<Klass>) -> () -> (), $@yield_once @convention(method) <τ_0_0> (@guaranteed TestGeneric<τ_0_0>) -> @yields @in_guaranteed τ_0_0
+  (%3, %4) = begin_apply %2<Klass>(%0) : $@yield_once @convention(method) <τ_0_0> (@guaranteed TestGeneric<τ_0_0>) -> @yields @in_guaranteed τ_0_0
+  %5 = copy_value %3 : $Klass
+  end_apply %4
+  destroy_value %5 : $Klass
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @testBeginApplyOpaqueYield :
+// CHECK: bb0(%0 : @guaranteed $TestGeneric<T>):
+// CHECK:   [[STK:%.*]] = alloc_stack $T
+// CHECK:   [[M:%.*]] = class_method %0 : $TestGeneric<T>, #TestGeneric.borrowedGeneric!read : <T> (TestGeneric<T>) -> () -> (), $@yield_once @convention(method) <τ_0_0> (@guaranteed TestGeneric<τ_0_0>) -> @yields @in_guaranteed τ_0_0
+// CHECK:   ([[Y:%.*]], [[TOK:%.*]]) = begin_apply %2<T>(%0) : $@yield_once @convention(method) <τ_0_0> (@guaranteed TestGeneric<τ_0_0>) -> @yields @in_guaranteed τ_0_0
+// CHECK:   copy_addr [[Y]] to [initialization] [[STK]] : $*T
+// CHECK:   end_apply [[TOK]]
+// CHECK:   destroy_addr [[STK]] : $*T
+// CHECK-LABEL: } // end sil function 'testBeginApplyOpaqueYield'
+sil hidden [ossa] @testBeginApplyOpaqueYield : $@convention(thin) <T> (@guaranteed TestGeneric<T>) -> () {
+bb0(%0 : @guaranteed $TestGeneric<T>):
+  %2 = class_method %0 : $TestGeneric<T>, #TestGeneric.borrowedGeneric!read : <T> (TestGeneric<T>) -> () -> (), $@yield_once @convention(method) <τ_0_0> (@guaranteed TestGeneric<τ_0_0>) -> @yields @in_guaranteed τ_0_0
+  (%3, %4) = begin_apply %2<T>(%0) : $@yield_once @convention(method) <τ_0_0> (@guaranteed TestGeneric<τ_0_0>) -> @yields @in_guaranteed τ_0_0
+  %5 = copy_value %3 : $T
+  end_apply %4
+  destroy_value %5 : $T
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @testOpaqueYield :
+// CHECK: bb0(%0 : @guaranteed $TestGeneric<T>):
+// CHECK:   [[REF:%.*]] = ref_element_addr %0 : $TestGeneric<T>, #TestGeneric.borrowedGeneric
+// CHECK:   [[ACCESS:%.*]] = begin_access [read] [dynamic] [[REF]] : $*T
+// CHECK:   yield [[ACCESS]] : $*T, resume bb2, unwind bb1
+// CHECK: bb1:
+// CHECK:   end_access [[ACCESS]] : $*T
+// CHECK:   unwind
+// CHECK: bb2:
+// CHECK:   end_access [[ACCESS]] : $*T
+// CHECK-LABEL: } // end sil function 'testOpaqueYield'
+sil hidden [ossa] @testOpaqueYield : $@yield_once @convention(method) <T> (@guaranteed TestGeneric<T>) -> @yields @in_guaranteed T {
+bb0(%0 : @guaranteed $TestGeneric<T>):
+  %2 = ref_element_addr %0 : $TestGeneric<T>, #TestGeneric.borrowedGeneric
+  %3 = begin_access [read] [dynamic] %2 : $*T
+  %4 = load_borrow %3 : $*T
+  yield %4 : $T, resume bb1, unwind bb2
+
+bb1:
+  end_borrow %4 : $T
+  end_access %3 : $*T
+  %8 = tuple ()
+  return %8 : $()
+
+bb2:
+  end_borrow %4 : $T
+  end_access %3 : $*T
+  unwind
 }
 
 sil [ossa] @use_T : $@convention(thin) <T> (@in T) -> ()

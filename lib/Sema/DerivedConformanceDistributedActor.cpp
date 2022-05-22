@@ -432,8 +432,7 @@ static ValueDecl *deriveDistributedActor_id(DerivedConformance &derived) {
   auto &C = derived.Context;
 
   // ```
-  // nonisolated
-  // let id: Self.ID // Self.ActorSystem.ActorID
+  // nonisolated let id: Self.ID // Self.ActorSystem.ActorID
   // ```
   auto propertyType = getDistributedActorIDType(derived.Nominal);
 
@@ -448,7 +447,8 @@ static ValueDecl *deriveDistributedActor_id(DerivedConformance &derived) {
   propDecl->getAttrs().add(
       new (C) NonisolatedAttr(/*IsImplicit=*/true));
 
-  derived.addMembersToConformanceContext({ propDecl, pbDecl });
+  derived.addMemberToConformanceContext(pbDecl, /*insertAtHead=*/true);
+  derived.addMemberToConformanceContext(propDecl, /*insertAtHead=*/true);
   return propDecl;
 }
 
@@ -460,8 +460,7 @@ static ValueDecl *deriveDistributedActor_actorSystem(
   assert(classDecl && derived.Nominal->isDistributedActor());
 
   // ```
-  // nonisolated
-  // let actorSystem: ActorSystem
+  // nonisolated let actorSystem: ActorSystem
   // ```
   // (no need for @actorIndependent because it is an immutable let)
   auto propertyType = getDistributedActorSystemType(classDecl);
@@ -477,7 +476,22 @@ static ValueDecl *deriveDistributedActor_actorSystem(
   propDecl->getAttrs().add(
       new (C) NonisolatedAttr(/*IsImplicit=*/true));
 
-  derived.addMembersToConformanceContext({ propDecl, pbDecl });
+  // IMPORTANT: `id` MUST be the first field of a distributed actor, and
+  // `actorSystem` MUST be the second field, because for a remote instance
+  // we don't allocate memory after those two fields, so their order is very
+  // important. The `hint` below makes sure the system is inserted right after.
+  if (auto id = derived.Nominal->getDistributedActorIDProperty()) {
+    derived.addMemberToConformanceContext(pbDecl, /*hint=*/id);
+    derived.addMemberToConformanceContext(propDecl, /*hint=*/id);
+  } else {
+    // `id` will be synthesized next, and will insert at head,
+    // so in order for system to be SECOND (as it must be),
+    // we'll insert at head right now and as id gets synthesized we'll get
+    // the correct order: id, actorSystem.
+    derived.addMemberToConformanceContext(pbDecl, /*insertAtHead==*/true);
+    derived.addMemberToConformanceContext(propDecl, /*insertAtHead=*/true);
+  }
+
   return propDecl;
 }
 

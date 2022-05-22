@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-inferred-signatures=on
+// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
 
 // SR-5726
 protocol Foo

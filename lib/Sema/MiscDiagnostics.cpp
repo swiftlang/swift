@@ -3572,11 +3572,12 @@ void swift::performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD) {
 }
 
 // Perform MiscDiagnostics on Switch Statements.
-static void checkSwitch(ASTContext &ctx, const SwitchStmt *stmt) {
+static void checkSwitch(ASTContext &ctx, const SwitchStmt *stmt,
+                        DeclContext *DC) {
   // We want to warn about "case .Foo, .Bar where 1 != 100:" since the where
   // clause only applies to the second case, and this is surprising.
   for (auto cs : stmt->getCases()) {
-    TypeChecker::checkExistentialTypes(ctx, cs);
+    TypeChecker::checkExistentialTypes(ctx, cs, DC);
 
     // The case statement can have multiple case items, each can have a where.
     // If we find a "where", and there is a preceding item without a where, and
@@ -5070,10 +5071,10 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
 void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {
   auto &ctx = DC->getASTContext();
 
-  TypeChecker::checkExistentialTypes(ctx, const_cast<Stmt *>(S));
-    
+  TypeChecker::checkExistentialTypes(ctx, const_cast<Stmt *>(S), DC);
+
   if (auto switchStmt = dyn_cast<SwitchStmt>(S))
-    checkSwitch(ctx, switchStmt);
+    checkSwitch(ctx, switchStmt, DC);
 
   checkStmtConditionTrailingClosure(ctx, S);
   

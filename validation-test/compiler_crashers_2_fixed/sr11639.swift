@@ -1,6 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir -primary-file %s -debug-generic-signatures -requirement-machine-protocol-signatures=off 2>&1 | %FileCheck %s
-
-// FIXME: Get this working with -requirement-machine-protocol-signatures=on again
+// RUN: %target-swift-frontend -emit-ir -primary-file %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
 public protocol FooProtocol {
   associatedtype Bar

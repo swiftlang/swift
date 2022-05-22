@@ -278,6 +278,10 @@ def enable_experimental_concurrency :
   Flag<["-"], "enable-experimental-concurrency">,
   HelpText<"Enable experimental concurrency model">;
 
+def enable_experimental_cxx_interop :
+  Flag<["-"], "enable-experimental-cxx-interop">,
+  HelpText<"Enable C++ interop code generation and config directives">;
+
 def enable_lexical_borrow_scopes :
   Joined<["-"], "enable-lexical-borrow-scopes=">,
   HelpText<"Whether to emit lexical borrow scopes (default: true)">,
@@ -377,6 +381,9 @@ def disable_requirement_machine_reuse : Flag<["-"], "disable-requirement-machine
 
 def enable_requirement_machine_opaque_archetypes : Flag<["-"], "enable-requirement-machine-opaque-archetypes">,
   HelpText<"Enable more correct opaque archetype support, which is off by default because it might fail to produce a convergent rewrite system">;
+
+def warn_redundant_requirements : Flag<["-"], "warn-redundant-requirements">,
+  HelpText<"Emit warnings for redundant requirements in generic signatures">;
 
 def dump_type_witness_systems : Flag<["-"], "dump-type-witness-systems">,
   HelpText<"Enables dumping type witness systems from associated type inference">;
@@ -821,11 +828,6 @@ def emit_sorted_sil : Flag<["-"], "emit-sorted-sil">,
 
 def emit_syntax : Flag<["-"], "emit-syntax">,
   HelpText<"Parse input file(s) and emit the Syntax tree(s) as JSON">, ModeOpt;
-
-def enable_experimental_cxx_interop :
-  Flag<["-"], "enable-experimental-cxx-interop">,
-  HelpText<"Enable C++ interop code generation and config directives">,
-  Flags<[FrontendOption, HelpHidden]>;
 
 def enable_cxx_interop :
   Flag<["-"], "enable-cxx-interop">,

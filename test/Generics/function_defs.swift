@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
 
 //===----------------------------------------------------------------------===//
 // Type-check function definitions

@@ -64,18 +64,14 @@ TypeRefinementContext::createForDecl(ASTContext &Ctx, Decl *D,
       TypeRefinementContext(Ctx, D, Parent, SrcRange, Info, ExplicitInfo);
 }
 
-TypeRefinementContext *
-TypeRefinementContext::createForResilienceBoundary(ASTContext &Ctx, Decl *D,
-                                TypeRefinementContext *Parent,
-                                const AvailabilityContext &Info,
-                                SourceRange SrcRange) {
+TypeRefinementContext *TypeRefinementContext::createForAPIBoundary(
+    ASTContext &Ctx, Decl *D, TypeRefinementContext *Parent,
+    const AvailabilityContext &Info, SourceRange SrcRange) {
   assert(D);
   assert(Parent);
-  return new (Ctx)
-      TypeRefinementContext(Ctx, IntroNode(D, Reason::ResilienceBoundary),
-                            Parent, SrcRange, Info,
-                            AvailabilityContext::alwaysAvailable());
-
+  return new (Ctx) TypeRefinementContext(
+      Ctx, IntroNode(D, Reason::APIBoundary), Parent, SrcRange, Info,
+      AvailabilityContext::alwaysAvailable());
 }
 
 TypeRefinementContext *
@@ -184,7 +180,7 @@ void TypeRefinementContext::dump(raw_ostream &OS, SourceManager &SrcMgr) const {
 SourceLoc TypeRefinementContext::getIntroductionLoc() const {
   switch (getReason()) {
   case Reason::Decl:
-  case Reason::ResilienceBoundary:
+  case Reason::APIBoundary:
     return Node.getAsDecl()->getLoc();
 
   case Reason::IfStmtThenBranch:
@@ -298,7 +294,7 @@ TypeRefinementContext::getAvailabilityConditionVersionSourceRange(
       Node.getAsWhileStmt()->getCond(), Platform, Version);
 
   case Reason::Root:
-  case Reason::ResilienceBoundary:
+  case Reason::APIBoundary:
     return SourceRange();
   }
 
@@ -312,8 +308,7 @@ void TypeRefinementContext::print(raw_ostream &OS, SourceManager &SrcMgr,
 
   OS << " versions=" << AvailabilityInfo.getOSVersion().getAsString();
 
-  if (getReason() == Reason::Decl
-      || getReason() == Reason::ResilienceBoundary) {
+  if (getReason() == Reason::Decl || getReason() == Reason::APIBoundary) {
     Decl *D = Node.getAsDecl();
     OS << " decl=";
     if (auto VD = dyn_cast<ValueDecl>(D)) {
@@ -355,8 +350,8 @@ StringRef TypeRefinementContext::getReasonName(Reason R) {
   case Reason::Decl:
     return "decl";
 
-  case Reason::ResilienceBoundary:
-    return "resilience_boundary";
+  case Reason::APIBoundary:
+    return "api_boundary";
 
   case Reason::IfStmtThenBranch:
     return "if_then";

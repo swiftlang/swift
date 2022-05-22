@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-inferred-signatures=off
+// RUN: %target-typecheck-verify-swift
 
 public class OuterClass {
   class InnerClass {}
@@ -16,9 +16,6 @@ public protocol PublicProto2 {
 //
 // FIXME: Once we no longer do that, come up with another strategy
 // to make the above diagnose.
-
-// FIXME: Get this working with the Requirement Machine, or decide that it should
-// be unsupported: rdar://90469477
 
 extension PublicProto2 where Self.T : OuterClass, Self.U == Self.T.InnerClass {
   public func cannotBePublic() {}

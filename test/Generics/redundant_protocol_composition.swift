@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-inferred-signatures=on
+// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
 
 // The GenericSignatureBuilder did not diagnose the first two.
 
@@ -11,7 +11,7 @@ struct G2<T> where T : BinaryInteger & FixedWidthInteger & UnsignedInteger & Cod
 struct G3<T> where T : BinaryInteger, T : FixedWidthInteger, T : UnsignedInteger & Codable {}
 // expected-warning@-1 {{redundant conformance constraint 'T' : 'BinaryInteger'}}
 
-// FIXME: These should also diagnose, but do not due to overly-eager
+// FIXME(rqm-diagnostics): These should also diagnose, but do not due to overly-eager
 // canonicalization in ProtocolCompositionType::get().
 
 struct G1a<T : BinaryInteger & FixedWidthInteger & UnsignedInteger> {}

@@ -472,6 +472,7 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   if (!invocationParam->isInOut()) {
     return false;
   }
+
   // --- Check parameter: throwing: Err.Type
   auto thrownTypeParam = params->get(3);
   if (thrownTypeParam->getArgumentName() != C.Id_throwing) {
