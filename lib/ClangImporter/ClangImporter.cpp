@@ -4122,32 +4122,15 @@ bool ClangImporter::Implementation::lookupValue(SwiftLookupTable &table,
   bool declFound = false;
 
   if (name.isOperator()) {
-      for (auto entry : table.lookupMemberOperators(name.getBaseName())) {
-          if (isVisibleClangEntry(entry)) {
-              if (auto decl = dyn_cast_or_null<ValueDecl>(
-                      importDeclReal(entry->getMostRecentDecl(), CurrentVersion))) {
-                  consumer.foundDecl(decl, DeclVisibilityKind::VisibleAtTopLevel);
-                  declFound = true;
-                  for (auto alternate : getAlternateDecls(decl)) {
-                      if (alternate->getName().matchesRef(name)) {
-                          consumer.foundDecl(alternate, DeclVisibilityKind::DynamicLookup,
-                                             DynamicLookupInfo::AnyObject);
-                      }
-                  }
-              }
-          }
-      }
 
-      // If CXXInterop is enabled we need to check the modified operator name as well
-      if(SwiftContext.LangOpts.EnableCXXInterop) {
-          auto declBaseName = DeclBaseName(SwiftContext.getIdentifier("__operator" + getOperatorNameForToken(name.getBaseName().getIdentifier().str().str())));
+      auto findAndConsumeBaseNameFromTable = [this, &table, &consumer, &declFound, &name](DeclBaseName declBaseName) {
           for (auto entry : table.lookupMemberOperators(declBaseName)) {
               if (isVisibleClangEntry(entry)) {
                   if (auto decl = dyn_cast_or_null<ValueDecl>(
                           importDeclReal(entry->getMostRecentDecl(), CurrentVersion))) {
                       consumer.foundDecl(decl, DeclVisibilityKind::VisibleAtTopLevel);
                       declFound = true;
-                      for (auto alternate: getAlternateDecls(decl)) {
+                      for (auto alternate : getAlternateDecls(decl)) {
                           if (alternate->getName().matchesRef(name)) {
                               consumer.foundDecl(alternate, DeclVisibilityKind::DynamicLookup,
                                                  DynamicLookupInfo::AnyObject);
@@ -4156,6 +4139,15 @@ bool ClangImporter::Implementation::lookupValue(SwiftLookupTable &table,
                   }
               }
           }
+      };
+
+      findAndConsumeBaseNameFromTable(name.getBaseName());
+
+      // If CXXInterop is enabled we need to check the modified operator name as well
+      if(SwiftContext.LangOpts.EnableCXXInterop) {
+          auto declBaseName = DeclBaseName(SwiftContext.getIdentifier(
+                  "__operator" + getOperatorNameForToken(name.getBaseName().getIdentifier().str().str())));
+          findAndConsumeBaseNameFromTable(declBaseName);
       }
   }
 

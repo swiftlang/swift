@@ -4298,11 +4298,6 @@ namespace {
             templateParams);
 
         if (auto *mdecl = dyn_cast<clang::CXXMethodDecl>(decl)) {
-          // Subscripts and call operators are imported as normal methods.
-          // bool staticOperator = mdecl->isOverloadedOperator();
-          bool requiresStaticTopLevel =
-                                mdecl->getOverloadedOperator() != clang::OO_Call &&
-                                mdecl->getOverloadedOperator() != clang::OO_Subscript;
           if (mdecl->isStatic()) {
             selfIdx = None;
           } else {
@@ -8154,7 +8149,6 @@ synthesizeOperatorMethodBody(AbstractFunctionDecl *afd, void *context) {
 FuncDecl *SwiftDeclConverter::makeOperator(FuncDecl *operatorMethod, clang::CXXMethodDecl *clangOperator) {
   auto &ctx = Impl.SwiftContext;
   auto opName = clang::getOperatorSpelling(clangOperator->getOverloadedOperator());
-  auto loc = operatorMethod->getLoc();
   auto paramList = operatorMethod->getParameters();
   auto genericParamList = operatorMethod->getGenericParams();
 
@@ -8181,8 +8175,6 @@ FuncDecl *SwiftDeclConverter::makeOperator(FuncDecl *operatorMethod, clang::CXXM
   for(auto param : *paramList) {
       newParams.push_back(param);
   }
-
-  auto newParamList = ParameterList::create(ctx, newParams);
 
   auto oldArgNames = operatorMethod->getName().getArgumentNames();
   SmallVector<Identifier, 4> newArgNames;
