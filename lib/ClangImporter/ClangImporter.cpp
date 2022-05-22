@@ -2807,7 +2807,6 @@ static bool isVisibleFromModule(const ClangModuleUnit *ModuleFilter,
 
   const clang::Decl *D = ClangNode.castAsDecl();
   auto &ClangASTContext = ModuleFilter->getClangASTContext();
-
   // We don't handle Clang submodules; pop everything up to the top-level
   // module.
   auto OwningClangModule = getClangTopLevelOwningModule(ClangNode,
@@ -2880,8 +2879,8 @@ public:
 
   void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
                  DynamicLookupInfo dynamicLookupInfo) override {
-    if (isVisibleFromModule(ModuleFilter, VD))
-      NextConsumer.foundDecl(VD, Reason, dynamicLookupInfo);
+    if (!VD->hasClangNode() || isVisibleFromModule(ModuleFilter, VD))
+        NextConsumer.foundDecl(VD, Reason, dynamicLookupInfo);
   }
 };
 
@@ -3112,7 +3111,7 @@ void ClangImporter::lookupValue(DeclName name, VisibleDeclConsumer &consumer) {
 ClangNode ClangImporter::getEffectiveClangNode(const Decl *decl) const {
   // Directly...
   if (auto clangNode = decl->getClangNode())
-    return clangNode;
+      return clangNode;
 
   // Or via the nested "Code" enum.
   if (auto *errorWrapper = dyn_cast<StructDecl>(decl)) {
@@ -4121,43 +4120,43 @@ bool ClangImporter::Implementation::lookupValue(SwiftLookupTable &table,
   auto clangTU = clangCtx.getTranslationUnitDecl();
 
   bool declFound = false;
-  // For operators we have to look up static member functions in addition to the
-  // top-level function lookup below.
-  auto declBaseName = (SwiftContext.LangOpts.EnableCXXInterop && name.isOperator())
-          ? DeclBaseName(SwiftContext.getIdentifier("__operator" + getOperatorNameForToken(std::string{name.getBaseName().getIdentifier()})))
-          : name.getBaseName();
 
   if (name.isOperator()) {
-    for (auto entry : table.lookupMemberOperators(declBaseName)) {
-        if (isVisibleClangEntry(entry)) {
-            if (auto decl = dyn_cast_or_null<ValueDecl>(
-                    importDeclReal(entry->getMostRecentDecl(), CurrentVersion))) {
-                consumer.foundDecl(decl, DeclVisibilityKind::VisibleAtTopLevel);
-                declFound = true;
-                for (auto alternate: getAlternateDecls(decl)) {
-                    if (alternate->getName().matchesRef(name)) {
-                        consumer.foundDecl(alternate, DeclVisibilityKind::DynamicLookup,
-                                           DynamicLookupInfo::AnyObject);
-                    }
-                }
-            }
-        }
-    }
-        for (auto entry : table.lookupMemberOperators(name.getBaseName())) {
-            if (isVisibleClangEntry(entry)) {
-                if (auto decl = dyn_cast_or_null<ValueDecl>(
-                        importDeclReal(entry->getMostRecentDecl(), CurrentVersion))) {
-                    consumer.foundDecl(decl, DeclVisibilityKind::VisibleAtTopLevel);
-                    declFound = true;
-                    for (auto alternate : getAlternateDecls(decl)) {
-                        if (alternate->getName().matchesRef(name)) {
-                            consumer.foundDecl(alternate, DeclVisibilityKind::DynamicLookup,
-                                               DynamicLookupInfo::AnyObject);
-                        }
-                    }
-                }
-            }
-    }
+      for (auto entry : table.lookupMemberOperators(name.getBaseName())) {
+          if (isVisibleClangEntry(entry)) {
+              if (auto decl = dyn_cast_or_null<ValueDecl>(
+                      importDeclReal(entry->getMostRecentDecl(), CurrentVersion))) {
+                  consumer.foundDecl(decl, DeclVisibilityKind::VisibleAtTopLevel);
+                  declFound = true;
+                  for (auto alternate : getAlternateDecls(decl)) {
+                      if (alternate->getName().matchesRef(name)) {
+                          consumer.foundDecl(alternate, DeclVisibilityKind::DynamicLookup,
+                                             DynamicLookupInfo::AnyObject);
+                      }
+                  }
+              }
+          }
+      }
+
+      // If CXXInterop is enabled we need to check the modified operator name as well
+      if(SwiftContext.LangOpts.EnableCXXInterop) {
+          auto declBaseName = DeclBaseName(SwiftContext.getIdentifier("__operator" + getOperatorNameForToken(name.getBaseName().getIdentifier().str().str())));
+          for (auto entry : table.lookupMemberOperators(declBaseName)) {
+              if (isVisibleClangEntry(entry)) {
+                  if (auto decl = dyn_cast_or_null<ValueDecl>(
+                          importDeclReal(entry->getMostRecentDecl(), CurrentVersion))) {
+                      consumer.foundDecl(decl, DeclVisibilityKind::VisibleAtTopLevel);
+                      declFound = true;
+                      for (auto alternate: getAlternateDecls(decl)) {
+                          if (alternate->getName().matchesRef(name)) {
+                              consumer.foundDecl(alternate, DeclVisibilityKind::DynamicLookup,
+                                                 DynamicLookupInfo::AnyObject);
+                          }
+                      }
+                  }
+              }
+          }
+      }
   }
 
   for (auto entry : table.lookup(name.getBaseName(), clangTU)) {

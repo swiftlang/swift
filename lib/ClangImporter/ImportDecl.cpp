@@ -3601,12 +3601,12 @@ namespace {
                 cxxOperatorKind != clang::OverloadedOperatorKind::OO_Call &&
                 cxxOperatorKind != clang::OverloadedOperatorKind::OO_Subscript) {
 
-              auto d = makeOperator(MD, cxxMethod);
-              result->addMember(d);
+              auto opFuncDecl = makeOperator(MD, cxxMethod);
 
-              Impl.addAlternateDecl(MD, d);
+              Impl.addAlternateDecl(MD, opFuncDecl);
 
-              Impl.markUnavailable(MD, "use - operator");
+              Impl.markUnavailable(MD, "use " + std::string{clang::getOperatorSpelling(cxxOperatorKind)} + " instead");
+
               // Make the actual member operator private.
               MD->overwriteAccess(AccessLevel::Private);
             }
@@ -4149,11 +4149,6 @@ namespace {
       auto dc =
           Impl.importDeclContextOf(decl, importedName.getEffectiveContext());
       if (!dc)
-        return nullptr;
-
-      // Support for importing operators is temporarily disabled: rdar://91070109
-      if (decl->getDeclName().getNameKind() == clang::DeclarationName::CXXOperatorName &&
-          decl->getDeclName().getCXXOverloadedOperator() != clang::OO_Subscript)
         return nullptr;
 
       // Handle cases where 2 CXX methods differ strictly in "constness"

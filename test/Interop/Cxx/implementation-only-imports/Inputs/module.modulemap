@@ -28,4 +28,9 @@ module DeclB {
     requires cplusplus
 }
 
+module Helper {
+    header "helper.h"
+    export *
+    requires cplusplus
+}
 
