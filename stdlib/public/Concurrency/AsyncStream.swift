@@ -321,7 +321,7 @@ public struct AsyncStream<Element> {
   ///     let stream = AsyncStream<Int> {
   ///         await Task.sleep(1 * 1_000_000_000)
   ///         return Int.random(in: 1...10)
-  ///     } onCancel: { @Sendable () in print("Cancelled.") }
+  ///     } onCancel: { @Sendable () in print("Canceled.") }
   ///
   ///     // Call point:
   ///     for await random in stream {
