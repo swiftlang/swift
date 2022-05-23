@@ -282,6 +282,8 @@ The additional flexibility comes with two issues: (1) consuming much more disk
 space and (2) you need to maintain the two builds in sync, which needs extra
 care when moving across branches.
 
+It is even possible to integrate the Ninja build into Xcode. For details on how to set this up see [Using Ninja with Xcode in DevelopmentTips.md](/docs/DevelopmentTips.md#using-ninja-with-xcode).
+
 ### Troubleshooting build issues
 
 - Double-check that all projects are checked out at the right branches.
