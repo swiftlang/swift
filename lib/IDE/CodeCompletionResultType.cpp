@@ -308,11 +308,33 @@ TypeRelation USRBasedTypeContext::ContextualType::typeRelation(
 
 // MARK: - CodeCompletionResultType
 
+/// Returns \c true if \p Ty is the 'Any' type or some type that is sufficiently
+/// similar to Any, like the 'Any' metatype or an optional type wrapping 'Any'.
+static bool isEssentiallyAnyType(Type Ty) {
+  while (true) {
+    if (auto MT = Ty->getAs<AnyMetatypeType>()) {
+      Ty = MT->getInstanceType();
+    } else if (auto OT = Ty->getOptionalObjectType()) {
+      Ty = OT;
+    } else {
+      break;
+    }
+  }
+  return Ty->isAny();
+}
+
 static TypeRelation calculateTypeRelation(Type Ty, Type ExpectedTy,
                                           const DeclContext &DC) {
   if (Ty.isNull() || ExpectedTy.isNull() || Ty->is<ErrorType>() ||
       ExpectedTy->is<ErrorType>())
     return TypeRelation::Unrelated;
+
+  /// Computing type relations to 'Any' is not very enlightning because
+  /// everything would be convertible to it. If the contextual type is 'Any',
+  /// just report all type relations as 'Unknown'.
+  if (isEssentiallyAnyType(ExpectedTy)) {
+    return TypeRelation::Unknown;
+  }
 
   // Equality/Conversion of GenericTypeParameterType won't account for
   // requirements – ignore them
