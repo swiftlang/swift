@@ -17,8 +17,6 @@
 // REQUIRES: CPU=x86_64 || CPU=arm64
 // REQUIRES: optimized_stdlib
 
-// REQUIRES: rdar93031874
-
 //////////////////
 // Declarations //
 //////////////////
@@ -300,7 +298,7 @@ public func varSimpleTestVar() async {
 
 // CHECK-LABEL: define internal swifttailcc void @"$s27move_function_dbginfo_async20letArgCCFlowTrueTestyyxnYalFTQ0_"(
 // CHECK:  call void @llvm.dbg.addr(metadata i8* %{{[0-9]+}}, metadata !{{[0-9]+}}, metadata !DIExpression(DW_OP_deref, DW_OP_plus_uconst, 16, DW_OP_plus_uconst, 8, DW_OP_deref)),
-// CHECK:  musttail call swifttailcc void @swift_task_switch(%swift.context* swiftasync %{{[0-9]+}}, i8* bitcast (void (i8*)* @"$s27move_function_dbginfo_async20letArgCCFlowTrueTestyyxnYalFTY1_" to i8*), i64 0, i64 0) #4,
+// CHECK:  musttail call swifttailcc void @swift_task_switch(%swift.context* swiftasync %{{[0-9]+}}, i8* bitcast (void (i8*)* @"$s27move_function_dbginfo_async20letArgCCFlowTrueTestyyxnYalFTY1_" to i8*), i64 0, i64 0)
 // CHECK-NEXT: ret void
 // CHECK-NEXT: }
 
