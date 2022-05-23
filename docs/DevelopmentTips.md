@@ -20,6 +20,13 @@ Going further, for various reasons the standard library has lots of warnings. Th
 
 Copy the invocation that has  ` -o <build-path>/swift-macosx-x86_64/stdlib/public/core/iphonesimulator/i386/Swift.o`, so that we can perform the actual call to swiftc ourselves. Tack on `-suppress-warnings` at the end, and now we have the command to just build `Swift.o` for i386 while only displaying the actual errors.
 
+### Choosing the bootstrapping mode
+By default, the compiler builds with the `boostrapping-with-hostlibs` (macOS) or `bootstrapping` (Linux) bootstrapping mode. To speed up local development it's recommended to build with the `hosttools` mode: `utils/build-script --bootstrapping=hosttools`.
+
+It requires a recently new swift toolchain to be installed on your build machine. On macOS this comes with your Xcode installation.
+
+Not that changing the bootstrapping mode needs a reconfiguration.
+
 ### Working with two build directories
 For developing and debugging you are probably building a debug configuration of swift. But it's often beneficial to also build a release-assert configuration in parallel (`utils/build-script -R`).
 
