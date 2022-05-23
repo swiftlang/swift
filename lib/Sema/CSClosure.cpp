@@ -38,7 +38,7 @@ Expr *getVoidExpr(ASTContext &ctx) {
 /// Find any type variable references inside of an AST node.
 class TypeVariableRefFinder : public ASTWalker {
   /// A stack of all closures the walker encountered so far.
-  SmallVector<DeclContext *> ClosureDCs;
+  SmallVector<DeclContext *, 2> ClosureDCs;
 
   ConstraintSystem &CS;
   ASTNode Parent;
