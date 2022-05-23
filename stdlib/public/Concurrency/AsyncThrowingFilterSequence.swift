@@ -23,7 +23,7 @@ extension AsyncSequence {
   /// but also throws an error for values divisible by 5:
   ///
   ///     do {
-  ///         let stream =  Counter(howHigh: 10)
+  ///         let stream = Counter(howHigh: 10)
   ///             .filter {
   ///                 if $0 % 5 == 0 {
   ///                     throw MyError()
@@ -31,12 +31,12 @@ extension AsyncSequence {
   ///                 return $0 % 2 == 0
   ///             }
   ///         for try await number in stream {
-  ///             print("\(number) ", terminator: " ")
+  ///             print(number, terminator: " ")
   ///         }
   ///     } catch {
   ///         print("Error: \(error)")
   ///     }
-  ///     // Prints: 2  4  Error: MyError()
+  ///     // Prints "2 4 Error: MyError()"
   ///
   /// - Parameter isIncluded: An error-throwing closure that takes an element
   ///   of the asynchronous sequence as its argument and returns a Boolean value
