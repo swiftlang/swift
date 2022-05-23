@@ -156,15 +156,6 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
       return error(status);
   }
 
-  StringRef moduleSDK = Core->SDKName;
-  StringRef clientSDK = ctx.LangOpts.SDKName;
-  if (ctx.SearchPathOpts.EnableSameSDKCheck &&
-      !moduleSDK.empty() && !clientSDK.empty() &&
-      moduleSDK != clientSDK) {
-    status = Status::SDKMismatch;
-    return error(status);
-  }
-
   StringRef SDKPath = ctx.SearchPathOpts.getSDKPath();
   if (SDKPath.empty() ||
       !Core->ModuleInputBuffer->getBufferIdentifier().startswith(SDKPath)) {
@@ -365,7 +356,7 @@ ModuleFile::getModuleName(ASTContext &Ctx, StringRef modulePath,
   bool isFramework = false;
   serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
       modulePath.str(), std::move(newBuf), nullptr, nullptr,
-      /*isFramework*/ isFramework, Ctx.SILOpts.EnableOSSAModules,
+      /*isFramework*/ isFramework, Ctx.SILOpts.EnableOSSAModules, Ctx.LangOpts.SDKName,
       Ctx.SearchPathOpts.DeserializedPathRecoverer,
       loadedModuleFile);
   Name = loadedModuleFile->Name.str();
