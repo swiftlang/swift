@@ -20,6 +20,18 @@ Going further, for various reasons the standard library has lots of warnings. Th
 
 Copy the invocation that has  ` -o <build-path>/swift-macosx-x86_64/stdlib/public/core/iphonesimulator/i386/Swift.o`, so that we can perform the actual call to swiftc ourselves. Tack on `-suppress-warnings` at the end, and now we have the command to just build `Swift.o` for i386 while only displaying the actual errors.
 
+### Working with two build directories
+For developing and debugging you are probably building a debug configuration of swift. But it's often beneficial to also build a release-assert configuration in parallel (`utils/build-script -R`).
+
+The standard library takes very long to build with a debug compiler. It's much faster to build everything (including the standard library) with a release compiler and only the swift-frontend (with `ninja swift-frontend`) in debug. Then copy the release-built standard library to the debug build:
+```
+src=/path/to/build/Ninja-ReleaseAssert/swift-macosx-x86_64
+dst=/path/to/build/Ninja-DebugAssert/swift-macosx-x86_64
+cp -r $src/stdlib $dst/
+cp -r $src/lib/swift/macosx $dst/lib/swift/
+cp -r $src/lib/swift/shims $dst/lib/swift/
+```
+
 ### Use sccache to cache build artifacts
 
 Compilation times for the compiler and the standard library can be agonizing, especially for cold builds. This is particularly painful if
