@@ -21,6 +21,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Parse/SyntaxParseActions.h"
+#include "swift/Parse/SyntaxRegexFallbackLexing.h"
 #include "swift/Syntax/Serialization/SyntaxSerialization.h"
 #include "swift/Syntax/SyntaxNodes.h"
 #include "swift/Subsystems.h"
@@ -478,6 +479,7 @@ struct SynParserDiagConsumer: public DiagnosticConsumer {
 };
 
 swiftparse_client_node_t SynParser::parse(const char *source, size_t len) {
+  registerSyntaxFallbackRegexParser();
   SourceManager SM;
   unsigned bufID = SM.addNewSourceBuffer(llvm::MemoryBuffer::getMemBuffer(
       StringRef(source, len), "syntax_parse_source"));
@@ -488,6 +490,10 @@ swiftparse_client_node_t SynParser::parse(const char *source, size_t len) {
   // Disable name lookups during parsing.
   // Not ready yet:
   // langOpts.EnableASTScopeLookup = true;
+
+  // Always enable bare /.../ regex literal in syntax parser.
+  langOpts.EnableExperimentalStringProcessing = true;
+  langOpts.EnableBareSlashRegexLiterals = true;
 
   auto parseActions =
     std::make_shared<CLibParseActions>(*this, SM, bufID);
