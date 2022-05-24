@@ -5629,7 +5629,7 @@ ArgumentList *ExprRewriter::coerceCallArguments(
     auto paramLabel = param.getLabel();
 
     // Handle variadic generic parameters.
-    if (ctx.LangOpts.EnableExperimentalVariadicGenerics &&
+    if (ctx.LangOpts.hasFeature(Feature::VariadicGenerics) &&
         paramInfo.isVariadicGenericParameter(paramIdx)) {
       assert(param.isVariadic());
       assert(!param.isInOut());

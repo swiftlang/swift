@@ -18,6 +18,7 @@
 #ifndef SWIFT_BASIC_LANGOPTIONS_H
 #define SWIFT_BASIC_LANGOPTIONS_H
 
+#include "swift/Basic/Feature.h"
 #include "swift/Basic/FunctionBodySkipping.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Version.h"
@@ -25,6 +26,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Triple.h"
@@ -341,9 +343,6 @@ namespace swift {
     /// Enable experimental 'move only' features.
     bool EnableExperimentalMoveOnly = false;
 
-    /// Enable variadic generics.
-    bool EnableExperimentalVariadicGenerics = false;
-
     /// Enable experimental associated type inference using type witness
     /// systems.
     bool EnableExperimentalAssociatedTypeInference = false;
@@ -368,6 +367,9 @@ namespace swift {
     /// Whether to enable the new operator decl and precedencegroup lookup
     /// behavior. This is a staging flag, and will be removed in the future.
     bool EnableNewOperatorLookup = false;
+
+    /// The set of features that have been enabled.
+    llvm::SmallSet<Feature, 2> Features;
 
     /// Use Clang function types for computing canonical types.
     /// If this option is false, the clang function types will still be computed
@@ -615,6 +617,13 @@ namespace swift {
     bool isSwiftVersionAtLeast(unsigned major, unsigned minor = 0) const {
       return EffectiveLanguageVersion.isVersionAtLeast(major, minor);
     }
+
+    /// Determine whether the given feature is enabled.
+    bool hasFeature(Feature feature) const;
+
+    /// Determine whether the given feature is enabled, looking up the feature
+    /// by name.
+    bool hasFeature(llvm::StringRef featureName) const;
 
     /// Returns true if the given platform condition argument represents
     /// a supported target operating system.

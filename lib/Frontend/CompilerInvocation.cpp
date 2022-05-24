@@ -461,9 +461,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                  OPT_disable_experimental_opened_existential_types,
                  true);
 
-  Opts.EnableExperimentalVariadicGenerics |=
-    Args.hasArg(OPT_enable_experimental_variadic_generics);
-
   Opts.EnableExperimentalAssociatedTypeInference |=
       Args.hasArg(OPT_enable_experimental_associated_type_inference);
 
@@ -648,6 +645,25 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   for (const Arg *A : Args.filtered(OPT_D)) {
     Opts.addCustomConditionalCompilationFlag(A->getValue());
   }
+
+  for (const Arg *A : Args.filtered(OPT_enable_experimental_feature)) {
+    // If this is a known experimental feature, allow it in +Asserts
+    // (non-release) builds for testing purposes.
+    if (auto feature = getExperimentalFeature(A->getValue())) {
+#ifdef NDEBUG
+      Diags.diagnose(SourceLoc(),
+                     diag::error_experimental_feature_not_available,
+                     A->getValue());
+#endif
+
+      Opts.Features.insert(*feature);
+    }
+  }
+
+  // Map historical flags over to experimental features. We do this for all
+  // compilers because that's how existing experimental feature flags work.
+  if (Args.hasArg(OPT_enable_experimental_variadic_generics))
+    Opts.Features.insert(Feature::VariadicGenerics);
 
   Opts.EnableAppExtensionRestrictions |= Args.hasArg(OPT_enable_app_extension);
 

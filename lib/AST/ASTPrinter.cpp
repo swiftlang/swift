@@ -2999,6 +2999,10 @@ static bool usesFeatureNoAsyncAvailability(Decl *decl) {
    return decl->getAttrs().getNoAsync(decl->getASTContext()) != nullptr;
 }
 
+static bool usesFeatureVariadicGenerics(Decl *decl) {
+  return false;
+}
+
 static void
 suppressingFeatureNoAsyncAvailability(PrintOptions &options,
                                       llvm::function_ref<void()> action) {
