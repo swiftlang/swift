@@ -38,3 +38,11 @@ public struct S {
   // CHECK: public var q: any main.Q
   public var q: any Q
 }
+
+
+public protocol ProtocolTypealias {
+  typealias A = P
+}
+
+// CHECK: public func dependentExistential<T>(value: (T) -> any main.P) where T : main.ProtocolTypealias
+public func dependentExistential<T: ProtocolTypealias>(value: (T) -> T.A) {}
