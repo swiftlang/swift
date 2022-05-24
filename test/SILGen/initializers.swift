@@ -438,6 +438,33 @@ class FailableBaseClass {
     self.init(failBeforeFullInitialization: ())! // unnecessary-but-correct '!'
   }
 
+  // Optional to non-optional
+  //
+  // CHECK-LABEL: sil hidden [ossa] @$s21failable_initializers17FailableBaseClassC21failDuringDelegation3ACSgyt_tcfC
+  // CHECK: bb0([[SELF_META:%[0-9]+]] : $@thick FailableBaseClass.Type):
+  // CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_box ${ var FailableBaseClass }, let, name "self"
+  // CHECK-NEXT: [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
+  // CHECK-NEXT: [[SELF_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
+  // CHECK-NEXT: [[PB_BOX:%[0-9]+]] = project_box [[SELF_LIFETIME]]
+  // CHECK: [[DELEG_INIT:%[0-9]+]] = class_method [[SELF_META]] : $@thick FailableBaseClass.Type, #FailableBaseClass.init!allocator
+  // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[DELEG_INIT]]([[SELF_META]])
+  // CHECK-NEXT: assign [[RESULT]] to [[PB_BOX]]
+  // CHECK-NEXT: [[RESULT_COPY:%[0-9]+]] = load [copy] [[PB_BOX]]
+  // CHECK-NEXT: [[INJECT_INTO_OPT:%[0-9]+]] = enum $Optional<FailableBaseClass>, #Optional.some!enumelt, [[RESULT_COPY]]
+  // CHECK-NEXT: end_borrow [[SELF_LIFETIME]]
+  // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
+  // CHECK-NEXT: br bb2([[INJECT_INTO_OPT]] : $Optional<FailableBaseClass>)
+  //
+  // FIXME: Dead block
+  // CHECK: bb1:
+  //
+  // CHECK: bb2([[ARG:%[0-9]+]] : @owned $Optional<FailableBaseClass>):
+  // CHECK-NEXT: return [[ARG]]
+  // CHECK-NEXT: }
+  convenience init?(failDuringDelegation3: ()) {
+    self.init(noFail: ())
+  }
+
   // IUO to IUO
   convenience init!(noFailDuringDelegation: ()) {
     self.init(failDuringDelegation2: ())! // unnecessary-but-correct '!'
