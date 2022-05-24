@@ -77,41 +77,43 @@ void swift::threading_impl::once_slow(once_t &predicate, void (*fn)(void *),
 }
 
 #if defined(__OpenBSD__)
-swift::threading_impl::stack_bounds
+llvm::Optional<swift::threading_impl::stack_bounds>
 swift::threading_impl::thread_get_current_stack_bounds() {
-  stack_bounds result = { nullptr, nullptr };
   stack_t sinfo;
 
   if (!pthread_stackseg_np(pthread_self(), &sinfo)) {
-    result.low = (char *)sinfo.ss_sp - sinfo.ss_size;
-    result.high = sinfo.ss_sp;
+    stack_bounds result = {
+      (char *)sinfo.ss_sp - sinfo.ss_size,
+      sinfo.ss_sp
+    };
+    return result;
   }
 
-  return result;
+  return {};
 }
 #else
-swift::threading_impl::stack_bounds
+llvm::Optional<swift::threading_impl::stack_bounds>
 swift::threading_impl::thread_get_current_stack_bounds() {
-  stack_bounds result = { nullptr, nullptr };
   pthread_attr_t attr;
   size_t size = 0;
   void *begin = nullptr;
 
 #if defined(__FreeBSD__)
   if (pthread_attr_init(&attr))
-    return result;
+    return {};
 #endif
 
   if (!pthread_getattr_np(pthread_self(), &attr)) {
     if (!pthread_attr_getstack(&attr, &begin, &size)) {
-      result.low = begin;
-      result.high = (char *)begin + size;
+      stack_bounds result = { begin, (char *)begin + size };
+      pthread_attr_destroy(&attr);
+      return result;
     }
 
     pthread_attr_destroy(&attr);
   }
 
-  return result;
+  return {};
 }
 #endif
 
