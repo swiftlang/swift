@@ -6211,7 +6211,12 @@ public:
     if (Options.PrintExplicitAny)
       Printer << "any ";
 
-    visit(T->getConstraintType());
+    // FIXME: The desugared type is used here only to support
+    // existential types with protocol typealiases in Swift
+    // interfaces. Verifying that the underlying type of a
+    // protocol typealias is a constriant type is fundamentally
+    // circular, so the desugared type should be written in source.
+    visit(T->getConstraintType()->getDesugaredType());
   }
 
   void visitLValueType(LValueType *T) {
