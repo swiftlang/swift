@@ -126,7 +126,7 @@ _ = "hello\("""
             world
             """
             )!"
-            // expected-error@-2 {{cannot find ')' to match this opening '(' in string interpolation}}
+            // expected-error@-4 {{cannot find ')' to match this opening '(' in string interpolation}}
             // expected-error@-5 {{unterminated string literal}}
             // expected-error@-3 {{unterminated string literal}}
 
@@ -166,12 +166,14 @@ _ = """
   // expected-error@-2 {{escaped newline at the last line is not allowed}} {{6-7=}}
 
 _ = """
-  foo\  """
+  foo\
+  """
   // expected-error@-1 {{escaped newline at the last line is not allowed}} {{6-7=}}
 
 _ = """
   foo\
-  """ // OK because LF + CR is two new lines.
+
+  """ // OK because LF + CR is two new lines.
 
 _ = """
 \

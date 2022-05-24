@@ -26,7 +26,7 @@ let goatedAlbum = "The Life Of \("Pablo"
 // expected-error @-1 {{cannot find ')' to match this opening '(' in string interpolation}}
 // expected-error @-2 {{unterminated string literal}}
 
-// expected-error @+4 {{cannot find ')' to match this opening '(' in string interpolation}}
+// expected-error @+3 {{cannot find ')' to match this opening '(' in string interpolation}}
 // expected-error @+1 {{unterminated string literal}}
 _ = """
 \(
