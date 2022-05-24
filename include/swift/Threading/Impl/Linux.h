@@ -21,6 +21,9 @@
 #include <pthread.h>
 
 #include <atomic>
+#include <optional>
+
+#include "llvm/ADT/Optional.h"
 
 #include "swift/Threading/Errors.h"
 
@@ -61,7 +64,7 @@ inline bool threads_same(thread_id a, thread_id b) {
   return ::pthread_equal(a, b);
 }
 
-stack_bounds thread_get_current_stack_bounds();
+llvm::Optional<stack_bounds> thread_get_current_stack_bounds();
 
 // .. Mutex support ..........................................................
 

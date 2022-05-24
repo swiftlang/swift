@@ -57,23 +57,25 @@ void swift::threading_impl::once_slow(once_t &predicate, void (*fn)(void *),
   linux::ulock_unlock(&predicate.lock);
 }
 
-swift::threading_impl::stack_bounds
+llvm::Optional<swift::threading_impl::stack_bounds>
 swift::threading_impl::thread_get_current_stack_bounds() {
-  stack_bounds result = { nullptr, nullptr };
   pthread_attr_t attr;
   size_t size = 0;
   void *begin = nullptr;
 
   if (!pthread_getattr_np(pthread_self(), &attr)) {
     if (!pthread_attr_getstack(&attr, &begin, &size)) {
-      result.low = begin;
-      result.high = (char *)begin + size;
+      stack_bounds result = { begin, (char *)begin + size };
+
+      pthread_attr_destroy(&attr);
+
+      return result;
     }
 
     pthread_attr_destroy(&attr);
   }
 
-  return result;
+  return {};
 }
 
 #endif // SWIFT_THREADING_LINUX

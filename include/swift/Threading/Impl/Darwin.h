@@ -21,6 +21,8 @@
 #include <os/lock.h>
 #include <pthread.h>
 
+#include "llvm/ADT/Optional.h"
+
 #include "swift/Threading/Errors.h"
 
 namespace swift {
@@ -38,7 +40,7 @@ inline bool threads_same(thread_id a, thread_id b) {
   return ::pthread_equal(a, b);
 }
 
-inline stack_bounds thread_get_current_stack_bounds() {
+inline llvm::Optional<stack_bounds> thread_get_current_stack_bounds() {
   stack_bounds result;
   pthread_t thread = pthread_self();
 
