@@ -574,8 +574,8 @@ int main(int argc, char **argv) {
   Invocation.getLangOptions().OptimizationRemarkMissedPattern =
       createOptRemarkRegex(PassRemarksMissed);
 
-  Invocation.getLangOptions().EnableExperimentalStaticAssert =
-      EnableExperimentalStaticAssert;
+  if (EnableExperimentalStaticAssert)
+    Invocation.getLangOptions().Features.insert(Feature::StaticAssert);
 
   Invocation.getLangOptions().EnableExperimentalDifferentiableProgramming =
       EnableExperimentalDifferentiableProgramming;

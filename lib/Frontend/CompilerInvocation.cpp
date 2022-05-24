@@ -447,9 +447,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DiagnosticsEditorMode |= Args.hasArg(OPT_diagnostics_editor_mode,
                                             OPT_serialize_diagnostics_path);
 
-  Opts.EnableExperimentalStaticAssert |=
-    Args.hasArg(OPT_enable_experimental_static_assert);
-
   Opts.EnableExperimentalConcurrency |=
     Args.hasArg(OPT_enable_experimental_concurrency);
 
@@ -664,6 +661,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   // compilers because that's how existing experimental feature flags work.
   if (Args.hasArg(OPT_enable_experimental_variadic_generics))
     Opts.Features.insert(Feature::VariadicGenerics);
+  if (Args.hasArg(OPT_enable_experimental_static_assert))
+    Opts.Features.insert(Feature::StaticAssert);
 
   Opts.EnableAppExtensionRestrictions |= Args.hasArg(OPT_enable_app_extension);
 

@@ -314,9 +314,6 @@ namespace swift {
     /// Specifies how strict concurrency checking will be.
     StrictConcurrency StrictConcurrencyLevel = StrictConcurrency::Targeted;
 
-    /// Enable experimental #assert feature.
-    bool EnableExperimentalStaticAssert = false;
-
     /// Enable experimental concurrency model.
     bool EnableExperimentalConcurrency = false;
 

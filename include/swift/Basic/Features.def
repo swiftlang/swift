@@ -54,7 +54,6 @@
                       langOpts.hasFeature(#FeatureName))
 #endif
 
-LANGUAGE_FEATURE(StaticAssert, 0, "#assert", langOpts.EnableExperimentalStaticAssert)
 LANGUAGE_FEATURE(AsyncAwait, 296, "async/await", true)
 LANGUAGE_FEATURE(EffectfulProp, 310, "Effectful properties", true)
 LANGUAGE_FEATURE(MarkerProtocol, 0, "@_marker protocol", true)
@@ -84,6 +83,7 @@ SUPPRESSIBLE_LANGUAGE_FEATURE(PrimaryAssociatedTypes2, 346, "Primary associated 
 SUPPRESSIBLE_LANGUAGE_FEATURE(UnavailableFromAsync, 0, "@_unavailableFromAsync", true)
 SUPPRESSIBLE_LANGUAGE_FEATURE(NoAsyncAvailability, 340, "@available(*, noasync)", true)
 
+EXPERIMENTAL_FEATURE(StaticAssert)
 EXPERIMENTAL_FEATURE(VariadicGenerics)
 
 #undef EXPERIMENTAL_FEATURE
