@@ -3,6 +3,8 @@
 
 // REQUIRES: long_test
 // REQUIRES: objc_interop
+// SIL includes assumption of 64-bit wordsize
+// REQUIRES: PTRSIZE=64
 
 import Builtin
 import Swift
