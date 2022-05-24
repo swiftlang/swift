@@ -71,3 +71,18 @@ TEST(OnceTest, once_threaded) {
     ASSERT_EQ(1u, callCount);
   }
 }
+
+// Check that swift::once works with a C++ lambda
+TEST(OnceTest, once_lambda) {
+  static swift::once_t predicate;
+  unsigned callCount = 0;
+
+  auto fn = [&callCount]() {
+    ++callCount;
+  };
+
+  swift::once(predicate, fn);
+  swift::once(predicate, fn);
+
+  ASSERT_EQ(1u, callCount);
+}

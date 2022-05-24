@@ -31,6 +31,17 @@ inline void once(once_t &predicate, void (*fn)(void *),
   threading_impl::once_impl(predicate, fn, context);
 }
 
+/// Executes the given callable exactly once.
+/// The predicate argument must refer to a global or static variable of static
+/// extent of type swift::once_t.
+template <typename Callable>
+inline void once(once_t &predicate, const Callable &callable) {
+  once(predicate, [](void *ctx) {
+    const Callable &callable = *(const Callable*)(ctx);
+    callable();
+  }, (void *)(&callable));
+}
+
 } // namespace swift
 
 #endif // SWIFT_THREADING_ONCE_H
