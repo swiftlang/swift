@@ -156,6 +156,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
   result.AlwaysTryPrintParameterLabels = true;
   result.PrintSPIs = printSPIs;
   result.PrintExplicitAny = true;
+  result.DesugarExistentialConstraint = true;
 
   // We should print __consuming, __owned, etc for the module interface file.
   result.SkipUnderscoredKeywords = false;
@@ -6211,7 +6212,16 @@ public:
     if (Options.PrintExplicitAny)
       Printer << "any ";
 
-    visit(T->getConstraintType());
+    // FIXME: The desugared type is used here only to support
+    // existential types with protocol typealiases in Swift
+    // interfaces. Verifying that the underlying type of a
+    // protocol typealias is a constriant type is fundamentally
+    // circular, so the desugared type should be written in source.
+    if (Options.DesugarExistentialConstraint) {
+      visit(T->getConstraintType()->getDesugaredType());
+    } else {
+      visit(T->getConstraintType());
+    }
   }
 
   void visitLValueType(LValueType *T) {

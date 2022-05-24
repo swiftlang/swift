@@ -285,6 +285,9 @@ struct PrintOptions {
   /// types.
   bool PrintExplicitAny = false;
 
+  /// Whether to desugar the constraint for an existential type.
+  bool DesugarExistentialConstraint = false;
+
   /// Whether to skip keywords with a prefix of underscore such as __consuming.
   bool SkipUnderscoredKeywords = false;
 
