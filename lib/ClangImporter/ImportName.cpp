@@ -1856,7 +1856,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     case clang::OverloadedOperatorKind::OO_GreaterEqual:
     case clang::OverloadedOperatorKind::OO_AmpAmp:
     case clang::OverloadedOperatorKind::OO_PipePipe:
-      baseName = isa<clang::CXXMethodDecl>(functionDecl) ? StringRef{"__operator" + std::string{getOperatorName(op)}} : clang::getOperatorSpelling(op);
+      baseName = isa<clang::CXXMethodDecl>(functionDecl) ? swiftCtx.getIdentifier("__operator" + std::string{getOperatorName(op)}).str() : swiftCtx.getIdentifier(clang::getOperatorSpelling(op)).str();
       isFunction = true;
       addEmptyArgNamesForClangFunction(functionDecl, argumentNames);
       break;
