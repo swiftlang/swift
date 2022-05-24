@@ -76,7 +76,7 @@ class IndexStoreDB(product.Product):
 
 
 def run_build_script_helper(action, host_target, product, args,
-                            sanitize_all=False):
+                            sanitize_all=False, clean=True):
     script_path = os.path.join(
         product.source_dir, 'Utilities', 'build-script-helper.py')
 
@@ -104,6 +104,9 @@ def run_build_script_helper(action, host_target, product, args,
         helper_cmd.extend(['--sanitize', 'undefined'])
     elif args.enable_tsan:
         helper_cmd.extend(['--sanitize', 'thread'])
+
+    if not clean:
+        helper_cmd.append('--no-clean')
 
     if not product.is_darwin_host(
             host_target) and product.is_cross_compile_target(host_target):
