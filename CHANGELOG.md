@@ -5,6 +5,86 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
 ## Swift 5.7
 
+* [SE-0309][]:
+
+  Protocols with associated types and `Self` requirements can now be used as the
+  types of values with the `any` keyword.
+
+  Protocol methods that return associated types can be called on an `any` type;
+  the result is type-erased to the associated type's upper bound, which is another
+  `any` type having the same constraints as the associated type. For example:
+
+  ```swift
+    protocol Surface {...}
+    
+    protocol Solid {
+      associatedtype SurfaceType: Surface
+      func boundary() -> SurfaceType
+    }
+    
+    let solid: any Solid = ...
+    
+    // Type of 'boundary' is 'any Surface'
+    let boundary = solid.boundary()
+  ```
+
+  Protocol methods that take an associated type or `Self` cannot be used with `any`,
+  however in conjunction with [SE-0352][], you can pass the `any` type to a function
+  taking a generic parameter constrained to the protocol. Within the generic context,
+  type relationships are explicit and all protocol methods can be used.
+
+* [SE-0346][]:
+
+  Protocols can now declare a list of one or more primary associated types:
+
+  ```swift
+    protocol Graph<Vertex, Edge> {
+      associatedtype Vertex
+      associatedtype Edge
+    }
+  ```
+
+  A protocol-constrained type like `Graph<Int>` can now be written anywhere that
+  expects the right-hand side of a protocol conformance requirement:
+
+  ```swift
+    func shortestPath<V, E>(_: some Graph<V>, from: V, to: V) -> [E]
+
+    extension Graph<Int> {...}
+
+    func build() -> some Graph<String> {}
+  ```
+
+  A protocol-constrained type is equivalent to a conformance requirement to the protocol
+  itself together with a same-type requirement constraining the primary associated type.
+  The first two examples above are equivalent to the following:
+
+  ```swift
+    func shortestPath<V, E, G>(_: G, from: V, to: V) -> [E]
+      where G: Graph, G.Vertex == V, G.Edge == V
+
+    extension Graph where Vertex == Int {...}
+  ```
+
+  The `build()` function returning `some Graph<String>` cannot be written using a `where`
+  clause; this is an example of a constrained opaque result type, which could not be written
+  before.
+
+* [SE-0353][]:
+
+  Further generalizing the above, protocol-constrained types can also be used with `any`:
+
+  ```swift
+    func findBestGraph(_: [any Graph<Int>]) -> any Graph<Int> {...}
+  ```
+
+* [SE-0358][]:
+
+  Various protocols in the standard library now declare primary associated types, for
+  example `Sequence` and `Collection` declare a single primary associated type `Element`.
+  For example, this allows writing down the types `some Collection<Int>` and
+  `any Collection<Int>`.
+
 * References to `optional` methods on a protocol metatype, as well as references to dynamically looked up methods on the `AnyObject` metatype are now supported. These references always have the type of a function that accepts a single argument and returns an optional value of function type:
 
   ```swift
@@ -9261,6 +9341,7 @@ Swift 1.0
 [SE-0300]: <https://github.com/apple/swift-evolution/blob/main/proposals/0300-continuation.md>
 [SE-0302]: <https://github.com/apple/swift-evolution/blob/main/proposals/0302-concurrent-value-and-concurrent-closures.md>
 [SE-0306]: <https://github.com/apple/swift-evolution/blob/main/proposals/0306-actors.md>
+[SE-0309]: <https://github.com/apple/swift-evolution/blob/main/proposals/0309-unlock-existential-types-for-all-protocols.md>
 [SE-0310]: <https://github.com/apple/swift-evolution/blob/main/proposals/0310-effectful-readonly-properties.md>
 [SE-0311]: <https://github.com/apple/swift-evolution/blob/main/proposals/0311-task-locals.md>
 [SE-0313]: <https://github.com/apple/swift-evolution/blob/main/proposals/0313-actor-isolation-control.md>
@@ -9283,9 +9364,12 @@ Swift 1.0
 [SE-0341]: <https://github.com/apple/swift-evolution/blob/main/proposals/0341-opaque-parameters.md>
 [SE-0343]: <https://github.com/apple/swift-evolution/blob/main/proposals/0343-top-level-concurrency.md>
 [SE-0345]: <https://github.com/apple/swift-evolution/blob/main/proposals/0345-if-let-shorthand.md>
+[SE-0346]: <https://github.com/apple/swift-evolution/blob/main/proposals/0346-light-weight-same-type-syntax.md>
 [SE-0347]: <https://github.com/apple/swift-evolution/blob/main/proposals/0347-type-inference-from-default-exprs.md>
 [SE-0349]: <https://github.com/apple/swift-evolution/blob/main/proposals/0349-unaligned-loads-and-stores.md>
 [SE-0352]: <https://github.com/apple/swift-evolution/blob/main/proposals/0352-implicit-open-existentials.md>
+[SE-0353]: <https://github.com/apple/swift-evolution/blob/main/proposals/0353-constrained-existential-types.md>
+[SE-0358]: <https://github.com/apple/swift-evolution/blob/main/proposals/0358-primary-associated-types-in-stdlib.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
