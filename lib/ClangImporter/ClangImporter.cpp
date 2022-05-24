@@ -876,12 +876,23 @@ getClangInvocationFileMapping(ASTContext &ctx) {
   if (!triple.isOSLinux())
     return {};
 
+  // Extract the libstdc++ installation path from Clang driver.
   auto clangDiags = clang::CompilerInstance::createDiagnostics(
       new clang::DiagnosticOptions());
   clang::driver::Driver clangDriver(ctx.ClangImporterOpts.clangPath,
                                     triple.str(), *clangDiags);
+  llvm::opt::InputArgList clangDriverArgs;
+  // If an SDK path was explicitly passed to Swift, make sure to pass it to
+  // Clang driver as well. It affects the resulting include paths.
+  auto sdkPath = ctx.SearchPathOpts.getSDKPath();
+  if (!sdkPath.empty()) {
+    unsigned argIndex = clangDriverArgs.MakeIndex("--sysroot", sdkPath);
+    clangDriverArgs.append(new llvm::opt::Arg(
+        clangDriver.getOpts().getOption(clang::driver::options::OPT__sysroot),
+        sdkPath, argIndex));
+  }
   auto cxxStdlibDirs =
-      clangDriver.getLibStdCxxIncludePaths(llvm::opt::InputArgList(), triple);
+      clangDriver.getLibStdCxxIncludePaths(clangDriverArgs, triple);
   if (cxxStdlibDirs.empty()) {
     ctx.Diags.diagnose(SourceLoc(), diag::libstdcxx_not_found, triple.str());
     return {};
