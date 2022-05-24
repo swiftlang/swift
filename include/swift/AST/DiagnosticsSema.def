@@ -4762,6 +4762,9 @@ ERROR(unchecked_not_inheritance_clause,none,
 ERROR(unchecked_not_existential,none,
       "'unchecked' attribute cannot apply to non-protocol type %0", (Type))
 
+ERROR(redundant_any_in_existential,none,
+       "redundant 'any' has no effect on existential type %0",
+       (Type))
 ERROR(any_not_existential,none,
        "'any' has no effect on %select{concrete type|type parameter}0 %1",
        (bool, Type))
