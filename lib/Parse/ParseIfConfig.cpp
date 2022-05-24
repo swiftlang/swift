@@ -329,6 +329,16 @@ public:
       return E;
     }
 
+    if (*KindName == "hasFeature") {
+      if (!getDeclRefStr(Arg, DeclRefKind::Ordinary)) {
+        D.diagnose(E->getLoc(), diag::unsupported_platform_condition_argument,
+                   "feature name");
+        return nullptr;
+      }
+
+      return E;
+    }
+
     // ( 'os' | 'arch' | '_endian' | '_runtime' ) '(' identifier ')''
     auto Kind = getPlatformConditionKind(*KindName);
     if (!Kind.hasValue()) {
@@ -531,6 +541,9 @@ public:
       ImportPath::Module::Builder builder(Ctx, Str, /*separator=*/'.',
                                           Arg->getStartLoc());
       return Ctx.canImportModule(builder.get(), version, underlyingModule);
+    } else if (KindName == "hasFeature") {
+      auto featureName = getDeclRefStr(Arg);
+      return Ctx.LangOpts.hasFeature(featureName);
     }
 
     auto Val = getDeclRefStr(Arg);
