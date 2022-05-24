@@ -16,8 +16,9 @@
 
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Bincompat.h"
-#include "swift/Runtime/Once.h"
+#include "swift/Runtime/Debug.h"
 #include "swift/Runtime/EnvironmentVariables.h"
+#include "swift/Threading/Once.h"
 #include "../SwiftShims/RuntimeShims.h"
 #include <stdint.h>
 
@@ -96,8 +97,8 @@ static void checkBinCompatEnvironmentVariable(void *context) {
 extern "C" __swift_bool _swift_stdlib_isExecutableLinkedOnOrAfter(
   _SwiftStdlibVersion version
 ) {
-  static OnceToken_t getenvToken;
-  SWIFT_ONCE_F(getenvToken, checkBinCompatEnvironmentVariable, nullptr);
+  static once_t getenvToken;
+  swift::once(getenvToken, checkBinCompatEnvironmentVariable, nullptr);
 
   if (binCompatVersionOverride._value > 0) {
     return version._value <= binCompatVersionOverride._value;
