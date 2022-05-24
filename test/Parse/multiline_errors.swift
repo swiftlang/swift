@@ -126,7 +126,7 @@ _ = "hello\("""
             world
             """
             )!"
-            // expected-error@-2 {{expected ')' at end of string interpolation}} expected-note @-4 {{to match this opening '('}}
+            // expected-error@-2 {{cannot find ')' to match this opening '(' in string interpolation}}
             // expected-error@-5 {{unterminated string literal}}
             // expected-error@-3 {{unterminated string literal}}
 
@@ -134,7 +134,7 @@ _ = "hello\(
             """
             world
             """)!"
-            // expected-error@-4 {{expected ')' at end of string interpolation}} expected-note @-4 {{to match this opening '('}}
+            // expected-error@-4 {{cannot find ')' to match this opening '(' in string interpolation}}
             // expected-error@-5 {{unterminated string literal}}
             // expected-error@-3 {{unterminated string literal}}
 
@@ -192,5 +192,5 @@ let _ = """
   \("bar
   baz
   """
-  // expected-error@-3 {{expected ')' at end of string interpolation}} expected-note @-3 {{to match this opening '('}}
+  // expected-error@-3 {{cannot find ')' to match this opening '(' in string interpolation}}
   // expected-error@-4 {{unterminated string literal}}

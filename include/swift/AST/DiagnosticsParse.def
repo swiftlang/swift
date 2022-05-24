@@ -1359,7 +1359,7 @@ ERROR(string_interpolation_extra,none,
 // String interpolation isnt closed by a )
 // ie: `let west = "ye \("`
 ERROR(string_interpolation_unclosed, none,
-      "expected ')' at end of string interpolation", ())
+      "cannot find ')' to match this opening '(' in string interpolation", ())
 
 // Interpolations with parameter labels or multiple values
 WARNING(string_interpolation_list_changing,none,

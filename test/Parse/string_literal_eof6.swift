@@ -2,7 +2,7 @@
 
 // NOTE: DO NOT add a newline at EOF.
 // expected-error@+2 {{unterminated string literal}}
-// expected-error@+3 {{expected ')' at end of string interpolation}} expected-note @+3 {{to match this opening '('}}
+// expected-error@+3 {{cannot find ')' to match this opening '(' in string interpolation}}
 _ = """
     foo
     \("bar

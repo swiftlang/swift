@@ -1887,7 +1887,6 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
       } else {
         if ((*CurPtr == '\r' || *CurPtr == '\n') && IsMultilineString) {
           diagnose(--TmpPtr, diag::string_interpolation_unclosed);
-          diagnose(--TmpPtr, diag::opening_paren);
 
           // The only case we reach here is unterminated single line string in
           // the interpolation. For better recovery, go on after emitting
@@ -1897,7 +1896,6 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
           continue;
         } else if (!IsMultilineString || CurPtr == BufferEnd) {
           diagnose(--TmpPtr, diag::string_interpolation_unclosed);
-          diagnose(--TmpPtr, diag::opening_paren);
         }
 
         // As a fallback, just emit an unterminated string error.
