@@ -696,6 +696,11 @@ def enable_experimental_feature :
   Flags<[FrontendOption]>,
   HelpText<"Enable an experimental feature">;
 
+def enable_upcoming_feature : Separate<["-"], "enable-upcoming-feature">,
+  Flags<[FrontendOption]>,
+  HelpText<"Enable a feature that will be introduced in an upcoming language "
+           "version">;
+
 def Rpass_EQ : Joined<["-"], "Rpass=">,
   Flags<[FrontendOption]>,
   HelpText<"Report performed transformations by optimization passes whose "

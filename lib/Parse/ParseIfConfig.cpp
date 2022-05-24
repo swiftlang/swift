@@ -484,6 +484,7 @@ public:
     bool isKnownFeature = llvm::StringSwitch<bool>(Name)
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option) \
         .Case("$" #FeatureName, Option)
+#define UPCOMING_FEATURE(FeatureName, SENumber, Version)
 #include "swift/Basic/Features.def"
         .Default(false);
 
