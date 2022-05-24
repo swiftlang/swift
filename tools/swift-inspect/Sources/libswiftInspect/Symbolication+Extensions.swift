@@ -133,7 +133,7 @@ func CSSymbolOwnerForeachSymbol(
 }
 
 func CSSymbolOwnerGetSymbolWithMangledName(
-  _ owner: CSTypeRef, 
+  _ owner: CSTypeRef,
   _ name: String
 ) -> CSTypeRef {
   Sym.CSSymbolOwnerGetSymbolWithMangledName(owner, name)
@@ -196,7 +196,7 @@ func task_start_peeking(_ task: task_t) -> Bool {
   if result == KERN_SUCCESS {
     return true
   }
-  
+
   print("task_start_peeking failed: \(machErrStr(result))", to: &Std.err)
   return false
 }

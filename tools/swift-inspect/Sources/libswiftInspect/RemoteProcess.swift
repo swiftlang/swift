@@ -12,7 +12,7 @@
 
 import SwiftRemoteMirror
 
-internal protocol RemoteProcess: AnyObject {
+public protocol RemoteProcess: AnyObject {
   associatedtype ProcessIdentifier
   associatedtype ProcessHandle
 
@@ -44,21 +44,56 @@ internal protocol RemoteProcess: AnyObject {
 }
 
 extension RemoteProcess {
-  static var Free: FreeFunction? {
+  public static var Free: FreeFunction? {
     return nil
   }
 }
 
 extension RemoteProcess {
-  internal func toOpaqueRef() -> UnsafeMutableRawPointer {
+  public func toOpaqueRef() -> UnsafeMutableRawPointer {
     return Unmanaged.passRetained(self).toOpaque()
   }
 
-  internal static func fromOpaque(_ ptr: UnsafeRawPointer) -> Self {
+  public static func fromOpaque(_ ptr: UnsafeRawPointer) -> Self {
     return Unmanaged.fromOpaque(ptr).takeUnretainedValue()
   }
 
-  internal func release() {
+  public func release() {
     Unmanaged.passUnretained(self).release()
   }
+}
+
+public struct InspectOptions {
+  public var nameOrPid: String = ""
+
+#if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
+  public var forkCorpse: Bool = false
+#endif
+
+  public init() {}
+}
+
+public func inspect(options: InspectOptions,
+                      _ body: (any RemoteProcess) throws -> Void) throws {
+  guard let processId = process(matching: options.nameOrPid) else {
+    print("No process found matching \(options.nameOrPid)")
+    return
+  }
+
+#if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
+  guard let process = DarwinRemoteProcess(processId: processId,
+                                          forkCorpse: options.forkCorpse) else {
+    print("Failed to create inspector for process id \(processId)")
+    return
+  }
+#elseif os(Windows)
+  guard let process = WindowsRemoteProcess(processId: processId) else {
+    print("Failed to create inspector for process id \(processId)")
+    return
+  }
+#else
+#error("Unsupported platform")
+#endif
+
+  try body(process)
 }

@@ -15,7 +15,7 @@
 import WinSDK
 import SwiftRemoteMirror
 
-internal final class WindowsRemoteProcess: RemoteProcess {
+public final class WindowsRemoteProcess: RemoteProcess {
   public typealias ProcessIdentifier = DWORD
   public typealias ProcessHandle = HANDLE
 
@@ -24,7 +24,7 @@ internal final class WindowsRemoteProcess: RemoteProcess {
 
   private var hSwiftCore: HMODULE = HMODULE(bitPattern: -1)!
 
-  static var QueryDataLayout: QueryDataLayoutFunction {
+  public static var QueryDataLayout: QueryDataLayoutFunction {
     return { (context, type, _, output) in
       let _ = WindowsRemoteProcess.fromOpaque(context!)
 
@@ -51,7 +51,7 @@ internal final class WindowsRemoteProcess: RemoteProcess {
     }
   }
 
-  static var Free: FreeFunction {
+  public static var Free: FreeFunction {
     return { (_, bytes, _) in
       free(UnsafeMutableRawPointer(mutating: bytes))
     }
@@ -72,7 +72,7 @@ internal final class WindowsRemoteProcess: RemoteProcess {
     }
   }
 
-  static var GetStringLength: GetStringLengthFunction {
+  public static var GetStringLength: GetStringLengthFunction {
     return { (context, address) in
       let process: WindowsRemoteProcess =
           WindowsRemoteProcess.fromOpaque(context!)
@@ -109,7 +109,7 @@ internal final class WindowsRemoteProcess: RemoteProcess {
     }
   }
 
-  static var GetSymbolAddress: GetSymbolAddressFunction {
+  public static var GetSymbolAddress: GetSymbolAddressFunction {
     return { (context, symbol, length) in
       let process: WindowsRemoteProcess =
           WindowsRemoteProcess.fromOpaque(context!)
@@ -124,7 +124,7 @@ internal final class WindowsRemoteProcess: RemoteProcess {
     }
   }
 
-  init?(processId: ProcessIdentifier) {
+  public init?(processId: ProcessIdentifier) {
     // Get process handle.
     self.process =
         OpenProcess(DWORD(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ), false,
@@ -189,7 +189,7 @@ internal final class WindowsRemoteProcess: RemoteProcess {
     self.release()
   }
 
-  func symbolicate(_ address: swift_addr_t) -> (module: String?, symbol: String?) {
+  public func symbolicate(_ address: swift_addr_t) -> (module: String?, symbol: String?) {
     let kMaxSymbolNameLength: Int = 1024
 
     let byteCount = MemoryLayout<SYMBOL_INFO>.size + kMaxSymbolNameLength + 1
@@ -226,7 +226,7 @@ internal final class WindowsRemoteProcess: RemoteProcess {
     return (context.1, symbol)
   }
 
-  internal func iterateHeap(_ body: (swift_addr_t, UInt64) -> Void) {
+  public func iterateHeap(_ body: (swift_addr_t, UInt64) -> Void) {
     let dwProcessId: DWORD = GetProcessId(self.process)
     if dwProcessId == 0 {
       // FIXME(compnerd) log error

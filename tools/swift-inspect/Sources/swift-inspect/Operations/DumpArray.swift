@@ -12,15 +12,18 @@
 
 import ArgumentParser
 import SwiftRemoteMirror
+import libswiftInspect
 
-internal struct DumpArrays: ParsableCommand {
-  static let configuration = CommandConfiguration(
+public struct DumpArrays: ParsableCommand {
+  public static let configuration = CommandConfiguration(
     abstract: "Print information about array objects in the target.")
 
   @OptionGroup()
   var options: UniversalOptions
 
-  func run() throws {
+  public init() {}
+
+  public func run() throws {
     try inspect(options: options) { process in
       print("Address", "Size", "Count", "Is Class", separator: "\t")
       process.iterateHeap { (allocation, size) in

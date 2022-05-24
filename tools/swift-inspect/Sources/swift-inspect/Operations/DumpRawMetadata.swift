@@ -12,9 +12,10 @@
 
 import ArgumentParser
 import SwiftRemoteMirror
+import libswiftInspect
 
-internal struct DumpRawMetadata: ParsableCommand {
-  static let configuration = CommandConfiguration(
+public struct DumpRawMetadata: ParsableCommand {
+  public static let configuration = CommandConfiguration(
     abstract: "Print the target's metadata allocations.")
 
   @OptionGroup()
@@ -23,7 +24,9 @@ internal struct DumpRawMetadata: ParsableCommand {
   @OptionGroup()
   var backtraceOptions: BacktraceOptions
 
-  func run() throws {
+  public init() {}
+
+  public func run() throws {
     try inspect(options: options) { process in
       let stacks: [swift_reflection_ptr_t:[swift_reflection_ptr_t]]? =
           backtraceOptions.style == nil

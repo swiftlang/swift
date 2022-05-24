@@ -46,16 +46,13 @@ class SwiftInspect(product.Product):
         return True
 
     def build(self, host_target):
-        run_build_script_helper(host_target, self, self.args)
+        run_build_script_helper('build', host_target, self, self.args)
 
     def should_test(self, host_target):
         return self.args.test_swift_inspect
 
     def test(self, host_target):
-        """Just run a single instance of the command for both .debug and
-           .release.
-        """
-        pass
+        run_build_script_helper('test', host_target, self, self.args)
 
     def should_install(self, host_target):
         return False
@@ -77,7 +74,7 @@ class SwiftInspect(product.Product):
                 swiftpm.SwiftPM]
 
 
-def run_build_script_helper(host_target, product, args):
+def run_build_script_helper(action, host_target, product, args):
     toolchain_path = args.install_destdir
     if platform.system() == 'Darwin':
         # The prefix is an absolute path, so concatenate without os.path.
@@ -98,6 +95,7 @@ def run_build_script_helper(host_target, product, args):
 
     build_cmd = [
         helper_path,
+        '--action', action,
         '--verbose',
         '--package-path', package_path,
         '--build-path', product.build_dir,

@@ -11,15 +11,18 @@
 //===----------------------------------------------------------------------===//
 
 import ArgumentParser
+import libswiftInspect
 
-internal struct DumpConformanceCache: ParsableCommand {
-  static let configuration = CommandConfiguration(
+public struct DumpConformanceCache: ParsableCommand {
+  public static let configuration = CommandConfiguration(
     abstract: "Print the contents of the target's protocol conformance cache.")
 
   @OptionGroup()
   var options: UniversalOptions
 
-  func run() throws {
+  public init() {}
+
+  public func run() throws {
     try inspect(options: options) { process in
       try process.context.iterateConformanceCache { type, proto in
         let type: String = process.context.name(type: type) ?? "<unknown>"
