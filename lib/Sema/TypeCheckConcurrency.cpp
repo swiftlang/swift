@@ -4836,9 +4836,8 @@ bool swift::isThrowsDecl(ConcreteDeclRef declRef) {
   return false;
 }
 
-bool swift::isAccessibleAcrossActors(
-    ValueDecl *value, const ActorIsolation &isolation,
-    const DeclContext *fromDC, Optional<ReferencedActor> actorInstance) {
+/// Determine whether a reference to this value isn't actually a value.
+static bool isNonValueReference(const ValueDecl *value) {
   switch (value->getKind()) {
   case DeclKind::AssociatedType:
   case DeclKind::Class:
@@ -4849,13 +4848,7 @@ bool swift::isAccessibleAcrossActors(
   case DeclKind::Protocol:
   case DeclKind::Struct:
   case DeclKind::TypeAlias:
-    return true;
-
   case DeclKind::EnumCase:
-  case DeclKind::EnumElement:
-    // Type-level entities are always accessible across actors.
-    return true;
-
   case DeclKind::IfConfig:
   case DeclKind::Import:
   case DeclKind::InfixOperator:
@@ -4867,16 +4860,26 @@ bool swift::isAccessibleAcrossActors(
   case DeclKind::PrecedenceGroup:
   case DeclKind::PrefixOperator:
   case DeclKind::TopLevelCode:
-    // Non-value entities are always accessible across actors.
-    return true;
-
   case DeclKind::Destructor:
-    // Destructors are always accessible across actors.
     return true;
 
+  case DeclKind::EnumElement:
   case DeclKind::Constructor:
-    // Initializers are accessible across actors unless they are global-actor
-    // qualified.
+  case DeclKind::Param:
+  case DeclKind::Var:
+  case DeclKind::Accessor:
+  case DeclKind::Func:
+  case DeclKind::Subscript:
+    return false;
+  }
+}
+
+bool swift::isAccessibleAcrossActors(
+    ValueDecl *value, const ActorIsolation &isolation,
+    const DeclContext *fromDC, Optional<ReferencedActor> actorInstance) {
+  // Initializers and enum elements are accessible across actors unless they
+  // are global-actor qualified.
+  if (isa<ConstructorDecl>(value) || isa<EnumElementDecl>(value)) {
     switch (isolation) {
     case ActorIsolation::ActorInstance:
     case ActorIsolation::Independent:
@@ -4887,19 +4890,15 @@ bool swift::isAccessibleAcrossActors(
     case ActorIsolation::GlobalActor:
       return false;
     }
-
-  case DeclKind::Param:
-  case DeclKind::Var:
-    // 'let' declarations are immutable, so some of them can be accessed across
-    // actors.
-    return varIsSafeAcrossActors(
-        fromDC->getParentModule(), cast<VarDecl>(value), isolation);
-
-  case DeclKind::Accessor:
-  case DeclKind::Func:
-  case DeclKind::Subscript:
-    return false;
   }
+
+  // 'let' declarations are immutable, so some of them can be accessed across
+  // actors.
+  if (auto var = dyn_cast<VarDecl>(value)) {
+    return varIsSafeAcrossActors(fromDC->getParentModule(), var, isolation);
+  }
+
+  return false;
 }
 
 ActorReferenceResult ActorReferenceResult::forSameConcurrencyDomain(
@@ -4947,6 +4946,11 @@ ActorReferenceResult ActorReferenceResult::forReference(
     if (declIsolation.requiresSubstitution())
       declIsolation = declIsolation.subst(declRef.getSubstitutions());
   }
+
+  // If the entity we are referencing is not a value, we're in thesame
+  // concurrency domain.
+  if (isNonValueReference(declRef.getDecl()))
+    return forSameConcurrencyDomain(declIsolation);
 
   // Compute the isolation of the context, if not provided.
   ActorIsolation contextIsolation = ActorIsolation::forUnspecified();
