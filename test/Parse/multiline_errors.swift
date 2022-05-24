@@ -166,14 +166,12 @@ _ = """
   // expected-error@-2 {{escaped newline at the last line is not allowed}} {{6-7=}}
 
 _ = """
-  foo\
-  """
+  foo\  """
   // expected-error@-1 {{escaped newline at the last line is not allowed}} {{6-7=}}
 
 _ = """
   foo\
-
-  """ // OK because LF + CR is two new lines.
+  """ // OK because LF + CR is two new lines.
 
 _ = """
 \
