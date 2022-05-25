@@ -404,3 +404,23 @@ func test_type_finder_doesnt_walk_into_inner_closures() {
     return x
   }
 }
+
+// rdar://93796211 (issue#59035) - crash during solution application to fallthrough statement
+func test_fallthrough_stmt() {
+  {
+    var collector: [Void] = []
+    for _: Void in [] {
+      switch (() as Void?, ()) {
+      case (let a?, let b):
+        // expected-warning@-1 {{constant 'b' inferred to have type '()', which may be unexpected}}
+        // expected-note@-2 {{add an explicit type annotation to silence this warning}}
+        collector.append(a)
+        fallthrough
+      case (nil,    let b):
+        // expected-warning@-1 {{constant 'b' inferred to have type '()', which may be unexpected}}
+        // expected-note@-2 {{add an explicit type annotation to silence this warning}}
+        collector.append(b)
+      }
+    }
+  }()
+}
