@@ -651,9 +651,15 @@ importer::getNormalInvocationArguments(
     // declarations.
     auto V = version::Version::getCurrentCompilerVersion();
     if (!V.empty()) {
+      // Note: Prior to Swift 5.7, the "Y" version component was omitted and the
+      // "X" component resided in its digits.
       invocationArgStrs.insert(invocationArgStrs.end(), {
         V.preprocessorDefinition("__SWIFT_COMPILER_VERSION",
-                                 {1000000000, /*ignored*/ 0, 1000000, 1000, 1}),
+                                 {1000000000000,   // X
+                                     1000000000,   // Y
+                                        1000000,   // Z
+                                           1000,   // a
+                                              1}), // b
       });
     }
   } else {
