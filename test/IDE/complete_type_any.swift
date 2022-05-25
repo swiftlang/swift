@@ -1,8 +1,5 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ANY_IN_FUNC_PARAM | %FileCheck %s -check-prefix=ANY_IN_FUNC_PARAM
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ANY_IN_VAR_TYPE | %FileCheck %s -check-prefix=ANY_IN_VAR_TYPE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ANY_METATYPE_VARIABLE | %FileCheck %s -check-prefix=ANY_METATYPE_VARIABLE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ANY_METATYPE_MEMBER | %FileCheck %s -check-prefix=ANY_METATYPE_MEMBER
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ANY_IN_TYPEALIAS | %FileCheck %s -check-prefix=ANY_IN_TYPEALIAS
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
 
 func testAnyInParamList(a: #^ANY_IN_FUNC_PARAM^#
 // ANY_IN_FUNC_PARAM: Begin completions
@@ -31,4 +28,32 @@ typealias A = #^ANY_IN_TYPEALIAS^#
 // ANY_IN_TYPEALIAS-DAG: Keyword/None: Any[#Any#]; name=Any
 // ANY_IN_TYPEALIAS: End completions
 
+func testRdar64812321() {
+  func foo<T>(x: T) {}
+  func foo(x: Any.Type) {}
 
+  struct MyStruct {}
+  let myStruct = MyStruct()
+
+  foo(x: #^ANY_RELATIONSHIP^#)
+  // The MyStruct type should not be preferred over the myStruct instance.
+
+// ANY_RELATIONSHIP: Begin completions
+// ANY_RELATIONSHIP-DAG: Decl[LocalVar]/Local:              myStruct[#MyStruct#]; name=myStruct
+// ANY_RELATIONSHIP-DAG: Decl[Struct]/Local:            MyStruct[#MyStruct#]; name=MyStruct
+// ANY_RELATIONSHIP: End completions
+}
+
+func testRdar84684686() {
+  func foo(_ x: Any?) {}
+
+  struct S {
+    static func bar(x: Int) -> Int { x }
+  }
+
+  // We should suggest a function call to `bar` here (i.e. `bar(x: <#Int#>)`), not a function reference (i.e. `bar(x:)`)
+  foo(S.#^ANY_PREFERS_FUNCTION_CALL^#)
+// ANY_PREFERS_FUNCTION_CALL: Begin completions
+// ANY_PREFERS_FUNCTION_CALL-DAG: Decl[StaticMethod]/CurrNominal:     bar({#x: Int#})[#Int#]; name=bar(x:)
+// ANY_PREFERS_FUNCTION_CALL: End completions
+}

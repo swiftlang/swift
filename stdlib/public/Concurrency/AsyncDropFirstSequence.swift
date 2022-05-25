@@ -22,12 +22,12 @@ extension AsyncSequence {
   ///
   /// In this example, an asynchronous sequence called `Counter` produces `Int`
   /// values from `1` to `10`. The `dropFirst(_:)` method causes the modified
-  /// sequence to ignore the values `0` through `4`, and instead emit `5` through `10`:
+  /// sequence to ignore the values `1` through `3`, and instead emit `4` through `10`:
   ///
   ///     for await number in Counter(howHigh: 10).dropFirst(3) {
-  ///         print("\(number) ", terminator: " ")
+  ///         print(number, terminator: " ")
   ///     }
-  ///     // prints "4 5 6 7 8 9 10"
+  ///     // Prints "4 5 6 7 8 9 10"
   ///
   /// If the number of elements to drop exceeds the number of elements in the
   /// sequence, the result is an empty sequence.

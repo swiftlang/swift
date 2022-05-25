@@ -20,6 +20,25 @@ Going further, for various reasons the standard library has lots of warnings. Th
 
 Copy the invocation that has  ` -o <build-path>/swift-macosx-x86_64/stdlib/public/core/iphonesimulator/i386/Swift.o`, so that we can perform the actual call to swiftc ourselves. Tack on `-suppress-warnings` at the end, and now we have the command to just build `Swift.o` for i386 while only displaying the actual errors.
 
+### Choosing the bootstrapping mode
+By default, the compiler builds with the `boostrapping-with-hostlibs` (macOS) or `bootstrapping` (Linux) bootstrapping mode. To speed up local development it's recommended to build with the `hosttools` mode: `utils/build-script --bootstrapping=hosttools`.
+
+It requires a recently new swift toolchain to be installed on your build machine. On macOS this comes with your Xcode installation.
+
+Not that changing the bootstrapping mode needs a reconfiguration.
+
+### Working with two build directories
+For developing and debugging you are probably building a debug configuration of swift. But it's often beneficial to also build a release-assert configuration in parallel (`utils/build-script -R`).
+
+The standard library takes very long to build with a debug compiler. It's much faster to build everything (including the standard library) with a release compiler and only the swift-frontend (with `ninja swift-frontend`) in debug. Then copy the release-built standard library to the debug build:
+```
+src=/path/to/build/Ninja-ReleaseAssert/swift-macosx-x86_64
+dst=/path/to/build/Ninja-DebugAssert/swift-macosx-x86_64
+cp -r $src/stdlib $dst/
+cp -r $src/lib/swift/macosx $dst/lib/swift/
+cp -r $src/lib/swift/shims $dst/lib/swift/
+```
+
 ### Use sccache to cache build artifacts
 
 Compilation times for the compiler and the standard library can be agonizing, especially for cold builds. This is particularly painful if
@@ -65,3 +84,29 @@ For example, to have `build-script` spawn only one link job at a time, we can in
 ```
 build-script --llvm-cmake-options==-DLLVM_PARALLEL_LINK_JOBS=1 --swift-cmake-options=-DSWIFT_PARALLEL_LINK_JOBS=1
 ```
+
+## Using ninja with Xcode
+
+Although it's possible to build the swift compiler entirely with Xcode (`--xcode`), often it's better to build with _ninja_ and use Xcode for editing and debugging.
+This is very convenient because you get the benefits of the ninja build system and all the benefits of the Xcode IDE, like code completion, refactoring, debugging, etc.
+
+To setup this environment a few steps are necessary:
+* Create a new workspace.
+* Create Xcode projects for LLVM and Swift with `utils/build-script --skip-build --xcode --skip-early-swift-driver`. Beside configuring, this needs to build a few LLVM files which are needed to configure the swift project.
+* Add the generated LLVM and Swift projects to your workspace. They can be found in the build directories `build/Xcode-DebugAssert/llvm-macosx-x86_64/LLVM.xcodeproj` and `build/Xcode-DebugAssert/swift-macosx-x86_64/Swift.xcodeproj`.
+* Add the `swift/SwiftCompilerSources` package to the workspace.
+* Create a new empty project `build-targets` (or however you want to name it) in the workspace, using the "External Build System" template.
+* For each compiler tool you want to build (`swift-frontend`, `sil-opt`, etc.), add an "External Build System" target to the `build-targets` project.
+* In the "Info" section of the target configuration, set:
+    * the _Build Tool_ to the full path of the `ninja` command
+    * the _Argument_ to the tool name (e.g. `swift-frontend`)
+    * the _Directory_ to the ninja swift build directory, e.g. `/absolute/path/to/build/Ninja-DebugAssert/swift-macosx-x86_64`. For debugging to work, this has to be a debug build of course.
+* For each target, create a new scheme:
+    * In the _Build_ section add the corresponding build target that you created before.
+    * In the _Run/Info_ section select the built _Executable_ in the build directory (e.g. `/absolute/path/to/build/Ninja-DebugAssert/swift-macosx-x86_64/bin/swift-frontend`).
+    * In the _Run/Arguments_ section you can set the command line arguments with which you want to run the compiler tool.
+    * In the _Run/Options_ section you can set the working directory for debugging.
+
+Now you are all set. You can build and debug like with a native Xcode project.
+
+If the project structure changes, e.g. new source files are added or deleted, you just have to re-create the LLVM and Swift projects with `utils/build-script --skip-build --xcode --skip-early-swift-driver`.
