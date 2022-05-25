@@ -79,7 +79,7 @@ struct Usage final {
   SmallPtrSet<SILInstruction *, 16> users;
   // The instructions from which the shrinking starts, the scope ending
   // instructions.
-  llvm::SmallVector<SILInstruction *, 4> ends;
+  llvm::SmallSetVector<SILInstruction *, 4> ends;
 
   Usage(){};
   Usage(Usage const &) = delete;
@@ -99,7 +99,7 @@ bool findUsage(Context const &context, Usage &usage) {
     // If a scope ending instruction is not an end_borrow, bail out.
     if (!isa<EndBorrowInst>(instruction))
       return false;
-    usage.ends.push_back(instruction);
+    usage.ends.insert(instruction);
   }
 
   SmallVector<Operand *, 16> uses;
@@ -181,7 +181,7 @@ private:
   /// IterativeBackwardReachability::Effects
   /// VisitBarrierAccessScopes::Effects
 
-  ArrayRef<SILInstruction *> gens() { return uses.ends; }
+  auto gens() { return uses.ends; }
 
   Effect effectForInstruction(SILInstruction *);
 
@@ -262,7 +262,7 @@ bool Dataflow::classificationIsBarrier(Classification classification) {
 }
 
 Dataflow::Effect Dataflow::effectForInstruction(SILInstruction *instruction) {
-  if (llvm::find(uses.ends, instruction) != uses.ends.end())
+  if (uses.ends.contains(instruction))
     return Effect::Gen();
   auto classification = classifyInstruction(instruction);
   if (recordCopies && classification == Classification::Copy)

@@ -149,7 +149,7 @@ protected:
 ///     Effect effectForPhi(SILBasicBlock *);
 ///
 ///     /// The uses from which reachability will begin.
-///     ArrayRef<SILInstruction *> gens();
+///     iterable gens();
 /// }
 template <typename Effects>
 class IterativeBackwardReachability final {
