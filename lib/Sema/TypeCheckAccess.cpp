@@ -1850,21 +1850,8 @@ public:
     });
 
     Where = wasWhere.withExported(hasExportedMembers);
-
-    // When diagnosing potential unavailability of the extended type, downgrade
-    // the diagnostics to warnings when the extension decl has no declared
-    // availability and the required availability is more than the deployment
-    // target.
-    DeclAvailabilityFlags extendedTypeFlags = None;
-    auto annotatedRange =
-        AvailabilityInference::annotatedAvailableRange(ED, ED->getASTContext());
-    if (!annotatedRange.hasValue())
-      extendedTypeFlags |= DeclAvailabilityFlag::
-          WarnForPotentialUnavailabilityBeforeDeploymentTarget;
-
     checkType(ED->getExtendedType(), ED->getExtendedTypeRepr(), ED,
-              ExportabilityReason::ExtensionWithPublicMembers,
-              extendedTypeFlags);
+              ExportabilityReason::ExtensionWithPublicMembers);
 
     // 3) If the extension contains exported members or defines conformances,
     // the 'where' clause must only name exported types.
