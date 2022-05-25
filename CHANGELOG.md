@@ -91,10 +91,26 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
 * [SE-0353][]:
 
-  Further generalizing the above, protocol-constrained types can also be used with `any`:
+  Protocols with primary associated types can now be used in existential types,
+  enabling same-type constraints on those associated types.
+
+  ```
+  let strings: any Collection<String> = [ "Hello" ]
+  ```
+
+  Note that language features requiring runtime support like dynamic casts
+  (`is`, `as?`, `as!`), as well as generic usages of parameterized existentials
+  in generic types (e.g. `Array<any Collection<Int>>`) involve additional
+  availability checks to use. Back-deploying usages in generic position can be
+  worked around with a generic type-erasing wrapper struct, which is now much
+  simpler to implement:
 
   ```swift
-    func findBestGraph(_: [any Graph<Int>]) -> any Graph<Int> {...}
+  struct AnyCollection<T> {
+    var wrapped: any Collection<T>
+  }
+
+  let arrayOfCollections: [AnyCollection<T>] = [ /**/ ]
   ```
 
 * [SE-0358][]:
