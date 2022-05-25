@@ -67,7 +67,7 @@ struct Usage final {
   /// Instructions which are users of the simple (i.e. not reborrowed) value.
   SmallPtrSet<SILInstruction *, 16> users;
   // The instructions from which the hoisting starts, the destroy_values.
-  llvm::SmallVector<SILInstruction *, 4> ends;
+  llvm::SmallSetVector<SILInstruction *, 4> ends;
 
   Usage(){};
   Usage(Usage const &) = delete;
@@ -89,7 +89,7 @@ bool findUsage(Context const &context, Usage &usage) {
     // flow and determine whether any were reused.  They aren't uses over which
     // we can't hoist though.
     if (isa<DestroyValueInst>(use->getUser())) {
-      usage.ends.push_back(use->getUser());
+      usage.ends.insert(use->getUser());
     } else {
       usage.users.insert(use->getUser());
     }
@@ -155,7 +155,7 @@ private:
   /// IterativeBackwardReachability::Effects
   /// VisitBarrierAccessScopes::Effects
 
-  ArrayRef<SILInstruction *> gens() { return uses.ends; }
+  auto gens() { return uses.ends; }
 
   Effect effectForInstruction(SILInstruction *);
   Effect effectForPhi(SILBasicBlock *);
@@ -211,7 +211,7 @@ bool Dataflow::classificationIsBarrier(Classification classification) {
 }
 
 Dataflow::Effect Dataflow::effectForInstruction(SILInstruction *instruction) {
-  if (llvm::find(uses.ends, instruction) != uses.ends.end())
+  if (uses.ends.contains(instruction))
     return Effect::Gen();
   auto classification = classifyInstruction(instruction);
   return classificationIsBarrier(classification) ? Effect::Kill()

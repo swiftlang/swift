@@ -111,7 +111,7 @@ struct KnownStorageUses : UniqueStorageUseVisitor {
   bool preserveDebugInfo;
 
   SmallPtrSet<SILInstruction *, 16> storageUsers;
-  SmallVector<SILInstruction *, 4> originalDestroys;
+  SmallSetVector<SILInstruction *, 4> originalDestroys;
   SmallPtrSet<SILInstruction *, 4> debugInsts;
 
   KnownStorageUses(AccessStorage storage, SILFunction *function)
@@ -158,7 +158,7 @@ protected:
   bool visitStore(Operand *use) override { return recordUser(use->getUser()); }
 
   bool visitDestroy(Operand *use) override {
-    originalDestroys.push_back(use->getUser());
+    originalDestroys.insert(use->getUser());
     return true;
   }
 
@@ -283,9 +283,7 @@ private:
     /// IterativeBackwardReachability::Effects
     /// VisitBarrierAccessScopes::Effects
 
-    ArrayRef<SILInstruction *> gens() {
-      return result.knownUses.originalDestroys;
-    }
+    auto gens() { return result.knownUses.originalDestroys; }
 
     Effect effectForInstruction(SILInstruction *instruction);
 
@@ -366,8 +364,7 @@ bool DeinitBarriers::classificationIsBarrier(Classification classification) {
 DeinitBarriers::DestroyReachability::Effect
 DeinitBarriers::DestroyReachability::effectForInstruction(
     SILInstruction *instruction) {
-  if (llvm::find(result.knownUses.originalDestroys, instruction) !=
-      result.knownUses.originalDestroys.end())
+  if (result.knownUses.originalDestroys.contains(instruction))
     return Effect::Gen();
   auto classification = result.classifyInstruction(instruction);
   if (recordDeadUsers && classification == Classification::DeadUser)
