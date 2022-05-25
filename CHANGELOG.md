@@ -5,6 +5,31 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
 ## Swift 5.7
 
+* [SE-0350][]:
+
+  The standard library has a new `Regex<Output>` type.
+  
+  This type represents an _extended regular expression_, allowing more fluent
+  string processing operations. A `Regex` may be created by
+  [initialization from a string][SE-0355]:
+  ```
+  let pattern = "a[bc]+" // matches "a" followed by one or more instances
+                         // of either "b" or "c"
+  let regex = try! Regex(pattern)
+  ```
+  Or via a [regex literal][SE-0354]:
+  ```
+  let regex = #/a[bc]+/#
+  ```
+  In Swift 6, `/` will also be supported as a delimiter for `Regex` literals.
+  You can enable this mode in Swift 5.7 with the `-enable-bare-slash-regex`
+  flag. Doing so will cause some existing expressions that use `/` as an 
+  operator to no longer compile; you can add parentheses or line breaks as a
+  workaround.
+  
+  There are [new string-processing algorithms][SE-0357] that support
+  `String`, `Regex` and arbitrary `Collection` types.
+
 * [SE-0329][]:
   New types representing time and clocks were introduced. This includes a protocol `Clock` defining clocks which allow for defining a concept of now and a way to wake up after a given instant. Additionally a new protocol `InstantProtocol` for defining instants in time was added. Furthermore a new protocol `DurationProtocol` was added to define an elapsed duration between two given `InstantProtocol` types. Most commonly the `Clock` types for general use are the `SuspendingClock` and `ContinuousClock` which represent the most fundamental clocks for the system. The `SuspendingClock` type does not progress while the machine is suspended whereas the `ContinuousClock` progresses no matter the state of the machine. 
 
@@ -9403,8 +9428,12 @@ Swift 1.0
 [SE-0346]: <https://github.com/apple/swift-evolution/blob/main/proposals/0346-light-weight-same-type-syntax.md>
 [SE-0347]: <https://github.com/apple/swift-evolution/blob/main/proposals/0347-type-inference-from-default-exprs.md>
 [SE-0349]: <https://github.com/apple/swift-evolution/blob/main/proposals/0349-unaligned-loads-and-stores.md>
+[SE-0350]: <https://github.com/apple/swift-evolution/blob/main/proposals/0350-regex-type-overview.md>
 [SE-0352]: <https://github.com/apple/swift-evolution/blob/main/proposals/0352-implicit-open-existentials.md>
 [SE-0353]: <https://github.com/apple/swift-evolution/blob/main/proposals/0353-constrained-existential-types.md>
+[SE-0354]: <https://github.com/apple/swift-evolution/blob/main/proposals/0354-regex-literals.md>
+[SE-0355]: <https://github.com/apple/swift-evolution/blob/main/proposals/0355-regex-syntax-run-time-construction.md>
+[SE-0357]: <https://github.com/apple/swift-evolution/blob/main/proposals/0357-regex-string-processing-algorithms.md>
 [SE-0358]: <https://github.com/apple/swift-evolution/blob/main/proposals/0358-primary-associated-types-in-stdlib.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>
