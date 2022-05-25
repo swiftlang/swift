@@ -83,6 +83,9 @@ enum class SendableCheckReason {
   /// actor isolation.
   Conformance,
 
+  /// An override of a function.
+  Override,
+
   /// The declaration is being exposed to Objective-C.
   ObjC,
 };
