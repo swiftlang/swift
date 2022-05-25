@@ -409,6 +409,13 @@ public:
     return true;
   }
 
+  bool writeStruct(const StructDecl *SD) {
+    if (addImport(SD))
+      return true;
+    printer.print(SD);
+    return true;
+  }
+
   bool writeProtocol(const ProtocolDecl *PD) {
     if (addImport(PD))
       return true;
@@ -584,6 +591,8 @@ public:
       if (outputLangMode == OutputLanguageMode::Cxx) {
         if (auto FD = dyn_cast<FuncDecl>(D))
           success = writeFunc(FD);
+        if (auto SD = dyn_cast<StructDecl>(D))
+          success = writeStruct(SD);
         // FIXME: Warn on unsupported exported decl.
       } else if (isa<ValueDecl>(D)) {
         if (auto CD = dyn_cast<ClassDecl>(D))
