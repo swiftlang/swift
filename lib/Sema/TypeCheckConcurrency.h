@@ -75,6 +75,9 @@ enum class SendableCheckReason {
   /// A reference to an actor from outside that actor.
   CrossActor,
 
+  /// Exiting an actor to non-isolated async code.
+  ExitingActor,
+
   /// A synchronous operation that was "promoted" to an asynchronous one
   /// because it was out of the actor's domain.
   SynchronousAsAsync,
@@ -271,7 +274,8 @@ public:
 /// \returns true if an problem was detected, false otherwise.
 bool diagnoseNonSendableTypesInReference(
     ConcreteDeclRef declRef, const DeclContext *fromDC, SourceLoc loc,
-    SendableCheckReason refKind);
+    SendableCheckReason refKind,
+    Optional<ActorIsolation> knownIsolation = None);
 
 /// Produce a diagnostic for a missing conformance to Sendable.
 void diagnoseMissingSendableConformance(
