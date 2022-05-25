@@ -3539,6 +3539,16 @@ static ActorIsolation getOverriddenIsolationFor(ValueDecl *value) {
   return isolation.subst(subs);
 }
 
+static ConcreteDeclRef getDeclRefInContext(ValueDecl *value) {
+  auto declContext = value->getInnermostDeclContext();
+  if (auto genericEnv = declContext->getGenericEnvironmentOfContext()) {
+    return ConcreteDeclRef(
+        value, genericEnv->getForwardingSubstitutionMap());
+  }
+
+  return ConcreteDeclRef(value);
+}
+
 /// Generally speaking, the isolation of the decl that overrides
 /// must match the overridden decl. But there are a number of exceptions,
 /// e.g., the decl that overrides can be nonisolated.
@@ -3546,12 +3556,8 @@ static ActorIsolation getOverriddenIsolationFor(ValueDecl *value) {
 static OverrideIsolationResult validOverrideIsolation(
     ValueDecl *value, ActorIsolation isolation,
     ValueDecl *overridden, ActorIsolation overriddenIsolation) {
-  ConcreteDeclRef valueRef(value);
+  ConcreteDeclRef valueRef = getDeclRefInContext(value);
   auto declContext = value->getInnermostDeclContext();
-  if (auto genericEnv = declContext->getGenericEnvironmentOfContext()) {
-    valueRef = ConcreteDeclRef(
-        value, genericEnv->getForwardingSubstitutionMap());
-  }
 
   auto refResult = ActorReferenceResult::forReference(
       valueRef, SourceLoc(), declContext, None, None,
@@ -3570,9 +3576,7 @@ static OverrideIsolationResult validOverrideIsolation(
     if (isAsyncDecl(overridden) ||
         isAccessibleAcrossActors(
             overridden, refResult.isolation, declContext)) {
-      // FIXME: Perform Sendable checking here because we're entering an
-      // actor.
-      return OverrideIsolationResult::Allowed;
+      return OverrideIsolationResult::Sendable;
     }
 
     // If the overridden declaration is from Objective-C with no actor
@@ -3948,7 +3952,9 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
     return;
 
   case OverrideIsolationResult::Sendable:
-    // FIXME: Do the Sendable check.
+    diagnoseNonSendableTypesInReference(
+        getDeclRefInContext(value), value->getInnermostDeclContext(),
+        value->getLoc(), SendableCheckReason::Override);
     return;
 
   case OverrideIsolationResult::Disallowed:
