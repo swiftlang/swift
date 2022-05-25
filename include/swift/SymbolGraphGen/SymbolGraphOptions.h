@@ -21,10 +21,10 @@ namespace symbolgraphgen {
 
 struct SymbolGraphOptions {
   /// The directory to output the symbol graph JSON files.
-  StringRef OutputDir = StringRef{};
+  StringRef OutputDir = {};
 
   /// The target of the module.
-  llvm::Triple Target = llvm::Triple{};
+  llvm::Triple Target = {};
   /// Pretty-print the JSON with newlines and indentation.
   bool PrettyPrint = false;
 
