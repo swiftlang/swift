@@ -543,10 +543,6 @@ def enable_explicit_existential_types :
   Flag<["-"], "enable-explicit-existential-types">,
   HelpText<"Enable experimental support for explicit existential types">;
 
-def enable_parameterized_existential_types :
-  Flag<["-"], "enable-parameterized-existential-types">,
-  HelpText<"Enable experimental support for parameterized existential types">;
-
 def enable_experimental_opened_existential_types :
   Flag<["-"], "enable-experimental-opened-existential-types">,
   HelpText<"Enable experimental support for implicitly opened existentials">;
