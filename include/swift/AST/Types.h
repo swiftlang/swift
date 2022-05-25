@@ -5822,7 +5822,6 @@ class OpenedArchetypeType final : public ArchetypeType,
   friend ArchetypeType;
   friend GenericEnvironment;
 
-  TypeBase *Opened;
   UUID ID;
 
   /// Create a new opened archetype in the given environment representing
