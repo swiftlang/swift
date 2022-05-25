@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=on -requirement-machine-inferred-signatures=on -disable-availability-checking -enable-parameterized-existential-types
+// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=on -requirement-machine-inferred-signatures=on -disable-availability-checking
 
 protocol Sequence<Element> {
   associatedtype Element
