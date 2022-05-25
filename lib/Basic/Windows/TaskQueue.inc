@@ -132,16 +132,16 @@ private:
 
     TaskProcessInformation TPI(T->PI.Pid, UTime, STime,
                                Counters.PeakWorkingSetSize);
-    bool ErrorOccured = false;
+    bool ErrorOccurred = false;
     if (Crashed) {
       if (Cbs.TaskSignalled) {
         TaskFinishedResponse Response =
             Cbs.TaskSignalled(T->PI.Pid, "", StdoutContents, StderrContents,
                               T->Context, T->PI.ReturnCode, TPI);
-        ErrorOccured = (Response == TaskFinishedResponse::StopExecution);
+        ErrorOccurred = (Response == TaskFinishedResponse::StopExecution);
       } else {
         // If we don't have a Signalled callback, unconditionally stop.
-        ErrorOccured = true;
+        ErrorOccurred = true;
       }
     } else {
       // Wait() returned a normal return code, so just indicate that the task
@@ -150,15 +150,15 @@ private:
         TaskFinishedResponse Response =
             Cbs.TaskFinished(T->PI.Pid, T->PI.ReturnCode, StdoutContents,
                              StderrContents, TPI, T->Context);
-        ErrorOccured = (Response == TaskFinishedResponse::StopExecution);
+        ErrorOccurred = (Response == TaskFinishedResponse::StopExecution);
       } else if (Crashed) {
-        ErrorOccured = true;
+        ErrorOccurred = true;
       }
     }
     llvm::sys::fs::remove(T->StdoutPath);
     if (T->SeparateErrors)
       llvm::sys::fs::remove(T->StderrPath);
-    return ErrorOccured;
+    return ErrorOccurred;
   }
 
 public:
@@ -171,14 +171,14 @@ public:
   /// Run the tasks to be executed.
   /// \return true on error.
   bool executeTasks() {
-    bool ErrorOccured = false;
-    while ((!ErrorOccured && !TasksToBeExecuted.empty()) ||
+    bool ErrorOccurred = false;
+    while ((!ErrorOccurred && !TasksToBeExecuted.empty()) ||
            !TasksBeingExecuted.empty()) {
-      if (!ErrorOccured)
-        ErrorOccured |= startUpSomeTasks();
-      ErrorOccured |= waitForFinishedTask();
+      if (!ErrorOccurred)
+        ErrorOccurred |= startUpSomeTasks();
+      ErrorOccurred |= waitForFinishedTask();
     }
-    return ErrorOccured;
+    return ErrorOccurred;
   }
 };
 

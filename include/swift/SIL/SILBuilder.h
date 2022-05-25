@@ -123,11 +123,23 @@ public:
     setInsertionPoint(I);
   }
 
-  // Used by swift bridging.
   explicit SILBuilder(SILInstruction *I, const SILDebugScope *debugScope)
       : TempContext(I->getFunction()->getModule()),
         C(TempContext), F(I->getFunction()), CurDebugScope(debugScope) {
     setInsertionPoint(I);
+  }
+
+  // Used by swift bridging.
+  explicit SILBuilder(SILInstruction *I, SILBasicBlock *BB,
+                      const SILDebugScope *debugScope)
+      : TempContext((BB ? BB->getParent() : I->getFunction())->getModule()),
+        C(TempContext), F(BB ? BB->getParent() : I->getFunction()),
+        CurDebugScope(debugScope) {
+    if (I) {
+      setInsertionPoint(I);
+    } else {
+      setInsertionPoint(BB);
+    }
   }
 
   explicit SILBuilder(SILBasicBlock::iterator I,
@@ -420,14 +432,15 @@ public:
 
   AllocBoxInst *createAllocBox(SILLocation Loc, CanSILBoxType BoxType,
                                Optional<SILDebugVariable> Var = None,
-                               bool hasDynamicLifetime = false) {
+                               bool hasDynamicLifetime = false,
+                               bool reflection = false) {
     llvm::SmallString<4> Name;
     Loc.markAsPrologue();
     assert((!dyn_cast_or_null<VarDecl>(Loc.getAsASTNode<Decl>()) || Var) &&
            "location is a VarDecl, but SILDebugVariable is empty");
     return insert(AllocBoxInst::create(getSILDebugLocation(Loc), BoxType, *F,
                                        substituteAnonymousArgs(Name, Var, Loc),
-                                       hasDynamicLifetime));
+                                       hasDynamicLifetime, reflection));
   }
 
   AllocExistentialBoxInst *

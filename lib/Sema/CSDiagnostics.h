@@ -1188,6 +1188,12 @@ public:
       : InvalidMemberRefFailure(solution, baseType, memberName, locator) {}
 
   SourceLoc getLoc() const override {
+    auto *locator = getLocator();
+
+    if (locator->findLast<LocatorPathElt::SyntacticElement>()) {
+      return constraints::getLoc(getAnchor());
+    }
+
     // Diagnostic should point to the member instead of its base expression.
     return constraints::getLoc(getRawAnchor());
   }

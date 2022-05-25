@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=on
+// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
 
 protocol P : Sequence {
   typealias Element = Iterator.Element

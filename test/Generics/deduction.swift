@@ -172,8 +172,7 @@ struct StaticFuncs {
 }
 
 struct StaticFuncsGeneric<U> {
-  // FIXME: Nested generics are very broken
-  // static func chameleon<T>() -> T {}
+  static func chameleon<T>() -> T {}
 }
 
 func chameleon<T>() -> T {}
@@ -182,10 +181,10 @@ func testStatic(_ sf: StaticFuncs, sfi: StaticFuncsGeneric<Int>) {
   var x: Int16
   x = StaticFuncs.chameleon()
   x = sf.chameleon2()
-  // FIXME: Nested generics are very broken
-  // x = sfi.chameleon()
-  // typealias SFI = StaticFuncsGeneric<Int>
-  // x = SFI.chameleon()
+
+  x = sfi.chameleon() // expected-error {{static member 'chameleon' cannot be used on instance of type 'StaticFuncsGeneric<Int>'}}
+  typealias SFI = StaticFuncsGeneric<Int>
+  x = SFI.chameleon()
   _ = x
 }
 

@@ -552,13 +552,12 @@ func testTryApply(_ x: Float) -> Float {
 // CHECK: bb0:
 // CHECK: [ACTIVE] %0 = argument of bb0 : $Float
 // CHECK: [NONE]   // function_ref closure #1 in testTryApply(_:)
-// CHECK: [NONE]   %3 = thin_to_thick_function %2 : $@convention(thin) () -> () to $@noescape @callee_guaranteed () -> ()
-// CHECK: [NONE]   %4 = convert_function %3 : $@noescape @callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> @error Error
+// CHECK: [NONE]   %3 = thin_to_thick_function %2 : $@convention(thin) () -> @error Error to $@noescape @callee_guaranteed () -> @error Error
 // CHECK: [NONE]   // function_ref rethrowing(_:)
 // CHECK: bb1:
-// CHECK: [NONE] %7 = argument of bb1 : $()
+// CHECK: [NONE] %6 = argument of bb1 : $()
 // CHECK: bb2:
-// CHECK: [NONE] %9 = argument of bb2 : $Error
+// CHECK: [NONE] %8 = argument of bb2 : $Error
 
 //===----------------------------------------------------------------------===//
 // Coroutine differentiation (`begin_apply`)

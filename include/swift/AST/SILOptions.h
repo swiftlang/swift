@@ -66,6 +66,12 @@ enum class DestroyHoistingOption : uint8_t {
   On = 1
 };
 
+enum class CrossModuleOptimizationMode : uint8_t {
+  Off = 0,
+  Default = 1,
+  Aggressive = 2
+};
+
 class SILModule;
 
 class SILOptions {
@@ -117,7 +123,7 @@ public:
   bool DisableSILPerfOptimizations = false;
 
   /// Controls whether cross module optimization is enabled.
-  bool CrossModuleOptimization = false;
+  CrossModuleOptimizationMode CMOMode = CrossModuleOptimizationMode::Off;
 
   /// Enables experimental performance annotations.
   bool EnablePerformanceAnnotations = false;

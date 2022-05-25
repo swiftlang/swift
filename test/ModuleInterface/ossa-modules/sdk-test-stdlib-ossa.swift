@@ -25,7 +25,7 @@
 
 // RUN: %target-swift-frontend -typecheck -sdk '%t/SDK' -prebuilt-module-cache-path '%t/PreBuiltSDKModules' -module-cache-path %t/TempModuleCacheOther -resource-dir '' -parse-stdlib -Rmodule-interface-rebuild %S/Inputs/sdk-test-stdlib-no-ossa-referent-no-rebuild-remark.swift -verify -enable-ossa-modules
 
-// Flacky hangs: rdar://77288690
+// Flaky hangs: rdar://77288690
 // UNSUPPORTED: CPU=arm64, CPU=arm64e
 
 @_fixed_layout

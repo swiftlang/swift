@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift %s -requirement-machine-protocol-signatures=on
-// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-protocol-signatures=on 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift %s -warn-redundant-requirements
+// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
 // The GenericSignatureBuilder was unable to derive the redundant conformance requirement 'B: P4'
 // in protocol P1.

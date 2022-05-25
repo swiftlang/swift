@@ -1387,6 +1387,15 @@ bool SILInstruction::isMetaInstruction() const {
   llvm_unreachable("Instruction not handled in isMetaInstruction()!");
 }
 
+unsigned SILInstruction::getCachedFieldIndex(NominalTypeDecl *decl,
+                                             VarDecl *property) {
+  return getModule().getFieldIndex(decl, property);
+}
+
+unsigned SILInstruction::getCachedCaseIndex(EnumElementDecl *enumElement) {
+  return getModule().getCaseIndex(enumElement);
+}
+
 //===----------------------------------------------------------------------===//
 //                                 Utilities
 //===----------------------------------------------------------------------===//
@@ -1645,6 +1654,10 @@ MultipleValueInstruction *MultipleValueInstructionResult::getParentImpl() const 
 bool SILInstruction::maySuspend() const {
   // await_async_continuation always suspends the current task.
   if (isa<AwaitAsyncContinuationInst>(this))
+    return true;
+
+  // hop_to_executor also may cause a suspension
+  if (isa<HopToExecutorInst>(this))
     return true;
   
   // Fully applying an async function may suspend the caller.

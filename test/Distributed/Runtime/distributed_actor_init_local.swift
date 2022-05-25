@@ -8,6 +8,10 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
+
+// FIXME(distributed): Seems something remains incorrect here
+// REQUIRES: rdar92952551
+
 import Distributed
 
 enum MyError: Error {
@@ -21,8 +25,8 @@ distributed actor PickATransport1 {
 }
 
 distributed actor PickATransport2 {
-  init(other: Int, thesystem: FakeActorSystem) async {
-    self.actorSystem = thesystem
+  init(other: Int, theSystem: FakeActorSystem) async {
+    self.actorSystem = theSystem
   }
 }
 
@@ -87,6 +91,16 @@ distributed actor MaybeAfterAssign {
       return nil
     }
     x = 100
+  }
+}
+
+distributed actor LocalTestingDA_Int {
+  typealias ActorSystem = LocalTestingDistributedActorSystem
+  var int: Int
+  init() {
+    actorSystem = .init()
+    int = 12
+    // CRASH
   }
 }
 
@@ -240,7 +254,7 @@ func test() async {
   // CHECK-NOT: ready
   // CHECK: resign id:ActorAddress(address: "[[ID5]]")
 
-  test.append(await PickATransport2(other: 1, thesystem: system))
+  test.append(await PickATransport2(other: 1, theSystem: system))
   // CHECK: assign type:PickATransport2, id:ActorAddress(address: "[[ID6:.*]]")
   // CHECK: ready actor:main.PickATransport2, id:ActorAddress(address: "[[ID6]]")
 
@@ -261,6 +275,10 @@ func test() async {
   test.append(MaybeAfterAssign(fail: false))
   // CHECK:      assign type:MaybeAfterAssign, id:ActorAddress(address: "[[ID10:.*]]")
   // CHECK-NEXT: ready actor:main.MaybeAfterAssign, id:ActorAddress(address: "[[ID10]]")
+
+  let localDA = LocalTestingDA_Int()
+  print("localDA = \(localDA.id)")
+  // CHECK: localDA = LocalTestingActorID(id: "1")
 
   // the following tests fail to initialize the actor's identity.
   print("-- start of no-assign tests --")

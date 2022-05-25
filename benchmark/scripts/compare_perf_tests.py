@@ -229,8 +229,8 @@ class PerformanceTestResult(object):
     statistics for normal distribution (MEAN, SD):
         #,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs),MAX_RSS(B)
     And new quantiles format with variable number of columns:
-        #,TEST,SAMPLES,MIN(μs),MEDIAN(μs),MAX(μs)
-        #,TEST,SAMPLES,MIN(μs),Q1(μs),Q2(μs),Q3(μs),MAX(μs),MAX_RSS(B)
+        #,TEST,SAMPLES,QMIN(μs),MEDIAN(μs),MAX(μs)
+        #,TEST,SAMPLES,QMIN(μs),Q1(μs),Q2(μs),Q3(μs),MAX(μs),MAX_RSS(B)
     The number of columns between MIN and MAX depends on the test driver's
     `--quantile`parameter. In both cases, the last column, MAX_RSS is optional.
     """
@@ -244,9 +244,10 @@ class PerformanceTestResult(object):
         self.name = csv_row[1]  # Name of the performance test
         self.num_samples = int(csv_row[2])  # Number of measurements taken
 
+        mem_index = (-1 if memory else 0) + (-3 if meta else 0)
         if quantiles:  # Variable number of columns representing quantiles
-            mem_index = (-1 if memory else 0) + (-3 if meta else 0)
             runtimes = csv_row[3:mem_index] if memory or meta else csv_row[3:]
+            last_runtime_index = mem_index - 1
             if delta:
                 runtimes = [int(x) if x else 0 for x in runtimes]
                 runtimes = functools.reduce(
@@ -277,19 +278,20 @@ class PerformanceTestResult(object):
                 sams.mean,
                 sams.sd,
             )
-            self.max_rss = (  # Maximum Resident Set Size (B)
-                int(csv_row[mem_index]) if memory else None
-            )
         else:  # Legacy format with statistics for normal distribution.
             self.min = int(csv_row[3])  # Minimum runtime (μs)
             self.max = int(csv_row[4])  # Maximum runtime (μs)
             self.mean = float(csv_row[5])  # Mean (average) runtime (μs)
             self.sd = float(csv_row[6])  # Standard Deviation (μs)
             self.median = int(csv_row[7])  # Median runtime (μs)
-            self.max_rss = (  # Maximum Resident Set Size (B)
-                int(csv_row[8]) if len(csv_row) > 8 else None
-            )
+            last_runtime_index = 7
             self.samples = None
+
+        self.max_rss = (  # Maximum Resident Set Size (B)
+            int(csv_row[mem_index]) if (
+                memory and len(csv_row) > (last_runtime_index + 1)
+            ) else None
+        )
 
         # Optional measurement metadata. The number of:
         # memory pages used, involuntary context switches and voluntary yields
@@ -427,7 +429,7 @@ class LogParser(object):
         self.mem_pages = int(mem_pages)
 
     def _configure_format(self, header):
-        self.quantiles = "MEAN" not in header
+        self.quantiles = "QMIN" in header
         self.memory = "MAX_RSS" in header
         self.meta = "PAGES" in header
         self.delta = "𝚫" in header
@@ -453,7 +455,7 @@ class LogParser(object):
                 Yield(len(self.samples), int(since_last_yield))
             )
         ),
-        re.compile(r"( *#[, \t]+TEST[, \t]+SAMPLES[, \t]+MIN.*)"): _configure_format,
+        re.compile(r"( *#[, \t]+TEST[, \t]+SAMPLES[, \t].*)"): _configure_format,
         # Environmental statistics: memory usage and context switches
         re.compile(
             r"\s+MAX_RSS \d+ - \d+ = (\d+) \((\d+) pages\)"

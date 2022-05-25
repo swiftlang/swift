@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir %s -debug-generic-signatures -requirement-machine-inferred-signatures=on 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s -debug-generic-signatures 2>&1 | %FileCheck %s
 // REQUIRES: OS=macosx
 
 import Combine

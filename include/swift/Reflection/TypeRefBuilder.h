@@ -100,6 +100,12 @@ public:
     : OriginalSize(Size), Cur(Cur), Size(Size), Name(Name) {
     if (Size != 0) {
       auto NextRecord = this->operator*();
+      if (!NextRecord) {
+        // NULL record pointer, don't attempt to proceed. Setting size to 0 will
+        // make this iterator compare equal to the end iterator.
+        this->Size = 0;
+        return;
+      }
       auto NextSize = Self::getCurrentRecordSize(NextRecord);
       if (NextSize > Size) {
         std::cerr << "!!! Reflection section too small to contain first record\n" << std::endl;
@@ -109,7 +115,9 @@ public:
                   << ", size of first record: "
                   << NextSize
                   << std::endl;
-        abort();
+        // Set this iterator equal to the end. This section is effectively
+        // empty.
+        this->Size = 0;
       }
     }
   }
@@ -149,7 +157,7 @@ public:
           std::cerr << std::hex << std::setw(2) << (int)p[i] << " ";
         }
         std::cerr << std::endl;
-        abort();
+        Size = 0; // Set this iterator equal to the end.
       }
     }
 
@@ -157,6 +165,10 @@ public:
   }
 
   bool operator==(const Self &other) const {
+    // Size = 0 means we're at the end even if Cur doesn't match. This allows
+    // iterators that encounter an incorrect size to safely end iteration.
+    if (Size == 0 && other.Size == 0)
+      return true;
     return Cur == other.Cur && Size == other.Size;
   }
 
@@ -356,6 +368,12 @@ public:
   using BuiltTypeDecl = llvm::Optional<std::string>;
   using BuiltProtocolDecl =
       llvm::Optional<std::pair<std::string, bool /*isObjC*/>>;
+  using BuiltSubstitution = std::pair<const TypeRef *, const TypeRef *>;
+  using BuiltRequirement = TypeRefRequirement;
+  using BuiltLayoutConstraint = TypeRefLayoutConstraint;
+  using BuiltGenericTypeParam = const GenericTypeParameterTypeRef *;
+  using BuiltGenericSignature = const GenericSignatureRef *;
+  using BuiltSubstitutionMap = llvm::DenseMap<DepthAndIndex, const TypeRef *>;
 
   TypeRefBuilder(const TypeRefBuilder &other) = delete;
   TypeRefBuilder &operator=(const TypeRefBuilder &other) = delete;
@@ -374,6 +392,8 @@ private:
   /// Cache for field info lookups.
   std::unordered_map<std::string, RemoteRef<FieldDescriptor>> FieldTypeInfoCache;
 
+  std::vector<std::unique_ptr<const GenericSignatureRef>> SignatureRefPool;
+
   TypeConverter TC;
   MetadataSourceBuilder MSB;
 
@@ -387,6 +407,13 @@ public:
   const TypeRefTy *makeTypeRef(Args... args) {
     const auto TR = new TypeRefTy(::std::forward<Args>(args)...);
     TypeRefPool.push_back(std::unique_ptr<const TypeRef>(TR));
+    return TR;
+  }
+
+  template <typename... Args>
+  const GenericSignatureRef *makeGenericSignatureRef(Args... args) {
+    const auto TR = new GenericSignatureRef(::std::forward<Args>(args)...);
+    SignatureRefPool.push_back(std::unique_ptr<const GenericSignatureRef>(TR));
     return TR;
   }
 
@@ -595,6 +622,14 @@ public:
         *this, {}, result, funcFlags, diffKind, nullptr);
   }
 
+  BuiltType createProtocolTypeFromDecl(BuiltProtocolDecl protocol) {
+    if (protocol->second) {
+      return llvm::cast<TypeRef>(createObjCProtocolType(protocol->first));
+    } else {
+      return llvm::cast<TypeRef>(createNominalType(protocol->first));
+    }
+  }
+
   const ProtocolCompositionTypeRef *
   createProtocolCompositionType(llvm::ArrayRef<BuiltProtocolDecl> protocols,
                                 BuiltType superclass, bool isClassBound,
@@ -604,10 +639,10 @@ public:
       if (!protocol)
         continue;
 
-      if (protocol->second)
-        protocolRefs.push_back(createObjCProtocolType(protocol->first));
-      else
-        protocolRefs.push_back(createNominalType(protocol->first));
+      auto protocolType = createProtocolTypeFromDecl(*protocol);
+      if (!protocolType)
+        continue;
+      protocolRefs.push_back(protocolType);
     }
 
     return ProtocolCompositionTypeRef::create(*this, protocolRefs, superclass,
@@ -670,9 +705,6 @@ public:
   }
 
   using BuiltSILBoxField = typename SILBoxTypeWithLayoutTypeRef::Field;
-  using BuiltSubstitution = std::pair<const TypeRef *, const TypeRef *>;
-  using BuiltRequirement = TypeRefRequirement;
-  using BuiltLayoutConstraint = TypeRefLayoutConstraint;
   BuiltLayoutConstraint getLayoutConstraint(LayoutConstraintKind kind) {
     // FIXME: Implement this.
     return {};
@@ -719,8 +751,7 @@ public:
     return createObjCClassType(name);
   }
 
-  const ObjCProtocolTypeRef *
-  createObjCProtocolType(const std::string &name) {
+  const ObjCProtocolTypeRef *createObjCProtocolType(const std::string &name) {
     return ObjCProtocolTypeRef::create(*this, name);
   }
 
@@ -736,6 +767,41 @@ public:
 
   const OpaqueTypeRef *getOpaqueType() {
     return OpaqueTypeRef::get();
+  }
+
+  BuiltGenericSignature
+  createGenericSignature(llvm::ArrayRef<BuiltType> builtParams,
+                         llvm::ArrayRef<BuiltRequirement> requirements) {
+    std::vector<BuiltGenericTypeParam> params;
+    for (auto &builtParam : builtParams) {
+      auto *genericRef =
+          llvm::dyn_cast<GenericTypeParameterTypeRef>(builtParam);
+      if (!genericRef)
+        return nullptr;
+      params.push_back(genericRef);
+    }
+    return GenericSignatureRef::create(*this, params, requirements);
+  }
+
+  BuiltSubstitutionMap
+  createSubstitutionMap(BuiltGenericSignature sig,
+                        llvm::ArrayRef<BuiltType> replacements) {
+    assert(sig->getParams().size() == replacements.size() &&
+           "Not enough replacement parameters!");
+    if (sig->getParams().size() != replacements.size())
+      return BuiltSubstitutionMap{};
+
+    BuiltSubstitutionMap map{};
+    for (unsigned paramIdx : indices(sig->getParams())) {
+      const auto *param = sig->getParams()[paramIdx];
+      auto replacement = replacements[paramIdx];
+      map[{param->getDepth(), param->getIndex()}] = replacement;
+    }
+    return map;
+  }
+
+  BuiltType subst(BuiltType subject, const BuiltSubstitutionMap &Subs) {
+    return subject->subst(*this, Subs);
   }
 
   ///
@@ -789,6 +855,7 @@ private:
   using ByteReader = std::function<remote::MemoryReader::ReadBytesResult (remote::RemoteAddress, unsigned)>;
   using StringReader = std::function<bool (remote::RemoteAddress, std::string &)>;
   using PointerReader = std::function<llvm::Optional<remote::RemoteAbsolutePointer> (remote::RemoteAddress, unsigned)>;
+  using DynamicSymbolResolver = std::function<llvm::Optional<remote::RemoteAbsolutePointer> (remote::RemoteAddress)>;
   using IntVariableReader = std::function<llvm::Optional<uint64_t> (std::string, unsigned)>;
 
   // These fields are captured from the MetadataReader template passed into the
@@ -802,6 +869,7 @@ private:
   ByteReader OpaqueByteReader;
   StringReader OpaqueStringReader;
   PointerReader OpaquePointerReader;
+  DynamicSymbolResolver OpaqueDynamicSymbolResolver;
   IntVariableReader OpaqueIntVariableReader;
 
 public:
@@ -828,6 +896,9 @@ public:
       }),
       OpaquePointerReader([&reader](remote::RemoteAddress address, unsigned size) -> llvm::Optional<remote::RemoteAbsolutePointer> {
         return reader.Reader->readPointer(address, size);
+      }),
+      OpaqueDynamicSymbolResolver([&reader](remote::RemoteAddress address) -> llvm::Optional<remote::RemoteAbsolutePointer> {
+        return reader.Reader->getDynamicSymbol(address);
       }),
       OpaqueIntVariableReader(
         [&reader](std::string symbol, unsigned size) -> llvm::Optional<uint64_t> {
@@ -953,13 +1024,16 @@ private:
     ByteReader OpaqueByteReader;
     StringReader OpaqueStringReader;
     PointerReader OpaquePointerReader;
+    DynamicSymbolResolver OpaqueDynamicSymbolResolver;
 
     ProtocolConformanceDescriptorReader(ByteReader byteReader,
                                         StringReader stringReader,
-                                        PointerReader pointerReader)
+                                        PointerReader pointerReader,
+                                        DynamicSymbolResolver dynamicSymbolResolver)
         : Error(""), OpaqueByteReader(byteReader),
-          OpaqueStringReader(stringReader), OpaquePointerReader(pointerReader) {
-    }
+          OpaqueStringReader(stringReader),
+          OpaquePointerReader(pointerReader),
+          OpaqueDynamicSymbolResolver(dynamicSymbolResolver) {}
 
     llvm::Optional<std::string>
     getParentContextName(uintptr_t contextDescriptorAddress) {
@@ -979,13 +1053,13 @@ private:
       auto parentOffsetAddress = detail::applyRelativeOffset(
           (const char *)contextDescriptorAddress,
           (int32_t)contextDescriptor->getParentOffset());
-      auto parentOfsetBytes = OpaqueByteReader(
+      auto parentOffsetBytes = OpaqueByteReader(
           remote::RemoteAddress(parentOffsetAddress), sizeof(uint32_t));
-      if (!parentOfsetBytes.get()) {
+      if (!parentOffsetBytes.get()) {
         Error = "Failed to parent offset in a type descriptor.";
         return llvm::None;
       }
-      auto parentFieldOffset = (const int32_t *)parentOfsetBytes.get();
+      auto parentFieldOffset = (const int32_t *)parentOffsetBytes.get();
       auto parentTargetAddress = detail::applyRelativeOffset(
           (const char *)parentOffsetAddress, *parentFieldOffset);
 
@@ -1074,13 +1148,13 @@ private:
       auto typeNameOffsetAddress =
           detail::applyRelativeOffset((const char *)typeDescriptorAddress,
                                       (int32_t)typeDescriptor->getNameOffset());
-      auto typeNameOfsetBytes = OpaqueByteReader(
+      auto typeNameOffsetBytes = OpaqueByteReader(
           remote::RemoteAddress(typeNameOffsetAddress), sizeof(uint32_t));
-      if (!typeNameOfsetBytes.get()) {
+      if (!typeNameOffsetBytes.get()) {
         Error = "Failed to read type name offset in a type descriptor.";
         return llvm::None;
       }
-      auto typeNameOffset = (const uint32_t *)typeNameOfsetBytes.get();
+      auto typeNameOffset = (const uint32_t *)typeNameOffsetBytes.get();
       auto typeNameAddress = detail::applyRelativeOffset(
           (const char *)typeNameOffsetAddress, (int32_t)*typeNameOffset);
       std::string typeName;
@@ -1095,15 +1169,15 @@ private:
       auto parentNameOffsetAddress = detail::applyRelativeOffset(
           (const char *)moduleDescriptorAddress,
           (int32_t)moduleDescriptor->getNameOffset());
-      auto parentNameOfsetBytes = OpaqueByteReader(
+      auto parentNameOffsetBytes = OpaqueByteReader(
           remote::RemoteAddress(parentNameOffsetAddress), sizeof(uint32_t));
-      if (!parentNameOfsetBytes.get()) {
+      if (!parentNameOffsetBytes.get()) {
         Error = "Failed to read parent name offset in a module descriptor.";
         return llvm::None;
       }
-      auto parentNameOfset = (const uint32_t *)parentNameOfsetBytes.get();
+      auto parentNameOffset = (const uint32_t *)parentNameOffsetBytes.get();
       auto parentNameAddress = detail::applyRelativeOffset(
-          (const char *)parentNameOffsetAddress, (int32_t)*parentNameOfset);
+          (const char *)parentNameOffsetAddress, (int32_t)*parentNameOffset);
       std::string parentName;
       OpaqueStringReader(remote::RemoteAddress(parentNameAddress), parentName);
       return parentName;
@@ -1129,13 +1203,13 @@ private:
       auto protocolNameOffsetAddress = detail::applyRelativeOffset(
           (const char *)protocolDescriptorAddress,
           (int32_t)protocolDescriptor->getNameOffset());
-      auto protocolNameOfsetBytes = OpaqueByteReader(
+      auto protocolNameOffsetBytes = OpaqueByteReader(
           remote::RemoteAddress(protocolNameOffsetAddress), sizeof(uint32_t));
-      if (!protocolNameOfsetBytes.get()) {
+      if (!protocolNameOffsetBytes.get()) {
         Error = "Failed to read type name offset in a protocol descriptor.";
         return llvm::None;
       }
-      auto protocolNameOffset = (const uint32_t *)protocolNameOfsetBytes.get();
+      auto protocolNameOffset = (const uint32_t *)protocolNameOffsetBytes.get();
 
       // Using the offset above, compute the address of the name field itsel
       // and read it.
@@ -1182,17 +1256,16 @@ private:
         return llvm::None;
       }
       auto contextDescriptorOffset =
-          (const uint32_t *)contextDescriptorOffsetBytes.get();
+          (const int32_t *)contextDescriptorOffsetBytes.get();
 
       // Read the type descriptor itself using the address computed above
       auto contextTypeDescriptorAddress = detail::applyRelativeOffset(
           (const char *)contextDescriptorFieldAddress,
-          (int32_t)*contextDescriptorOffset);
+          *contextDescriptorOffset);
 
       // Instead of a type descriptor this may just be a symbol reference, check that first
-      if (auto symbol = OpaquePointerReader(remote::RemoteAddress(contextTypeDescriptorAddress),
-                                            PointerSize)) {
-        if (!symbol->getSymbol().empty()) {
+      if (auto symbol = OpaqueDynamicSymbolResolver(remote::RemoteAddress(contextTypeDescriptorAddress))) {
+        if (!symbol->isResolved()) {
           mangledTypeName = symbol->getSymbol().str();
           Demangle::Context Ctx;
           auto demangledRoot =
@@ -1201,6 +1274,9 @@ private:
           typeName =
               nodeToString(demangledRoot->getChild(0)->getChild(0));
           return std::make_pair(mangledTypeName, typeName);
+        } else if (symbol->getOffset()) {
+          // If symbol is empty and has an offset, this is the resolved remote address
+          contextTypeDescriptorAddress = symbol->getOffset();
         }
       }
 
@@ -1396,7 +1472,7 @@ public:
     std::unordered_map<std::string, std::vector<std::string>> typeConformances;
     ProtocolConformanceDescriptorReader<ObjCInteropKind, PointerSize>
         conformanceReader(OpaqueByteReader, OpaqueStringReader,
-                          OpaquePointerReader);
+                          OpaquePointerReader, OpaqueDynamicSymbolResolver);
     for (const auto &section : ReflectionInfos) {
       auto ConformanceBegin = section.Conformance.startAddress();
       auto ConformanceEnd = section.Conformance.endAddress();

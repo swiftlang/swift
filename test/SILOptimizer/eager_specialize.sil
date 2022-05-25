@@ -848,6 +848,24 @@ bb0(%0 : $*T):
   return %8 : $Builtin.Int64
 }
 
+// Don't specialize `shared` definitions they are imported from another module.
+// CHECK-NOT: sil @$s24testDontSpecializeSharedSi_Ts5
+sil shared [_specialize exported: true, kind: full, where T == Int] @testDontSpecializeShared : $@convention(thin) <T>(@in T) -> () {
+bb(%0: $*T):
+ destroy_addr %0 : $*T
+ %t = tuple()
+ return %t : $()
+}
+
+// But do specialize `shared` definitions when they are target from another // function.
+// CHECK: sil @$s24testDontSpecializeSharedSd_Ts5
+sil shared [_specialize exported: true, kind: full, target: "testDontSpecializeShared" ,where T == Double] @butSpecializeWhenTargetIsPresent : $@convention(thin) <T>(@in T) -> () {
+bb(%0: $*T):
+ destroy_addr %0 : $*T
+ %t = tuple()
+ return %t : $()
+}
+
 sil_vtable ClassUsingThrowingP {
   #ClassUsingThrowingP.init!allocator: (ClassUsingThrowingP.Type) -> () -> ClassUsingThrowingP : @$s34eager_specialize_throwing_function19ClassUsingThrowingPCACycfC	// ClassUsingThrowingP.__allocating_init()
   #ClassUsingThrowingP.init!initializer: (ClassUsingThrowingP.Type) -> () -> ClassUsingThrowingP : @$s34eager_specialize_throwing_function19ClassUsingThrowingPCACycfc	// ClassUsingThrowingP.init()

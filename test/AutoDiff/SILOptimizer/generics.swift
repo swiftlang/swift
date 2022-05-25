@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-sil -verify %s -requirement-machine-inferred-signatures=on | %FileCheck %s -check-prefix=CHECK-SIL
+// RUN: %target-swift-emit-sil -verify %s -warn-redundant-requirements | %FileCheck %s -check-prefix=CHECK-SIL
 
 import _Differentiation
 

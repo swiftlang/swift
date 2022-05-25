@@ -1355,6 +1355,10 @@ public:
   void visitAllocBoxInst(AllocBoxInst *ABI) {
     if (ABI->hasDynamicLifetime())
       *this << "[dynamic_lifetime] ";
+    
+    if (ABI->emitReflectionMetadata()) {
+      *this << "[reflection] ";
+    }
     *this << ABI->getType();
     printDebugVar(ABI->getVarInfo(),
                   &ABI->getModule().getASTContext().SourceMgr);
@@ -2768,6 +2772,10 @@ void SingleValueInstruction::dump() const {
 void SILInstruction::print(raw_ostream &OS) const {
   SILPrintContext Ctx(OS);
   SILPrinter(Ctx).print(this);
+}
+
+void NonSingleValueInstruction::dump() const {
+  SILNode::dump();
 }
 
 /// Pretty-print the SILBasicBlock to errs.

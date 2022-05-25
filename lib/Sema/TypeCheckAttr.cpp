@@ -1710,9 +1710,19 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
 
   if (EnclosingDecl) {
     if (!AttrRange.isContainedIn(EnclosingAnnotatedRange.getValue())) {
-      diagnose(attr->getLocation(), diag::availability_decl_more_than_enclosing);
+      diagnose(D->isImplicit() ? EnclosingDecl->getLoc() : attr->getLocation(),
+               diag::availability_decl_more_than_enclosing,
+               D->getDescriptiveKind());
+      if (D->isImplicit())
+        diagnose(EnclosingDecl->getLoc(),
+                 diag::availability_implicit_decl_here,
+                 D->getDescriptiveKind(),
+                 prettyPlatformString(targetPlatform(Ctx.LangOpts)),
+                 AttrRange.getOSVersion().getLowerEndpoint());
       diagnose(EnclosingDecl->getLoc(),
-               diag::availability_decl_more_than_enclosing_enclosing_here);
+               diag::availability_decl_more_than_enclosing_enclosing_here,
+               prettyPlatformString(targetPlatform(Ctx.LangOpts)),
+               EnclosingAnnotatedRange->getOSVersion().getLowerEndpoint());
     }
   }
 
@@ -2096,28 +2106,6 @@ synthesizeMainBody(AbstractFunctionDecl *fn, void *arg) {
   return std::make_pair(body, /*typechecked=*/false);
 }
 
-static FuncDecl *resolveMainFunctionDecl(DeclContext *declContext,
-                                         ResolvedMemberResult &resolution,
-                                         ASTContext &ctx) {
-  // Choose the best overload if it's a main function
-  if (resolution.hasBestOverload()) {
-    ValueDecl *best = resolution.getBestOverload();
-    if (FuncDecl *func = dyn_cast<FuncDecl>(best)) {
-      if (func->isMainTypeMainMethod()) {
-        return func;
-      }
-    }
-  }
-  // Look for the most highly-ranked main-function candidate
-  for (ValueDecl *candidate : resolution.getMemberDecls(Viable)) {
-    if (FuncDecl *func = dyn_cast<FuncDecl>(candidate)) {
-      if (func->isMainTypeMainMethod())
-        return func;
-    }
-  }
-  return nullptr;
-}
-
 FuncDecl *
 SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
                                         Decl *D) const {
@@ -2170,17 +2158,91 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
   // usual type-checking.  The alternative would be to directly call
   // mainType.main() from the entry point, and that would require fully
   // type-checking the call to mainType.main().
+  using namespace constraints;
+  ConstraintSystem CS(declContext,
+                      ConstraintSystemFlags::IgnoreAsyncSyncMismatch);
+  ConstraintLocator *locator =
+      CS.getConstraintLocator({}, ConstraintLocator::Member);
+  // Allowed main function types
+  // `() -> Void`
+  // `() async -> Void`
+  // `() throws -> Void`
+  // `() async throws -> Void`
+  // `@MainActor () -> Void`
+  // `@MainActor () async -> Void`
+  // `@MainActor () throws -> Void`
+  // `@MainActor () async throws -> Void`
+  {
+    llvm::SmallVector<Type, 8> mainTypes = {
 
-  constraints::ConstraintSystemOptions lookupOptions;
-  if (context.LangOpts.EnableAsyncMainResolution)
-    lookupOptions |=
-        constraints::ConstraintSystemFlags::ConsiderNominalTypeContextsAsync;
+        FunctionType::get(/*params*/ {}, context.TheEmptyTupleType,
+                          ASTExtInfo()),
+        FunctionType::get(
+            /*params*/ {}, context.TheEmptyTupleType,
+            ASTExtInfoBuilder().withAsync().build()),
 
-  auto resolution = resolveValueMember(
-      *declContext, nominal->getInterfaceType(), context.Id_main,
-      lookupOptions);
-  FuncDecl *mainFunction =
-      resolveMainFunctionDecl(declContext, resolution, context);
+        FunctionType::get(/*params*/ {}, context.TheEmptyTupleType,
+                          ASTExtInfoBuilder().withThrows().build()),
+
+        FunctionType::get(
+            /*params*/ {}, context.TheEmptyTupleType,
+            ASTExtInfoBuilder().withAsync().withThrows().build())};
+
+    Type mainActor = context.getMainActorType();
+    if (mainActor) {
+      mainTypes.push_back(FunctionType::get(
+          /*params*/ {}, context.TheEmptyTupleType,
+          ASTExtInfoBuilder().withGlobalActor(mainActor).build()));
+      mainTypes.push_back(FunctionType::get(
+          /*params*/ {}, context.TheEmptyTupleType,
+          ASTExtInfoBuilder().withAsync().withGlobalActor(mainActor).build()));
+      mainTypes.push_back(FunctionType::get(
+          /*params*/ {}, context.TheEmptyTupleType,
+          ASTExtInfoBuilder().withThrows().withGlobalActor(mainActor).build()));
+      mainTypes.push_back(FunctionType::get(/*params*/ {},
+                                            context.TheEmptyTupleType,
+                                            ASTExtInfoBuilder()
+                                                .withAsync()
+                                                .withThrows()
+                                                .withGlobalActor(mainActor)
+                                                .build()));
+    }
+    TypeVariableType *mainType =
+        CS.createTypeVariable(locator, /*options=*/0);
+    llvm::SmallVector<Constraint *, 4> typeEqualityConstraints;
+    typeEqualityConstraints.reserve(mainTypes.size());
+    for (const Type &candidateMainType : mainTypes) {
+      typeEqualityConstraints.push_back(
+          Constraint::create(CS, ConstraintKind::Equal, Type(mainType),
+                             candidateMainType, locator));
+    }
+
+    CS.addDisjunctionConstraint(typeEqualityConstraints, locator);
+    CS.addValueMemberConstraint(
+        nominal->getInterfaceType(), DeclNameRef(context.Id_main),
+        Type(mainType), declContext, FunctionRefKind::SingleApply, {}, locator);
+  }
+
+  FuncDecl *mainFunction = nullptr;
+  llvm::SmallVector<Solution, 4> candidates;
+
+  if (!CS.solve(candidates, FreeTypeVariableBinding::Disallow)) {
+    // We can't use CS.diagnoseAmbiguity directly since the locator is empty
+    // Sticking the main type decl `D` in results in an assert due to a
+    // unsimplifiable locator anchor since it appears to be looking for an
+    // expression, which we don't have.
+    // (locator could not be simplified to anchor)
+    // TODO: emit notes for each of the ambiguous candidates
+    if (candidates.size() != 1) {
+      context.Diags.diagnose(nominal->getLoc(), diag::ambiguous_decl_ref,
+                             DeclNameRef(context.Id_main));
+      attr->setInvalid();
+      return nullptr;
+    }
+    mainFunction = dyn_cast<FuncDecl>(
+        candidates[0].overloadChoices[locator].choice.getDecl());
+  }
+
   if (!mainFunction) {
     const bool hasAsyncSupport =
         AvailabilityContext::forDeploymentTarget(context).isContainedIn(
@@ -2381,7 +2443,6 @@ static void checkSpecializeAttrRequirements(SpecializeAttr *attr,
 /// Type check that a set of requirements provided by @_specialize.
 /// Store the set of requirements in the attribute.
 void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
-  DeclContext *DC = D->getDeclContext();
   auto *FD = cast<AbstractFunctionDecl>(D);
   auto genericSig = FD->getGenericSignature();
   auto *trailingWhereClause = attr->getTrailingWhereClause();
@@ -2407,7 +2468,6 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   }
 
   InferredGenericSignatureRequest request{
-      DC->getParentModule(),
       genericSig.getPointer(),
       /*genericParams=*/nullptr,
       WhereClauseOwner(FD, attr),
@@ -4613,7 +4673,6 @@ bool resolveDifferentiableAttrDerivativeGenericSignature(
     }
 
     InferredGenericSignatureRequest request{
-        original->getParentModule(),
         originalGenSig.getPointer(),
         /*genericParams=*/nullptr,
         WhereClauseOwner(original, attr),
@@ -4897,10 +4956,11 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
 /// - Stores the attribute in `ASTContext::DerivativeAttrs`.
 ///
 /// \returns true on error, false on success.
-static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
-                                    DerivativeAttr *attr) {
+static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
   // Note: Implementation must be idempotent because it may be called multiple
   // times for the same attribute.
+  Decl *D = attr->getOriginalDeclaration();
+  auto &Ctx = D->getASTContext();
   auto &diags = Ctx.Diags;
   // `@derivative` attribute requires experimental differentiable programming
   // to be enabled.
@@ -5313,13 +5373,18 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
 }
 
 void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
-  if (typeCheckDerivativeAttr(Ctx, D, attr))
+  if (typeCheckDerivativeAttr(attr))
     attr->setInvalid();
 }
 
 AbstractFunctionDecl *
 DerivativeAttrOriginalDeclRequest::evaluate(Evaluator &evaluator,
                                             DerivativeAttr *attr) const {
+  // Try to resolve the original function.
+  if (attr->isValid() && attr->OriginalFunction.isNull())
+    if (typeCheckDerivativeAttr(attr))
+      attr->setInvalid();
+
   // If the typechecker has resolved the original function, return it.
   if (auto *FD = attr->OriginalFunction.dyn_cast<AbstractFunctionDecl *>())
     return FD;

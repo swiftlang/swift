@@ -89,13 +89,26 @@ function(add_swift_compiler_modules_library name)
 
   if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
     set(deployment_version "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
-    set(sdk_option "-sdk" "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
+    set(sdk_path "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
+    set(sdk_option "-sdk" "${sdk_path}")
     if(${BOOTSTRAPPING_MODE} STREQUAL "CROSSCOMPILE-WITH-HOSTLIBS")
       # Let the cross-compiled compile don't pick up the compiled stdlib by providing
       # an (almost) empty resource dir.
       # The compiler will instead pick up the stdlib from the SDK.
       get_filename_component(swift_exec_bin_dir ${ALS_SWIFT_EXEC} DIRECTORY)
       set(sdk_option ${sdk_option} "-resource-dir" "${swift_exec_bin_dir}/../bootstrapping0/lib/swift")
+    endif()
+    if(NOT EXISTS "${sdk_path}/usr/include/c++")
+      # Darwin SDKs in Xcode 12 or older do not include libc++, which prevents clang from finding libc++ when invoked
+      # from ClangImporter. This results in build errors. To workaround this, let's explicitly pass the path to libc++
+      # to clang.
+      message(WARNING "Building with an outdated Darwin SDK: libc++ missing from the ${SWIFT_HOST_VARIANT_SDK} SDK. Will use libc++ from the toolchain.")
+      get_filename_component(absolute_libcxx_path "${CMAKE_C_COMPILER}/../../include/c++/v1" REALPATH)
+      if (EXISTS "${absolute_libcxx_path}")
+        set(sdk_option ${sdk_option} "-Xcc" "-isystem" "-Xcc" "${absolute_libcxx_path}")
+      else()
+        message(ERROR "libc++ not found in the toolchain.")
+      endif()
     endif()
   elseif(${BOOTSTRAPPING_MODE} STREQUAL "CROSSCOMPILE")
     set(sdk_option "-sdk" "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
@@ -158,19 +171,16 @@ function(add_swift_compiler_modules_library name)
   endforeach()
 
   # Create a static library containing all module object files.
+  if (XCODE)
+    # Xcode does not compile libraries that contain only object files.
+    # Therefore, it fails to create the static library. As a workaround,
+    # we add an empty source file force_lib.c to the target.
+    set(all_obj_files force_lib.c ${all_obj_files})
+  endif()
   add_library(${name} STATIC ${all_obj_files})
   add_dependencies(${name} ${all_module_targets})
   set_target_properties(${name} PROPERTIES LINKER_LANGUAGE CXX)
   set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${name})
-
-  # Xcode does not compile libraries that contain only object files.
-  # Therefore, it fails to create the static library. As a workaround,
-  # we add a dummy script phase to the target.
-  if (XCODE)
-    add_custom_command(TARGET ${name} POST_BUILD 
-      COMMAND ""
-      COMMENT "Dummy script phase to force building this target")
-  endif()
 endfunction()
 
 
@@ -212,6 +222,10 @@ else()
         list(APPEND b0_deps swiftDarwin-bootstrapping0)
         list(APPEND b1_deps swiftDarwin-bootstrapping1)
       endif()
+      if(${SWIFT_HOST_VARIANT_SDK} IN_LIST SWIFT_LIBSTDCXX_PLATFORMS)
+        list(APPEND b0_deps copy-libstdcxx-modulemap-bootstrapping0 copy-libstdcxx-header-bootstrapping0)
+        list(APPEND b1_deps copy-libstdcxx-modulemap-bootstrapping1 copy-libstdcxx-header-bootstrapping1)
+      endif()
     endif()
     if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
       set(platform ${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR})
@@ -249,25 +263,4 @@ else()
     message(FATAL_ERROR "Unknown BOOTSTRAPPING_MODE '${BOOTSTRAPPING_MODE}'")
   endif()
 
-endif()
-
-# Configure 'SwiftCompilerModules' SwiftPM package. The 'Package.swift' will
-# be created at '${build_dir}/SwiftCompilerSources/Package.swift' and can be
-# built with 'swift-build'.
-# Note that this SwiftPM package itself is just for development purposes, and
-# is not actually used for the compiler building. 
-set(swiftcompiler_source_dir_name "_Sources")
-configure_file(Package.swift.in
-  "${CMAKE_CURRENT_BINARY_DIR}/Package.swift" @ONLY)
-# SwiftPM requires all sources are inside the directory of 'Package.swift'.
-# Create symlinks to the actual source directories.
-execute_process(COMMAND
-  "${CMAKE_COMMAND}" -E create_symlink
-  "${CMAKE_CURRENT_SOURCE_DIR}/Sources"
-  "${CMAKE_CURRENT_BINARY_DIR}/${swiftcompiler_source_dir_name}")
-if(SWIFT_BUILD_REGEX_PARSER_IN_COMPILER)
-  execute_process(COMMAND
-    "${CMAKE_COMMAND}" -E create_symlink
-    "${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}/Sources/_RegexParser"
-    "${CMAKE_CURRENT_BINARY_DIR}/_RegexParser_Sources")
 endif()

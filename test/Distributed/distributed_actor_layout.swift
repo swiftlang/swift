@@ -32,3 +32,18 @@ public distributed actor MyActor {
     self.actorSystem = actorSystem
   }
 }
+
+// CHECK: %T27distributed_actor_accessors10MyActorIntC = type <{ %swift.refcounted, %swift.defaultactor }>
+//
+// This does not have the concrete fields in the IR type because the LocalTestingDistributedActorSystem
+// is declared in Distributed, which means that it is compiled with library evolution turned on,
+// which causes the type to be laid out at runtime.
+@available(SwiftStdlib 5.7, *)
+public distributed actor MyActorInt {
+  public typealias ActorSystem = LocalTestingDistributedActorSystem
+  var field: String = ""
+
+  init(actorSystem: LocalTestingDistributedActorSystem) {
+    self.actorSystem = actorSystem
+  }
+}

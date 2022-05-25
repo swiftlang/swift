@@ -815,6 +815,13 @@ void Lexer::lexOperatorIdentifier() {
         rangeContainsPlaceholderEnd(CurPtr + 2, BufferEnd)) {
       break;
     }
+
+    // If we are lexing a `/.../` regex literal, we don't consider `/` to be an
+    // operator character.
+    if (ForwardSlashRegexMode != LexerForwardSlashRegexMode::None &&
+        *CurPtr == '/') {
+      break;
+    }
   } while (advanceIfValidContinuationOfOperator(CurPtr, BufferEnd));
 
   if (CurPtr-TokStart > 2) {
@@ -1993,23 +2000,11 @@ bool Lexer::tryLexRegexLiteral(const char *TokStart) {
     //   2
     // }
     //
-    // This takes advantage of the consistent operator spacing rule. We also
-    // need to ban ')' to avoid ambiguity with unapplied operator references e.g
-    // `reduce(1, /)`. This would be invalid regex syntax anyways. Note this
-    // doesn't totally save us from e.g `foo(/, 0)`, but it should at least
-    // help, and it ensures users can always surround their operator ref in
-    // parens `(/)` to fix the issue.
+    // This takes advantage of the consistent operator spacing rule.
     // TODO: This heuristic should be sunk into the Swift library once we have a
     // way of doing fix-its from there.
     auto *RegexContentStart = TokStart + 1;
     switch (*RegexContentStart) {
-    case ')': {
-      if (!MustBeRegex)
-        return false;
-
-      // ')' is invalid anyway, so we can let the parser diagnose it.
-      break;
-    }
     case ' ':
     case '\t': {
       if (!MustBeRegex)
@@ -2065,6 +2060,48 @@ bool Lexer::tryLexRegexLiteral(const char *TokStart) {
     Ptr--;
   }
 
+  // If we're tentatively lexing `/.../`, scan to make sure we don't have any
+  // unbalanced ')'s. This helps avoid ambiguity with unapplied operator
+  // references e.g `reduce(1, /)` and `foo(/, 0) / 2`. This would be invalid
+  // regex syntax anyways. This ensures users can surround their operator ref
+  // in parens `(/)` to fix the issue. This also applies to prefix operators
+  // that can be disambiguated as e.g `(/S.foo)`. Note we need to track whether
+  // or not we're in a custom character class `[...]`, as parens are literal
+  // there.
+  // TODO: This should be sunk into the Swift library.
+  if (IsForwardSlash && !MustBeRegex) {
+    unsigned CharClassDepth = 0;
+    unsigned GroupDepth = 0;
+    for (auto *Cursor = TokStart + 1; Cursor < Ptr - 1; Cursor++) {
+      switch (*Cursor) {
+      case '\\':
+        // Skip over the next character of an escape.
+        Cursor++;
+        break;
+      case '(':
+        if (CharClassDepth == 0)
+          GroupDepth += 1;
+        break;
+      case ')':
+        if (CharClassDepth != 0)
+          break;
+
+        // Invalid, so bail.
+        if (GroupDepth == 0)
+          return false;
+
+        GroupDepth -= 1;
+        break;
+      case '[':
+        CharClassDepth += 1;
+        break;
+      case ']':
+        if (CharClassDepth != 0)
+          CharClassDepth -= 1;
+      }
+    }
+  }
+
   // Update to point to where we ended regex lexing.
   assert(Ptr > TokStart && Ptr <= BufferEnd);
   CurPtr = Ptr;
@@ -2078,18 +2115,6 @@ bool Lexer::tryLexRegexLiteral(const char *TokStart) {
   // We either had a successful lex, or something that was recoverable.
   formToken(tok::regex_literal, TokStart);
   return true;
-}
-
-void Lexer::tryLexForwardSlashRegexLiteralFrom(State S, bool mustBeRegex) {
-  if (!LangOpts.EnableBareSlashRegexLiterals)
-    return;
-
-  // Try re-lex with forward slash enabled.
-  llvm::SaveAndRestore<LexerForwardSlashRegexMode> RegexLexingScope(
-      ForwardSlashRegexMode, mustBeRegex
-                                 ? LexerForwardSlashRegexMode::Always
-                                 : LexerForwardSlashRegexMode::Tentative);
-  restoreState(S, /*enableDiagnostics*/ true);
 }
 
 /// lexEscapedIdentifier:
@@ -2682,6 +2707,16 @@ Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc,
   // we need to lex just the comment token.
   Lexer L(FakeLangOpts, SM, BufferID, nullptr, LexerMode::Swift,
           HashbangMode::Allowed, CRM);
+
+  if (SM.isRegexLiteralStart(Loc)) {
+    // HACK: If this was previously lexed as a regex literal, make sure we
+    // re-lex with forward slash regex literals enabled to make sure we get an
+    // accurate length. We can force EnableExperimentalStringProcessing on, as
+    // we know it must have been enabled to parse the regex in the first place.
+    FakeLangOpts.EnableExperimentalStringProcessing = true;
+    L.ForwardSlashRegexMode = LexerForwardSlashRegexMode::Always;
+  }
+
   L.restoreState(State(Loc));
   return L.peekNextToken();
 }

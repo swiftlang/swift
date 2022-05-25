@@ -270,10 +270,6 @@ def pch_output_dir: Separate<["-"], "pch-output-dir">,
   Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
   HelpText<"Directory to persist automatically created precompiled bridging headers">;
 
-def async_main: Flag<["-"], "async-main">,
-    Flags<[FrontendOption]>,
-    HelpText<"Resolve main function as if it were called from an asynchronous context">;
-
 // FIXME: Unhide this once it doesn't depend on an output file map.
 def incremental : Flag<["-"], "incremental">,
   Flags<[NoInteractiveOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
@@ -622,18 +618,6 @@ def no_emit_module_separately:
   Flags<[NoInteractiveOption, HelpHidden]>,
   HelpText<"Force using merge-module as the incremental build mode (new Driver only)">;
 
-def requirement_machine_protocol_signatures_EQ : Joined<["-"], "requirement-machine-protocol-signatures=">,
-  Flags<[FrontendOption]>,
-  HelpText<"Control usage of experimental protocol requirement signature minimization: 'on', 'off', 'verify' or 'check'">;
-
-def requirement_machine_abstract_signatures_EQ : Joined<["-"], "requirement-machine-abstract-signatures=">,
-  Flags<[FrontendOption]>,
-  HelpText<"Control usage of experimental generic signature minimization: 'on', 'off', 'verify' or 'check'">;
-
-def requirement_machine_inferred_signatures_EQ : Joined<["-"], "requirement-machine-inferred-signatures=">,
-  Flags<[FrontendOption]>,
-  HelpText<"Control usage of experimental generic signature minimization: 'on', 'off', 'verify' or 'check'">;
-
 def experimental_hermetic_seal_at_link:
   Flag<["-"], "experimental-hermetic-seal-at-link">,
   Flags<[FrontendOption, HelpHidden]>,
@@ -816,6 +800,10 @@ def Oplayground : Flag<["-"], "Oplayground">, Group<O_Group>,
   Flags<[HelpHidden, FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Compile with optimizations appropriate for a playground">;
 
+def EnbaleDefaultCMO : Flag<["-"], "enable-default-cmo">,
+  Flags<[HelpHidden, FrontendOption]>,
+  HelpText<"Perform conservative cross-module optimization">;
+
 def CrossModuleOptimization : Flag<["-"], "cross-module-optimization">,
   Flags<[HelpHidden, FrontendOption]>,
   HelpText<"Perform cross-module optimization">;
@@ -857,6 +845,9 @@ def debug_prefix_map : Separate<["-"], "debug-prefix-map">,
 def coverage_prefix_map : Separate<["-"], "coverage-prefix-map">,
   Flags<[FrontendOption]>,
   HelpText<"Remap source paths in coverage info">, MetaVarName<"<prefix=replacement>">;
+def file_prefix_map : Separate<["-"], "file-prefix-map">,
+  Flags<[FrontendOption]>,
+  HelpText<"Remap source paths in debug, coverage, and index info">, MetaVarName<"<prefix=replacement>">;
 
 def file_compilation_dir : Separate<["-"], "file-compilation-dir">,
   Flags<[FrontendOption]>, MetaVarName<"<path>">,

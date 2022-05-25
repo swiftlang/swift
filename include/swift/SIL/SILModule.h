@@ -38,7 +38,6 @@
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/SILWitnessTable.h"
 #include "swift/SIL/TypeLowering.h"
-#include "swift/TBDGen/TBDGen.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/MapVector.h"
@@ -304,6 +303,9 @@ private:
   /// This is the set of undef values we've created, for uniquing purposes.
   llvm::DenseMap<SILType, SILUndef *> UndefValues;
 
+  llvm::DenseMap<std::pair<Decl *, VarDecl *>, unsigned> fieldIndices;
+  llvm::DenseMap<EnumElementDecl *, unsigned> enumCaseIndices;
+
   /// The stage of processing this module is at.
   SILStage Stage;
 
@@ -387,10 +389,6 @@ private:
 
   /// Folding set for key path patterns.
   llvm::FoldingSet<KeyPathPattern> KeyPathPatterns;
-  
-  /// Symbols (e.g. function names) which are made public by the
-  /// CrossModuleOptimization pass and therefore must be included in the TBD file.
-  TBDSymbolSetPtr publicCMOSymbols;
 
 public:
   ~SILModule();
@@ -452,6 +450,19 @@ public:
   ///
   /// This should only be the case during parsing or deserialization.
   bool hasUnresolvedOpenedArchetypeDefinitions();
+
+  /// Get a unique index for a struct or class field in layout order.
+  ///
+  /// Precondition: \p decl must be a non-resilient struct or class.
+  ///
+  /// Precondition: \p field must be a stored property declared in \p decl,
+  ///               not in a superclass.
+  ///
+  /// Postcondition: The returned index is unique across all properties in the
+  ///                object, including properties declared in a superclass.
+  unsigned getFieldIndex(NominalTypeDecl *decl, VarDecl *property);
+
+  unsigned getCaseIndex(EnumElementDecl *enumElement);
 
   /// Called by SILBuilder whenever a new instruction is created and inserted.
   void notifyAddedInstruction(SILInstruction *inst);
@@ -559,12 +570,6 @@ public:
   bool isOptimizedOnoneSupportModule() const;
 
   const SILOptions &getOptions() const { return Options; }
-
-  /// Return the symbols (e.g. function names) which are made public by the
-  /// CrossModuleOptimization pass and therefore must be included in the TBD file.
-  TBDSymbolSetPtr getPublicCMOSymbols() { return publicCMOSymbols; }
-
-  void addPublicCMOSymbol(StringRef symbol);
 
   using iterator = FunctionListType::iterator;
   using const_iterator = FunctionListType::const_iterator;

@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=off
-// RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=on 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
 protocol P1 { 
   func p1()
@@ -74,7 +74,7 @@ struct V<T : Canidae> {}
 
 // CHECK-LABEL: .inferSuperclassRequirement1@
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : Canidae>
-func inferSuperclassRequirement1<T : Carnivora>(
+func inferSuperclassRequirement1<T : Carnivora>( // expected-warning {{redundant superclass constraint 'T' : 'Carnivora'}}
 	_ v: V<T>) {}
 
 // CHECK-LABEL: .inferSuperclassRequirement2@
@@ -114,7 +114,6 @@ func inferSameType1<T, U>(_ x: Model_P3_P4_Eq<T, U>) {
 
 func inferSameType2<T : P3, U : P4>(_: T, _: U) where U.P4Assoc : P2, T.P3Assoc == U.P4Assoc {}
 // expected-warning@-1{{redundant conformance constraint 'U.P4Assoc' : 'P2'}}
-// expected-note@-2{{conformance constraint 'U.P4Assoc' : 'P2' implied here}}
 
 func inferSameType3<T : PCommonAssoc1>(_: T) where T.CommonAssoc : P1, T : PCommonAssoc2 {
 }
@@ -133,8 +132,8 @@ protocol P7 : P6 {
 
 // CHECK-LABEL: P7@
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P7, τ_0_0.[P6]AssocP6.[P5]Element : P6, τ_0_0.[P6]AssocP6.[P5]Element == τ_0_0.[P7]AssocP7.[P6]AssocP6.[P5]Element>
-extension P7 where AssocP6.Element : P6, // expected-note{{conformance constraint 'Self.AssocP7.AssocP6.Element' : 'P6' implied here}}
-        AssocP7.AssocP6.Element : P6, // expected-warning{{redundant conformance constraint 'Self.AssocP7.AssocP6.Element' : 'P6'}}
+extension P7 where AssocP6.Element : P6, // expected-warning{{redundant conformance constraint 'Self.AssocP6.Element' : 'P6'}}
+        AssocP7.AssocP6.Element : P6,
         AssocP6.Element == AssocP7.AssocP6.Element {
   func nestedSameType1() { }
 }
@@ -162,7 +161,6 @@ func sameTypeConcrete1<T : P9 & P10>(_: T) where T.A == X3, T.C == T.B, T.C == I
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P10, τ_0_0 : P9, τ_0_0.[P8]B == X3, τ_0_0.[P10]C == X3>
 func sameTypeConcrete2<T : P9 & P10>(_: T) where T.B : X3, T.C == T.B, T.C == X3 { }
 // expected-warning@-1{{redundant superclass constraint 'T.B' : 'X3'}}
-// expected-note@-2{{superclass constraint 'T.B' : 'X3' implied here}}
 
 // Note: a standard-library-based stress test to make sure we don't inject
 // any additional requirements.
@@ -174,11 +172,14 @@ extension RangeReplaceableCollection
 	func f() { }
 }
 
+// FIXME(rqm-diagnostics): Bogus warning
+
 // CHECK-LABEL: X14.recursiveConcreteSameType
 // CHECK: Generic signature: <T, V where T == Range<Int>>
 // CHECK-NEXT: Canonical generic signature: <τ_0_0, τ_1_0 where τ_0_0 == Range<Int>>
 struct X14<T> where T.Iterator == IndexingIterator<T> {
 	func recursiveConcreteSameType<V>(_: V) where T == Range<Int> { }
+  // expected-warning@-1 {{redundant same-type constraint 'T' == 'Range<Int>'}}
 }
 
 // rdar://problem/30478915
@@ -268,10 +269,13 @@ struct X18: P18, P17 {
   typealias A = X18
 }
 
+// FIXME(rqm-diagnostics): Bogus warning
+
 // CHECK-LABEL: .X19.foo@
 // CHECK: Generic signature: <T, U where T == X18>
 struct X19<T: P18> where T == T.A {
   func foo<U>(_: U) where T == X18 { }
+  // expected-warning@-1 {{redundant same-type constraint 'T' == 'X18'}}
 }
 
 // rdar://problem/31520386

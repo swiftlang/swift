@@ -52,6 +52,7 @@
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Basic/Version.h"
 #include "clang/CodeGen/ObjectFilePCHContainerOperations.h"
+#include "clang/Driver/Driver.h"
 #include "clang/Frontend/FrontendActions.h"
 #include "clang/Frontend/Utils.h"
 #include "clang/Index/IndexingAction.h"
@@ -73,6 +74,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include <algorithm>
 #include <memory>
 
@@ -649,9 +651,15 @@ importer::getNormalInvocationArguments(
     // declarations.
     auto V = version::Version::getCurrentCompilerVersion();
     if (!V.empty()) {
+      // Note: Prior to Swift 5.7, the "Y" version component was omitted and the
+      // "X" component resided in its digits.
       invocationArgStrs.insert(invocationArgStrs.end(), {
         V.preprocessorDefinition("__SWIFT_COMPILER_VERSION",
-                                 {1000000000, /*ignored*/ 0, 1000000, 1000, 1}),
+                                 {1000000000000,   // X
+                                     1000000000,   // Y
+                                        1000000,   // Z
+                                           1000,   // a
+                                              1}), // b
       });
     }
   } else {
@@ -692,14 +700,6 @@ importer::getNormalInvocationArguments(
       invocationArgStrs.push_back((Twine("-fmodule-map-file=") + *path).str());
     } else {
       // FIXME: Emit a warning of some kind.
-    }
-
-    if (EnableCXXInterop) {
-      if (auto path =
-              getLibStdCxxModuleMapPath(searchPathOpts, triple, buffer)) {
-        invocationArgStrs.push_back(
-            (Twine("-fmodule-map-file=") + *path).str());
-      }
     }
   }
 
@@ -868,6 +868,78 @@ importer::addCommonInvocationArguments(
   for (auto extraArg : importerOpts.ExtraArgs) {
     invocationArgStrs.push_back(extraArg);
   }
+}
+
+/// On Linux, some platform libraries (glibc, libstdc++) are not modularized.
+/// We inject modulemaps for those libraries into their include directories
+/// to allow using them from Swift.
+static SmallVector<std::pair<std::string, std::string>, 16>
+getClangInvocationFileMapping(ASTContext &ctx) {
+  using Path = SmallString<128>;
+
+  const llvm::Triple &triple = ctx.LangOpts.Target;
+  // We currently only need this when building for Linux.
+  if (!triple.isOSLinux())
+    return {};
+
+  auto clangDiags = clang::CompilerInstance::createDiagnostics(
+      new clang::DiagnosticOptions());
+  clang::driver::Driver clangDriver(ctx.ClangImporterOpts.clangPath,
+                                    triple.str(), *clangDiags);
+  auto cxxStdlibDirs =
+      clangDriver.getLibStdCxxIncludePaths(llvm::opt::InputArgList(), triple);
+  if (cxxStdlibDirs.empty()) {
+    ctx.Diags.diagnose(SourceLoc(), diag::libstdcxx_not_found, triple.str());
+    return {};
+  }
+  Path cxxStdlibDir(cxxStdlibDirs.front());
+  // VFS does not allow mapping paths that contain `../` or `./`.
+  llvm::sys::path::remove_dots(cxxStdlibDir, /*remove_dot_dot=*/true);
+
+  // Currently only a modulemap for libstdc++ is injected.
+  if (!ctx.LangOpts.EnableCXXInterop)
+    return {};
+
+  Path actualModuleMapPath;
+  Path buffer;
+  if (auto path = getLibStdCxxModuleMapPath(ctx.SearchPathOpts, triple, buffer))
+    actualModuleMapPath = path.getValue();
+  else
+    return {};
+
+  // Only inject the module map if it actually exists. It may not, for example
+  // if `swiftc -target x86_64-unknown-linux-gnu -emit-ir` is invoked using
+  // a Swift compiler not built for Linux targets.
+  if (!llvm::sys::fs::exists(actualModuleMapPath))
+    // FIXME: emit a warning of some kind.
+    return {};
+
+  // TODO: remove the libstdcxx.h header and reference all libstdc++ headers
+  // directly from the modulemap.
+  Path actualHeaderPath = actualModuleMapPath;
+  llvm::sys::path::remove_filename(actualHeaderPath);
+  llvm::sys::path::append(actualHeaderPath, "libstdcxx.h");
+
+  // Inject a modulemap into VFS for the libstdc++ directory.
+  // Only inject the module map if the module does not already exist at
+  // {sysroot}/usr/include/module.{map,modulemap}.
+  Path injectedModuleMapLegacyPath(cxxStdlibDir);
+  llvm::sys::path::append(injectedModuleMapLegacyPath, "module.map");
+  if (llvm::sys::fs::exists(injectedModuleMapLegacyPath))
+    return {};
+
+  Path injectedModuleMapPath(cxxStdlibDir);
+  llvm::sys::path::append(injectedModuleMapPath, "module.modulemap");
+  if (llvm::sys::fs::exists(injectedModuleMapPath))
+    return {};
+
+  Path injectedHeaderPath(cxxStdlibDir);
+  llvm::sys::path::append(injectedHeaderPath, "libstdcxx.h");
+
+  return {
+      {std::string(injectedModuleMapPath), std::string(actualModuleMapPath)},
+      {std::string(injectedHeaderPath), std::string(actualHeaderPath)},
+  };
 }
 
 bool ClangImporter::canReadPCH(StringRef PCHFilename) {
@@ -1122,9 +1194,10 @@ ClangImporter::create(ASTContext &ctx,
     }
   }
 
+  auto fileMapping = getClangInvocationFileMapping(ctx);
   // Wrap Swift's FS to allow Clang to override the working directory
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS =
-      llvm::vfs::RedirectingFileSystem::create({}, true,
+      llvm::vfs::RedirectingFileSystem::create(fileMapping, true,
                                                *ctx.SourceMgr.getFileSystem());
 
   // Create a new Clang compiler invocation.
@@ -2177,9 +2250,10 @@ bool PlatformAvailability::isPlatformRelevant(StringRef name) const {
     return name == "ios" || name == "ios_app_extension";
 
   case PlatformKind::macCatalyst:
+    return name == "ios" || name == "maccatalyst";
   case PlatformKind::macCatalystApplicationExtension:
-    // ClangImporter does not yet support macCatalyst.
-    return false;
+    return name == "ios" || name == "ios_app_extension" ||
+           name == "maccatalyst" || name == "maccatalyst_app_extension";
 
   case PlatformKind::tvOS:
     return name == "tvos";
@@ -2725,7 +2799,7 @@ static bool isVisibleFromModule(const ClangModuleUnit *ModuleFilter,
   // Handle redeclarable Clang decls by checking each redeclaration.
   bool IsTagDecl = isa<clang::TagDecl>(D);
   if (!(IsTagDecl || isa<clang::FunctionDecl>(D) || isa<clang::VarDecl>(D) ||
-        isa<clang::TypedefNameDecl>(D))) {
+        isa<clang::TypedefNameDecl>(D) || isa<clang::NamespaceDecl>(D))) {
     return false;
   }
 
@@ -4330,9 +4404,15 @@ ClangDirectLookupRequest::evaluate(Evaluator &evaluator,
   if (auto spec = dyn_cast<clang::ClassTemplateSpecializationDecl>(clangDecl))
     return lookupInClassTemplateSpecialization(ctx, spec, desc.name);
 
-  auto *clangModule =
-      getClangOwningModule(clangDecl, clangDecl->getASTContext());
-  auto *lookupTable = ctx.getClangModuleLoader()->findLookupTable(clangModule);
+  SwiftLookupTable *lookupTable = nullptr;
+  if (isa<clang::NamespaceDecl>(clangDecl)) {
+    // DeclContext of a namespace imported into Swift is the __ObjC module.
+    lookupTable = ctx.getClangModuleLoader()->findLookupTable(nullptr);
+  } else {
+    auto *clangModule =
+        getClangOwningModule(clangDecl, clangDecl->getASTContext());
+    lookupTable = ctx.getClangModuleLoader()->findLookupTable(clangModule);
+  }
 
   auto foundDecls = lookupTable->lookup(
       SerializedSwiftName(desc.name.getBaseName()), EffectiveClangContext());
@@ -5655,19 +5735,31 @@ ClangImporter::getCXXFunctionTemplateSpecialization(SubstitutionMap subst,
 }
 
 bool ClangImporter::isCXXMethodMutating(const clang::CXXMethodDecl *method) {
-  return isa<clang::CXXConstructorDecl>(method) || !method->isConst() ||
-         // method->getParent()->hasMutableFields() ||
-         // FIXME(rdar://91961524): figure out a way to handle mutable fields
-         // without breaking classes from the C++ standard library (e.g.
-         // `std::string` which has a mutable member in old libstdc++ version
-         // used on CentOS 7)
-         (method->hasAttrs() &&
-          llvm::any_of(method->getAttrs(), [](clang::Attr *a) {
-            if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(a)) {
-              return swiftAttr->getAttribute() == "mutating";
-            }
-            return false;
-          }));
+  if (isa<clang::CXXConstructorDecl>(method) || !method->isConst())
+    return true;
+  if (isAnnotatedWith(method, "mutating"))
+    return true;
+  if (method->getParent()->hasMutableFields()) {
+    if (isAnnotatedWith(method, "nonmutating"))
+      return false;
+    // FIXME(rdar://91961524): figure out a way to handle mutable fields
+    // without breaking classes from the C++ standard library (e.g.
+    // `std::string` which has a mutable member in old libstdc++ version used on
+    // CentOS 7)
+    return false;
+  }
+  return false;
+}
+
+bool ClangImporter::isAnnotatedWith(const clang::CXXMethodDecl *method,
+                                    StringRef attr) {
+  return method->hasAttrs() &&
+         llvm::any_of(method->getAttrs(), [attr](clang::Attr *a) {
+           if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(a)) {
+             return swiftAttr->getAttribute() == attr;
+           }
+           return false;
+         });
 }
 
 SwiftLookupTable *

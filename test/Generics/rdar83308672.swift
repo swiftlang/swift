@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -debug-generic-signatures -requirement-machine-protocol-signatures=on 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -debug-generic-signatures -warn-redundant-requirements 2>&1 | %FileCheck %s
 
 // CHECK: rdar83308672.(file).A@
 // CHECK-NEXT: Requirement signature: <Self where Self == Self.[A]X.[P1]T, Self.[A]X : P1, Self.[A]Y : P2>

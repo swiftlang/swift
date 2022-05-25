@@ -58,7 +58,8 @@ void actor_note_job_queue(HeapObject *actor, Job *first,
 // Task trace calls.
 
 void task_create(AsyncTask *task, AsyncTask *parent, TaskGroup *group,
-                 AsyncLet *asyncLet);
+                 AsyncLet *asyncLet, uint8_t jobPriority, bool isChildTask,
+                 bool isFuture, bool isGroupChildTask, bool isAsyncLetTask);
 
 void task_destroy(AsyncTask *task);
 
@@ -103,9 +104,9 @@ struct job_run_info {
 // call to task_run_end.  Any information we want to log must be
 // extracted from the job when we start to run it because execution
 // will invalidate the job.
-job_run_info job_run_begin(Job *job, ExecutorRef *executor);
+job_run_info job_run_begin(Job *job);
 
-void job_run_end(ExecutorRef *executor, job_run_info info);
+void job_run_end(job_run_info info);
 
 } // namespace trace
 } // namespace concurrency

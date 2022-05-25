@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=on
-// RUN: %target-swift-frontend -debug-generic-signatures -typecheck %s -requirement-machine-protocol-signatures=on 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: %target-swift-frontend -debug-generic-signatures -typecheck %s 2>&1 | %FileCheck %s
 
 // CHECK-LABEL: Requirement signature: <Self where Self == Self.[Adjoint]Dual.[Adjoint]Dual, Self.[Adjoint]Dual : Adjoint>
 public protocol Adjoint {

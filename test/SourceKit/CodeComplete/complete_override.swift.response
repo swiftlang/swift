@@ -2,16 +2,6 @@
   key.results: [
     {
       key.kind: source.lang.swift.keyword,
-      key.name: "_compilerInitialized",
-      key.sourcetext: "_compilerInitialized",
-      key.description: "_compilerInitialized",
-      key.typename: "",
-      key.context: source.codecompletion.context.none,
-      key.typerelation: source.codecompletion.typerelation.notapplicable,
-      key.num_bytes_to_erase: 0
-    },
-    {
-      key.kind: source.lang.swift.keyword,
       key.name: "_const",
       key.sourcetext: "_const",
       key.description: "_const",
@@ -22,9 +12,9 @@
     },
     {
       key.kind: source.lang.swift.keyword,
-      key.name: "_local",
-      key.sourcetext: "_local",
-      key.description: "_local",
+      key.name: "actor",
+      key.sourcetext: "actor",
+      key.description: "actor",
       key.typename: "",
       key.context: source.codecompletion.context.none,
       key.typerelation: source.codecompletion.typerelation.notapplicable,

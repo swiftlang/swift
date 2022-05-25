@@ -163,7 +163,10 @@ public:
     /// type sequence
     HasTypeSequence = 0x1000,
 
-    Last_Property = HasTypeSequence
+    /// This type contains a parameterized existential type \c any P<T>.
+    HasParameterizedExistential = 0x2000,
+
+    Last_Property = HasParameterizedExistential
   };
   enum { BitWidth = countBitsUsed(Property::Last_Property) };
 
@@ -222,6 +225,12 @@ public:
   bool hasPlaceholder() const { return Bits & HasPlaceholder; }
 
   bool hasTypeSequence() const { return Bits & HasTypeSequence; }
+
+  /// Does a type with these properties structurally contain a
+  /// parameterized existential type?
+  bool hasParameterizedExistential() const {
+    return Bits & HasParameterizedExistential;
+  }
 
   /// Returns the set of properties present in either set.
   friend RecursiveTypeProperties operator|(Property lhs, Property rhs) {
@@ -624,6 +633,11 @@ public:
 
   bool hasTypeSequence() const {
     return getRecursiveProperties().hasTypeSequence();
+  }
+
+  /// Determine whether the type involves a parameterized existential type.
+  bool hasParameterizedExistential() const {
+    return getRecursiveProperties().hasParameterizedExistential();
   }
 
   /// Determine whether the type involves the given opened existential
@@ -4446,6 +4460,32 @@ public:
   SILType getDirectFormalResultsType(SILModule &M,
                                      TypeExpansionContext expansion);
 
+  unsigned getNumIndirectFormalYields() const {
+    return isCoroutine() ? NumAnyIndirectFormalResults : 0;
+  }
+  /// Does this function have any formally indirect yields?
+  bool hasIndirectFormalYields() const {
+    return getNumIndirectFormalYields() != 0;
+  }
+  unsigned getNumDirectFormalYields() const {
+    return isCoroutine() ? NumAnyResults - NumAnyIndirectFormalResults : 0;
+  }
+
+  struct IndirectFormalYieldFilter {
+    bool operator()(SILYieldInfo yield) const {
+      return !yield.isFormalIndirect();
+    }
+  };
+
+  using IndirectFormalYieldIter =
+      llvm::filter_iterator<const SILYieldInfo *, IndirectFormalYieldFilter>;
+  using IndirectFormalYieldRange = iterator_range<IndirectFormalYieldIter>;
+
+  /// A range of SILYieldInfo for all formally Indirect Yields.
+  IndirectFormalYieldRange getIndirectFormalYields() const {
+    return llvm::make_filter_range(getYields(), IndirectFormalYieldFilter());
+  }
+
   /// Get a single non-address SILType for all SIL results regardless of whether
   /// they are formally indirect. The actual SIL result type of an apply
   /// instruction that calls this function depends on the current SIL stage and
@@ -5878,6 +5918,9 @@ private:
                       LayoutConstraint layout);
 };
 BEGIN_CAN_TYPE_WRAPPER(OpenedArchetypeType, ArchetypeType)
+  CanOpenedArchetypeType getRoot() const {
+    return CanOpenedArchetypeType(getPointer()->getRoot());
+  }
 END_CAN_TYPE_WRAPPER(OpenedArchetypeType, ArchetypeType)
 
 /// An archetype that represents an opaque element of a type sequence in context.

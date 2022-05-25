@@ -103,7 +103,7 @@ CodeCompletionCache::~CodeCompletionCache() {}
 ///
 /// This should be incremented any time we commit a change to the format of the
 /// cached results. This isn't expected to change very often.
-static constexpr uint32_t onDiskCompletionCacheVersion = 6; // Store completion item result types in the cache
+static constexpr uint32_t onDiskCompletionCacheVersion = 7; // Store whether a type can be used as attribute
 
 /// Deserializes CodeCompletionResults from \p in and stores them in \p V.
 /// \see writeCacheModule.
@@ -193,8 +193,9 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
       auto supertypeIndex = read32le(p);
       supertypes.push_back(getType(supertypeIndex));
     }
-    const USRBasedType *res =
-        USRBasedType::fromUSR(usr, supertypes, V.USRTypeArena);
+    auto customAttributeKinds = OptionSet<CustomAttributeKind, uint8_t>(*p++);
+    const USRBasedType *res = USRBasedType::fromUSR(
+        usr, supertypes, customAttributeKinds, V.USRTypeArena);
     knownTypes[index] = res;
     return res;
   };
@@ -381,6 +382,9 @@ static void writeCachedModule(llvm::raw_ostream &out,
     for (auto supertypeIndex : supertypeIndicies) {
       LE.write(static_cast<uint32_t>(supertypeIndex));
     }
+    OptionSet<CustomAttributeKind, uint8_t> customAttributeKinds =
+        type->getCustomAttributeKinds();
+    LE.write(static_cast<uint8_t>(customAttributeKinds.toRaw()));
     knownTypes[type] = size;
     return static_cast<uint32_t>(size);
   };

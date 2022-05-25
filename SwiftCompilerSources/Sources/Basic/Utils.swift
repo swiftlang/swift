@@ -13,6 +13,30 @@
 @_exported import BasicBridging
 
 //===----------------------------------------------------------------------===//
+//                              StringRef
+//===----------------------------------------------------------------------===//
+
+public struct StringRef : CustomStringConvertible, CustomReflectable {
+  let _bridged : BridgedStringRef
+
+  public init(bridged: BridgedStringRef) { self._bridged = bridged }
+
+  public var string: String { _bridged.string }
+  public var description: String { string }
+  public var customMirror: Mirror { Mirror(self, children: []) }
+  
+  public static func ==(lhs: StringRef, rhs: StaticString) -> Bool {
+    let lhsBuffer = UnsafeBufferPointer<UInt8>(start: lhs._bridged.data, count: Int(lhs._bridged.length))
+    return rhs.withUTF8Buffer { (rhsBuffer: UnsafeBufferPointer<UInt8>) in
+      if lhsBuffer.count != rhsBuffer.count { return false }
+      return lhsBuffer.elementsEqual(rhsBuffer, by: ==)
+    }
+  }
+  
+  public static func !=(lhs: StringRef, rhs: StaticString) -> Bool { !(lhs == rhs) }
+}
+
+//===----------------------------------------------------------------------===//
 //                            Bridging Utilities
 //===----------------------------------------------------------------------===//
 

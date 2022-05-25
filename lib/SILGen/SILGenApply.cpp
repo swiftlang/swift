@@ -3119,7 +3119,7 @@ private:
     auto emissionKind = SGFAccessKind::BorrowedObjectRead;
     for (auto param : claimedParams) {
       assert(!param.isConsumed());
-      if (param.isIndirectInGuaranteed()) {
+      if (param.isIndirectInGuaranteed() && SGF.silConv.useLoweredAddresses()) {
         emissionKind = SGFAccessKind::BorrowedAddressRead;
         break;
       }
@@ -3497,8 +3497,10 @@ static void emitBorrowedLValueRecursive(SILGenFunction &SGF,
 
   // Load if necessary.
   assert(!param.isConsumed() && "emitting borrow into consumed parameter?");
-  if (!param.isIndirectInGuaranteed() && value.getType().isAddress()) {
-    value = SGF.B.createFormalAccessLoadBorrow(loc, value);
+  if (value.getType().isAddress()) {
+    if (!param.isIndirectInGuaranteed() || !SGF.silConv.useLoweredAddresses()) {
+      value = SGF.B.createFormalAccessLoadBorrow(loc, value);
+    }
   }
 
   assert(param.getInterfaceType() == value.getType().getASTType());
@@ -3960,15 +3962,20 @@ SILGenFunction::emitBeginApply(SILLocation loc, ManagedValue fn,
   // Manage all the yielded values.
   auto yieldInfos = substFnType->getYields();
   assert(yieldValues.size() == yieldInfos.size());
+  bool useLoweredAddresses = silConv.useLoweredAddresses();
   for (auto i : indices(yieldValues)) {
     auto value = yieldValues[i];
     auto info = yieldInfos[i];
     if (info.isIndirectInOut()) {
       yields.push_back(ManagedValue::forLValue(value));
     } else if (info.isConsumed()) {
-      yields.push_back(emitManagedRValueWithCleanup(value));
+      !useLoweredAddresses && value->getType().isTrivial(getFunction())
+          ? yields.push_back(ManagedValue::forTrivialRValue(value))
+          : yields.push_back(emitManagedRValueWithCleanup(value));
     } else if (info.isGuaranteed()) {
-      yields.push_back(ManagedValue::forBorrowedRValue(value));
+      !useLoweredAddresses && value->getType().isTrivial(getFunction())
+          ? yields.push_back(ManagedValue::forTrivialRValue(value))
+          : yields.push_back(ManagedValue::forBorrowedRValue(value));
     } else {
       yields.push_back(ManagedValue::forTrivialRValue(value));
     }
@@ -4580,22 +4587,25 @@ RValue SILGenFunction::emitApply(
     rawDirectResult = rawDirectResults[0];
   }
 
-  if (!calleeTypeInfo.foreign.async) {
-    // hop back to the current executor
-    breadcrumb.emit(*this, loc);
-  }
-
   // For objc async calls, lifetime extend the args until the result plan which
   // generates `await_async_continuation`.
   // Lifetime is extended by creating unmanaged copies here and by pushing the
   // cleanups required just before the result plan is generated.
-  SmallVector<ManagedValue, 8> unmanagedCopies;
+  SmallVector<SILValue, 8> unmanagedCopies;
   if (calleeTypeInfo.foreign.async) {
     for (auto arg : args) {
       if (arg.hasCleanup()) {
         unmanagedCopies.push_back(arg.unmanagedCopy(*this, loc));
       }
     }
+    // similarly, we defer the emission of the breadcrumb until the result
+    // plan's finish method is called, because it must happen in the
+    // successors of the `await_async_continuation` terminator.
+    resultPlan->deferExecutorBreadcrumb(std::move(breadcrumb));
+
+  } else {
+    // In the ordinary case, we hop back to the current executor
+    breadcrumb.emit(*this, loc);
   }
 
   // Pop the argument scope.
@@ -4676,31 +4686,20 @@ RValue SILGenFunction::emitApply(
                               *foreignError, calleeTypeInfo.foreign.async);
   }
 
-  // For objc async calls, push cleanup to be used on throw paths in the result
-  // planner.
-  for (unsigned i : indices(unmanagedCopies)) {
-    SILValue value = unmanagedCopies[i].getValue();
-    Cleanups.pushCleanup<FixLifetimeDestroyCleanup>(value);
-    unmanagedCopies[i] = ManagedValue(value, Cleanups.getTopCleanup());
+  // For objc async calls, push cleanups to be used on
+  // both result and throw paths prior to finishing the result plan.
+  if (calleeTypeInfo.foreign.async) {
+    for (auto unmanagedCopy : unmanagedCopies) {
+      Cleanups.pushCleanup<FixLifetimeDestroyCleanup>(unmanagedCopy);
+    }
+  } else {
+    assert(unmanagedCopies.empty());
   }
 
   auto directResultsArray = makeArrayRef(directResults);
   RValue result = resultPlan->finish(*this, loc, substResultType,
                                      directResultsArray, bridgedForeignError);
   assert(directResultsArray.empty() && "didn't claim all direct results");
-
-  // For objc async calls, generate cleanup on the resume path here and forward
-  // the previously pushed cleanups.
-  if (calleeTypeInfo.foreign.async) {
-    for (auto unmanagedCopy : unmanagedCopies) {
-      auto value = unmanagedCopy.forward(*this);
-      B.emitFixLifetime(loc, value);
-      B.emitDestroyOperation(loc, value);
-    }
-
-    // hop back to the current executor
-    breadcrumb.emit(*this, loc);
-  }
 
   return result;
 }

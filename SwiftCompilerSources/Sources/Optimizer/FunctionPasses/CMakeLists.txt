@@ -15,4 +15,5 @@ swift_compiler_sources(Optimizer
   RangeDumper.swift
   ReleaseDevirtualizer.swift
   RunUnitTests.swift
+  StackPromotion.swift
 )

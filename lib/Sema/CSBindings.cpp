@@ -1993,10 +1993,16 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
   // without any contextual information, so even though `x` would get
   // bound to result type of the chain, underlying type variable wouldn't
   // be resolved, so we need to propagate holes up the conversion chain.
+  // Also propagate in code completion mode because in some cases code
+  // completion relies on type variable being a potential hole.
   if (TypeVar->getImpl().canBindToHole()) {
-    if (auto objectTy = type->getOptionalObjectType()) {
-      if (auto *typeVar = objectTy->getAs<TypeVariableType>())
-        cs.recordPotentialHole(typeVar);
+    if (srcLocator->directlyAt<OptionalEvaluationExpr>() ||
+        cs.isForCodeCompletion()) {
+      if (auto objectTy = type->getOptionalObjectType()) {
+        if (auto *typeVar = objectTy->getAs<TypeVariableType>()) {
+          cs.recordPotentialHole(typeVar);
+        }
+      }
     }
   }
 

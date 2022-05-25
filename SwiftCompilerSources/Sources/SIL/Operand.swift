@@ -99,12 +99,15 @@ public struct UseList : CollectionLikeSequence {
     self.firstOpPtr = firstOpPtr.op
   }
 
-  public var isSingleUse: Bool {
+  public var singleUse: Operand? {
     if let opPtr = firstOpPtr {
-      return Operand_nextUse(BridgedOperand(op: opPtr)).op == nil
+      if Operand_nextUse(BridgedOperand(op: opPtr)).op != nil { return nil }
+      return Operand(BridgedOperand(op: opPtr))
     }
-    return false
+    return nil
   }
+
+  public var isSingleUse: Bool { singleUse != nil }
 
   public func makeIterator() -> Iterator {
     return Iterator(currentOpPtr: firstOpPtr)

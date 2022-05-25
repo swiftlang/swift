@@ -345,8 +345,8 @@ func accessorsInFunction(_ functionParam: Int) {
 // ACCESSORS_IN_MEMBER_FUNC_2: Begin completions
 // ACCESSORS_IN_MEMBER_FUNC_2-DAG: Decl[LocalVar]/Local:            self[#AccessorsInMemberFunction#]
 // ACCESSORS_IN_MEMBER_FUNC_2-DAG: Decl[LocalVar]/Local{{(/TypeRelation\[Convertible\])?}}:            functionParam[#Int#]
-// ACCESSORS_IN_MEMBER_FUNC_2-DAG: Decl[InstanceVar]/OutNominal:    instanceVar[#Double#]
-// ACCESSORS_IN_MEMBER_FUNC_2-DAG: Decl[InstanceMethod]/OutNominal: instanceFunc({#(a): Int#})[#Float#]
+// ACCESSORS_IN_MEMBER_FUNC_2-DAG: Decl[InstanceVar]/CurrNominal:    instanceVar[#Double#]
+// ACCESSORS_IN_MEMBER_FUNC_2-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc({#(a): Int#})[#Float#]
 // ACCESSORS_IN_MEMBER_FUNC_2: End completions
 
 struct AccessorsInMemberFunction {

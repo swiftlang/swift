@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-parameterized-existential-types
+// RUN: %target-typecheck-verify-swift -enable-parameterized-existential-types -disable-availability-checking
 //
 // FIXME: Merge this file with existential_metatypes.swift once -enable-parameterized-existential-types becomes the default
 

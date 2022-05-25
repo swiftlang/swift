@@ -22,11 +22,32 @@ using namespace swift;
 using namespace ide;
 using TypeRelation = CodeCompletionResultTypeRelation;
 
+// MARK: - Utilities
+
+/// Returns the kind of attributes \c Ty can be used as.
+static OptionSet<CustomAttributeKind> getCustomAttributeKinds(Type Ty) {
+  OptionSet<CustomAttributeKind> Result;
+  if (auto NominalTy = Ty->getAs<NominalType>()) {
+    auto NominalDecl = NominalTy->getDecl();
+    if (NominalDecl->getAttrs().hasAttribute<PropertyWrapperAttr>()) {
+      Result |= CustomAttributeKind::PropertyWrapper;
+    }
+    if (NominalDecl->getAttrs().hasAttribute<ResultBuilderAttr>()) {
+      Result |= CustomAttributeKind::ResultBuilder;
+    }
+    if (NominalDecl->isGlobalActor()) {
+      Result |= CustomAttributeKind::GlobalActor;
+    }
+  }
+  return Result;
+}
+
 // MARK: - USRBasedTypeContext
 
 USRBasedTypeContext::USRBasedTypeContext(const ExpectedTypeContext *TypeContext,
                                          USRBasedTypeArena &Arena)
-    : Arena(Arena) {
+    : Arena(Arena), ExpectedCustomAttributeKinds(
+                        TypeContext->getExpectedCustomAttributeKinds()) {
 
   for (auto possibleTy : TypeContext->getPossibleTypes()) {
     ContextualTypes.emplace_back(USRBasedType::fromType(possibleTy, Arena));
@@ -63,6 +84,11 @@ USRBasedTypeContext::USRBasedTypeContext(const ExpectedTypeContext *TypeContext,
 
 TypeRelation
 USRBasedTypeContext::typeRelation(const USRBasedType *ResultType) const {
+  if (ExpectedCustomAttributeKinds) {
+    return ResultType->getCustomAttributeKinds() & ExpectedCustomAttributeKinds
+               ? TypeRelation::Convertible
+               : TypeRelation::Unrelated;
+  }
   const USRBasedType *VoidType = Arena.getVoidType();
   if (ResultType == VoidType) {
     // Void is not convertible to anything and we don't report Void <-> Void
@@ -85,7 +111,7 @@ USRBasedTypeContext::typeRelation(const USRBasedType *ResultType) const {
 
 USRBasedTypeArena::USRBasedTypeArena() {
   // '$sytD' is the USR of the Void type.
-  VoidType = USRBasedType::fromUSR("$sytD", {}, *this);
+  VoidType = USRBasedType::fromUSR("$sytD", {}, {}, *this);
 }
 
 const USRBasedType *USRBasedTypeArena::getVoidType() const { return VoidType; }
@@ -125,11 +151,12 @@ TypeRelation USRBasedType::typeRelationImpl(
 }
 
 const USRBasedType *USRBasedType::null(USRBasedTypeArena &Arena) {
-  return USRBasedType::fromUSR(/*USR=*/"", /*Supertypes=*/{}, Arena);
+  return USRBasedType::fromUSR(/*USR=*/"", /*Supertypes=*/{}, {}, Arena);
 }
 
 const USRBasedType *
 USRBasedType::fromUSR(StringRef USR, ArrayRef<const USRBasedType *> Supertypes,
+                      OptionSet<CustomAttributeKind> CustomAttributeKinds,
                       USRBasedTypeArena &Arena) {
   auto ExistingTypeIt = Arena.CanonicalTypes.find(USR);
   if (ExistingTypeIt != Arena.CanonicalTypes.end()) {
@@ -142,7 +169,7 @@ USRBasedType::fromUSR(StringRef USR, ArrayRef<const USRBasedType *> Supertypes,
   Supertypes = Supertypes.copy(Arena.Allocator);
 
   const USRBasedType *Result =
-      new (Arena.Allocator) USRBasedType(USR, Supertypes);
+      new (Arena.Allocator) USRBasedType(USR, Supertypes, CustomAttributeKinds);
   Arena.CanonicalTypes[USR] = Result;
   return Result;
 }
@@ -204,10 +231,38 @@ const USRBasedType *USRBasedType::fromType(Type Ty, USRBasedTypeArena &Arena) {
           Conformance->getProtocol()->getDeclaredInterfaceType(), Arena));
     }
   }
-  Type Superclass = Ty->getSuperclass();
+
+  // You would think that superclass + conformances form a DAG. You are wrong!
+  // We can achieve a circular supertype hierarcy with
+  //
+  // protocol Proto : Class {}
+  // class Class : Proto {}
+  //
+  // USRBasedType is not set up for this. Serialization of code completion
+  // results from global modules can't handle cycles in the supertype hierarchy
+  // because it writes the DAG leaf to root(s) and needs to know the type
+  // offsets. To get consistent results independent of where we start
+  // constructing USRBasedTypes, ignore superclasses of protocols. If we kept
+  // track of already visited types, we would get different results depending on
+  // whether we start constructing the USRBasedType hierarchy from Proto or
+  // Class.
+  // Ignoring superclasses of protocols is safe to do because USRBasedType is an
+  // under-approximation anyway.
+
+  /// If `Ty` is a class type and has a superclass, return that. In all other
+  /// cases, return null.
+  auto getSuperclass = [](Type Ty) -> Type {
+    if (isa_and_nonnull<ClassDecl>(Ty->getAnyNominal())) {
+      return Ty->getSuperclass();
+    } else {
+      return Type();
+    }
+  };
+
+  Type Superclass = getSuperclass(Ty);
   while (Superclass) {
     Supertypes.push_back(USRBasedType::fromType(Superclass, Arena));
-    Superclass = Superclass->getSuperclass();
+    Superclass = getSuperclass(Superclass);
   }
 
   assert(llvm::all_of(Supertypes, [&USR](const USRBasedType *Ty) {
@@ -223,7 +278,8 @@ const USRBasedType *USRBasedType::fromType(Type Ty, USRBasedTypeArena &Arena) {
     return ImpliedSupertypes.contains(Ty);
   });
 
-  return USRBasedType::fromUSR(USR, Supertypes, Arena);
+  return USRBasedType::fromUSR(USR, Supertypes, ::getCustomAttributeKinds(Ty),
+                               Arena);
 }
 
 TypeRelation USRBasedType::typeRelation(const USRBasedType *ResultType,
@@ -249,11 +305,33 @@ TypeRelation USRBasedTypeContext::ContextualType::typeRelation(
 
 // MARK: - CodeCompletionResultType
 
+/// Returns \c true if \p Ty is the 'Any' type or some type that is sufficiently
+/// similar to Any, like the 'Any' metatype or an optional type wrapping 'Any'.
+static bool isEssentiallyAnyType(Type Ty) {
+  while (true) {
+    if (auto MT = Ty->getAs<AnyMetatypeType>()) {
+      Ty = MT->getInstanceType();
+    } else if (auto OT = Ty->getOptionalObjectType()) {
+      Ty = OT;
+    } else {
+      break;
+    }
+  }
+  return Ty->isAny();
+}
+
 static TypeRelation calculateTypeRelation(Type Ty, Type ExpectedTy,
                                           const DeclContext &DC) {
   if (Ty.isNull() || ExpectedTy.isNull() || Ty->is<ErrorType>() ||
       ExpectedTy->is<ErrorType>())
     return TypeRelation::Unrelated;
+
+  /// Computing type relations to 'Any' is not very enlightning because
+  /// everything would be convertible to it. If the contextual type is 'Any',
+  /// just report all type relations as 'Unknown'.
+  if (isEssentiallyAnyType(ExpectedTy)) {
+    return TypeRelation::Unknown;
+  }
 
   // Equality/Conversion of GenericTypeParameterType won't account for
   // requirements – ignore them
@@ -281,6 +359,12 @@ calculateMaxTypeRelation(Type Ty, const ExpectedTypeContext &typeContext,
                          const DeclContext &DC) {
   if (Ty->isVoid() && typeContext.requiresNonVoid())
     return TypeRelation::Invalid;
+  if (typeContext.getExpectedCustomAttributeKinds()) {
+    return (getCustomAttributeKinds(Ty) &
+            typeContext.getExpectedCustomAttributeKinds())
+               ? TypeRelation::Convertible
+               : TypeRelation::Unrelated;
+  }
   if (typeContext.empty())
     return TypeRelation::Unknown;
 

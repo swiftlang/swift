@@ -2023,7 +2023,9 @@ public:
           PBD->isFullyValidated(i)
               ? &PBD->getPatternList()[i]
               : evaluateOrDefault(Ctx.evaluator,
-                                  PatternBindingEntryRequest{PBD, i}, nullptr);
+                                  PatternBindingEntryRequest{
+                                      PBD, i, LeaveClosureBodiesUnchecked},
+                                  nullptr);
       assert(entry && "No pattern binding entry?");
 
       const auto *Pat = PBD->getPattern(i);
@@ -2711,10 +2713,7 @@ public:
 
     checkInheritanceClause(PD);
 
-    if (PD->getASTContext().LangOpts.RequirementMachineProtocolSignatures
-        == RequirementMachineMode::Enabled) {
-      checkProtocolRefinementRequirements(PD);
-    }
+    checkProtocolRefinementRequirements(PD);
 
     TypeChecker::checkDeclCircularity(PD);
     if (PD->isResilient())
@@ -2745,20 +2744,12 @@ public:
     }
 
     if (!reqSig.getErrors()) {
-      if (getASTContext().LangOpts.RequirementMachineProtocolSignatures ==
-          RequirementMachineMode::Disabled) {
-    #ifndef NDEBUG
-        // The GenericSignatureBuilder outputs incorrectly-minimized signatures
-        // sometimes, so only check invariants in asserts builds.
-        PD->getGenericSignature().verify(reqSig.getRequirements());
-    #endif
-      } else {
-        // When using the Requirement Machine, always verify signatures.
-        // An incorrect signature indicates a serious problem which can cause
-        // miscompiles or inadvertent ABI dependencies on compiler bugs, so
-        // we really want to avoid letting one slip by.
-        PD->getGenericSignature().verify(reqSig.getRequirements());
-      }
+      // Always verify signatures, even if building without asserts.
+      //
+      // An incorrect signature indicates a serious problem which can cause
+      // miscompiles or inadvertent ABI dependencies on compiler bugs, so
+      // we really want to avoid letting one slip by.
+      PD->getGenericSignature().verify(reqSig.getRequirements());
     }
 
     checkExplicitAvailability(PD);

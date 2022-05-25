@@ -57,6 +57,7 @@
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/Module.h"
 #include "clang/Basic/SourceManager.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ConvertUTF.h"
@@ -107,6 +108,17 @@ static bool isPublicOrUsableFromInline(Type ty) {
   });
 }
 
+static bool isPrespecilizationDeclWithTarget(const ValueDecl *vd) {
+  // Add exported prespecialized symbols.
+  for (auto *attr : vd->getAttrs().getAttributes<SpecializeAttr>()) {
+    if (!attr->isExported())
+      continue;
+    if (auto *targetFun = attr->getTargetFunctionDecl(vd))
+      return true;
+  }
+  return false;
+}
+
 static bool contributesToParentTypeStorage(const AbstractStorageDecl *ASD) {
   auto *DC = ASD->getDeclContext()->getAsDecl();
   if (!DC) return false;
@@ -144,6 +156,8 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
       PrintOptions::FunctionRepresentationMode::Full;
   result.AlwaysTryPrintParameterLabels = true;
   result.PrintSPIs = printSPIs;
+  result.PrintExplicitAny = true;
+  result.DesugarExistentialConstraint = true;
 
   // We should print __consuming, __owned, etc for the module interface file.
   result.SkipUnderscoredKeywords = false;
@@ -177,9 +191,11 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
       if (!options.PrintSPIs && D->isSPI())
         return false;
 
-      // Skip anything that isn't 'public' or '@usableFromInline'.
+      // Skip anything that isn't 'public' or '@usableFromInline' or has a
+      // _specialize attribute with a targetFunction parameter.
       if (auto *VD = dyn_cast<ValueDecl>(D)) {
-        if (!isPublicOrUsableFromInline(VD)) {
+        if (!isPublicOrUsableFromInline(VD) &&
+            !isPrespecilizationDeclWithTarget(VD)) {
           // We do want to print private stored properties, without their
           // original names present.
           if (auto *ASD = dyn_cast<AbstractStorageDecl>(VD))
@@ -6085,6 +6101,11 @@ public:
   }
 
   void visitSILBoxType(SILBoxType *T) {
+    // Print attributes.
+    if (T->getLayout()->capturesGenericEnvironment()) {
+      Printer << "@captures_generics ";
+    }
+    
     {
       // A box layout has its own independent generic environment. Don't try
       // to print it with the environment's generic params.
@@ -6192,7 +6213,16 @@ public:
     if (Options.PrintExplicitAny)
       Printer << "any ";
 
-    visit(T->getConstraintType());
+    // FIXME: The desugared type is used here only to support
+    // existential types with protocol typealiases in Swift
+    // interfaces. Verifying that the underlying type of a
+    // protocol typealias is a constriant type is fundamentally
+    // circular, so the desugared type should be written in source.
+    if (Options.DesugarExistentialConstraint) {
+      visit(T->getConstraintType()->getDesugaredType());
+    } else {
+      visit(T->getConstraintType());
+    }
   }
 
   void visitLValueType(LValueType *T) {
@@ -6368,10 +6398,16 @@ public:
 
       // Print based on the type.
       Printer << "some ";
-      if (auto inheritedType = decl->getInherited().front().getType())
-        inheritedType->print(Printer, Options);
-      else
+      if (!decl->getConformingProtocols().empty()) {
+        llvm::interleave(decl->getConformingProtocols(), Printer, [&](ProtocolDecl *proto){
+          if (auto printType = proto->getDeclaredType())
+            printType->print(Printer, Options);
+          else
+            Printer << proto->getNameStr();
+        }, " & ");
+      } else {
         Printer << "Any";
+      }
       return;
     }
 

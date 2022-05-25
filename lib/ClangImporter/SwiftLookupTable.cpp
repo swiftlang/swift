@@ -1922,6 +1922,30 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
     }
   }
 
+  // Class template instantiations are imported lazily, however, the lookup
+  // table must include their mangled name (__CxxTemplateInst...) to make it
+  // possible to find these decls during deserialization. For any C++ typedef
+  // that defines a name for a class template instantiation (e.g. std::string),
+  // import the mangled name of this instantiation, and add it to the table.
+  if (auto typedefNameDecl = dyn_cast<clang::TypedefNameDecl>(named)) {
+    auto underlyingDecl = typedefNameDecl->getUnderlyingType()->getAsTagDecl();
+
+    if (auto specializationDecl =
+            dyn_cast_or_null<clang::ClassTemplateSpecializationDecl>(
+                underlyingDecl)) {
+      auto name = nameImporter.importName(specializationDecl, currentVersion);
+
+      // Avoid adding duplicate entries into the table.
+      auto existingEntries =
+          table.lookup(DeclBaseName(name.getDeclName().getBaseName()),
+                       name.getEffectiveContext());
+      if (existingEntries.empty()) {
+        table.addEntry(name.getDeclName(), specializationDecl,
+                       name.getEffectiveContext());
+      }
+    }
+  }
+
   // Walk the members of any context that can have nested members.
   if (isa<clang::TagDecl>(named) || isa<clang::ObjCInterfaceDecl>(named) ||
       isa<clang::ObjCProtocolDecl>(named) ||

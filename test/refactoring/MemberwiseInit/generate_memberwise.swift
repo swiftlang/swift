@@ -8,6 +8,15 @@ class Person {
   lazy var idea: Idea = { fatalError() }()
   var location: () -> Place = { fatalError() }
   var secondLocation: (() -> Place)!
+  @MyWrapper var wrapped: String = ""
+  var computed: String { "hi" }
+  var getSet: String {
+    get { "hi" }
+    set {}
+  }
+  var didSet: String = "ds" {
+    didSet { print("didSet") }
+  }
 }
 
 struct Place {
@@ -20,6 +29,8 @@ struct Place {
   let postalCode: Int
   let plusFour: Int?
   let callback: Callback
+  @MyWrapper var wrapped: String
+  var `protocol`: String
 }
 
 protocol Thing {
@@ -30,13 +41,26 @@ enum Idea {
   var subject: String { fatalError() }
 }
 
+struct OnlyComputed {
+  lazy var idea: Idea = { fatalError() }()
+  var computed: String { "hi" }
+}
+
+@propertyWrapper
+struct MyWrapper {
+  let wrappedValue: String
+}
+
 // RUN: %empty-directory(%t.result)
 // RUN: %refactor -memberwise-init -source-filename %s -pos=1:8 > %t.result/generate_memberwise.swift
 // RUN: diff -u %S/Outputs/generate_memberwise/class_members.swift.expected %t.result/generate_memberwise.swift
 
-// RUN: %refactor -memberwise-init -source-filename %s -pos=13:8 > %t.result/struct_members.swift
+// RUN: %refactor -memberwise-init -source-filename %s -pos=22:8 > %t.result/struct_members.swift
 // RUN: diff -u %S/Outputs/generate_memberwise/struct_members.swift.expected %t.result/struct_members.swift
 
-// RUN: not %refactor -memberwise-init -source-filename %s -pos=21:10 > %t.result/protocol_members.swift
-// RUN: not %refactor -memberwise-init -source-filename %s -pos=25:6 > %t.result/enum_members.swift
+// RUN: %refactor -memberwise-init -source-filename %s -pos=44:8 > %t.result/only_computed_members.swift
+// RUN: diff -u %S/Outputs/generate_memberwise/only_computed_members.swift.expected %t.result/only_computed_members.swift
+
+// RUN: not %refactor -memberwise-init -source-filename %s -pos=36:10 > %t.result/protocol_members.swift
+// RUN: not %refactor -memberwise-init -source-filename %s -pos=40:6 > %t.result/enum_members.swift
 

@@ -300,14 +300,14 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_access_notes_path);
   inputArgs.AddLastArg(arguments, options::OPT_library_level);
   inputArgs.AddLastArg(arguments, options::OPT_enable_bare_slash_regex);
-  inputArgs.AddLastArg(arguments, options::OPT_async_main);
 
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);
 
   // Pass on file paths that should be remapped in debug info.
-  inputArgs.AddAllArgs(arguments, options::OPT_debug_prefix_map);
-  inputArgs.AddAllArgs(arguments, options::OPT_coverage_prefix_map);
+  inputArgs.AddAllArgs(arguments, options::OPT_debug_prefix_map,
+                                  options::OPT_coverage_prefix_map,
+                                  options::OPT_file_prefix_map);
 
   std::string globalRemapping = getGlobalDebugPathRemapping();
   if (!globalRemapping.empty()) {

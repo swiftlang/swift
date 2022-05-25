@@ -1002,7 +1002,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::AllocBoxInst: {
     const AllocBoxInst *ABI = cast<AllocBoxInst>(&SI);
-    writeOneTypeLayout(ABI->getKind(), ABI->hasDynamicLifetime() ? 1 : 0,
+    unsigned flags
+      = (ABI->hasDynamicLifetime() ? 1 : 0)
+      | (ABI->emitReflectionMetadata() ? 2 : 0);
+    writeOneTypeLayout(ABI->getKind(),
+                       flags,
                        ABI->getType());
     break;
   }
@@ -1752,6 +1756,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     if (SI.getKind() == SILInstructionKind::ConvertFunctionInst) {
       if (cast<ConvertFunctionInst>(SI).withoutActuallyEscaping())
         attrs |= 0x01;
+    } else if (auto *refCast = dyn_cast<UncheckedRefCastInst>(&SI)) {
+      attrs = encodeValueOwnership(refCast->getOwnershipKind());
     }
     writeConversionLikeInstruction(cast<SingleValueInstruction>(&SI), attrs);
     break;

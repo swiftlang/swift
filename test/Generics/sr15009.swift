@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -debug-generic-signatures -requirement-machine-protocol-signatures=on 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -debug-generic-signatures 2>&1 | %FileCheck %s
 
 // CHECK: sr15009.(file).P@
 // CHECK-NEXT: Requirement signature: <Self where Self == Self.[P]A.[Q]B, Self.[P]A : Q>

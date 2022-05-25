@@ -93,21 +93,6 @@ namespace swift {
     ErrorOnFailureRemarkOnSuccess
   };
 
-  /// Value for LangOptions::EnableRequirementMachine.
-  enum class RequirementMachineMode {
-    /// Use the GenericSignatureBuilder for all queries.
-    Disabled = 0,
-
-    /// Use the RequirementMachine for all queries.
-    Enabled = 1,
-
-    /// Use both and assert if the results do not match.
-    Verify = 2,
-
-    /// Use both, print a message only but do not assert on mismatch.
-    Check = 3,
-  };
-
   /// A collection of options that affect the language dialect and
   /// provide compiler debugging facilities.
   class LangOptions final {
@@ -222,9 +207,6 @@ namespace swift {
 
     /// Emit a remark after loading a module.
     bool EnableModuleLoadingRemarks = false;
-
-    /// Resolve main function as though it were called from an async context
-    bool EnableAsyncMainResolution = false;
 
     ///
     /// Support for alternate usage modes
@@ -487,7 +469,7 @@ namespace swift {
     bool HermeticSealAtLink = false;
 
     /// Allow deserializing implementation only dependencies. This should only
-    /// be set true by lldb and other tooling, so that deserilization
+    /// be set true by lldb and other tooling, so that deserialization
     /// recovery issues won't bring down the debugger.
     /// TODO: remove this when @_implementationOnly modules are robust enough.
     bool AllowDeserializingImplementationOnly = false;
@@ -542,21 +524,6 @@ namespace swift {
     /// classes.
     unsigned RequirementMachineMaxSplitConcreteEquivClassAttempts = 2;
 
-    /// Enable the new experimental protocol requirement signature minimization
-    /// algorithm.
-    RequirementMachineMode RequirementMachineProtocolSignatures =
-        RequirementMachineMode::Enabled;
-
-    /// Enable the new experimental generic signature minimization algorithm
-    /// for abstract generic signatures.
-    RequirementMachineMode RequirementMachineAbstractSignatures =
-        RequirementMachineMode::Enabled;
-
-    /// Enable the new experimental generic signature minimization algorithm
-    /// for user-written generic signatures.
-    RequirementMachineMode RequirementMachineInferredSignatures =
-        RequirementMachineMode::Enabled;
-
     /// Enable preprocessing pass to eliminate conformance requirements
     /// on generic parameters which are made concrete. Usually you want this
     /// enabled. It can be disabled for debugging and testing.
@@ -574,6 +541,9 @@ namespace swift {
     /// concrete types. This will sometimes fail to produce a convergent
     /// rewrite system.
     bool EnableRequirementMachineOpaqueArchetypes = false;
+
+    /// Enable warnings for redundant requirements in generic signatures.
+    bool WarnRedundantRequirements = false;
 
     /// Enables dumping type witness systems from associated type inference.
     bool DumpTypeWitnessSystems = false;
@@ -798,7 +768,7 @@ namespace swift {
     /// header, place it in this directory.
     std::string PrecompiledHeaderOutputDir;
 
-    /// The optimizaton setting.  This doesn't typically matter for
+    /// The optimization setting.  This doesn't typically matter for
     /// import, but it can affect Clang's IR generation of static functions.
     std::string Optimization;
 
@@ -840,7 +810,7 @@ namespace swift {
     /// When set, don't look for or load overlays.
     bool DisableOverlayModules = false;
 
-    /// When set, import SPI_AVAILABLE symbols with Swift SPI attribtues.
+    /// When set, import SPI_AVAILABLE symbols with Swift SPI attributes.
     bool EnableClangSPI = true;
 
     /// When set, don't enforce warnings with -Werror.

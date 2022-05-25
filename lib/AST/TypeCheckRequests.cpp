@@ -62,6 +62,14 @@ void swift::simple_display(llvm::raw_ostream &out,
   }
 }
 
+void swift::simple_display(llvm::raw_ostream &out, ASTNode node) {
+  if (node) {
+    node.dump(out);
+  } else {
+    out << "null";
+  }
+}
+
 void swift::simple_display(llvm::raw_ostream &out, Type type) {
   if (type)
     type.print(out);
@@ -788,22 +796,6 @@ void GenericSignatureRequest::diagnoseCycle(DiagnosticEngine &diags) const {
 //----------------------------------------------------------------------------//
 
 void InferredGenericSignatureRequest::noteCycleStep(DiagnosticEngine &d) const {
-  // For now, the GSB does a better job of describing the exact structure of
-  // the cycle.
-  //
-  // FIXME: We should consider merging the circularity handling the GSB does
-  // into this request.  See rdar://55263708
-}
-
-void InferredGenericSignatureRequestGSB::noteCycleStep(DiagnosticEngine &d) const {
-  // For now, the GSB does a better job of describing the exact structure of
-  // the cycle.
-  //
-  // FIXME: We should consider merging the circularity handling the GSB does
-  // into this request.  See rdar://55263708
-}
-
-void InferredGenericSignatureRequestRQM::noteCycleStep(DiagnosticEngine &d) const {
   // For now, the GSB does a better job of describing the exact structure of
   // the cycle.
   //

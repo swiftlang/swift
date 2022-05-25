@@ -25,9 +25,9 @@ extension AsyncSequence {
   /// sequence to pass through the first six values, then end.
   ///
   ///     for await number in Counter(howHigh: 10).prefix(6) {
-  ///         print("\(number) ")
+  ///         print(number, terminator: " ")
   ///     }
-  ///     // prints "1 2 3 4 5 6"
+  ///     // Prints "1 2 3 4 5 6"
   ///
   /// If the count passed to `prefix(_:)` exceeds the number of elements in the
   /// base sequence, the result contains all of the elements in the sequence.

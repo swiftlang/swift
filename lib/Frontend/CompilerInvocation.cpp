@@ -497,8 +497,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Diags.diagnose(SourceLoc(), diag::warn_flag_deprecated,
                    "-enable-experimental-async-top-level");
 
-  Opts.EnableAsyncMainResolution = Args.hasArg(OPT_async_main);
-
   Opts.DiagnoseInvalidEphemeralnessAsError |=
       Args.hasArg(OPT_enable_invalid_ephemeralness_as_error);
 
@@ -801,7 +799,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.ClangTarget = llvm::Triple(A->getValue());
   }
 
-  Opts.EnableCXXInterop |= Args.hasArg(OPT_enable_experimental_cxx_interop) |
+  Opts.EnableCXXInterop |= Args.hasArg(OPT_enable_experimental_cxx_interop) ||
                            Args.hasArg(OPT_enable_cxx_interop);
   Opts.EnableObjCInterop =
       Args.hasFlag(OPT_enable_objc_interop, OPT_disable_objc_interop,
@@ -950,51 +948,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DisableSubstSILFunctionTypes =
       Args.hasArg(OPT_disable_subst_sil_function_types);
 
-  if (auto A = Args.getLastArg(OPT_requirement_machine_protocol_signatures_EQ)) {
-    auto value = llvm::StringSwitch<Optional<RequirementMachineMode>>(A->getValue())
-        .Case("off", RequirementMachineMode::Disabled)
-        .Case("on", RequirementMachineMode::Enabled)
-        .Case("verify", RequirementMachineMode::Verify)
-        .Case("check", RequirementMachineMode::Check)
-        .Default(None);
-
-    if (value)
-      Opts.RequirementMachineProtocolSignatures = *value;
-    else
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-  }
-
-  if (auto A = Args.getLastArg(OPT_requirement_machine_abstract_signatures_EQ)) {
-    auto value = llvm::StringSwitch<Optional<RequirementMachineMode>>(A->getValue())
-        .Case("off", RequirementMachineMode::Disabled)
-        .Case("on", RequirementMachineMode::Enabled)
-        .Case("verify", RequirementMachineMode::Verify)
-        .Case("check", RequirementMachineMode::Check)
-        .Default(None);
-
-    if (value)
-      Opts.RequirementMachineAbstractSignatures = *value;
-    else
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-  }
-
-  if (auto A = Args.getLastArg(OPT_requirement_machine_inferred_signatures_EQ)) {
-    auto value = llvm::StringSwitch<Optional<RequirementMachineMode>>(A->getValue())
-        .Case("off", RequirementMachineMode::Disabled)
-        .Case("on", RequirementMachineMode::Enabled)
-        .Case("verify", RequirementMachineMode::Verify)
-        .Case("check", RequirementMachineMode::Check)
-        .Default(None);
-
-    if (value)
-      Opts.RequirementMachineInferredSignatures = *value;
-    else
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-  }
-
   Opts.DumpRequirementMachine = Args.hasArg(
       OPT_dump_requirement_machine);
   Opts.AnalyzeRequirementMachine = Args.hasArg(
@@ -1058,6 +1011,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_enable_requirement_machine_opaque_archetypes))
     Opts.EnableRequirementMachineOpaqueArchetypes = true;
+
+  if (Args.hasArg(OPT_warn_redundant_requirements))
+    Opts.WarnRedundantRequirements = true;
 
   Opts.DumpTypeWitnessSystems = Args.hasArg(OPT_dump_type_witness_systems);
 
@@ -1209,14 +1165,23 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
     Opts.ExtraArgs.push_back(A->getValue());
   }
 
-  for (auto A : Args.getAllArgValues(OPT_debug_prefix_map)) {
+  for (const Arg *A : Args.filtered(OPT_file_prefix_map,
+                                    OPT_debug_prefix_map)) {
+    std::string Val(A->getValue());
     // Forward -debug-prefix-map arguments from Swift to Clang as
-    // -fdebug-prefix-map. This is required to ensure DIFiles created there,
-    // like "<swift-imported-modules>", have their paths remapped properly.
+    // -fdebug-prefix-map= and -file-prefix-map as -ffile-prefix-map=.
+    //
+    // This is required to ensure DIFiles created there, like
+    /// "<swift-imported-modules>", as well as index data, have their paths
+    // remapped properly.
+    //
     // (Note, however, that Clang's usage of std::map means that the remapping
     // may not be applied in the same order, which can matter if one mapping is
     // a prefix of another.)
-    Opts.ExtraArgs.push_back("-fdebug-prefix-map=" + A);
+    if (A->getOption().matches(OPT_file_prefix_map))
+      Opts.ExtraArgs.push_back("-ffile-prefix-map=" + Val);
+    else
+      Opts.ExtraArgs.push_back("-fdebug-prefix-map=" + Val);
   }
 
   if (!workingDirectory.empty()) {
@@ -1747,7 +1712,11 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       OPT_enable_actor_data_race_checks,
       OPT_disable_actor_data_race_checks, /*default=*/false);
   Opts.DisableSILPerfOptimizations |= Args.hasArg(OPT_disable_sil_perf_optzns);
-  Opts.CrossModuleOptimization |= Args.hasArg(OPT_CrossModuleOptimization);
+  if (Args.hasArg(OPT_CrossModuleOptimization)) {
+    Opts.CMOMode = CrossModuleOptimizationMode::Aggressive;
+  } else if (Args.hasArg(OPT_EnbaleDefaultCMO)) {
+    Opts.CMOMode = CrossModuleOptimizationMode::Default;  
+  }
   Opts.EnablePerformanceAnnotations |=
       Args.hasArg(OPT_ExperimentalPerformanceAnnotations);
   Opts.VerifyAll |= Args.hasArg(OPT_sil_verify_all);
@@ -1995,6 +1964,13 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                    Opts.DebugInfoLevel == IRGenDebugInfoLevel::LineTables
                      ? "-gline-tables-only"
                      : "-gdwarf_types");
+  }
+
+  for (auto A : Args.getAllArgValues(options::OPT_file_prefix_map)) {
+    auto SplitMap = StringRef(A).split('=');
+    Opts.FilePrefixMap.addMapping(SplitMap.first, SplitMap.second);
+    Opts.DebugPrefixMap.addMapping(SplitMap.first, SplitMap.second);
+    Opts.CoveragePrefixMap.addMapping(SplitMap.first, SplitMap.second);
   }
 
   for (auto A : Args.getAllArgValues(options::OPT_debug_prefix_map)) {
@@ -2562,7 +2538,7 @@ serialization::Status
 CompilerInvocation::loadFromSerializedAST(StringRef data) {
   serialization::ExtendedValidationInfo extendedInfo;
   serialization::ValidationInfo info = serialization::validateSerializedAST(
-      data, getSILOptions().EnableOSSAModules, &extendedInfo);
+      data, getSILOptions().EnableOSSAModules, LangOpts.SDKName, &extendedInfo);
 
   if (info.status != serialization::Status::Valid)
     return info.status;
@@ -2598,7 +2574,7 @@ CompilerInvocation::setUpInputForSILTool(
 
   auto result = serialization::validateSerializedAST(
       fileBufOrErr.get()->getBuffer(), getSILOptions().EnableOSSAModules,
-      &extendedInfo);
+      LangOpts.SDKName, &extendedInfo);
   bool hasSerializedAST = result.status == serialization::Status::Valid;
 
   if (hasSerializedAST) {

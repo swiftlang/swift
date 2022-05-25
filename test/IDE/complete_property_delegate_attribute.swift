@@ -1,7 +1,5 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AFTER_PAREN | %FileCheck %s -check-prefix=AFTER_PAREN
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG_MyEnum_NODOT | %FileCheck %s -check-prefix=ARG_MyEnum_NODOT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG_MyEnum_DOT | %FileCheck %s -check-prefix=ARG_MyEnum_DOT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG_MyEnum_NOBINDING | %FileCheck %s -check-prefix=ARG_MyEnum_NOBINDING
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
 
 enum MyEnum {
   case east, west
@@ -42,7 +40,32 @@ struct TestStruct {
 
   @MyStruct(arg1: MyEnum.#^ARG_MyEnum_NOBINDING^#)
 // ARG_MyEnum_NOBINDING: Begin completions
-// ARG_MyEnum_NOBINDING-DAG: Decl[EnumElement]/CurrNominal: east[#MyEnum#];
-// ARG_MyEnum_NOBINDING-DAG: Decl[EnumElement]/CurrNominal: west[#MyEnum#];
-// ARG_MyEnum_NOBINDING: End completions
+// ARG_MyEnum_NOBINDING-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Convertible]: east[#MyEnum#];
+// ARG_MyEnum_NOBINDING-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Convertible]: west[#MyEnum#];
+// ARG_MyEnum_NOBINDINaG: End completions
+
+  // FIXME: No call patterns are suggested if we are completing in variable with multiple property wrappers (rdar://91480982)
+  func sync1() {}
+
+  @MyStruct(arg1: MyEnum.east, #^SECOND_ARG_LABEL^#) var test4
+// SECOND_ARG_LABEL: Begin completions, 1 items
+// SECOND_ARG_LABEL-DAG: Pattern/Local/Flair[ArgLabels]:     {#arg2: Int#}[#Int#];
+// SECOND_ARG_LABEL: End completions
+
+  @MyStruct(arg1: MyEnum.east, #^SECOND_ARG_LABEL_NO_VAR?check=SECOND_ARG_LABEL^#)
+
+  // FIXME: No call patterns are suggested if we are completing in variable with multiple property wrappers (rdar://91480982)
+  func sync2() {}
+
+  @MyStruct(arg1: MyEnum.east, arg2: #^SECOND_ARG^#) var test4
+// SECOND_ARG: Begin completions
+// SECOND_ARG-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Convertible]: globalInt[#Int#]; name=globalInt
+// SECOND_ARG: End completions
+
+  @MyStruct(arg1: MyEnum.east, arg2: #^SECOND_ARG_NO_VAR?check=SECOND_ARG^#)
+
+  // FIXME: No call patterns are suggested if we are completing in variable with multiple property wrappers (rdar://91480982)
+  func sync3() {}
+
+  @MyStruct(#^WITHOUT_VAR?check=AFTER_PAREN^#
 }

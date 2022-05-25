@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=on -requirement-machine-inferred-signatures=on -requirement-machine-abstract-signatures=on
+// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
 
 // Reduced from https://github.com/plx/HDXLSIMDSupport.
 

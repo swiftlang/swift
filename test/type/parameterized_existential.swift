@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=on -requirement-machine-inferred-signatures=on -disable-availability-checking -enable-parameterized-existential-types
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-parameterized-existential-types
 
 protocol Sequence<Element> {
   associatedtype Element
@@ -37,6 +37,8 @@ struct Collapse<T: DoubleWide>: DoubleWide {
 }
 
 func test() -> any DoubleWide<some DoubleWide<Int, Int>, some DoubleWide<Int, Int>> { return Collapse<Int>(x: 42) }
+// expected-error@-1 {{'some' types cannot be used in constraints on existential types}}
+// expected-error@-2 {{'some' types cannot be used in constraints on existential types}}
 
 func diagonalizeAny(_ x: any Sequence<Int>) -> any Sequence<(Int, Int)> {
   return x.map { ($0, $0) }

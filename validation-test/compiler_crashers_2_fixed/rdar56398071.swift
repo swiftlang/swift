@@ -1,6 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -requirement-machine-protocol-signatures=off
-
-// TODO: Get this to pass with  -requirement-machine-protocol-signatures=on.
+// RUN: %target-swift-frontend -primary-file %s -emit-ir
 
 public protocol WrappedSignedInteger: SignedInteger where Stride == Int {
     typealias WrappedInteger = Int

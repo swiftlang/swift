@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s -debug-generic-signatures -requirement-machine-inferred-signatures=on 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck -verify %s -debug-generic-signatures -warn-redundant-requirements 2>&1 | %FileCheck %s
 
 // Another GenericSignatureBuilder oddity, reduced from RxSwift.
 //

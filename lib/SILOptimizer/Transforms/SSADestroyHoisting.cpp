@@ -98,6 +98,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/Reachability.h"
+#include "swift/SILOptimizer/Analysis/VisitBarrierAccessScopes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 
@@ -110,7 +111,7 @@ struct KnownStorageUses : UniqueStorageUseVisitor {
   bool preserveDebugInfo;
 
   SmallPtrSet<SILInstruction *, 16> storageUsers;
-  SmallVector<SILInstruction *, 4> originalDestroys;
+  SmallSetVector<SILInstruction *, 4> originalDestroys;
   SmallPtrSet<SILInstruction *, 4> debugInsts;
 
   KnownStorageUses(AccessStorage storage, SILFunction *function)
@@ -157,7 +158,7 @@ protected:
   bool visitStore(Operand *use) override { return recordUser(use->getUser()); }
 
   bool visitDestroy(Operand *use) override {
-    originalDestroys.push_back(use->getUser());
+    originalDestroys.insert(use->getUser());
     return true;
   }
 
@@ -186,23 +187,25 @@ protected:
   }
 };
 
+class DestroyReachability;
+
 /// Step #2: Perform backward dataflow from KnownStorageUses.originalDestroys to
 /// KnownStorageUses.storageUsers to find deinitialization barriers.
-class DeinitBarriers {
+class DeinitBarriers final {
 public:
-  // Data flow state: blocks whose beginning is backward reachable from a
-  // destroy without first reaching a barrier or storage use.
-  SmallPtrSetVector<SILBasicBlock *, 4> destroyReachesBeginBlocks;
+  // Instructions beyond which a destroy_addr cannot be hoisted, reachable from
+  // a destroy_addr.  Deinit barriers or storage uses.
+  SmallSetVector<SILInstruction *, 4> barrierInstructions;
 
-  // Data flow state: blocks whose end is backward reachable from a destroy
-  // without first reaching a barrier or storage use.
-  SmallPtrSet<SILBasicBlock *, 4> destroyReachesEndBlocks;
+  // Phis beyond which a destroy_addr cannot be hoisted, reachable from a
+  // destroy_addr.
+  SmallSetVector<SILBasicBlock *, 4> barrierPhis;
 
-  // Deinit barriers or storage uses within a block, reachable from a destroy.
-  SmallVector<SILInstruction *, 4> barriers;
+  // Blocks beyond the end of which a destroy_addr cannot be hoisted.
+  SmallSetVector<SILBasicBlock *, 4> barrierBlocks;
 
   // Debug instructions that are no longer within this lifetime after shrinking.
-  SmallVector<SILInstruction *, 4> deadUsers;
+  SmallSetVector<SILInstruction *, 4> deadUsers;
 
   // The access scopes which are hoisting barriers.
   //
@@ -222,22 +225,13 @@ public:
     storageDefInst = rootValue->getDefiningInstruction();
   }
 
-  void compute() {
-    FindBarrierAccessScopes(*this).solveBackward();
-    if (barrierAccessScopes.size() == 0)
-      return;
-    destroyReachesBeginBlocks.clear();
-    destroyReachesEndBlocks.clear();
-    barriers.clear();
-    deadUsers.clear();
-    DestroyReachability(*this).solveBackward();
-  }
+  void compute() { DestroyReachability(*this).solve(); }
 
   bool isBarrier(SILInstruction *instruction) const {
-    return classificationIsBarrier(
-        classifyInstruction(instruction, ignoreDeinitBarriers, storageDefInst,
-                            barrierAccessScopes, knownUses));
+    return classificationIsBarrier(classifyInstruction(instruction));
   };
+
+  friend class DestroyReachability;
 
 private:
   DeinitBarriers(DeinitBarriers const &) = delete;
@@ -249,177 +243,93 @@ private:
 
   enum class Classification { DeadUser, Barrier, Other };
 
-  Classification classifyInstruction(SILInstruction *inst) {
-    return classifyInstruction(inst, ignoreDeinitBarriers, storageDefInst,
-                               barrierAccessScopes, knownUses);
-  }
-
-  static Classification classifyInstruction(
-      SILInstruction *inst, bool ignoreDeinitBarriers,
-      SILInstruction *storageDefInst,
-      const llvm::SmallPtrSetImpl<BeginAccessInst *> &barrierAccessScopes,
-      const KnownStorageUses &knownUses);
-
-  void visitedInstruction(SILInstruction *instruction,
-                          Classification classification);
+  Classification classifyInstruction(SILInstruction *inst) const;
 
   static bool classificationIsBarrier(Classification classification);
 
-  // Implements BackwardReachability::BlockReachability
-  //
-  // Determine which end_access instructions must be treated as barriers.
-  //
-  // An end_access is a barrier if the access scope it ends contains any deinit
-  // barriers.  Suppose that it weren't treated as a barrier.  Then the
-  // destroy_addr would be hoisted up to the in-scope deinit barrier.  That
-  // could result in a deinit being executed within the scope which was
-  // previously executed outside it.  Executing a deinit in the scope could
-  // violate exclusivity.
-  //
-  // So before determining what ALL the barriers are, we need to determine which
-  // end_access instructions are barriers.  Do that by observing which access
-  // scopes are open when encountering a barrier.  The access scopes which are
-  // open are those for which we've seen an end_access instruction when walking
-  // backwards from the destroy_addrs.  Add these access scopes to
-  // DeinitBarriers::barrierAccessScopes.
-  //
-  // Tracking which access scopes are open consists of two parts:
-  // (1) in-block analysis
-  // (2) cross-block analysis
-  // For (1), maintain a set of access scopes which are currently open.  Insert
-  // and erase scopes when seeing begin_access and end_access instructions when
-  // they're visited in checkReachableBarrier.  A stack can't be used here
-  // because access scopes are not necessarily nested.
-  // For (2), when entering a block, the access scope is the union of all the
-  // open access scopes in the block's predecessors.
-  class FindBarrierAccessScopes {
+  /// Operates backward reachability and access scope visitor.  Implements the
+  /// interfaces involved.
+  ///
+  /// Implements IterativeBackwardReachability::findBarriers::Visitor
+  /// Implements VisitBarrierAccessScopes::Visitor
+  /// Implements IterativeBackwardReachability::Effects
+  /// Implements VisitBarrierAccessScopes::Effects
+  class DestroyReachability final {
+    using Dataflow = IterativeBackwardReachability<DestroyReachability>;
+    using Effect = Dataflow::Effect;
+    using ScopeVisitor =
+        VisitBarrierAccessScopes<DestroyReachability, DestroyReachability>;
+
     DeinitBarriers &result;
-    llvm::DenseMap<SILBasicBlock *, llvm::SmallPtrSet<BeginAccessInst *, 2>>
-        liveInAccessScopes;
-    llvm::SmallPtrSet<BeginAccessInst *, 2> runningLiveAccessScopes;
-
-    BackwardReachability<FindBarrierAccessScopes> reachability;
-
-  public:
-    FindBarrierAccessScopes(DeinitBarriers &result)
-        : result(result), reachability(result.knownUses.getFunction(), *this) {
-      // Seed backward reachability with destroy points.
-      for (SILInstruction *destroy : result.knownUses.originalDestroys) {
-        reachability.initLastUse(destroy);
-      }
-    }
-
-    void markLiveAccessScopesAsBarriers() {
-      for (auto *scope : runningLiveAccessScopes) {
-        result.barrierAccessScopes.insert(scope);
-      }
-    }
-
-    bool hasReachableBegin(SILBasicBlock *block) {
-      return result.destroyReachesBeginBlocks.contains(block);
-    }
-
-    void markReachableBegin(SILBasicBlock *block) {
-      result.destroyReachesBeginBlocks.insert(block);
-      if (!runningLiveAccessScopes.empty()) {
-        liveInAccessScopes[block] = runningLiveAccessScopes;
-      }
-    }
-
-    void markReachableEnd(SILBasicBlock *block) {
-      result.destroyReachesEndBlocks.insert(block);
-      runningLiveAccessScopes.clear();
-      for (auto *predecessor : block->getPredecessorBlocks()) {
-        auto iterator = liveInAccessScopes.find(predecessor);
-        if (iterator != liveInAccessScopes.end()) {
-          for (auto *bai : iterator->getSecond()) {
-            runningLiveAccessScopes.insert(bai);
-          }
-        }
-      }
-    }
-
-    bool checkReachableBarrier(SILInstruction *inst) {
-      // For correctness, it is required that
-      // FindBarrierAccessScopes::checkReachableBarrier return true whenever
-      // DestroyReachability::checkReachableBarrier does, with one exception:
-      // DestryReachability::checkReachableBarrier will also return true for any
-      // end_access barrier that FindBarrierAccessScopes finds.
-      if (auto *eai = dyn_cast<EndAccessInst>(inst)) {
-        runningLiveAccessScopes.insert(eai->getBeginAccess());
-      } else if (auto *bai = dyn_cast<BeginAccessInst>(inst)) {
-        runningLiveAccessScopes.erase(bai);
-      }
-      auto classification = result.classifyInstruction(inst);
-      result.visitedInstruction(inst, classification);
-      auto isBarrier = result.classificationIsBarrier(classification);
-      if (isBarrier) {
-        markLiveAccessScopesAsBarriers();
-      }
-      // If we've seen a barrier, then we can stop looking for access scopes.
-      // Any that were open already have now been marked as barriers.  And if
-      // none are open, the second data flow won't get beyond this barrier to
-      // face subsequent end_access instructions.
-      return isBarrier;
-    }
-
-    bool checkReachablePhiBarrier(SILBasicBlock *block) {
-      bool isBarrier =
-          llvm::any_of(block->getPredecessorBlocks(), [&](auto *predecessor) {
-            return result.isBarrier(predecessor->getTerminator());
-          });
-      if (isBarrier) {
-        // If there's a barrier preventing us from hoisting out of this block,
-        // then every open access scope contains a barrier, so all the
-        // corresponding end_access instructions are barriers too.
-        markLiveAccessScopesAsBarriers();
-      }
-      return isBarrier;
-    }
-
-    void solveBackward() { reachability.solveBackward(); }
-  };
-
-  // Conforms to BackwardReachability::BlockReachability
-  class DestroyReachability {
-    DeinitBarriers &result;
-
-    BackwardReachability<DestroyReachability> reachability;
+    Dataflow::Result reachability;
+    Dataflow dataflow;
+    Optional<SmallVector<SILBasicBlock *, 16>> cachedRoots;
+    bool recordDeadUsers = false;
 
   public:
     DestroyReachability(DeinitBarriers &result)
-        : result(result), reachability(result.knownUses.getFunction(), *this) {
-      // Seed backward reachability with destroy points.
-      for (SILInstruction *destroy : result.knownUses.originalDestroys) {
-        reachability.initLastUse(destroy);
+        : result(result), reachability(result.knownUses.getFunction()),
+          dataflow(result.knownUses.getFunction(),
+                   result.storageDefInst ? result.storageDefInst->getParent()
+                                         : nullptr,
+                   *this, reachability) {}
+
+    void solve();
+
+  private:
+    friend Dataflow;
+    friend ScopeVisitor;
+
+    /// IterativeBackwardReachability::Effects
+    /// VisitBarrierAccessScopes::Effects
+
+    auto gens() { return result.knownUses.originalDestroys; }
+
+    Effect effectForInstruction(SILInstruction *instruction);
+
+    Effect effectForPhi(SILBasicBlock *block);
+
+    /// VisitBarrierAccessScopes::Effects
+
+    bool isLocalGen(SILInstruction *instruction) {
+      return reachability.localGens.contains(instruction);
+    }
+
+    auto localGens() { return reachability.localGens; }
+
+    /// IterativeBackwardReachability::findBarriers::Visitor:
+
+    void visitBarrierInstruction(SILInstruction *instruction) {
+      result.barrierInstructions.insert(instruction);
+    }
+
+    void visitBarrierPhi(SILBasicBlock *block) {
+      result.barrierPhis.insert(block);
+    }
+
+    void visitBarrierBlock(SILBasicBlock *block) {
+      result.barrierBlocks.insert(block);
+    }
+
+    /// VisitBarrierAccessScopes::Visitor
+
+    ArrayRef<SILBasicBlock *> roots();
+
+    bool isInRegion(SILBasicBlock *block) {
+      return reachability.discoveredBlocks.contains(block);
+    }
+
+    void visitBarrierAccessScope(BeginAccessInst *bai) {
+      result.barrierAccessScopes.insert(bai);
+      for (auto *eai : bai->getEndAccesses()) {
+        dataflow.addKill(eai);
       }
     }
-
-    bool hasReachableBegin(SILBasicBlock *block) {
-      return result.destroyReachesBeginBlocks.contains(block);
-    }
-
-    void markReachableBegin(SILBasicBlock *block) {
-      result.destroyReachesBeginBlocks.insert(block);
-    }
-
-    void markReachableEnd(SILBasicBlock *block) {
-      result.destroyReachesEndBlocks.insert(block);
-    }
-
-    bool checkReachableBarrier(SILInstruction *);
-
-    bool checkReachablePhiBarrier(SILBasicBlock *);
-
-    void solveBackward() { reachability.solveBackward(); }
   };
 };
 
-DeinitBarriers::Classification DeinitBarriers::classifyInstruction(
-    SILInstruction *inst, bool ignoreDeinitBarriers,
-    SILInstruction *storageDefInst,
-    const llvm::SmallPtrSetImpl<BeginAccessInst *> &barrierAccessScopes,
-    const KnownStorageUses &knownUses) {
+DeinitBarriers::Classification
+DeinitBarriers::classifyInstruction(SILInstruction *inst) const {
   if (knownUses.debugInsts.contains(inst)) {
     return Classification::DeadUser;
   }
@@ -433,9 +343,9 @@ DeinitBarriers::Classification DeinitBarriers::classifyInstruction(
     return Classification::Barrier;
   }
   if (auto *eai = dyn_cast<EndAccessInst>(inst)) {
-    return barrierAccessScopes.contains(eai->getBeginAccess())
-               ? Classification::Barrier
-               : Classification::Other;
+    if (barrierAccessScopes.contains(eai->getBeginAccess())) {
+      return Classification::Barrier;
+    }
   }
   return Classification::Other;
 }
@@ -451,46 +361,34 @@ bool DeinitBarriers::classificationIsBarrier(Classification classification) {
   llvm_unreachable("exhaustive switch is not exhaustive?!");
 }
 
-void DeinitBarriers::visitedInstruction(SILInstruction *instruction,
-                                        Classification classification) {
-  assert(classifyInstruction(instruction) == classification);
-  switch (classification) {
-  case Classification::DeadUser:
-    deadUsers.push_back(instruction);
-    break;
-  case Classification::Barrier:
-    barriers.push_back(instruction);
-    break;
-  case Classification::Other:
-    break;
-  }
-}
-
-/// Return true if \p inst is a barrier.
-///
-/// Called exactly once for each reachable instruction. This is guaranteed to
-/// hold as a barrier occurs between any original destroys that are reachable
-/// from each. Any path reaching multiple destroys requires initialization,
-/// which is a storageUser and therefore a barrier.
-bool DeinitBarriers::DestroyReachability::checkReachableBarrier(
+DeinitBarriers::DestroyReachability::Effect
+DeinitBarriers::DestroyReachability::effectForInstruction(
     SILInstruction *instruction) {
-  // For correctness, it is required that
-  // DestroyReachability::checkReachableBarrier return true whenever
-  // FindBarrierAccessScopes::checkReachableBarrier does.  It must additionally
-  // return true when encountering an end_access barrier that
-  // FindBarrierAccessScope determined is a barrier.
+  if (result.knownUses.originalDestroys.contains(instruction))
+    return Effect::Gen();
   auto classification = result.classifyInstruction(instruction);
-  result.visitedInstruction(instruction, classification);
-  return result.classificationIsBarrier(classification);
+  if (recordDeadUsers && classification == Classification::DeadUser)
+    result.deadUsers.insert(instruction);
+  return result.classificationIsBarrier(classification) ? Effect::Kill()
+                                                        : Effect::NoEffect();
 }
 
-bool DeinitBarriers::DestroyReachability::checkReachablePhiBarrier(
-    SILBasicBlock *block) {
-  assert(llvm::all_of(block->getArguments(),
-                      [&](auto argument) { return PhiValue(argument); }));
-  return llvm::any_of(block->getPredecessorBlocks(), [&](auto *predecessor) {
-    return result.isBarrier(predecessor->getTerminator());
-  });
+DeinitBarriers::DestroyReachability::Effect
+DeinitBarriers::DestroyReachability::effectForPhi(SILBasicBlock *block) {
+  bool isBarrier =
+      llvm::any_of(block->getPredecessorBlocks(), [&](auto *predecessor) {
+        return result.isBarrier(predecessor->getTerminator());
+      });
+  return isBarrier ? Effect::Kill() : Effect::NoEffect();
+}
+
+void DeinitBarriers::DestroyReachability::solve() {
+  dataflow.initialize();
+  ScopeVisitor visitor(result.knownUses.getFunction(), *this, *this);
+  visitor.visit();
+  dataflow.solve();
+  recordDeadUsers = true;
+  dataflow.findBarriers(*this);
 }
 
 /// Algorithm for hoisting the destroys of a single uniquely identified storage
@@ -576,7 +474,7 @@ bool HoistDestroys::rewriteDestroys(const AccessStorage &storage,
                                     const KnownStorageUses &knownUses,
                                     const DeinitBarriers &deinitBarriers) {
   // Place a new destroy after each barrier instruction.
-  for (SILInstruction *barrier : deinitBarriers.barriers) {
+  for (SILInstruction *barrier : deinitBarriers.barrierInstructions) {
     auto *barrierBlock = barrier->getParent();
     if (barrier != barrierBlock->getTerminator()) {
       if (!foldBarrier(barrier, storage, knownUses, deinitBarriers))
@@ -589,24 +487,13 @@ bool HoistDestroys::rewriteDestroys(const AccessStorage &storage,
   }
   // Place a new destroy at each CFG edge in which the successor's beginning is
   // reached but the predecessors end is not reached.
-  for (auto *beginReachedBlock : deinitBarriers.destroyReachesBeginBlocks) {
-    SILInstruction *barrier = nullptr;
-    if (auto *predecessor = beginReachedBlock->getSinglePredecessorBlock()) {
-      if (deinitBarriers.destroyReachesEndBlocks.contains(predecessor))
-        continue;
-
-      barrier = predecessor->getTerminator();
-
-    } else if (!beginReachedBlock->pred_empty()) {
-      // This is the only successor, so the destroy must reach the predecessors.
-      assert(llvm::all_of(
-          beginReachedBlock->getPredecessorBlocks(), [&](auto *predecessor) {
-            return deinitBarriers.destroyReachesEndBlocks.contains(predecessor);
-          }));
-      continue;
-    }
+  for (auto *block : deinitBarriers.barrierPhis) {
+    // The destroy does not reach above the block's phi.
+    insertDestroy(nullptr, &block->front(), knownUses);
+  }
+  for (auto *block : deinitBarriers.barrierBlocks) {
     // The destroy does not reach the end of any predecessors.
-    insertDestroy(barrier, &beginReachedBlock->front(), knownUses);
+    insertDestroy(nullptr, &block->front(), knownUses);
   }
   // Delete dead users before merging destroys.
   for (auto *deadInst : deinitBarriers.deadUsers) {

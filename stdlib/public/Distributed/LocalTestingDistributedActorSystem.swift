@@ -43,7 +43,7 @@ public final class LocalTestingDistributedActorSystem: DistributedActorSystem, @
   public init() {}
 
   public func resolve<Act>(id: ActorID, as actorType: Act.Type)
-    throws -> Act? where Act: DistributedActor {
+    throws -> Act? where Act: DistributedActor, Act.ID == ActorID {
     guard let anyActor = self.activeActorsLock.withLock({ self.activeActors[id] }) else {
       throw LocalTestingDistributedActorSystemError(message: "Unable to locate id '\(id)' locally")
     }
@@ -54,7 +54,7 @@ public final class LocalTestingDistributedActorSystem: DistributedActorSystem, @
   }
 
   public func assignID<Act>(_ actorType: Act.Type) -> ActorID
-    where Act: DistributedActor {
+    where Act: DistributedActor, Act.ID == ActorID {
     let id = self.idProvider.next()
     self.assignedIDsLock.withLock {
       self.assignedIDs.insert(id)
@@ -63,8 +63,7 @@ public final class LocalTestingDistributedActorSystem: DistributedActorSystem, @
   }
 
   public func actorReady<Act>(_ actor: Act)
-    where Act: DistributedActor,
-    Act.ID == ActorID {
+    where Act: DistributedActor, Act.ID == ActorID {
     guard self.assignedIDsLock.withLock({ self.assignedIDs.contains(actor.id) }) else {
       fatalError("Attempted to mark an unknown actor '\(actor.id)' ready")
     }
@@ -126,21 +125,34 @@ public final class LocalTestingDistributedActorSystem: DistributedActorSystem, @
 }
 
 @available(SwiftStdlib 5.7, *)
-public struct LocalTestingActorAddress: Hashable, Sendable, Codable {
-  public let address: String
+@available(*, deprecated, renamed: "LocalTestingActorID")
+public typealias LocalTestingActorAddress = LocalTestingActorID
 
-  public init(parse address: String) {
-    self.address = address
+@available(SwiftStdlib 5.7, *)
+public struct LocalTestingActorID: Hashable, Sendable, Codable {
+  @available(*, deprecated, renamed: "id")
+  public var address: String {
+    self.id
+  }
+  public let id: String
+
+  @available(*, deprecated, renamed: "init(id:)")
+  public init(parse id: String) {
+    self.id = id
+  }
+
+  public init(id: String) {
+    self.id = id
   }
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.singleValueContainer()
-    self.address = try container.decode(String.self)
+    self.id = try container.decode(String.self)
   }
 
   public func encode(to encoder: Encoder) throws {
     var container = encoder.singleValueContainer()
-    try container.encode(self.address)
+    try container.encode(self.id)
   }
 }
 
@@ -233,10 +245,27 @@ fileprivate class _Lock {
   private let underlying: UnsafeMutablePointer<pthread_mutex_t>
   #endif
 
+  init() {
+    #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
+    self.underlying = UnsafeMutablePointer.allocate(capacity: 1)
+    self.underlying.initialize(to: os_unfair_lock())
+    #elseif os(Windows)
+    self.underlying = UnsafeMutablePointer.allocate(capacity: 1)
+    InitializeSRWLock(self.underlying)
+    #elseif os(WASI)
+    // WASI environment has only a single thread
+    #else
+    self.underlying = UnsafeMutablePointer.allocate(capacity: 1)
+    guard pthread_mutex_init(self.underlying, nil) == 0 else {
+      fatalError("pthread_mutex_init failed")
+    }
+    #endif
+  }
+
   deinit {
     #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
     // `os_unfair_lock`s do not need to be explicitly destroyed
-    #elseif os(Windows)    
+    #elseif os(Windows)
     // `SRWLOCK`s do not need to be explicitly destroyed
     #elseif os(WASI)
     // WASI environment has only a single thread
@@ -252,21 +281,6 @@ fileprivate class _Lock {
     #endif
   }
 
-  init() {
-    #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
-    self.underlying = UnsafeMutablePointer.allocate(capacity: 1)
-    #elseif os(Windows)
-    self.underlying = UnsafeMutablePointer.allocate(capacity: 1)
-    InitializeSRWLock(self.underlying)
-    #elseif os(WASI)
-    // WASI environment has only a single thread
-    #else
-    self.underlying = UnsafeMutablePointer.allocate(capacity: 1)
-    guard pthread_mutex_init(self.underlying, nil) == 0 else {
-      fatalError("pthread_mutex_init failed")
-    }
-    #endif
-  }
 
   @discardableResult
   func withLock<T>(_ body: () -> T) -> T {

@@ -870,6 +870,16 @@ void CompletionLookup::addVarDeclRef(const VarDecl *VD,
 
   if (isUnresolvedMemberIdealType(VarType))
     Builder.addFlair(CodeCompletionFlairBit::ExpressionSpecific);
+
+  if (auto Accessor = VD->getEffectfulGetAccessor()) {
+    if (auto AFT = getTypeOfMember(Accessor, dynamicLookupInfo)->getAs<AnyFunctionType>()) {
+      if (Accessor->hasImplicitSelfDecl()) {
+        AFT = AFT->getResult()->getAs<AnyFunctionType>();
+        assert(AFT);
+      }
+      addEffectsSpecifiers(Builder, AFT, Accessor);
+    }
+  }
 }
 
 /// Return whether \p param has a non-desirable default value for code
@@ -1553,6 +1563,11 @@ void CompletionLookup::addConstructorCallsForType(
     Type type, Identifier name, DeclVisibilityKind Reason,
     DynamicLookupInfo dynamicLookupInfo) {
   if (!Sink.addInitsToTopLevel)
+    return;
+
+  // 'AnyObject' is not initializable.
+  // FIXME: Should we do this in 'AnyObjectLookupRequest'?
+  if (type->isAnyObject())
     return;
 
   assert(CurrDeclContext);

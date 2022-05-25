@@ -8,7 +8,7 @@ s/Z1/Â/g
 # [0xCC, 0x82] in UTF-8 is U+0302.
 # This character is invalid for identifier start, but valid for identifier body.
 # It becomes unknown token.
-# If this type characters are conitguous, they are concatenated to one long unknown token.
+# If this type characters are contiguous, they are concatenated to one long unknown token.
 # Marker(2) is replaced to this sequence.
 s/Z2/Ì‚/g
 

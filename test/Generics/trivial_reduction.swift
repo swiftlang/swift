@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-protocol-signatures=on 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
 // CHECK-LABEL: trivial_reduction.(file).P1@
 // CHECK-LABEL: Requirement signature: <Self where Self == Self.[P1]C.[P1]C, Self.[P1]C : P1, Self.[P1]C == Self.[P1]R>

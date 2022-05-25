@@ -234,6 +234,20 @@ func test_local_function_capturing_vars() {
   }
 }
 
+func test_test_invalid_redeclaration() {
+  func test(_: () -> Void) {
+  }
+
+  test {
+    let foo = 0 // expected-note {{'foo' previously declared here}}
+    let foo = foo // expected-error {{invalid redeclaration of 'foo'}}
+  }
+
+  test {
+    let (foo, foo) = (5, 6) // expected-error {{invalid redeclaration of 'foo'}} expected-note {{'foo' previously declared here}}
+  }
+}
+
 func test_pattern_ambiguity_doesnot_crash_compiler() {
   enum E {
   case hello(result: Int) // expected-note 2 {{found this candidate}}
@@ -314,5 +328,79 @@ func test_wrapped_var_without_initializer() {
   fn {
     @Wrapper(name: "foo")
     var v;
+  }
+}
+
+// rdar://92366212 - crash in ConstraintSystem::getType
+func test_unknown_refs_in_tilde_operator() {
+  enum E {
+  }
+
+  let _: (E) -> Void = {
+    if case .test(unknown) = $0 {
+      // expected-error@-1 {{type 'E' has no member 'test'}}
+      // expected-error@-2 2 {{cannot find 'unknown' in scope}}
+    }
+  }
+}
+
+// rdar://92347054 - crash during conjunction processing
+func test_no_crash_with_circular_ref_due_to_error() {
+  struct S { // expected-note {{did you mean 'S'?}}
+    var x: Int?
+  }
+
+  func test(v: Int?, arr: [S]) -> Int { // expected-note {{did you mean 'v'?}}
+    // There is missing `f` here which made body of the
+    // `if` a multiple statement closure instead that uses
+    // `next` inside.
+    i let x = v, let next = arr.first?.x { // expected-error {{cannot find 'i' in scope}}
+      // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
+      // expected-error@-2 {{'let' cannot appear nested inside another 'var' or 'let' pattern}}
+      // expected-error@-3 {{cannot call value of non-function type 'Int?'}}
+      print(next)
+      return x
+    }
+    return 0
+  }
+}
+
+func test_diagnosing_on_missing_member_in_case() {
+  enum E {
+    case one
+  }
+
+  func test(_: (E) -> Void) {}
+
+  test {
+    switch $0 {
+    case .one: break
+    case .unknown: break // expected-error {{type 'E' has no member 'unknown'}}
+    }
+  }
+}
+
+// Type finder shouldn't bring external closure result type
+// into the scope of an inner closure e.g. while solving
+// init of pattern binding `x`.
+func test_type_finder_doesnt_walk_into_inner_closures() {
+  func test<T>(fn: () -> T) -> T { fn() }
+
+  _ = test { // Ok
+    let x = test {
+      42
+    }
+
+    let _ = test {
+      test { "" }
+    }
+
+    // multi-statement
+    let _ = test {
+      _ = 42
+      return test { "" }
+    }
+
+    return x
   }
 }

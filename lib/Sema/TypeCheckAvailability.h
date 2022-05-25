@@ -40,8 +40,10 @@ namespace swift {
 
 enum class DeclAvailabilityFlag : uint8_t {
   /// Do not diagnose uses of protocols in versions before they were introduced.
-  /// Used when type-checking protocol conformances, since conforming to a
-  /// protocol that doesn't exist yet is allowed.
+  /// We allow a type to conform to a protocol that is less available than the
+  /// type itself. This enables a type to retroactively model or directly conform
+  /// to a protocol only available on newer OSes and yet still be used on older
+  /// OSes.
   AllowPotentiallyUnavailableProtocol = 1 << 0,
 
   /// Diagnose uses of declarations in versions before they were introduced, but
@@ -54,7 +56,13 @@ enum class DeclAvailabilityFlag : uint8_t {
 
   /// If an error diagnostic would normally be emitted, demote the error to a
   /// warning. Used for ObjC key path components.
-  ForObjCKeyPath = 1 << 3
+  ForObjCKeyPath = 1 << 3,
+  
+  /// Downgrade errors about decl availability to warnings when the fix would be
+  /// to constrain availability to a version that is more available than the
+  /// current deployment target. This is needed for source compatibility in when
+  /// checking public extensions in library modules.
+  WarnForPotentialUnavailabilityBeforeDeploymentTarget = 1 << 4,
 };
 using DeclAvailabilityFlags = OptionSet<DeclAvailabilityFlag>;
 
@@ -224,13 +232,14 @@ diagnoseConformanceAvailability(SourceLoc loc,
                                 Type replacementTy=Type(),
                                 bool useConformanceAvailabilityErrorsOption = false);
 
-bool
-diagnoseSubstitutionMapAvailability(SourceLoc loc,
-                                    SubstitutionMap subs,
-                                    const ExportContext &context,
-                                    Type depTy=Type(),
-                                    Type replacementTy=Type(),
-                                    bool useConformanceAvailabilityErrorsOption = false);
+bool diagnoseSubstitutionMapAvailability(
+    SourceLoc loc,
+    SubstitutionMap subs, 
+    const ExportContext &context,
+    Type depTy = Type(),
+    Type replacementTy = Type(),
+    bool useConformanceAvailabilityErrorsOption = false,
+    bool suppressParameterizationCheckForOptional = false);
 
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
@@ -266,6 +275,11 @@ bool diagnoseExplicitUnavailability(
     const ExtensionDecl *ext,
     const ExportContext &where,
     bool useConformanceAvailabilityErrorsOption = false);
+
+/// Diagnose uses of the runtime features of parameterized protools. Returns
+/// \c true if a diagnostic was emitted.
+bool diagnoseParameterizedProtocolAvailability(SourceRange loc,
+                                               const DeclContext *DC);
 
 /// Check if \p decl has a introduction version required by -require-explicit-availability
 void checkExplicitAvailability(Decl *decl);

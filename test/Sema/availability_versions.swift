@@ -615,19 +615,19 @@ class ClassAvailableOn10_9 {
 }
 
 @available(OSX, introduced: 10.51)
-class ClassAvailableOn10_51 { // expected-note {{enclosing scope here}}
+class ClassAvailableOn10_51 { // expected-note {{enclosing scope requires availability of macOS 10.51 or newer}}
   func someMethod() {}
   class func someClassMethod() {
     let _ = ClassAvailableOn10_51()
   }
   var someProp : Int = 22
 
-  @available(OSX, introduced: 10.9) // expected-error {{declaration cannot be more available than enclosing scope}}
+  @available(OSX, introduced: 10.9) // expected-error {{instance method cannot be more available than enclosing scope}}
   func someMethodAvailableOn10_9() { }
 
   @available(OSX, introduced: 10.52)
-  var propWithGetter: Int { // expected-note{{enclosing scope here}}
-    @available(OSX, introduced: 10.51) // expected-error {{declaration cannot be more available than enclosing scope}}
+  var propWithGetter: Int { // expected-note{{enclosing scope requires availability of macOS 10.52 or newer}}
+    @available(OSX, introduced: 10.51) // expected-error {{getter cannot be more available than enclosing scope}}
     get { return 0 }
   }
 }
@@ -1022,8 +1022,8 @@ extension ClassToExtend : ProtocolAvailableOn10_51 {
 }
 
 @available(OSX, introduced: 10.51)
-extension ClassToExtend { // expected-note {{enclosing scope here}}
-  @available(OSX, introduced: 10.9) // expected-error {{declaration cannot be more available than enclosing scope}}
+extension ClassToExtend { // expected-note {{enclosing scope requires availability of macOS 10.51 or newer}}
+  @available(OSX, introduced: 10.9) // expected-error {{instance method cannot be more available than enclosing scope}}
   func extensionMethod10_9() { }
 }
 
@@ -1632,10 +1632,6 @@ func funcWithMultipleShortFormAnnotationsForTheSamePlatform() {
       // expected-note@-1 {{add 'if #available' version check}}
 }
 
-@available(OSX 10.9, *)
-@available(OSX, unavailable)
-func unavailableWins() { } // expected-note {{'unavailableWins()' has been explicitly marked unavailable here}}
-
 func useShortFormAvailable() {
   // expected-note@-1 4{{add @available attribute to enclosing global function}}
 
@@ -1654,6 +1650,34 @@ func useShortFormAvailable() {
 
   funcWithMultipleShortFormAnnotationsForTheSamePlatform() // expected-error {{'funcWithMultipleShortFormAnnotationsForTheSamePlatform()' is only available in macOS 10.53 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
+}
 
+// Unavailability takes precedence over availability and is inherited
+
+@available(OSX 10.9, *)
+@available(OSX, unavailable)
+func unavailableWins() { }
+    // expected-note@-1 {{'unavailableWins()' has been explicitly marked unavailable here}}
+
+struct HasUnavailableExtension {
+  @available(OSX, unavailable)
+  public func directlyUnavailable() { }
+      // expected-note@-1 {{'directlyUnavailable()' has been explicitly marked unavailable here}}
+}
+
+@available(OSX, unavailable)
+extension HasUnavailableExtension {
+  public func inheritsUnavailable() { }
+      // expected-note@-1 {{'inheritsUnavailable()' has been explicitly marked unavailable here}}
+
+  @available(OSX 10.9, *)
+  public func moreAvailableButStillUnavailable() { }
+      // expected-note@-1 {{'moreAvailableButStillUnavailable()' has been explicitly marked unavailable here}}
+}
+
+func useHasUnavailableExtension(_ s: HasUnavailableExtension) {
   unavailableWins() // expected-error {{'unavailableWins()' is unavailable}}
+  s.directlyUnavailable() // expected-error {{'directlyUnavailable()' is unavailable}}
+  s.inheritsUnavailable() // expected-error {{'inheritsUnavailable()' is unavailable in macOS}}
+  s.moreAvailableButStillUnavailable() // expected-error {{'moreAvailableButStillUnavailable()' is unavailable in macOS}}
 }

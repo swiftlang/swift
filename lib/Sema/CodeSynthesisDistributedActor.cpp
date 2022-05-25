@@ -117,9 +117,17 @@ static VarDecl *addImplicitDistributedActorIDProperty(
   propDecl->getAttrs().add(
       new (C) CompilerInitializedAttr(/*IsImplicit=*/true));
 
-  nominal->addMember(propDecl);
-  nominal->addMember(pbDecl);
-
+  // IMPORTANT: The `id` MUST be the first field of any distributed actor,
+  // because when we allocate remote proxy instances, we don't allocate memory
+  // for anything except the first two fields: id and actorSystem, so they
+  // MUST be those fields.
+  //
+  // Their specific order also matters, because it is enforced this way in IRGen
+  // and how we emit them in AST MUST match what IRGen expects or cross-module
+  // things could be using wrong offsets and manifest as reading trash memory on
+  // id or system accesses.
+  nominal->addMember(propDecl, /*hint=*/nullptr, /*insertAtHead=*/true);
+  nominal->addMember(pbDecl, /*hint=*/nullptr, /*insertAtHead=*/true);
   return propDecl;
 }
 

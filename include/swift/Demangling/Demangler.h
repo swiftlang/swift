@@ -80,6 +80,10 @@ class NodeFactory {
 #endif
 
 public:
+#ifndef NDEBUG
+  /// Enabled only by the unit tests to test the failure paths.
+  bool disableAssertionsForUnitTest = false;
+#endif
 
   NodeFactory() {
 #ifdef NODE_FACTORY_DEBUGGING
@@ -623,7 +627,7 @@ public:
 
 /// A demangler which uses stack space for its initial memory.
 ///
-/// The \p Size paramter specifies the size of the stack space.
+/// The \p Size parameter specifies the size of the stack space.
 template <size_t Size> class StackAllocatedDemangler : public Demangler {
   char StackSpace[Size];
 

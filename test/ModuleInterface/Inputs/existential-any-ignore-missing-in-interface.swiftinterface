@@ -1,0 +1,25 @@
+// swift-interface-format-version: 1.0
+// swift-compiler-version: Swift version 5.7-dev (LLVM cd62c186b914a47, Swift d74d00ef63ab637)
+// swift-module-flags: -swift-version 5 -enable-library-evolution -module-name ExistentialAnyMissing
+import Swift
+public protocol P {
+}
+public protocol Q {
+	associatedtype A : ExistentialAnyMissing.P
+}
+public func takesAndReturnsP(_ x: ExistentialAnyMissing.P) -> ExistentialAnyMissing.P
+public func takesAndReturnsOptionalP(_ x: ExistentialAnyMissing.P?) -> ExistentialAnyMissing.P?
+public func takesAndReturnsQ(_ x: ExistentialAnyMissing.Q) -> ExistentialAnyMissing.Q
+public struct S {
+	public var p: ExistentialAnyMissing.P
+	public var maybeP: ExistentialAnyMissing.P?
+	public var q: ExistentialAnyMissing.Q
+  public var maybeQ: ExistentialAnyMissing.Q?
+}
+@inlinable internal func inlinableTakesAny(_ a: Any) {
+  switch a {
+  case is P: break
+  case is Q: break
+  default: break
+  }
+}

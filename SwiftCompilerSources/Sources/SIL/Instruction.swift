@@ -38,7 +38,8 @@ public class Instruction : ListNode, CustomStringConvertible, Hashable {
   final public var function: Function { block.function }
 
   final public var description: String {
-    SILNode_debugDescription(bridgedNode).takeString()
+    var s = SILNode_debugDescription(bridgedNode)
+    return String(cString: s.c_str())
   }
 
   final public var operands: OperandArray {
@@ -62,7 +63,7 @@ public class Instruction : ListNode, CustomStringConvertible, Hashable {
   }
 
   final public var location: Location {
-    return Location(bridgedLocation: SILInstruction_getLocation(bridged))
+    return Location(bridged: SILInstruction_getLocation(bridged))
   }
 
   public var mayTrap: Bool { false }
@@ -120,14 +121,21 @@ public class Instruction : ListNode, CustomStringConvertible, Hashable {
 extension BridgedInstruction {
   public var instruction: Instruction { obj.getAs(Instruction.self) }
   public func getAs<T: Instruction>(_ instType: T.Type) -> T { obj.getAs(T.self) }
+  public var optional: OptionalBridgedInstruction {
+    OptionalBridgedInstruction(obj: self.obj)
+  }
 }
 
 extension OptionalBridgedInstruction {
   var instruction: Instruction? { obj.getAs(Instruction.self) }
+  public static var none: OptionalBridgedInstruction {
+    OptionalBridgedInstruction(obj: nil)
+  }
 }
 
 public class SingleValueInstruction : Instruction, Value {
   final public var definingInstruction: Instruction? { self }
+  final public var definingBlock: BasicBlock { block }
 
   fileprivate final override var resultCount: Int { 1 }
   fileprivate final override func getResult(index: Int) -> Value { self }
@@ -135,7 +143,8 @@ public class SingleValueInstruction : Instruction, Value {
 
 public final class MultipleValueInstructionResult : Value {
   final public var description: String {
-    SILNode_debugDescription(bridgedNode).takeString()
+    var s = SILNode_debugDescription(bridgedNode)
+    return String(cString: s.c_str())
   }
 
   public var instruction: Instruction {
@@ -143,6 +152,7 @@ public final class MultipleValueInstructionResult : Value {
   }
 
   public var definingInstruction: Instruction? { instruction }
+  public var definingBlock: BasicBlock { instruction.block }
 
   public var index: Int { MultiValueInstResult_getIndex(bridged) }
 

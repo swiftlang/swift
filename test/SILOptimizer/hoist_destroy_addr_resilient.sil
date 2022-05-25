@@ -1,0 +1,72 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -emit-module -enable-library-evolution \
+// RUN:   -emit-module-path=%t/resilient_struct.swiftmodule \
+// RUN:   -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
+
+// RUN: %target-sil-opt -I %t -opt-mode=speed -enable-sil-verify-all %s -ssa-destroy-hoisting | %FileCheck %s --check-prefix=CHECK
+
+import resilient_struct
+
+struct Twople<Bound> {
+  @_hasStorage public let lowerBound: Bound { get }
+  @_hasStorage public let upperBound: Bound { get }
+}
+
+sil [ossa] @get_range_out : $@convention(thin) () -> @out Twople<Size>
+
+// Given a non-resilient struct containing two resilient struct fields ONLY ONE
+// of which is copy_addr'd out of just before the destroy_addr of the struct,
+// DO NOT fold the destroy_addr of the struct into the one copy_addrs--doing so
+// would leave the second field initialized.
+//
+// CHECK: sil [ossa] @dont_fold_into_one_of_two_copy_addr_resilient_struct : {{.*}} {
+// CHECK-NOT: copy_addr [take]
+// CHECK: copy_addr
+// CHECK-NEXT: destroy_addr
+// CHECK-LABEL: } // end sil function 'dont_fold_into_one_of_two_copy_addr_resilient_struct'
+sil [ossa] @dont_fold_into_one_of_two_copy_addr_resilient_struct : $@convention(thin) () -> () {
+bb0:
+  %range_addr = alloc_stack $Twople<Size>
+  %get_range_out = function_ref @get_range_out : $@convention(thin) () -> @out Twople<Size>
+  apply %get_range_out(%range_addr) : $@convention(thin) () -> @out Twople<Size>
+  %range_upperBound_addr = struct_element_addr %range_addr : $*Twople<Size>, #Twople.upperBound
+  %date_addr = alloc_stack $Size
+  copy_addr %range_upperBound_addr to [initialization] %date_addr : $*Size
+  destroy_addr %range_addr : $*Twople<Size>
+  destroy_addr %date_addr : $*Size
+  dealloc_stack %date_addr : $*Size
+  dealloc_stack %range_addr : $*Twople<Size>
+  %retval = tuple ()
+  return %retval : $()
+} // end sil function 'dont_fold_into_one_of_two_copy_addr_resilient_struct'
+
+// Given a non-resilient struct containing two resilient fields both of which
+// are copy_addr'd out of just before the destroy_addr of the struct, fold the
+// destroy_addr of the struct into the two copy_addrs, forming copy_addr
+// [take]s.
+//
+// CHECK: sil [ossa] @fold_into_two_of_two_copy_addr_resilient_struct : {{.*}} {
+// CHECK: copy_addr [take]
+// CHECK: copy_addr [take]
+// CHECK-LABEL: } // end sil function 'fold_into_two_of_two_copy_addr_resilient_struct'
+sil [ossa] @fold_into_two_of_two_copy_addr_resilient_struct : $@convention(thin) () -> () {
+bb0:
+  %range_addr = alloc_stack $Twople<Size>
+  %get_range_out = function_ref @get_range_out : $@convention(thin) () -> @out Twople<Size>
+  apply %get_range_out(%range_addr) : $@convention(thin) () -> @out Twople<Size>
+  %range_upperBound_addr = struct_element_addr %range_addr : $*Twople<Size>, #Twople.upperBound
+  %range_lowerBound_addr = struct_element_addr %range_addr : $*Twople<Size>, #Twople.lowerBound
+  %date_addr_1 = alloc_stack $Size
+  %date_addr_2 = alloc_stack $Size
+  copy_addr %range_upperBound_addr to [initialization] %date_addr_1 : $*Size
+  copy_addr %range_lowerBound_addr to [initialization] %date_addr_2 : $*Size
+  destroy_addr %range_addr : $*Twople<Size>
+  destroy_addr %date_addr_1 : $*Size
+  destroy_addr %date_addr_2 : $*Size
+  dealloc_stack %date_addr_2 : $*Size
+  dealloc_stack %date_addr_1 : $*Size
+  dealloc_stack %range_addr : $*Twople<Size>
+  %retval = tuple ()
+  return %retval : $()
+} // end sil function 'dont_fold_into_one_of_two_copy_addr_resilient_struct'
+

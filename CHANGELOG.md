@@ -24,6 +24,86 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   }
   ```
 
+* [SE-0309][]:
+
+  Protocols with associated types and `Self` requirements can now be used as the
+  types of values with the `any` keyword.
+
+  Protocol methods that return associated types can be called on an `any` type;
+  the result is type-erased to the associated type's upper bound, which is another
+  `any` type having the same constraints as the associated type. For example:
+
+  ```swift
+    protocol Surface {...}
+    
+    protocol Solid {
+      associatedtype SurfaceType: Surface
+      func boundary() -> SurfaceType
+    }
+    
+    let solid: any Solid = ...
+    
+    // Type of 'boundary' is 'any Surface'
+    let boundary = solid.boundary()
+  ```
+
+  Protocol methods that take an associated type or `Self` cannot be used with `any`,
+  however in conjunction with [SE-0352][], you can pass the `any` type to a function
+  taking a generic parameter constrained to the protocol. Within the generic context,
+  type relationships are explicit and all protocol methods can be used.
+
+* [SE-0346][]:
+
+  Protocols can now declare a list of one or more primary associated types:
+
+  ```swift
+    protocol Graph<Vertex, Edge> {
+      associatedtype Vertex
+      associatedtype Edge
+    }
+  ```
+
+  A protocol-constrained type like `Graph<Int>` can now be written anywhere that
+  expects the right-hand side of a protocol conformance requirement:
+
+  ```swift
+    func shortestPath<V, E>(_: some Graph<V>, from: V, to: V) -> [E]
+
+    extension Graph<Int> {...}
+
+    func build() -> some Graph<String> {}
+  ```
+
+  A protocol-constrained type is equivalent to a conformance requirement to the protocol
+  itself together with a same-type requirement constraining the primary associated type.
+  The first two examples above are equivalent to the following:
+
+  ```swift
+    func shortestPath<V, E, G>(_: G, from: V, to: V) -> [E]
+      where G: Graph, G.Vertex == V, G.Edge == V
+
+    extension Graph where Vertex == Int {...}
+  ```
+
+  The `build()` function returning `some Graph<String>` cannot be written using a `where`
+  clause; this is an example of a constrained opaque result type, which could not be written
+  before.
+
+* [SE-0353][]:
+
+  Further generalizing the above, protocol-constrained types can also be used with `any`:
+
+  ```swift
+    func findBestGraph(_: [any Graph<Int>]) -> any Graph<Int> {...}
+  ```
+
+* [SE-0358][]:
+
+  Various protocols in the standard library now declare primary associated types, for
+  example `Sequence` and `Collection` declare a single primary associated type `Element`.
+  For example, this allows writing down the types `some Collection<Int>` and
+  `any Collection<Int>`.
+
 * References to `optional` methods on a protocol metatype, as well as references to dynamically looked up methods on the `AnyObject` metatype are now supported. These references always have the type of a function that accepts a single argument and returns an optional value of function type:
 
   ```swift
@@ -112,7 +192,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   in places that would previously fail because `any` types do not conform
   to their protocols. For example:
 
-  ```
+  ```swift
   protocol P {
     associatedtype A
     func getA() -> A
@@ -349,7 +429,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
 * [SE-0328][]:
 
-  Opaque types (expressed with 'some') can now be used in structural positions
+  Opaque types (expressed with `some`) can now be used in structural positions
   within a result type, including having multiple opaque types in the same
   result. For example:
 
@@ -832,7 +912,7 @@ Swift 5.5
   }
 
     
-  func hadWithdrawlOn(_ day: Date, from acct: BankAccount) async -> Bool {
+  func hadWithdrawalOn(_ day: Date, from acct: BankAccount) async -> Bool {
     return await !acct[day].allSatisfy { $0.amount >= Amount.zero }
     //            ^~~~~~~~~ this access is async
   }
@@ -961,7 +1041,7 @@ Swift 5.5
   }
   ```
 
-* The 'lazy' keyword now works in local contexts, making the following valid:
+* The `lazy` keyword now works in local contexts, making the following valid:
 
   ```swift
   func test(useIt: Bool) {
@@ -2807,7 +2887,7 @@ Swift 3.1
   result in a compilation error.
 
   Examples of functions that "return twice" include `vfork` and `setjmp`.
-  These functions change the control flow of a program in ways that that Swift
+  These functions change the control flow of a program in ways that Swift
   has never supported. For example, definitive initialization of variables,
   a core Swift language feature, could not be guaranteed when these functions
   were used.
@@ -2920,7 +3000,7 @@ Swift 3.0
 
 * [SE-0101][]:
 
- The functions `sizeof()`, `strideof()`, and `alignof()` have been removed.
+  The functions `sizeof()`, `strideof()`, and `alignof()` have been removed.
   Memory layout properties for a type `T` are now spelled
   `MemoryLayout<T>.size`, `MemoryLayout<T>.stride`, and
   `MemoryLayout<T>.alignment`, respectively.
@@ -2962,7 +3042,7 @@ Swift 3.0
 
 * [SE-0124][]:
 
- Initializers on `Int` and `UInt` that accept an `ObjectIdentifier` must now use an explicit `bitPattern` label.
+  Initializers on `Int` and `UInt` that accept an `ObjectIdentifier` must now use an explicit `bitPattern` label.
 
   ```swift
   let x: ObjectIdentifier = ...
@@ -3218,7 +3298,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
     didFailToRegisterForRemoteNotificationsWithError error: NSError)
   ```
 
- Now it accepts an `Error` argument:
+  Now it accepts an `Error` argument:
 
   ```swift
   optional func application(_ application: UIApplication,
@@ -3441,7 +3521,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
   foo/* comment */! // no longer works
   ```
 
- Parse errors resulting from this change can be resolved by moving the comment outside the expression.
+  Parse errors resulting from this change can be resolved by moving the comment outside the expression.
 
 * [SE-0031][]:
 
@@ -3502,7 +3582,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
   Attributes change from using `=` in parameters lists
   to using `:`, aligning with function call syntax.
 
-  ```
+  ```swift
   // before
   @available(*, unavailable, renamed="MyRenamedProtocol")
 
@@ -3543,13 +3623,13 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 
   Curried function syntax (with successive parenthesized groups of arguments) is removed, and now produces a compile-time error. Use chained functional return types instead.
 
-```
-// Before
-public func project(function f: FunctionType)(p0: CGPoint, p1: CGPoint)(x: CGFloat) -> CGPoint
+  ```swift
+  // Before
+  public func project(function f: FunctionType)(p0: CGPoint, p1: CGPoint)(x: CGFloat) -> CGPoint
 
-// After
-public func project(function f: FunctionType) -> (p0: CGPoint, p1: CGPoint) -> (x: CGFloat) -> CGPoint
-```
+  // After
+  public func project(function f: FunctionType) -> (p0: CGPoint, p1: CGPoint) -> (x: CGFloat) -> CGPoint
+  ```
 
 * Generic signatures can now contain superclass requirements with generic parameter types, for example:
 
@@ -4896,11 +4976,15 @@ Swift 1.2
 * The `@autoclosure` attribute is now an attribute on a parameter, not an
   attribute on the parameter's type.
 
-  Where before you might have used:
+  Where before you might have used
 
   ```swift
   func assert(predicate : @autoclosure () -> Bool) {...}
-  you now write this as:
+  ```
+
+  you now write this as
+
+  ```swift
   func assert(@autoclosure predicate : () -> Bool) {...}
   ```
 
@@ -4942,7 +5026,11 @@ Swift 1.2
       // redeclares Objective-C method
       //'setProperty:'
   }
+  ```
+
   Similar checking applies to accidental overrides in the Objective-C runtime:
+
+  ```swift
   class B : NSObject {
   func method(arg: String) { }     // note: overridden declaration
       // here has type '(String) -> ()'
@@ -4953,7 +5041,11 @@ Swift 1.2
       // selector 'method:' has incompatible
       // type '([String]) -> ()'
   }
+  ```
+
   as well as protocol conformances:
+
+  ```swift
   class MyDelegate : NSObject, NSURLSessionDelegate {
   func URLSession(session: NSURLSession, didBecomeInvalidWithError:
       Bool){ } // error: Objective-C method 'URLSession:didBecomeInvalidWithError:'
@@ -5041,13 +5133,17 @@ Swift 1.2
   that used `unsafeBitCast` as a workaround for this issue can be written to
   use the raw value initializer.
 
-  For example:
+  For example,
 
   ```swift
   let animationCurve =
     unsafeBitCast(userInfo[UIKeyboardAnimationCurveUserInfoKey].integerValue,
     UIViewAnimationCurve.self)
-  can now be written instead as:
+  ```
+
+  can now be written instead as
+
+  ```swift
   let animationCurve = UIViewAnimationCurve(rawValue:
     userInfo[UIKeyboardAnimationCurveUserInfoKey].integerValue)!
   ```
@@ -9117,7 +9213,7 @@ Swift 1.0
 [SE-0107]: <https://github.com/apple/swift-evolution/blob/main/proposals/0107-unsaferawpointer.md>
 [SE-0108]: <https://github.com/apple/swift-evolution/blob/main/proposals/0108-remove-assoctype-inference.md>
 [SE-0109]: <https://github.com/apple/swift-evolution/blob/main/proposals/0109-remove-boolean.md>
-[SE-0110]: <https://github.com/apple/swift-evolution/blob/main/proposals/0110-distingish-single-tuple-arg.md>
+[SE-0110]: <https://github.com/apple/swift-evolution/blob/main/proposals/0110-distinguish-single-tuple-arg.md>
 [SE-0111]: <https://github.com/apple/swift-evolution/blob/main/proposals/0111-remove-arg-label-type-significance.md>
 [SE-0112]: <https://github.com/apple/swift-evolution/blob/main/proposals/0112-nserror-bridging.md>
 [SE-0113]: <https://github.com/apple/swift-evolution/blob/main/proposals/0113-rounding-functions-on-floatingpoint.md>
@@ -9264,6 +9360,7 @@ Swift 1.0
 [SE-0300]: <https://github.com/apple/swift-evolution/blob/main/proposals/0300-continuation.md>
 [SE-0302]: <https://github.com/apple/swift-evolution/blob/main/proposals/0302-concurrent-value-and-concurrent-closures.md>
 [SE-0306]: <https://github.com/apple/swift-evolution/blob/main/proposals/0306-actors.md>
+[SE-0309]: <https://github.com/apple/swift-evolution/blob/main/proposals/0309-unlock-existential-types-for-all-protocols.md>
 [SE-0310]: <https://github.com/apple/swift-evolution/blob/main/proposals/0310-effectful-readonly-properties.md>
 [SE-0311]: <https://github.com/apple/swift-evolution/blob/main/proposals/0311-task-locals.md>
 [SE-0313]: <https://github.com/apple/swift-evolution/blob/main/proposals/0313-actor-isolation-control.md>
@@ -9287,9 +9384,12 @@ Swift 1.0
 [SE-0341]: <https://github.com/apple/swift-evolution/blob/main/proposals/0341-opaque-parameters.md>
 [SE-0343]: <https://github.com/apple/swift-evolution/blob/main/proposals/0343-top-level-concurrency.md>
 [SE-0345]: <https://github.com/apple/swift-evolution/blob/main/proposals/0345-if-let-shorthand.md>
+[SE-0346]: <https://github.com/apple/swift-evolution/blob/main/proposals/0346-light-weight-same-type-syntax.md>
 [SE-0347]: <https://github.com/apple/swift-evolution/blob/main/proposals/0347-type-inference-from-default-exprs.md>
 [SE-0349]: <https://github.com/apple/swift-evolution/blob/main/proposals/0349-unaligned-loads-and-stores.md>
 [SE-0352]: <https://github.com/apple/swift-evolution/blob/main/proposals/0352-implicit-open-existentials.md>
+[SE-0353]: <https://github.com/apple/swift-evolution/blob/main/proposals/0353-constrained-existential-types.md>
+[SE-0358]: <https://github.com/apple/swift-evolution/blob/main/proposals/0358-primary-associated-types-in-stdlib.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>
 [SR-106]: <https://bugs.swift.org/browse/SR-106>

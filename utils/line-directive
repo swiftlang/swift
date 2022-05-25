@@ -690,7 +690,8 @@ def run():
             command_args,
             stderr=subprocess.STDOUT,
             stdout=subprocess.PIPE,
-            universal_newlines=True
+            universal_newlines=True,
+            encoding='UTF-8'
         )
 
         sources = '(?P<file>' + '|'.join(re.escape(s) for s in sources) + ')'
