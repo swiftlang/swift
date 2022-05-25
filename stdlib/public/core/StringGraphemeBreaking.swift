@@ -111,7 +111,7 @@ extension _StringGuts {
       // Already aligned, or grapheme breaking returned an unexpected result.
       return i._characterAligned
     }
-    let r = String.Index(encodedOffset: start, characterStride: stride)
+    let r = String.Index(_encodedOffset: start)
     return markEncoding(r._characterAligned)
   }
 
@@ -159,7 +159,7 @@ extension _StringGuts {
       // Already aligned, or grapheme breaking returned an unexpected result.
       return i
     }
-    var r = String.Index(encodedOffset: prior, characterStride: stride)
+    var r = String.Index(_encodedOffset: prior)
     if bounds.lowerBound._isCharacterAligned {
       r = r._characterAligned
     } else {
