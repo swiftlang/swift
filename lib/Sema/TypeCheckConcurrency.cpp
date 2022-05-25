@@ -913,7 +913,16 @@ bool swift::diagnoseNonSendableTypes(
 
 bool swift::diagnoseNonSendableTypesInReference(
     ConcreteDeclRef declRef, const DeclContext *fromDC, SourceLoc loc,
-    SendableCheckReason reason) {
+    SendableCheckReason reason, Optional<ActorIsolation> knownIsolation) {
+
+  // Retrieve the actor isolation to use in diagnostics.
+  auto getActorIsolation = [&] {
+    if (knownIsolation)
+      return *knownIsolation;
+
+    return swift::getActorIsolation(declRef.getDecl());
+  };
+
   // For functions, check the parameter and result types.
   SubstitutionMap subs = declRef.getSubstitutions();
   if (auto function = dyn_cast<AbstractFunctionDecl>(declRef.getDecl())) {
@@ -922,7 +931,7 @@ bool swift::diagnoseNonSendableTypesInReference(
       if (diagnoseNonSendableTypes(
               paramType, fromDC, loc, diag::non_sendable_param_type,
               (unsigned)reason, function->getDescriptiveKind(),
-              function->getName(), getActorIsolation(function)))
+              function->getName(), getActorIsolation()))
         return true;
     }
 
@@ -932,7 +941,7 @@ bool swift::diagnoseNonSendableTypesInReference(
       if (diagnoseNonSendableTypes(
               resultType, fromDC, loc, diag::non_sendable_result_type,
               (unsigned)reason, func->getDescriptiveKind(), func->getName(),
-              getActorIsolation(func)))
+              getActorIsolation()))
         return true;
     }
 
@@ -949,7 +958,7 @@ bool swift::diagnoseNonSendableTypesInReference(
             var->getDescriptiveKind(), var->getName(),
             var->isLocalCapture(),
             (unsigned)reason,
-            getActorIsolation(var)))
+            getActorIsolation()))
       return true;
   }
 
@@ -959,7 +968,7 @@ bool swift::diagnoseNonSendableTypesInReference(
       if (diagnoseNonSendableTypes(
               paramType, fromDC, loc, diag::non_sendable_param_type,
               (unsigned)reason, subscript->getDescriptiveKind(),
-              subscript->getName(), getActorIsolation(subscript)))
+              subscript->getName(), getActorIsolation()))
         return true;
     }
 
@@ -968,7 +977,7 @@ bool swift::diagnoseNonSendableTypesInReference(
     if (diagnoseNonSendableTypes(
             resultType, fromDC, loc, diag::non_sendable_result_type,
             (unsigned)reason, subscript->getDescriptiveKind(),
-            subscript->getName(), getActorIsolation(subscript)))
+            subscript->getName(), getActorIsolation()))
       return true;
 
     return false;
@@ -2722,8 +2731,10 @@ namespace {
         if (diagnoseReferenceToUnsafeGlobal(decl, loc))
           return true;
 
-        // FIXME: SE-0338 would trigger Sendable checks here.
-        return false;
+        return diagnoseNonSendableTypesInReference(
+                   declRef, getDeclContext(), loc,
+                   SendableCheckReason::ExitingActor,
+                   result.isolation);
 
       case ActorReferenceResult::EntersActor:
         // Handle all of the checking below.
