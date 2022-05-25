@@ -1746,10 +1746,22 @@ public:
   void visitNominalTypeDecl(const NominalTypeDecl *nominal) {
     checkGenericParams(nominal, nominal);
 
+    DeclAvailabilityFlags flags =
+        DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol;
+
+    // As a concession to source compatibility for API libraries, downgrade
+    // diagnostics about inheritance from a less available type when the
+    // following conditions are met:
+    // 1. The inherited type is only potentially unavailable before the
+    //    deployment target.
+    // 2. The inheriting type is `@usableFromInline`.
+    if (nominal->getAttrs().hasAttribute<UsableFromInlineAttr>())
+      flags |= DeclAvailabilityFlag::
+          WarnForPotentialUnavailabilityBeforeDeploymentTarget;
+
     llvm::for_each(nominal->getInherited(), [&](TypeLoc inherited) {
       checkType(inherited.getType(), inherited.getTypeRepr(), nominal,
-                ExportabilityReason::General,
-                DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol);
+                ExportabilityReason::General, flags);
     });
   }
 
