@@ -21,7 +21,6 @@ from . import llbuild
 from . import llvm
 from . import product
 from . import swift
-from . import swiftpm
 from . import xctest
 from .. import shell
 from .. import targets
@@ -128,7 +127,7 @@ def run_build_script_helper(action, host_target, product, args):
             '--lit-test-dir', lit_test_dir
         ]
     # Pass Cross compile host info
-    if swiftpm.SwiftPM.has_cross_compile_hosts(args):
+    if product.has_cross_compile_hosts():
         if product.is_darwin_host(host_target):
             helper_cmd += ['--cross-compile-hosts']
             for cross_compile_host in args.cross_compile_hosts:
