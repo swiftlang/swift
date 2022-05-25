@@ -2,7 +2,7 @@
 // REQUIRES: concurrency
 
 @available(SwiftStdlib 5.1, *)
-class NotSendable { // expected-note 8{{class 'NotSendable' does not conform to the 'Sendable' protocol}}
+class NotSendable { // expected-note 9{{class 'NotSendable' does not conform to the 'Sendable' protocol}}
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -13,6 +13,8 @@ extension NotSendable: Sendable { }
 protocol IsolatedWithNotSendableRequirements: Actor {
   func f() -> NotSendable
   var prop: NotSendable { get }
+
+  func fAsync() async -> NotSendable
 }
 
 // Okay, everything is isolated the same way
@@ -20,6 +22,7 @@ protocol IsolatedWithNotSendableRequirements: Actor {
 actor A1: IsolatedWithNotSendableRequirements {
   func f() -> NotSendable { NotSendable() }
   var prop: NotSendable { NotSendable() }
+  func fAsync() async -> NotSendable { NotSendable() }
 }
 
 // Okay, sendable checking occurs when calling through the protocol
@@ -28,6 +31,9 @@ actor A1: IsolatedWithNotSendableRequirements {
 actor A2: IsolatedWithNotSendableRequirements {
   nonisolated func f() -> NotSendable { NotSendable() }
   nonisolated var prop: NotSendable { NotSendable() }
+
+  nonisolated func fAsync() async -> NotSendable { NotSendable() }
+  // expected-warning@-1{{non-sendable type 'NotSendable' returned by nonisolated instance method 'fAsync()' satisfying protocol requirement cannot cross actor boundary}}
 }
 
 @available(SwiftStdlib 5.1, *)

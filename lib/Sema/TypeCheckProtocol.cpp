@@ -2954,6 +2954,10 @@ bool ConformanceChecker::checkActorIsolation(
     requirementIsolation = requirementIsolation.subst(subs);
   }
 
+  SourceLoc loc = witness->getLoc();
+  if (loc.isInvalid())
+    loc = Conformance->getLoc();
+
   auto refResult = ActorReferenceResult::forReference(
       getConcreteWitness(), witness->getLoc(), DC, None, None,
       None, requirementIsolation);
@@ -2971,7 +2975,8 @@ bool ConformanceChecker::checkActorIsolation(
     return false;
 
   case ActorReferenceResult::ExitsActorToNonisolated:
-    // FIXME: SE-0338 would diagnose this.
+    diagnoseNonSendableTypesInReference(
+        getConcreteWitness(), DC, loc, SendableCheckReason::Conformance);
     return false;
 
   case ActorReferenceResult::EntersActor:
@@ -3015,10 +3020,6 @@ bool ConformanceChecker::checkActorIsolation(
 
   // If we aren't missing anything, do a Sendable check and move on.
   if (!missingOptions) {
-    SourceLoc loc = witness->getLoc();
-    if (loc.isInvalid())
-      loc = Conformance->getLoc();
-
     // FIXME: Disable Sendable checking when the witness is an initializer
     // that is explicitly marked nonisolated.
     if (isa<ConstructorDecl>(witness) &&
