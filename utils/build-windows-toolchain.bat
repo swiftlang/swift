@@ -45,13 +45,29 @@ call :CloneRepositories || (exit /b)
 
 md "%BuildRoot%\Library"
 
-:: TODO(compnerd) build ICU from source
-curl.exe -sOL "https://github.com/unicode-org/icu/releases/download/release-67-1/icu4c-67_1-Win64-MSVC2017.zip" || (exit /b)
-"%SystemDrive%\Program Files\Git\usr\bin\unzip.exe" -o icu4c-67_1-Win64-MSVC2017.zip -d %BuildRoot%\Library\icu-67.1
-md %BuildRoot%\Library\icu-67.1\usr\bin
-copy %BuildRoot%\Library\icu-67.1\bin64\icudt67.dll %BuildRoot%\Library\icu-67.1\usr\bin || (exit /b)
-copy %BuildRoot%\Library\icu-67.1\bin64\icuin67.dll %BuildRoot%\Library\icu-67.1\usr\bin || (exit /b)
-copy %BuildRoot%\Library\icu-67.1\bin64\icuuc67.dll %BuildRoot%\Library\icu-67.1\usr\bin || (exit /b)
+:: Build ICU
+copy %SourceRoot%\swift-installer-scripts\shared\ICU\CMakeLists.txt %SourceRoot%\icu\icu4c\ || (exit /b)
+cmake ^
+  -B %BuildRoot%\icu ^
+
+  -D BUILD_SHARED_LIBS=NO ^
+  -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
+  -D CMAKE_C_COMPILER=cl ^
+  -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
+  -D CMAKE_CXX_COMPILER=cl ^
+  -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
+  -D CMAKE_MT=mt ^
+  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
+  -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
+
+  -D CMAKE_INSTALL_PREFIX=%BuildRoot%\Library\icu-69.1\usr ^
+
+  -D BUILD_TOOLS=YES ^
+
+  -G Ninja ^
+  -S %SourceRoot%\icu\icu4c || (exit /b)
+cmake --build "%BuildRoot%\icu" || (exit /b)
+cmake --build "%BuildRoot%\icu" --target install || (exit /b)
 
 :: FIXME(compnerd) is there a way to build the sources without downloading the amalgamation?
 curl.exe -sOL "https://sqlite.org/2021/sqlite-amalgamation-3360000.zip" || (exit /b)
@@ -280,9 +296,10 @@ cmake ^
   -D CMAKE_INSTALL_PREFIX=%SDKInstallRoot%\usr ^
 
   -D CURL_DIR=%BuildRoot%\Library\curl-7.77.0\usr\lib\cmake\CURL ^
-  -D ICU_ROOT=%BuildRoot%\Library\icu-67.1 ^
-  -D ICU_UC_LIBRARY=%BuildRoot%\Library\icu-67.1\lib64\icuuc67.lib ^
-  -D ICU_I18N_LIBRARY=%BuildRoot%\Library\icu-67.1\lib64\icuin67.lib ^
+  -D ICU_ROOT=%BuildRoot%\Library\icu-69.1\usr ^
+  -D ICU_DATA_LIBRARY_RELEASE=%BuildRoot%\Library\icu-69.1\usr\lib\sicudt69.lib ^
+  -D ICU_UC_LIBRARY_RELEASE=%BuildRoot%\Library\icu-69.1\usr\lib\sicuuc69.lib ^
+  -D ICU_I18N_LIBRARY_RELEASE=%BuildRoot%\Library\icu-69.1\usr\lib\sicuin69.lib ^
   -D LIBXML2_LIBRARY=%BuildRoot%\Library\libxml2-2.9.12\usr\lib\libxml2s.lib ^
   -D LIBXML2_INCLUDE_DIR=%BuildRoot%\Library\libxml2-2.9.12\usr\include\libxml2 ^
   -D LIBXML2_DEFINITIONS="/DLIBXML_STATIC" ^
@@ -655,17 +672,6 @@ msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\runtime.wixproj ^
 :: TODO(compnerd) actually perform the code-signing
 :: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\runtime\runtime.msi
 
-:: Package icu.msi
-msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\icu.wixproj ^
-  -p:RunWixToolsOutOfProc=true ^
-  -p:OutputPath=%PackageRoot%\icu\ ^
-  -p:IntermediateOutputPath=%PackageRoot%\icu\ ^
-  -p:ProductVersion=67.1 ^
-  -p:ProductVersionMajor=67 ^
-  -p:ICU_ROOT=%BuildRoot%
-:: TODO(compnerd) actually perform the code-signing
-:: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\icu\icu.msi
-
 :: Package devtools.msi
 msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\devtools.wixproj ^
   -p:RunWixToolsOutOfProc=true ^
@@ -679,7 +685,6 @@ msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\devtools.wixproj 
 move %PackageRoot%\toolchain\toolchain.msi %PackageRoot% || (exit /b)
 move %PackageRoot%\sdk\sdk.msi %PackageRoot% || (exit /b)
 move %PackageRoot%\runtime\runtime.msi %PackageRoot% || (exit /b)
-move %PackageRoot%\icu\icu.msi %PackageRoot% || (exit /b)
 move %PackageRoot%\devtools\devtools.msi %PackageRoot% || (exit /b)
 
 :: Build Installer
@@ -693,8 +698,6 @@ msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\installer.wixproj
 
 :: Stage Artifacts
 md %BuildRoot%\artifacts
-:: ICU Dependency for runtime libraries
-move %PackageRoot%\icu.msi %BuildRoot%\artifacts || (exit /b)
 :: Redistributable libraries for developers
 move %PackageRoot%\runtime.msi %BuildRoot%\artifacts || (exit /b)
 :: Toolchain
@@ -708,7 +711,7 @@ move %PackageRoot%\installer\installer.exe %BuildRoot%\artifacts || (exit /b)
 
 :: Test Swift
 :: TODO(compnerd) make lit adjust the path properly
-path %BuildRoot%\3;%BuildRoot%\1\bin;%BuildRoot%\Library\icu-67.1\usr\bin;%PATH%;%SystemDrive%\Program Files\Git\usr\bin
+path %BuildRoot%\3;%BuildRoot%\1\bin;%PATH%;%SystemDrive%\Program Files\Git\usr\bin
 cmake --build %BuildRoot%\1 --target check-swift || (exit /b)
 
 :: Test dispatch
@@ -735,9 +738,10 @@ cmake ^
   -D CMAKE_INSTALL_PREFIX=%SDKInstallRoot%\usr ^
 
   -D CURL_DIR=%BuildRoot%\Library\curl-7.77.0\usr\lib\cmake\CURL ^
-  -D ICU_ROOT=%BuildRoot%\Library\icu-67.1 ^
-  -D ICU_UC_LIBRARY=%BuildRoot%\Library\icu-67.1\lib64\icuuc67.lib ^
-  -D ICU_I18N_LIBRARY=%BuildRoot%\Library\icu-67.1\lib64\icuin67.lib ^
+  -D ICU_ROOT=%BuildRoot%\Library\icu-69.1\usr ^
+  -D ICU_DATA_LIBRARY_RELEASE=%BuildRoot%\Library\icu-69.1\usr\lib\sicudt69.lib ^
+  -D ICU_I18N_LIBRARY_RELEASE=%BuildRoot%\Library\icu-69.1\usr\lib\sicuin69.lib ^
+  -D ICU_UC_LIBRARY_RELEASE=%BuildRoot%\Library\icu-69.1\usr\lib\sicuuc69.lib ^
   -D LIBXML2_LIBRARY=%BuildRoot%\Library\libxml2-2.9.12\usr\lib\libxml2s.lib ^
   -D LIBXML2_INCLUDE_DIR=%BuildRoot%\Library\libxml2-2.9.12\usr\include\libxml2 ^
   -D LIBXML2_DEFINITIONS="/DLIBXML_STATIC" ^
@@ -832,7 +836,7 @@ rd /s /q zlib libxml2 sqlite icu curl
 git clone --quiet --no-tags --depth 1 --branch v1.2.11 https://github.com/madler/zlib
 git clone --quiet --no-tags --depth 1 --branch v2.9.12 https://github.com/gnome/libxml2
 git clone --quiet --no-tags --depth 1 --branch version-3.36.0 https://github.com/sqlite/sqlite
-git clone --quiet --no-tags --depth 1 --branch maint/maint-67 https://github.com/unicode-org/icu
+git clone --quiet --no-tags --depth 1 --branch maint/maint-69 https://github.com/unicode-org/icu
 git clone --quiet --no-tags --depth 1 --branch curl-7_77_0 https://github.com/curl/curl
 
 goto :eof
