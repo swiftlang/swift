@@ -1,4 +1,4 @@
-// UNSUPPORTED: windows
+// UNSUPPORTED: OS=windows-msvc
 // UNSUPPORTED: CPU=powerpc64le
 // RUN: %swiftc_driver -driver-print-jobs -sanitize=fuzzer,address -target x86_64-apple-macosx10.9 -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ %s | %FileCheck -check-prefix=LIBFUZZER_OSX %s
 // RUN: %swiftc_driver -driver-print-jobs -sanitize=fuzzer,address -target x86_64-unknown-linux-gnu -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ %s | %FileCheck -check-prefix=LIBFUZZER_LINUX %s

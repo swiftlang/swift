@@ -1,5 +1,5 @@
 // RUN: %swiftc_driver %s -### 2>&1 | %FileCheck %s
 
-// UNSUPPORTED: windows
+// UNSUPPORTED: OS=windows-msvc
 // CHECK: swift-frontend
 
