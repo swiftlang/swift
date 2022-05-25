@@ -57,6 +57,7 @@
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/Module.h"
 #include "clang/Basic/SourceManager.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ConvertUTF.h"
@@ -6397,10 +6398,16 @@ public:
 
       // Print based on the type.
       Printer << "some ";
-      if (auto inheritedType = decl->getInherited().front().getType())
-        inheritedType->print(Printer, Options);
-      else
+      if (!decl->getConformingProtocols().empty()) {
+        llvm::interleave(decl->getConformingProtocols(), Printer, [&](ProtocolDecl *proto){
+          if (auto printType = proto->getDeclaredType())
+            printType->print(Printer, Options);
+          else
+            Printer << proto->getNameStr();
+        }, " & ");
+      } else {
         Printer << "Any";
+      }
       return;
     }
 

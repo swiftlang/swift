@@ -929,70 +929,112 @@ internal struct InternalStruct { // expected-note 2 {{add @available attribute}}
 
 //
 // Extensions are externally visible if they extend a public type and (1) have
-// public members or (2) declare a conformance to a public protocol. Externally
-// visible extensions should be typechecked with the inlining target.
+// public members or (2) declare a conformance to a public protocol.
+//
+// Extensions without explicit availability that are externally visible use an
+// implied floor of either the availability of the extended type or the
+// deployment target, whichever is more available. This is a special rule
+// designed as a convenience to library authors who have written quite a bit of
+// code without annotating availability on their extensions and getting away
+// with it because previously the deployment target was always used as the
+// floor.
+//
+// Extensions without explicit availability that are not visible externally are
+// checked using an implied floor of the deployment target.
 //
 
-// OK, NoAvailable is always available, both internally and externally.
+
+// MARK: Extensions on NoAvailable
+
 extension NoAvailable {}
-extension NoAvailable {
-  public func publicFunc1() {}
+
+extension NoAvailable { // expected-note {{add @available attribute to enclosing extension}}
+  func internalFuncInExtension( // expected-note {{add @available attribute to enclosing instance method}}
+    _: NoAvailable,
+    _: BeforeInliningTarget,
+    _: AtInliningTarget,
+    _: BetweenTargets,
+    _: AtDeploymentTarget,
+    _: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
+  ) {}
 }
 
-// OK, no public members and BetweenTargets is always available internally.
+extension NoAvailable { // expected-note 3 {{add @available attribute to enclosing extension}}
+  public func publicFuncInExtension( // expected-note 3 {{add @available attribute to enclosing instance method}}
+    _: NoAvailable,
+    _: BeforeInliningTarget,
+    _: AtInliningTarget,
+    _: BetweenTargets, // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
+    _: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
+    _: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
+  ) {}
+}
+
+// MARK: Extensions on BetweenTargets
+
 extension BetweenTargets {}
 
-// OK, no public members and BetweenTargets is always available internally.
-extension BetweenTargets {
-  internal func internalFunc1() {}
-  private func privateFunc1() {}
-  fileprivate func fileprivateFunc1() {}
+extension BetweenTargets { // expected-note {{add @available attribute to enclosing extension}}
+  func internalFuncInExtension( // expected-note {{add @available attribute to enclosing instance method}}
+    _: NoAvailable,
+    _: BeforeInliningTarget,
+    _: AtInliningTarget,
+    _: BetweenTargets,
+    _: AtDeploymentTarget,
+    _: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
+  ) {}
 }
 
-// expected-warning@+1 {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}} expected-note@+1 {{add @available attribute to enclosing extension}}
-extension BetweenTargets {
-  public func publicFunc1() {}
+extension BetweenTargets { // expected-note 2 {{add @available attribute to enclosing extension}}
+  public func publicFuncInExtension( // expected-note 2 {{add @available attribute to enclosing instance method}}
+    _: NoAvailable,
+    _: BeforeInliningTarget,
+    _: AtInliningTarget,
+    _: BetweenTargets,
+    _: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
+    _: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
+  ) {}
 }
 
-// expected-warning@+1 {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}} expected-note@+1 {{add @available attribute to enclosing extension}}
+@available(macOS 10.15, *)
 extension BetweenTargets {
-  @usableFromInline
-  internal func usableFromInlineFunc1() {}
+  public func publicFuncInExtensionWithExplicitAvailability( // expected-note {{add @available attribute to enclosing instance method}}
+    _: NoAvailable,
+    _: BeforeInliningTarget,
+    _: AtInliningTarget,
+    _: BetweenTargets,
+    _: AtDeploymentTarget,
+    _: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
+  ) {}
 }
 
-// expected-warning@+1 {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}} expected-note@+1 {{add @available attribute to enclosing extension}}
-extension BetweenTargets {
-  internal func internalFunc2() {}
-  private func privateFunc2() {}
-  fileprivate func fileprivateFunc2() {}
-  public func publicFunc2() {}
-}
-
-// An extension with more availability than BetweenTargets.
-// expected-error@+2 {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
-@available(macOS 10.10, *)
-extension BetweenTargets {
-  public func publicFunc3() {}
-}
-
-// FIXME: Can we prevent this warning when SPI members are the reason the extension is exported?
-// expected-warning@+1 {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}} expected-note@+1 {{add @available attribute to enclosing extension}}
-extension BetweenTargets {
-  @_spi(Private)
-  public func spiFunc1() {}
+extension BetweenTargets { // expected-note {{add @available attribute to enclosing extension}}
+  @available(macOS 10.15, *)
+  public func publicFuncWithExplicitAvailabilityInExtension(
+    _: NoAvailable,
+    _: BeforeInliningTarget,
+    _: AtInliningTarget,
+    _: BetweenTargets,
+    _: AtDeploymentTarget,
+    _: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
+  ) {}
 }
 
 @_spi(Private)
-extension BetweenTargets {
-  internal func internalFunc3() {}
-  private func privateFunc3() {}
-  fileprivate func fileprivateFunc3() {}
-  public func spiFunc2() {}
+extension BetweenTargets { // expected-note {{add @available attribute to enclosing extension}}
+  public func inheritedSPIFuncInExtension( // expected-note {{add @available attribute to enclosing instance method}}
+    _: NoAvailable,
+    _: BeforeInliningTarget,
+    _: AtInliningTarget,
+    _: BetweenTargets,
+    _: AtDeploymentTarget,
+    _: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
+  ) {}
 }
 
 @available(macOS, unavailable)
 extension BetweenTargets {
-  public func inheritsUnavailable(
+  public func inheritsUnavailableFuncInExtension(
     _: NoAvailable,
     _: BeforeInliningTarget,
     _: AtInliningTarget,
@@ -1000,49 +1042,96 @@ extension BetweenTargets {
     _: AtDeploymentTarget,
     _: AfterDeploymentTarget,
     _: Unavailable
-  ) { }
+  ) {}
 }
 
-@_spi(Private)
-extension BetweenTargets { // expected-note 1 {{add @available attribute to enclosing extension}}
-  public func inheritsSPINoAvailable( // expected-note 1 {{add @available attribute to enclosing instance method}}
+// This extension is explicitly more available than BetweenTargets but because
+// it only contains internal members, the availability floor is still the
+// deployment target.
+@available(macOS 10.10, *)
+extension BetweenTargets {
+  func internalFuncInExcessivelyAvailableExtension() {}
+}
+
+extension BetweenTargets {
+  @available(macOS 10.10, *)
+  func excessivelyAvailableInternalFuncInExtension() {}
+}
+
+@available(macOS 10.10, *)
+extension BetweenTargets { // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
+  public func publicFuncInExcessivelyAvailableExtension() {}
+}
+
+// MARK: Extensions on BetweenTargetsInternal
+
+// Same availability as BetweenTargets but internal instead of public.
+@available(macOS 10.14.5, *)
+internal struct BetweenTargetsInternal {}
+
+extension BetweenTargetsInternal {}
+
+extension BetweenTargetsInternal { // expected-note {{add @available attribute to enclosing extension}}
+  func internalFuncInExtension( // expected-note {{add @available attribute to enclosing instance method}}
     _: NoAvailable,
     _: BeforeInliningTarget,
     _: AtInliningTarget,
     _: BetweenTargets,
     _: AtDeploymentTarget,
     _: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
-  ) { }
+  ) {}
 }
 
-// Same availability as BetweenTargets but internal instead of public.
-@available(macOS 10.14.5, *)
-internal struct BetweenTargetsInternal {}
-
-// OK, extensions on internal types are never visible externally.
-extension BetweenTargetsInternal {}
-extension BetweenTargetsInternal {
-  public func publicFunc() {}
+extension BetweenTargetsInternal { // expected-note {{add @available attribute to enclosing extension}}
+  public func publicFuncInExtension( // expected-note {{add @available attribute to enclosing instance method}}
+    _: NoAvailable,
+    _: BeforeInliningTarget,
+    _: AtInliningTarget,
+    _: BetweenTargets,
+    _: AtDeploymentTarget,
+    _: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
+  ) {}
 }
 
-// expected-warning@+1 {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}} expected-note@+1 {{add @available attribute to enclosing extension}}
-extension AtDeploymentTarget {
-  public func publicFunc() {}
-}
+// MARK: Extensions on AfterDeploymentTarget
 
 // expected-error@+1 {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note@+1 {{add @available attribute to enclosing extension}}
 extension AfterDeploymentTarget {}
 
-// expected-error@+1 {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note@+1 {{add @available attribute to enclosing extension}}
-extension AfterDeploymentTarget {
-  internal func internalFunc1() {}
-  private func privateFunc1() {}
-  fileprivate func fileprivateFunc1() {}
+// expected-error@+1 {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
+extension AfterDeploymentTarget { // expected-note 2 {{add @available attribute to enclosing extension}}
+  func internalFuncInExtension( // expected-note {{add @available attribute to enclosing instance method}}
+    _: NoAvailable,
+    _: BeforeInliningTarget,
+    _: AtInliningTarget,
+    _: BetweenTargets,
+    _: AtDeploymentTarget,
+    _: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
+  ) {}
 }
 
-// expected-error@+1 {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note@+1 {{add @available attribute to enclosing extension}}
+// expected-error@+1 {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
+extension AfterDeploymentTarget { // expected-note 2 {{add @available attribute to enclosing extension}}
+  public func publicFuncInExtension( // expected-note {{add @available attribute to enclosing instance method}}
+    _: NoAvailable,
+    _: BeforeInliningTarget,
+    _: AtInliningTarget,
+    _: BetweenTargets,
+    _: AtDeploymentTarget,
+    _: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
+  ) {}
+}
+
+@available(macOS 11, *)
 extension AfterDeploymentTarget {
-  public func publicFunc1() {}
+  public func publicFuncInExtensionWithExplicitAvailability(
+    _: NoAvailable,
+    _: BeforeInliningTarget,
+    _: AtInliningTarget,
+    _: BetweenTargets,
+    _: AtDeploymentTarget,
+    _: AfterDeploymentTarget
+  ) {}
 }
 
 
@@ -1062,8 +1151,8 @@ public protocol PublicProto {}
 extension NoAvailable: PublicProto {}
 extension BeforeInliningTarget: PublicProto {}
 extension AtInliningTarget: PublicProto {}
-extension BetweenTargets: PublicProto {} // expected-warning {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add @available attribute to enclosing extension}}
-extension AtDeploymentTarget: PublicProto {} // expected-warning {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add @available attribute to enclosing extension}}
+extension BetweenTargets: PublicProto {}
+extension AtDeploymentTarget: PublicProto {}
 extension AfterDeploymentTarget: PublicProto {} // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add @available attribute to enclosing extension}}
 
 
@@ -1201,6 +1290,11 @@ public enum NoAvailableEnumWithClasses {
   public class InheritsBetweenTargets: BetweenTargetsClass {} // expected-error {{'BetweenTargetsClass' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}} expected-note 2 {{add @available attribute to enclosing class}}
   public class InheritsAtDeploymentTarget: AtDeploymentTargetClass {} // expected-error {{'AtDeploymentTargetClass' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}} expected-note 2 {{add @available attribute to enclosing class}}
   public class InheritsAfterDeploymentTarget: AfterDeploymentTargetClass {} // expected-error {{'AfterDeploymentTargetClass' is only available in macOS 11 or newer}} expected-note 2 {{add @available attribute to enclosing class}}
+  
+  // As a special case, downgrade the less available superclasses diagnostic for
+  // `@usableFromInline` classes.
+  @usableFromInline
+  class UFIInheritsBetweenTargets: BetweenTargetsClass {} // expected-warning {{'BetweenTargetsClass' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}} expected-note 2 {{add @available attribute to enclosing class}}
 }
 
 @_spi(Private)

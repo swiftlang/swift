@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-parameterized-existential-types
+// RUN: %target-typecheck-verify-swift -disable-availability-checking
 
 protocol Sequence<Element> {
   associatedtype Element

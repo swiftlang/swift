@@ -1409,7 +1409,15 @@ private:
       }
 
       auto caseStmt = cast<CaseStmt>(rawCase.get<Stmt *>());
-      visitCaseStmt(caseStmt);
+      // Body of the `case` statement can contain a `fallthrough`
+      // statement that requires both source and destination
+      // `case` preambles to be type-checked, so bodies of `case`
+      // statements should be visited after preambles.
+      visitCaseStmtPreamble(caseStmt);
+    }
+
+    for (auto *caseStmt : switchStmt->getCases()) {
+      visitCaseStmtBody(caseStmt);
 
       // Check restrictions on '@unknown'.
       if (caseStmt->hasUnknownAttr()) {
@@ -1436,7 +1444,7 @@ private:
     return doStmt;
   }
 
-  ASTNode visitCaseStmt(CaseStmt *caseStmt) {
+  void visitCaseStmtPreamble(CaseStmt *caseStmt) {
     // Translate the patterns and guard expressions for each case label item.
     for (auto &caseItem : caseStmt->getMutableCaseLabelItems()) {
       SolutionApplicationTarget caseTarget(&caseItem,
@@ -1453,11 +1461,16 @@ private:
           solution.getType(prev)->mapTypeOutOfContext());
       expected->setInterfaceType(type);
     }
+  }
 
-    // Translate the body.
+  void visitCaseStmtBody(CaseStmt *caseStmt) {
     auto *newBody = visit(caseStmt->getBody()).get<Stmt *>();
     caseStmt->setBody(cast<BraceStmt>(newBody));
+  }
 
+  ASTNode visitCaseStmt(CaseStmt *caseStmt) {
+    visitCaseStmtPreamble(caseStmt);
+    visitCaseStmtBody(caseStmt);
     return caseStmt;
   }
 

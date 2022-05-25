@@ -569,18 +569,27 @@ static void addSendableFixIt(
     const NominalTypeDecl *nominal, InFlightDiagnostic &diag, bool unchecked) {
   if (nominal->getInherited().empty()) {
     SourceLoc fixItLoc = nominal->getBraces().Start;
-    if (unchecked)
-      diag.fixItInsert(fixItLoc, ": @unchecked Sendable");
-    else
-      diag.fixItInsert(fixItLoc, ": Sendable");
+    diag.fixItInsert(fixItLoc,
+                     unchecked ? ": @unchecked Sendable" : ": Sendable");
   } else {
-    ASTContext &ctx = nominal->getASTContext();
-    SourceLoc fixItLoc = nominal->getInherited().back().getSourceRange().End;
-    fixItLoc = Lexer::getLocForEndOfToken(ctx.SourceMgr, fixItLoc);
-    if (unchecked)
-      diag.fixItInsert(fixItLoc, ", @unchecked Sendable");
-    else
-      diag.fixItInsert(fixItLoc, ", Sendable");
+    auto fixItLoc = nominal->getInherited().back().getLoc();
+    diag.fixItInsertAfter(fixItLoc,
+                          unchecked ? ", @unchecked Sendable" : ", Sendable");
+  }
+}
+
+/// Add Fix-It text for the given generic param declaration type to adopt
+/// Sendable.
+static void addSendableFixIt(const GenericTypeParamDecl *genericArgument,
+                             InFlightDiagnostic &diag, bool unchecked) {
+  if (genericArgument->getInherited().empty()) {
+    auto fixItLoc = genericArgument->getLoc();
+    diag.fixItInsertAfter(fixItLoc,
+                          unchecked ? ": @unchecked Sendable" : ": Sendable");
+  } else {
+    auto fixItLoc = genericArgument->getInherited().back().getLoc();
+    diag.fixItInsertAfter(fixItLoc,
+                          unchecked ? ", @unchecked Sendable" : ", Sendable");
   }
 }
 
@@ -874,6 +883,18 @@ static bool diagnoseSingleNonSendableType(
       nominal->diagnose(
           diag::non_sendable_nominal, nominal->getDescriptiveKind(),
           nominal->getName());
+    } else if (auto genericArchetype = type->getAs<ArchetypeType>()) {
+      auto interfaceType = genericArchetype->getInterfaceType();
+      if (auto genericParamType =
+              interfaceType->getAs<GenericTypeParamType>()) {
+        auto *genericParamTypeDecl = genericParamType->getDecl();
+        if (genericParamTypeDecl &&
+            genericParamTypeDecl->getModuleContext() == module) {
+          auto diag = genericParamTypeDecl->diagnose(
+              diag::add_generic_parameter_sendable_conformance, type);
+          addSendableFixIt(genericParamTypeDecl, diag, /*unchecked=*/false);
+        }
+      }
     }
 
     return false;
@@ -1527,6 +1548,7 @@ namespace {
     SmallVector<const DeclContext *, 4> contextStack;
     SmallVector<ApplyExpr*, 4> applyStack;
     SmallVector<std::pair<OpaqueValueExpr *, Expr *>, 4> opaqueValues;
+    SmallVector<const PatternBindingDecl *, 2> patternBindingStack;
 
     /// Keeps track of the capture context of variables that have been
     /// explicitly captured in closures.
@@ -1538,6 +1560,10 @@ namespace {
 
     using MutableVarParent
         = llvm::PointerUnion<InOutExpr *, LoadExpr *, AssignExpr *>;
+
+    const PatternBindingDecl *getTopPatternBindingDecl() const {
+      return patternBindingStack.empty() ? nullptr : patternBindingStack.back();
+    }
 
     /// Mapping from mutable variable reference exprs, or inout expressions,
     /// to the parent expression, when that parent is either a load or
@@ -1694,9 +1720,24 @@ namespace {
         Type type = getDeclContext()
             ->mapTypeIntoContext(decl->getInterfaceType())
             ->getReferenceStorageReferent();
-        diagnoseNonSendableTypes(
-            type, getDeclContext(), capture.getLoc(),
-            diag::non_sendable_capture, decl->getName());
+
+        if (closure->isImplicit()) {
+          auto *patternBindingDecl = getTopPatternBindingDecl();
+          if (patternBindingDecl && patternBindingDecl->isAsyncLet()) {
+            diagnoseNonSendableTypes(
+                type, getDeclContext(), capture.getLoc(),
+                diag::implicit_async_let_non_sendable_capture, decl->getName());
+          } else {
+            // Fallback to a generic implicit capture missing sendable
+            // conformance diagnostic.
+            diagnoseNonSendableTypes(type, getDeclContext(), capture.getLoc(),
+                                     diag::implicit_non_sendable_capture,
+                                     decl->getName());
+          }
+        } else {
+          diagnoseNonSendableTypes(type, getDeclContext(), capture.getLoc(),
+                                   diag::non_sendable_capture, decl->getName());
+        }
       }
     }
 
@@ -1759,6 +1800,10 @@ namespace {
         contextStack.push_back(func);
       }
 
+      if (auto *PBD = dyn_cast<PatternBindingDecl>(decl)) {
+        patternBindingStack.push_back(PBD);
+      }
+
       return true;
     }
 
@@ -1766,6 +1811,11 @@ namespace {
       if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
         assert(contextStack.back() == func);
         contextStack.pop_back();
+      }
+
+      if (auto *PBD = dyn_cast<PatternBindingDecl>(decl)) {
+        assert(patternBindingStack.back() == PBD);
+        patternBindingStack.pop_back();
       }
 
       return true;
