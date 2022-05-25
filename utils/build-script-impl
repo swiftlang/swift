@@ -1839,16 +1839,8 @@ for host in "${ALL_HOSTS[@]}"; do
                     llvm_enable_projects+=("clang-tools-extra")
                 fi
 
-                # On non-Darwin platforms, build lld so we can always have a
-                # linker that is compatible with the swift we are using to
-                # compile the stdlib.
-                #
-                # This makes it easier to build target stdlibs on systems that
-                # have old toolchains without more modern linker features.
-                if [[ "$(uname -s)" != "Darwin" ]] ; then
-                    if [[ ! "${SKIP_BUILD_LLD}" ]]; then
-                        llvm_enable_projects+=("lld")
-                    fi
+                if [[ ! "${SKIP_BUILD_LLD}" ]]; then
+                    llvm_enable_projects+=("lld")
                 fi
 
                 cmake_options+=(
