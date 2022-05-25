@@ -5,8 +5,8 @@
 // REQUIRES: libdispatch
 // REQUIRES: tsan_runtime
 // UNSUPPORTED: use_os_stdlib
-// UNSUPPORTED: linux
-// UNSUPPORTED: windows
+// UNSUPPORTED: OS=linux-gnu
+// UNSUPPORTED: OS=windows-msvc
 
 // REQUIRES: rdar83246843
 
