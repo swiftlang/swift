@@ -2755,6 +2755,13 @@ public:
 
 private:
   void fixIt(InFlightDiagnostic &diagnostic) const;
+
+  /// Determine whether the fix-it to add `as any ...` requires parens.
+  ///
+  /// Parens are required to avoid suppressing existential opening
+  /// if result of the call is passed as an argument to another call
+  /// that requires such opening.
+  bool fixItRequiresParens() const;
 };
 
 } // end namespace constraints
