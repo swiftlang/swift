@@ -632,7 +632,7 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
     // Build ParameterizedProtocolType if the protocol has a primary associated
     // type and we're in a supported context (for now just generic requirements,
     // inheritance clause, extension binding).
-    if (!resolution.getOptions().isParameterizedProtocolSupported(ctx.LangOpts)) {
+    if (!resolution.getOptions().isParameterizedProtocolSupported()) {
       diags.diagnose(loc, diag::parameterized_protocol_not_supported);
       return ErrorType::get(ctx);
     }

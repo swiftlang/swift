@@ -29,7 +29,7 @@ protocol Invalid5<Element, Element> {
 
 /// Test semantics
 
-protocol Sequence<Element> {
+protocol Sequence<Element> { // expected-note {{'Sequence' declared here}}
   associatedtype Element
   // expected-note@-1 {{protocol requires nested type 'Element'; do you want to add it?}}
 }
@@ -189,17 +189,17 @@ func returnsSequenceOfInt1() -> Sequence<Int> {}
 // expected-error@-1 {{protocol type with type arguments can only be used as a generic constraint}}
 
 func takesSequenceOfInt2(_: any Sequence<Int>) {}
-// expected-error@-1 {{protocol type with type arguments can only be used as a generic constraint}}
 
 func returnsSequenceOfInt2() -> any Sequence<Int> {}
-// expected-error@-1 {{protocol type with type arguments can only be used as a generic constraint}}
 
 func typeExpr() {
   _ = Sequence<Int>.self
   // expected-error@-1 {{protocol type with type arguments can only be used as a generic constraint}}
 
   _ = any Sequence<Int>.self
-  // expected-error@-1 {{protocol type with type arguments can only be used as a generic constraint}}
+  // expected-error@-1 {{'self' is not a member type of protocol 'parameterized_protocol.Sequence<Swift.Int>'}}
+
+  _ = (any Sequence<Int>).self
 }
 
 /// Not supported as a protocol composition term for now
