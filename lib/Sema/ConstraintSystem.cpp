@@ -5719,7 +5719,8 @@ ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
   case ConversionRestrictionKind::StringToPointer:
     // Always ephemeral.
     return ConversionEphemeralness::Ephemeral;
-  case ConversionRestrictionKind::InoutToPointer: {
+  case ConversionRestrictionKind::InoutToPointer:
+  case ConversionRestrictionKind::InoutToCPointer: {
 
     // Ephemeral, except if the expression is a reference to a global or
     // static stored variable, or a directly accessed stored property on such a
