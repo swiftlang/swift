@@ -4657,9 +4657,10 @@ ERROR(isolated_parameter_not_actor,none,
 
 WARNING(non_sendable_param_type,none,
         "non-sendable type %0 %select{passed in call to %4 %2 %3|"
+        "exiting %4 context in call to non-isolated %2 %3|"
         "passed in implicitly asynchronous call to %4 %2 %3|"
-        "in parameter of %4 %2 %3 satisfying non-isolated protocol "
-        "requirement|"
+        "in parameter of %4 %2 %3 satisfying protocol requirement|"
+        "in parameter of %4 overriding %2 %3|"
         "in parameter of %4 '@objc' %2 %3}1 cannot cross actor boundary",
         (Type, unsigned, DescriptiveDeclKind, DeclName, ActorIsolation))
 WARNING(non_sendable_call_param_type,none,
@@ -4668,8 +4669,10 @@ WARNING(non_sendable_call_param_type,none,
         (Type, bool, ActorIsolation))
 WARNING(non_sendable_result_type,none,
         "non-sendable type %0 returned by %select{call to %4 %2 %3|"
+        "call from %4 context to non-isolated %2 %3|"
         "implicitly asynchronous call to %4 %2 %3|"
-        "%4 %2 %3 satisfying non-isolated protocol requirement|"
+        "%4 %2 %3 satisfying protocol requirement|"
+        "%4 overriding %2 %3|"
         "%4 '@objc' %2 %3}1 cannot cross actor boundary",
         (Type, unsigned, DescriptiveDeclKind, DeclName, ActorIsolation))
 WARNING(non_sendable_call_result_type,none,
@@ -4679,8 +4682,10 @@ WARNING(non_sendable_call_result_type,none,
 WARNING(non_sendable_property_type,none,
         "non-sendable type %0 in %select{"
         "%select{asynchronous access to %5 %1 %2|"
+        "asynchronous access from %5 context to non-isolated %1 %2|"
         "implicitly asynchronous access to %5 %1 %2|"
-        "conformance of %5 %1 %2 to non-isolated protocol requirement|"
+        "conformance of %5 %1 %2 to protocol requirement|"
+        "%5 overriding %1 %2|"
         "%5 '@objc' %1 %2}4|captured local %1 %2}3 cannot "
         "cross %select{actor|task}3 boundary",
         (Type, DescriptiveDeclKind, DeclName, bool, unsigned, ActorIsolation))
