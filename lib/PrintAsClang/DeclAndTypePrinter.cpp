@@ -14,6 +14,7 @@
 #include "ClangSyntaxPrinter.h"
 #include "PrimitiveTypeMapping.h"
 #include "PrintClangFunction.h"
+#include "PrintClangValueType.h"
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
@@ -325,6 +326,14 @@ private:
     os << "\n";
     printMembers(CD->getMembers());
     os << "@end\n";
+  }
+
+  void visitStructDecl(StructDecl *SD) {
+    if (outputLang != OutputLanguageMode::Cxx)
+      return;
+    // FIXME: Print struct's availability.
+    ClangValueTypePrinter printer(os);
+    printer.printStructDecl(SD);
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
