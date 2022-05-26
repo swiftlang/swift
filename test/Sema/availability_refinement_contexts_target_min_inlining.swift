@@ -12,7 +12,7 @@
 // CHECK-watchos: {{^}}(root versions=[2.0,+Inf)
 
 // CHECK-macosx-NEXT: {{^}}  (decl_implicit versions=[10.15,+Inf) decl=foo()
-// CHECK-ios-NEXT: {{^}}  (decl_implicit versions=[13.0,+Inf) decl=foo()
+// CHECK-ios-NEXT: {{^}}  (decl_implicit versions=[13,+Inf) decl=foo()
 // CHECK-tvos-NEXT: {{^}}  (decl_implicit versions=[13.0,+Inf) decl=foo()
 // CHECK-watchos-NEXT: {{^}}  (decl_implicit versions=[6.0,+Inf) decl=foo()
 func foo() {}
