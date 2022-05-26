@@ -133,30 +133,3 @@ static void swift_slowDeallocImpl(void *ptr, size_t alignMask) {
 void swift::swift_slowDealloc(void *ptr, size_t bytes, size_t alignMask) {
   swift_slowDeallocImpl(ptr, alignMask);
 }
-
-#if defined(__APPLE__) && defined(__MACH__) && SWIFT_STDLIB_HAS_DARWIN_LIBMALLOC
-// On Darwin, define our own, hidden operator new/delete implementations. We
-// don't want to pick up any overrides that come from other code, but we also
-// don't want to expose our overrides to any other code. We can't do this
-// directly in C++, as the compiler has an implicit prototype with default
-// visibility. However, if we implement them as C functions using the C++
-// mangled names, the compiler accepts them without complaint, and the linker
-// still links all internal uses with these overrides.
-
-__attribute__((visibility(("hidden")))) extern "C" void *_Znwm(size_t size) {
-  return swift_slowAlloc(size, MALLOC_ALIGN_MASK);
-}
-
-__attribute__((visibility(("hidden")))) extern "C" void _ZdlPv(void *ptr) {
-  swift_slowDeallocImpl(ptr, MALLOC_ALIGN_MASK);
-}
-
-__attribute__((visibility(("hidden")))) extern "C" void *_Znam(size_t size) {
-  return swift_slowAlloc(size, MALLOC_ALIGN_MASK);
-}
-
-__attribute__((visibility(("hidden")))) extern "C" void _ZdaPv(void *ptr) {
-  swift_slowDeallocImpl(ptr, MALLOC_ALIGN_MASK);
-}
-
-#endif
