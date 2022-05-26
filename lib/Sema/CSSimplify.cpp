@@ -4896,9 +4896,13 @@ bool ConstraintSystem::repairFailures(
           if (!(overload && overload->choice.isDecl()))
             return true;
 
-          if (!getParameterList(overload->choice.getDecl())
-                   ->get(applyLoc->getParamIdx())
-                   ->getTypeOfDefaultExpr())
+          // Ignore decls that don't have meaningful parameter lists - this
+          // matches variables and parameters with function types.
+          auto *paramList = getParameterList(overload->choice.getDecl());
+          if (!paramList)
+            return true;
+
+          if (!paramList->get(applyLoc->getParamIdx())->getTypeOfDefaultExpr())
             return true;
         }
       }
