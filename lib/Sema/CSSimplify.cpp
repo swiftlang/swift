@@ -6589,9 +6589,18 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
               // Only try an inout-to-pointer conversion if we know it's not
               // an array being converted to a raw pointer type. Such
               // conversions can only use array-to-pointer.
-              if (!baseIsArray || !isRawPointerKind(pointerKind))
+              if (!baseIsArray || !isRawPointerKind(pointerKind)) {
                 conversionsOrFixes.push_back(
                     ConversionRestrictionKind::InoutToPointer);
+
+                // If regular inout-to-pointer conversion doesn't work,
+                // let's try C pointer conversion that has special semantics
+                // for imported declarations.
+                if (isArgumentOfImportedDecl(locator)) {
+                  conversionsOrFixes.push_back(
+                      ConversionRestrictionKind::InoutToCPointer);
+                }
+              }
             }
           }
 
@@ -12221,6 +12230,35 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
 
   case ConversionRestrictionKind::PointerToCPointer:
     return simplifyPointerToCPointerRestriction(type1, type2, flags, locator);
+
+  case ConversionRestrictionKind::InoutToCPointer: {
+    SmallVector<Type, 2> optionals;
+
+    auto ptr2 =
+        type2->getDesugaredType()->lookThroughAllOptionalTypes(optionals);
+
+    increaseScore(SK_ValueToOptional, optionals.size());
+
+    PointerTypeKind pointerKind;
+    (void)ptr2->getAnyPointerElementType(pointerKind);
+
+    auto baseType1 = type1->getInOutObjectType();
+
+    Type ptr1;
+    // The right-hand size is a raw pointer, so let's use `UnsafeMutablePointer`
+    // for the `inout` type.
+    if (pointerKind == PTK_UnsafeRawPointer ||
+        pointerKind == PTK_UnsafeMutableRawPointer) {
+      ptr1 = BoundGenericType::get(Context.getUnsafeMutablePointerDecl(),
+                                   /*parent=*/nullptr, {baseType1});
+    } else {
+      ptr1 = baseType1->wrapInPointer(pointerKind);
+    }
+
+    assert(ptr1);
+
+    return simplifyPointerToCPointerRestriction(ptr1, ptr2, flags, locator);
+  }
 
   // T < U or T is bridged to V where V < U ===> Array<T> <c Array<U>
   case ConversionRestrictionKind::ArrayUpcast: {
