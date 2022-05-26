@@ -1930,7 +1930,7 @@ swift_stdlib_getTypeByMangledNameUntrusted(const char *typeNameStart,
     if (c >= '\x01' && c <= '\x1F')
       return nullptr;
   }
-  
+
   return swift_getTypeByMangledName(MetadataState::Complete, typeName, nullptr,
                                     {}, {}).getType().getMetadata();
 }
@@ -2197,6 +2197,23 @@ swift_getOpaqueTypeConformance(const void * const *arguments,
 // Return the ObjC class for the given type name.
 // This gets installed as a callback from libobjc.
 
+static bool validateObjCMangledName(const char *_Nonnull typeName) {
+  // Accept names with a mangling prefix.
+  if (getManglingPrefixLength(typeName))
+    return true;
+
+  // Accept names that start with a digit (unprefixed mangled names).
+  if (isdigit(typeName[0]))
+    return true;
+
+  // Accept names that contain a dot.
+  if (strchr(typeName, '.'))
+    return true;
+
+  // Reject anything else.
+  return false;
+}
+
 // FIXME: delete this #if and dlsym once we don't
 // need to build with older libobjc headers
 #if !OBJC_GETCLASSHOOK_DEFINED
@@ -2232,8 +2249,9 @@ getObjCClassByMangledName(const char * _Nonnull typeName,
       [&](const Metadata *type, unsigned index) { return nullptr; }
     ).getType().getMetadata();
   } else {
-    metadata = swift_stdlib_getTypeByMangledNameUntrusted(typeStr.data(),
-                                                          typeStr.size());
+    if (validateObjCMangledName(typeName))
+      metadata = swift_stdlib_getTypeByMangledNameUntrusted(typeStr.data(),
+                                                            typeStr.size());
   }
   if (metadata) {
     auto objcClass =
