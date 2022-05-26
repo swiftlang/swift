@@ -229,10 +229,82 @@ struct ThrowStruct {
     self.init(noThrows: ())
   }
 
+  // CHECK-LABEL: sil hidden [ossa] @$s21failable_initializers11ThrowStructV0A0ACSgyt_tcfC
+  // CHECK: bb0([[SELF_META:%[0-9]+]] : $@thin ThrowStruct.Type):
+  // CHECK: [[DELEG_INIT:%[0-9]+]] = function_ref @$s21failable_initializers11ThrowStructV6throwsACyt_tKcfC
+  // CHECK-NEXT: try_apply [[DELEG_INIT]]([[SELF_META]]) : $@convention(method) (@thin ThrowStruct.Type) -> (@owned ThrowStruct, @error Error), normal [[SUCC_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
+  //
+  // CHECK: [[SUCC_BB]]([[RESULT:%[0-9]+]] : @owned $ThrowStruct):
+  // CHECK-NEXT: [[INJECT_INTO_OPT:%[0-9]+]] = enum $Optional<ThrowStruct>, #Optional.some!enumelt, [[RESULT]]
+  // CHECK-NEXT: br bb2([[INJECT_INTO_OPT]] : $Optional<ThrowStruct>)
+  //
+  // CHECK: bb2([[OPT_RESULT:%[0-9]+]] : @owned $Optional<ThrowStruct>):
+  // CHECK: [[SELECT:%[0-9]+]] = select_enum [[OPT_RESULT]]
+  // CHECK-NEXT: cond_br [[SELECT]], [[SOME_BB:bb[0-9]+]], [[NONE_BB:bb[0-9]+]]
+  //
+  // CHECK: [[NONE_BB]]:
+  // CHECK-NEXT: destroy_value [[OPT_RESULT]]
+  // CHECK-NEXT: br bb5
+  //
+  // CHECK: [[SOME_BB]]:
+  // CHECK-NEXT: [[RESULT:%[0-9]+]] = unchecked_enum_data [[OPT_RESULT]] : {{.*}}, #Optional.some!enumelt
+  // CHECK-NEXT: assign [[RESULT]] to [[DEST:%[0-9]+]]
+  // CHECK-NEXT: [[RESULT_CP:%[0-9]+]] = load [copy] [[DEST]]
+  // CHECK-NEXT: [[INJECT_INTO_OPT:%[0-9]+]] = enum $Optional<ThrowStruct>, #Optional.some!enumelt, [[RESULT_CP]]
+  // CHECK: br bb6([[INJECT_INTO_OPT]] : $Optional<ThrowStruct>)
+  //
+  // CHECK: bb5:
+  // CHECK: [[NIL:%[0-9]+]] = enum $Optional<ThrowStruct>, #Optional.none!enumelt
+  // CHECK-NEXT: br bb6([[NIL]] : $Optional<ThrowStruct>)
+  //
+  // CHECK: bb6([[RET:%[0-9]+]] : @owned $Optional<ThrowStruct>):
+  // CHECK-NEXT: return [[RET]]
+  //
+  // CHECK: bb7([[ERR:%[0-9]+]] : @owned $Error):
+  // CHECK-NEXT: destroy_value [[ERR]]
+  // CHECK-NEXT: [[NIL:%[0-9]+]] = enum $Optional<ThrowStruct>, #Optional.none!enumelt
+  // CHECK-NEXT: br bb2([[NIL]] : $Optional<ThrowStruct>)
+  //
+  // CHECK: [[ERROR_BB]]([[ERR:%[0-9]+]] : @owned $Error):
+  // CHECK-NEXT: br bb7([[ERR]] : $Error)
+  // CHECK-NEXT: }
   init?(failable: ()) {
     try? self.init(throws: ())
   }
 
+  // CHECK-LABEL: sil hidden [ossa] @$s21failable_initializers11ThrowStructV9failable2ACSgyt_tcfC
+  // CHECK: bb0([[SELF_META:%[0-9]+]] : $@thin ThrowStruct.Type):
+  // CHECK: [[DELEG_INIT:%[0-9]+]] = function_ref @$s21failable_initializers11ThrowStructV0A9AndThrowsACSgyt_tKcfC
+  // CHECK-NEXT: try_apply [[DELEG_INIT]]([[SELF_META]]) : $@convention(method) (@thin ThrowStruct.Type) -> (@owned Optional<ThrowStruct>, @error Error), normal [[SUCC_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
+  //
+  // CHECK: [[SUCC_BB]]([[OPT_RESULT:%[0-9]+]] : @owned $Optional<ThrowStruct>):
+  // CHECK: [[SELECT:%[0-9]+]] = select_enum [[OPT_RESULT]]
+  // CHECK-NEXT: cond_br [[SELECT]], [[SOME_BB:bb[0-9]+]], [[NONE_BB:bb[0-9]+]]
+  //
+  // CHECK: [[NONE_BB]]:
+  // CHECK-NEXT: destroy_value [[OPT_RESULT]]
+  // CHECK-NEXT: br bb4
+  //
+  // CHECK: [[SOME_BB]]:
+  // CHECK-NEXT: [[RESULT:%[0-9]+]] = unchecked_enum_data [[OPT_RESULT]] : $Optional<ThrowStruct>, #Optional.some!enumelt
+  // CHECK-NEXT: assign [[RESULT]] to [[DEST:%[0-9]+]]
+  // CHECK-NEXT: [[RESULT_CP:%[0-9]+]] = load [copy] [[DEST]]
+  // CHECK-NEXT: [[INJECT_INTO_OPT:%[0-9]+]] = enum $Optional<ThrowStruct>, #Optional.some!enumelt, [[RESULT_CP]]
+  // CHECK: br bb5([[INJECT_INTO_OPT]] : $Optional<ThrowStruct>)
+  //
+  // CHECK: bb4:
+  // CHECK: [[NIL:%[0-9]+]] = enum $Optional<ThrowStruct>, #Optional.none!enumelt
+  // CHECK-NEXT: br bb5([[NIL]] : $Optional<ThrowStruct>)
+  //
+  // CHECK: bb5([[RET:%[0-9]+]] : @owned $Optional<ThrowStruct>):
+  // CHECK-NEXT: return [[RET]]
+  //
+  // CHECK: bb6([[ERR:%[0-9]+]] : @owned $Error):
+  // CHECK: unreachable
+  //
+  // CHECK: [[ERROR_BB]]([[ERR:%[0-9]+]] : @owned $Error):
+  // CHECK-NEXT: br bb6([[ERR]] : $Error)
+  // CHECK-NEXT: }
   init?(failable2: ()) {
     try! self.init(failableAndThrows: ())
   }
@@ -241,6 +313,55 @@ struct ThrowStruct {
     try? self.init(failableAndThrows: ())!
   }
 
+  // CHECK-LABEL: sil hidden [ossa] @$s21failable_initializers11ThrowStructV9failable4ACSgyt_tcfC
+  // CHECK: bb0([[SELF_META:%[0-9]+]] : $@thin ThrowStruct.Type):
+  // CHECK: [[DELEG_INIT:%[0-9]+]] = function_ref @$s21failable_initializers11ThrowStructV0A9AndThrowsACSgyt_tKcfC
+  // CHECK-NEXT: try_apply [[DELEG_INIT]]([[SELF_META]]) : $@convention(method) (@thin ThrowStruct.Type) -> (@owned Optional<ThrowStruct>, @error Error), normal [[SUCC_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
+  //
+  // CHECK: [[SUCC_BB]]([[OPT_RESULT:%[0-9]+]] : @owned $Optional<ThrowStruct>):
+  // CHECK-NEXT: [[INJECT_INTO_OPT:%[0-9]+]] = enum {{.*}}, #Optional.some!enumelt, [[OPT_RESULT]]
+  // CHECK-NEXT: br bb2([[INJECT_INTO_OPT]] : $Optional<Optional<ThrowStruct>>)
+  //
+  // CHECK: bb2([[OPT_OPT_RESULT:%[0-9]+]] : @owned $Optional<Optional<ThrowStruct>>):
+  // CHECK-NEXT: switch_enum [[OPT_OPT_RESULT]] : {{.*}}, case #Optional.some!enumelt: [[OPT_OPT_SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[OPT_OPT_NONE_BB:bb[0-9]+]]
+  //
+  // CHECK: [[OPT_OPT_SOME_BB]]([[OPT_RESULT:%[0-9]+]] : @owned $Optional<ThrowStruct>):
+  // CHECK-NEXT: br bb5([[OPT_RESULT]] : $Optional<ThrowStruct>)
+  //
+  // CHECK: [[OPT_OPT_NONE_BB]]:
+  // CHECK-NEXT: [[NIL:%[0-9]+]] = enum $Optional<ThrowStruct>, #Optional.none!enumelt
+  // CHECK-NEXT: br bb5([[NIL]] : $Optional<ThrowStruct>)
+  //
+  // CHECK: bb5([[OPT_RESULT:%[0-9]+]] : @owned $Optional<ThrowStruct>):
+  // CHECK: [[SELECT:%[0-9]+]] = select_enum [[OPT_RESULT]]
+  // CHECK-NEXT: cond_br [[SELECT]], [[OPT_SOME_BB:bb[0-9]+]], [[OPT_NONE_BB:bb[0-9]+]]
+  //
+  // CHECK: [[OPT_NONE_BB]]:
+  // CHECK-NEXT: destroy_value [[OPT_RESULT]]
+  // CHECK-NEXT: br bb8
+  //
+  // CHECK: [[OPT_SOME_BB]]:
+  // CHECK-NEXT: [[RESULT:%[0-9]+]] = unchecked_enum_data [[OPT_RESULT]] : {{.*}}, #Optional.some!enumelt
+  // CHECK-NEXT: assign [[RESULT]] to [[DEST:%[0-9]+]]
+  // CHECK-NEXT: [[RESULT_CP:%[0-9]+]] = load [copy] [[DEST]]
+  // CHECK-NEXT: [[INJECT_INTO_OPT:%[0-9]+]] = enum $Optional<ThrowStruct>, #Optional.some!enumelt, [[RESULT_CP]]
+  // CHECK: br bb9([[INJECT_INTO_OPT]] : $Optional<ThrowStruct>)
+  //
+  // CHECK: bb8:
+  // CHECK: [[NIL:%[0-9]+]] = enum $Optional<ThrowStruct>, #Optional.none!enumelt
+  // CHECK-NEXT: br bb9([[NIL]] : $Optional<ThrowStruct>)
+  //
+  // CHECK: bb9([[RET:%[0-9]+]] : @owned $Optional<ThrowStruct>):
+  // CHECK-NEXT: return [[RET]]
+  //
+  // CHECK: bb10([[ERR:%[0-9]+]] : @owned $Error):
+  // CHECK-NEXT: destroy_value [[ERR]]
+  // CHECK-NEXT: [[NIL:%[0-9]+]] = enum $Optional<Optional<ThrowStruct>>, #Optional.none!enumelt
+  // CHECK-NEXT: br bb2([[NIL]] : $Optional<Optional<ThrowStruct>>)
+  //
+  // CHECK: [[ERROR_BB]]([[ERR:%[0-9]+]] : @owned $Error):
+  // CHECK-NEXT: br bb10([[ERR]] : $Error)
+  // CHECK-NEXT: }
   init?(failable4: ()) {
     try? self.init(failableAndThrows: ())
   }
