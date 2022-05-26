@@ -4,6 +4,7 @@
 // RUN: %{python} -m json.tool %t/EmitWhileBuilding.symbols.json %t/EmitWhileBuilding.formatted.symbols.json
 // RUN: %FileCheck %s --input-file %t/EmitWhileBuilding.formatted.symbols.json
 // RUN: %FileCheck %s --input-file %t/EmitWhileBuilding.formatted.symbols.json --check-prefix HEADER
+// RUN: %FileCheck %s --input-file %t/EmitWhileBuilding.formatted.symbols.json --check-prefix LOCATION
 
 // REQUIRES: objc_interop
 
@@ -28,3 +29,6 @@ public enum SwiftEnum {}
 // CHECK-NEXT:           "spelling": "SwiftEnum"
 // CHECK-NEXT:       }
 // CHECK-NEXT:   ],
+
+// ensure that the only nodes with a "location" field are the ones that came from Swift
+// LOCATION-COUNT-2: "location":
