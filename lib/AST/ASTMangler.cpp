@@ -1686,6 +1686,9 @@ void ASTMangler::appendRetroactiveConformances(SubstitutionMap subMap,
 
   unsigned numProtocolRequirements = 0;
   for (auto conformance : subMap.getConformances()) {
+    if (conformance.isInvalid())
+      continue;
+
     if (conformance.getRequirement()->isMarkerProtocol())
       continue;
 
