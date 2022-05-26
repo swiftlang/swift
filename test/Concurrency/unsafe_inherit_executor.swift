@@ -21,6 +21,7 @@ struct A {
 }
 
 
+@_nonSendable
 class NonSendableObject { // expected-note{{class 'NonSendableObject' does not conform to the 'Sendable' protocol}}
   var property = 0
 }
