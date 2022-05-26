@@ -165,86 +165,94 @@ func unwrap(_ x: Int) throws -> Int { return x }
 struct ThrowStruct {
   var x: Canary
 
-  init(fail: ()) throws { x = Canary() }
+  init(throws: ()) throws { x = Canary() }
 
-  init(noFail: ()) { x = Canary() }
+  init(noThrows: ()) { x = Canary() }
 
-  init(failBeforeDelegation: Int) throws {
-    try unwrap(failBeforeDelegation)
-    self.init(noFail: ())
+  init(throwsBeforeDelegation: Int) throws {
+    try unwrap(throwsBeforeDelegation)
+    self.init(noThrows: ())
   }
 
-  init(failBeforeOrDuringDelegation: Int) throws {
-    try unwrap(failBeforeOrDuringDelegation)
-    try self.init(fail: ())
+  init(throwsBeforeOrDuringDelegation: Int) throws {
+    try unwrap(throwsBeforeOrDuringDelegation)
+    try self.init(throws: ())
   }
 
-  init(failBeforeOrDuringDelegation2: Int) throws {
-    try self.init(failBeforeDelegation: unwrap(failBeforeOrDuringDelegation2))
+  init(throwsBeforeOrDuringDelegation2: Int) throws {
+    try self.init(throwsBeforeDelegation: unwrap(throwsBeforeOrDuringDelegation2))
   }
 
-  init(failDuringDelegation: Int) throws {
-    try self.init(fail: ())
+  init(throwsDuringDelegation: Int) throws {
+    try self.init(throws: ())
   }
 
-  init(failAfterDelegation: Int) throws {
-    self.init(noFail: ())
-    try unwrap(failAfterDelegation)
+  init(throwsAfterDelegation: Int) throws {
+    self.init(noThrows: ())
+    try unwrap(throwsAfterDelegation)
   }
 
-  init(failDuringOrAfterDelegation: Int) throws {
-    try self.init(fail: ())
-    try unwrap(failDuringOrAfterDelegation)
+  init(throwsDuringOrAfterDelegation: Int) throws {
+    try self.init(throws: ())
+    try unwrap(throwsDuringOrAfterDelegation)
   }
 
-  init(failBeforeOrAfterDelegation: Int) throws {
-    try unwrap(failBeforeOrAfterDelegation)
-    self.init(noFail: ())
-    try unwrap(failBeforeOrAfterDelegation)
+  init(throwsBeforeOrAfterDelegation: Int) throws {
+    try unwrap(throwsBeforeOrAfterDelegation)
+    self.init(noThrows: ())
+    try unwrap(throwsBeforeOrAfterDelegation)
   }
 
-  init?(throwsToOptional: Int) {
-    try? self.init(failDuringDelegation: throwsToOptional)
+  init(throwsBeforeSelfReplacement: Int) throws {
+    try unwrap(throwsBeforeSelfReplacement)
+    self = ThrowStruct(noThrows: ())
   }
 
-  init(throwsToIUO: Int) {
-    try! self.init(failDuringDelegation: throwsToIUO)
+  init(throwsDuringSelfReplacement: Int) throws {
+    try self = ThrowStruct(throws: ())
   }
 
-  init?(throwsToOptionalThrows: Int) throws {
-    try? self.init(fail: ())
+  init(throwsAfterSelfReplacement: Int) throws {
+    self = ThrowStruct(noThrows: ())
+    try unwrap(throwsAfterSelfReplacement)
   }
 
-  init(throwsOptionalToThrows: Int) throws {
-    self.init(throwsToOptional: throwsOptionalToThrows)!
+  init(nonFailable: ()) {
+    try! self.init(throws: ())
   }
 
-  init?(throwsOptionalToOptional: Int) {
-    try! self.init(throwsToOptionalThrows: throwsOptionalToOptional)
+  init(nonFailable2: ()) throws {
+    self.init(failable: ())!
   }
 
-  init(failBeforeSelfReplacement: Int) throws {
-    try unwrap(failBeforeSelfReplacement)
-    self = ThrowStruct(noFail: ())
+  init?(failableAndThrows: ()) throws {
+    self.init(noThrows: ())
   }
 
-  init(failDuringSelfReplacement: Int) throws {
-    try self = ThrowStruct(fail: ())
+  init?(failable: ()) {
+    try? self.init(throws: ())
   }
 
-  init(failAfterSelfReplacement: Int) throws {
-    self = ThrowStruct(noFail: ())
-    try unwrap(failAfterSelfReplacement)
+  init?(failable2: ()) {
+    try! self.init(failableAndThrows: ())
+  }
+
+  init?(failable3: ()) {
+    try? self.init(failableAndThrows: ())!
+  }
+
+  init?(failable4: ()) {
+    try? self.init(failableAndThrows: ())
   }
 }
 
 extension ThrowStruct {
-  init(failInExtension: ()) throws {
-    try self.init(fail: failInExtension)
+  init(throwsInExtension: ()) throws {
+    try self.init(throws: throwsInExtension)
   }
 
   init(assignInExtension: ()) throws {
-    try self = ThrowStruct(fail: ())
+    try self = ThrowStruct(throws: ())
   }
 }
 
