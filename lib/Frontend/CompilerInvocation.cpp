@@ -450,9 +450,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalConcurrency |=
     Args.hasArg(OPT_enable_experimental_concurrency);
 
-  Opts.EnableExperimentalNamedOpaqueTypes |=
-      Args.hasArg(OPT_enable_experimental_named_opaque_types);
-
   Opts.EnableOpenedExistentialTypes =
     Args.hasFlag(OPT_enable_experimental_opened_existential_types,
                  OPT_disable_experimental_opened_existential_types,
@@ -663,6 +660,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.Features.insert(Feature::VariadicGenerics);
   if (Args.hasArg(OPT_enable_experimental_static_assert))
     Opts.Features.insert(Feature::StaticAssert);
+  if (Args.hasArg(OPT_enable_experimental_associated_type_inference))
+    Opts.Features.insert(Feature::NamedOpaqueTypes);
 
   Opts.EnableAppExtensionRestrictions |= Args.hasArg(OPT_enable_app_extension);
 

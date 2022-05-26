@@ -317,10 +317,6 @@ namespace swift {
     /// Enable experimental concurrency model.
     bool EnableExperimentalConcurrency = false;
 
-    /// Enable experimental support for named opaque result types, e.g.
-    /// `func f() -> <T> T`.
-    bool EnableExperimentalNamedOpaqueTypes = false;
-
     /// Enable support for implicitly opening existential argument types
     /// in calls to generic functions.
     bool EnableOpenedExistentialTypes = false;

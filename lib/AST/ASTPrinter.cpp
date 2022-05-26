@@ -3003,6 +3003,10 @@ static bool usesFeatureVariadicGenerics(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureNamedOpaqueTypes(Decl *decl) {
+  return false;
+}
+
 static void
 suppressingFeatureNoAsyncAvailability(PrintOptions &options,
                                       llvm::function_ref<void()> action) {

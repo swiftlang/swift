@@ -564,7 +564,7 @@ ParserResult<TypeRepr> Parser::parseType(
 
 ParserResult<TypeRepr> Parser::parseTypeWithOpaqueParams(Diag<> MessageID) {
   GenericParamList *genericParams = nullptr;
-  if (Context.LangOpts.EnableExperimentalNamedOpaqueTypes) {
+  if (Context.LangOpts.hasFeature(Feature::NamedOpaqueTypes)) {
     auto result = maybeParseGenericParams();
     genericParams = result.getPtrOrNull();
     if (result.hasCodeCompletion())
