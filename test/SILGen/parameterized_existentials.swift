@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -module-name parameterized -enable-parameterized-existential-types -disable-availability-checking %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name parameterized -disable-availability-checking %s | %FileCheck %s
 
 protocol P<T, U, V> {
   associatedtype T
