@@ -709,87 +709,21 @@ move %PackageRoot%\installer\installer.exe %BuildRoot%\artifacts || (exit /b)
 
 :: TODO(compnerd) test LLVM
 
-:: Test Swift
-:: TODO(compnerd) make lit adjust the path properly
-path %BuildRoot%\3;%BuildRoot%\1\bin;%PATH%;%SystemDrive%\Program Files\Git\usr\bin
-cmake --build %BuildRoot%\1 --target check-swift || (exit /b)
+SET SKIP_TEST=0
+FOR %%T IN (%SKIP_TESTS%) DO (IF /I %%T==swift SET SKIP_TEST=1)
+IF "%SKIP_TEST%"=="0" call :TestSwift
 
-:: Test dispatch
-cmake --build %BuildRoot%\3 --target ExperimentalTest || (exit /b)
+SET SKIP_TEST=0
+FOR %%T IN (%SKIP_TESTS%) DO (IF /I %T==dispatch SET SKIP_TEST=1)
+IF "%SKIP_TEST%"=="0" call :TestDispatch
 
-:: NOTE(compnerd) update the path *before* the build because the tests are
-:: executed to shard the test suite.
-path %BuildRoot%\5;%BuildRoot%\4\bin;%PATH%
+SET SKIP_TEST=0
+FOR %%T IN (%SKIP_TESTS%) DO (IF /I %T==foundation SET SKIP_TEST=1)
+IF "%SKIP_TEST%"=="0" call :TestFoundation
 
-:: Rebuild Foundation (w/ testing)
-cmake ^
-  -B %BuildRoot%\4 ^
-
-  -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
-  -D CMAKE_C_COMPILER=%BuildRoot%/1/bin/clang-cl.exe ^
-  -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
-  -D CMAKE_CXX_COMPILER=%BuildRoot%/1/bin/clang-cl.exe ^
-  -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
-  -D CMAKE_MT=mt ^
-  -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
-  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
-  -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
-
-  -D CMAKE_INSTALL_PREFIX=%SDKInstallRoot%\usr ^
-
-  -D CURL_DIR=%BuildRoot%\Library\curl-7.77.0\usr\lib\cmake\CURL ^
-  -D ICU_ROOT=%BuildRoot%\Library\icu-69.1\usr ^
-  -D ICU_DATA_LIBRARY_RELEASE=%BuildRoot%\Library\icu-69.1\usr\lib\sicudt69.lib ^
-  -D ICU_I18N_LIBRARY_RELEASE=%BuildRoot%\Library\icu-69.1\usr\lib\sicuin69.lib ^
-  -D ICU_UC_LIBRARY_RELEASE=%BuildRoot%\Library\icu-69.1\usr\lib\sicuuc69.lib ^
-  -D LIBXML2_LIBRARY=%BuildRoot%\Library\libxml2-2.9.12\usr\lib\libxml2s.lib ^
-  -D LIBXML2_INCLUDE_DIR=%BuildRoot%\Library\libxml2-2.9.12\usr\include\libxml2 ^
-  -D LIBXML2_DEFINITIONS="/DLIBXML_STATIC" ^
-  -D ZLIB_LIBRARY=%BuildRoot%\Library\zlib-1.2.11\usr\lib\zlibstatic.lib ^
-  -D ZLIB_INCLUDE_DIR=%BuildRoot%\Library\zlib-1.2.11\usr\include ^
-  -D dispatch_DIR=%BuildRoot%\3\cmake\modules ^
-  -D XCTest_DIR=%BuildRoot%\5\cmake\modules ^
-
-  -D ENABLE_TESTING=YES ^
-
-  -G Ninja ^
-  -S %SourceRoot%\swift-corelibs-foundation || (exit /b)
-cmake --build %BuildRoot%\4 || (exit /b)
-
-:: Test Foundation
-set CTEST_OUTPUT_ON_FAILURE=1
-cmake --build %BuildRoot%\4 --target test || (exit /b)
-
-:: Rebuild XCTest (w/ testing)
-cmake ^
-  -B %BuildRoot%\5 ^
-
-  -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
-  -D CMAKE_C_COMPILER=%BuildRoot%/1/bin/clang-cl.exe ^
-  -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
-  -D CMAKE_CXX_COMPILER=%BuildRoot%/1/bin/clang-cl.exe ^
-  -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
-  -D CMAKE_MT=mt ^
-  -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
-  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
-  -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
-
-  -D CMAKE_INSTALL_PREFIX=%PlatformRoot%\Developer\Library\XCTest-development\usr ^
-
-  -D dispatch_DIR=%BuildRoot%\3\cmake\modules ^
-  -D Foundation_DIR=%BuildRoot%\4\cmake\modules ^
-
-  -D ENABLE_TESTING=YES ^
-  -D XCTEST_PATH_TO_LIBDISPATCH_BUILD=%BuildRoot%\3 ^
-  -D XCTEST_PATH_TO_LIBDISPATCH_SOURCE=%SourceRoot%\swift-corelibs-libdispatch ^
-  -D XCTEST_PATH_TO_FOUNDATION_BUILD=%BuildRoot%\4 ^
-
-  -G Ninja ^
-  -S %SourceRoot%\swift-corelibs-xctest || (exit /b)
-cmake --build %BuildRoot%\5 || (exit /b)
-
-:: Test XCTest
-cmake --build %BuildRoot%\5 --target check-xctest || (exit /b)
+SET SKIP_TEST=0
+FOR %%T IN (%SKIP_TESTS%) DO (IF /I %T==xctest SET SKIP_TEST=1)
+IF "%SKIP_TEST%"=="0" call :TestXCTest
 
 :: Clean up the module cache
 rd /s /q %LocalAppData%\clang\ModuleCache
@@ -838,6 +772,116 @@ git clone --quiet --no-tags --depth 1 --branch v2.9.12 https://github.com/gnome/
 git clone --quiet --no-tags --depth 1 --branch version-3.36.0 https://github.com/sqlite/sqlite
 git clone --quiet --no-tags --depth 1 --branch maint/maint-69 https://github.com/unicode-org/icu
 git clone --quiet --no-tags --depth 1 --branch curl-7_77_0 https://github.com/curl/curl
+
+goto :eof
+endlocal
+
+:TestSwift
+setlocal enableextensions enabledelayedexpansion
+
+:: Test Swift
+:: TODO(compnerd) make lit adjust the path properly
+path %BuildRoot%\3;%BuildRoot%\1\bin;%PATH%;%SystemDrive%\Program Files\Git\usr\bin
+cmake --build %BuildRoot%\1 --target check-swift || (exit /b)
+
+goto :eof
+endlocal
+
+:TestDispatch
+setlocal enableextensions enabledelayedexpansion
+
+:: Test dispatch
+cmake --build %BuildRoot%\3 --target ExperimentalTest || (exit /b)
+
+goto :eof
+endlocal
+
+:TestFoundation
+setlocal enableextensions enabledelayedexpansion
+
+:: NOTE(compnerd) update the path *before* the build because the tests are
+:: executed to shard the test suite.
+path %BuildRoot%\5;%BuildRoot%\4\bin;%BuildRoot%\3;%BuildRoot%\1\bin;%PATH%;%SystemDrive%\Program Files\Git\usr\bin
+
+:: Rebuild Foundation (w/ testing)
+cmake ^
+  -B %BuildRoot%\4 ^
+
+  -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
+  -D CMAKE_C_COMPILER=%BuildRoot%/1/bin/clang-cl.exe ^
+  -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
+  -D CMAKE_CXX_COMPILER=%BuildRoot%/1/bin/clang-cl.exe ^
+  -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
+  -D CMAKE_MT=mt ^
+  -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
+  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
+  -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
+
+  -D CMAKE_INSTALL_PREFIX=%SDKInstallRoot%\usr ^
+
+  -D CURL_DIR=%BuildRoot%\Library\curl-7.77.0\usr\lib\cmake\CURL ^
+  -D ICU_ROOT=%BuildRoot%\Library\icu-69.1\usr ^
+  -D ICU_DATA_LIBRARY_RELEASE=%BuildRoot%\Library\icu-69.1\usr\lib\sicudt69.lib ^
+  -D ICU_I18N_LIBRARY_RELEASE=%BuildRoot%\Library\icu-69.1\usr\lib\sicuin69.lib ^
+  -D ICU_UC_LIBRARY_RELEASE=%BuildRoot%\Library\icu-69.1\usr\lib\sicuuc69.lib ^
+  -D LIBXML2_LIBRARY=%BuildRoot%\Library\libxml2-2.9.12\usr\lib\libxml2s.lib ^
+  -D LIBXML2_INCLUDE_DIR=%BuildRoot%\Library\libxml2-2.9.12\usr\include\libxml2 ^
+  -D LIBXML2_DEFINITIONS="/DLIBXML_STATIC" ^
+  -D ZLIB_LIBRARY=%BuildRoot%\Library\zlib-1.2.11\usr\lib\zlibstatic.lib ^
+  -D ZLIB_INCLUDE_DIR=%BuildRoot%\Library\zlib-1.2.11\usr\include ^
+  -D dispatch_DIR=%BuildRoot%\3\cmake\modules ^
+  -D XCTest_DIR=%BuildRoot%\5\cmake\modules ^
+
+  -D ENABLE_TESTING=YES ^
+
+  -G Ninja ^
+  -S %SourceRoot%\swift-corelibs-foundation || (exit /b)
+cmake --build %BuildRoot%\4 || (exit /b)
+
+:: Test Foundation
+set CTEST_OUTPUT_ON_FAILURE=1
+cmake --build %BuildRoot%\4 --target test || (exit /b)
+
+goto :eof
+endlocal
+
+:TestXCTest
+setlocal enableextensions enabledelayedexpansion
+
+:: NOTE(compnerd) update the path *before* the build because the tests are
+:: executed to shard the test suite.
+path %BuildRoot%\5;%BuildRoot%\4\bin;%BuildRoot%\3;%BuildRoot%\1\bin;%PATH%;%SystemDrive%\Program Files\Git\usr\bin
+
+:: Rebuild XCTest (w/ testing)
+cmake ^
+  -B %BuildRoot%\5 ^
+
+  -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
+  -D CMAKE_C_COMPILER=%BuildRoot%/1/bin/clang-cl.exe ^
+  -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
+  -D CMAKE_CXX_COMPILER=%BuildRoot%/1/bin/clang-cl.exe ^
+  -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
+  -D CMAKE_MT=mt ^
+  -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
+  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
+  -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
+
+  -D CMAKE_INSTALL_PREFIX=%PlatformRoot%\Developer\Library\XCTest-development\usr ^
+
+  -D dispatch_DIR=%BuildRoot%\3\cmake\modules ^
+  -D Foundation_DIR=%BuildRoot%\4\cmake\modules ^
+
+  -D ENABLE_TESTING=YES ^
+  -D XCTEST_PATH_TO_LIBDISPATCH_BUILD=%BuildRoot%\3 ^
+  -D XCTEST_PATH_TO_LIBDISPATCH_SOURCE=%SourceRoot%\swift-corelibs-libdispatch ^
+  -D XCTEST_PATH_TO_FOUNDATION_BUILD=%BuildRoot%\4 ^
+
+  -G Ninja ^
+  -S %SourceRoot%\swift-corelibs-xctest || (exit /b)
+cmake --build %BuildRoot%\5 || (exit /b)
+
+:: Test XCTest
+cmake --build %BuildRoot%\5 --target check-xctest || (exit /b)
 
 goto :eof
 endlocal

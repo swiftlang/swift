@@ -934,7 +934,16 @@ bool swift::diagnoseNonSendableTypes(
 
 bool swift::diagnoseNonSendableTypesInReference(
     ConcreteDeclRef declRef, const DeclContext *fromDC, SourceLoc loc,
-    SendableCheckReason reason) {
+    SendableCheckReason reason, Optional<ActorIsolation> knownIsolation) {
+
+  // Retrieve the actor isolation to use in diagnostics.
+  auto getActorIsolation = [&] {
+    if (knownIsolation)
+      return *knownIsolation;
+
+    return swift::getActorIsolation(declRef.getDecl());
+  };
+
   // For functions, check the parameter and result types.
   SubstitutionMap subs = declRef.getSubstitutions();
   if (auto function = dyn_cast<AbstractFunctionDecl>(declRef.getDecl())) {
@@ -943,7 +952,7 @@ bool swift::diagnoseNonSendableTypesInReference(
       if (diagnoseNonSendableTypes(
               paramType, fromDC, loc, diag::non_sendable_param_type,
               (unsigned)reason, function->getDescriptiveKind(),
-              function->getName(), getActorIsolation(function)))
+              function->getName(), getActorIsolation()))
         return true;
     }
 
@@ -953,7 +962,7 @@ bool swift::diagnoseNonSendableTypesInReference(
       if (diagnoseNonSendableTypes(
               resultType, fromDC, loc, diag::non_sendable_result_type,
               (unsigned)reason, func->getDescriptiveKind(), func->getName(),
-              getActorIsolation(func)))
+              getActorIsolation()))
         return true;
     }
 
@@ -970,7 +979,7 @@ bool swift::diagnoseNonSendableTypesInReference(
             var->getDescriptiveKind(), var->getName(),
             var->isLocalCapture(),
             (unsigned)reason,
-            getActorIsolation(var)))
+            getActorIsolation()))
       return true;
   }
 
@@ -980,7 +989,7 @@ bool swift::diagnoseNonSendableTypesInReference(
       if (diagnoseNonSendableTypes(
               paramType, fromDC, loc, diag::non_sendable_param_type,
               (unsigned)reason, subscript->getDescriptiveKind(),
-              subscript->getName(), getActorIsolation(subscript)))
+              subscript->getName(), getActorIsolation()))
         return true;
     }
 
@@ -989,7 +998,7 @@ bool swift::diagnoseNonSendableTypesInReference(
     if (diagnoseNonSendableTypes(
             resultType, fromDC, loc, diag::non_sendable_result_type,
             (unsigned)reason, subscript->getDescriptiveKind(),
-            subscript->getName(), getActorIsolation(subscript)))
+            subscript->getName(), getActorIsolation()))
       return true;
 
     return false;
@@ -2772,8 +2781,10 @@ namespace {
         if (diagnoseReferenceToUnsafeGlobal(decl, loc))
           return true;
 
-        // FIXME: SE-0338 would trigger Sendable checks here.
-        return false;
+        return diagnoseNonSendableTypesInReference(
+                   declRef, getDeclContext(), loc,
+                   SendableCheckReason::ExitingActor,
+                   result.isolation);
 
       case ActorReferenceResult::EntersActor:
         // Handle all of the checking below.
@@ -3539,6 +3550,16 @@ static ActorIsolation getOverriddenIsolationFor(ValueDecl *value) {
   return isolation.subst(subs);
 }
 
+static ConcreteDeclRef getDeclRefInContext(ValueDecl *value) {
+  auto declContext = value->getInnermostDeclContext();
+  if (auto genericEnv = declContext->getGenericEnvironmentOfContext()) {
+    return ConcreteDeclRef(
+        value, genericEnv->getForwardingSubstitutionMap());
+  }
+
+  return ConcreteDeclRef(value);
+}
+
 /// Generally speaking, the isolation of the decl that overrides
 /// must match the overridden decl. But there are a number of exceptions,
 /// e.g., the decl that overrides can be nonisolated.
@@ -3546,12 +3567,8 @@ static ActorIsolation getOverriddenIsolationFor(ValueDecl *value) {
 static OverrideIsolationResult validOverrideIsolation(
     ValueDecl *value, ActorIsolation isolation,
     ValueDecl *overridden, ActorIsolation overriddenIsolation) {
-  ConcreteDeclRef valueRef(value);
+  ConcreteDeclRef valueRef = getDeclRefInContext(value);
   auto declContext = value->getInnermostDeclContext();
-  if (auto genericEnv = declContext->getGenericEnvironmentOfContext()) {
-    valueRef = ConcreteDeclRef(
-        value, genericEnv->getForwardingSubstitutionMap());
-  }
 
   auto refResult = ActorReferenceResult::forReference(
       valueRef, SourceLoc(), declContext, None, None,
@@ -3570,9 +3587,7 @@ static OverrideIsolationResult validOverrideIsolation(
     if (isAsyncDecl(overridden) ||
         isAccessibleAcrossActors(
             overridden, refResult.isolation, declContext)) {
-      // FIXME: Perform Sendable checking here because we're entering an
-      // actor.
-      return OverrideIsolationResult::Allowed;
+      return OverrideIsolationResult::Sendable;
     }
 
     // If the overridden declaration is from Objective-C with no actor
@@ -3948,7 +3963,9 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
     return;
 
   case OverrideIsolationResult::Sendable:
-    // FIXME: Do the Sendable check.
+    diagnoseNonSendableTypesInReference(
+        getDeclRefInContext(value), value->getInnermostDeclContext(),
+        value->getLoc(), SendableCheckReason::Override);
     return;
 
   case OverrideIsolationResult::Disallowed:
@@ -4886,9 +4903,8 @@ bool swift::isThrowsDecl(ConcreteDeclRef declRef) {
   return false;
 }
 
-bool swift::isAccessibleAcrossActors(
-    ValueDecl *value, const ActorIsolation &isolation,
-    const DeclContext *fromDC, Optional<ReferencedActor> actorInstance) {
+/// Determine whether a reference to this value isn't actually a value.
+static bool isNonValueReference(const ValueDecl *value) {
   switch (value->getKind()) {
   case DeclKind::AssociatedType:
   case DeclKind::Class:
@@ -4899,13 +4915,7 @@ bool swift::isAccessibleAcrossActors(
   case DeclKind::Protocol:
   case DeclKind::Struct:
   case DeclKind::TypeAlias:
-    return true;
-
   case DeclKind::EnumCase:
-  case DeclKind::EnumElement:
-    // Type-level entities are always accessible across actors.
-    return true;
-
   case DeclKind::IfConfig:
   case DeclKind::Import:
   case DeclKind::InfixOperator:
@@ -4917,16 +4927,26 @@ bool swift::isAccessibleAcrossActors(
   case DeclKind::PrecedenceGroup:
   case DeclKind::PrefixOperator:
   case DeclKind::TopLevelCode:
-    // Non-value entities are always accessible across actors.
-    return true;
-
   case DeclKind::Destructor:
-    // Destructors are always accessible across actors.
     return true;
 
+  case DeclKind::EnumElement:
   case DeclKind::Constructor:
-    // Initializers are accessible across actors unless they are global-actor
-    // qualified.
+  case DeclKind::Param:
+  case DeclKind::Var:
+  case DeclKind::Accessor:
+  case DeclKind::Func:
+  case DeclKind::Subscript:
+    return false;
+  }
+}
+
+bool swift::isAccessibleAcrossActors(
+    ValueDecl *value, const ActorIsolation &isolation,
+    const DeclContext *fromDC, Optional<ReferencedActor> actorInstance) {
+  // Initializers and enum elements are accessible across actors unless they
+  // are global-actor qualified.
+  if (isa<ConstructorDecl>(value) || isa<EnumElementDecl>(value)) {
     switch (isolation) {
     case ActorIsolation::ActorInstance:
     case ActorIsolation::Independent:
@@ -4937,19 +4957,15 @@ bool swift::isAccessibleAcrossActors(
     case ActorIsolation::GlobalActor:
       return false;
     }
-
-  case DeclKind::Param:
-  case DeclKind::Var:
-    // 'let' declarations are immutable, so some of them can be accessed across
-    // actors.
-    return varIsSafeAcrossActors(
-        fromDC->getParentModule(), cast<VarDecl>(value), isolation);
-
-  case DeclKind::Accessor:
-  case DeclKind::Func:
-  case DeclKind::Subscript:
-    return false;
   }
+
+  // 'let' declarations are immutable, so some of them can be accessed across
+  // actors.
+  if (auto var = dyn_cast<VarDecl>(value)) {
+    return varIsSafeAcrossActors(fromDC->getParentModule(), var, isolation);
+  }
+
+  return false;
 }
 
 ActorReferenceResult ActorReferenceResult::forSameConcurrencyDomain(
@@ -4997,6 +5013,11 @@ ActorReferenceResult ActorReferenceResult::forReference(
     if (declIsolation.requiresSubstitution())
       declIsolation = declIsolation.subst(declRef.getSubstitutions());
   }
+
+  // If the entity we are referencing is not a value, we're in thesame
+  // concurrency domain.
+  if (isNonValueReference(declRef.getDecl()))
+    return forSameConcurrencyDomain(declIsolation);
 
   // Compute the isolation of the context, if not provided.
   ActorIsolation contextIsolation = ActorIsolation::forUnspecified();
