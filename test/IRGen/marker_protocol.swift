@@ -57,9 +57,14 @@ public func markerInDictionary() -> Any {
 // CHECK: swiftcc void @"$s15marker_protocol7genericyyxAA1PRzlF"(%swift.opaque* noalias nocapture %0, %swift.type* %T)
 public func generic<T: P>(_: T) { }
 
+public struct GenericType<T: Hashable & P> { }
+
+// CHECK-LABEL: @"$s15marker_protocol11testGeneric1i5arrayySi_SaySiGtF"(
 public func testGeneric(i: Int, array: [Int]) {
   generic(i)
   generic(array)
+  // CHECK: __swift_instantiateConcreteTypeFromMangledName{{.*}}$s15marker_protocol11GenericTypeVySaySiGGmMD
+  print(GenericType<[Int]>.self)
 }
 
 // Forming an existential involving a marker protocol would crash the compiler
