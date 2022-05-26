@@ -284,18 +284,14 @@ public:
   }
 
   /// Whether parameterized protocol types are supported in this context.
-  ///
-  /// FIXME: Remove LangOptions parameter once EnableParameterizedExistentialTypes
-  /// staging flag is gone.
-  bool isParameterizedProtocolSupported(const LangOptions &opts) const {
+  bool isParameterizedProtocolSupported() const {
     switch (context) {
     case Context::Inherited:
     case Context::ExtensionBinding:
     case Context::GenericRequirement:
-      return true;
     case Context::ExistentialConstraint:
     case Context::MetatypeBase:
-      return opts.EnableParameterizedExistentialTypes;
+      return true;
     case Context::None:
     case Context::TypeAliasDecl:
     case Context::GenericTypeAliasDecl:
