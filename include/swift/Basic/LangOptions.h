@@ -321,9 +321,6 @@ namespace swift {
     /// in calls to generic functions.
     bool EnableOpenedExistentialTypes = false;
 
-    /// Enable experimental flow-sensitive concurrent captures.
-    bool EnableExperimentalFlowSensitiveConcurrentCaptures = false;
-
     /// Disable experimental ClangImporter diagnostics.
     bool DisableExperimentalClangImporterDiagnostics = false;
 
