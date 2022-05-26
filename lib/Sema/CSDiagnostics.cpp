@@ -6895,6 +6895,7 @@ void NonEphemeralConversionFailure::emitSuggestionNotes() const {
     break;
   }
   case ConversionRestrictionKind::InoutToPointer:
+  case ConversionRestrictionKind::InoutToCPointer:
     // For an arbitrary inout-to-pointer, we can suggest
     // withUnsafe[Mutable][Bytes/Pointer].
     if (auto alternative = getAlternativeKind())
