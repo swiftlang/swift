@@ -156,15 +156,17 @@ func anyAny() {
 
 protocol P1 {}
 protocol P2 {}
+protocol P3 {}
 do {
   // Test that we don't accidentally misparse an 'any' type as a 'some' type
   // and vice versa.
-  let _: P1 & any P2 // expected-error {{'any' should appear at the beginning of a composition}}
-  let _: any P1 & any P2 // expected-error {{'any' should appear at the beginning of a composition}}
-  let _: any P1 & some P2 // expected-error {{'some' should appear at the beginning of a composition}}
+  let _: P1 & any P2 // expected-error {{'any' should appear at the beginning of a composition}} {{15-19=}} {{10-10=any }}
+  let _: any P1 & any P2 // expected-error {{'any' should appear at the beginning of a composition}} {{19-23=}}
+  let _: any P1 & P2 & any P3 // expected-error {{'any' should appear at the beginning of a composition}} {{24-28=}}
+  let _: any P1 & some P2 // expected-error {{'some' should appear at the beginning of a composition}} {{19-24=}}
   let _: some P1 & any P2
   // expected-error@-1 {{'some' type can only be declared on a single property declaration}}
-  // expected-error@-2 {{'any' should appear at the beginning of a composition}}
+  // expected-error@-2 {{'any' should appear at the beginning of a composition}} {{20-24=}}
 }
 
 struct ConcreteComposition: P1, P2 {}
