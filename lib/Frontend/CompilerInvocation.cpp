@@ -1257,6 +1257,7 @@ static void ParseSymbolGraphArgs(symbolgraphgen::SymbolGraphOptions &Opts,
   Opts.PrettyPrint = false;
   Opts.EmitSynthesizedMembers = true;
   Opts.PrintMessages = false;
+  Opts.IncludeClangDocs = false;
 }
 
 static bool ParseSearchPathArgs(SearchPathOptions &Opts,
