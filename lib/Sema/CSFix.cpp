@@ -22,6 +22,7 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/RequirementSignature.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Sema/ConstraintLocator.h"
 #include "swift/Sema/ConstraintSystem.h"
@@ -2234,7 +2235,7 @@ bool AddExplicitExistentialCoercion::isRequired(
         // If result is an existential type and the base has `where` clauses
         // associated with its associated types, the call needs a coercion.
         if (erasedMemberTy->isExistentialType() &&
-            hasConstrainedAssociatedTypes(member)) {
+            hasConstrainedAssociatedTypes(member, *existentialType)) {
           RequiresCoercion = true;
           return Action::Stop;
         }
@@ -2246,7 +2247,7 @@ bool AddExplicitExistentialCoercion::isRequired(
       // e.g. `$T` or `[$T]`.
       if (auto *typeVar = componentTy->getAs<TypeVariableType>()) {
         if (auto existentialType = GetExistentialType(typeVar)) {
-          RequiresCoercion |= hasConstrainedAssociatedTypes(
+          RequiresCoercion |= hasAnyConstrainedAssociatedTypes(
               (*existentialType)->getExistentialLayout());
           return RequiresCoercion ? Action::Stop : Action::SkipChildren;
         }
@@ -2256,17 +2257,103 @@ bool AddExplicitExistentialCoercion::isRequired(
     }
 
   private:
-    bool hasConstrainedAssociatedTypes(DependentMemberType *member) {
-      auto *assocType = member->getAssocType();
+    /// Check whether the given member type has any of its associated
+    /// types constrained by requirements associated with the given
+    /// existential type.
+    static bool hasConstrainedAssociatedTypes(DependentMemberType *member,
+                                              Type existentialTy) {
+      auto layout = existentialTy->getExistentialLayout();
+      for (auto *protocol : layout.getProtocols()) {
+        auto requirementSig = protocol->getRequirementSignature();
+        if (hasConstrainedAssociatedTypes(member,
+                                          requirementSig.getRequirements()))
+          return true;
+      }
+      return false;
+    }
 
-      // If this member has associated type requirements, we are done.
-      if (assocType->getTrailingWhereClause())
-        return true;
+    /// Check whether the given member type has any of its associated
+    /// types constrained by the given requirement set.
+    static bool
+    hasConstrainedAssociatedTypes(DependentMemberType *member,
+                                  ArrayRef<Requirement> requirements) {
+      for (const auto &req : requirements) {
+        switch (req.getKind()) {
+        case RequirementKind::Superclass:
+        case RequirementKind::Conformance:
+        case RequirementKind::Layout: {
+          if (isAnchoredOn(req.getFirstType(), member->getAssocType()))
+            return true;
+          break;
+        }
 
-      if (auto *DMT = member->getBase()->getAs<DependentMemberType>())
-        return hasConstrainedAssociatedTypes(DMT);
+        case RequirementKind::SameType: {
+          auto lhsTy = req.getFirstType();
+          auto rhsTy = req.getSecondType();
+
+          if (isAnchoredOn(lhsTy, member->getAssocType()) ||
+              isAnchoredOn(rhsTy, member->getAssocType()))
+            return true;
+
+          break;
+        }
+        }
+      }
 
       return false;
+    }
+
+    /// Check whether any of the protocols mentioned in the given
+    /// existential layout have constraints associated with their
+    /// associated types via a `where` clause, for example:
+    /// `associatedtype A: P where A.B == Int`
+    static bool hasAnyConstrainedAssociatedTypes(ExistentialLayout layout) {
+      for (auto *protocol : layout.getProtocols()) {
+        auto requirementSig = protocol->getRequirementSignature();
+        for (const auto &req : requirementSig.getRequirements()) {
+          switch (req.getKind()) {
+          case RequirementKind::Conformance:
+          case RequirementKind::Layout:
+          case RequirementKind::Superclass: {
+            if (getMemberChainDepth(req.getFirstType()) > 1)
+              return true;
+            break;
+          }
+
+          case RequirementKind::SameType:
+            auto lhsTy = req.getFirstType();
+            auto rhsTy = req.getSecondType();
+
+            if (getMemberChainDepth(lhsTy) > 1 ||
+                getMemberChainDepth(rhsTy) > 1)
+              return true;
+
+            break;
+          }
+        }
+      }
+      return false;
+    }
+
+    /// Check whether the given type is a dependent member type and
+    /// is anchored on the given associated type e.g. type is `A.B.C`
+    /// and associated type is `A.B`.
+    static bool isAnchoredOn(Type type, AssociatedTypeDecl *assocTy,
+                             unsigned depth = 0) {
+      if (auto *member = type->getAs<DependentMemberType>()) {
+        if (member->getAssocType() == assocTy)
+          return depth > 0;
+
+        return isAnchoredOn(member->getBase(), assocTy, depth + 1);
+      }
+
+      return false;
+    }
+
+    static unsigned getMemberChainDepth(Type type, unsigned currDepth = 0) {
+      if (auto *memberTy = type->getAs<DependentMemberType>())
+        return getMemberChainDepth(memberTy->getBase(), currDepth + 1);
+      return currDepth;
     }
 
     static Type getBaseTypeOfDependentMemberChain(DependentMemberType *member) {
@@ -2279,17 +2366,6 @@ bool AddExplicitExistentialCoercion::isRequired(
         return getBaseTypeOfDependentMemberChain(DMT);
 
       return base;
-    }
-
-    static bool hasConstrainedAssociatedTypes(ExistentialLayout layout) {
-      for (auto *protocol : layout.getProtocols()) {
-        if (llvm::any_of(protocol->getAssociatedTypeMembers(),
-                         [](const auto *assocTypeDecl) {
-                           return bool(assocTypeDecl->getTrailingWhereClause());
-                         }))
-          return true;
-      }
-      return false;
     }
   };
 

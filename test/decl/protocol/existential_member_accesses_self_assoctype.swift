@@ -694,7 +694,7 @@ protocol MiscTestsProto {
 do {
   func miscTests(_ arg: any MiscTestsProto) {
     var r: any Sequence & IteratorProtocol = arg.getR()
-    r.makeIterator() // expected-warning {{result of call to 'makeIterator()' is unused}}
+    r.makeIterator() // expected-error {{inferred result type 'any IteratorProtocol' requires explicit coercion due to loss of generic requirements}} {{19-19=as any IteratorProtocol}}
     r.next() // expected-warning {{result of call to 'next()' is unused}}
     r.nonexistent() // expected-error {{value of type 'any IteratorProtocol & Sequence' has no member 'nonexistent'}}
 
@@ -786,8 +786,7 @@ do {
     _ = arg.method3 // expected-error {{member 'method3' cannot be used on value of type 'any ConcreteAssocTypes'; consider using a generic constraint instead}}
     _ = arg.property1 // expected-error {{member 'property1' cannot be used on value of type 'any ConcreteAssocTypes'; consider using a generic constraint instead}}
     // Covariant 'Self' erasure works in conjunction with concrete associated types.
-    let _: (Bool, any ConcreteAssocTypes) = arg.property2 // expected-error {{inferred result type '(Bool, any ConcreteAssocTypes)' requires explicit coercion due to loss of generic requirements}} {{58-58=as (Bool, any ConcreteAssocTypes)}}
-    let _: (Bool, any ConcreteAssocTypes) = arg.property2 as (Bool, any ConcreteAssocTypes) // Ok
+    let _: (Bool, any ConcreteAssocTypes) = arg.property2 // ok
     _ = arg.property3 // expected-error {{member 'property3' cannot be used on value of type 'any ConcreteAssocTypes'; consider using a generic constraint instead}}
     _ = arg[subscript1: false] // expected-error {{member 'subscript' cannot be used on value of type 'any ConcreteAssocTypes'; consider using a generic constraint instead}}
     _ = arg[subscript2: false] // expected-error {{member 'subscript' cannot be used on value of type 'any ConcreteAssocTypes'; consider using a generic constraint instead}}
