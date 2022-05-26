@@ -330,9 +330,6 @@ namespace swift {
     /// Enable inference of Sendable conformances for public types.
     bool EnableInferPublicSendable = false;
 
-    /// Enable experimental 'move only' features.
-    bool EnableExperimentalMoveOnly = false;
-
     /// Enable experimental associated type inference using type witness
     /// systems.
     bool EnableExperimentalAssociatedTypeInference = false;

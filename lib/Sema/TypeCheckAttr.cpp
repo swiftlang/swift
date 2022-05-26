@@ -328,7 +328,7 @@ public:
 void AttributeChecker::visitNoImplicitCopyAttr(NoImplicitCopyAttr *attr) {
   // Only allow for this attribute to be used when experimental move only is
   // enabled.
-  if (!D->getASTContext().LangOpts.EnableExperimentalMoveOnly) {
+  if (!D->getASTContext().LangOpts.hasFeature(Feature::MoveOnly)) {
     auto error =
         diag::experimental_moveonly_feature_can_only_be_used_when_enabled;
     diagnoseAndRemoveAttr(attr, error);

@@ -458,9 +458,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalAssociatedTypeInference |=
       Args.hasArg(OPT_enable_experimental_associated_type_inference);
 
-  Opts.EnableExperimentalMoveOnly |=
-    Args.hasArg(OPT_enable_experimental_move_only);
-
   Opts.EnableInferPublicSendable |=
     Args.hasFlag(OPT_enable_infer_public_concurrent_value,
                  OPT_disable_infer_public_concurrent_value,
@@ -662,6 +659,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.Features.insert(Feature::NamedOpaqueTypes);
   if (Args.hasArg(OPT_enable_experimental_flow_sensitive_concurrent_captures))
     Opts.Features.insert(Feature::FlowSensitiveConcurrencyCaptures);
+  if (Args.hasArg(OPT_enable_experimental_move_only))
+    Opts.Features.insert(Feature::MoveOnly);
 
   Opts.EnableAppExtensionRestrictions |= Args.hasArg(OPT_enable_app_extension);
 
