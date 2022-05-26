@@ -287,4 +287,7 @@ func testExplicitCoercionRequirement(v: any B, otherV: any B & D) {
   func getP<T: P>(_: T) {}
   getP(getC(v)) // expected-error {{inferred result type 'any P' requires explicit coercion due to loss of generic requirements}} {{8-8=(}} {{15-15=as any P)}}
   getP(v.getC()) // expected-error {{inferred result type 'any P' requires explicit coercion due to loss of generic requirements}}  {{8-8=(}} {{14-14=as any P)}}
+
+  getP((getC(v) as any P))   // Ok - parens avoid opening suppression
+  getP((v.getC() as any P))  // Ok - parens avoid opening suppression
 }

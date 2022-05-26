@@ -1479,13 +1479,14 @@ shouldOpenExistentialCallArgument(
     return None;
 
   // An argument expression that explicitly coerces to an existential
-  // disables the implicit opening of the existential.
+  // disables the implicit opening of the existential unless it's
+  // wrapped in parens.
   if (argExpr) {
     if (auto argCast = dyn_cast<ExplicitCastExpr>(
             argExpr->getSemanticsProvidingExpr())) {
       if (auto typeRepr = argCast->getCastTypeRepr()) {
         if (auto toType = cs.getType(typeRepr)) {
-          if (toType->isAnyExistentialType())
+          if (!isa<ParenExpr>(argExpr) && toType->isAnyExistentialType())
             return None;
         }
       }
