@@ -3091,24 +3091,22 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
           unsigned varKind = var->isLet();
 
           if (pbd->isAsyncLet()) {
-            SourceRange pbdVarNameRange(
-                pbd->getStartLoc(),
-                pbd->getPattern(0)->getEndLoc());
-            Diags.diagnose(var->getLoc(), diag::pbd_never_used,
-                           var->getName(), varKind);
+            SourceRange pbdVarNameRange(pbd->getStartLoc(),
+                                        pbd->getPattern(0)->getEndLoc());
+            Diags.diagnose(var->getLoc(), diag::pbd_never_used, var->getName(),
+                           varKind);
 
             Diags.diagnose(var->getLoc(), diag::fixit_async_let_unused_cancel)
-              .fixItReplace(var->getLoc(), "_");
+                .fixItReplace(var->getLoc(), "_");
 
             Diags.diagnose(var->getLoc(), diag::fixit_async_let_unused_run);
           } else {
-            SourceRange replaceRange(
-                pbd->getStartLoc(),
-                pbd->getPattern(0)->getEndLoc());
-            Diags.diagnose(var->getLoc(), diag::pbd_never_used,
-                           var->getName(), varKind);
+            SourceRange replaceRange(pbd->getStartLoc(),
+                                     pbd->getPattern(0)->getEndLoc());
+            Diags.diagnose(var->getLoc(), diag::pbd_never_used, var->getName(),
+                           varKind);
             Diags.diagnose(var->getLoc(), diag::fixit_assign_to_underscore)
-              .fixItReplace(replaceRange, "_");
+                .fixItReplace(replaceRange, "_");
           }
           continue;
         }
@@ -3202,7 +3200,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
         if (foundVP) {
           unsigned varKind = var->isLet();
           Diags.diagnose(var->getLoc(), diag::variable_never_used,
-                        var->getName(), varKind);
+                         var->getName(), varKind);
 
           Diags.diagnose(var->getLoc(), diag::fixit_assign_to_underscore)
               .fixItReplace(foundVP->getSourceRange(), "_");
@@ -3232,7 +3230,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
                          var->getName(), varKind);
 
           Diags.diagnose(var->getLoc(), diag::fixit_assign_to_underscore)
-            .fixItReplace(var->getLoc(), "_");
+              .fixItReplace(var->getLoc(), "_");
         }
       }
       continue;
