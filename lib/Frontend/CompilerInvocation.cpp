@@ -455,9 +455,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                  OPT_disable_experimental_opened_existential_types,
                  true);
 
-  Opts.EnableExperimentalAssociatedTypeInference |=
-      Args.hasArg(OPT_enable_experimental_associated_type_inference);
-
   Opts.EnableInferPublicSendable |=
     Args.hasFlag(OPT_enable_infer_public_concurrent_value,
                  OPT_disable_infer_public_concurrent_value,
@@ -655,7 +652,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.Features.insert(Feature::VariadicGenerics);
   if (Args.hasArg(OPT_enable_experimental_static_assert))
     Opts.Features.insert(Feature::StaticAssert);
-  if (Args.hasArg(OPT_enable_experimental_associated_type_inference))
+  if (Args.hasArg(OPT_enable_experimental_named_opaque_types))
     Opts.Features.insert(Feature::NamedOpaqueTypes);
   if (Args.hasArg(OPT_enable_experimental_flow_sensitive_concurrent_captures))
     Opts.Features.insert(Feature::FlowSensitiveConcurrencyCaptures);
@@ -663,6 +660,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.Features.insert(Feature::MoveOnly);
   if (Args.hasArg(OPT_experimental_one_way_closure_params))
     Opts.Features.insert(Feature::OneWayClosureParameters);
+  if (Args.hasArg(OPT_enable_experimental_associated_type_inference))
+    Opts.Features.insert(Feature::TypeWitnessSystemInference);
 
   Opts.EnableAppExtensionRestrictions |= Args.hasArg(OPT_enable_app_extension);
 
