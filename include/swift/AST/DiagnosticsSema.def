@@ -6330,5 +6330,19 @@ ERROR(attr_incompatible_with_back_deploy,none,
       "'%0' cannot be applied to a back deployed %1",
       (DeclAttribute, DescriptiveDeclKind))
 
+//------------------------------------------------------------------------------
+// MARK: Implicit opening of existential types
+//------------------------------------------------------------------------------
+
+ERROR(result_requires_explicit_coercion,none,
+      "inferred result type %0 requires explicit coercion due to "
+      "loss of generic requirements",
+      (Type))
+
+NOTE(candidate_result_requires_explicit_coercion,none,
+     "inferred result type %0 requires explicit coercion due to "
+     "loss of generic requirements",
+     (Type))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
