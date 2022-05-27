@@ -1637,6 +1637,10 @@ static bool isRetroactiveConformance(const RootProtocolConformance *root) {
     return false; // self-conformances are never retroactive. nor are builtin.
   }
 
+  // Don't consider marker protocols at all.
+  if (conformance->getProtocol()->isMarkerProtocol())
+    return false;
+
   return conformance->isRetroactive();
 }
 
@@ -1682,6 +1686,12 @@ void ASTMangler::appendRetroactiveConformances(SubstitutionMap subMap,
 
   unsigned numProtocolRequirements = 0;
   for (auto conformance : subMap.getConformances()) {
+    if (conformance.isInvalid())
+      continue;
+
+    if (conformance.getRequirement()->isMarkerProtocol())
+      continue;
+
     SWIFT_DEFER {
       ++numProtocolRequirements;
     };

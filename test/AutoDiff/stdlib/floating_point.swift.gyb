@@ -81,6 +81,7 @@ FloatingPointDerivativeTests.test("${Self}.squareRoot") {
 
 FloatingPointDerivativeTests.test("${Self}.addingProduct") {
   expectEqual((1, 2, 3), gradient(at: ${Self}(10), 3, 2, of: { $0.addingProduct($1, $2) }))
+  expectEqual((2, 4, 6), pullback(at: ${Self}(10), 3, 2, of: { $0.addingProduct($1, $2) })(2))
 }
 
 FloatingPointDerivativeTests.test("${Self}.minimum") {

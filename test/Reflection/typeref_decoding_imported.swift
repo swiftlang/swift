@@ -1,7 +1,7 @@
 // XFAIL: OS=windows-msvc
 
 // SR-12893
-// XFAIL: openbsd
+// XFAIL: OS=openbsd
 
 // RUN: %empty-directory(%t)
 

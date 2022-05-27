@@ -7,7 +7,7 @@
 // CHECK-NOT: public_external_unused_test
 
 // TODO: update check line for the hidden_external_test for Windows.
-// UNSUPPORTED: windows
+// UNSUPPORTED: OS=windows-msvc
 
 sil public_external [serialized] @public_external_test : $@convention(thin)  () -> () {
   %0 = tuple()

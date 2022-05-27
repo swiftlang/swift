@@ -1847,21 +1847,9 @@ for host in "${ALL_HOSTS[@]}"; do
                     llvm_enable_projects+=("clang-tools-extra")
                 fi
 
-                # On non-Darwin platforms, build lld so we can always have a
-                # linker that is compatible with the swift we are using to
-                # compile the stdlib.
-                #
-                # This makes it easier to build target stdlibs on systems that
-                # have old toolchains without more modern linker features.
-
-                # wasm: lld should be built when cross building for wasm
-                # After enabling stdlib cross compile, add if statement
-                # to build only when cross compiling for wasm
-                # if [[ "$(uname -s)" != "Darwin" ]] ; then
-                    if [[ ! "${SKIP_BUILD_LLD}" ]]; then
-                        llvm_enable_projects+=("lld")
-                    fi
-                # fi
+                if [[ ! "${SKIP_BUILD_LLD}" ]]; then
+                    llvm_enable_projects+=("lld")
+                fi
 
                 cmake_options+=(
                     -DLLVM_ENABLE_PROJECTS="$(join ";" ${llvm_enable_projects[@]})"

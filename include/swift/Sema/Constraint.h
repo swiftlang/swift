@@ -263,6 +263,8 @@ enum class ConversionRestrictionKind {
   ProtocolMetatypeToProtocolClass,
   /// Inout-to-pointer conversion.
   InoutToPointer,
+  /// Converting from `inout` to a C pointer has `PointerToCPointer` semantics.
+  InoutToCPointer,
   /// Array-to-pointer conversion.
   ArrayToPointer,
   /// String-to-pointer conversion.
@@ -302,8 +304,8 @@ enum class ConversionRestrictionKind {
   /// via an implicit Double initializer call passing a CGFloat value.
   CGFloatToDouble,
   /// Implicit conversion between Swift and C pointers:
-  //    - Unsafe[Mutable]RawPointer -> Unsafe[Mutable]Pointer<[U]Int>
-  //    - Unsafe[Mutable]Pointer<Int{8, 16, ...}> <-> Unsafe[Mutable]Pointer<UInt{8, 16, ...}>
+  ///    - Unsafe[Mutable]RawPointer -> Unsafe[Mutable]Pointer<[U]Int>
+  ///    - Unsafe[Mutable]Pointer<Int{8, 16, ...}> <-> Unsafe[Mutable]Pointer<UInt{8, 16, ...}>
   PointerToCPointer,
   // Convert a pack into a type with an equivalent arity.
   // - If the arity of the pack is 1, drops the pack structure <T> => T
