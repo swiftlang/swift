@@ -60,6 +60,24 @@ import TestsUtils
   }
   blackHole(count)
 }
+@inline(never) func count_characters_by_index(_ s: String) {
+  var idx = s.startIndex
+  while idx != s.endIndex {
+    blackHole(s[idx])
+    s.formIndex(after: &idx)
+  }
+}
+
+@inline(never) func count_characters_by_index_rev(
+    _ s: ReversedCollection<String>
+  ) {
+  var idx = s.endIndex
+  s.formIndex(before: &idx)
+  while idx != s.startIndex {
+    blackHole(s[idx])
+    s.formIndex(before: &idx)
+  }
+}
 
 //
 // Workloads
@@ -94,9 +112,10 @@ public func run_StringWalk(_ n: Int) {
 let baseMultiplier = 250
 let unicodeScalarsMultiplier = baseMultiplier
 let charactersMultiplier = baseMultiplier / 5
+let characters_by_indexMultiplier = baseMultiplier / 5
 
 % Names = ["ascii", "utf16", "tweet", "japanese", "chinese", "korean", "russian", "punctuated", "punctuatedJapanese"]
-% Kinds = ["unicodeScalars", "characters"]
+% Kinds = ["unicodeScalars", "characters", "characters_by_index"]
 % Directions = ["", "_Backwards"]
 
 // An extended benchmark suite exercising finer-granularity behavior of our
@@ -136,7 +155,7 @@ public let benchmarks = [
 ]
 
 % for Name in Names:
-%   for (Kind, View) in zip(Kinds, [".unicodeScalars", ""]):
+%   for (Kind, View) in zip(Kinds, [".unicodeScalars", "", ""]):
 
 @inline(never)
 public func run_StringWalk_${Name}_${Kind}(_ n: Int) {
@@ -209,7 +228,6 @@ public func run_CharIndexing_${Name}_unicodeScalars_Backwards(_ n: Int) {
   }
   blackHole(count)
 }
-
 
 
 % end
