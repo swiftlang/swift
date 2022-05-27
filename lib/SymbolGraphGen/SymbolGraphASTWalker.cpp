@@ -68,7 +68,7 @@ SymbolGraph *SymbolGraphASTWalker::getModuleSymbolGraph(const Decl *D) {
     return &MainGraph;
   }
   
-  if (isFromExportedImportedModule(D)) {
+  if (isExportedImportedModule(M)) {
     return &MainGraph;
   }
   
@@ -231,9 +231,12 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
 }
 
 bool SymbolGraphASTWalker::isFromExportedImportedModule(const Decl* D) const {
-    auto *M = D->getModuleContext();
-    
-    return llvm::any_of(ExportedImportedModules, [&M](const auto *MD) {
-        return areModulesEqual(M, MD->getModuleContext());
-    });
+  auto *M = D->getModuleContext();
+  return isExportedImportedModule(M);
+}
+
+bool SymbolGraphASTWalker::isExportedImportedModule(const ModuleDecl *M) const {
+  return llvm::any_of(ExportedImportedModules, [&M](const auto *MD) {
+    return areModulesEqual(M, MD->getModuleContext());
+  });
 }
