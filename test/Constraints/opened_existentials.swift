@@ -210,3 +210,84 @@ func testTakeValueAndClosure(p: any P) {
     // expected-note@-1{{did you mean to use 'as!' to force downcast?}}
     p)
 }
+
+protocol B {
+  associatedtype C: P where C.A == Double
+  associatedtype D: P
+}
+
+protocol D {
+  associatedtype E
+}
+
+extension B {
+  var testVar: (Int, [C]) { get { fatalError() } }
+
+  func getC() -> C { fatalError() }
+}
+
+func testExplicitCoercionRequirement(v: any B, otherV: any B & D) {
+  func getC<T: B>(_: T) -> T.C { fatalError() }
+  func getTuple<T: B>(_: T) -> (T, T.C) { fatalError() }
+  func getNoError<T: B>(_: T) -> T.C.A { fatalError() }
+  func getComplex<T: B>(_: T) -> ([(x: (a: T.C, b: Int), y: Int)], [Int: T.C]) { fatalError() }
+
+  func overloaded<T: B>(_: T) -> (x: Int, y: T.C) { fatalError() }
+  func overloaded<T: P>(_: T) -> Int { 42 }
+  // expected-note@-1 {{candidate requires that 'any B' conform to 'P' (requirement specified as 'T' : 'P')}}
+
+  _ = getC(v) // expected-error {{inferred result type 'any P' requires explicit coercion due to loss of generic requirements}} {{14-14=as any P}}
+  _ = getC(v) as any P // Ok
+
+  _ = getTuple(v) // expected-error {{inferred result type '(any B, any P)' requires explicit coercion due to loss of generic requirements}} {{18-18=as (any B, any P)}}
+  _ = getTuple(v) as (any B, any P) // Ok
+
+  _ = getNoError(v) // Ok because T.C.A == Double
+
+  _ = getComplex(v) // expected-error {{inferred result type '([(x: (a: any P, b: Int), y: Int)], [Int : any P])' requires explicit coercion due to loss of generic requirements}} {{20-20=as ([(x: (a: any P, b: Int), y: Int)], [Int : any P])}}
+  _ = getComplex(v) as ([(x: (a: any P, b: Int), y: Int)], [Int : any P]) // Ok
+
+  _ = overloaded(v) // expected-error {{no exact matches in call to local function 'overloaded'}}
+  // expected-note@-1 {{inferred result type '(x: Int, y: any P)' requires explicit coercion due to loss of generic requirements}} {{20-20=as (x: Int, y: any P)}}
+
+  func acceptsAny<T>(_: T) {}
+
+  acceptsAny(getC(v)) // expected-error {{inferred result type 'any P' requires explicit coercion due to loss of generic requirements}} {{21-21=as any P}}
+  acceptsAny(getC(v) as any P) // Ok
+
+  acceptsAny(getComplex(v)) // expected-error {{inferred result type '([(x: (a: any P, b: Int), y: Int)], [Int : any P])' requires explicit coercion due to loss of generic requirements}} {{27-27=as ([(x: (a: any P, b: Int), y: Int)], [Int : any P])}}
+  acceptsAny(getComplex(v) as ([(x: (a: any P, b: Int), y: Int)], [Int : any P]))
+
+  func getAssocNoRequirements<T: B>(_: T) -> (Int, [T.D]) { fatalError() }
+
+  _ = getAssocNoRequirements(v) // Ok, `D` doesn't have any requirements
+
+  // Test existential opening from protocol extension access
+  _ = v.getC() // expected-error {{inferred result type 'any P' requires explicit coercion due to loss of generic requirements}} {{13-13=as any P}}
+  _ = v.getC() as any P // Ok
+
+  _ = v.testVar // expected-error {{inferred result type '(Int, [any P])' requires explicit coercion due to loss of generic requirements}} {{16-16=as (Int, [any P])}}
+  _ = v.testVar as (Int, [any P])
+
+  func getE<T: D>(_: T) -> T.E { fatalError() }
+
+  _ = getE(otherV) // Ok `E` doesn't have a `where` clause
+
+  func getSelf<T: B>(_: T) -> T { fatalError() } // expected-note {{found this candidate}}
+  func getSelf<T: D>(_: T) -> T { fatalError() } // expected-note {{found this candidate}}
+
+  _ = getSelf(v) // expected-error {{inferred result type 'any B' requires explicit coercion due to loss of generic requirements}} {{17-17=as any B}}
+  _ = getSelf(v) as any B // Ok
+  _ = getSelf(otherV) as any B & D // expected-error {{ambiguous use of 'getSelf'}}
+
+  func getBDSelf<T: D>(_: T) -> T { fatalError() }
+  _ = getBDSelf(otherV) // expected-error {{inferred result type 'any B & D' requires explicit coercion due to loss of generic requirements}} {{24-24=as any B & D}}
+  _ = getBDSelf(otherV) as any B & D // Ok
+
+  func getP<T: P>(_: T) {}
+  getP(getC(v)) // expected-error {{inferred result type 'any P' requires explicit coercion due to loss of generic requirements}} {{8-8=(}} {{15-15=as any P)}}
+  getP(v.getC()) // expected-error {{inferred result type 'any P' requires explicit coercion due to loss of generic requirements}}  {{8-8=(}} {{14-14=as any P)}}
+
+  getP((getC(v) as any P))   // Ok - parens avoid opening suppression
+  getP((v.getC() as any P))  // Ok - parens avoid opening suppression
+}
