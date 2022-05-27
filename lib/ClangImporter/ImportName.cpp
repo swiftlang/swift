@@ -63,8 +63,9 @@ static const char *getOperatorName(clang::OverloadedOperatorKind Operator) {
   case clang::NUM_OVERLOADED_OPERATORS:
     return nullptr;
 
-#define OVERLOADED_OPERATOR(Name,Spelling,Token,Unary,Binary,MemberOnly) \
-  case clang::OO_##Name: return #Name;
+#define OVERLOADED_OPERATOR(Name, Spelling, Token, Unary, Binary, MemberOnly)  \
+  case clang::OO_##Name:                                                       \
+    return #Name;
 #include "clang/Basic/OperatorKinds.def"
   }
 
@@ -1856,7 +1857,13 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     case clang::OverloadedOperatorKind::OO_GreaterEqual:
     case clang::OverloadedOperatorKind::OO_AmpAmp:
     case clang::OverloadedOperatorKind::OO_PipePipe:
-      baseName = isa<clang::CXXMethodDecl>(functionDecl) ? swiftCtx.getIdentifier("__operator" + std::string{getOperatorName(op)}).str() : swiftCtx.getIdentifier(clang::getOperatorSpelling(op)).str();
+      baseName =
+          isa<clang::CXXMethodDecl>(functionDecl)
+              ? swiftCtx
+                    .getIdentifier("__operator" +
+                                   std::string{getOperatorName(op)})
+                    .str()
+              : swiftCtx.getIdentifier(clang::getOperatorSpelling(op)).str();
       isFunction = true;
       addEmptyArgNamesForClangFunction(functionDecl, argumentNames);
       break;

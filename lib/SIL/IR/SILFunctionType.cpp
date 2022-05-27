@@ -3477,10 +3477,9 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
       bool staticOperator = method->isOverloadedOperator() &&
                             method->getOverloadedOperator() != clang::OO_Call &&
                             method->getOverloadedOperator() != clang::OO_Subscript;
-      return isa<clang::CXXConstructorDecl>(method) ||
-                     method->isStatic()
-          ? SILFunctionTypeRepresentation::CFunctionPointer
-          : SILFunctionTypeRepresentation::CXXMethod;
+      return isa<clang::CXXConstructorDecl>(method) || method->isStatic()
+                 ? SILFunctionTypeRepresentation::CFunctionPointer
+                 : SILFunctionTypeRepresentation::CXXMethod;
     }
 
 
