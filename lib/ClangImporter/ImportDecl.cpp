@@ -3606,11 +3606,8 @@ namespace {
 
               Impl.addAlternateDecl(MD, opFuncDecl);
 
-              Impl.markUnavailable(
-                  MD,
-                  "use " +
-                      std::string{clang::getOperatorSpelling(cxxOperatorKind)} +
-                      " instead");
+              auto msg = "use " + std::string{clang::getOperatorSpelling(cxxOperatorKind)} + " instead";
+              Impl.markUnavailable(MD,msg);
 
               // Make the actual member operator private.
               MD->overwriteAccess(AccessLevel::Private);
@@ -8171,12 +8168,13 @@ SwiftDeclConverter::makeOperator(FuncDecl *operatorMethod,
 
   auto parentCtx = operatorMethod->getDeclContext();
 
-  auto lhsParam =
-      new (ctx) ParamDecl(SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
-                          ctx.getIdentifier("lhs"), parentCtx);
+  auto lhsParam = new (ctx) ParamDecl(
+          SourceLoc(),
+          SourceLoc(),Identifier(),
+          SourceLoc(),ctx.getIdentifier("lhs"),
+          parentCtx);
 
-  lhsParam->setInterfaceType(
-      operatorMethod->getDeclContext()->getSelfInterfaceType());
+  lhsParam->setInterfaceType(operatorMethod->getDeclContext()->getSelfInterfaceType());
 
   if (operatorMethod->isMutating()) {
     // This implicitly makes the parameter indirect.
@@ -8200,8 +8198,9 @@ SwiftDeclConverter::makeOperator(FuncDecl *operatorMethod,
     newArgNames.push_back(id);
   }
 
-  auto opDeclName =
-      DeclName(ctx, opId, {newArgNames.begin(), newArgNames.end()});
+  auto opDeclName = DeclName(
+          ctx,opId,
+          {newArgNames.begin(), newArgNames.end()});
 
   auto topLevelStaticFuncDecl = FuncDecl::createImplicit(
       ctx, StaticSpellingKind::None, opDeclName, SourceLoc(),
