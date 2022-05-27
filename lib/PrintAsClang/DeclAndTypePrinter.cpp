@@ -332,7 +332,7 @@ private:
     if (outputLang != OutputLanguageMode::Cxx)
       return;
     // FIXME: Print struct's availability.
-    ClangValueTypePrinter printer(os);
+    ClangValueTypePrinter printer(os, owningPrinter.interopContext);
     printer.printStructDecl(SD);
   }
 
