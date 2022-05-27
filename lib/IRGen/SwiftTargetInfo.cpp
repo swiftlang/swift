@@ -257,6 +257,7 @@ SwiftTargetInfo SwiftTargetInfo::get(IRGenModule &IGM) {
   case llvm::Triple::wasm32:
     configureWasm32(IGM, triple, target);
     break;
+
   default:
     // FIXME: Complain here? Default target info is unlikely to be correct.
     break;

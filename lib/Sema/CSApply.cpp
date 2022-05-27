@@ -6611,7 +6611,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       return buildCollectionUpcastExpr(expr, toType, /*bridged=*/false, locator);
     }
 
-    case ConversionRestrictionKind::InoutToPointer: {
+    case ConversionRestrictionKind::InoutToPointer:
+    case ConversionRestrictionKind::InoutToCPointer: {
       bool isOptional = false;
       Type unwrappedTy = toType;
       if (Type unwrapped = toType->getOptionalObjectType()) {
@@ -6629,7 +6630,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         result = cs.cacheType(new (ctx) InjectIntoOptionalExpr(result, toType));
       return result;
     }
-    
+
     case ConversionRestrictionKind::ArrayToPointer: {
       bool isOptional = false;
       Type unwrappedTy = toType;

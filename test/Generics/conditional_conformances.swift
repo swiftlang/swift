@@ -49,6 +49,7 @@ struct RedundantSame<T: P1> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=RedundantSame
 // CHECK-NEXT: (normal_conformance type=RedundantSame<T> protocol=P2)
 extension RedundantSame: P2 where T: P1 {}
+// expected-warning@-1 {{redundant conformance constraint 'T' : 'P1'}}
 
 struct RedundantSuper<T: P4> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=RedundantSuper
@@ -334,6 +335,8 @@ struct RedundancyOrderDependenceGood<T: P1, U> {}
 // CHECK-NEXT: (normal_conformance type=RedundancyOrderDependenceGood<T, U> protocol=P2
 // CHECK-NEXT:   same_type: T U)
 extension RedundancyOrderDependenceGood: P2 where U: P1, T == U {}
+// expected-warning@-1 {{redundant conformance constraint 'U' : 'P1'}}
+
 struct RedundancyOrderDependenceBad<T, U: P1> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=RedundancyOrderDependenceBad
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=RedundancyOrderDependenceBad

@@ -54,15 +54,19 @@ public:
     /// The root refinement context.
     Root,
 
-    /// The context was introduced by a declaration (e.g., the body of a
-    /// function declaration or the contents of a class declaration).
+    /// The context was introduced by a declaration with an explicit
+    /// availability attribute. The context contains both the signature and the
+    /// body of the declaration.
     Decl,
 
-    /// The context was introduced by an API boundary; that is, we are in
-    /// a module with library evolution enabled and the parent context's
-    /// contents can be visible to the module's clients, but this context's
-    /// contents are not.
-    APIBoundary,
+    /// The context was introduced implicitly by a declaration. The context may
+    /// cover the entire declaration or it may cover a subset of it. For
+    /// example, a public, non-inlinable function declaration in an API module
+    /// will have at least two associated contexts: one for the entire
+    /// declaration at the declared availability of the API and a nested
+    /// implicit context for the body of the function, which will always run at
+    /// the deployment target of the library.
+    DeclImplicit,
 
     /// The context was introduced for the Then branch of an IfStmt.
     IfStmtThenBranch,
@@ -131,7 +135,8 @@ private:
     }
 
     Decl *getAsDecl() const {
-      assert(IntroReason == Reason::Decl || IntroReason == Reason::APIBoundary);
+      assert(IntroReason == Reason::Decl ||
+             IntroReason == Reason::DeclImplicit);
       return D;
     }
 
@@ -163,8 +168,8 @@ private:
 
   SourceRange SrcRange;
 
-  /// A canonical availability info for this context, computed top-down from the root
-  /// context (compilation deployment target).
+  /// A canonical availability info for this context, computed top-down from the
+  /// root context.
   AvailabilityContext AvailabilityInfo;
 
   /// If this context was annotated with an availability attribute, this property captures that.
@@ -194,8 +199,8 @@ public:
 
   /// Create a refinement context for the given declaration.
   static TypeRefinementContext *
-  createForAPIBoundary(ASTContext &Ctx, Decl *D, TypeRefinementContext *Parent,
-                       const AvailabilityContext &Info, SourceRange SrcRange);
+  createForDeclImplicit(ASTContext &Ctx, Decl *D, TypeRefinementContext *Parent,
+                        const AvailabilityContext &Info, SourceRange SrcRange);
 
   /// Create a refinement context for the Then branch of the given IfStmt.
   static TypeRefinementContext *

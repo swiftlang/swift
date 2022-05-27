@@ -209,7 +209,7 @@ static_assert(alignof(HeapObject) == alignof(void*),
   (__swift_uintptr_t) SWIFT_ABI_DEFAULT_BRIDGEOBJECT_TAG_64
 
 #elif defined(__wasm32__)
-extern unsigned char __global_base;
+
 #define _swift_abi_LeastValidPointerValue                                      \
   (__swift_uintptr_t) SWIFT_ABI_WASM32_LEAST_VALID_POINTER
 

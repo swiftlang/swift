@@ -1746,10 +1746,22 @@ public:
   void visitNominalTypeDecl(const NominalTypeDecl *nominal) {
     checkGenericParams(nominal, nominal);
 
+    DeclAvailabilityFlags flags =
+        DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol;
+
+    // As a concession to source compatibility for API libraries, downgrade
+    // diagnostics about inheritance from a less available type when the
+    // following conditions are met:
+    // 1. The inherited type is only potentially unavailable before the
+    //    deployment target.
+    // 2. The inheriting type is `@usableFromInline`.
+    if (nominal->getAttrs().hasAttribute<UsableFromInlineAttr>())
+      flags |= DeclAvailabilityFlag::
+          WarnForPotentialUnavailabilityBeforeDeploymentTarget;
+
     llvm::for_each(nominal->getInherited(), [&](TypeLoc inherited) {
       checkType(inherited.getType(), inherited.getTypeRepr(), nominal,
-                ExportabilityReason::General,
-                DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol);
+                ExportabilityReason::General, flags);
     });
   }
 
@@ -1850,21 +1862,8 @@ public:
     });
 
     Where = wasWhere.withExported(hasExportedMembers);
-
-    // When diagnosing potential unavailability of the extended type, downgrade
-    // the diagnostics to warnings when the extension decl has no declared
-    // availability and the required availability is more than the deployment
-    // target.
-    DeclAvailabilityFlags extendedTypeFlags = None;
-    auto annotatedRange =
-        AvailabilityInference::annotatedAvailableRange(ED, ED->getASTContext());
-    if (!annotatedRange.hasValue())
-      extendedTypeFlags |= DeclAvailabilityFlag::
-          WarnForPotentialUnavailabilityBeforeDeploymentTarget;
-
     checkType(ED->getExtendedType(), ED->getExtendedTypeRepr(), ED,
-              ExportabilityReason::ExtensionWithPublicMembers,
-              extendedTypeFlags);
+              ExportabilityReason::ExtensionWithPublicMembers);
 
     // 3) If the extension contains exported members or defines conformances,
     // the 'where' clause must only name exported types.

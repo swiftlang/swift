@@ -1,4 +1,4 @@
-// UNSUPPORTED: windows
+// UNSUPPORTED: OS=windows-msvc
 
 // Temporarily disable on AArch64 Linux (rdar://88451721)
 // UNSUPPORTED: OS=linux-gnu && CPU=aarch64
