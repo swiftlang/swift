@@ -65,7 +65,7 @@ func runTest(numCounters: Int, numWorkers: Int, numIterations: Int) async {
   for i in 0..<numWorkers {
     workers.append(
       Task.detached(priority: randomPriority) { [counters] in
-        await try! Task.sleep(nanoseconds: UInt64.random(in: 0..<100) * 1_000_000)
+        try! await Task.sleep(nanoseconds: UInt64.random(in: 0..<100) * 1_000_000)
         await worker(identity: i, counters: counters, numIterations: numIterations)
       }
     )
