@@ -3815,7 +3815,7 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
 
   bool complained = false;
   if (repr->hasEllipsis()) {
-    if (getASTContext().LangOpts.EnableExperimentalVariadicGenerics &&
+    if (getASTContext().LangOpts.hasFeature(Feature::VariadicGenerics) &&
         repr->getNumElements() == 1 && !repr->hasElementNames()) {
       // This is probably a pack expansion. Try to resolve the pattern type.
       auto patternTy = resolveType(repr->getElementType(0), elementOptions);
