@@ -2999,6 +2999,30 @@ static bool usesFeatureNoAsyncAvailability(Decl *decl) {
    return decl->getAttrs().getNoAsync(decl->getASTContext()) != nullptr;
 }
 
+static bool usesFeatureVariadicGenerics(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureNamedOpaqueTypes(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureFlowSensitiveConcurrencyCaptures(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureMoveOnly(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureOneWayClosureParameters(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureTypeWitnessSystemInference(Decl *decl) {
+  return false;
+}
+
 static void
 suppressingFeatureNoAsyncAvailability(PrintOptions &options,
                                       llvm::function_ref<void()> action) {

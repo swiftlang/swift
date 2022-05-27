@@ -224,6 +224,20 @@ bool LangOptions::isCustomConditionalCompilationFlagSet(StringRef Name) const {
       != CustomConditionalCompilationFlags.end();
 }
 
+bool LangOptions::hasFeature(Feature feature) const {
+  if (Features.contains(feature))
+    return true;
+
+  return false;
+}
+
+bool LangOptions::hasFeature(llvm::StringRef featureName) const {
+  if (auto feature = getExperimentalFeature(featureName))
+    return hasFeature(*feature);
+
+  return false;
+}
+
 std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   clearAllPlatformConditionValues();
 
@@ -407,6 +421,15 @@ bool swift::isSuppressibleFeature(Feature feature) {
 #include "swift/Basic/Features.def"
   }
   llvm_unreachable("covered switch");
+}
+
+llvm::Optional<Feature> swift::getExperimentalFeature(llvm::StringRef name) {
+  return llvm::StringSwitch<Optional<Feature>>(name)
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)
+#define EXPERIMENTAL_FEATURE(FeatureName) \
+                   .Case(#FeatureName, Feature::FeatureName)
+#include "swift/Basic/Features.def"
+                   .Default(None);
 }
 
 DiagnosticBehavior LangOptions::getAccessNoteFailureLimit() const {
