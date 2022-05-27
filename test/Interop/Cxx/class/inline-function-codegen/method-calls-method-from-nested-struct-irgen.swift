@@ -6,4 +6,4 @@ public func getValueFromMethod() -> CInt {
   return callMethod(41)
 }
 
-// CHECK: define linkonce_odr{{( dso_local)?}} i32 @{{_ZN13IncrementUser11Incrementor9incrementEi|"\?increment@Incrementor@IncrementUser@@QEAAHH@Z"}}(%"struct.IncrementUser::Incrementor"* nonnull align 1 dereferenceable(1) %this, i32 %t)
+// CHECK: define {{.*}}i32 @{{_ZN13IncrementUser11Incrementor9incrementEi|"\?increment@Incrementor@IncrementUser@@QEAAHH@Z"}}(%"struct.IncrementUser::Incrementor"* {{.*}}, i32 {{.*}})

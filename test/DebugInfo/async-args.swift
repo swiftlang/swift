@@ -10,10 +10,10 @@ func withGenericArg<T>(_ msg: T) async {
   // This odd debug info is part of a contract with CoroSplit/CoroFrame to fix
   // this up after coroutine splitting.
   // CHECK-LABEL: {{^define .*}} @"$s1M14withGenericArgyyxYalF"(%swift.context* swiftasync %0
-  // CHECK: call void @llvm.dbg.declare(metadata %swift.type** %
-  // CHECK-SAME:   metadata ![[TAU:[0-9]+]], metadata !DIExpression()
-  // CHECK: call void @llvm.dbg.declare(metadata %swift.opaque** %
-  // CHECK-SAME:   metadata ![[MSG:[0-9]+]], metadata !DIExpression(DW_OP_deref))
+  // CHECK: call void @llvm.dbg.declare(metadata %swift.context* %0
+  // CHECK-SAME:   metadata ![[MSG:[0-9]+]], metadata !DIExpression(DW_OP_plus_uconst, {{.*}}DW_OP_deref))
+  // CHECK: call void @llvm.dbg.declare(metadata %swift.context* %0
+  // CHECK-SAME:   metadata ![[TAU:[0-9]+]], metadata !DIExpression(DW_OP_plus_uconst,
 
   await forceSplit()
   // CHECK-LABEL: {{^define .*}} @"$s1M14withGenericArgyyxYalFTQ0_"(i8* swiftasync %0)

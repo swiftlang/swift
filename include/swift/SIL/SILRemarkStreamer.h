@@ -21,6 +21,7 @@
 
 #include "swift/Basic/SourceManager.h"
 #include "swift/SIL/OptimizationRemark.h"
+#include "llvm/Remarks/Remark.h"
 #include "llvm/Remarks/RemarkStreamer.h"
 
 namespace swift {

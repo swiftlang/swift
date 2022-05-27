@@ -6863,7 +6863,7 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
 
   // Resilient enum types lower down to the same opaque type.
   if (IGM.isResilient(theEnum, ResilienceExpansion::Maximal))
-    storageType = cast<llvm::StructType>(IGM.OpaquePtrTy->getElementType());
+    storageType = cast<llvm::StructType>(IGM.OpaquePtrTy->getPointerElementType());
   else
     storageType = IGM.createNominalType(type);
 

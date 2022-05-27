@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "flow-isolation"
 
+#include "llvm/Support/WithColor.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ActorIsolation.h"
 #include "swift/AST/DiagnosticsSIL.h"

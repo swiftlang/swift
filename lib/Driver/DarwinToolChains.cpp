@@ -213,10 +213,11 @@ static bool findXcodeClangLibPath(const Twine &libName,
 }
 
 static void addVersionString(const ArgList &inputArgs, ArgStringList &arguments,
-                             unsigned major, unsigned minor, unsigned micro) {
+                             llvm::VersionTuple version) {
   llvm::SmallString<8> buf;
   llvm::raw_svector_ostream os{buf};
-  os << major << '.' << minor << '.' << micro;
+  os << version.getMajor() << '.' << version.getMinor().getValueOr(0) << '.'
+     << version.getSubminor().getValueOr(0);
   arguments.push_back(inputArgs.MakeArgString(os.str()));
 }
 
@@ -588,38 +589,30 @@ toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
     }
 
     // Compute the platform version.
-    unsigned major, minor, micro;
+    llvm::VersionTuple osVersion;
     if (tripleIsMacCatalystEnvironment(triple)) {
-      triple.getiOSVersion(major, minor, micro);
+      osVersion = triple.getiOSVersion();
 
-      // Mac Catalyst on arm was introduced with an iOS deployment target of
-      // 14.0; the linker doesn't want to see a deployment target before that.
-      if (major < 14 && triple.isAArch64()) {
-        major = 14;
-        minor = 0;
-        micro = 0;
-      }
-
-      // Mac Catalyst was introduced with an iOS deployment target of 13.1;
-      // the linker doesn't want to see a deployment target before that.
-      if (major < 13) {
-        major = 13;
-        minor = 1;
-        micro = 0;
+      if (osVersion.getMajor() < 14 && triple.isAArch64()) {
+        // Mac Catalyst on arm was introduced with an iOS deployment target of
+        // 14.0; the linker doesn't want to see a deployment target before that.
+        osVersion = llvm::VersionTuple(/*Major=*/14, /*Minor=*/0);
+      } else if (osVersion.getMajor() < 13) {
+        // Mac Catalyst was introduced with an iOS deployment target of 13.1;
+        // the linker doesn't want to see a deployment target before that.
+        osVersion = llvm::VersionTuple(/*Major=*/13, /*Minor=*/1);
       }
     } else {
       switch (getDarwinPlatformKind((triple))) {
       case DarwinPlatformKind::MacOS:
-        triple.getMacOSXVersion(major, minor, micro);
+        triple.getMacOSXVersion(osVersion);
 
         // The first deployment of arm64 for macOS is version 10.16;
-        if (triple.isAArch64() && major <= 10 && minor < 16) {
-          llvm::VersionTuple firstMacARM64e(10, 16, 0);
-          firstMacARM64e = canonicalizePlatformVersion(PlatformKind::macOS,
-                                                       firstMacARM64e);
-          major = firstMacARM64e.getMajor();
-          minor = firstMacARM64e.getMinor().getValueOr(0);
-          micro = firstMacARM64e.getSubminor().getValueOr(0);
+        if (triple.isAArch64() && osVersion.getMajor() <= 10 &&
+            osVersion.getMinor().getValueOr(0) < 16) {
+          osVersion = llvm::VersionTuple(/*Major=*/10, /*Minor=*/16);
+          osVersion = canonicalizePlatformVersion(PlatformKind::macOS,
+                                                  osVersion);
         }
 
         break;
@@ -627,37 +620,31 @@ toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
       case DarwinPlatformKind::IPhoneOSSimulator:
       case DarwinPlatformKind::TvOS:
       case DarwinPlatformKind::TvOSSimulator:
-        triple.getiOSVersion(major, minor, micro);
+        osVersion = triple.getiOSVersion();
 
         // The first deployment of arm64 simulators is iOS/tvOS 14.0;
         // the linker doesn't want to see a deployment target before that.
         if (triple.isSimulatorEnvironment() && triple.isAArch64() &&
-            major < 14) {
-          major = 14;
-          minor = 0;
-          micro = 0;
+            osVersion.getMajor() < 14) {
+          osVersion = llvm::VersionTuple(/*Major=*/14, /*Minor=*/0);
         }
 
         break;
       case DarwinPlatformKind::WatchOS:
       case DarwinPlatformKind::WatchOSSimulator:
-        triple.getOSVersion(major, minor, micro);
+        osVersion = triple.getOSVersion();
         break;
       }
     }
 
     // Compute the SDK version.
-    unsigned sdkMajor = 0, sdkMinor = 0, sdkMicro = 0;
-    if (auto sdkVersion = getTargetSDKVersion(triple)) {
-      sdkMajor = sdkVersion->getMajor();
-      sdkMinor = sdkVersion->getMinor().getValueOr(0);
-      sdkMicro = sdkVersion->getSubminor().getValueOr(0);
-    }
+    auto sdkVersion = getTargetSDKVersion(triple)
+        .getValueOr(llvm::VersionTuple());
 
     Arguments.push_back("-platform_version");
     Arguments.push_back(platformName);
-    addVersionString(context.Args, Arguments, major, minor, micro);
-    addVersionString(context.Args, Arguments, sdkMajor, sdkMinor, sdkMicro);
+    addVersionString(context.Args, Arguments, osVersion);
+    addVersionString(context.Args, Arguments, sdkVersion);
   };
 
   addPlatformVersionArg(getTriple());

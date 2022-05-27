@@ -5895,7 +5895,7 @@ void swift::serializeToBuffers(
   std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
   const SILModule *M) {
 
-  assert(!withNullAsEmptyStringRef(options.OutputPath).empty());
+  assert(!options.OutputPath.empty());
   {
     FrontendStatsTracer tracer(getContext(DC).Stats,
                                "Serialization, swiftmodule, to buffer");
@@ -5914,10 +5914,11 @@ void swift::serializeToBuffers(
     emitABIDescriptor(DC, options);
     if (moduleBuffer)
       *moduleBuffer = std::make_unique<llvm::SmallVectorMemoryBuffer>(
-                        std::move(buf), options.OutputPath);
+          std::move(buf), options.OutputPath,
+          /*RequiresNullTerminator=*/false);
   }
 
-  if (!withNullAsEmptyStringRef(options.DocOutputPath).empty()) {
+  if (!options.DocOutputPath.empty()) {
     FrontendStatsTracer tracer(getContext(DC).Stats,
                                "Serialization, swiftdoc, to buffer");
     llvm::SmallString<1024> buf;
@@ -5931,10 +5932,11 @@ void swift::serializeToBuffers(
     });
     if (moduleDocBuffer)
       *moduleDocBuffer = std::make_unique<llvm::SmallVectorMemoryBuffer>(
-                           std::move(buf), options.DocOutputPath);
+          std::move(buf), options.DocOutputPath,
+          /*RequiresNullTerminator=*/false);
   }
 
-  if (!withNullAsEmptyStringRef(options.SourceInfoOutputPath).empty()) {
+  if (!options.SourceInfoOutputPath.empty()) {
     FrontendStatsTracer tracer(getContext(DC).Stats,
                                "Serialization, swiftsourceinfo, to buffer");
     llvm::SmallString<1024> buf;
@@ -5948,7 +5950,8 @@ void swift::serializeToBuffers(
     });
     if (moduleSourceInfoBuffer)
       *moduleSourceInfoBuffer = std::make_unique<llvm::SmallVectorMemoryBuffer>(
-          std::move(buf), options.SourceInfoOutputPath);
+          std::move(buf), options.SourceInfoOutputPath,
+          /*RequiresNullTerminator=*/false);
   }
 }
 
@@ -5957,12 +5960,12 @@ void swift::serialize(ModuleOrSourceFile DC,
                       const symbolgraphgen::SymbolGraphOptions &symbolGraphOptions,
                       const SILModule *M,
                       const fine_grained_dependencies::SourceFileDepGraph *DG) {
-  assert(!withNullAsEmptyStringRef(options.OutputPath).empty());
+  assert(!options.OutputPath.empty());
 
-  if (StringRef(options.OutputPath) == "-") {
+  if (options.OutputPath == "-") {
     // Special-case writing to stdout.
     Serializer::writeToStream(llvm::outs(), DC, M, options, DG);
-    assert(withNullAsEmptyStringRef(options.DocOutputPath).empty());
+    assert(options.DocOutputPath.empty());
     return;
   }
 
@@ -5977,7 +5980,7 @@ void swift::serialize(ModuleOrSourceFile DC,
   if (hadError)
     return;
 
-  if (!withNullAsEmptyStringRef(options.DocOutputPath).empty()) {
+  if (!options.DocOutputPath.empty()) {
     (void)withOutputFile(getContext(DC).Diags,
                          options.DocOutputPath,
                          [&](raw_ostream &out) {
@@ -5988,7 +5991,7 @@ void swift::serialize(ModuleOrSourceFile DC,
     });
   }
 
-  if (!withNullAsEmptyStringRef(options.SourceInfoOutputPath).empty()) {
+  if (!options.SourceInfoOutputPath.empty()) {
     (void)withOutputFile(getContext(DC).Diags,
                          options.SourceInfoOutputPath,
                          [&](raw_ostream &out) {

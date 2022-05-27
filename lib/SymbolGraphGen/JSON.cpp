@@ -52,15 +52,12 @@ void swift::symbolgraphgen::serialize(const llvm::Triple &T,
     OS.attributeObject("operatingSystem", [&](){
       OS.attribute("name", T.getOSTypeName(T.getOS()));
 
-      unsigned Major;
-      unsigned Minor;
-      unsigned Patch;
-      T.getOSVersion(Major, Minor, Patch);
-      llvm::VersionTuple OSVersion(Major, Minor, Patch);
-
-      OS.attributeBegin("minimumVersion");
-      serialize(OSVersion, OS);
-      OS.attributeEnd();
+      llvm::VersionTuple OSVersion = T.getOSVersion();
+      if (!OSVersion.empty()) {
+        OS.attributeBegin("minimumVersion");
+        serialize(OSVersion, OS);
+        OS.attributeEnd();
+      }
     });
   });
 }

@@ -719,7 +719,7 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
 
   fwd->setAttributes(attrs);
   // Merge initial attributes with attrs.
-  llvm::AttrBuilder b;
+  llvm::AttrBuilder b(IGM.getLLVMContext());
   IGM.constructInitialFnAttributes(b);
   fwd->addFnAttrs(b);
 

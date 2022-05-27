@@ -106,7 +106,7 @@ namespace {
                             StringRef FileName,
                             bool IsAngled,
                             clang::CharSourceRange FilenameRange,
-                            const clang::FileEntry *File,
+                            Optional<clang::FileEntryRef> File,
                             StringRef SearchPath,
                             StringRef RelativePath,
                             const clang::Module *Imported,
@@ -284,14 +284,14 @@ private:
                           StringRef FileName,
                           bool IsAngled,
                           clang::CharSourceRange FilenameRange,
-                          const clang::FileEntry *File,
+                          Optional<clang::FileEntryRef> File,
                           StringRef SearchPath,
                           StringRef RelativePath,
                           const clang::Module *Imported,
                           clang::SrcMgr::CharacteristicKind FileType) override{
     if (!Imported) {
       if (File)
-        Impl.BridgeHeaderFiles.insert(File);
+        Impl.BridgeHeaderFiles.insert(*File);
       return;
     }
     // Synthesize identifier locations.
@@ -865,6 +865,9 @@ importer::addCommonInvocationArguments(
 
   invocationArgStrs.push_back("-fansi-escape-codes");
 
+  invocationArgStrs.push_back("-Xclang");
+  invocationArgStrs.push_back("-no-opaque-pointers");
+
   for (auto extraArg : importerOpts.ExtraArgs) {
     invocationArgStrs.push_back(extraArg);
   }
@@ -1349,7 +1352,9 @@ ClangImporter::create(ASTContext &ctx,
   // callbacks are still being added, and (b) the logic to parse them has
   // changed.
   clang::Parser::DeclGroupPtrTy parsed;
-  while (!importer->Impl.Parser->ParseTopLevelDecl(parsed)) {
+  clang::Sema::ModuleImportState importState =
+      clang::Sema::ModuleImportState::NotACXX20Module;
+  while (!importer->Impl.Parser->ParseTopLevelDecl(parsed, importState)) {
     for (auto *D : parsed.get()) {
       importer->Impl.addBridgeHeaderTopLevelDecls(D);
 
@@ -1507,7 +1512,9 @@ bool ClangImporter::Implementation::importHeader(
   };
 
   clang::Parser::DeclGroupPtrTy parsed;
-  while (!Parser->ParseTopLevelDecl(parsed)) {
+  clang::Sema::ModuleImportState importState =
+      clang::Sema::ModuleImportState::NotACXX20Module;
+  while (!Parser->ParseTopLevelDecl(parsed, importState)) {
     if (parsed)
       handleParsed(parsed.get());
     for (auto additionalParsedGroup : consumer.getAdditionalParsedDecls())
@@ -3000,16 +3007,18 @@ void ClangImporter::lookupBridgingHeaderDecls(
 bool ClangImporter::lookupDeclsFromHeader(StringRef Filename,
                               llvm::function_ref<bool(ClangNode)> filter,
                               llvm::function_ref<void(Decl*)> receiver) const {
-  auto File = getClangPreprocessor().getFileManager().getFile(Filename);
-  if (!File)
+  llvm::Expected<clang::FileEntryRef> ExpectedFile =
+      getClangPreprocessor().getFileManager().getFileRef(Filename);
+  if (!ExpectedFile)
     return true;
+  clang::FileEntryRef File = *ExpectedFile;
 
   auto &ClangCtx = getClangASTContext();
   auto &ClangSM = ClangCtx.getSourceManager();
   auto &ClangPP = getClangPreprocessor();
 
   // Look up the header in the includes of the bridging header.
-  if (Impl.BridgeHeaderFiles.count(*File)) {
+  if (Impl.BridgeHeaderFiles.count(File)) {
     auto headerFilter = [&](ClangNode ClangN) -> bool {
       if (ClangN.isNull())
         return false;
@@ -3018,7 +3027,9 @@ bool ClangImporter::lookupDeclsFromHeader(StringRef Filename,
       if (ClangLoc.isInvalid())
         return false;
 
-      if (ClangSM.getFileEntryForID(ClangSM.getFileID(ClangLoc)) != *File)
+      Optional<clang::FileEntryRef> LocRef =
+          ClangSM.getFileEntryRefForID(ClangSM.getFileID(ClangLoc));
+      if (!LocRef || *LocRef != File)
         return false;
 
       return filter(ClangN);
@@ -3028,7 +3039,7 @@ bool ClangImporter::lookupDeclsFromHeader(StringRef Filename,
     return false;
   }
 
-  clang::FileID FID = ClangSM.translateFile(*File);
+  clang::FileID FID = ClangSM.translateFile(File);
   if (FID.isInvalid())
     return false;
 

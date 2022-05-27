@@ -1351,7 +1351,7 @@ static bool serializeSIB(SILModule *SM, const PrimarySpecificPaths &PSPs,
   assert(!moduleOutputPath.empty() && "must have an output path");
 
   SerializationOptions serializationOpts;
-  serializationOpts.OutputPath = moduleOutputPath.c_str();
+  serializationOpts.OutputPath = moduleOutputPath;
   serializationOpts.SerializeAllSIL = true;
   serializationOpts.IsSIB = true;
 

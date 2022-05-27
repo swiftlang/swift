@@ -689,14 +689,14 @@ SerializedModuleLoaderBase::findModule(ImportPath::Element moduleID,
 static std::pair<StringRef, clang::VersionTuple>
 getOSAndVersionForDiagnostics(const llvm::Triple &triple) {
   StringRef osName;
-  unsigned major, minor, micro;
+  llvm::VersionTuple osVersion;
   if (triple.isMacOSX()) {
     // macOS triples represent their versions differently, so we have to use the
     // special accessor.
-    triple.getMacOSXVersion(major, minor, micro);
+    triple.getMacOSXVersion(osVersion);
     osName = swift::prettyPlatformString(PlatformKind::macOS);
   } else {
-    triple.getOSVersion(major, minor, micro);
+    osVersion = triple.getOSVersion();
     if (triple.isWatchOS()) {
       osName = swift::prettyPlatformString(PlatformKind::watchOS);
     } else if (triple.isTvOS()) {
@@ -714,12 +714,7 @@ getOSAndVersionForDiagnostics(const llvm::Triple &triple) {
   }
 
   assert(!osName.empty());
-  clang::VersionTuple version;
-  if (micro != 0)
-    version = clang::VersionTuple(major, minor, micro);
-  else
-    version = clang::VersionTuple(major, minor);
-  return {osName, version};
+  return {osName, osVersion};
 }
 
 LoadedFile *SerializedModuleLoaderBase::loadAST(

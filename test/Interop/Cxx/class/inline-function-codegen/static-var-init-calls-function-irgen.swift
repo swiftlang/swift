@@ -8,4 +8,4 @@ public func getInitializedStaticVar() -> CInt {
   return initializeStaticVar()
 }
 
-// CHECK: define linkonce_odr{{( dso_local)?}} i32 @{{_Z9incrementi|"\?increment@@YAHH@Z"}}(i32 %t)
+// CHECK: define {{.*}}i32 @{{_Z9incrementi|"\?increment@@YAHH@Z"}}(i32{{.*}})
