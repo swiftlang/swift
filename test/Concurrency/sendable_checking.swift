@@ -104,3 +104,12 @@ struct WrapClass<T: NSClass> {
 }
 
 extension WrapClass: Sendable where T: Sendable { }
+
+// Make sure we don't inherit the unavailable Sendable conformance from
+// our superclass.
+class SendableSubclass: NSClass, @unchecked Sendable { }
+
+@available(SwiftStdlib 5.1, *)
+func testSubclassing(obj: SendableSubclass) async {
+  acceptCV(obj) // okay!
+}
