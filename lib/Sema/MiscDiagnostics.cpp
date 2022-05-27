@@ -3095,7 +3095,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
                 pbd->getStartLoc(),
                 pbd->getPattern(0)->getEndLoc());
             Diags.diagnose(var->getLoc(), diag::pbd_never_used,
-                           var->getName(), varKind, /*withfixit*/false);
+                           var->getName(), varKind);
 
             Diags.diagnose(var->getLoc(), diag::fixit_async_let_unused_cancel)
               .fixItReplace(var->getLoc(), "_");
@@ -3106,7 +3106,8 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
                 pbd->getStartLoc(),
                 pbd->getPattern(0)->getEndLoc());
             Diags.diagnose(var->getLoc(), diag::pbd_never_used,
-                           var->getName(), varKind, /*withfixit*/true)
+                           var->getName(), varKind);
+            Diags.diagnose(var->getLoc(), diag::fixit_assign_to_underscore)
               .fixItReplace(replaceRange, "_");
           }
           continue;
@@ -3200,9 +3201,10 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
 
         if (foundVP) {
           unsigned varKind = var->isLet();
-          Diags
-              .diagnose(var->getLoc(), diag::variable_never_used,
-                        var->getName(), varKind, /*hasFixit*/true)
+          Diags.diagnose(var->getLoc(), diag::variable_never_used,
+                        var->getName(), varKind);
+
+          Diags.diagnose(var->getLoc(), diag::fixit_assign_to_underscore)
               .fixItReplace(foundVP->getSourceRange(), "_");
           continue;
         }
@@ -3219,7 +3221,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
 
         if (var->isAsyncLet()) {
           Diags.diagnose(var->getLoc(), diag::variable_never_used,
-                         var->getName(), varKind, /*hasFixit*/false);
+                         var->getName(), varKind);
 
           Diags.diagnose(var->getLoc(), diag::fixit_async_let_unused_cancel)
               .fixItReplace(var->getLoc(), "_");
@@ -3227,7 +3229,9 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
         } else {
           // Just rewrite the one variable with a _.
           Diags.diagnose(var->getLoc(), diag::variable_never_used,
-                         var->getName(), varKind, /*hasFixit*/true)
+                         var->getName(), varKind);
+
+          Diags.diagnose(var->getLoc(), diag::fixit_assign_to_underscore)
             .fixItReplace(var->getLoc(), "_");
         }
       }
