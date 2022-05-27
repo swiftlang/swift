@@ -1074,6 +1074,69 @@ ConvertingInitialization::finishEmission(SILGenFunction &SGF,
   llvm_unreachable("bad state");
 }
 
+static ManagedValue
+emitPeepholedConversions(SILGenFunction &SGF, SILLocation loc,
+                                   const Conversion &outerConversion,
+                                   const Conversion &innerConversion,
+                                   ConversionPeepholeHint hint,
+                                   SGFContext C,
+                                   ValueProducerRef produceOrigValue) {
+  auto produceValue = [&](SGFContext C) {
+    if (!hint.isForced()) {
+      return produceOrigValue(SGF, loc, C);
+    }
+
+    auto value = produceOrigValue(SGF, loc, SGFContext());
+    auto &optTL = SGF.getTypeLowering(value.getType());
+    // isForceUnwrap is hardcoded true because hint.isForced() is only
+    // set by implicit force unwraps.
+    return SGF.emitCheckedGetOptionalValueFrom(loc, value,
+                                               /*isForceUnwrap*/ true,
+                                               optTL, C);
+  };
+
+  auto getBridgingSourceType = [&] {
+    CanType sourceType = innerConversion.getBridgingSourceType();
+    if (hint.isForced())
+      sourceType = sourceType.getOptionalObjectType();
+    return sourceType;
+  };
+  auto getBridgingResultType = [&] {
+    return outerConversion.getBridgingResultType();
+  };
+  auto getBridgingLoweredResultType = [&] {
+    return outerConversion.getBridgingLoweredResultType();
+  };
+
+  switch (hint.getKind()) {
+  case ConversionPeepholeHint::Identity:
+    return produceValue(C);
+
+  case ConversionPeepholeHint::BridgeToAnyObject: {
+    auto value = produceValue(SGFContext());
+    return SGF.emitNativeToBridgedValue(loc, value, getBridgingSourceType(),
+                                        getBridgingResultType(),
+                                        getBridgingLoweredResultType(), C);
+  }
+
+  case ConversionPeepholeHint::Subtype: {
+    // Otherwise, emit and convert.
+    // TODO: if the context allows +0, use it in more situations.
+    auto value = produceValue(SGFContext());
+    SILType loweredResultTy = getBridgingLoweredResultType();
+
+    // Nothing to do if the value already has the right representation.
+    if (value.getType().getObjectType() == loweredResultTy.getObjectType())
+      return value;
+
+    CanType sourceType = getBridgingSourceType();
+    CanType resultType = getBridgingResultType();
+    return SGF.emitTransformedValue(loc, value, sourceType, resultType, C);
+  }
+  }
+  llvm_unreachable("bad kind");
+}
+
 bool ConvertingInitialization::tryPeephole(SILGenFunction &SGF,
                                            SILLocation loc,
                                            ManagedValue origValue,
@@ -1104,6 +1167,15 @@ bool ConvertingInitialization::tryPeephole(SILGenFunction &SGF, SILLocation loc,
   ManagedValue value = emitPeepholedConversions(SGF, loc, outerConversion,
                                                 innerConversion, *hint,
                                                 FinalContext, produceValue);
+  
+  // The callers to tryPeephole assume that the initialization is ready to be
+  // finalized after returning. If this conversion sits on top of another
+  // initialization, forward the value into the underlying initialization and
+  // report the value as emitted in context.
+  if (FinalContext.getEmitInto() && !value.isInContext()) {
+    value.ensurePlusOne(SGF, loc).forwardInto(SGF, loc, FinalContext.getEmitInto());
+    value = ManagedValue::forInContext();
+  }
   setConvertedValue(value);
   return true;
 }
@@ -1117,15 +1189,11 @@ void ConvertingInitialization::copyOrInitValueInto(SILGenFunction &SGF,
   // TODO: take advantage of borrowed inputs?
   if (!isInit) formalValue = formalValue.copy(SGF, loc);
   State = Initialized;
-  SGFContext emissionContext = OwnedSubInitialization
-    ? SGFContext() : FinalContext;
   
-  Value = TheConversion.emit(SGF, loc, formalValue, emissionContext);
+  Value = TheConversion.emit(SGF, loc, formalValue, FinalContext);
   
-  if (OwnedSubInitialization) {
-    OwnedSubInitialization->copyOrInitValueInto(SGF, loc,
-                                                Value,
-                                                isInit);
+  if (FinalContext.getEmitInto() && !Value.isInContext()) {
+    Value.forwardInto(SGF, loc, FinalContext.getEmitInto());
     Value = ManagedValue::forInContext();
   }
 }
@@ -1512,65 +1580,3 @@ Lowering::canPeepholeConversions(SILGenFunction &SGF,
   llvm_unreachable("bad kind");
 }
 
-ManagedValue
-Lowering::emitPeepholedConversions(SILGenFunction &SGF, SILLocation loc,
-                                   const Conversion &outerConversion,
-                                   const Conversion &innerConversion,
-                                   ConversionPeepholeHint hint,
-                                   SGFContext C,
-                                   ValueProducerRef produceOrigValue) {
-  auto produceValue = [&](SGFContext C) {
-    if (!hint.isForced()) {
-      return produceOrigValue(SGF, loc, C);
-    }
-
-    auto value = produceOrigValue(SGF, loc, SGFContext());
-    auto &optTL = SGF.getTypeLowering(value.getType());
-    // isForceUnwrap is hardcoded true because hint.isForced() is only
-    // set by implicit force unwraps.
-    return SGF.emitCheckedGetOptionalValueFrom(loc, value,
-                                               /*isForceUnwrap*/ true,
-                                               optTL, C);
-  };
-
-  auto getBridgingSourceType = [&] {
-    CanType sourceType = innerConversion.getBridgingSourceType();
-    if (hint.isForced())
-      sourceType = sourceType.getOptionalObjectType();
-    return sourceType;
-  };
-  auto getBridgingResultType = [&] {
-    return outerConversion.getBridgingResultType();
-  };
-  auto getBridgingLoweredResultType = [&] {
-    return outerConversion.getBridgingLoweredResultType();
-  };
-
-  switch (hint.getKind()) {
-  case ConversionPeepholeHint::Identity:
-    return produceValue(C);
-
-  case ConversionPeepholeHint::BridgeToAnyObject: {
-    auto value = produceValue(SGFContext());
-    return SGF.emitNativeToBridgedValue(loc, value, getBridgingSourceType(),
-                                        getBridgingResultType(),
-                                        getBridgingLoweredResultType(), C);
-  }
-
-  case ConversionPeepholeHint::Subtype: {
-    // Otherwise, emit and convert.
-    // TODO: if the context allows +0, use it in more situations.
-    auto value = produceValue(SGFContext());
-    SILType loweredResultTy = getBridgingLoweredResultType();
-
-    // Nothing to do if the value already has the right representation.
-    if (value.getType().getObjectType() == loweredResultTy.getObjectType())
-      return value;
-
-    CanType sourceType = getBridgingSourceType();
-    CanType resultType = getBridgingResultType();
-    return SGF.emitTransformedValue(loc, value, sourceType, resultType, C);
-  }
-  }
-  llvm_unreachable("bad kind");
-}
