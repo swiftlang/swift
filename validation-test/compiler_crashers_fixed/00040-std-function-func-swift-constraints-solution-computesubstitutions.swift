@@ -12,5 +12,6 @@
 
 func d<b: Sequence, e>(c : b) -> e? where Optional<e> == b.Iterator.Element {
   for mx : e? in c { // expected-warning {{immutable value 'mx' was never used}}
+  // expected-note@-1 {{consider replacing with '_'}}
   }
 }

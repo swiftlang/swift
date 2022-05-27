@@ -5,7 +5,8 @@
 // <rdar://problem/18876585> Compiler should warn me if I set a parameter as 'var' but never modify it
 
 func basicTests() -> Int {
-  let x = 42 // expected-warning {{immutable value 'x' was never used; consider replacing with assignment to '_' or removing it}} {{3-8=_}}
+  let x = 42 // expected-warning {{immutable value 'x' was never used}}
+             // expected-note@-1 {{consider replacing with '_' or removing it}} {{3-8=_}}
   var y = 12 // expected-warning {{variable 'y' was never mutated; consider changing to 'let' constant}} {{3-6=let}}
   _ = 42 // ok
   _ = 42 // ok
@@ -69,7 +70,8 @@ func nestedFunction() -> Int {
   
   func g() {
     x = 97
-    var q = 27  // expected-warning {{variable 'q' was never used}} {{5-10=_}}
+    var q = 27  // expected-warning {{variable 'q' was never used}}
+                // expected-note@-1 {{consider replacing with '_' or removing it}} {{5-10=_}}
   }
   g()
   
@@ -313,9 +315,11 @@ func testFixitsInStatementsWithPatterns(_ a : Int?) {
 
 // <rdar://22774938> QoI: "never used" in an "if let" should rewrite expression to use != nil
 func test(_ a : Int?, b : Any) {
-  if true == true, let x = a {   // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{20-25=_}}
+  if true == true, let x = a {   // expected-warning {{immutable value 'x' was never used}}
+                                 // expected-note@-1{{consider replacing with '_' or removing it}} {{20-25=_}}
   }
-  if let x = a, let y = a {  // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{6-11=_}}
+  if let x = a, let y = a {  // expected-warning {{immutable value 'x' was never used}}
+                             // expected-note@-1{{consider replacing with '_' or removing it}} {{6-11=_}}
     _ = y
   }
 
@@ -365,7 +369,10 @@ func test(_ a : Int?, b : Any) {
   if let bbb = (try? throwingBB()) as? Int {} // expected-warning {{value 'bbb' was defined but never used; consider replacing with boolean test}} {{6-16=}} {{36-39=is}}
 
   let cc: (Any?, Any) = (1, 2)
-  if let (cc1, cc2) = cc as? (Int, Int) {} // expected-warning {{immutable value 'cc1' was never used; consider replacing with '_' or removing it}} expected-warning {{immutable value 'cc2' was never used; consider replacing with '_' or removing it}}
+  if let (cc1, cc2) = cc as? (Int, Int) {} // expected-warning {{immutable value 'cc1' was never used}}
+                                           // expected-note@-1 {{consider replacing with '_' or removing it}}
+                                           // expected-warning@-2 {{immutable value 'cc2' was never used}}
+                                           // expected-note@-3 {{consider replacing with '_' or removing it}}
 
   // SR-1112
   let xxx: Int? = 0
@@ -382,10 +389,14 @@ func test(_ a : Int?, b : Any) {
 }
 
 func test2() {
-  let a = 4 // expected-warning {{initialization of immutable value 'a' was never used; consider replacing with assignment to '_' or removing it}} {{3-8=_}}
-  var ( b ) = 6 // expected-warning {{initialization of variable 'b' was never used; consider replacing with assignment to '_' or removing it}} {{3-12=_}}
-  var c: Int = 4 // expected-warning {{variable 'c' was never used; consider replacing with '_' or removing it}} {{7-8=_}}
-  let (d): Int = 9 // expected-warning {{immutable value 'd' was never used; consider replacing with '_' or removing it}} {{8-9=_}}
+  let a = 4 // expected-warning {{initialization of immutable value 'a' was never used}}
+            // expected-note@-1{{consider replacing with '_' or removing it}} {{3-8=_}}
+  var ( b ) = 6 // expected-warning {{initialization of variable 'b' was never used}}
+                // expected-note@-1{{consider replacing with '_' or removing it}} {{3-12=_}}
+  var c: Int = 4 // expected-warning {{variable 'c' was never used}}
+                 // expected-note@-1{{consider replacing with '_' or removing it}} {{7-8=_}}
+  let (d): Int = 9 // expected-warning {{immutable value 'd' was never used}}
+                   // expected-note@-1{{consider replacing with '_' or removing it}} {{8-9=_}}
 }
 
 let optionalString: String? = "check"
@@ -400,7 +411,8 @@ var unNeededVar = false
 if unNeededVar {}
 guard let foo = optionalAny else {}
 
-for i in 0..<10 { // expected-warning {{immutable value 'i' was never used; consider replacing with '_' or removing it}} {{5-6=_}}
+for i in 0..<10 { // expected-warning {{immutable value 'i' was never used}}
+                  // expected-note@-1{{consider replacing with '_' or removing it}} {{5-6=_}}
    print("")
 }
 
@@ -468,7 +480,8 @@ extension MemberGetterExtension {
 
 func testLocalFunc() {
   var unusedVar = 0
-  // expected-warning@-1 {{initialization of variable 'unusedVar' was never used; consider replacing with assignment to '_' or removing it}}
+  // expected-warning@-1 {{initialization of variable 'unusedVar' was never used}}
+  // expected-note@-2 {{consider replacing with '_' or removing it}}
 
   var notMutatedVar = 0
   // expected-warning@-1 {{variable 'notMutatedVar' was never mutated; consider changing to 'let' constant}}
@@ -506,35 +519,50 @@ func testVariablesBoundInPatterns() {
   // introducer stripped by the fixit. All other cases are currently too
   // complicated for the VarDeclUsageChecker.
   switch StringB.simple(b: true) {
-  case .simple(b: let b) where false: // expected-warning {{immutable value 'b' was never used; consider replacing with '_' or removing it}} {{19-24=_}}
+  case .simple(b: let b) where false: // expected-warning {{immutable value 'b' was never used}}
+                                      // expected-note@-1 {{consider replacing with '_' or removing it}} {{19-24=_}}
     break
-  case .simple(b: var b) where false: // expected-warning {{variable 'b' was never used; consider replacing with '_' or removing it}} {{19-24=_}}
+  case .simple(b: var b) where false: // expected-warning {{variable 'b' was never used}}
+                                      // expected-note@-1 {{consider replacing with '_' or removing it}} {{19-24=_}}
     break
-  case var .simple(b: b): // expected-warning {{variable 'b' was never used; consider replacing with '_' or removing it}} {{23-24=_}}
+  case var .simple(b: b): // expected-warning {{variable 'b' was never used}}
+                          // expected-note@-1 {{consider replacing with '_' or removing it}} {{23-24=_}}
     break
   case .tuple(b: let (b1, b2)) where false:
-    // expected-warning@-1 {{immutable value 'b1' was never used; consider replacing with '_' or removing it}} {{23-25=_}}
-    // expected-warning@-2 {{immutable value 'b2' was never used; consider replacing with '_' or removing it}} {{27-29=_}}
+    // expected-warning@-1 {{immutable value 'b1' was never used}}
+    // expected-note@-2 {{consider replacing with '_' or removing it}} {{23-25=_}}
+    // expected-warning@-3 {{immutable value 'b2' was never used}}
+    // expected-note@-4 {{consider replacing with '_' or removing it}} {{27-29=_}}
     break
   case .tuple(b: (let b1, let b2)) where false:
-    // expected-warning@-1 {{immutable value 'b1' was never used; consider replacing with '_' or removing it}} {{19-25=_}}
-    // expected-warning@-2 {{immutable value 'b2' was never used; consider replacing with '_' or removing it}} {{27-33=_}}
+    // expected-warning@-1 {{immutable value 'b1' was never used}}
+    // expected-note@-2 {{consider replacing with '_' or removing it}} {{19-25=_}}
+    // expected-warning@-3 {{immutable value 'b2' was never used}}
+    // expected-note@-4 {{consider replacing with '_' or removing it}} {{27-33=_}}
     break
   case .tuple(b: (var b1, var b2)) where false:
-    // expected-warning@-1 {{variable 'b1' was never used; consider replacing with '_' or removing it}} {{19-25=_}}
-    // expected-warning@-2 {{variable 'b2' was never used; consider replacing with '_' or removing it}} {{27-33=_}}
+    // expected-warning@-1 {{variable 'b1' was never used}}
+    // expected-note@-2 {{consider replacing with '_' or removing it}} {{19-25=_}}
+    // expected-warning@-3 {{variable 'b2' was never used}}
+    // expected-note@-4 {{consider replacing with '_' or removing it}} {{27-33=_}}
     break
   case var .tuple(b: (b1, b2)) where false:
-    // expected-warning@-1 {{variable 'b1' was never used; consider replacing with '_' or removing it}} {{23-25=_}}
-    // expected-warning@-2 {{variable 'b2' was never used; consider replacing with '_' or removing it}} {{27-29=_}}
+    // expected-warning@-1 {{variable 'b1' was never used}}
+    // expected-note@-2 {{consider replacing with '_' or removing it}} {{23-25=_}}
+    // expected-warning@-3 {{variable 'b2' was never used}}
+    // expected-note@-4 {{consider replacing with '_' or removing it}} {{27-29=_}}
     break
-  case .tuple(b: let b): // expected-warning {{immutable value 'b' was never used; consider replacing with '_' or removing it}} {{18-23=_}}
+  case .tuple(b: let b): // expected-warning {{immutable value 'b' was never used}}
+                         // expected-note@-1 {{consider replacing with '_' or removing it}} {{18-23=_}}
     break
-  case .optional(b: let x?) where false: // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{25-26=_}}
+  case .optional(b: let x?) where false: // expected-warning {{immutable value 'x' was never used}}
+                                         // expected-note@-1 {{consider replacing with '_' or removing it}} {{25-26=_}}
     break
-  case .optional(b: let .some(x)) where false: // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{31-32=_}}
+  case .optional(b: let .some(x)) where false: // expected-warning {{immutable value 'x' was never used}}
+                                               // expected-note@-1 {{consider replacing with '_' or removing it}} {{31-32=_}}
     break
-  case let .optional(b: x?): // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{25-26=_}}
+  case let .optional(b: x?): // expected-warning {{immutable value 'x' was never used}}
+                             // expected-note@-1 {{consider replacing with '_' or removing it}} {{25-26=_}}
     break
   case let .optional(b: .none): // expected-warning {{'let' pattern has no effect; sub-pattern didn't bind any variables}} {{8-12=}}
     break

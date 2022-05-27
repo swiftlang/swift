@@ -4,7 +4,8 @@ class A1 {
   func foo1() -> Int {}
   func foo2() {
     var foo1 = foo1()
-    // expected-warning@-1 {{initialization of variable 'foo1' was never used; consider replacing with assignment to '_' or removing it}}
+    // expected-warning@-1 {{initialization of variable 'foo1' was never used}}
+    // expected-note@-2 {{consider replacing with '_' or removing it}}
   }
 }
 
@@ -12,14 +13,16 @@ class A2 {
   var foo1 = 2
   func foo2() {
     var foo1 = foo1
-    // expected-warning@-1 {{initialization of variable 'foo1' was never used; consider replacing with assignment to '_' or removing it}}
+    // expected-warning@-1 {{initialization of variable 'foo1' was never used}}
+    // expected-note@-2 {{consider replacing with '_' or removing it}}
   }
 }
 
 class A3 {
   func foo2() {
     var foo1 = foo1()
-    // expected-warning@-1 {{initialization of variable 'foo1' was never used; consider replacing with assignment to '_' or removing it}}
+    // expected-warning@-1 {{initialization of variable 'foo1' was never used}}
+    // expected-note@-2 {{consider replacing with '_' or removing it}}
   }
   func foo1() -> Int {}
 }
@@ -36,14 +39,16 @@ func localContext() {
     func foo1() -> Int {}
     func foo2() {
       var foo1 = foo1()
-      // expected-warning@-1 {{initialization of variable 'foo1' was never used; consider replacing with assignment to '_' or removing it}}
+      // expected-warning@-1 {{initialization of variable 'foo1' was never used}}
+      // expected-note@-2 {{consider replacing with '_' or removing it}}
     }
 
     class A6 {
       func foo1() -> Int {}
       func foo2() {
         var foo1 = foo1()
-        // expected-warning@-1 {{initialization of variable 'foo1' was never used; consider replacing with assignment to '_' or removing it}}
+        // expected-warning@-1 {{initialization of variable 'foo1' was never used}}
+        // expected-note@-2 {{consider replacing with '_' or removing it}}
       }
     }
 

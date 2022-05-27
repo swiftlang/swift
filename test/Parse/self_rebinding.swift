@@ -53,7 +53,8 @@ class MyCls {
     func something() {}
 
     func test() {
-        // expected-warning @+1 {{initialization of immutable value 'self' was never used}}
+        // expected-warning @+2 {{initialization of immutable value 'self' was never used}}
+        // expected-note @+1 {{consider replacing with '_' or removing it}}{{9-19=_}}
         let `self` = Writer() // Even if `self` is shadowed,
         something() // this should still refer `MyCls.something`.
     }

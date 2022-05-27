@@ -33,11 +33,13 @@ func canImportVersioned() {
 #endif
 
 #if canImport(Foo, _version: 4)
-  let d = 1 // expected-warning {{initialization of immutable value 'd' was never used; consider replacing with assignment to '_' or removing it}}
+  let d = 1 // expected-warning {{initialization of immutable value 'd' was never used}}
+            // expected-note@-1 {{consider replacing with '_' or removing it}}
 #endif
 
 #if canImport(Foo, _version: 113.33)
-  let e = 1 // expected-warning {{initialization of immutable value 'e' was never used; consider replacing with assignment to '_' or removing it}}
+  let e = 1 // expected-warning {{initialization of immutable value 'e' was never used}}
+            // expected-note@-1 {{consider replacing with '_' or removing it}}
 #endif
 
 #if canImport(Foo, _underlyingVersion: 113.33)
@@ -45,15 +47,18 @@ func canImportVersioned() {
 #endif
 
 #if canImport(Foo, _version: 113.329)
-  let f = 1 // expected-warning {{initialization of immutable value 'f' was never used; consider replacing with assignment to '_' or removing it}}
+  let f = 1 // expected-warning {{initialization of immutable value 'f' was never used}}
+            // expected-note@-1 {{consider replacing with '_' or removing it}}
 #endif
 
 #if canImport(Foo, _version: 113.330)
-  let g = 1 // expected-warning {{initialization of immutable value 'g' was never used; consider replacing with assignment to '_' or removing it}}
+  let g = 1 // expected-warning {{initialization of immutable value 'g' was never used}}
+            // expected-note@-1 {{consider replacing with '_' or removing it}}
 #endif
 
 #if canImport(Foo)
-  let h = 1 // expected-warning {{initialization of immutable value 'h' was never used; consider replacing with assignment to '_' or removing it}}
+  let h = 1 // expected-warning {{initialization of immutable value 'h' was never used}}
+            // expected-note@-1 {{consider replacing with '_' or removing it}}
 #endif
 }
 
@@ -67,10 +72,12 @@ func canImportVersionedString() {
 #endif
 
 #if canImport(Foo, _version: "4")
-  let d = 1 // expected-warning {{initialization of immutable value 'd' was never used; consider replacing with assignment to '_' or removing it}}
+  let d = 1 // expected-warning {{initialization of immutable value 'd' was never used}}
+            // expected-note@-1 {{consider replacing with '_' or removing it}}
 #endif
 
 #if canImport(Foo, _version: "113.33")
-  let e = 1 // expected-warning {{initialization of immutable value 'e' was never used; consider replacing with assignment to '_' or removing it}}
+  let e = 1 // expected-warning {{initialization of immutable value 'e' was never used}}
+  // expected-note@-1 {{consider replacing with '_' or removing it}}
 #endif
 }

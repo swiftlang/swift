@@ -153,7 +153,8 @@ func s(a: A, b: B) {
     break
 
   case (.B(_), let b):
-  // expected-warning@-1 {{immutable value 'b' was never used; consider replacing with '_' or removing it}}
+  // expected-warning@-1 {{immutable value 'b' was never used}}
+  // expected-note@-2 {{consider replacing with '_' or removing it}}
     break
 
   case (.C, _), (.D, _):

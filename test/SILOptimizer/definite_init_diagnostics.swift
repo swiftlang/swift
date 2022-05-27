@@ -223,7 +223,8 @@ func existentials(_ i: Int, dp: DerivedProtocol) {
   var b : Any
   b = ()
 
-  // expected-warning @+1 {{variable 'c' was never used}} {{7-8=_}}
+  // expected-warning @+2 {{variable 'c' was never used}}
+  // expected-note @+1 {{consider replacing with '_' or removing it}}{{7-8=_}}
   var c : Any   // no uses.
   
   // expected-warning @+1 {{variable 'd1' was never mutated}} {{3-6=let}}
@@ -877,7 +878,8 @@ struct MyMutabilityImplementation : TestMutabilityProtocol {
 func testLocalProperties(_ b : Int) -> Int {
   // expected-note @+1 {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
   let x : Int
-  let y : Int // never assigned is ok    expected-warning {{immutable value 'y' was never used}} {{7-8=_}}
+  let y : Int // never assigned is ok    expected-warning {{immutable value 'y' was never used}}
+  // expected-note @-1 {{consider replacing with '_' or removing it}} {{7-8=_}}
 
   x = b
   x = b    // expected-error {{immutable value 'x' may only be initialized once}}
@@ -899,7 +901,8 @@ func testAddressOnlyProperty<T>(_ b : T) -> T {
   // expected-note @+1 {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
   let x : T  // expected-note {{change 'let' to 'var' to make it mutable}}
   let y : T
-  let z : T   // never assigned is ok.  expected-warning {{immutable value 'z' was never used}} {{7-8=_}}
+  let z : T   // never assigned is ok.  expected-warning {{immutable value 'z' was never used}}
+              // expected-note @-1 {{consider replacing with '_' or removing it}} {{7-8=_}}
   x = b
   y = b
   x = b   // expected-error {{immutable value 'x' may only be initialized once}}
