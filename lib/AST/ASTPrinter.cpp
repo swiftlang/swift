@@ -3015,6 +3015,10 @@ static bool usesFeatureMoveOnly(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureOneWayClosureParameters(Decl *decl) {
+  return false;
+}
+
 static void
 suppressingFeatureNoAsyncAvailability(PrintOptions &options,
                                       llvm::function_ref<void()> action) {

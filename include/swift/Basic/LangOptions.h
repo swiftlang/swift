@@ -721,10 +721,6 @@ namespace swift {
     /// Disable constraint system performance hacks.
     bool DisableConstraintSolverPerformanceHacks = false;
 
-    /// Enable experimental support for one-way constraints for the
-    /// parameters of closures.
-    bool EnableOneWayClosureParameters = false;
-
     /// See \ref FrontendOptions.PrintFullConvention
     bool PrintFullConvention = false;
   };

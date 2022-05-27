@@ -661,6 +661,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.Features.insert(Feature::FlowSensitiveConcurrencyCaptures);
   if (Args.hasArg(OPT_enable_experimental_move_only))
     Opts.Features.insert(Feature::MoveOnly);
+  if (Args.hasArg(OPT_experimental_one_way_closure_params))
+    Opts.Features.insert(Feature::OneWayClosureParameters);
 
   Opts.EnableAppExtensionRestrictions |= Args.hasArg(OPT_enable_app_extension);
 
@@ -1110,9 +1112,6 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
 
   // Always enable operator designated types for the standard library.
   Opts.EnableOperatorDesignatedTypes |= FrontendOpts.ParseStdlib;
-
-  Opts.EnableOneWayClosureParameters |=
-      Args.hasArg(OPT_experimental_one_way_closure_params);
 
   Opts.PrintFullConvention |=
       Args.hasArg(OPT_experimental_print_full_convention);
