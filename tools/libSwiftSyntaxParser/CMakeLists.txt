@@ -10,12 +10,14 @@ set(LLVM_EXPORTED_SYMBOL_FILE
 add_swift_host_library(libSwiftSyntaxParser SHARED
   c-include-check.c
   libSwiftSyntaxParser.cpp
+  HAS_SWIFT_MODULES
   LLVM_LINK_COMPONENTS support)
 if(NOT SWIFT_BUILT_STANDALONE AND NOT CMAKE_C_COMPILER_ID MATCHES Clang)
   add_dependencies(libSwiftSyntaxParser clang)
 endif()
 target_link_libraries(libSwiftSyntaxParser PRIVATE
-  swiftParse)
+  swiftParse
+  swiftCompilerModules_SwiftSyntax)
 set_target_properties(libSwiftSyntaxParser
     PROPERTIES
     OUTPUT_NAME ${SYNTAX_PARSER_LIB_NAME})

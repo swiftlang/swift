@@ -3,8 +3,10 @@
 // RUN: diff -u %s %t/afterRoundtrip.swift
 // RUN: cat %t/errors.swift | %FileCheck %s
 
+// REQUIRES: swift_in_compiler
+
 // Escaping newlines is not supported
 _ = /\
 /
 
-// CHECK: 7:7: error: unterminated regex literal
+// CHECK: 10:1: error: expected expression path in Swift key path

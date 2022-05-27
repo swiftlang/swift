@@ -17,7 +17,7 @@ import Basic
 #if canImport(_CompilerRegexParser)
 @_spi(CompilerInterface) import _CompilerRegexParser
 
-public func registerRegexParser() {
+func registerRegexParser() {
   Parser_registerRegexLiteralParsingFn(_RegexLiteralParsingFn)
   Parser_registerRegexLiteralLexingFn(_RegexLiteralLexingFn)
 }
@@ -122,6 +122,6 @@ public func _RegexLiteralParsingFn(
 #else // canImport(_CompilerRegexParser)
 
 #warning("Regex parsing is disabled")
-public func registerRegexParser() {}
+func registerRegexParser() {}
 
 #endif // canImport(_CompilerRegexParser)

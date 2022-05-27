@@ -16,7 +16,7 @@
 #
 function(add_swift_compiler_module module)
   cmake_parse_arguments(ALSM
-                        ""
+                        "ADD_TO_SYNTAXPARSE"
                         ""
                         "DEPENDS;SOURCES"
                         ${ARGN})
@@ -35,6 +35,7 @@ function(add_swift_compiler_module module)
 
   set_property(TARGET ${target_name} PROPERTY module_name ${module})
   set_property(TARGET ${target_name} PROPERTY module_depends ${ALSM_DEPENDS})
+  set_property(TARGET ${target_name} PROPERTY add_to_syntaxparse ${ALSM_ADD_TO_SYNTAXPARSE})
 
   get_property(modules GLOBAL PROPERTY swift_compiler_modules)
   set_property(GLOBAL PROPERTY swift_compiler_modules ${modules} ${module})
@@ -120,6 +121,8 @@ function(add_swift_compiler_modules_library name)
 
   set(all_obj_files)
   set(all_module_targets)
+  set(syntaxparse_obj_files)
+  set(syntaxparse_module_targets)
   get_property(modules GLOBAL PROPERTY "swift_compiler_modules")
   foreach(module ${modules})
 
@@ -127,6 +130,7 @@ function(add_swift_compiler_modules_library name)
     get_target_property(module ${module_target} "module_name")
     get_target_property(sources ${module_target} SOURCES)
     get_target_property(dependencies ${module_target} "module_depends")
+    get_target_property(add_to_syntaxparse ${module_target} "add_to_syntaxparse")
     set(deps, "")
     if (dependencies)
       foreach(dep_module ${dependencies})
@@ -146,6 +150,9 @@ function(add_swift_compiler_modules_library name)
     set_property(TARGET ${module_target} PROPERTY "module_file" "${module_file}")
 
     set(all_obj_files ${all_obj_files} ${module_obj_file})
+    if (add_to_syntaxparse)
+      set(syntaxparse_obj_files ${syntaxparse_obj_files} ${module_obj_file})
+    endif()
 
     # Compile the module into an object file
     add_custom_command_target(dep_target OUTPUT ${module_obj_file}
@@ -168,6 +175,9 @@ function(add_swift_compiler_modules_library name)
 
     set("${module}_dep_target" ${dep_target})
     set(all_module_targets ${all_module_targets} ${dep_target})
+    if (add_to_syntaxparse)
+      set(syntaxparse_module_targets ${syntaxparse_module_targets} ${dep_target})
+    endif()
   endforeach()
 
   # Create a static library containing all module object files.
@@ -181,6 +191,15 @@ function(add_swift_compiler_modules_library name)
   add_dependencies(${name} ${all_module_targets})
   set_target_properties(${name} PROPERTIES LINKER_LANGUAGE CXX)
   set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${name})
+
+  if (XCODE)
+    set(syntaxparse_obj_files force_lib.c ${syntaxparse_obj_files})
+  endif()
+  add_library("${name}_SwiftSyntax" STATIC ${syntaxparse_obj_files})
+  add_dependencies("${name}_SwiftSyntax" ${syntaxparse_module_targets})
+  set_target_properties("${name}_SwiftSyntax" PROPERTIES LINKER_LANGUAGE CXX)
+  set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS "${name}_SwiftSyntax")
+
 endfunction()
 
 
@@ -190,6 +209,7 @@ add_swift_host_library(swiftCompilerStub OBJECT stubs.cpp)
 if (NOT BOOTSTRAPPING_MODE)
 
   add_library(swiftCompilerModules ALIAS swiftCompilerStub)
+  add_library(swiftCompilerModules_SwiftSyntax ALIAS swiftCompilerStub)
 
 else()
   # Note: "Swift" is not added intentionally here, because it would break

@@ -18,11 +18,11 @@
 #include "swift-c/SyntaxParser/SwiftSyntaxParser.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/LangOptions.h"
+#include "swift/Basic/InitializeSwiftModules.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Version.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Parse/SyntaxParseActions.h"
-#include "swift/Parse/SyntaxRegexFallbackLexing.h"
 #include "swift/Syntax/Serialization/SyntaxSerialization.h"
 #include "swift/Syntax/SyntaxNodes.h"
 #include "swift/Subsystems.h"
@@ -498,7 +498,11 @@ struct SynParserDiagConsumer: public DiagnosticConsumer {
 };
 
 swiftparse_client_node_t SynParser::parse(const char *source, size_t len) {
-  registerSyntaxFallbackRegexParser();
+
+  // Initialize libswift modules.
+  static std::once_flag flag;
+  std::call_once(flag, []() { initializeSwiftParseModules(); });
+
   SourceManager SM;
   unsigned bufID = SM.addNewSourceBuffer(llvm::MemoryBuffer::getMemBuffer(
       StringRef(source, len), "syntax_parse_source"));
