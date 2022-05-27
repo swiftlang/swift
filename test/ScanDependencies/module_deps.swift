@@ -24,7 +24,7 @@
 // RUN: %target-swift-frontend -scan-dependencies -test-dependency-scan-cache-serialization -module-cache-path %t/clang-module-cache %s -o %t/deps.json -I %S/Inputs/CHeaders -I %S/Inputs/Swift -import-objc-header %S/Inputs/CHeaders/Bridging.h -swift-version 4
 // RUN: %FileCheck -check-prefix CHECK_NO_CLANG_TARGET %s < %t/deps.json
 
-// Ensure that scanning with `-clang-target` makes sure that Swift modules' respecitve PCM-dependency-build-argument sets do not contain target triples.
+// Ensure that scanning with `-clang-target` makes sure that Swift modules' respective PCM-dependency-build-argument sets do not contain target triples.
 // RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %s -o %t/deps_clang_target.json -I %S/Inputs/CHeaders -I %S/Inputs/Swift -import-objc-header %S/Inputs/CHeaders/Bridging.h -swift-version 4 -clang-target %target-cpu-apple-macosx10.14
 // Check the contents of the JSON output
 // RUN: %FileCheck -check-prefix CHECK_CLANG_TARGET %s < %t/deps_clang_target.json
