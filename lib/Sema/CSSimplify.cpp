@@ -1747,7 +1747,7 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
     // We pull these out special because variadic parameters ban lots of
     // the more interesting typing constructs called out below like
     // inout and @autoclosure.
-    if (cs.getASTContext().LangOpts.EnableExperimentalVariadicGenerics &&
+    if (cs.getASTContext().LangOpts.hasFeature(Feature::VariadicGenerics) &&
         paramInfo.isVariadicGenericParameter(paramIdx)) {
       auto *PET = paramTy->castTo<PackExpansionType>();
       OpenTypeSequenceElements openTypeSequence{cs, PET};
@@ -9875,7 +9875,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   // type as seen in the body of the closure and the external parameter
   // type.
   bool oneWayConstraints =
-    getASTContext().TypeCheckerOpts.EnableOneWayClosureParameters ||
+    getASTContext().LangOpts.hasFeature(Feature::OneWayClosureParameters) ||
     resultBuilderType;
 
   auto *paramList = closure->getParameters();

@@ -447,35 +447,18 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DiagnosticsEditorMode |= Args.hasArg(OPT_diagnostics_editor_mode,
                                             OPT_serialize_diagnostics_path);
 
-  Opts.EnableExperimentalStaticAssert |=
-    Args.hasArg(OPT_enable_experimental_static_assert);
-
   Opts.EnableExperimentalConcurrency |=
     Args.hasArg(OPT_enable_experimental_concurrency);
-
-  Opts.EnableExperimentalNamedOpaqueTypes |=
-      Args.hasArg(OPT_enable_experimental_named_opaque_types);
 
   Opts.EnableOpenedExistentialTypes =
     Args.hasFlag(OPT_enable_experimental_opened_existential_types,
                  OPT_disable_experimental_opened_existential_types,
                  true);
 
-  Opts.EnableExperimentalVariadicGenerics |=
-    Args.hasArg(OPT_enable_experimental_variadic_generics);
-
-  Opts.EnableExperimentalAssociatedTypeInference |=
-      Args.hasArg(OPT_enable_experimental_associated_type_inference);
-
-  Opts.EnableExperimentalMoveOnly |=
-    Args.hasArg(OPT_enable_experimental_move_only);
-
   Opts.EnableInferPublicSendable |=
     Args.hasFlag(OPT_enable_infer_public_concurrent_value,
                  OPT_disable_infer_public_concurrent_value,
                  false);
-  Opts.EnableExperimentalFlowSensitiveConcurrentCaptures |=
-    Args.hasArg(OPT_enable_experimental_flow_sensitive_concurrent_captures);
 
   Opts.DisableExperimentalClangImporterDiagnostics |=
       Args.hasArg(OPT_disable_experimental_clang_importer_diagnostics);
@@ -648,6 +631,37 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   for (const Arg *A : Args.filtered(OPT_D)) {
     Opts.addCustomConditionalCompilationFlag(A->getValue());
   }
+
+  for (const Arg *A : Args.filtered(OPT_enable_experimental_feature)) {
+    // If this is a known experimental feature, allow it in +Asserts
+    // (non-release) builds for testing purposes.
+    if (auto feature = getExperimentalFeature(A->getValue())) {
+#ifdef NDEBUG
+      Diags.diagnose(SourceLoc(),
+                     diag::error_experimental_feature_not_available,
+                     A->getValue());
+#endif
+
+      Opts.Features.insert(*feature);
+    }
+  }
+
+  // Map historical flags over to experimental features. We do this for all
+  // compilers because that's how existing experimental feature flags work.
+  if (Args.hasArg(OPT_enable_experimental_variadic_generics))
+    Opts.Features.insert(Feature::VariadicGenerics);
+  if (Args.hasArg(OPT_enable_experimental_static_assert))
+    Opts.Features.insert(Feature::StaticAssert);
+  if (Args.hasArg(OPT_enable_experimental_named_opaque_types))
+    Opts.Features.insert(Feature::NamedOpaqueTypes);
+  if (Args.hasArg(OPT_enable_experimental_flow_sensitive_concurrent_captures))
+    Opts.Features.insert(Feature::FlowSensitiveConcurrencyCaptures);
+  if (Args.hasArg(OPT_enable_experimental_move_only))
+    Opts.Features.insert(Feature::MoveOnly);
+  if (Args.hasArg(OPT_experimental_one_way_closure_params))
+    Opts.Features.insert(Feature::OneWayClosureParameters);
+  if (Args.hasArg(OPT_enable_experimental_associated_type_inference))
+    Opts.Features.insert(Feature::TypeWitnessSystemInference);
 
   Opts.EnableAppExtensionRestrictions |= Args.hasArg(OPT_enable_app_extension);
 
@@ -1097,9 +1111,6 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
 
   // Always enable operator designated types for the standard library.
   Opts.EnableOperatorDesignatedTypes |= FrontendOpts.ParseStdlib;
-
-  Opts.EnableOneWayClosureParameters |=
-      Args.hasArg(OPT_experimental_one_way_closure_params);
 
   Opts.PrintFullConvention |=
       Args.hasArg(OPT_experimental_print_full_convention);

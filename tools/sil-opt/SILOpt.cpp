@@ -561,9 +561,8 @@ int main(int argc, char **argv) {
     EnableExperimentalConcurrency;
   Optional<bool> enableExperimentalMoveOnly =
       toOptionalBool(EnableExperimentalMoveOnly);
-  if (enableExperimentalMoveOnly)
-    Invocation.getLangOptions().EnableExperimentalMoveOnly =
-        *enableExperimentalMoveOnly;
+  if (enableExperimentalMoveOnly && *enableExperimentalMoveOnly)
+    Invocation.getLangOptions().Features.insert(Feature::MoveOnly);
 
   Invocation.getLangOptions().EnableObjCInterop =
     EnableObjCInterop ? true :
@@ -574,8 +573,8 @@ int main(int argc, char **argv) {
   Invocation.getLangOptions().OptimizationRemarkMissedPattern =
       createOptRemarkRegex(PassRemarksMissed);
 
-  Invocation.getLangOptions().EnableExperimentalStaticAssert =
-      EnableExperimentalStaticAssert;
+  if (EnableExperimentalStaticAssert)
+    Invocation.getLangOptions().Features.insert(Feature::StaticAssert);
 
   Invocation.getLangOptions().EnableExperimentalDifferentiableProgramming =
       EnableExperimentalDifferentiableProgramming;
