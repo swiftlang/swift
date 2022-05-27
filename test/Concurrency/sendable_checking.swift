@@ -95,3 +95,12 @@ func f() async {
     n.pointee += 1
   }
 }
+
+// Make sure the generic signature doesn't minimize away Sendable requirements.
+@_nonSendable class NSClass { }
+
+struct WrapClass<T: NSClass> {
+  var t: T
+}
+
+extension WrapClass: Sendable where T: Sendable { }

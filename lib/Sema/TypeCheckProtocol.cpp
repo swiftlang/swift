@@ -3388,7 +3388,8 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
     auto overriddenConformance =
       DC->getParentModule()->lookupConformance(Adoptee,
                                                overridden->getProtocol(),
-                                               /*allowMissing=*/true);
+                                               /*allowMissing=*/true,
+                                               /*allowUnavailable=*/false);
     if (overriddenConformance.isInvalid() ||
         !overriddenConformance.isConcrete())
       continue;
