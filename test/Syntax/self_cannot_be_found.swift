@@ -1,3 +1,5 @@
+// RUN: %target-typecheck-verify-swift
+
 let _ = self // expected-error {{cannot find `self` in scope, did you mean to declare or extend a type?}} 
 let s = self.b // // expected-error {{cannot find `self` in scope, did you mean to declare or extend a type?}} 
 let w = self.method() // expected-error {{cannot find `self` in scope, did you mean to declare or extend a type?}} 

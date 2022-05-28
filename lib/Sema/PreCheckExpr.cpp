@@ -586,8 +586,10 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     }
 
     auto emitBasicError = [&] {
+      SmallString<32> Buffer;
+      StringRef NameString = Name.getString(buffer);
       // `self` gets diagnosed with a different error when it can't be found.
-      bool diagSelfCannotBeFound = (Name.getFullName().compare(StringRef("self")) == 0);
+      bool diagSelfCannotBeFound = (NameString.compare(StringRef("self")) == 0);
       
       if (diagSelfCannotBeFound) {
         Context.Diags
