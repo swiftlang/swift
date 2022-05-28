@@ -366,7 +366,7 @@ the following changes are permitted:
 - Adding or removing a conformance to a non-ABI-public protocol.
 - Adding ``@dynamicCallable`` to the struct.
 
-The important most aspect of a Swift struct is its value semantics, not its
+The most important aspect of a Swift struct is its value semantics, not its
 layout. Note that adding a stored property to a struct is *not* a breaking
 change even with Swift's synthesis of memberwise and no-argument initializers;
 these initializers are always ``internal`` and thus not exposed to clients

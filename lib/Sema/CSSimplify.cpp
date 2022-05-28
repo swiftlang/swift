@@ -1479,13 +1479,14 @@ shouldOpenExistentialCallArgument(
     return None;
 
   // An argument expression that explicitly coerces to an existential
-  // disables the implicit opening of the existential.
+  // disables the implicit opening of the existential unless it's
+  // wrapped in parens.
   if (argExpr) {
     if (auto argCast = dyn_cast<ExplicitCastExpr>(
             argExpr->getSemanticsProvidingExpr())) {
       if (auto typeRepr = argCast->getCastTypeRepr()) {
         if (auto toType = cs.getType(typeRepr)) {
-          if (toType->isAnyExistentialType())
+          if (!isa<ParenExpr>(argExpr) && toType->isAnyExistentialType())
             return None;
         }
       }
@@ -1746,7 +1747,7 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
     // We pull these out special because variadic parameters ban lots of
     // the more interesting typing constructs called out below like
     // inout and @autoclosure.
-    if (cs.getASTContext().LangOpts.EnableExperimentalVariadicGenerics &&
+    if (cs.getASTContext().LangOpts.hasFeature(Feature::VariadicGenerics) &&
         paramInfo.isVariadicGenericParameter(paramIdx)) {
       auto *PET = paramTy->castTo<PackExpansionType>();
       OpenTypeSequenceElements openTypeSequence{cs, PET};
@@ -9874,7 +9875,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   // type as seen in the body of the closure and the external parameter
   // type.
   bool oneWayConstraints =
-    getASTContext().TypeCheckerOpts.EnableOneWayClosureParameters ||
+    getASTContext().LangOpts.hasFeature(Feature::OneWayClosureParameters) ||
     resultBuilderType;
 
   auto *paramList = closure->getParameters();
@@ -11462,6 +11463,18 @@ ConstraintSystem::simplifyApplicableFnConstraint(
         result2 = typeEraseOpenedExistentialReference(
             result2, opened.second->getExistentialType(), opened.first,
             TypePosition::Covariant);
+      }
+
+      // If result type has any erased existential types it requires explicit
+      // `as` coercion.
+      if (AddExplicitExistentialCoercion::isRequired(
+              *this, func2->getResult(), openedExistentials, locator)) {
+        if (!shouldAttemptFixes())
+          return SolutionKind::Error;
+
+        if (recordFix(AddExplicitExistentialCoercion::create(
+                *this, result2, getConstraintLocator(locator))))
+          return SolutionKind::Error;
       }
     }
 
@@ -13121,6 +13134,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::DropAsyncAttribute:
   case FixKind::AllowSwiftToCPointerConversion:
   case FixKind::AllowTupleLabelMismatch:
+  case FixKind::AddExplicitExistentialCoercion:
     llvm_unreachable("handled elsewhere");
   }
 

@@ -691,6 +691,11 @@ def strict_concurrency : Joined<["-"], "strict-concurrency=">,
            "concurrency model, or 'complete' ('Sendable' and other checking is "
            "enabled for all code in the module)">;
 
+def enable_experimental_feature :
+  Separate<["-"], "enable-experimental-feature">,
+  Flags<[FrontendOption]>,
+  HelpText<"Enable an experimental feature">;
+
 def Rpass_EQ : Joined<["-"], "Rpass=">,
   Flags<[FrontendOption]>,
   HelpText<"Report performed transformations by optimization passes whose "

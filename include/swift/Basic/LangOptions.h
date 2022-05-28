@@ -18,6 +18,7 @@
 #ifndef SWIFT_BASIC_LANGOPTIONS_H
 #define SWIFT_BASIC_LANGOPTIONS_H
 
+#include "swift/Basic/Feature.h"
 #include "swift/Basic/FunctionBodySkipping.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Version.h"
@@ -25,6 +26,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Triple.h"
@@ -312,22 +314,12 @@ namespace swift {
     /// Specifies how strict concurrency checking will be.
     StrictConcurrency StrictConcurrencyLevel = StrictConcurrency::Targeted;
 
-    /// Enable experimental #assert feature.
-    bool EnableExperimentalStaticAssert = false;
-
     /// Enable experimental concurrency model.
     bool EnableExperimentalConcurrency = false;
-
-    /// Enable experimental support for named opaque result types, e.g.
-    /// `func f() -> <T> T`.
-    bool EnableExperimentalNamedOpaqueTypes = false;
 
     /// Enable support for implicitly opening existential argument types
     /// in calls to generic functions.
     bool EnableOpenedExistentialTypes = false;
-
-    /// Enable experimental flow-sensitive concurrent captures.
-    bool EnableExperimentalFlowSensitiveConcurrentCaptures = false;
 
     /// Disable experimental ClangImporter diagnostics.
     bool DisableExperimentalClangImporterDiagnostics = false;
@@ -337,16 +329,6 @@ namespace swift {
 
     /// Enable inference of Sendable conformances for public types.
     bool EnableInferPublicSendable = false;
-
-    /// Enable experimental 'move only' features.
-    bool EnableExperimentalMoveOnly = false;
-
-    /// Enable variadic generics.
-    bool EnableExperimentalVariadicGenerics = false;
-
-    /// Enable experimental associated type inference using type witness
-    /// systems.
-    bool EnableExperimentalAssociatedTypeInference = false;
 
     /// Disable the implicit import of the _Concurrency module.
     bool DisableImplicitConcurrencyModuleImport =
@@ -368,6 +350,9 @@ namespace swift {
     /// Whether to enable the new operator decl and precedencegroup lookup
     /// behavior. This is a staging flag, and will be removed in the future.
     bool EnableNewOperatorLookup = false;
+
+    /// The set of features that have been enabled.
+    llvm::SmallSet<Feature, 2> Features;
 
     /// Use Clang function types for computing canonical types.
     /// If this option is false, the clang function types will still be computed
@@ -616,6 +601,13 @@ namespace swift {
       return EffectiveLanguageVersion.isVersionAtLeast(major, minor);
     }
 
+    /// Determine whether the given feature is enabled.
+    bool hasFeature(Feature feature) const;
+
+    /// Determine whether the given feature is enabled, looking up the feature
+    /// by name.
+    bool hasFeature(llvm::StringRef featureName) const;
+
     /// Returns true if the given platform condition argument represents
     /// a supported target operating system.
     ///
@@ -724,10 +716,6 @@ namespace swift {
     
     /// Disable constraint system performance hacks.
     bool DisableConstraintSolverPerformanceHacks = false;
-
-    /// Enable experimental support for one-way constraints for the
-    /// parameters of closures.
-    bool EnableOneWayClosureParameters = false;
 
     /// See \ref FrontendOptions.PrintFullConvention
     bool PrintFullConvention = false;

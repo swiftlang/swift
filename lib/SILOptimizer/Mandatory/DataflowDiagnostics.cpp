@@ -271,7 +271,7 @@ class EmitDFDiagnostics : public SILFunctionTransform {
       }
     }
 
-    if (M.getASTContext().LangOpts.EnableExperimentalStaticAssert) {
+    if (M.getASTContext().LangOpts.hasFeature(Feature::StaticAssert)) {
       SymbolicValueBumpAllocator allocator;
       ConstExprEvaluator constantEvaluator(allocator,
                                            getOptions().AssertConfig);

@@ -2634,7 +2634,8 @@ namespace {
         // allow reads, depending on a SIL diagnostic pass to identify the
         // remaining race conditions.
         if (!var->supportsMutation() ||
-            (ctx.LangOpts.EnableExperimentalFlowSensitiveConcurrentCaptures &&
+            (ctx.LangOpts.hasFeature(
+                 Feature::FlowSensitiveConcurrencyCaptures) &&
              parent.dyn_cast<LoadExpr *>())) {
           return false;
         }
