@@ -13,3 +13,7 @@ struct aStruct {
         self.b
     }
 }
+
+let _ = aStruct.self
+let initialized = aStruct().self
+_ = initialized.b
