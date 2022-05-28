@@ -349,7 +349,7 @@ void IRGenModule::addSwiftErrorAttributes(llvm::AttributeList &attrs,
   // We create a shadow stack location of the swifterror parameter for the
   // debugger on such platforms and so we can't mark the parameter with a
   // swifterror attribute.
-  if (IsSwiftErrorInRegister)
+  if (ShouldUseSwiftError)
     b.addAttribute(llvm::Attribute::SwiftError);
   
   // The error result should not be aliased, captured, or pointed at invalid
@@ -4245,7 +4245,7 @@ Address IRGenFunction::createErrorResultSlot(SILType errorType, bool isAsync) {
   // The slot for async callees cannot be annotated swifterror because those
   // errors are never passed in registers but rather are always passed
   // indirectly in the async context.
-  if (IGM.IsSwiftErrorInRegister && !isAsync)
+  if (IGM.ShouldUseSwiftError && !isAsync)
     cast<llvm::AllocaInst>(addr.getAddress())->setSwiftError(true);
 
   // Initialize at the alloca point.
