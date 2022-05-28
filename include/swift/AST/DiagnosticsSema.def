@@ -906,7 +906,7 @@ ERROR(cannot_find_in_scope_corrected,none,
       "cannot %select{find|find operator}1 %0 in scope; did you mean '%2'?",
       (DeclNameRef, bool, StringRef))
 ERROR(cannot_find_self_in_scope,none,
-      "Cannot find `self` in scope, did you mean to declare or extend a type?", ())
+      "cannot find `self` in scope, did you mean to declare or extend a type?", ())
 NOTE(confusable_character,none,
       "%select{identifier|operator}0 '%1' contains possibly confused characters; "
       "did you mean to use '%2'?",
