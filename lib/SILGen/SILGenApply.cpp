@@ -1142,9 +1142,7 @@ public:
     }
 
     auto captureInfo = SGF.SGM.Types.getLoweredLocalCaptures(constant);
-    if (afd->getDeclContext()->isLocalContext() &&
-        !captureInfo.hasGenericParamCaptures())
-      subs = SubstitutionMap();
+    subs = captureInfo.getEffectiveSubstitutionMap(afd, subs);
 
     // Check whether we have to dispatch to the original implementation of a
     // dynamically_replaceable inside of a dynamic_replacement(for:) function.
@@ -1223,9 +1221,8 @@ public:
 
     auto captureInfo = SGF.SGM.M.Types.getLoweredLocalCaptures(constant);
 
-    SubstitutionMap subs;
-    if (captureInfo.hasGenericParamCaptures())
-      subs = SGF.getForwardingSubstitutionMap();
+    SubstitutionMap subs = captureInfo.getEffectiveSubstitutionMap(
+        e, SGF.getForwardingSubstitutionMap());
 
     setCallee(Callee::forDirect(SGF, constant, subs, e));
     
@@ -5394,10 +5391,7 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &SGF,
   // generic parameters, in which case we don't want to pass in any
   // substitutions.
   auto captureInfo = SGF.SGM.Types.getLoweredLocalCaptures(constant);
-  if (decl->getDeclContext()->isLocalContext() &&
-      !captureInfo.hasGenericParamCaptures()) {
-    subs = SubstitutionMap();
-  }
+  subs = captureInfo.getEffectiveSubstitutionMap(decl, subs);
 
   // If this is a method in a protocol, generate it as a protocol call.
   if (isa<ProtocolDecl>(decl->getDeclContext())) {

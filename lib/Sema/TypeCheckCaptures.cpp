@@ -41,6 +41,7 @@ class FindCapturedVars : public ASTWalker {
   SourceLoc DynamicSelfCaptureLoc;
   DynamicSelfType *DynamicSelf = nullptr;
   OpaqueValueExpr *OpaqueValue = nullptr;
+  SmallSetVector<GenericEnvironment *, 2> openedExistentials;
   SourceLoc CaptureLoc;
   DeclContext *CurDC;
   bool NoEscape, ObjC;
@@ -64,7 +65,8 @@ public:
         dynamicSelfToRecord = DynamicSelf;
     }
 
-    return CaptureInfo(Context, Captures, dynamicSelfToRecord, OpaqueValue,
+    return CaptureInfo(Context, Captures, openedExistentials.getArrayRef(),
+                       dynamicSelfToRecord, OpaqueValue,
                        HasGenericParamCaptures);
   }
 
@@ -147,9 +149,13 @@ public:
     // perform it accurately.
     if (type->hasArchetype() || type->hasTypeParameter()) {
       type.walk(TypeCaptureWalker(ObjC, [&](Type t) {
+        if (auto openedExistential = t->getAs<OpenedArchetypeType>()) {
+          openedExistentials.insert(openedExistential->getGenericEnvironment());
+          return;
+        }
+
         if ((t->is<ArchetypeType>() ||
              t->is<GenericTypeParamType>()) &&
-            !t->isOpenedExistential() &&
             !HasGenericParamCaptures) {
           GenericParamCaptureLoc = loc;
           HasGenericParamCaptures = true;
@@ -386,6 +392,10 @@ public:
       if (captureInfo.hasOpaqueValueCapture())
         OpaqueValue = captureInfo.getOpaqueValue();
     }
+
+    for (auto openedEnv : captureInfo.getOpenedExistentials()) {
+      openedExistentials.insert(openedEnv);
+    }
   }
 
   bool walkToDeclPre(Decl *D) override {
@@ -606,6 +616,17 @@ public:
     }
 
     return { true, E };
+  }
+
+  Expr *walkToExprPost(Expr *expr) override {
+    // Remove opened existential environments once we've closed over them.
+    // These don't need to be captured.
+    if (auto opened = dyn_cast<OpenExistentialExpr>(expr)) {
+      openedExistentials.remove(
+          opened->getOpenedArchetype()->getGenericEnvironment());
+    }
+
+    return expr;
   }
 };
 

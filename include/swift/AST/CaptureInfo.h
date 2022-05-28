@@ -19,6 +19,7 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/AST/TypeAlignments.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -35,7 +36,11 @@ template <> struct DenseMapInfo<swift::CapturedValue>;
 namespace swift {
 class ValueDecl;
 class FuncDecl;
+class GenericSignature;
+class GenericTypeParamType;
 class OpaqueValueExpr;
+class SubstitutionMap;
+class Type;
 class VarDecl;
 
 /// CapturedValue includes both the declaration being captured, along with flags
@@ -118,19 +123,39 @@ class DynamicSelfType;
 /// Stores information about captured variables.
 class CaptureInfo {
   class CaptureInfoStorage final
-      : public llvm::TrailingObjects<CaptureInfoStorage, CapturedValue> {
+      : public llvm::TrailingObjects<CaptureInfoStorage, CapturedValue,
+                                     GenericEnvironment *> {
 
     DynamicSelfType *DynamicSelf;
     OpaqueValueExpr *OpaqueValue;
-    unsigned Count;
+    unsigned CaptureCount;
+    unsigned OpenedExistentialCount;
+
+    friend class llvm::TrailingObjects<CaptureInfoStorage, CapturedValue,
+                                       GenericEnvironment *>;
+
+    size_t numTrailingObjects(OverloadToken<CapturedValue>) const {
+      return CaptureCount;
+    }
+
   public:
-    explicit CaptureInfoStorage(unsigned count, DynamicSelfType *dynamicSelf,
+    explicit CaptureInfoStorage(unsigned captureCount,
+                                unsigned openedExistentialCount,
+                                DynamicSelfType *dynamicSelf,
                                 OpaqueValueExpr *opaqueValue)
-      : DynamicSelf(dynamicSelf), OpaqueValue(opaqueValue), Count(count) { }
+      : DynamicSelf(dynamicSelf), OpaqueValue(opaqueValue),
+        CaptureCount(captureCount),
+        OpenedExistentialCount(openedExistentialCount) { }
 
     ArrayRef<CapturedValue> getCaptures() const {
       return llvm::makeArrayRef(this->getTrailingObjects<CapturedValue>(),
-                                Count);
+                                CaptureCount);
+    }
+
+    ArrayRef<GenericEnvironment *> getOpenedExistentials() const {
+      return llvm::makeArrayRef(
+          this->getTrailingObjects<GenericEnvironment *>(),
+          OpenedExistentialCount);
     }
 
     DynamicSelfType *getDynamicSelfType() const {
@@ -153,6 +178,7 @@ public:
   /// The default-constructed CaptureInfo is "not yet computed".
   CaptureInfo() = default;
   CaptureInfo(ASTContext &ctx, ArrayRef<CapturedValue> captures,
+              ArrayRef<GenericEnvironment *> openedExistentials,
               DynamicSelfType *dynamicSelf, OpaqueValueExpr *opaqueValue,
               bool genericParamCaptures);
 
@@ -164,7 +190,8 @@ public:
   }
 
   bool isTrivial() const {
-    return getCaptures().empty() && !hasGenericParamCaptures() &&
+    return getCaptures().empty() && getOpenedExistentials().empty() &&
+           !hasGenericParamCaptures() &&
            !hasDynamicSelfCapture() && !hasOpaqueValueCapture();
   }
 
@@ -174,6 +201,14 @@ public:
     if (!hasBeenComputed())
       return None;
     return StorageAndFlags.getPointer()->getCaptures();
+  }
+
+  ArrayRef<GenericEnvironment *> getOpenedExistentials() const {
+    // FIXME: Ideally, everywhere that synthesizes a function should include
+    // its capture info.
+    if (!hasBeenComputed())
+      return None;
+    return StorageAndFlags.getPointer()->getOpenedExistentials();
   }
 
   /// Return a filtered list of the captures for this function,
@@ -219,6 +254,33 @@ public:
       return nullptr;
     return StorageAndFlags.getPointer()->getOpaqueValue();
   }
+
+  /// Retrieve the effective generic signature for a function or closure with
+  /// described by the given declaration context (\c dc) with this capture
+  /// list.
+  ///
+  /// The effective generic signature can include the generic parameters
+  /// of the given context (if they are captured) and might have additional
+  /// generic parameters for opened existential types.
+  ///
+  /// \param openedExistentialMap If non-null, will be populated with the
+  /// mapping from the newly-created generic parameters to the opened
+  /// existential types they represent.
+  GenericSignature getEffectiveGenericSignature(
+      DeclContext *dc,
+      llvm::SmallDenseMap<GenericTypeParamType *, Type> *openedExistentialMap
+        = nullptr) const;
+
+  /// Retrieve the effective substitution map for a function or closure with
+  /// described by the given declaration context (\c dc) with this capture
+  /// list.
+  ///
+  /// This produces the substitution map needed when calling a function a
+  /// function described by the given declaration context with the given
+  /// set of substitutions, accounting for any generic parameters added/removed
+  /// due to captures.
+  SubstitutionMap getEffectiveSubstitutionMap(
+      DeclContext *dc, SubstitutionMap dcSubs);
 
   /// Retrieve the variable corresponding to an isolated parameter that has
   /// been captured, if there is one. This might be a capture variable

@@ -2426,20 +2426,10 @@ const TypeLowering *TypeConverter::getTypeLoweringForExpansion(
   return nullptr;
 }
 
-static GenericSignature 
-getEffectiveGenericSignature(DeclContext *dc,
-                             CaptureInfo captureInfo) {
-  if (dc->getParent()->isLocalContext() &&
-      !captureInfo.hasGenericParamCaptures())
-    return nullptr;
-
-  return dc->getGenericSignatureOfContext();
-}
-
-static GenericSignature 
+static GenericSignature
 getEffectiveGenericSignature(AnyFunctionRef fn,
                              CaptureInfo captureInfo) {
-  return getEffectiveGenericSignature(fn.getAsDeclContext(), captureInfo);
+  return captureInfo.getEffectiveGenericSignature(fn.getAsDeclContext());
 }
 
 static CanGenericSignature
@@ -2633,7 +2623,10 @@ getFunctionInterfaceTypeWithCaptures(TypeConverter &TC,
 
   // Capture generic parameters from the enclosing context if necessary.
   auto closure = *constant.getAnyFunctionRef();
-  auto genericSig = getEffectiveGenericSignature(closure, captureInfo);
+  llvm::SmallDenseMap<GenericTypeParamType *, Type> openedExistentialMap;
+
+  auto genericSig = captureInfo.getEffectiveGenericSignature(
+      closure.getAsDeclContext(), &openedExistentialMap);
 
   auto innerExtInfo =
       AnyFunctionType::ExtInfoBuilder(FunctionType::Representation::Thin,
@@ -2641,6 +2634,40 @@ getFunctionInterfaceTypeWithCaptures(TypeConverter &TC,
           .withConcurrent(funcType->isSendable())
           .withAsync(funcType->isAsync())
           .build();
+
+  // If there are opened existential types in the function type,
+  if (funcType->hasOpenedExistential()) {
+    // Build a reverse mapping from the opened root archetypes to the
+    // corresponding generic parameters in the effective signature.
+    llvm::SmallDenseMap<OpenedArchetypeType *, Type> openedToGenericParams;
+    for (const auto &opened : openedExistentialMap) {
+      openedToGenericParams[opened.second->castTo<OpenedArchetypeType>()]
+          = Type(opened.first);
+    }
+
+    // Replace opened archetypes with their corresponding generic parameters
+    // in the effective signature.
+    funcType = cast<AnyFunctionType>(
+        funcType.transformRec([&](TypeBase *type) -> Optional<Type> {
+          auto openedArchetype = dyn_cast<OpenedArchetypeType>(type);
+          if (!openedArchetype)
+            return None;
+
+          auto rootArchetype = openedArchetype->getRoot();
+          assert(openedToGenericParams.count(rootArchetype) &&
+                 "Missing opened archetype");
+          auto newRootGP = openedToGenericParams[rootArchetype];
+
+          auto oldRootGP = rootArchetype->getInterfaceType()
+            ->castTo<GenericTypeParamType>();
+          return rootArchetype->getInterfaceType().transformRec([&](TypeBase *type) -> Optional<Type> {
+            if (type->isEqual(oldRootGP))
+              return Type(newRootGP);
+
+            return None;
+          });
+        })->getCanonicalType());
+  }
 
   return CanAnyFunctionType::get(
       getCanonicalSignatureOrNull(genericSig),
@@ -2818,8 +2845,8 @@ TypeConverter::getConstantGenericSignature(SILDeclRef c) {
   case SILDeclRef::Kind::DefaultArgGenerator: {
     // Use the generic environment of the original function.
     auto captureInfo = getLoweredLocalCaptures(c);
-    return getEffectiveGenericSignature(
-      vd->getInnermostDeclContext(), captureInfo);
+    return captureInfo.getEffectiveGenericSignature(
+      vd->getInnermostDeclContext());
   }
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
   case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue: {
@@ -2947,6 +2974,7 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   // Recursively collect transitive captures from captured local functions.
   llvm::DenseSet<AnyFunctionRef> visitedFunctions;
   llvm::MapVector<ValueDecl*,CapturedValue> captures;
+  llvm::SetVector<GenericEnvironment *> openedExistentials;
 
   // If there is a capture of 'self' with dynamic 'Self' type, it goes last so
   // that IRGen can pass dynamic 'Self' metadata.
@@ -3112,6 +3140,9 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
         captures.insert(std::pair<ValueDecl *, CapturedValue>(value, capture));
       }
     }
+
+    openedExistentials.insert(captureInfo.getOpenedExistentials().begin(),
+                              captureInfo.getOpenedExistentials().end());
   };
 
   collectFunctionCaptures = [&](AnyFunctionRef curFn) {
@@ -3186,8 +3217,9 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   }
 
   // Cache the uniqued set of transitive captures.
-  CaptureInfo info{Context, resultingCaptures, capturesDynamicSelf,
-                   capturesOpaqueValue, capturesGenericParams};
+  CaptureInfo info{Context, resultingCaptures, openedExistentials.getArrayRef(),
+                   capturesDynamicSelf, capturesOpaqueValue,
+                   capturesGenericParams};
   auto inserted = LoweredCaptures.insert({fn, info});
   assert(inserted.second && "already in map?!");
   (void)inserted;

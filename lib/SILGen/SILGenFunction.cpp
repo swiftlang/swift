@@ -450,18 +450,8 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
   auto pft = constantInfo.SILFnType;
 
   auto closure = *constant.getAnyFunctionRef();
-  auto *dc = closure.getAsDeclContext()->getParent();
-  if (dc->isLocalContext() && !loweredCaptureInfo.hasGenericParamCaptures()) {
-    // If the lowered function type is not polymorphic but we were given
-    // substitutions, we have a closure in a generic context which does not
-    // capture generic parameters. Just drop the substitutions.
-    subs = { };
-  } else if (closure.getAbstractClosureExpr()) {
-    // If we have a closure expression in generic context, Sema won't give
-    // us substitutions, so we just use the forwarding substitutions from
-    // context.
-    subs = getForwardingSubstitutionMap();
-  }
+  subs = loweredCaptureInfo.getEffectiveSubstitutionMap(
+      closure.getAsDeclContext(), getForwardingSubstitutionMap());
 
   bool wasSpecialized = false;
   if (!subs.empty()) {

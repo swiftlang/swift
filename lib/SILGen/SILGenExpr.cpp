@@ -1608,6 +1608,7 @@ ManagedValue emitCFunctionPointer(SILGenFunction &SGF,
   //   func q() { let z = 0; func r() { print(z) }; g(r); } // error
   // (See also: [NOTE: diagnose-swift-to-c-convention-change])
   if (!captures.getCaptures().empty() ||
+      !captures.getOpenedExistentials().empty() ||
       captures.hasGenericParamCaptures() ||
       captures.hasDynamicSelfCapture() ||
       captures.hasOpaqueValueCapture()) {
@@ -2545,9 +2546,8 @@ RValue RValueEmitter::visitAbstractClosureExpr(AbstractClosureExpr *e,
   // Emit the closure body.
   SGF.SGM.emitClosure(e);
 
-  SubstitutionMap subs;
-  if (e->getCaptureInfo().hasGenericParamCaptures())
-    subs = SGF.getForwardingSubstitutionMap();
+  SubstitutionMap subs = e->getCaptureInfo().getEffectiveSubstitutionMap(
+      e, SGF.getForwardingSubstitutionMap());
 
   // Generate the closure value (if any) for the closure expr's function
   // reference.

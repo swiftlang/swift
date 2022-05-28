@@ -997,7 +997,8 @@ void InterfaceTypeRequest::cacheResult(Type type) const {
   if (type) {
     assert(!type->hasTypeVariable() && "Type variable in interface type");
     assert(!type->is<InOutType>() && "Interface type must be materializable");
-    assert(!type->hasArchetype() && "Archetype in interface type");
+    assert(!(type->hasArchetype() && !type->hasOpenedExistential()) &&
+           "Archetype in interface type");
   }
   decl->TypeAndAccess.setPointer(type);
 }
