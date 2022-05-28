@@ -3027,6 +3027,10 @@ static bool usesFeatureTypeWitnessSystemInference(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureForwardTrailingClosures(Decl *decl) {
+  return false;
+}
+
 static void
 suppressingFeatureNoAsyncAvailability(PrintOptions &options,
                                       llvm::function_ref<void()> action) {

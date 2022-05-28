@@ -90,6 +90,7 @@ SUPPRESSIBLE_LANGUAGE_FEATURE(UnavailableFromAsync, 0, "@_unavailableFromAsync",
 SUPPRESSIBLE_LANGUAGE_FEATURE(NoAsyncAvailability, 340, "@available(*, noasync)", true)
 
 FUTURE_FEATURE(ConciseMagicFile, 274, 6)
+FUTURE_FEATURE(ForwardTrailingClosures, 286, 6)
 
 EXPERIMENTAL_FEATURE(StaticAssert)
 EXPERIMENTAL_FEATURE(VariadicGenerics)
