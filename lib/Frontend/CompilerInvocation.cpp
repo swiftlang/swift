@@ -632,6 +632,21 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.addCustomConditionalCompilationFlag(A->getValue());
   }
 
+  // Add a future feature if it is not already implied by the language version.
+  auto addFutureFeatureIfNotImplied = [&](Feature feature) {
+    // Check if this feature was introduced already in this language version.
+    if (auto firstVersion = getFeatureLanguageVersion(feature)) {
+      if (Opts.isSwiftVersionAtLeast(*firstVersion))
+        return;
+    }
+
+    Opts.Features.insert(feature);
+  };
+
+  // Map historical flags over to future features.
+  if (Args.hasArg(OPT_enable_experimental_concise_pound_file))
+    addFutureFeatureIfNotImplied(Feature::ConciseMagicFile);
+
   for (const Arg *A : Args.filtered(OPT_enable_experimental_feature)) {
     // If this is a known experimental feature, allow it in +Asserts
     // (non-release) builds for testing purposes.
@@ -758,10 +773,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
   }
-
-  Opts.EnableConcisePoundFile =
-      Args.hasArg(OPT_enable_experimental_concise_pound_file) ||
-      Opts.EffectiveLanguageVersion.isVersionAtLeast(6);
 
   Opts.EnableCrossImportOverlays =
       Args.hasFlag(OPT_enable_cross_import_overlays,

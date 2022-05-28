@@ -1114,7 +1114,7 @@ getMagicIdentifierLiteralKind(tok Kind, const LangOptions &Opts) {
   switch (Kind) {
   case tok::pound_file:
     // TODO: Enable by default at the next source break. (SR-13199)
-    return Opts.EnableConcisePoundFile
+    return Opts.hasFeature(Feature::ConciseMagicFile)
          ? MagicIdentifierLiteralExpr::FileIDSpelledAsFile
          : MagicIdentifierLiteralExpr::FilePathSpelledAsFile;
 #define MAGIC_IDENTIFIER_TOKEN(NAME, TOKEN) \
