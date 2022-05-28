@@ -37,7 +37,7 @@ extension PublicProtoRejected {
 extension PublicProtoRejected where Self : Equatable {
   @_spi(Private)
   public func reqWithoutDefault() {
-    // constrainted implementation
+    // constrained implementation
   }
 }
 
