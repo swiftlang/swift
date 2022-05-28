@@ -1015,7 +1015,9 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
   // If the existential is class-constrained, the class might conform
   // concretely.
   if (auto superclass = layout.explicitSuperclass) {
-    if (auto result = lookupConformance(superclass, protocol))
+    if (auto result = lookupConformance(
+            superclass, protocol, /*allowMissing=*/false,
+            /*allowUnavailable=*/false))
       return result;
   }
 
@@ -1071,7 +1073,8 @@ ProtocolConformanceRef ProtocolConformanceRef::forMissingOrInvalid(
 
 ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
                                                      ProtocolDecl *protocol,
-                                                     bool allowMissing) {
+                                                     bool allowMissing,
+                                                     bool allowUnavailable) {
   // If we are recursively checking for implicit conformance of a nominal
   // type to Sendable, fail without evaluating this request. This
   // squashes cycles.
@@ -1088,11 +1091,16 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
   auto result = evaluateOrDefault(
       getASTContext().evaluator, request, ProtocolConformanceRef::forInvalid());
 
-  // If we aren't supposed to allow missing conformances through for this
-  // protocol, replace the result with an "invalid" result.
+  // If we aren't supposed to allow missing conformances but we have one,
+  // replace the result with an "invalid" result.
   if (!allowMissing &&
       shouldCreateMissingConformances(type, protocol) &&
       result.hasMissingConformance(this))
+    return ProtocolConformanceRef::forInvalid();
+
+  // If we aren't supposed to allow unavailable conformances but we have one,
+  // replace the result with an "invalid" result.
+  if (!allowUnavailable && result.hasUnavailableConformance())
     return ProtocolConformanceRef::forInvalid();
 
   return result;
@@ -1248,7 +1256,9 @@ LookupConformanceInModuleRequest::evaluate(
     // able to be resolved by a substitution that makes the archetype
     // concrete.
     if (auto super = archetype->getSuperclass()) {
-      if (auto inheritedConformance = mod->lookupConformance(super, protocol)) {
+      if (auto inheritedConformance = mod->lookupConformance(
+              super, protocol, /*allowMissing=*/false,
+              /*allowUnavailable=*/false)) {
         return ProtocolConformanceRef(ctx.getInheritedConformance(
             type, inheritedConformance.getConcrete()));
       }

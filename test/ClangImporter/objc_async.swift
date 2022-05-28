@@ -374,3 +374,10 @@ func testSender(
   sender.sendPtr(ptr)
   sender.sendStringArray(stringArray)
 }
+
+// Sendable checking
+public struct SomeWrapper<T: AuditedNonSendable> {
+  public let unit: T
+}
+
+extension SomeWrapper: Sendable where T: Sendable {}
