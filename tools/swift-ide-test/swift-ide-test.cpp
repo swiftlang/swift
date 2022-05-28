@@ -4305,7 +4305,7 @@ int main(int argc, char *argv[]) {
     InitInvok.getLangOptions().EnableExperimentalStringProcessing = true;
   }
   if (options::EnableBareSlashRegexLiterals) {
-    InitInvok.getLangOptions().EnableBareSlashRegexLiterals = true;
+    InitInvok.getLangOptions().Features.insert(Feature::BareSlashRegexLiterals);
     InitInvok.getLangOptions().EnableExperimentalStringProcessing = true;
   }
 

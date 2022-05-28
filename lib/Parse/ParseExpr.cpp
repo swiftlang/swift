@@ -881,7 +881,8 @@ UnresolvedDeclRefExpr *Parser::parseExprOperator() {
 }
 
 void Parser::tryLexRegexLiteral(bool forUnappliedOperator) {
-  if (!Context.LangOpts.EnableBareSlashRegexLiterals)
+  if (!Context.LangOpts.hasFeature(Feature::BareSlashRegexLiterals) ||
+      !Context.LangOpts.EnableExperimentalStringProcessing)
     return;
 
   // Check to see if we have a regex literal `/.../`, optionally with a prefix

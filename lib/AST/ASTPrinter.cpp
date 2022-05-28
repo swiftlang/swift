@@ -3003,6 +3003,14 @@ static bool usesFeatureConciseMagicFile(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureForwardTrailingClosures(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureBareSlashRegexLiterals(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureVariadicGenerics(Decl *decl) {
   return false;
 }
@@ -3024,10 +3032,6 @@ static bool usesFeatureOneWayClosureParameters(Decl *decl) {
 }
 
 static bool usesFeatureTypeWitnessSystemInference(Decl *decl) {
-  return false;
-}
-
-static bool usesFeatureForwardTrailingClosures(Decl *decl) {
   return false;
 }
 

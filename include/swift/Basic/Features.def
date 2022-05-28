@@ -91,6 +91,7 @@ SUPPRESSIBLE_LANGUAGE_FEATURE(NoAsyncAvailability, 340, "@available(*, noasync)"
 
 FUTURE_FEATURE(ConciseMagicFile, 274, 6)
 FUTURE_FEATURE(ForwardTrailingClosures, 286, 6)
+FUTURE_FEATURE(BareSlashRegexLiterals, 354, 6)
 
 EXPERIMENTAL_FEATURE(StaticAssert)
 EXPERIMENTAL_FEATURE(VariadicGenerics)
