@@ -275,8 +275,10 @@ Optional<Type> ConcreteContraction::substTypeParameterRec(
       // 'allowMissing' value here is actually irrelevant.
       auto conformance = ((*substBaseType)->isTypeParameter()
                           ? ProtocolConformanceRef(proto)
-                          : module->lookupConformance(*substBaseType, proto,
-                                                      /*allowMissing=*/false));
+                          : module->lookupConformance(
+                              *substBaseType, proto,
+                              /*allowMissing=*/false,
+                              /*allowUnavailable=*/false));
 
       // The base type doesn't conform, in which case the requirement remains
       // unsubstituted.
@@ -391,7 +393,7 @@ ConcreteContraction::substRequirement(const Requirement &req) const {
 
     if (!substFirstType->isTypeParameter() &&
         !module->lookupConformance(substFirstType, proto,
-                                   allowMissing)) {
+                                   allowMissing, /*allowUnavailable=*/false)) {
       // Handle the case of <T where T : P, T : C> where C is a class and
       // C does not conform to P by leaving the conformance requirement
       // unsubstituted.

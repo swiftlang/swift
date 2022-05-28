@@ -1270,7 +1270,8 @@ void NominalTypeDecl::prepareConformanceTable() const {
   auto addSynthesized = [&](KnownProtocolKind kind) {
     if (auto *proto = getASTContext().getProtocol(kind)) {
       if (protocols.count(proto) == 0) {
-        ConformanceTable->addSynthesizedConformance(mutableThis, proto);
+        ConformanceTable->addSynthesizedConformance(
+            mutableThis, proto, mutableThis);
         protocols.insert(proto);
       }
     }
@@ -1741,6 +1742,28 @@ SourceLoc swift::extractNearestSourceLoc(const ProtocolConformanceRef conformanc
     return extractNearestSourceLoc(conformanceRef.getConcrete());
   }
   return SourceLoc();
+}
+
+bool ProtocolConformanceRef::hasUnavailableConformance() const {
+  // Abstract conformances are never unavailable.
+  if (!isConcrete())
+    return false;
+
+  // Check whether this conformance is on an unavailable extension.
+  auto concrete = getConcrete();
+  auto ext = dyn_cast<ExtensionDecl>(concrete->getDeclContext());
+  if (ext && AvailableAttr::isUnavailable(ext))
+    return true;
+
+  // Check the conformances in the substitution map.
+  auto module = concrete->getDeclContext()->getParentModule();
+  auto subMap = concrete->getSubstitutions(module);
+  for (auto subConformance : subMap.getConformances()) {
+    if (subConformance.hasUnavailableConformance())
+      return true;
+  }
+
+  return false;
 }
 
 bool ProtocolConformanceRef::hasMissingConformance(ModuleDecl *module) const {
