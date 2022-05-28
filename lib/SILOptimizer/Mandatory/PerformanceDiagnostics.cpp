@@ -90,6 +90,9 @@ static bool isEffectFreeArraySemanticCall(SILInstruction *inst) {
 bool PerformanceDiagnostics::visitFunction(SILFunction *function,
                                               PerformanceConstraints perfConstr,
                                               LocWithParent *parentLoc) {
+  if (!function->isDefinition())
+    return false;
+
   ReachingReturnBlocks rrBlocks(function);
   NonErrorHandlingBlocks neBlocks(function);
                                        
