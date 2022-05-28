@@ -587,9 +587,8 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
 
     auto emitBasicError = [&] {
       // `self` gets diagnosed with a different error when it can't be found.
-      bool diagSelfCannotBeFound = Name.isSimpleName(Context.Id_self);
-      
-      if (diagSelfCannotBeFound) {
+
+      if (Name.isSimpleName(Context.Id_self)) {
         Context.Diags
             .diagnose(Loc, diag::cannot_find_self_in_scope)
             .highlight(UDRE->getSourceRange());
