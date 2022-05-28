@@ -120,10 +120,10 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
 
     /// Create a synthesized conformance.
     ///
-    /// The given nominal type declaration will get a synthesized
+    /// The given declaration context (for a type) will get a synthesized
     /// conformance to the requested protocol.
-    static ConformanceSource forSynthesized(NominalTypeDecl *typeDecl) {
-      return ConformanceSource(typeDecl, ConformanceEntryKind::Synthesized);
+    static ConformanceSource forSynthesized(DeclContext *dc) {
+      return ConformanceSource(dc, ConformanceEntryKind::Synthesized);
     }
 
     /// Return a new conformance source with the given location of "@unchecked".
@@ -188,9 +188,9 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
 
     /// For a synthesized conformance, retrieve the nominal type decl
     /// that will receive the conformance.
-    NominalTypeDecl *getSynthesizedDecl() const {
+    DeclContext *getSynthesizedDeclContext() const {
       assert(getKind() == ConformanceEntryKind::Synthesized);
-      return static_cast<NominalTypeDecl *>(Storage.getPointer());
+      return static_cast<DeclContext *>(Storage.getPointer());
     }
 
     /// Get the declaration context that this conformance will be
@@ -428,7 +428,8 @@ public:
 
   /// Add a synthesized conformance to the lookup table.
   void addSynthesizedConformance(NominalTypeDecl *nominal,
-                                 ProtocolDecl *protocol);
+                                 ProtocolDecl *protocol,
+                                 DeclContext *conformanceDC);
 
   /// Register an externally-supplied protocol conformance.
   void registerProtocolConformance(ProtocolConformance *conformance,

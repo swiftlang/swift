@@ -107,6 +107,10 @@ public:
   }
 
   /// Determine whether this conformance (or a conformance it depends on)
+  /// involves an always-unavailable conformance.
+  bool hasUnavailableConformance() const;
+
+  /// Determine whether this conformance (or a conformance it depends on)
   /// involves a "missing" conformance anywhere. Such conformances
   /// cannot be depended on to always exist.
   bool hasMissingConformance(ModuleDecl *module) const;
