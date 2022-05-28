@@ -19,6 +19,12 @@ OperatorsTestSuite.test("LoadableIntWrapper.plus (inline)") {
 }
 #endif
 
+OperatorsTestSuite.test("LoadableIntWrapper.tilde (inline)") {
+  let wrapper = LoadableIntWrapper(value: 42)
+  let not42 = ~wrapper
+  expectEqual(~42, not42)
+}
+
 OperatorsTestSuite.test("LoadableIntWrapper.call (inline)") {
   var wrapper = LoadableIntWrapper(value: 42)
 
