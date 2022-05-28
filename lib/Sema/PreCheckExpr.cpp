@@ -586,10 +586,20 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     }
 
     auto emitBasicError = [&] {
-      Context.Diags
-          .diagnose(Loc, diag::cannot_find_in_scope, Name,
-                    Name.isOperator())
-          .highlight(UDRE->getSourceRange());
+      // `self` gets diagnosed with a different error when it can't be found.
+      bool diagSelfCannotBeFound = (Name.getFullName().compare(StringRef("self")) == 0);
+      
+      if (diagSelfCannotBeFound) {
+        Context.Diags
+            .diagnose(Loc, diag::cannot_find_self_in_scope)
+            .highlight(UDRE->getSourceRange());
+      } else {
+        Context.Diags
+            .diagnose(Loc, diag::cannot_find_in_scope, Name,
+                      Name.isOperator())
+            .highlight(UDRE->getSourceRange());
+      }
+
       if (!Context.LangOpts.DisableExperimentalClangImporterDiagnostics) {
         Context.getClangModuleLoader()->diagnoseTopLevelValue(
             Name.getFullName());
