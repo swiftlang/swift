@@ -485,8 +485,8 @@ func protocol_composition(_ c: ProtocolP & ProtocolQ, _ c1: ProtocolP & Composit
   _ = c1 as? ConcretePQ1 // OK
   _ = c1 as? ConcretePPQ1 // Ok
   _ = c1 as? NotConforms // Ok
-  _ = c1 as? StructNotComforms // expected-warning {{cast from 'any ProtocolP & Composition' (aka 'ProtocolP & ProtocolP1 & ProtocolQ1') to unrelated type 'StructNotComforms' always fails}}
-  _ = c1 as? NotConformsFinal // expected-warning {{cast from 'any ProtocolP & Composition' (aka 'ProtocolP & ProtocolP1 & ProtocolQ1') to unrelated type 'NotConformsFinal' always fails}}
+  _ = c1 as? StructNotComforms // expected-warning {{cast from 'any ProtocolP & Composition' (aka 'any ProtocolP & ProtocolP1 & ProtocolQ1') to unrelated type 'StructNotComforms' always fails}}
+  _ = c1 as? NotConformsFinal // expected-warning {{cast from 'any ProtocolP & Composition' (aka 'any ProtocolP & ProtocolP1 & ProtocolQ1') to unrelated type 'NotConformsFinal' always fails}}
 }
 
 // SR-13899
