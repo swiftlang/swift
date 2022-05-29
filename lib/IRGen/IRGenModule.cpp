@@ -577,16 +577,13 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     AtomicBoolSize = Size(ClangASTContext->getTypeSize(atomicBoolTy));
     AtomicBoolAlign = Alignment(ClangASTContext->getTypeSize(atomicBoolTy));
   }
-
-  // On WebAssembly, tail optional arguments are not allowed because wasm requires
-  // callee and caller signature should be same. So LLVM adds dummy arguments for
-  // swiftself and swifterror. If there is swiftself but there isn't swifterror in
-  // a swiftcc function or invocation, then LLVM adds dummy swifterror parameter or
+  // On WebAssembly, tail optional arguments are not allowed because Wasm requires
+  // callee and caller signature to be the same. So LLVM adds dummy arguments for
+  // `swiftself` and `swifterror`. If there is `swiftself` but is no `swifterror` in
+  // a swiftcc function or invocation, then LLVM adds dummy `swifterror` parameter or
   // argument. To count up how many dummy arguments should be added, we need to mark
-  // it as swifterror even though it's not in register.
-  //
-  // TODO: Before sending patch, please rename `IsSwiftErrorInRegister` to `ShouldUseSwiftError`
-  IsSwiftErrorInRegister =
+  // it as `swifterror` even though it's not in register.
+  ShouldUseSwiftError =
     clang::CodeGen::swiftcall::isSwiftErrorLoweredInRegister(
       ClangCodeGen->CGM()) || TargetInfo.OutputObjectFormat == llvm::Triple::Wasm;
 
@@ -889,7 +886,8 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
                       RuntimeAvailability availability,
                       llvm::ArrayRef<llvm::Type*> retTypes,
                       llvm::ArrayRef<llvm::Type*> argTypes,
-                      ArrayRef<Attribute::AttrKind> attrs) {
+                      ArrayRef<Attribute::AttrKind> attrs,
+                      IRGenModule *IGM) {
 
   if (cache)
     return cache;
@@ -966,14 +964,17 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
     // Add swiftself and swifterror attributes only when swift_willThrow
     // swift_willThrow is defined in RuntimeFunctions.def, but due to the
     // DSL limitation, arguments attributes are not set.
-    // On the other hand, caller of swift_willThrow assumes that it's attributed
-    // with swiftself and swifterror.
+    // On the other hand, caller of `swift_willThrow` assumes that it's attributed
+    // with `swiftself` and `swifterror`.
     // This mismatch of attributes would be issue when lowering to WebAssembly.
-    // While lowering, LLVM count up how many dummy params are necssary to match
+    // While lowering, LLVM counts how many dummy params are necessary to match
     // callee and caller signature. So we need to add them correctly.
     if (functionName == "swift_willThrow") {
+      assert(IGM && "IGM is required for swift_willThrow.");
       fn->addParamAttr(0, Attribute::AttrKind::SwiftSelf);
-      fn->addParamAttr(1, Attribute::AttrKind::SwiftError);
+      if (IGM->ShouldUseSwiftError) {
+        fn->addParamAttr(1, Attribute::AttrKind::SwiftError);
+      }
     }
   }
 
@@ -1018,7 +1019,7 @@ void IRGenModule::registerRuntimeEffect(ArrayRef<RuntimeEffect> effect,
     registerRuntimeEffect(EFFECT, #NAME);                                      \
     return getRuntimeFn(Module, ID##Fn, #NAME, CC,                             \
                         AVAILABILITY(this->Context),                           \
-                        RETURNS, ARGS, ATTRS);                                 \
+                        RETURNS, ARGS, ATTRS, this);                           \
   }
 
 #include "swift/Runtime/RuntimeFunctions.def"
