@@ -69,7 +69,7 @@ public protocol DistributedActorSystem: Sendable {
   // - MARK: Actor Lifecycle
   /// Create an `ActorID` for the passed actor type.
   ///
-  /// This function is invoked by an distributed actor during its initialization,
+  /// This function is invoked by a distributed actor during its initialization,
   /// and the returned address value is stored along with it for the time of its
   /// lifetime.
   ///
