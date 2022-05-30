@@ -512,9 +512,7 @@ swiftparse_client_node_t SynParser::parse(const char *source, size_t len) {
 
   // Always enable bare /.../ regex literal in syntax parser.
   langOpts.EnableExperimentalStringProcessing = true;
-  if (EnableBareSlashRegexLiteral && *EnableBareSlashRegexLiteral) {
-    langOpts.EnableBareSlashRegexLiterals = true;
-  }
+  langOpts.Features.insert(Feature::BareSlashRegexLiterals);
   if (EffectiveLanguageVersion) {
     langOpts.EffectiveLanguageVersion = *EffectiveLanguageVersion;
   }
