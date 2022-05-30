@@ -2447,10 +2447,10 @@ void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
   }
 
   auto *ReferenceDC = Where.getDeclContext();
-  auto &ReferenceDCAttrs = ReferenceDC->getAsDecl()->getAttrs();
+  auto &attrs = ReferenceDC->getInnermostDeclarationDeclContext()->getAsDecl()->getAttrs();
 
   // If the reference declaration has the `IgnoreDeprecationWarnings` attribute, don't diagnose.
-  if (ReferenceDCAttrs.hasAttribute<IgnoreDeprecationWarningsAttr>()) {
+  if (attrs != nullptr && attrs.hasAttribute<IgnoreDeprecationWarningsAttr>()) {
     return;
   }
 
@@ -2535,10 +2535,10 @@ bool TypeChecker::diagnoseIfDeprecated(SourceLoc loc,
   }
 
   auto *dc = where.getDeclContext();
-  auto &attrs = dc->getAsDecl()->getAttrs();
+  auto &attrs = dc->getInnermostDeclarationDeclContext()->getAsDecl()->getAttrs();
 
   // If the reference declaration has the `IgnoreDeprecationWarnings` attribute, don't diagnose.
-  if (attrs.hasAttribute<IgnoreDeprecationWarningsAttr>()) {
+  if (attrs != nullptr && attrs.hasAttribute<IgnoreDeprecationWarningsAttr>()) {
     return false;
   }
 
