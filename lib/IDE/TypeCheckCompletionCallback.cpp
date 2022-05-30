@@ -21,7 +21,7 @@ using namespace swift::ide;
 using namespace swift::constraints;
 
 void TypeCheckCompletionCallback::fallbackTypeCheck(DeclContext *DC) {
-  assert(!GotCallback);
+//  assert(!GotCallback);
 
   CompletionContextFinder finder(DC);
   if (!finder.hasCompletionExpr())

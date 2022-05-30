@@ -22,7 +22,7 @@ using namespace swift::constraints;
 using namespace swift::ide;
 
 void DotExprTypeCheckCompletionCallback::fallbackTypeCheck(DeclContext *DC) {
-  assert(!gotCallback());
+//  assert(!gotCallback());
 
   // Default to checking the completion expression in isolation.
   Expr *fallbackExpr = CompletionExpr;
