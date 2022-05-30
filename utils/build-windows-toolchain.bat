@@ -40,7 +40,7 @@ set TEMP=%BuildRoot%\tmp
 set TMP=%BuildRoot%\tmp
 set TMPDIR=%BuildRoot%\tmp
 
-set NINJA_STATUS="[%%f/%%t][%%p][%%es]"
+set NINJA_STATUS=[%%f/%%t][%%p][%%es] 
 
 call :CloneDependencies || (exit /b)
 call :CloneRepositories || (exit /b)
