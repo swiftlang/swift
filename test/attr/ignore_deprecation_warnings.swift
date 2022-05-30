@@ -9,6 +9,9 @@ func deprecatedFuncWithReturnValue() -> Int {
 }
 
 @available(*, deprecated)
+var deprecatedVariable = ""
+
+@available(*, deprecated)
 struct deprecatedType {}
 
 @ignoreDeprecationWarnings
@@ -19,7 +22,12 @@ func x() {
 @ignoreDeprecationWarnings
 let instance = deprecatedType()
 
-let instanceThatSouldProduceWarning = deprecatedType() // expected-warning {{'deprecatedFunc()' is deprecated}}
+let instanceThatSouldProduceWarning = deprecatedType() // expected-warning {{'deprecatedType' is deprecated}}
+
+@ignoreDeprecationWarnings
+var x: String = deprecatedVariable
+
+var s = deprecatedVariable // expected-warning {{'deprecatedVariable' is deprecated}}
 
 func funcThatShouldProduceWarning() {
     deprecatedFunc() // expected-warning {{'deprecatedFunc()' is deprecated}}
