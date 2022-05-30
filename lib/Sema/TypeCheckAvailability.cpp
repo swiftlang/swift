@@ -2447,6 +2447,13 @@ void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
   }
 
   auto *ReferenceDC = Where.getDeclContext();
+  auto &ReferenceDCAttrs = ReferenceDC->getAsDecl()->getAttrs();
+
+  // If the reference declaration has the `IgnoreDeprecationWarnings` attribute, don't diagnose.
+  if (ReferenceDCAttrs.hasAttribute<IgnoreDeprecationWarningsAttr>()) {
+    return;
+  }
+
   auto &Context = ReferenceDC->getASTContext();
   if (!Context.LangOpts.DisableAvailabilityChecking) {
     AvailabilityContext RunningOSVersions = Where.getAvailabilityContext();
@@ -2528,6 +2535,13 @@ bool TypeChecker::diagnoseIfDeprecated(SourceLoc loc,
   }
 
   auto *dc = where.getDeclContext();
+  auto &attrs = dc->getAsDecl()->getAttrs();
+
+  // If the reference declaration has the `IgnoreDeprecationWarnings` attribute, don't diagnose.
+  if (attrs.hasAttribute<IgnoreDeprecationWarningsAttr>()) {
+    return false;
+  }
+
   auto &ctx = dc->getASTContext();
   if (!ctx.LangOpts.DisableAvailabilityChecking) {
     AvailabilityContext runningOSVersion = where.getAvailabilityContext();

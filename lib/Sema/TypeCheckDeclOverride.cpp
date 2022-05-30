@@ -1537,6 +1537,7 @@ namespace  {
     UNINTERESTING_ATTR(TypeEraser)
     UNINTERESTING_ATTR(SPIAccessControl)
     UNINTERESTING_ATTR(HasStorage)
+    UNINTERESTING_ATTR(IgnoreDeprecationWarnings)
     UNINTERESTING_ATTR(UIApplicationMain)
     UNINTERESTING_ATTR(UsableFromInline)
     UNINTERESTING_ATTR(ObjCNonLazyRealization)
