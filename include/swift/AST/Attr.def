@@ -733,7 +733,7 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(_local, KnownToBeLocal,
   APIBreakingToAdd | APIBreakingToRemove,
   130)
 
-DECL_ATTR(ignoreDeprecationWarnings, IgnoreDeprecationWarnings,
+SIMPLE_DECL_ATTR(ignoreDeprecationWarnings, IgnoreDeprecationWarnings,
   OnAbstractFunction | OnGenericType | OnVar | OnSubscript | OnEnumElement |
   OnExtension | AllowMultipleAttributes |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
