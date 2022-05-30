@@ -486,25 +486,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       = A->getOption().matches(OPT_enable_deserialization_recovery);
   }
 
-  // Whether '/.../' regex literals are enabled. This implies experimental
-  // string processing.
-  if (Args.hasArg(OPT_enable_bare_slash_regex)) {
-    Opts.EnableBareSlashRegexLiterals = true;
-    Opts.EnableExperimentalStringProcessing = true;
-  }
-
-  // Experimental string processing.
-  if (auto A = Args.getLastArg(OPT_enable_experimental_string_processing,
-                               OPT_disable_experimental_string_processing)) {
-    Opts.EnableExperimentalStringProcessing =
-        A->getOption().matches(OPT_enable_experimental_string_processing);
-
-    // When experimental string processing is explicitly disabled, also disable
-    // forward slash regex `/.../`.
-    if (!Opts.EnableExperimentalStringProcessing)
-      Opts.EnableBareSlashRegexLiterals = false;
-  }
-
   Opts.EnableExperimentalBoundGenericExtensions |=
     Args.hasArg(OPT_enable_experimental_bound_generic_extensions);
 
@@ -632,6 +613,29 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.addCustomConditionalCompilationFlag(A->getValue());
   }
 
+  // Determine whether string processing is enabled
+  Opts.EnableExperimentalStringProcessing =
+    Args.hasFlag(OPT_enable_experimental_string_processing,
+                 OPT_disable_experimental_string_processing,
+                 Args.hasArg(OPT_enable_bare_slash_regex));
+
+  // Add a future feature if it is not already implied by the language version.
+  auto addFutureFeatureIfNotImplied = [&](Feature feature) {
+    // Check if this feature was introduced already in this language version.
+    if (auto firstVersion = getFeatureLanguageVersion(feature)) {
+      if (Opts.isSwiftVersionAtLeast(*firstVersion))
+        return;
+    }
+
+    Opts.Features.insert(feature);
+  };
+
+  // Map historical flags over to future features.
+  if (Args.hasArg(OPT_enable_experimental_concise_pound_file))
+    addFutureFeatureIfNotImplied(Feature::ConciseMagicFile);
+  if (Args.hasArg(OPT_enable_bare_slash_regex))
+    addFutureFeatureIfNotImplied(Feature::BareSlashRegexLiterals);
+
   for (const Arg *A : Args.filtered(OPT_enable_experimental_feature)) {
     // If this is a known experimental feature, allow it in +Asserts
     // (non-release) builds for testing purposes.
@@ -758,10 +762,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
   }
-
-  Opts.EnableConcisePoundFile =
-      Args.hasArg(OPT_enable_experimental_concise_pound_file) ||
-      Opts.EffectiveLanguageVersion.isVersionAtLeast(6);
 
   Opts.EnableCrossImportOverlays =
       Args.hasFlag(OPT_enable_cross_import_overlays,

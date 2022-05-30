@@ -354,6 +354,9 @@ namespace swift {
     /// The set of features that have been enabled.
     llvm::SmallSet<Feature, 2> Features;
 
+    /// Temporary flag to support LLDB's transition to using \c Features.
+    bool EnableBareSlashRegexLiterals = false;
+
     /// Use Clang function types for computing canonical types.
     /// If this option is false, the clang function types will still be computed
     /// but will not be used for checking type equality.
@@ -528,10 +531,6 @@ namespace swift {
 
     /// Enables dumping type witness systems from associated type inference.
     bool DumpTypeWitnessSystems = false;
-
-    /// Enables `/.../` syntax regular-expression literals. This requires
-    /// experimental string processing. Note this does not affect `#/.../#`.
-    bool EnableBareSlashRegexLiterals = false;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.
