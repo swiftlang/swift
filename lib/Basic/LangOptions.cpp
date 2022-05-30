@@ -229,6 +229,10 @@ bool LangOptions::hasFeature(Feature feature) const {
   if (Features.contains(feature))
     return true;
 
+  if (feature == Feature::BareSlashRegexLiterals &&
+      EnableBareSlashRegexLiterals)
+    return true;
+
   if (auto version = getFeatureLanguageVersion(feature))
     return isSwiftVersionAtLeast(*version);
 
