@@ -640,72 +640,7 @@ python -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'D
 :: TODO(compnerd) match the XCTest installation name
 python -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'XCTEST_VERSION': 'development' } }), encoding='utf-8'))" > %PlatformRoot%\Info.plist
 
-:: Package toolchain.msi
-msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\toolchain.wixproj ^
-  -p:RunWixToolsOutOfProc=true ^
-  -p:OutputPath=%PackageRoot%\toolchain\ ^
-  -p:IntermediateOutputPath=%PackageRoot%\toolchain\ ^
-  -p:DEVTOOLS_ROOT=%BuildRoot%\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain ^
-  -p:TOOLCHAIN_ROOT=%BuildRoot%\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain
-:: TODO(compnerd) actually perform the code-signing
-:: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\toolchain\toolchain.msi
-
-:: Package sdk.msi
-msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\CustomActions\SwiftInstaller\SwiftInstaller.vcxproj -t:restore
-msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\sdk.wixproj ^
-  -p:RunWixToolsOutOfProc=true ^
-  -p:OutputPath=%PackageRoot%\sdk\ ^
-  -p:IntermediateOutputPath=%PackageRoot%\sdk\ ^
-  -p:PLATFORM_ROOT=%PlatformRoot%\ ^
-  -p:SDK_ROOT=%SDKInstallRoot%\ ^
-  -p:SWIFT_SOURCE_DIR=%SourceRoot%\swift\ ^
-  -p:PlatformToolset=v142
-:: TODO(compnerd) actually perform the code-signing
-:: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\sdk\sdk.msi
-
-:: Package runtime.msi
-msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\runtime.wixproj ^
-  -p:RunWixToolsOutOfProc=true ^
-  -p:OutputPath=%PackageRoot%\runtime\ ^
-  -p:IntermediateOutputPath=%PackageRoot%\runtime\ ^
-  -p:SDK_ROOT=%SDKInstallRoot%\
-:: TODO(compnerd) actually perform the code-signing
-:: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\runtime\runtime.msi
-
-:: Package devtools.msi
-msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\devtools.wixproj ^
-  -p:RunWixToolsOutOfProc=true ^
-  -p:OutputPath=%PackageRoot%\devtools\ ^
-  -p:IntermediateOutputPath=%PackageRoot%\devtools\ ^
-  -p:DEVTOOLS_ROOT=%BuildRoot%\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain
-:: TODO(compnerd) actually perform the code-signing
-:: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\devtools\devtools.msi
-
-:: Collate MSIs
-move %PackageRoot%\toolchain\toolchain.msi %PackageRoot% || (exit /b)
-move %PackageRoot%\sdk\sdk.msi %PackageRoot% || (exit /b)
-move %PackageRoot%\runtime\runtime.msi %PackageRoot% || (exit /b)
-move %PackageRoot%\devtools\devtools.msi %PackageRoot% || (exit /b)
-
-:: Build Installer
-msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\installer.wixproj ^
-  -p:RunWixToolsOutOfProc=true ^
-  -p:OutputPath=%PackageRoot%\installer\ ^
-  -p:IntermediateOutputPath=%PackageRoot%\installer\ ^
-  -p:MSI_LOCATION=%PackageRoot%\
-:: TODO(compnerd) actually perform the code-signing
-:: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\installer\installer.exe
-
-:: Stage Artifacts
-md %BuildRoot%\artifacts
-:: Redistributable libraries for developers
-move %PackageRoot%\runtime.msi %BuildRoot%\artifacts || (exit /b)
-:: Toolchain
-move %PackageRoot%\toolchain.msi %BuildRoot%\artifacts || (exit /b)
-:: SDK
-move %PackageRoot%\sdk.msi %BuildRoot%\artifacts || (exit /b)
-:: Installer
-move %PackageRoot%\installer\installer.exe %BuildRoot%\artifacts || (exit /b)
+IF NOT "%SKIP_PACKAGING%"=="1" call :PackageToolchain
 
 :: TODO(compnerd) test LLVM
 
@@ -882,6 +817,80 @@ cmake --build %BuildRoot%\5 || (exit /b)
 
 :: Test XCTest
 cmake --build %BuildRoot%\5 --target check-xctest || (exit /b)
+
+goto :eof
+endlocal
+
+:PackageToolchain
+setlocal enableextensions enabledelayedexpansion
+
+:: Package toolchain.msi
+msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\toolchain.wixproj ^
+  -p:RunWixToolsOutOfProc=true ^
+  -p:OutputPath=%PackageRoot%\toolchain\ ^
+  -p:IntermediateOutputPath=%PackageRoot%\toolchain\ ^
+  -p:DEVTOOLS_ROOT=%BuildRoot%\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain ^
+  -p:TOOLCHAIN_ROOT=%BuildRoot%\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain
+:: TODO(compnerd) actually perform the code-signing
+:: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\toolchain\toolchain.msi
+
+:: Package sdk.msi
+msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\CustomActions\SwiftInstaller\SwiftInstaller.vcxproj -t:restore
+msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\sdk.wixproj ^
+  -p:RunWixToolsOutOfProc=true ^
+  -p:OutputPath=%PackageRoot%\sdk\ ^
+  -p:IntermediateOutputPath=%PackageRoot%\sdk\ ^
+  -p:PLATFORM_ROOT=%PlatformRoot%\ ^
+  -p:SDK_ROOT=%SDKInstallRoot%\ ^
+  -p:SWIFT_SOURCE_DIR=%SourceRoot%\swift\ ^
+  -p:PlatformToolset=v142
+:: TODO(compnerd) actually perform the code-signing
+:: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\sdk\sdk.msi
+
+:: Package runtime.msi
+msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\runtime.wixproj ^
+  -p:RunWixToolsOutOfProc=true ^
+  -p:OutputPath=%PackageRoot%\runtime\ ^
+  -p:IntermediateOutputPath=%PackageRoot%\runtime\ ^
+  -p:SDK_ROOT=%SDKInstallRoot%\
+:: TODO(compnerd) actually perform the code-signing
+:: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\runtime\runtime.msi
+
+:: Package devtools.msi
+msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\devtools.wixproj ^
+  -p:RunWixToolsOutOfProc=true ^
+  -p:OutputPath=%PackageRoot%\devtools\ ^
+  -p:IntermediateOutputPath=%PackageRoot%\devtools\ ^
+  -p:DEVTOOLS_ROOT=%BuildRoot%\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain
+:: TODO(compnerd) actually perform the code-signing
+:: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\devtools\devtools.msi
+
+:: Collate MSIs
+move %PackageRoot%\toolchain\toolchain.msi %PackageRoot% || (exit /b)
+move %PackageRoot%\sdk\sdk.msi %PackageRoot% || (exit /b)
+move %PackageRoot%\runtime\runtime.msi %PackageRoot% || (exit /b)
+move %PackageRoot%\devtools\devtools.msi %PackageRoot% || (exit /b)
+
+:: Build Installer
+msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\installer.wixproj ^
+  -p:RunWixToolsOutOfProc=true ^
+  -p:OutputPath=%PackageRoot%\installer\ ^
+  -p:IntermediateOutputPath=%PackageRoot%\installer\ ^
+  -p:MSI_LOCATION=%PackageRoot%\
+:: TODO(compnerd) actually perform the code-signing
+:: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\installer\installer.exe
+
+:: Stage Artifacts
+md %BuildRoot%\artifacts
+
+:: Redistributable libraries for developers
+move %PackageRoot%\runtime.msi %BuildRoot%\artifacts || (exit /b)
+:: Toolchain
+move %PackageRoot%\toolchain.msi %BuildRoot%\artifacts || (exit /b)
+:: SDK
+move %PackageRoot%\sdk.msi %BuildRoot%\artifacts || (exit /b)
+:: Installer
+move %PackageRoot%\installer\installer.exe %BuildRoot%\artifacts || (exit /b)
 
 goto :eof
 endlocal

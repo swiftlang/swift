@@ -48,6 +48,12 @@
   LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)
 #endif
 
+#ifndef FUTURE_FEATURE
+#  define FUTURE_FEATURE(FeatureName, SENumber, Version)   \
+     LANGUAGE_FEATURE(FeatureName, SENumber, #FeatureName, \
+                      langOpts.hasFeature(#FeatureName))
+#endif
+
 #ifndef EXPERIMENTAL_FEATURE
 #  define EXPERIMENTAL_FEATURE(FeatureName)  \
      LANGUAGE_FEATURE(FeatureName, 0, #FeatureName, \
@@ -83,6 +89,10 @@ SUPPRESSIBLE_LANGUAGE_FEATURE(PrimaryAssociatedTypes2, 346, "Primary associated 
 SUPPRESSIBLE_LANGUAGE_FEATURE(UnavailableFromAsync, 0, "@_unavailableFromAsync", true)
 SUPPRESSIBLE_LANGUAGE_FEATURE(NoAsyncAvailability, 340, "@available(*, noasync)", true)
 
+FUTURE_FEATURE(ConciseMagicFile, 274, 6)
+FUTURE_FEATURE(ForwardTrailingClosures, 286, 6)
+FUTURE_FEATURE(BareSlashRegexLiterals, 354, 6)
+
 EXPERIMENTAL_FEATURE(StaticAssert)
 EXPERIMENTAL_FEATURE(VariadicGenerics)
 EXPERIMENTAL_FEATURE(NamedOpaqueTypes)
@@ -92,5 +102,6 @@ EXPERIMENTAL_FEATURE(OneWayClosureParameters)
 EXPERIMENTAL_FEATURE(TypeWitnessSystemInference)
 
 #undef EXPERIMENTAL_FEATURE
+#undef FUTURE_FEATURE
 #undef SUPPRESSIBLE_LANGUAGE_FEATURE
 #undef LANGUAGE_FEATURE
