@@ -486,9 +486,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       = A->getOption().matches(OPT_enable_deserialization_recovery);
   }
 
-  Opts.EnableExperimentalBoundGenericExtensions |=
-    Args.hasArg(OPT_enable_experimental_bound_generic_extensions);
-
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
   Opts.CheckAPIAvailabilityOnly |=
@@ -666,6 +663,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.Features.insert(Feature::OneWayClosureParameters);
   if (Args.hasArg(OPT_enable_experimental_associated_type_inference))
     Opts.Features.insert(Feature::TypeWitnessSystemInference);
+  if (Args.hasArg(OPT_enable_experimental_bound_generic_extensions))
+    Opts.Features.insert(Feature::BoundGenericExtensions);
 
   Opts.EnableAppExtensionRestrictions |= Args.hasArg(OPT_enable_app_extension);
 
