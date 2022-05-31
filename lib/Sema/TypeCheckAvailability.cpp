@@ -193,7 +193,7 @@ static void computeExportContextBits(ASTContext &Ctx, Decl *D,
   if (D->getAttrs().getDeprecated(Ctx))
     *deprecated = true;
 
-  if (D->getAttrs().hasAttribute<IgnoreDeprecationWarningsAttr>)
+  if (D->getAttrs().hasAttribute<IgnoreDeprecationWarningsAttr>())
     *ignoresDeprecation = true;
 
   if (auto *A = D->getAttrs().getUnavailable(Ctx)) {
@@ -256,7 +256,7 @@ ExportContext ExportContext::forFunctionBody(DeclContext *DC, SourceLoc loc) {
   forEachOuterDecl(DC,
                    [&](Decl *D) {
                      computeExportContextBits(Ctx, D,
-                                              &spi, &implicit, &deprecated, &ignoresDeprecated
+                                              &spi, &implicit, &deprecated, &ignoresDeprecated,
                                               &unavailablePlatformKind);
                    });
 
