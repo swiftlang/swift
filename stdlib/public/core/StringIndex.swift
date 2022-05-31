@@ -23,12 +23,11 @@ String's Index has the following layout:
  └──────────┴────────────────╨────────────────────────╨───────┘
                              └────── resilient ───────┘
 
-Position, transcoded offset, and flags are fully exposed in the ABI. Grapheme
-cache and reserved bits are partially resilient: the fact that there are 11 bits
-with a default value of `0` is ABI, but not the layout, construction, or
-interpretation of those bits. Inlinable code should not set a non-zero value to
-resilient bits: doing so breaks future evolution as the meaning of those bits
-isn't frozen.
+Position, transcoded offset, and flags are fully exposed in the ABI. Reserved 
+bits are partially resilient: the fact that there are 11 bits with a default 
+value of `0` is ABI, but not the layout, construction, or interpretation of 
+those bits. Inlinable code should not set a non-zero value to resilient bits: 
+doing so breaks future evolution as the meaning of those bits isn't frozen.
 
 - position aka `encodedOffset`: A 48-bit offset into the string's code units
 
@@ -118,7 +117,8 @@ extension String.Index {
   }
 
   /// This used to return the cached stride value if it was set, however since
-  /// the cache was removed in Swift 5.7 we just return nil
+  /// the cache and references to it were removed in Swift 5.7 we just return
+  /// nil to maintain ABI
   @usableFromInline
   internal var characterStride: Int? {
     return nil
@@ -165,6 +165,8 @@ extension String.Index {
     self.init(encodedOffset: offset, transcodedOffset: 0)
   }
 
+  /// This constructor used to set the `characterStride` cache, however it was
+  /// removed in Swift 5.7 so this constructor is kept for ABI reasons only
   @usableFromInline
   internal init(
     encodedOffset: Int, transcodedOffset: Int, characterStride: Int
@@ -172,6 +174,8 @@ extension String.Index {
     self.init(encodedOffset: encodedOffset, transcodedOffset: transcodedOffset)
   }
 
+  /// This constructor used to set the `characterStride` cache, however it was
+  /// removed in Swift 5.7 so this constructor is kept for ABI reasons only
   @usableFromInline
   internal init(encodedOffset pos: Int, characterStride char: Int) {
     self.init(encodedOffset: pos, transcodedOffset: 0, characterStride: char)
