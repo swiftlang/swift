@@ -1202,6 +1202,11 @@ AbstractFunctionDecl::isDistributedTargetInvocationResultHandlerOnReturn() const
       return false;
     }
 
+    // --- must not be mutating
+    if (func->isMutating()) {
+      return false;
+    }
+
     // === Check generics
     if (!isGeneric()) {
       return false;
