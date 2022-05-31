@@ -339,7 +339,7 @@ static bool isStoreCopy(SILValue value) {
     return false;
 
   auto *user = value->getSingleUse()->getUser();
-  return isa<StoreInst>(user) || isa<AssignInst>(user);
+  return isa<StoreInst>(user);
 }
 
 void ValueStorageMap::insertValue(SILValue value, SILValue storageAddress) {
@@ -2605,8 +2605,6 @@ protected:
     vmi->setOperand(opAddr);
   }
 
-  void visitAssignInst(AssignInst *assignInst);
-
   void visitBeginBorrowInst(BeginBorrowInst *borrow);
 
   void visitEndBorrowInst(EndBorrowInst *end) {}
@@ -2835,11 +2833,6 @@ void UseRewriter::visitStoreInst(StoreInst *storeInst) {
     isInit = IsNotInitialization;
   }
   rewriteStore(storeInst->getSrc(), storeInst->getDest(), isInit);
-}
-
-void UseRewriter::visitAssignInst(AssignInst *assignInst) {
-  rewriteStore(assignInst->getSrc(), assignInst->getDest(),
-               IsNotInitialization);
 }
 
 /// Emit end_borrows for a an incomplete BorrowedValue with only nonlifetime
