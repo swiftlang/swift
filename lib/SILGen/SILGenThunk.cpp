@@ -217,6 +217,17 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
     }
     return maybeCompletionHandlerOrigTy.getValue();
   }();
+  
+  // Bridge the block type, so that if it is formally expressed in terms of
+  // bridged Swift types, we still lower the parameters to their ultimate
+  // ObjC types.
+  completionHandlerOrigTy = Types
+    .getBridgedFunctionType(AbstractionPattern(origFormalType.getGenericSignatureOrNull(),
+                                               completionHandlerOrigTy),
+                            completionHandlerOrigTy,
+                            Bridgeability::Full,
+                            SILFunctionTypeRepresentation::Block);
+
   auto blockParams = completionHandlerOrigTy.getParams();
 
   // Build up the implementation function type, which matches the
