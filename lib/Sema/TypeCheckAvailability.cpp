@@ -263,7 +263,7 @@ ExportContext ExportContext::forFunctionBody(DeclContext *DC, SourceLoc loc) {
   bool exported = false;
 
   return ExportContext(DC, runningOSVersion, fragileKind,
-                       spi, exported, implicit, deprecated, ignoresDeprecation,
+                       spi, exported, implicit, deprecated, ignoresDeprecated,
                        unavailablePlatformKind);
 }
 
