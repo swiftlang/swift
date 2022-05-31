@@ -180,6 +180,19 @@ extension Sequence<Int> {
 }
 
 
+/// Constraint aliases
+
+typealias SequenceOfInt = Sequence<Int>
+typealias SequenceOf<T> = Sequence<T>
+
+// CHECK-LABEL: .testConstraintAlias1@
+// CHECK-NEXT: Generic signature: <T where T : Sequence, T.[Sequence]Element == Int>
+func testConstraintAlias1<T : SequenceOfInt>(_: T) {}
+
+// CHECK-LABEL: .testConstraintAlias2@
+// CHECK-NEXT: Generic signature: <T where T : Sequence, T.[Sequence]Element == String>
+func testConstraintAlias2<T : SequenceOf<String>>(_: T) {}
+
 /// Protocol compositions
 
 // CHECK-LABEL: .testComposition1@
