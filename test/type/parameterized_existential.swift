@@ -7,10 +7,10 @@ protocol Sequence<Element> { // expected-note {{'Sequence' declared here}}
 // 'any' is required here
 
 func takesSequenceOfInt1(_: Sequence<Int>) {}
-// expected-error@-1 {{protocol type with type arguments can only be used as a generic constraint}}
+// expected-error@-1 {{use of protocol 'Sequence' as a type must be written 'any Sequence'}}
 
 func returnsSequenceOfInt1() -> Sequence<Int> {}
-// expected-error@-1 {{protocol type with type arguments can only be used as a generic constraint}}
+// expected-error@-1 {{use of protocol 'Sequence' as a type must be written 'any Sequence'}}
 
 struct ConcreteSequence<Element> : Sequence {}
 
@@ -83,7 +83,7 @@ func splay(_ x: some Pair<Int, String>) -> (Int, String) { fatalError() }
 
 func typeExpr() {
   _ = Sequence<Int>.self
-  // expected-error@-1 {{protocol type with type arguments can only be used as a generic constraint}}
+  // expected-error@-1 {{use of protocol 'Sequence' as a type must be written 'any Sequence'}}
 
   _ = any Sequence<Int>.self
   // expected-error@-1 {{'self' is not a member type of protocol 'parameterized_existential.Sequence<Swift.Int>'}}
