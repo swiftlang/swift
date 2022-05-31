@@ -42,13 +42,14 @@ using namespace swift;
 ExportContext::ExportContext(DeclContext *DC,
                              AvailabilityContext runningOSVersion,
                              FragileFunctionKind kind,
-                             bool spi, bool exported, bool implicit, bool deprecated,
+                             bool spi, bool exported, bool implicit, bool deprecated, bool ignoresDeprecation,
                              Optional<PlatformKind> unavailablePlatformKind)
     : DC(DC), RunningOSVersion(runningOSVersion), FragileKind(kind) {
   SPI = spi;
   Exported = exported;
   Implicit = implicit;
   Deprecated = deprecated;
+  IgnoresDeprecation = ignoresDeprecation;
   if (unavailablePlatformKind) {
     Unavailable = 1;
     Platform = unsigned(*unavailablePlatformKind);
