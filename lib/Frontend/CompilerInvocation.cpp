@@ -547,9 +547,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_enable_experimental_additive_arithmetic_derivation))
     Opts.EnableExperimentalAdditiveArithmeticDerivedConformances = true;
 
-  Opts.EnableExperimentalForwardModeDifferentiation |=
-      Args.hasArg(OPT_enable_experimental_forward_mode_differentiation);
-
   Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);
   if (Opts.DebuggerSupport)
     Opts.EnableDollarIdentifiers = true;
@@ -665,6 +662,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.Features.insert(Feature::TypeWitnessSystemInference);
   if (Args.hasArg(OPT_enable_experimental_bound_generic_extensions))
     Opts.Features.insert(Feature::BoundGenericExtensions);
+  if (Args.hasArg(OPT_enable_experimental_forward_mode_differentiation))
+    Opts.Features.insert(Feature::ForwardModeDifferentiation);
 
   Opts.EnableAppExtensionRestrictions |= Args.hasArg(OPT_enable_app_extension);
 

@@ -426,13 +426,6 @@ namespace swift {
     /// file.
     bool EmitFineGrainedDependencySourcefileDotFiles = false;
 
-    /// Whether to enable experimental differentiable programming features:
-    /// `@differentiable` declaration attribute, etc.
-    bool EnableExperimentalDifferentiableProgramming = false;
-
-    /// Whether to enable forward mode differentiation.
-    bool EnableExperimentalForwardModeDifferentiation = false;
-
     /// Whether to enable experimental `AdditiveArithmetic` derived
     /// conformances.
     bool EnableExperimentalAdditiveArithmeticDerivedConformances = false;

@@ -108,6 +108,14 @@ EXPERIMENTAL_FEATURE(TypeWitnessSystemInference)
 /// \endcode
 EXPERIMENTAL_FEATURE(BoundGenericExtensions)
 
+/// Whether to enable experimental differentiable programming features:
+/// `@differentiable` declaration attribute, etc.
+EXPERIMENTAL_FEATURE(DifferentiableProgramming)
+
+/// Whether to enable forward mode differentiation.
+EXPERIMENTAL_FEATURE(ForwardModeDifferentiation)
+
+
 #undef EXPERIMENTAL_FEATURE
 #undef FUTURE_FEATURE
 #undef SUPPRESSIBLE_LANGUAGE_FEATURE
