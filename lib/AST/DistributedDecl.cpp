@@ -404,6 +404,11 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
     return false;
   }
 
+  auto *func = dyn_cast<FuncDecl>(this);
+  if (!func) {
+    return false;
+  }
+
   // === Structural Checks
   // -- Must be throwing
   if (!hasThrows()) {
@@ -412,6 +417,11 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
 
   // -- Must be async
   if (!hasAsync()) {
+    return false;
+  }
+
+  // -- Must not be mutating, use classes to implement a system instead
+  if (func->isMutating()) {
     return false;
   }
 
@@ -1163,6 +1173,11 @@ AbstractFunctionDecl::isDistributedTargetInvocationResultHandlerOnReturn() const
 
     // --- must be throwing
     if (!hasThrows()) {
+      return false;
+    }
+
+    // --- must not be mutating
+    if (func->isMutating()) {
       return false;
     }
 
