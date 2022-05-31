@@ -3064,6 +3064,15 @@ SynthesizedFileUnit &FileUnit::getOrCreateSynthesizedFile() {
       return *thisSynth;
     SynthesizedFile = new (getASTContext()) SynthesizedFileUnit(*this);
     SynthesizedFileAndKind.setPointer(SynthesizedFile);
+    // FIXME: Mutating the module in-flight is not a good idea. Any
+    // callers above us in the stack that are iterating over
+    // the module's files will have their iterators invalidated. There's
+    // a strong chance that whatever analysis led to this function being
+    // called is doing just that!
+    //
+    // Instead we ought to just call ModuleDecl::clearLookupCache() here
+    // and patch out the places looking for synthesized files hanging off of
+    // source files.
     getParentModule()->addFile(*SynthesizedFile);
   }
   return *SynthesizedFile;
