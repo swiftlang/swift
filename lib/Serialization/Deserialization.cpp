@@ -149,6 +149,8 @@ const char ExtensionError::ID = '\0';
 void ExtensionError::anchor() {}
 const char DeclAttributesDidNotMatch::ID = '\0';
 void DeclAttributesDidNotMatch::anchor() {}
+const char DeclAccessLevelTooLow::ID = '\0';
+void DeclAccessLevelTooLow::anchor() {}
 
 /// Skips a single record in the bitstream.
 ///
@@ -2625,6 +2627,9 @@ class DeclDeserializer {
   unsigned localDiscriminator = 0;
   StringRef filenameForPrivate;
 
+  // Minimum access level of decls to deserialize.
+  AccessLevel minAccessLevel = AccessLevel::Private;
+
   // Auxiliary map for deserializing `@differentiable` attributes.
   llvm::DenseMap<DifferentiableAttr *, IndexSubset *> diffAttrParamIndicesMap;
 
@@ -2711,7 +2716,8 @@ public:
   llvm::Error deserializeDeclCommon();
 
   Expected<Decl *> getDeclCheckedImpl(
-    llvm::function_ref<bool(DeclAttributes)> matchAttributes = nullptr);
+    llvm::function_ref<bool(DeclAttributes)> matchAttributes = nullptr,
+    Optional<AccessLevel> minAccessLevel = None);
 
   Expected<Decl *> deserializeTypeAlias(ArrayRef<uint64_t> scratch,
                                         StringRef blobData) {
@@ -2730,6 +2736,14 @@ public:
 
     Identifier name = MF.getIdentifier(nameID);
     PrettySupplementalDeclNameTrace trace(name);
+
+    auto accessLevel = getActualAccessLevel(rawAccessLevel);
+    if (!accessLevel) {
+      MF.fatal();
+    } else if (accessLevel.getValue() < minAccessLevel) {
+        return llvm::make_error<DeclAccessLevelTooLow>(accessLevel.getValue(),
+                                                       minAccessLevel);
+    }
 
     for (TypeID dependencyID : dependencyIDs) {
       auto dependency = MF.getTypeChecked(dependencyID);
@@ -2754,11 +2768,8 @@ public:
 
     auto underlying = MF.getType(underlyingTypeID);
     alias->setUnderlyingType(underlying);
-    
-    if (auto accessLevel = getActualAccessLevel(rawAccessLevel))
-      alias->setAccess(*accessLevel);
-    else
-      MF.fatal();
+
+    alias->setAccess(*accessLevel);
 
     if (isImplicit)
       alias->setImplicit();
@@ -3074,6 +3085,15 @@ public:
                                        numVTableEntries,
                                        arrayFieldIDs);
 
+
+    auto accessLevel = getActualAccessLevel(rawAccessLevel);
+    if (!accessLevel) {
+      MF.fatal();
+    } else if (accessLevel.getValue() < minAccessLevel) {
+      return llvm::make_error<DeclAccessLevelTooLow>(accessLevel.getValue(),
+                                                     minAccessLevel);
+    }
+
     Identifier name = MF.getIdentifier(nameID);
     PrettySupplementalDeclNameTrace trace(name);
 
@@ -3147,10 +3167,6 @@ public:
 
     MF.configureStorage(var, opaqueReadOwnership,
                         readImpl, writeImpl, readWriteImpl, accessors);
-    auto accessLevel = getActualAccessLevel(rawAccessLevel);
-    if (!accessLevel)
-      MF.fatal();
-
     var->setAccess(*accessLevel);
 
     if (var->isSettable(nullptr)) {
@@ -3361,6 +3377,14 @@ public:
                                               nameAndDependencyIDs);
     }
 
+    auto accessLevel = getActualAccessLevel(rawAccessLevel);
+    if (!accessLevel) {
+      MF.fatal();
+    } else if (accessLevel.getValue() < minAccessLevel) {
+      return llvm::make_error<DeclAccessLevelTooLow>(accessLevel.getValue(),
+                                                     minAccessLevel);
+    }
+
     DeclDeserializationError::Flags errorFlags;
     unsigned numVTableEntries = needsNewVTableEntry ? 1 : 0;
 
@@ -3474,10 +3498,7 @@ public:
 
     fn->setGenericSignature(MF.getGenericSignature(genericSigID));
 
-    if (auto accessLevel = getActualAccessLevel(rawAccessLevel))
-      fn->setAccess(*accessLevel);
-    else
-      MF.fatal();
+    fn->setAccess(*accessLevel);
 
     if (auto SelfAccessKind = getActualSelfAccessKind(rawMutModifier))
       fn->setSelfAccessKind(*SelfAccessKind);
@@ -4444,7 +4465,8 @@ public:
 Expected<Decl *>
 ModuleFile::getDeclChecked(
     DeclID DID,
-    llvm::function_ref<bool(DeclAttributes)> matchAttributes) {
+    llvm::function_ref<bool(DeclAttributes)> matchAttributes,
+    Optional<AccessLevel> minAccessLevel) {
   if (DID == 0)
     return nullptr;
 
@@ -4458,7 +4480,8 @@ ModuleFile::getDeclChecked(
 
     Expected<Decl *> deserialized =
       DeclDeserializer(*this, declOrOffset).getDeclCheckedImpl(
-        matchAttributes);
+        matchAttributes,
+        minAccessLevel);
     if (!deserialized)
       return deserialized;
   } else if (matchAttributes) {
@@ -5051,7 +5074,8 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
 
 Expected<Decl *>
 DeclDeserializer::getDeclCheckedImpl(
-  llvm::function_ref<bool(DeclAttributes)> matchAttributes) {
+  llvm::function_ref<bool(DeclAttributes)> matchAttributes,
+  Optional<AccessLevel> minAccessLevel) {
 
   auto commonError = deserializeDeclCommon();
   if (commonError)
@@ -5088,6 +5112,12 @@ DeclDeserializer::getDeclCheckedImpl(
 
   PrettyDeclDeserialization stackTraceEntry(
      &MF, declOrOffset, static_cast<decls_block::RecordKind>(recordID));
+
+  auto prevMinAccessLevel = this->minAccessLevel;
+  if (minAccessLevel)
+    this->minAccessLevel = minAccessLevel.getValue();
+
+  SWIFT_DEFER { this->minAccessLevel = prevMinAccessLevel; };
 
   switch (recordID) {
 #define CASE(RECORD_NAME) \

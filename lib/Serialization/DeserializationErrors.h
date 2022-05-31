@@ -445,6 +445,36 @@ public:
   }
 };
 
+// Decl was not deserialized because its access level was below the filter.
+//
+// \sa getDeclChecked
+class DeclAccessLevelTooLow : public llvm::ErrorInfo<DeclAccessLevelTooLow> {
+  friend ErrorInfo;
+  static const char ID;
+  void anchor() override;
+
+  swift::AccessLevel declAccessLevel;
+  swift::AccessLevel minAccessLevel;
+
+public:
+  DeclAccessLevelTooLow(swift::AccessLevel declAccessLevel,
+                        swift::AccessLevel minAccessLevel) {
+    this->declAccessLevel = declAccessLevel;
+    this->minAccessLevel = minAccessLevel;
+  }
+
+  void log(raw_ostream &OS) const override {
+    OS << "Access level too low: deserialized '" <<
+          getAccessLevelSpelling(declAccessLevel) <<
+          "', expected greater or equal to '" <<
+          getAccessLevelSpelling(minAccessLevel) << "'";
+  }
+
+  std::error_code convertToErrorCode() const override {
+    return llvm::inconvertibleErrorCode();
+  }
+};
+
 LLVM_NODISCARD
 static inline std::unique_ptr<llvm::ErrorInfoBase>
 takeErrorInfo(llvm::Error error) {

@@ -830,10 +830,15 @@ public:
   /// determine if it should be fully deserialized and returned. If the
   /// attributes fail the check, the decl is not deserialized and
   /// \c DeclAttributesDidNotMatch is returned.
+  ///
+  /// \param minAccessLevel If set, skip deserializing decls under the given
+  /// access level when possible. On a skipped decl, this returns
+  /// \c DeclAccessLevelTooLow.
   llvm::Expected<Decl *>
   getDeclChecked(
     serialization::DeclID DID,
-    llvm::function_ref<bool(DeclAttributes)> matchAttributes = nullptr);
+    llvm::function_ref<bool(DeclAttributes)> matchAttributes = nullptr,
+    Optional<AccessLevel> minAccessLevel = None);
 
   /// Returns the decl context with the given ID, deserializing it if needed.
   DeclContext *getDeclContext(serialization::DeclContextID DID);
