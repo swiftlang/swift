@@ -290,28 +290,56 @@ public func testReabstracted(f: Optional<()->()>) {
 }
 
 
-// Test that we don't devirtualize calls to protocol requirements with covariant `Self` nested
-// inside a collection type – the devirtualizer does not support handling these yet.
-protocol CovariantSelfInsideCollection {
-  func array() -> Array<Self>
-  func dictionary() -> Dictionary<String, Self>
-  func mixed(_: (Array<(Dictionary<String, String>, Self)>) -> Void)
+// Test that we don't devirtualize calls to protocol requirements with
+// covariant `Self`-rooted type parameters nested inside a collection type;
+// the devirtualizer doesn't know how to handle these yet.
+protocol CovariantSelfInCollection {
+  associatedtype Assoc
+
+  func self1() -> Array<Self>
+  func self2() -> Dictionary<String, Self>
+  func self3(_: (Self...) -> Void)
+  func self4(_: (Array<(Dictionary<String, String>, Self)>) -> Void)
+
+  func assoc1() -> Array<Assoc>
+  func assoc2() -> Dictionary<String, Assoc>
+  func assoc3(_: (Assoc...) -> Void)
+  func assoc4(_: (Array<(Dictionary<String, String>, Assoc)>) -> Void)
+}
+struct CovariantSelfInCollectionImpl: CovariantSelfInCollection {
+  typealias Assoc = Bool
+
+  func self1() -> Array<Self> { [self] }
+  func self2() -> Dictionary<String, Self> { [#file : self] }
+  func self3(_: (Self...) -> Void) {}
+  func self4(_: (Array<(Dictionary<String, String>, Self)>) -> Void) {}
+
+  func assoc1() -> Array<Assoc> { [true] }
+  func assoc2() -> Dictionary<String, Assoc> { [#file : true] }
+  func assoc3(_: (Assoc...) -> Void) {}
+  func assoc4(_: (Array<(Dictionary<String, String>, Assoc)>) -> Void) {}
 }
 // CHECK-LABEL: sil @$s34devirt_protocol_method_invocations12testNoDevirtyyF
 //
-// CHECK: witness_method $S, #CovariantSelfInsideCollection.array
-// CHECK: witness_method $S, #CovariantSelfInsideCollection.dictionary
-// CHECK: witness_method $S, #CovariantSelfInsideCollection.mixed
+// CHECK: witness_method $CovariantSelfInCollectionImpl, #CovariantSelfInCollection.self1
+// CHECK: witness_method $CovariantSelfInCollectionImpl, #CovariantSelfInCollection.self2
+// CHECK: witness_method $CovariantSelfInCollectionImpl, #CovariantSelfInCollection.self3
+// CHECK: witness_method $CovariantSelfInCollectionImpl, #CovariantSelfInCollection.self4
+// CHECK: witness_method $CovariantSelfInCollectionImpl, #CovariantSelfInCollection.assoc1
+// CHECK: witness_method $CovariantSelfInCollectionImpl, #CovariantSelfInCollection.assoc2
+// CHECK: witness_method $CovariantSelfInCollectionImpl, #CovariantSelfInCollection.assoc3
+// CHECK: witness_method $CovariantSelfInCollectionImpl, #CovariantSelfInCollection.assoc4
 // CHECK: end sil function '$s34devirt_protocol_method_invocations12testNoDevirtyyF'
 public func testNoDevirt() {
-  struct S: CovariantSelfInsideCollection {
-    func array() -> Array<Self> { fatalError() }
-    func dictionary() -> Dictionary<String, Self> { fatalError() }
-    func mixed(_: (Array<(Dictionary<String, String>, Self)>) -> Void) {}
-  }
+  let p: any CovariantSelfInCollection = CovariantSelfInCollectionImpl()
 
-  let p: CovariantSelfInsideCollection = S()
-  _ = p.array()
-  _ = p.dictionary()
-  p.mixed { _ in }
+  _ = p.self1()
+  _ = p.self2()
+  p.self3 { _ in }
+  p.self4 { _ in }
+
+  _ = p.assoc1()
+  _ = p.assoc2()
+  p.assoc3 { _ in }
+  p.assoc4 { _ in }
 }
