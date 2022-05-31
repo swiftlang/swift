@@ -3932,18 +3932,33 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
     }
 
     // FIXME: Support compositions involving parameterized protocol types,
-    // like Collection<String> & Sendable, etc.
-    if (ty->isConstraintType() &&
-        !ty->is<ParameterizedProtocolType>()) {
-      auto layout = ty->getExistentialLayout();
-      if (auto superclass = layout.explicitSuperclass)
-        if (checkSuperclass(tyR->getStartLoc(), superclass))
-          continue;
-      if (!layout.getProtocols().empty())
+    // like 'any Collection<String> & Sendable', etc.
+    if (ty->isConstraintType()) {
+      if (ty->is<ProtocolType>()) {
         HasProtocol = true;
+        Members.push_back(ty);
+        continue;
+      }
 
-      Members.push_back(ty);
-      continue;
+      if (ty->is<ParameterizedProtocolType>() &&
+          options.isParameterizedProtocolSupported() &&
+          options.getContext() != TypeResolverContext::ExistentialConstraint) {
+        HasProtocol = true;
+        Members.push_back(ty);
+        continue;
+      }
+
+      if (ty->is<ProtocolCompositionType>()) {
+        auto layout = ty->getExistentialLayout();
+        if (auto superclass = layout.explicitSuperclass)
+          if (checkSuperclass(tyR->getStartLoc(), superclass))
+            continue;
+        if (!layout.getProtocols().empty())
+          HasProtocol = true;
+
+        Members.push_back(ty);
+        continue;
+      }
     }
 
     diagnose(tyR->getStartLoc(),

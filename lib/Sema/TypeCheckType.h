@@ -132,7 +132,7 @@ enum class TypeResolverContext : uint8_t {
   /// Whether we are in the constraint type of an existential type.
   ExistentialConstraint,
 
-  /// Whether we are in a requirement of a generic declaration.
+  /// Whether we are in the constraint type of a conformance requirement.
   GenericRequirement,
 
   /// Whether we are in a same-type requirement of a generic
