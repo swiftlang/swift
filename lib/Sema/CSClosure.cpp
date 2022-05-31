@@ -1196,6 +1196,17 @@ private:
     return nullptr;
   }
 
+  ASTNode visit(Stmt *S) {
+    auto rewritten = ASTVisitor::visit(S);
+    if (!rewritten)
+      return {};
+
+    if (auto *stmt = getAsStmt(rewritten))
+      performStmtDiagnostics(stmt, closure);
+
+    return rewritten;
+  }
+
   void visitDecl(Decl *decl) {
     if (isa<IfConfigDecl>(decl))
       return;

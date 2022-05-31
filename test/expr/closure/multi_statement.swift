@@ -405,6 +405,36 @@ func test_type_finder_doesnt_walk_into_inner_closures() {
   }
 }
 
+// rdar://94049113 - compiler accepts non-optional `guard let` in a closure
+func test_non_optional_guard_let_is_diagnosed() {
+  func fn(_: (Int) -> Void) {}
+
+  fn {
+    if true {
+      guard let v = $0 else { // expected-error {{initializer for conditional binding must have Optional type, not 'Int'}}
+        return
+      }
+
+      print(v)
+    }
+  }
+
+  fn {
+    switch $0 {
+    case (let val):
+      fn {
+        guard let x = val else {  // expected-error {{initializer for conditional binding must have Optional type, not 'Int'}}
+          return
+        }
+
+        print($0 + x)
+      }
+
+    default: break
+    }
+  }
+}
+
 // rdar://93796211 (issue#59035) - crash during solution application to fallthrough statement
 func test_fallthrough_stmt() {
   {
