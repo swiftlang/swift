@@ -193,6 +193,7 @@ func testConstraintAlias1<T : SequenceOfInt>(_: T) {}
 // CHECK-NEXT: Generic signature: <T where T : Sequence, T.[Sequence]Element == String>
 func testConstraintAlias2<T : SequenceOf<String>>(_: T) {}
 
+
 /// Protocol compositions
 
 // CHECK-LABEL: .testComposition1@
@@ -213,3 +214,14 @@ protocol TestCompositionProtocol1 {
 struct TestStructComposition : Sequence<Int> & Sendable {}
 // expected-error@-1 {{cannot inherit from protocol type with generic argument 'Sequence<Int>'}}
 // expected-error@-2 {{type 'TestStructComposition' does not conform to protocol 'Sequence'}}
+
+
+/// Conflicts
+
+protocol Pair<X, Y> where Self.X == Self.Y {
+  associatedtype X
+  associatedtype Y
+}
+
+func splay(_ x: some Pair<Int, String>) -> (Int, String) { fatalError() }
+// expected-error@-1 {{no type for '(some Pair<Int, String>).X' can satisfy both '(some Pair<Int, String>).X == String' and '(some Pair<Int, String>).X == Int'}}
