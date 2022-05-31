@@ -881,6 +881,9 @@ getClangInvocationFileMapping(ASTContext &ctx) {
   // We currently only need this when building for Linux.
   if (!triple.isOSLinux())
     return {};
+  // Android uses libc++.
+  if (triple.isAndroid())
+    return {};
 
   auto clangDiags = clang::CompilerInstance::createDiagnostics(
       new clang::DiagnosticOptions());
