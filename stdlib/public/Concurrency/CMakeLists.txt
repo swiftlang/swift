@@ -25,9 +25,14 @@ endif()
 set(SWIFT_RUNTIME_CONCURRENCY_C_FLAGS)
 set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS)
 
-set(swift_concurrency_private_link_libraries swiftThreading)
+set(swift_concurrency_private_link_libraries)
 if(CMAKE_SYSTEM_NAME STREQUAL Windows)
   list(APPEND swift_concurrency_private_link_libraries Synchronization)
+endif()
+
+set(swift_concurrency_incorporate_object_libraries)
+if(NOT SWIFT_BUILD_STATIC_STDLIB)
+  list(APPEND swift_concurrency_incorporate_object_libraries swiftThreading)
 endif()
 
 if("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "dispatch")
@@ -71,6 +76,11 @@ endif()
 
 list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_FLAGS
   "-D__STDC_WANT_LIB_EXT1__=1")
+
+if(SWIFT_BUILD_STATIC_STDLIB)
+  list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_FLAGS
+    "-DSWIFT_BUILD_STATIC_STDLIB=1")
+endif()
 
 add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   ../CompatibilityOverride/CompatibilityOverride.cpp
@@ -132,7 +142,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   SWIFT_MODULE_DEPENDS_WINDOWS CRT
 
   PRIVATE_LINK_LIBRARIES ${swift_concurrency_private_link_libraries}
-
+  INCORPORATE_OBJECT_LIBRARIES ${swift_concurrency_incorporate_object_libraries}
   LINK_LIBRARIES ${swift_concurrency_link_libraries}
 
   C_COMPILE_FLAGS
