@@ -2447,16 +2447,11 @@ void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
   // We match the behavior of clang to not report deprecation warnings
   // inside declarations that are themselves deprecated on all deployment
   // targets.
-  if (Where.isDeprecated()) {
+  if (Where.isDeprecated() || Where.ignoresDeprecation()) {
     return;
   }
 
   auto *ReferenceDC = Where.getDeclContext();
-
-  // If the reference declaration has the `IgnoreDeprecationWarnings` attribute, don't diagnose.
-  if (auto *decl = ReferenceDC->getInnermostDeclarationDeclContext()) {
-    if (decl->getAttrs().hasAttribute<IgnoreDeprecationWarningsAttr>()) return;
-  }
 
   auto &Context = ReferenceDC->getASTContext();
   if (!Context.LangOpts.DisableAvailabilityChecking) {
@@ -2534,15 +2529,11 @@ bool TypeChecker::diagnoseIfDeprecated(SourceLoc loc,
   // We match the behavior of clang to not report deprecation warnings
   // inside declarations that are themselves deprecated on all deployment
   // targets.
-  if (where.isDeprecated()) {
+  if (where.isDeprecated() || where.ignoresDeprecation()) {
     return false;
   }
 
   auto *dc = where.getDeclContext();
-
-  if (auto *innerMostDecl = dc->getInnermostDeclarationDeclContext()) {
-      if (innerMostDecl->getAttrs().hasAttribute<IgnoreDeprecationWarningsAttr>()) return false;
-  }
 
   auto &ctx = dc->getASTContext();
   if (!ctx.LangOpts.DisableAvailabilityChecking) {
