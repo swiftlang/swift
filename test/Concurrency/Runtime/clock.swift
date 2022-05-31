@@ -18,7 +18,7 @@ var tests = TestSuite("Time")
       }
       // give a reasonable range of expected elapsed time
       expectGT(elapsed, .milliseconds(90))
-      expectLT(elapsed, .milliseconds(200))
+      expectLT(elapsed, .milliseconds(1000))
     }
 
     tests.test("ContinuousClock sleep with tolerance") {
@@ -28,7 +28,7 @@ var tests = TestSuite("Time")
       }
       // give a reasonable range of expected elapsed time
       expectGT(elapsed, .milliseconds(90))
-      expectLT(elapsed, .milliseconds(300))
+      expectLT(elapsed, .milliseconds(2000))
     }
 
     tests.test("ContinuousClock sleep longer") {
@@ -36,7 +36,7 @@ var tests = TestSuite("Time")
         try! await Task.sleep(until: .now + .seconds(1), clock: .continuous)
       }
       expectGT(elapsed, .seconds(1) - .milliseconds(90))
-      expectLT(elapsed, .seconds(1) + .milliseconds(200))
+      expectLT(elapsed, .seconds(1) + .milliseconds(1000))
     }
 
     tests.test("SuspendingClock sleep") {
@@ -46,7 +46,7 @@ var tests = TestSuite("Time")
       }
       // give a reasonable range of expected elapsed time
       expectGT(elapsed, .milliseconds(90))
-      expectLT(elapsed, .milliseconds(200))
+      expectLT(elapsed, .milliseconds(1000))
     }
 
     tests.test("SuspendingClock sleep with tolerance") {
@@ -56,7 +56,7 @@ var tests = TestSuite("Time")
       }
       // give a reasonable range of expected elapsed time
       expectGT(elapsed, .milliseconds(90))
-      expectLT(elapsed, .milliseconds(300))
+      expectLT(elapsed, .milliseconds(2000))
     }
 
     tests.test("SuspendingClock sleep longer") {
@@ -64,7 +64,7 @@ var tests = TestSuite("Time")
         try! await Task.sleep(until: .now + .seconds(1), clock: .suspending)
       }
       expectGT(elapsed, .seconds(1) - .milliseconds(90))
-      expectLT(elapsed, .seconds(1) + .milliseconds(200))
+      expectLT(elapsed, .seconds(1) + .milliseconds(1000))
     }
 
     tests.test("duration addition") {
