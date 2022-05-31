@@ -31,6 +31,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <iostream>
 
 #if defined(__APPLE__) && defined(__MACH__)
 #include <TargetConditionals.h>
@@ -43,7 +44,7 @@ using namespace swift::reflection;
 using namespace swift::remote;
 
 using NativeReflectionContext = swift::reflection::ReflectionContext<
-    External<RuntimeTarget<sizeof(uintptr_t)>>>;
+  External<WithObjCInterop<RuntimeTarget<sizeof(uintptr_t)>>>>;
 
 template <typename T> static T unwrap(llvm::Expected<T> value) {
   if (value)
@@ -142,6 +143,6 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
   auto reader = std::make_shared<ObjectMemoryReader>();
   NativeReflectionContext context(std::move(reader));
   context.addImage(RemoteAddress(Data));
-  context.getBuilder().dumpAllSections(stdout);
+  context.getBuilder().dumpAllSections<WithObjCInterop, sizeof(uintptr_t)>(std::cout);
   return 0; // Non-zero return values are reserved for future use.
 }
