@@ -573,9 +573,10 @@ public:
 
   static bool canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
                                     bool IsConcurrencyEnabled,
+                                    bool IsGlobalVariable,
                                     Optional<DeclKind> DK);
 
-  void getAttributeDeclCompletions(bool IsInSil, Optional<DeclKind> DK);
+  void getAttributeDeclCompletions(bool IsInSil, bool isGlobalVariable, Optional<DeclKind> DK);
 
   void getAttributeDeclParamCompletions(DeclAttrKind AttrKind, int ParamIndex);
 

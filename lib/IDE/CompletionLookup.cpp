@@ -2917,6 +2917,7 @@ void CompletionLookup::getGenericRequirementCompletions(
 
 bool CompletionLookup::canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
                                              bool IsConcurrencyEnabled,
+                                             bool IsGlobalVariable,
                                              Optional<DeclKind> DK) {
   if (DeclAttribute::isUserInaccessible(DAK))
     return false;
@@ -2930,10 +2931,12 @@ bool CompletionLookup::canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
     return false;
   if (!DK.hasValue())
     return true;
+  if (IsGlobalVariable && DAK == DeclAttrKind::DAK_IgnoreDeprecationWarnings)
+    return false;
   return DeclAttribute::canAttributeAppearOnDeclKind(DAK, DK.getValue());
 }
 
-void CompletionLookup::getAttributeDeclCompletions(bool IsInSil,
+void CompletionLookup::getAttributeDeclCompletions(bool IsInSil, bool isGlobalVariable
                                                    Optional<DeclKind> DK) {
   // FIXME: also include user-defined attribute keywords
   StringRef TargetName = "Declaration";
@@ -2949,7 +2952,7 @@ void CompletionLookup::getAttributeDeclCompletions(bool IsInSil,
   bool IsConcurrencyEnabled = Ctx.LangOpts.EnableExperimentalConcurrency;
   std::string Description = TargetName.str() + " Attribute";
 #define DECL_ATTR(KEYWORD, NAME, ...)                                          \
-  if (canUseAttributeOnDecl(DAK_##NAME, IsInSil, IsConcurrencyEnabled,         \
+  if (canUseAttributeOnDecl(DAK_##NAME, IsInSil, IsConcurrencyEnabled, IsGlobalVariable        \
                             DK))                         \
     addDeclAttrKeyword(#KEYWORD, Description);
 #include "swift/AST/Attr.def"
