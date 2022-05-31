@@ -3929,7 +3929,7 @@ generateForEachStmtConstraints(
 
     auto makeIteratorTarget = SolutionApplicationTarget::forInitialization(
         makeIteratorCall, dc, /*patternType=*/Type(), PB, /*index=*/0,
-        target.shouldBindPatternVarsOneWay());
+        /*shouldBindPatternsOneWay=*/false);
 
     cs.setContextualType(
         sequenceExpr,
