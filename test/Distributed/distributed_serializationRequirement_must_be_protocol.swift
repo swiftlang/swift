@@ -16,9 +16,9 @@ final class SomeEnum: Sendable {}
 final class System: DistributedActorSystem {
   // ignore those since they all fail with the SerializationRequirement being invalid:
   // expected-error@-2{{type 'System' does not conform to protocol 'DistributedActorSystem'}}
-  // expected-note@-3{{protocol 'System' requires function 'remoteCallVoid'}}
+  // expected-note@-3{{protocol 'DistributedActorSystem' requires function 'remoteCallVoid'}}
   // expected-error@-4{{class 'System' is missing witness for protocol requirement 'remoteCall'}}
-  // expected-note@-5{{protocol 'System' requires function 'remoteCall' with signature:}}
+  // expected-note@-5{{protocol 'DistributedActorSystem' requires function 'remoteCall' with signature:}}
   // expected-error@-6{{class 'System' is missing witness for protocol requirement 'remoteCallVoid'}}
   typealias ActorID = String
   typealias InvocationEncoder = ClassInvocationEncoder
@@ -81,10 +81,10 @@ final class System: DistributedActorSystem {
 }
 
 struct ClassInvocationEncoder: DistributedTargetInvocationEncoder {
-  // expected-note@-1{{protocol 'ClassInvocationEncoder' requires function 'recordArgument' with signature:}}
-  // expected-error@-2{{struct 'ClassInvocationEncoder' is missing witness for protocol requirement 'recordArgument'}}
-  // expected-note@-3{{protocol 'ClassInvocationEncoder' requires function 'recordReturnType' with signature:}}
-  // expected-error@-4{{struct 'ClassInvocationEncoder' is missing witness for protocol requirement 'recordReturnType'}}
+  // expected-error@-1{{struct 'ClassInvocationEncoder' is missing witness for protocol requirement 'recordArgument'}}
+  // expected-note@-2{{protocol 'DistributedTargetInvocationEncoder' requires function 'recordArgument' with signature:}}
+  // expected-error@-3{{struct 'ClassInvocationEncoder' is missing witness for protocol requirement 'recordReturnType'}}
+  // expected-note@-4{{protocol 'DistributedTargetInvocationEncoder' requires function 'recordReturnType' with signature:}}
   typealias SerializationRequirement = SomeClazz
 
   public mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
@@ -97,7 +97,7 @@ struct ClassInvocationEncoder: DistributedTargetInvocationEncoder {
 
 final class ClassInvocationDecoder: DistributedTargetInvocationDecoder {
   // expected-error@-1{{class 'ClassInvocationDecoder' is missing witness for protocol requirement 'decodeNextArgument'}}
-  // expected-note@-2{{protocol 'ClassInvocationDecoder' requires function 'decodeNextArgument'}}
+  // expected-note@-2{{protocol 'DistributedTargetInvocationDecoder' requires function 'decodeNextArgument'}}
   typealias SerializationRequirement = SomeClazz
 
   public func decodeGenericSubstitutions() throws -> [Any.Type] {
