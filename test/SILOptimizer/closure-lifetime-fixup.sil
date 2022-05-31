@@ -208,3 +208,50 @@ bb3(%13 : $@noescape @callee_guaranteed () -> ()):
   return %16 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_lifetime_extension_until_function_exit :
+// CHECK: [[NONE1:%.*]] = enum $Optional<@callee_guaranteed () -> ()>, #Optional.none!enumelt
+// CHECK: [[NONE2:%.*]] = enum $Optional<@callee_guaranteed () -> ()>, #Optional.none!enumelt
+// CHECK: cond_br undef, bb1, bb2
+// CHECK: bb1:
+// CHECK:  [[ORIG:%.*]] = function_ref @originalClosure : $@convention(thin) () -> ()
+// CHECK:  [[PA1:%.*]] = partial_apply [callee_guaranteed] [[ORIG]]() : $@convention(thin) () -> ()
+// CHECK:  [[COPY:%.*]] = copy_value [[PA1]] : $@callee_guaranteed () -> ()
+// CHECK:  [[NOESC:%.*]] = convert_escape_to_noescape [[COPY]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK:  [[SOME:%.*]] = enum $Optional<@callee_guaranteed () -> ()>, #Optional.some!enumelt, [[COPY]] : $@callee_guaranteed () -> ()
+// CHECK:  [[BORROW:%.*]] = begin_borrow [[SOME]] : $Optional<@callee_guaranteed () -> ()>
+// CHECK:  [[MDI:%.*]] = mark_dependence [[NOESC]] : $@noescape @callee_guaranteed () -> () on [[BORROW]] : $Optional<@callee_guaranteed () -> ()>
+// CHECK:  br bb3([[BORROW]] : $Optional<@callee_guaranteed () -> ()>, [[SOME]] : $Optional<@callee_guaranteed () -> ()>, {{.*}})
+// CHECK-LABEL: } // end sil function 'test_lifetime_extension_until_function_exit'
+sil [ossa] @test_lifetime_extension_until_function_exit : $@convention(thin) (@guaranteed Klass, @guaranteed @callee_guaranteed () -> (), @guaranteed Klass, @guaranteed @callee_guaranteed () -> ()) -> () {
+bb0(%0 : @guaranteed $Klass, %1 : @guaranteed $@callee_guaranteed () -> (), %2 : @guaranteed $Klass, %3 : @guaranteed $@callee_guaranteed () -> ()):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %5 = function_ref @originalClosure : $@convention(thin) () -> ()
+  %6 = partial_apply [callee_guaranteed] %5() : $@convention(thin) () -> ()
+  %7 = convert_escape_to_noescape [not_guaranteed] %6 : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+  %8 = function_ref @noEscapeThunk : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  %9 = partial_apply [callee_guaranteed] %8(%7) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  %10 = mark_dependence %9 : $@callee_guaranteed () -> () on %7 : $@noescape @callee_guaranteed () -> ()
+  %11 = copy_value %10 : $@callee_guaranteed () -> ()
+  %12 = alloc_stack $@block_storage @callee_guaranteed () -> ()
+  %13 = project_block_storage %12 : $*@block_storage @callee_guaranteed () -> ()
+  store %11 to [init] %13 : $*@callee_guaranteed () -> ()
+  %15 = function_ref @blockThunk : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> ()
+  %16 = init_block_storage_header %12 : $*@block_storage @callee_guaranteed () -> (), invoke %15 : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> (), type $@convention(block) @noescape () -> ()
+  %17 = copy_block_without_escaping %16 : $@convention(block) @noescape () -> () withoutEscaping %10 : $@callee_guaranteed () -> ()
+  %18 = enum $Optional<@convention(block) @noescape () -> ()>, #Optional.some!enumelt, %17 : $@convention(block) @noescape () -> ()
+  destroy_addr %13 : $*@callee_guaranteed () -> ()
+  dealloc_stack %12 : $*@block_storage @callee_guaranteed () -> ()
+  destroy_value %6 : $@callee_guaranteed () -> ()
+  destroy_value %18 : $Optional<@convention(block) @noescape () -> ()>
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %25 = tuple ()
+  return %25 : $()
+}
+
