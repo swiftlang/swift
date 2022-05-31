@@ -2045,6 +2045,12 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_no_clang_module_breadcrumbs))
     Opts.DisableClangModuleSkeletonCUs = true;
 
+  if (auto A = Args.getLastArg(OPT_enable_round_trip_debug_types,
+                               OPT_disable_round_trip_debug_types)) {
+    Opts.DisableRoundTripDebugTypes =
+        Args.hasArg(OPT_disable_round_trip_debug_types);
+  }
+
   if (Args.hasArg(OPT_disable_debugger_shadow_copies))
     Opts.DisableDebuggerShadowCopies = true;
 

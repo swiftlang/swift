@@ -915,7 +915,6 @@ private:
     if (!Opts.DisableRoundTripDebugTypes &&
         !Ty->getASTContext().LangOpts.EnableCXXInterop) {
       // Make sure we can reconstruct mangled types for the debugger.
-#ifndef NDEBUG
       auto &Ctx = Ty->getASTContext();
       Type Reconstructed = Demangle::getTypeForMangling(Ctx, Result);
       if (!Reconstructed) {
@@ -936,7 +935,6 @@ private:
         Reconstructed->dump(llvm::errs());
         abort();
       }
-#endif
     }
 
     return BumpAllocatedString(Result);
