@@ -288,13 +288,13 @@ public:
     switch (context) {
     case Context::Inherited:
     case Context::ExtensionBinding:
+    case Context::TypeAliasDecl:
+    case Context::GenericTypeAliasDecl:
     case Context::GenericRequirement:
     case Context::ExistentialConstraint:
     case Context::MetatypeBase:
       return true;
     case Context::None:
-    case Context::TypeAliasDecl:
-    case Context::GenericTypeAliasDecl:
     case Context::InExpression:
     case Context::ExplicitCastExpr:
     case Context::ForEachStmt:
