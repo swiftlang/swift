@@ -3748,8 +3748,6 @@ ERROR(protocol_declares_unknown_primary_assoc_type,none,
       (Identifier, Type))
 ERROR(protocol_declares_duplicate_primary_assoc_type,none,
       "duplicate primary associated type name %0", (Identifier))
-ERROR(parameterized_protocol_not_supported,none,
-      "protocol type with type arguments can only be used as a generic constraint", ())
 ERROR(protocol_does_not_have_primary_assoc_type,none,
       "cannot specialize protocol type %0", (Type))
 ERROR(parameterized_protocol_type_argument_count_mismatch,none,
