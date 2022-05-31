@@ -318,10 +318,11 @@ class InheritedProtocolCollector {
   static const StringLiteral DummyProtocolName;
 
   using AvailableAttrList = TinyPtrVector<const AvailableAttr *>;
-  using OtherAttrList = TinyPtrVector<const DeclAttribute*>;
+  using OriginallyDefinedInAttrList =
+      TinyPtrVector<const OriginallyDefinedInAttr *>;
   using ProtocolAndAvailability =
-    std::tuple<ProtocolDecl *, AvailableAttrList, bool /*isUnchecked*/,
-    OtherAttrList>;
+      std::tuple<ProtocolDecl *, AvailableAttrList, bool /*isUnchecked*/,
+                 OriginallyDefinedInAttrList>;
 
   /// Protocols that will be included by the ASTPrinter without any extra work.
   SmallVector<ProtocolDecl *, 8> IncludedProtocols;
@@ -357,10 +358,12 @@ class InheritedProtocolCollector {
     return cache.getValue();
   }
 
-  static OtherAttrList getOtherAttrList(const Decl *D) {
-    OtherAttrList results;
+  static OriginallyDefinedInAttrList
+  getOriginallyDefinedInAttrList(const Decl *D) {
+    OriginallyDefinedInAttrList results;
     while (D) {
-      for (auto *result: D->getAttrs().getAttributes<OriginallyDefinedInAttr>()) {
+      for (auto *result :
+           D->getAttrs().getAttributes<OriginallyDefinedInAttr>()) {
         results.push_back(result);
       }
       D = D->getDeclContext()->getAsDecl();
@@ -396,11 +399,9 @@ class InheritedProtocolCollector {
         if (canPrintNormally)
           IncludedProtocols.push_back(protoDecl);
         else
-          ExtraProtocols.push_back(
-            ProtocolAndAvailability(protoDecl,
-                                    getAvailabilityAttrs(D, availableAttrs),
-                                    inherited.isUnchecked,
-                                    getOtherAttrList(D)));
+          ExtraProtocols.push_back(ProtocolAndAvailability(
+              protoDecl, getAvailabilityAttrs(D, availableAttrs),
+              inherited.isUnchecked, getOriginallyDefinedInAttrList(D)));
       }
       // FIXME: This ignores layout constraints, but currently we don't support
       // any of those besides 'AnyObject'.
@@ -417,11 +418,9 @@ class InheritedProtocolCollector {
       for (auto *conf : localConformances) {
         if (conf->getSourceKind() != ConformanceEntryKind::Synthesized)
           continue;
-        ExtraProtocols.push_back(
-          ProtocolAndAvailability(conf->getProtocol(),
-                                  getAvailabilityAttrs(D, availableAttrs),
-                                  isUncheckedConformance(conf),
-                                  getOtherAttrList(D)));
+        ExtraProtocols.push_back(ProtocolAndAvailability(
+            conf->getProtocol(), getAvailabilityAttrs(D, availableAttrs),
+            isUncheckedConformance(conf), getOriginallyDefinedInAttrList(D)));
       }
     }
   }
@@ -628,7 +627,7 @@ public:
     auto proto = std::get<0>(protoAndAvailability);
     auto availability = std::get<1>(protoAndAvailability);
     auto isUnchecked = std::get<2>(protoAndAvailability);
-    auto otherAttrs = std::get<3>(protoAndAvailability);
+    auto originallyDefinedInAttrs = std::get<3>(protoAndAvailability);
 
     // Create a synthesized ExtensionDecl for the conformance.
     ASTContext &ctx = M->getASTContext();
@@ -640,21 +639,24 @@ public:
     extension->setImplicit();
 
     // Build up synthesized DeclAttributes for the extension.
-    TinyPtrVector<const DeclAttribute *> attrs;
-    attrs.insert(attrs.end(), availability.begin(), availability.end());
-    auto spiAttributes =
-        proto->getAttrs().getAttributes<SPIAccessControlAttr>();
-    attrs.insert(attrs.end(), spiAttributes.begin(), spiAttributes.end());
-    attrs.insert(attrs.end(), otherAttrs.begin(), otherAttrs.end());
+    TinyPtrVector<const DeclAttribute *> clonedAttrs;
+    for (auto *attr : availability) {
+      clonedAttrs.push_back(attr->clone(ctx, /*implicit*/ true));
+    }
+    for (auto *attr : proto->getAttrs().getAttributes<SPIAccessControlAttr>()) {
+      clonedAttrs.push_back(attr->clone(ctx, /*implicit*/ true));
+    }
+    for (auto *attr : originallyDefinedInAttrs) {
+      clonedAttrs.push_back(attr->clone(ctx, /*implicit*/ true));
+    }
 
     // Since DeclAttributes is a linked list where each added attribute becomes
     // the head, we need to add these attributes in reverse order to reproduce
     // the order in which previous implementations printed these attributes.
-    DeclAttributes declAttrs;
-    for (auto attr = attrs.rbegin(), end = attrs.rend(); attr != end; ++attr) {
-      declAttrs.add(const_cast<DeclAttribute *>(*attr));
+    for (auto attr = clonedAttrs.rbegin(), end = clonedAttrs.rend();
+         attr != end; ++attr) {
+      extension->getAttrs().add(const_cast<DeclAttribute *>(*attr));
     }
-    extension->getAttrs() = declAttrs;
 
     ctx.evaluator.cacheOutput(ExtendedTypeRequest{extension},
                               nominal->getDeclaredType());
