@@ -1156,8 +1156,6 @@ public:
                                       SourceRange range,
                                       ArrayRef<Identifier> spiGroups);
 
-  SPIAccessControlAttr *clone(ASTContext &C, bool implicit) const;
-
   /// Name of SPIs declared by the attribute.
   ///
   /// Note: A single SPI name per attribute is currently supported but this
@@ -1714,15 +1712,12 @@ public:
   }
 };
 
-/// Describes a symbol that was originally defined in another module. For
-/// example, given the following declaration:
-///
+/// Describe a symbol was originally defined in another module. For example, given
 /// \code
 /// @_originallyDefinedIn(module: "Original", OSX 10.15) var foo: Int
 /// \endcode
 ///
-/// The variable \p foo was originally defined in another module called
-/// \p Original prior to OSX 10.15
+/// Where variable Foo has originally defined in another module called Original prior to OSX 10.15
 class OriginallyDefinedInAttr: public DeclAttribute {
 public:
   OriginallyDefinedInAttr(SourceLoc AtLoc, SourceRange Range,
@@ -1734,8 +1729,6 @@ public:
       OriginalModuleName(OriginalModuleName),
       Platform(Platform),
       MovedVersion(MovedVersion) {}
-
-  OriginallyDefinedInAttr *clone(ASTContext &C, bool implicit) const;
 
   // The original module name.
   const StringRef OriginalModuleName;
