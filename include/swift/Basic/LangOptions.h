@@ -196,10 +196,6 @@ namespace swift {
     /// Require public declarations to declare that they are Sendable (or not).
     bool RequireExplicitSendable = false;
 
-    /// If false, '#file' evaluates to the full path rather than a
-    /// human-readable string.
-    bool EnableConcisePoundFile = false;
-
     /// Detect and automatically import modules' cross-import overlays.
     bool EnableCrossImportOverlays = false;
 
@@ -430,17 +426,6 @@ namespace swift {
     /// file.
     bool EmitFineGrainedDependencySourcefileDotFiles = false;
 
-    /// Whether to enable experimental differentiable programming features:
-    /// `@differentiable` declaration attribute, etc.
-    bool EnableExperimentalDifferentiableProgramming = false;
-
-    /// Whether to enable forward mode differentiation.
-    bool EnableExperimentalForwardModeDifferentiation = false;
-
-    /// Whether to enable experimental `AdditiveArithmetic` derived
-    /// conformances.
-    bool EnableExperimentalAdditiveArithmeticDerivedConformances = false;
-
     /// Enable verification when every SubstitutionMap is constructed.
     bool VerifyAllSubstitutionMaps = false;
 
@@ -461,13 +446,6 @@ namespace swift {
     // Allow errors during module generation. See corresponding option in
     // FrontendOptions.
     bool AllowModuleWithCompilerErrors = false;
-
-    /// Enable extensions of (sugared) bound generic types
-    ///
-    /// \code
-    /// extension [Int] { /**/ }
-    /// \endcode
-    bool EnableExperimentalBoundGenericExtensions = false;
 
     /// A helper enum to represent whether or not we customized the default
     /// ASTVerifier behavior via a frontend flag. By default, we do not
