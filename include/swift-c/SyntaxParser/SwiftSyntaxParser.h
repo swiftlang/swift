@@ -93,6 +93,15 @@ swiftparse_parser_create(void);
 SWIFTPARSE_PUBLIC void
 swiftparse_parser_dispose(swiftparse_parser_t);
 
+/// Set the language version that should be used to parse the Swift source file.
+SWIFTPARSE_PUBLIC void
+swiftparse_parser_set_language_version(swiftparse_parser_t c_parser,
+                                       const char *version);
+
+/// Set whether bare slash regex literals are enabled.
+SWIFTPARSE_PUBLIC void swiftparse_parser_set_enable_bare_slash_regex_literal(
+    swiftparse_parser_t c_parser, bool enabled);
+
 /// Invoked by the parser when a syntax node is parsed. The client should
 /// return a pointer to associate with that particular node.
 typedef swiftparse_client_node_t
