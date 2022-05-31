@@ -196,10 +196,6 @@ namespace swift {
     /// Require public declarations to declare that they are Sendable (or not).
     bool RequireExplicitSendable = false;
 
-    /// If false, '#file' evaluates to the full path rather than a
-    /// human-readable string.
-    bool EnableConcisePoundFile = false;
-
     /// Detect and automatically import modules' cross-import overlays.
     bool EnableCrossImportOverlays = false;
 
