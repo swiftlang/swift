@@ -3047,6 +3047,10 @@ static bool usesFeatureForwardModeDifferentiation(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureAdditiveArithmeticDerivedConformances(Decl *decl) {
+  return false;
+}
+
 static void
 suppressingFeatureNoAsyncAvailability(PrintOptions &options,
                                       llvm::function_ref<void()> action) {

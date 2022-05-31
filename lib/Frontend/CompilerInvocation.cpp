@@ -544,9 +544,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_emit_fine_grained_dependency_sourcefile_dot_files))
     Opts.EmitFineGrainedDependencySourcefileDotFiles = true;
 
-  if (Args.hasArg(OPT_enable_experimental_additive_arithmetic_derivation))
-    Opts.EnableExperimentalAdditiveArithmeticDerivedConformances = true;
-
   Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);
   if (Opts.DebuggerSupport)
     Opts.EnableDollarIdentifiers = true;
@@ -664,6 +661,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.Features.insert(Feature::BoundGenericExtensions);
   if (Args.hasArg(OPT_enable_experimental_forward_mode_differentiation))
     Opts.Features.insert(Feature::ForwardModeDifferentiation);
+  if (Args.hasArg(OPT_enable_experimental_additive_arithmetic_derivation))
+    Opts.Features.insert(Feature::AdditiveArithmeticDerivedConformances);
 
   Opts.EnableAppExtensionRestrictions |= Args.hasArg(OPT_enable_app_extension);
 

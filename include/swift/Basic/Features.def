@@ -115,6 +115,9 @@ EXPERIMENTAL_FEATURE(DifferentiableProgramming)
 /// Whether to enable forward mode differentiation.
 EXPERIMENTAL_FEATURE(ForwardModeDifferentiation)
 
+/// Whether to enable experimental `AdditiveArithmetic` derived
+/// conformances.
+EXPERIMENTAL_FEATURE(AdditiveArithmeticDerivedConformances)
 
 #undef EXPERIMENTAL_FEATURE
 #undef FUTURE_FEATURE
