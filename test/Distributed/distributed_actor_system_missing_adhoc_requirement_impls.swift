@@ -816,12 +816,23 @@ struct BadResultHandler_missingOnReturn: DistributedTargetInvocationResultHandle
   func onReturnVoid() async throws {}
   func onThrow<Err: Error>(error: Err) async throws {}
 }
+
 struct BadResultHandler_missingRequirement: DistributedTargetInvocationResultHandler {
   // expected-error@-1{{struct 'BadResultHandler_missingRequirement' is missing witness for protocol requirement 'onReturn'}}
   // expected-note@-2{{protocol 'BadResultHandler_missingRequirement' requires function 'onReturn' with signature:}}
   typealias SerializationRequirement = Codable
 
   func onReturn<Success>(value: Success) async throws {} // MISSING : Codable
+  func onReturnVoid() async throws {}
+  func onThrow<Err: Error>(error: Err) async throws {}
+}
+
+struct BadResultHandler_mutatingButShouldNotBe: DistributedTargetInvocationResultHandler {
+  // expected-error@-1{{struct 'BadResultHandler_missingRequirement' is missing witness for protocol requirement 'onReturn'}}
+  // expected-note@-2{{protocol 'BadResultHandler_missingRequirement' requires function 'onReturn' with signature:}}
+  typealias SerializationRequirement = Codable
+
+  mutating func onReturn<Success: Codable>(value: Success) async throws {} // WRONG: can't be mutating
   func onReturnVoid() async throws {}
   func onThrow<Err: Error>(error: Err) async throws {}
 }
