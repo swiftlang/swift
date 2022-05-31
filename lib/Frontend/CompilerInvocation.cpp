@@ -486,9 +486,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       = A->getOption().matches(OPT_enable_deserialization_recovery);
   }
 
-  Opts.EnableExperimentalBoundGenericExtensions |=
-    Args.hasArg(OPT_enable_experimental_bound_generic_extensions);
-
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
   Opts.CheckAPIAvailabilityOnly |=
@@ -546,12 +543,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_emit_fine_grained_dependency_sourcefile_dot_files))
     Opts.EmitFineGrainedDependencySourcefileDotFiles = true;
-
-  if (Args.hasArg(OPT_enable_experimental_additive_arithmetic_derivation))
-    Opts.EnableExperimentalAdditiveArithmeticDerivedConformances = true;
-
-  Opts.EnableExperimentalForwardModeDifferentiation |=
-      Args.hasArg(OPT_enable_experimental_forward_mode_differentiation);
 
   Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);
   if (Opts.DebuggerSupport)
@@ -666,6 +657,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.Features.insert(Feature::OneWayClosureParameters);
   if (Args.hasArg(OPT_enable_experimental_associated_type_inference))
     Opts.Features.insert(Feature::TypeWitnessSystemInference);
+  if (Args.hasArg(OPT_enable_experimental_bound_generic_extensions))
+    Opts.Features.insert(Feature::BoundGenericExtensions);
+  if (Args.hasArg(OPT_enable_experimental_forward_mode_differentiation))
+    Opts.Features.insert(Feature::ForwardModeDifferentiation);
+  if (Args.hasArg(OPT_enable_experimental_additive_arithmetic_derivation))
+    Opts.Features.insert(Feature::AdditiveArithmeticDerivedConformances);
 
   Opts.EnableAppExtensionRestrictions |= Args.hasArg(OPT_enable_app_extension);
 

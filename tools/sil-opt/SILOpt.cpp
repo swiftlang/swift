@@ -576,8 +576,10 @@ int main(int argc, char **argv) {
   if (EnableExperimentalStaticAssert)
     Invocation.getLangOptions().Features.insert(Feature::StaticAssert);
 
-  Invocation.getLangOptions().EnableExperimentalDifferentiableProgramming =
-      EnableExperimentalDifferentiableProgramming;
+  if (EnableExperimentalDifferentiableProgramming) {
+    Invocation.getLangOptions().Features.insert(
+        Feature::DifferentiableProgramming);
+  }
 
   Invocation.getLangOptions().EnableCXXInterop = EnableCxxInterop;
 
