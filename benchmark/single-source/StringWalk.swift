@@ -127,21 +127,21 @@ public let benchmarks = [
   BenchmarkInfo(
     name: "StringWalk_ascii_unicodeScalars",
     runFunction: run_StringWalk_ascii_unicodeScalars,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_ascii_characters",
     runFunction: run_StringWalk_ascii_characters,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_ascii_characters_by_index",
     runFunction: run_StringWalk_ascii_characters_by_index,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
@@ -160,21 +160,21 @@ public let benchmarks = [
   BenchmarkInfo(
     name: "StringWalk_ascii_unicodeScalars_Backwards",
     runFunction: run_StringWalk_ascii_unicodeScalars_Backwards,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_ascii_characters_Backwards",
     runFunction: run_StringWalk_ascii_characters_Backwards,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_ascii_characters_by_index_Backwards",
     runFunction: run_StringWalk_ascii_characters_by_index_Backwards,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
@@ -193,21 +193,21 @@ public let benchmarks = [
   BenchmarkInfo(
     name: "StringWalk_utf16_unicodeScalars",
     runFunction: run_StringWalk_utf16_unicodeScalars,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_utf16_characters",
     runFunction: run_StringWalk_utf16_characters,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_utf16_characters_by_index",
     runFunction: run_StringWalk_utf16_characters_by_index,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
@@ -226,21 +226,21 @@ public let benchmarks = [
   BenchmarkInfo(
     name: "StringWalk_utf16_unicodeScalars_Backwards",
     runFunction: run_StringWalk_utf16_unicodeScalars_Backwards,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_utf16_characters_Backwards",
     runFunction: run_StringWalk_utf16_characters_Backwards,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_utf16_characters_by_index_Backwards",
     runFunction: run_StringWalk_utf16_characters_by_index_Backwards,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
@@ -259,21 +259,21 @@ public let benchmarks = [
   BenchmarkInfo(
     name: "StringWalk_tweet_unicodeScalars",
     runFunction: run_StringWalk_tweet_unicodeScalars,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_tweet_characters",
     runFunction: run_StringWalk_tweet_characters,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_tweet_characters_by_index",
     runFunction: run_StringWalk_tweet_characters_by_index,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
@@ -292,21 +292,21 @@ public let benchmarks = [
   BenchmarkInfo(
     name: "StringWalk_tweet_unicodeScalars_Backwards",
     runFunction: run_StringWalk_tweet_unicodeScalars_Backwards,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_tweet_characters_Backwards",
     runFunction: run_StringWalk_tweet_characters_Backwards,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_tweet_characters_by_index_Backwards",
     runFunction: run_StringWalk_tweet_characters_by_index_Backwards,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
@@ -325,21 +325,21 @@ public let benchmarks = [
   BenchmarkInfo(
     name: "StringWalk_japanese_unicodeScalars",
     runFunction: run_StringWalk_japanese_unicodeScalars,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_japanese_characters",
     runFunction: run_StringWalk_japanese_characters,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_japanese_characters_by_index",
     runFunction: run_StringWalk_japanese_characters_by_index,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
@@ -358,21 +358,21 @@ public let benchmarks = [
   BenchmarkInfo(
     name: "StringWalk_japanese_unicodeScalars_Backwards",
     runFunction: run_StringWalk_japanese_unicodeScalars_Backwards,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_japanese_characters_Backwards",
     runFunction: run_StringWalk_japanese_characters_Backwards,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_japanese_characters_by_index_Backwards",
     runFunction: run_StringWalk_japanese_characters_by_index_Backwards,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
@@ -391,21 +391,21 @@ public let benchmarks = [
   BenchmarkInfo(
     name: "StringWalk_chinese_unicodeScalars",
     runFunction: run_StringWalk_chinese_unicodeScalars,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_chinese_characters",
     runFunction: run_StringWalk_chinese_characters,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_chinese_characters_by_index",
     runFunction: run_StringWalk_chinese_characters_by_index,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
@@ -424,21 +424,21 @@ public let benchmarks = [
   BenchmarkInfo(
     name: "StringWalk_chinese_unicodeScalars_Backwards",
     runFunction: run_StringWalk_chinese_unicodeScalars_Backwards,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_chinese_characters_Backwards",
     runFunction: run_StringWalk_chinese_characters_Backwards,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_chinese_characters_by_index_Backwards",
     runFunction: run_StringWalk_chinese_characters_by_index_Backwards,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
@@ -457,21 +457,21 @@ public let benchmarks = [
   BenchmarkInfo(
     name: "StringWalk_korean_unicodeScalars",
     runFunction: run_StringWalk_korean_unicodeScalars,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_korean_characters",
     runFunction: run_StringWalk_korean_characters,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_korean_characters_by_index",
     runFunction: run_StringWalk_korean_characters_by_index,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
@@ -490,21 +490,21 @@ public let benchmarks = [
   BenchmarkInfo(
     name: "StringWalk_korean_unicodeScalars_Backwards",
     runFunction: run_StringWalk_korean_unicodeScalars_Backwards,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_korean_characters_Backwards",
     runFunction: run_StringWalk_korean_characters_Backwards,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_korean_characters_by_index_Backwards",
     runFunction: run_StringWalk_korean_characters_by_index_Backwards,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
@@ -523,21 +523,21 @@ public let benchmarks = [
   BenchmarkInfo(
     name: "StringWalk_russian_unicodeScalars",
     runFunction: run_StringWalk_russian_unicodeScalars,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_russian_characters",
     runFunction: run_StringWalk_russian_characters,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_russian_characters_by_index",
     runFunction: run_StringWalk_russian_characters_by_index,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
@@ -556,21 +556,21 @@ public let benchmarks = [
   BenchmarkInfo(
     name: "StringWalk_russian_unicodeScalars_Backwards",
     runFunction: run_StringWalk_russian_unicodeScalars_Backwards,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_russian_characters_Backwards",
     runFunction: run_StringWalk_russian_characters_Backwards,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_russian_characters_by_index_Backwards",
     runFunction: run_StringWalk_russian_characters_by_index_Backwards,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
@@ -589,21 +589,21 @@ public let benchmarks = [
   BenchmarkInfo(
     name: "StringWalk_punctuated_unicodeScalars",
     runFunction: run_StringWalk_punctuated_unicodeScalars,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_punctuated_characters",
     runFunction: run_StringWalk_punctuated_characters,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_punctuated_characters_by_index",
     runFunction: run_StringWalk_punctuated_characters_by_index,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
@@ -622,21 +622,21 @@ public let benchmarks = [
   BenchmarkInfo(
     name: "StringWalk_punctuated_unicodeScalars_Backwards",
     runFunction: run_StringWalk_punctuated_unicodeScalars_Backwards,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_punctuated_characters_Backwards",
     runFunction: run_StringWalk_punctuated_characters_Backwards,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_punctuated_characters_by_index_Backwards",
     runFunction: run_StringWalk_punctuated_characters_by_index_Backwards,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
@@ -655,21 +655,21 @@ public let benchmarks = [
   BenchmarkInfo(
     name: "StringWalk_punctuatedJapanese_unicodeScalars",
     runFunction: run_StringWalk_punctuatedJapanese_unicodeScalars,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_punctuatedJapanese_characters",
     runFunction: run_StringWalk_punctuatedJapanese_characters,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_punctuatedJapanese_characters_by_index",
     runFunction: run_StringWalk_punctuatedJapanese_characters_by_index,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
@@ -688,21 +688,21 @@ public let benchmarks = [
   BenchmarkInfo(
     name: "StringWalk_punctuatedJapanese_unicodeScalars_Backwards",
     runFunction: run_StringWalk_punctuatedJapanese_unicodeScalars_Backwards,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_punctuatedJapanese_characters_Backwards",
     runFunction: run_StringWalk_punctuatedJapanese_characters_Backwards,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_punctuatedJapanese_characters_by_index_Backwards",
     runFunction: run_StringWalk_punctuatedJapanese_characters_by_index_Backwards,
-    tags: [.api, .String, .skip],
+    tags: [.api, .String],
     legacyFactor: 40),
 
 
