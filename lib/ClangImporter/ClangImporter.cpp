@@ -3115,7 +3115,7 @@ void ClangImporter::lookupValue(DeclName name, VisibleDeclConsumer &consumer) {
 ClangNode ClangImporter::getEffectiveClangNode(const Decl *decl) const {
   // Directly...
   if (auto clangNode = decl->getClangNode())
-      return clangNode;
+    return clangNode;
 
   // Or via the nested "Code" enum.
   if (auto *errorWrapper = dyn_cast<StructDecl>(decl)) {
