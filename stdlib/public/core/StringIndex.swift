@@ -119,6 +119,7 @@ extension String.Index {
   /// This used to return the cached stride value if it was set, however since
   /// the cache and references to it were removed in Swift 5.7 we just return
   /// nil to maintain ABI
+  @available(*, unavailable)
   @usableFromInline
   internal var characterStride: Int? {
     return nil
@@ -167,6 +168,7 @@ extension String.Index {
 
   /// This constructor used to set the `characterStride` cache, however it was
   /// removed in Swift 5.7 so this constructor is kept for ABI reasons only
+  @available(*, unavailable)
   @usableFromInline
   internal init(
     encodedOffset: Int, transcodedOffset: Int, characterStride: Int
@@ -176,9 +178,10 @@ extension String.Index {
 
   /// This constructor used to set the `characterStride` cache, however it was
   /// removed in Swift 5.7 so this constructor is kept for ABI reasons only
+  @available(*, unavailable)
   @usableFromInline
   internal init(encodedOffset pos: Int, characterStride char: Int) {
-    self.init(encodedOffset: pos, transcodedOffset: 0, characterStride: char)
+    self.init(encodedOffset: pos, transcodedOffset: 0)
   }
 
   #if !INTERNAL_CHECKS_ENABLED

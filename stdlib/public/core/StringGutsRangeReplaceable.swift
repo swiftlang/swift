@@ -512,10 +512,7 @@ extension _StringGuts {
       _encodedOffset: newBounds.lowerBound
     )._scalarAligned._knownUTF8
 
-    // Preserve character alignment flag if possible
-    if startIndex._isCharacterAligned,
-      (oldRange.lowerBound > oldBounds.lowerBound ||
-        isOnGraphemeClusterBoundary(newStart)) {
+    if isOnGraphemeClusterBoundary(newStart) {
       newStart = newStart._characterAligned
     }
 
