@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import SwiftShims
+
 //===----------------------------------------------------------------------===//
 // Unicode.NFD
 //===----------------------------------------------------------------------===//
@@ -121,5 +123,45 @@ extension Substring {
   @available(SwiftStdlib 5.7, *)
   public var _nfc: Unicode._NFC {
     Unicode._NFC(base: unicodeScalars)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Unicode.Script
+//===----------------------------------------------------------------------===//
+
+extension Unicode.Scalar.Properties {
+  @_spi(_Unicode)
+  @available(SwiftStdlib 5.7, *)
+  public var _script: UInt8 {
+    let rawValue = _swift_stdlib_getScript(_scalar.value)
+
+    _internalInvariant(rawValue != .max, "Unknown script rawValue")
+
+    return rawValue
+  }
+
+  @_spi(_Unicode)
+  @available(SwiftStdlib 5.7, *)
+  public var _scriptExtensions: [UInt8] {
+    var count: UInt8 = 0
+    let pointer = _swift_stdlib_getScriptExtensions(_scalar.value, &count)
+
+    guard let pointer = pointer else {
+      return [_script]
+    }
+
+    var result: [UInt8] = []
+    result.reserveCapacity(Int(count))
+
+    for i in 0 ..< count {
+      let rawValue = pointer[Int(i)]
+
+      _internalInvariant(rawValue != .max, "Unknown script rawValue")
+
+      result.append(rawValue)
+    }
+
+    return result
   }
 }
