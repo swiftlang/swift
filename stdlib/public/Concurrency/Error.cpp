@@ -34,15 +34,3 @@ void swift::swift_Concurrency_fatalError(uint32_t flags, const char *format,
   va_start(val, format);
   swift_Concurrency_fatalErrorv(flags, format, val);
 }
-
-#if !SWIFT_BUILD_STATIC_STDLIB
-// Handle fatal errors from the threading library
-SWIFT_ATTRIBUTE_NORETURN
-SWIFT_FORMAT(1, 2)
-void swift::threading::fatal(const char *format, ...) {
-  va_list val;
-
-  va_start(val, format);
-  swift_Concurrency_fatalErrorv(0, format, val);
-}
-#endif // !SWIFT_BUILD_STATIC_STDLIB
