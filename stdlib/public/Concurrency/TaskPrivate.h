@@ -27,21 +27,12 @@
 #include "swift/Runtime/Error.h"
 #include "swift/Runtime/Exclusivity.h"
 #include "swift/Runtime/HeapObject.h"
+#include "swift/Threading/Thread.h"
 #include <atomic>
 #include <new>
 
 #define SWIFT_FATAL_ERROR swift_Concurrency_fatalError
 #include "../runtime/StackAllocator.h"
-
-#if HAVE_PTHREAD_H
-#include <pthread.h>
-#endif
-#if defined(_WIN32)
-#define WIN32_LEAN_AND_MEAN
-#define VC_EXTRA_LEAN
-#define NOMINMAX
-#include <Windows.h>
-#endif
 
 namespace swift {
 
@@ -50,24 +41,8 @@ namespace swift {
 #if 0
 #define SWIFT_TASK_DEBUG_LOG(fmt, ...)                                         \
   fprintf(stderr, "[%lu] [%s:%d](%s) " fmt "\n",                               \
-          (unsigned long)_swift_get_thread_id(),                               \
-          __FILE__, __LINE__, __FUNCTION__,                                    \
-          __VA_ARGS__)
-
-#if defined(_WIN32)
-using ThreadID = decltype(GetCurrentThreadId());
-#else
-using ThreadID = decltype(pthread_self());
-#endif
-
-inline ThreadID _swift_get_thread_id() {
-#if defined(_WIN32)
-  return GetCurrentThreadId();
-#else
-  return pthread_self();
-#endif
-}
-
+          (unsigned long)Thread::current()::platformThreadId(), __FILE__,      \
+          __LINE__, __FUNCTION__, __VA_ARGS__)
 #else
 #define SWIFT_TASK_DEBUG_LOG(fmt, ...) (void)0
 #endif
@@ -114,7 +89,7 @@ void _swift_tsan_release(void *addr);
 /// executors.
 #define DISPATCH_QUEUE_GLOBAL_EXECUTOR (void *)1
 
-#if !defined(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
+#if !SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY
 inline SerialExecutorWitnessTable *
 _swift_task_getDispatchQueueSerialExecutorWitnessTable() {
   extern SerialExecutorWitnessTable wtable

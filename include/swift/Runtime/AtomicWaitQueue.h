@@ -21,7 +21,7 @@
 
 #include "swift/Runtime/Heap.h"
 #include "swift/Runtime/HeapObject.h"
-#include "swift/Runtime/Mutex.h"
+#include "swift/Threading/Mutex.h"
 #include <assert.h>
 
 namespace swift {

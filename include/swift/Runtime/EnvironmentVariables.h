@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "../Basic/Lazy.h"
+#include "swift/Threading/Once.h"
 
 namespace swift {
 namespace runtime {
@@ -22,17 +22,17 @@ namespace environment {
 
 void initialize(void *);
 
-extern OnceToken_t initializeToken;
+extern swift::once_t initializeToken;
 
 // Declare backing variables.
 #define VARIABLE(name, type, defaultValue, help) extern type name ## _variable;
 #include "../../../stdlib/public/runtime/EnvironmentVariables.def"
 
 // Define getter functions.
-#define VARIABLE(name, type, defaultValue, help)        \
-  inline type name() {                                  \
-    SWIFT_ONCE_F(initializeToken, initialize, nullptr); \
-    return name ## _variable;                           \
+#define VARIABLE(name, type, defaultValue, help)                               \
+  inline type name() {                                                         \
+    swift::once(initializeToken, initialize, nullptr);                         \
+    return name##_variable;                                                    \
   }
 #include "../../../stdlib/public/runtime/EnvironmentVariables.def"
 

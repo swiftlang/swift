@@ -14,19 +14,25 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+#endif
+
 #include "../CompatibilityOverride/CompatibilityOverride.h"
-#include "swift/Runtime/Concurrency.h"
-#include "swift/ABI/Task.h"
-#include "swift/ABI/TaskLocal.h"
-#include "swift/ABI/TaskOptions.h"
-#include "swift/ABI/Metadata.h"
-#include "swift/Runtime/Mutex.h"
-#include "swift/Runtime/HeapObject.h"
+#include "Debug.h"
+#include "Error.h"
 #include "TaskGroupPrivate.h"
 #include "TaskPrivate.h"
 #include "Tracing.h"
-#include "Debug.h"
-#include "Error.h"
+#include "swift/ABI/Metadata.h"
+#include "swift/ABI/Task.h"
+#include "swift/ABI/TaskLocal.h"
+#include "swift/ABI/TaskOptions.h"
+#include "swift/Runtime/Concurrency.h"
+#include "swift/Runtime/HeapObject.h"
+#include "swift/Threading/Mutex.h"
 #include <atomic>
 #include <new>
 

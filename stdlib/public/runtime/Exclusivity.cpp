@@ -31,7 +31,7 @@
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/Metadata.h"
-#include "swift/Runtime/ThreadLocalStorage.h"
+#include "swift/Threading/ThreadLocalStorage.h"
 #include <cinttypes>
 #include <cstdio>
 #include <memory>

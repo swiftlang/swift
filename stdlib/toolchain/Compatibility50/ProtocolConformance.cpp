@@ -17,9 +17,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "Overrides.h"
 #include "../../public/runtime/Private.h"
-#include "swift/Basic/Lazy.h"
+#include "Overrides.h"
+#include "swift/Threading/Once.h"
 #include <dlfcn.h>
 #include <mach-o/dyld.h>
 #include <mach-o/getsect.h>
@@ -91,8 +91,8 @@ swift::swift50override_conformsToProtocol(const Metadata *type,
   ConformsToProtocol_t *original_conformsToProtocol)
 {
   // Register our add image callback if necessary.
-  static OnceToken_t token;
-  SWIFT_ONCE_F(token, registerAddImageCallback, nullptr);
+  static swift::once_t token;
+  swift::once(token, registerAddImageCallback, nullptr);
 
   // The implementation of swift_conformsToProtocol in Swift 5.0 would return
   // a false negative answer when asking whether a subclass conforms using

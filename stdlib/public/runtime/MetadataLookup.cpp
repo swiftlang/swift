@@ -14,32 +14,32 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "../CompatibilityOverride/CompatibilityOverride.h"
+#include "ImageInspection.h"
+#include "Private.h"
+#include "swift/ABI/TypeIdentity.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/TypeDecoder.h"
 #include "swift/Reflection/Records.h"
-#include "swift/ABI/TypeIdentity.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
-#include "swift/Runtime/Mutex.h"
 #include "swift/Strings.h"
+#include "swift/Threading/Mutex.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/StringExtras.h"
-#include "Private.h"
-#include "../CompatibilityOverride/CompatibilityOverride.h"
-#include "ImageInspection.h"
+#include <cstring>
 #include <functional>
-#include <vector>
 #include <list>
 #include <new>
-#include <cstring>
+#include <vector>
 
 using namespace swift;
 using namespace Demangle;
