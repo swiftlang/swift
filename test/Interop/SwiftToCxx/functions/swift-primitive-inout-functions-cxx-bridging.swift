@@ -4,6 +4,10 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/functions.h)
 
+// CHECK: SWIFT_EXTERN void $s9Functions8inOutIntyySizF(ptrdiff_t * x) SWIFT_NOEXCEPT SWIFT_CALL; // inOutInt(_:)
+// CHECK: SWIFT_EXTERN void $s9Functions11inOutTwoIntyySiz_SiztF(ptrdiff_t * x, ptrdiff_t * y) SWIFT_NOEXCEPT SWIFT_CALL; // inOutTwoInt(_:_:)
+// CHECK: SWIFT_EXTERN void $s9Functions13inOutTwoParamyySbz_SdztF(bool * x, double * y) SWIFT_NOEXCEPT SWIFT_CALL; // inOutTwoParam(_:_:)
+
 // CHECK:      inline void inOutInt(swift::Int & x) noexcept {
 // CHECK-NEXT:   return _impl::$s9Functions8inOutIntyySizF(&x);
 // CHECK-NEXT: }
