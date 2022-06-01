@@ -295,6 +295,125 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
     let buffer = Base(rebasing: self)
     return buffer.assumingMemoryBound(to: T.self)
   }
+
+  /// Returns a new instance of the given type, read from the
+  /// specified offset into the buffer pointer slice's raw memory.
+  ///
+  /// The memory at `offset` bytes into this buffer pointer slice
+  /// must be properly aligned for accessing `T` and initialized to `T` or
+  /// another type that is layout compatible with `T`.
+  ///
+  /// You can use this method to create new values from the underlying
+  /// buffer pointer's bytes. The following example creates two new `Int32`
+  /// instances from the memory referenced by the buffer pointer `someBytes`.
+  /// The bytes for `a` are copied from the first four bytes of `someBytes`,
+  /// and the bytes for `b` are copied from the next four bytes.
+  ///
+  ///     let a = someBytes[0..<4].load(as: Int32.self)
+  ///     let b = someBytes[4..<8].load(as: Int32.self)
+  ///
+  /// The memory to read for the new instance must not extend beyond the
+  /// memory region represented by the buffer pointer slice---that is,
+  /// `offset + MemoryLayout<T>.size` must be less than or equal
+  /// to the slice's `count`.
+  ///
+  /// - Parameters:
+  ///   - offset: The offset into the slice's memory, in bytes, at
+  ///     which to begin reading data for the new instance. The default is zero.
+  ///   - type: The type to use for the newly constructed instance. The memory
+  ///     must be initialized to a value of a type that is layout compatible
+  ///     with `type`.
+  /// - Returns: A new instance of type `T`, copied from the buffer pointer
+  ///   slice's memory.
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func load<T>(fromByteOffset offset: Int = 0, as type: T.Type) -> T {
+    let buffer = Base(rebasing: self)
+    return buffer.load(fromByteOffset: offset, as: T.self)
+  }
+
+  /// Returns a new instance of the given type, read from the
+  /// specified offset into the buffer pointer slice's raw memory.
+  ///
+  /// This function only supports loading trivial types.
+  /// A trivial type does not contain any reference-counted property
+  /// within its in-memory stored representation.
+  /// The memory at `offset` bytes into the buffer slice must be laid out
+  /// identically to the in-memory representation of `T`.
+  ///
+  /// You can use this method to create new values from the buffer pointer's
+  /// underlying bytes. The following example creates two new `Int32`
+  /// instances from the memory referenced by the buffer pointer `someBytes`.
+  /// The bytes for `a` are copied from the first four bytes of `someBytes`,
+  /// and the bytes for `b` are copied from the fourth through seventh bytes.
+  ///
+  ///     let a = someBytes[..<4].loadUnaligned(as: Int32.self)
+  ///     let b = someBytes[3...].loadUnaligned(as: Int32.self)
+  ///
+  /// The memory to read for the new instance must not extend beyond the
+  /// memory region represented by the buffer pointer slice---that is,
+  /// `offset + MemoryLayout<T>.size` must be less than or equal
+  /// to the slice's `count`.
+  ///
+  /// - Parameters:
+  ///   - offset: The offset into the slice's memory, in bytes, at
+  ///     which to begin reading data for the new instance. The default is zero.
+  ///   - type: The type to use for the newly constructed instance. The memory
+  ///     must be initialized to a value of a type that is layout compatible
+  ///     with `type`.
+  /// - Returns: A new instance of type `T`, copied from the buffer pointer's
+  ///   memory.
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func loadUnaligned<T>(
+    fromByteOffset offset: Int = 0,
+    as type: T.Type
+  ) -> T {
+    let buffer = Base(rebasing: self)
+    return buffer.loadUnaligned(fromByteOffset: offset, as: T.self)
+  }
+
+  /// Stores a value's bytes into the buffer pointer slice's raw memory at the
+  /// specified byte offset.
+  ///
+  /// The type `T` to be stored must be a trivial type. The memory must also be
+  /// uninitialized, initialized to `T`, or initialized to another trivial
+  /// type that is layout compatible with `T`.
+  ///
+  /// The memory written to must not extend beyond
+  /// the memory region represented by the buffer pointer slice---that is,
+  /// `offset + MemoryLayout<T>.size` must be less than or equal
+  /// to the slice's `count`.
+  ///
+  /// After calling `storeBytes(of:toByteOffset:as:)`, the memory is
+  /// initialized to the raw bytes of `value`. If the memory is bound to a
+  /// type `U` that is layout compatible with `T`, then it contains a value of
+  /// type `U`. Calling `storeBytes(of:toByteOffset:as:)` does not change the
+  /// bound type of the memory.
+  ///
+  /// - Note: A trivial type can be copied with just a bit-for-bit copy without
+  ///   any indirection or reference-counting operations. Generally, native
+  ///   Swift types that do not contain strong or weak references or other
+  ///   forms of indirection are trivial, as are imported C structs and enums.
+  ///
+  /// If you need to store into memory a copy of a value of a type that isn't
+  /// trivial, you cannot use the `storeBytes(of:toByteOffset:as:)` method.
+  /// Instead, you must know either initialize the memory or,
+  /// if you know the memory was already bound to `type`, assign to the memory.
+  ///
+  /// - Parameters:
+  ///   - value: The value to store as raw bytes.
+  ///   - offset: The offset in bytes into the buffer pointer slice's memory
+  ///     to begin writing bytes from the value. The default is zero.
+  ///   - type: The type to use for the newly constructed instance. The memory
+  ///     must be initialized to a value of a type that is layout compatible
+  ///     with `type`.
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func storeBytes<T>(of value: T, as type: T.Type) {
+    let buffer = Base(rebasing: self)
+    buffer.storeBytes(of: value, toByteOffset: 0, as: T.self)
+  }
 }
 
 extension Slice where Base == UnsafeRawBufferPointer {
@@ -400,6 +519,83 @@ extension Slice where Base == UnsafeRawBufferPointer {
   ) -> UnsafeBufferPointer<T> {
     let buffer = Base(rebasing: self)
     return buffer.assumingMemoryBound(to: T.self)
+  }
+
+  /// Returns a new instance of the given type, read from the
+  /// specified offset into the buffer pointer slice's raw memory.
+  ///
+  /// The memory at `offset` bytes into this buffer pointer slice
+  /// must be properly aligned for accessing `T` and initialized to `T` or
+  /// another type that is layout compatible with `T`.
+  ///
+  /// You can use this method to create new values from the underlying
+  /// buffer pointer's bytes. The following example creates two new `Int32`
+  /// instances from the memory referenced by the buffer pointer `someBytes`.
+  /// The bytes for `a` are copied from the first four bytes of `someBytes`,
+  /// and the bytes for `b` are copied from the next four bytes.
+  ///
+  ///     let a = someBytes[0..<4].load(as: Int32.self)
+  ///     let b = someBytes[4..<8].load(as: Int32.self)
+  ///
+  /// The memory to read for the new instance must not extend beyond the
+  /// memory region represented by the buffer pointer slice---that is,
+  /// `offset + MemoryLayout<T>.size` must be less than or equal
+  /// to the slice's `count`.
+  ///
+  /// - Parameters:
+  ///   - offset: The offset into the slice's memory, in bytes, at
+  ///     which to begin reading data for the new instance. The default is zero.
+  ///   - type: The type to use for the newly constructed instance. The memory
+  ///     must be initialized to a value of a type that is layout compatible
+  ///     with `type`.
+  /// - Returns: A new instance of type `T`, copied from the buffer pointer
+  ///   slice's memory.
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func load<T>(fromByteOffset offset: Int = 0, as type: T.Type) -> T {
+    let buffer = Base(rebasing: self)
+    return buffer.load(fromByteOffset: offset, as: T.self)
+  }
+
+  /// Returns a new instance of the given type, read from the
+  /// specified offset into the buffer pointer slice's raw memory.
+  ///
+  /// This function only supports loading trivial types.
+  /// A trivial type does not contain any reference-counted property
+  /// within its in-memory stored representation.
+  /// The memory at `offset` bytes into the buffer slice must be laid out
+  /// identically to the in-memory representation of `T`.
+  ///
+  /// You can use this method to create new values from the buffer pointer's
+  /// underlying bytes. The following example creates two new `Int32`
+  /// instances from the memory referenced by the buffer pointer `someBytes`.
+  /// The bytes for `a` are copied from the first four bytes of `someBytes`,
+  /// and the bytes for `b` are copied from the fourth through seventh bytes.
+  ///
+  ///     let a = someBytes[..<4].loadUnaligned(as: Int32.self)
+  ///     let b = someBytes[3...].loadUnaligned(as: Int32.self)
+  ///
+  /// The memory to read for the new instance must not extend beyond the
+  /// memory region represented by the buffer pointer slice---that is,
+  /// `offset + MemoryLayout<T>.size` must be less than or equal
+  /// to the slice's `count`.
+  ///
+  /// - Parameters:
+  ///   - offset: The offset into the slice's memory, in bytes, at
+  ///     which to begin reading data for the new instance. The default is zero.
+  ///   - type: The type to use for the newly constructed instance. The memory
+  ///     must be initialized to a value of a type that is layout compatible
+  ///     with `type`.
+  /// - Returns: A new instance of type `T`, copied from the buffer pointer's
+  ///   memory.
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func loadUnaligned<T>(
+    fromByteOffset offset: Int = 0,
+    as type: T.Type
+  ) -> T {
+    let buffer = Base(rebasing: self)
+    return buffer.loadUnaligned(fromByteOffset: offset, as: T.self)
   }
 }
 
