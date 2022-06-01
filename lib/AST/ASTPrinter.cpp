@@ -2999,6 +2999,18 @@ static bool usesFeatureNoAsyncAvailability(Decl *decl) {
    return decl->getAttrs().getNoAsync(decl->getASTContext()) != nullptr;
 }
 
+static bool usesFeatureConciseMagicFile(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureForwardTrailingClosures(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureBareSlashRegexLiterals(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureVariadicGenerics(Decl *decl) {
   return false;
 }
