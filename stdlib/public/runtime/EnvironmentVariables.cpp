@@ -150,7 +150,7 @@ void printHelp(const char *extra) {
 #include "EnvironmentVariables.def"
 
 // Initialization code.
-OnceToken_t swift::runtime::environment::initializeToken;
+swift::once_t swift::runtime::environment::initializeToken;
 
 #if SWIFT_STDLIB_HAS_ENVIRON && (defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__linux__))
 extern "C" char **environ;

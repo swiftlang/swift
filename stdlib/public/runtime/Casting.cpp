@@ -16,14 +16,15 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Runtime/Casting.h"
-#include "../SwiftShims/RuntimeShims.h"
-#include "../SwiftShims/GlobalObjects.h"
 #include "../CompatibilityOverride/CompatibilityOverride.h"
+#include "../SwiftShims/GlobalObjects.h"
+#include "../SwiftShims/RuntimeShims.h"
 #include "ErrorObject.h"
 #include "ExistentialMetadataImpl.h"
 #include "Private.h"
 #include "SwiftHashableSupport.h"
 #include "swift/Basic/Lazy.h"
+#include "swift/Basic/Unreachable.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Debug.h"
@@ -31,13 +32,7 @@
 #include "swift/Runtime/ExistentialContainer.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
-#if defined(__wasi__)
-# define SWIFT_CASTING_SUPPORTS_MUTEX 0
-#else
-# define SWIFT_CASTING_SUPPORTS_MUTEX 1
-# include "swift/Runtime/Mutex.h"
-#endif
-#include "swift/Basic/Unreachable.h"
+#include "swift/Threading/Mutex.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerIntPair.h"
 #if SWIFT_OBJC_INTEROP
@@ -144,10 +139,8 @@ enum class TypeNameKind {
 
 using TypeNameCacheKey = llvm::PointerIntPair<const Metadata *, 2, TypeNameKind>;
 
-#if SWIFT_CASTING_SUPPORTS_MUTEX
-static StaticReadWriteLock TypeNameCacheLock;
-static StaticReadWriteLock MangledToPrettyFunctionNameCacheLock;
-#endif
+static LazyMutex TypeNameCacheLock;
+static LazyMutex MangledToPrettyFunctionNameCacheLock;
 
 /// Cache containing rendered names for Metadata.
 /// Access MUST be protected using `TypeNameCacheLock`.
@@ -166,9 +159,7 @@ swift::swift_getTypeName(const Metadata *type, bool qualified) {
 
   // Attempt read-only lookup of cache entry.
   {
-    #if SWIFT_CASTING_SUPPORTS_MUTEX
-    StaticScopedReadLock guard(TypeNameCacheLock);
-    #endif
+    LazyMutex::ScopedLock guard(TypeNameCacheLock);
 
     auto found = cache.find(key);
     if (found != cache.end()) {
@@ -179,9 +170,7 @@ swift::swift_getTypeName(const Metadata *type, bool qualified) {
 
   // Read-only lookup failed to find item, we may need to create it.
   {
-    #if SWIFT_CASTING_SUPPORTS_MUTEX
-    StaticScopedWriteLock guard(TypeNameCacheLock);
-    #endif
+    LazyMutex::ScopedLock guard(TypeNameCacheLock);
 
     // Do lookup again just to make sure it wasn't created by another
     // thread before we acquired the write lock.
@@ -212,9 +201,7 @@ swift::swift_getMangledTypeName(const Metadata *type) {
 
   // Attempt read-only lookup of cache entry.
   {
-    #if SWIFT_CASTING_SUPPORTS_MUTEX
-    StaticScopedReadLock guard(TypeNameCacheLock);
-    #endif
+    LazyMutex::ScopedLock guard(TypeNameCacheLock);
 
     auto found = cache.find(key);
     if (found != cache.end()) {
@@ -225,9 +212,7 @@ swift::swift_getMangledTypeName(const Metadata *type) {
 
   // Read-only cache lookup failed, we may need to create it.
   {
-    #if SWIFT_CASTING_SUPPORTS_MUTEX
-    StaticScopedWriteLock guard(TypeNameCacheLock);
-    #endif
+    LazyMutex::ScopedLock guard(TypeNameCacheLock);
 
     // Do lookup again just to make sure it wasn't created by another
     // thread before we acquired the write lock.
@@ -270,9 +255,7 @@ swift::swift_getFunctionFullNameFromMangledName(
   auto &cache = MangledToPrettyFunctionNameCache.get();
   // Attempt read-only lookup of cache entry.
   {
-    #if SWIFT_CASTING_SUPPORTS_MUTEX
-    StaticScopedReadLock guard(MangledToPrettyFunctionNameCacheLock);
-    #endif
+    LazyMutex::ScopedLock guard(MangledToPrettyFunctionNameCacheLock);
 
     auto found = cache.find(mangledName);
     if (found != cache.end()) {
@@ -387,9 +370,7 @@ swift::swift_getFunctionFullNameFromMangledName(
   result[size] = 0; // 0-terminated string
 
   {
-    #if SWIFT_CASTING_SUPPORTS_MUTEX
-    StaticScopedWriteLock guard(MangledToPrettyFunctionNameCacheLock);
-    #endif
+    LazyMutex::ScopedLock guard(MangledToPrettyFunctionNameCacheLock);
 
     cache.insert({mangledName, {result, size}});
     return TypeNamePair{result, size};

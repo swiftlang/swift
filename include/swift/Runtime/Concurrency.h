@@ -26,7 +26,7 @@
 #pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
 
 // Does the runtime use a cooperative global executor?
-#if defined(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
+#if defined(SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY)
 #define SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR 1
 #else
 #define SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR 0

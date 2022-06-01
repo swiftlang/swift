@@ -12,13 +12,16 @@
 #ifndef SWIFT_RUNTIME_METADATACACHE_H
 #define SWIFT_RUNTIME_METADATACACHE_H
 
-#include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/STLExtras.h"
+#include "swift/Runtime/AtomicWaitQueue.h"
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/Metadata.h"
-#include "swift/Runtime/Mutex.h"
-#include "swift/Runtime/AtomicWaitQueue.h"
+#include "swift/Threading/Mutex.h"
+
 #include "../SwiftShims/Visibility.h"
+
+#include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/STLExtras.h"
+
 #include <condition_variable>
 #include <thread>
 
@@ -169,8 +172,7 @@ class LockingConcurrentMapStorage {
   // TargetGenericMetadataInstantiationCache::PrivateData. On 32-bit archs, that
   // space is not large enough to accommodate a Mutex along with everything
   // else. There, use a SmallMutex to squeeze into the available space.
-  using MutexTy =
-      std::conditional_t<sizeof(void *) == 8, StaticMutex, SmallMutex>;
+  using MutexTy = std::conditional_t<sizeof(void *) == 8, Mutex, SmallMutex>;
   StableAddressConcurrentReadableHashMap<EntryType,
                                          TaggedMetadataAllocator<Tag>, MutexTy>
       Map;
