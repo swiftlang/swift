@@ -115,7 +115,7 @@ __swift_intptr_t _swift_stdlib_getScalarBitArrayIdx(__swift_uint32_t scalar,
   
   // If our chunk index is larger than the quick look indices, then it means
   // our scalar appears in chunks who are all 0 and trailing.
-  if ((__swift_uint64_t) idx > quickLookSize) {
+  if ((__swift_uint64_t) idx > quickLookSize - 1) {
     return std::numeric_limits<__swift_intptr_t>::max();
   }
   
