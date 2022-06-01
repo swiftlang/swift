@@ -143,7 +143,7 @@ extension Task where Success == Never, Failure == Never {
     try await clock.sleep(until: deadline, tolerance: tolerance)
   }
   
-  /// Suspends the current task for the given duration.
+  /// Suspends the current task for the given duration on a continuous clock.
   ///
   /// If the task is canceled before the time ends, this function throws 
   /// `CancellationError`.
