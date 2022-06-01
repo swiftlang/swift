@@ -1856,7 +1856,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     case clang::OverloadedOperatorKind::OO_LessEqual:
     case clang::OverloadedOperatorKind::OO_GreaterEqual:
     case clang::OverloadedOperatorKind::OO_AmpAmp:
-    case clang::OverloadedOperatorKind::OO_PipePipe:
+    case clang::OverloadedOperatorKind::OO_PipePipe: {
       auto operatorName = isa<clang::CXXMethodDecl>(functionDecl)
                               ? "__operator" + std::string{getOperatorName(op)}
                               : clang::getOperatorSpelling(op);
@@ -1864,6 +1864,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       isFunction = true;
       addEmptyArgNamesForClangFunction(functionDecl, argumentNames);
       break;
+    }
     case clang::OverloadedOperatorKind::OO_Call:
       baseName = "callAsFunction";
       isFunction = true;

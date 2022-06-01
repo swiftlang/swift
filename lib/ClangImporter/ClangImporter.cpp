@@ -2751,6 +2751,11 @@ ClangImporter::Implementation::lookupTypedef(clang::DeclarationName name) {
 
 static bool isDeclaredInModule(const ClangModuleUnit *ModuleFilter,
                                const Decl *VD) {
+  // Sometimes imported decls get put into the clang header module. If we
+  // found one of these decls, don't filter it out.
+  if (VD->getModuleContext()->getName().str() == CLANG_HEADER_MODULE_NAME) {
+    return true;
+  }
   auto ContainingUnit = VD->getDeclContext()->getModuleScopeContext();
   return ModuleFilter == ContainingUnit;
 }
@@ -2898,11 +2903,9 @@ public:
 
   void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
                  DynamicLookupInfo dynamicLookupInfo) override {
-    if (isDeclaredInModule(ModuleFilter, VD) ||
-        // Sometimes imported decls get put into the clang header module. If we
-        // found one of these decls, don't filter it out.
-        VD->getModuleContext()->getName().str() == CLANG_HEADER_MODULE_NAME)
+    if (isDeclaredInModule(ModuleFilter, VD)) {
       NextConsumer.foundDecl(VD, Reason, dynamicLookupInfo);
+    }
   }
 };
 
