@@ -1949,8 +1949,8 @@ SPIAccessControlAttr::create(ASTContext &context,
 
 SPIAccessControlAttr *SPIAccessControlAttr::clone(ASTContext &C,
                                                   bool implicit) const {
-  auto *attr = new (C) SPIAccessControlAttr(
-      implicit ? SourceLoc() : AtLoc, implicit ? SourceRange() : getRange(),
+  auto *attr = SPIAccessControlAttr::create(
+      C, implicit ? SourceLoc() : AtLoc, implicit ? SourceRange() : getRange(),
       getSPIGroups());
   attr->setImplicit(implicit);
   return attr;
