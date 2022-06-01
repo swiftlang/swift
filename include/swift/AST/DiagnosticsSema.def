@@ -5488,6 +5488,9 @@ NOTE(type_eraser_init_not_accessible,none,
      "cannot have more restrictive access than protocol %1 "
      "(which is %select{private|fileprivate|internal|public|open}2)",
      (AccessLevel, Type, AccessLevel))
+NOTE(type_eraser_init_spi,none,
+     "'init(erasing:)' is SPI, but protocol %0 is not"
+     "%select{| in the same SPI groups as 'init(erasing:)'}1", (Type, bool))
 
 //------------------------------------------------------------------------------
 // MARK: @available
