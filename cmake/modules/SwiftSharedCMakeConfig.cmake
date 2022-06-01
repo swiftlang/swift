@@ -250,8 +250,8 @@ endmacro()
 #     The product name, e.g. Swift or SourceKit. Used as prefix for some
 #     cmake variables.
 macro(swift_common_standalone_build_config product)
-  swift_common_standalone_build_config_llvm(${product})
   if(SWIFT_INCLUDE_TOOLS)
+    swift_common_standalone_build_config_llvm(${product})
     swift_common_standalone_build_config_clang(${product})
     swift_common_standalone_build_config_cmark(${product})
   endif()
