@@ -1033,10 +1033,20 @@ namespace {
           Indent -= 2;
         }
       }
+
       if (D->hasSingleExpressionBody()) {
-        OS << '\n';
-        printRec(D->getSingleExpressionBody());
-      } else if (auto Body = D->getBody(/*canSynthesize=*/false)) {
+        // There won't be an expression if this is an initializer that was
+        // originally spelled "init?(...) { nil }", because "nil" is modeled
+        // via FailStmt in this context.
+        if (auto *Body = D->getSingleExpressionBody()) {
+          OS << '\n';
+          printRec(Body);
+
+          return;
+        }
+      }
+
+      if (auto Body = D->getBody(/*canSynthesize=*/false)) {
         OS << '\n';
         printRec(Body, D->getASTContext());
       }

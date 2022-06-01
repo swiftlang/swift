@@ -3636,57 +3636,89 @@ namespace {
     }
 
     Expr *visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *expr) {
-      // A non-failable initializer cannot delegate to a failable
-      // initializer.
-      Expr *unwrappedSubExpr = expr->getSubExpr()->getSemanticsProvidingExpr();
-      Type valueTy = cs.getType(unwrappedSubExpr)->getOptionalObjectType();
-      auto inCtor = cast<ConstructorDecl>(dc->getInnermostMethodContext());
-      if (valueTy && !inCtor->isFailable()) {
+      Expr *subExpr = expr->getSubExpr();
+      auto *inCtor = cast<ConstructorDecl>(dc->getInnermostMethodContext());
+
+      // A non-failable initializer cannot delegate nor chain to
+      //  * a throwing initializer via 'try?'
+      //  * a failable initializer, unless the failability kind is IUO or the
+      //    result is explicitly forced
+      if (!inCtor->isFailable() && cs.getType(subExpr)->isOptional()) {
         bool isChaining;
         auto *otherCtorRef = expr->getCalledConstructor(isChaining);
-        ConstructorDecl *ctor = otherCtorRef->getDecl();
-        assert(ctor);
+        auto *otherCtor = otherCtorRef->getDecl();
+        assert(otherCtor);
 
-        // If the initializer we're calling is not declared as
-        // checked, it's an error.
-        bool isError = !ctor->isImplicitlyUnwrappedOptional();
-
-        // If we're suppressing diagnostics, just fail.
-        if (isError && SuppressDiagnostics)
-          return nullptr;
-
-        auto &ctx = cs.getASTContext();
-
+        Expr *newSubExpr = subExpr;
         auto &de = cs.getASTContext().Diags;
-        if (isError) {
-          if (auto *optTry = dyn_cast<OptionalTryExpr>(unwrappedSubExpr)) {
-            de.diagnose(optTry->getTryLoc(),
-                        diag::delegate_chain_nonoptional_to_optional_try,
-                        isChaining);
-            de.diagnose(optTry->getTryLoc(), diag::init_delegate_force_try)
-                .fixItReplace({optTry->getTryLoc(), optTry->getQuestionLoc()},
-                              "try!");
-            de.diagnose(inCtor->getLoc(), diag::init_propagate_failure)
-                .fixItInsertAfter(inCtor->getLoc(), "?");
-          } else {
+
+        // Look through 'try', 'try!', and identity expressions.
+        subExpr = subExpr->getValueProvidingExpr();
+
+        // Diagnose if we find a 'try?'.
+        // FIXME: We could put up with occurences of 'try?' if they do not apply
+        // directly to the called ctor, e.g. 'try? try self.init()', or if the
+        // called ctor isn't throwing.
+        if (auto *OTE = dyn_cast<OptionalTryExpr>(subExpr)) {
+          if (SuppressDiagnostics)
+            return nullptr;
+
+          // Give the user the option of using 'try!' or making the enclosing
+          // initializer failable.
+          de.diagnose(OTE->getTryLoc(),
+                      diag::delegate_chain_nonoptional_to_optional_try,
+                      isChaining);
+          de.diagnose(OTE->getTryLoc(), diag::init_delegate_force_try)
+              .fixItReplace({OTE->getTryLoc(), OTE->getQuestionLoc()}, "try!");
+          de.diagnose(inCtor->getLoc(), diag::init_propagate_failure)
+              .fixItInsertAfter(inCtor->getLoc(), "?");
+
+          subExpr = OTE->getSubExpr();
+        }
+
+        while (true) {
+          subExpr = subExpr->getSemanticsProvidingExpr();
+
+          // Look through optional injections.
+          if (auto *IIOE = dyn_cast<InjectIntoOptionalExpr>(subExpr)) {
+            subExpr = IIOE->getSubExpr();
+            continue;
+          }
+
+          // Look through all try expressions.
+          if (auto *ATE = dyn_cast<AnyTryExpr>(subExpr)) {
+            subExpr = ATE->getSubExpr();
+            continue;
+          }
+
+          break;
+        }
+
+        // If we're still hitting an optional and the called ctor is failable,
+        // diagnose only if the failability kind is not IUO. Note that the
+        // expression type alone is not always indicative of the ctor's
+        // failability, because it could be declared on 'Optional' itself.
+        if (cs.getType(subExpr)->isOptional() && otherCtor->isFailable()) {
+          if (!otherCtor->isImplicitlyUnwrappedOptional()) {
+            if (SuppressDiagnostics)
+              return nullptr;
+
             // Give the user the option of adding '!' or making the enclosing
             // initializer failable.
             de.diagnose(otherCtorRef->getLoc(),
                         diag::delegate_chain_nonoptional_to_optional,
-                        isChaining, ctor->getName());
+                        isChaining, otherCtor->getName());
             de.diagnose(otherCtorRef->getLoc(), diag::init_force_unwrap)
                 .fixItInsertAfter(expr->getEndLoc(), "!");
             de.diagnose(inCtor->getLoc(), diag::init_propagate_failure)
                 .fixItInsertAfter(inCtor->getLoc(), "?");
           }
+
+          // Recover by injecting the force operation (the first option).
+          newSubExpr = forceUnwrapIUO(newSubExpr);
         }
 
-        // Recover by injecting the force operation (the first option).
-        Expr *newSub = new (ctx) ForceValueExpr(expr->getSubExpr(),
-                                                expr->getEndLoc());
-        cs.setType(newSub, valueTy);
-        newSub->setImplicit();
-        expr->setSubExpr(newSub);
+        expr->setSubExpr(newSubExpr);
       }
 
       return expr;
