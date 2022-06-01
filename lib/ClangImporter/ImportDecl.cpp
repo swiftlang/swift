@@ -2577,6 +2577,17 @@ namespace {
       if (!dc)
         return nullptr;
 
+      bool isOperator = decl->getDeclName().getNameKind() ==
+                        clang::DeclarationName::CXXOperatorName;
+      bool isNonSubscriptOperator =
+          isOperator && (decl->getDeclName().getCXXOverloadedOperator() !=
+                         clang::OO_Subscript);
+
+      // For now, we don't support non-subscript operators which are templated
+      if (isNonSubscriptOperator && decl->isTemplated()) {
+        return nullptr;
+      }
+
       auto aliasedDecl =
           Impl.importDecl(decl->getAliasedNamespace(), getActiveSwiftVersion());
       if (!aliasedDecl)
