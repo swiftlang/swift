@@ -1722,7 +1722,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
 
   case CompletionKind::AttributeBegin: {
-    bool isGlobalVariable = (AttTarget.hasValue() && AttTarget.getValue() == DeclKind::Var && CurDeclContext.getContextKind() == DeclContextKind::TopLevelCodeDecl);
+    bool isGlobalVariable = (AttTarget.hasValue() && AttTarget.getValue() == DeclKind::Var && CurDeclContext.isLocalContext());
     Lookup.getAttributeDeclCompletions(IsInSil, isGlobalVariable, AttTargetDK);
     OptionSet<CustomAttributeKind> ExpectedCustomAttributeKinds;
     if (AttTargetDK) {
