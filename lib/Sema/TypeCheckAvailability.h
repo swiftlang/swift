@@ -40,8 +40,10 @@ namespace swift {
 
 enum class DeclAvailabilityFlag : uint8_t {
   /// Do not diagnose uses of protocols in versions before they were introduced.
-  /// Used when type-checking protocol conformances, since conforming to a
-  /// protocol that doesn't exist yet is allowed.
+  /// We allow a type to conform to a protocol that is less available than the
+  /// type itself. This enables a type to retroactively model or directly conform
+  /// to a protocol only available on newer OSes and yet still be used on older
+  /// OSes.
   AllowPotentiallyUnavailableProtocol = 1 << 0,
 
   /// Diagnose uses of declarations in versions before they were introduced, but
@@ -54,7 +56,13 @@ enum class DeclAvailabilityFlag : uint8_t {
 
   /// If an error diagnostic would normally be emitted, demote the error to a
   /// warning. Used for ObjC key path components.
-  ForObjCKeyPath = 1 << 3
+  ForObjCKeyPath = 1 << 3,
+  
+  /// Downgrade errors about decl availability to warnings when the fix would be
+  /// to constrain availability to a version that is more available than the
+  /// current deployment target. This is needed for source compatibility in when
+  /// checking public extensions in library modules.
+  WarnForPotentialUnavailabilityBeforeDeploymentTarget = 1 << 4,
 };
 using DeclAvailabilityFlags = OptionSet<DeclAvailabilityFlag>;
 
@@ -183,9 +191,10 @@ public:
   Optional<ExportabilityReason> getExportabilityReason() const;
 };
 
-/// Check if a public declaration is part of a module's API; that is, this
-/// will return false if the declaration is @_spi or @_implementationOnly.
+/// Check if a declaration is exported as part of a module's external interface.
+/// This includes public and @usableFromInline decls.
 bool isExported(const ValueDecl *VD);
+bool isExported(const ExtensionDecl *ED);
 bool isExported(const Decl *D);
 
 /// Diagnose uses of unavailable declarations in expressions.
