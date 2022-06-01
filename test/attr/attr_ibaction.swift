@@ -41,6 +41,10 @@ class IBActionWrapperTy {
   func moreMagic(_: AnyObject) -> () {} // no-warning
   @objc @IBAction
   func evenMoreMagic(_: AnyObject) -> () {} // no-warning
+
+  @available(macOS 10.15, *)
+  @IBAction // expected-error {{@IBAction instance methods cannot be async}}
+  func asyncIBAction(_: AnyObject) async -> () {}
 }
 
 struct S { }

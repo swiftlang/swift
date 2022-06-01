@@ -530,6 +530,12 @@ void AttributeChecker::visitIBActionAttr(IBActionAttr *attr) {
     return;
   }
 
+  if (FD->isAsyncContext()) {
+    diagnoseAndRemoveAttr(attr, diag::invalid_ibaction_decl_async,
+                          attr->getAttrName());
+    return;
+  }
+
   if (isRelaxedIBAction(Ctx))
     // iOS, tvOS, and watchOS allow 0-2 parameters to an @IBAction method.
     validateIBActionSignature(Ctx, attr, FD, /*minParams=*/0, /*maxParams=*/2);
