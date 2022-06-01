@@ -1271,6 +1271,13 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Effects;
   }
+
+  EffectsAttr *clone(ASTContext &ctx) const {
+    if (getKind() == EffectsKind::Custom) {
+      return new (ctx) EffectsAttr(customString);
+    }
+    return new (ctx) EffectsAttr(getKind());
+  }
 };
 
 
@@ -2308,6 +2315,13 @@ public:
   void add(DeclAttribute *Attr) {
     Attr->Next = DeclAttrs;
     DeclAttrs = Attr;
+  }
+
+  /// Add multiple constructed DeclAttributes to this list.
+  void add(DeclAttributes &Attrs) {
+    for (auto attr : Attrs) {
+      add(attr);
+    }
   }
 
   // Iterator interface over DeclAttribute objects.
