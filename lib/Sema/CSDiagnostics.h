@@ -2764,6 +2764,41 @@ private:
   bool fixItRequiresParens() const;
 };
 
+/// Diagnose situations where pattern variables with the same name
+/// have conflicting types:
+///
+/// \code
+/// enum E {
+/// case a(Int)
+/// case b(String)
+/// }
+///
+/// func test(e: E) {
+///   switch e {
+///    case .a(let x), .b(let x): ...
+///   }
+/// }
+/// \endcode
+///
+/// In this example `x` is bound to `Int` and `String` at the same
+/// time which is incorrect.
+class ConflictingPatternVariables final : public FailureDiagnostic {
+  Type ExpectedType;
+  SmallVector<VarDecl *, 4> Vars;
+
+public:
+  ConflictingPatternVariables(const Solution &solution, Type expectedTy,
+                              ArrayRef<VarDecl *> conflicts,
+                              ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator),
+        ExpectedType(resolveType(expectedTy)),
+        Vars(conflicts.begin(), conflicts.end()) {
+    assert(!Vars.empty());
+  }
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 

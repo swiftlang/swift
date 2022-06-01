@@ -2427,7 +2427,9 @@ AddExplicitExistentialCoercion::create(ConstraintSystem &cs, Type resultTy,
 
 bool RenameConflictingPatternVariables::diagnose(const Solution &solution,
                                                  bool asNote) const {
-  return false;
+  ConflictingPatternVariables failure(solution, ExpectedType,
+                                      getConflictingVars(), getLocator());
+  return failure.diagnose(asNote);
 }
 
 RenameConflictingPatternVariables *
