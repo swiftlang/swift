@@ -52,7 +52,9 @@ func testAsyncSequence1<Seq: AsyncSequence>(_ seq: Seq) async throws where Seq.E
 
 func testAsyncSequence3<Seq>(_ seq: Seq) async throws where Seq: AsyncSequence, Seq.Element == Int { // expected-note{{consider making generic parameter 'Seq' conform to the 'Sendable' protocol}} {{28-28=: Sendable}}
    async let result = seq // expected-warning{{capture of 'seq' with non-sendable type 'Seq' in 'async let' binding}}
-   //expected-warning@-1{{initialization of immutable value 'result' was never used; consider replacing with assignment to '_' or removing it}}
+   //expected-warning@-1{{initialization of immutable value 'result' was never used}}
+   //expected-note@-2{{replace with assignment to '_' to cancel and await the task}}{{14-20=_}}
+   //expected-note@-3{{explicitly await the result to run task to completion}}
 }
 
 func testAsyncSequence4<Seq>(_ seq: Seq) async throws where Seq: AsyncSequence, Seq.Element == Int { // expected-note{{consider making generic parameter 'Seq' conform to the 'Sendable' protocol}} {{28-28=: Sendable}}
