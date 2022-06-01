@@ -29,9 +29,9 @@ protocol Invalid5<Element, Element> {
 
 /// Test semantics
 
-protocol Sequence<Element> { // expected-note {{'Sequence' declared here}}
+protocol Sequence<Element> {
   associatedtype Element
-  // expected-note@-1 {{protocol requires nested type 'Element'; do you want to add it?}}
+  // expected-note@-1 2{{protocol requires nested type 'Element'; do you want to add it?}}
 }
 
 extension Sequence {
@@ -180,31 +180,48 @@ extension Sequence<Int> {
 }
 
 
-/// Cannot use parameterized protocol as the type of a value
+/// Constraint aliases
 
-func takesSequenceOfInt1(_: Sequence<Int>) {}
-// expected-error@-1 {{protocol type with type arguments can only be used as a generic constraint}}
+typealias SequenceOfInt = Sequence<Int>
+typealias SequenceOf<T> = Sequence<T>
 
-func returnsSequenceOfInt1() -> Sequence<Int> {}
-// expected-error@-1 {{protocol type with type arguments can only be used as a generic constraint}}
+// CHECK-LABEL: .testConstraintAlias1@
+// CHECK-NEXT: Generic signature: <T where T : Sequence, T.[Sequence]Element == Int>
+func testConstraintAlias1<T : SequenceOfInt>(_: T) {}
 
-func takesSequenceOfInt2(_: any Sequence<Int>) {}
+// CHECK-LABEL: .testConstraintAlias2@
+// CHECK-NEXT: Generic signature: <T where T : Sequence, T.[Sequence]Element == String>
+func testConstraintAlias2<T : SequenceOf<String>>(_: T) {}
 
-func returnsSequenceOfInt2() -> any Sequence<Int> {}
 
-func typeExpr() {
-  _ = Sequence<Int>.self
-  // expected-error@-1 {{protocol type with type arguments can only be used as a generic constraint}}
+/// Protocol compositions
 
-  _ = any Sequence<Int>.self
-  // expected-error@-1 {{'self' is not a member type of protocol 'parameterized_protocol.Sequence<Swift.Int>'}}
+// CHECK-LABEL: .testComposition1@
+// CHECK-NEXT: Generic signature: <T where T : Sendable, T : Sequence, T.[Sequence]Element == Int>
+func testComposition1<T : Sequence<Int> & Sendable>(_: T) {}
 
-  _ = (any Sequence<Int>).self
+// CHECK-LABEL: .testComposition2@
+// CHECK-NEXT: Generic signature:
+// CHECK-NEXT: Canonical generic signature: <τ_0_0 where τ_0_0 : Sendable, τ_0_0 : Sequence, τ_0_0.[Sequence]Element == Int>
+func testComposition2(_: some Sequence<Int> & Sendable) {}
+
+// CHECK-LABEL: parameterized_protocol.(file).TestCompositionProtocol1@
+// CHECK: Requirement signature: <Self where Self.[TestCompositionProtocol1]S : Sendable, Self.[TestCompositionProtocol1]S : Sequence, Self.[TestCompositionProtocol1]S.[Sequence]Element == Int>
+protocol TestCompositionProtocol1 {
+  associatedtype S : Sequence<Int> & Sendable
 }
 
-/// Not supported as a protocol composition term for now
+struct TestStructComposition : Sequence<Int> & Sendable {}
+// expected-error@-1 {{cannot inherit from protocol type with generic argument 'Sequence<Int>'}}
+// expected-error@-2 {{type 'TestStructComposition' does not conform to protocol 'Sequence'}}
 
-protocol SomeProto {}
 
-func protocolCompositionNotSupported(_: SomeProto & Sequence<Int>) {}
-// expected-error@-1 {{non-protocol, non-class type 'Sequence<Int>' cannot be used within a protocol-constrained type}}
+/// Conflicts
+
+protocol Pair<X, Y> where Self.X == Self.Y {
+  associatedtype X
+  associatedtype Y
+}
+
+func splay(_ x: some Pair<Int, String>) -> (Int, String) { fatalError() }
+// expected-error@-1 {{no type for '(some Pair<Int, String>).X' can satisfy both '(some Pair<Int, String>).X == String' and '(some Pair<Int, String>).X == Int'}}
