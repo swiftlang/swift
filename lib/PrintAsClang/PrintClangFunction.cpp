@@ -109,7 +109,7 @@ void DeclAndTypeClangFunctionPrinter::printFunctionSignature(
     typePrinter.visit(ty, optionalKind);
 
     if (isInOutParam) {
-      os << " &";
+      os << (outputLang == OutputLanguageMode::Cxx ? " &" : " *");
     }
 
     if (!name.empty()) {
