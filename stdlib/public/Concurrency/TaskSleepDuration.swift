@@ -142,4 +142,20 @@ extension Task where Success == Never, Failure == Never {
   ) async throws {
     try await clock.sleep(until: deadline, tolerance: tolerance)
   }
+  
+  /// Suspends the current task for the given duration.
+  ///
+  /// If the task is canceled before the time ends, this function throws 
+  /// `CancellationError`.
+  ///
+  /// This function doesn't block the underlying thread.
+  ///
+  ///       try await Task.sleep(for: .seconds(3))
+  ///
+  @available(SwiftStdlib 5.7, *)
+  public static func sleep(
+    for duration: Duration
+  ) async throws {
+    try await sleep(until: .now + duration, clock: .continuous)
+  }
 }
