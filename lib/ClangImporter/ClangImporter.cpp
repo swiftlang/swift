@@ -4871,6 +4871,51 @@ makeBaseClassMemberAccessors(DeclContext *declContext,
   return {getterDecl, setterDecl};
 }
 
+// Clone attributes that have been imported from Clang.
+DeclAttributes cloneImportedAttributes(ValueDecl *decl, ASTContext &context) {
+  auto attrs = DeclAttributes();
+  for (auto attr : decl->getAttrs()) {
+    switch (attr->getKind()) {
+    case DAK_Available: {
+      attrs.add(cast<AvailableAttr>(attr)->clone(context, true));
+      break;
+    }
+    case DAK_Custom: {
+      if (CustomAttr *cAttr = cast<CustomAttr>(attr)) {
+        attrs.add(CustomAttr::create(context, SourceLoc(), cAttr->getTypeExpr(),
+                                     cAttr->getInitContext(), cAttr->getArgs(),
+                                     true));
+      }
+      break;
+    }
+    case DAK_DiscardableResult: {
+      attrs.add(new (context) DiscardableResultAttr(true));
+      break;
+    }
+    case DAK_Effects: {
+      attrs.add(cast<EffectsAttr>(attr)->clone(context));
+      break;
+    }
+    case DAK_Final: {
+      attrs.add(new (context) FinalAttr(true));
+      break;
+    }
+    case DAK_Transparent: {
+      attrs.add(new (context) TransparentAttr(true));
+      break;
+    }
+    case DAK_WarnUnqualifiedAccess: {
+      attrs.add(new (context) WarnUnqualifiedAccessAttr(true));
+      break;
+    }
+    default:
+      break;
+    }
+  }
+
+  return attrs;
+}
+
 ValueDecl *cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
   if (auto fn = dyn_cast<FuncDecl>(decl)) {
     // TODO: function templates are specialized during type checking so to
@@ -4882,11 +4927,14 @@ ValueDecl *cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
          isa<clang::FunctionTemplateDecl>(fn->getClangDecl())))
       return nullptr;
 
+    ASTContext &context = decl->getASTContext();
     auto out = FuncDecl::createImplicit(
-        fn->getASTContext(), fn->getStaticSpelling(), fn->getName(),
+        context, fn->getStaticSpelling(), fn->getName(),
         fn->getNameLoc(), fn->hasAsync(), fn->hasThrows(),
         fn->getGenericParams(), fn->getParameters(),
         fn->getResultInterfaceType(), newContext);
+    auto inheritedAttributes = cloneImportedAttributes(decl, context);
+    out->getAttrs().add(inheritedAttributes);
     out->copyFormalAccessFrom(fn);
     out->setBodySynthesizer(synthesizeBaseClassMethodBody, fn);
     out->setSelfAccessKind(fn->getSelfAccessKind());
