@@ -15,13 +15,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <cstdint>
-
+#include "llvm/ADT/DenseMap.h"
 #include "RuntimeInvocationsTracking.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/HeapObject.h"
-#include "swift/Threading/Mutex.h"
-#include "llvm/ADT/DenseMap.h"
+#include "swift/Runtime/Mutex.h"
 
 #if defined(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS)
 
@@ -34,7 +32,7 @@ namespace swift {
 // functions.
 struct RuntimeFunctionCountersState {
 #define FUNCTION_TO_TRACK(RT_FUNCTION)                                         \
-  std::uint32_t SWIFT_RT_FUNCTION_INVOCATION_COUNTER_NAME(RT_FUNCTION) = 0;
+  uint32_t SWIFT_RT_FUNCTION_INVOCATION_COUNTER_NAME(RT_FUNCTION) = 0;
 // Provide one counter per runtime function being tracked.
 #include "RuntimeInvocationsTracking.def"
 };
@@ -51,7 +49,7 @@ static bool UpdateGlobalRuntimeFunctionCounters = false;
 /// Global set of counters tracking the total number of runtime invocations.
 struct RuntimeFunctionCountersStateSentinel {
   RuntimeFunctionCountersState State;
-  LazyMutex Lock;
+  StaticReadWriteLock Lock;
 };
 static RuntimeFunctionCountersStateSentinel RuntimeGlobalFunctionCountersState;
 
@@ -59,7 +57,7 @@ static RuntimeFunctionCountersStateSentinel RuntimeGlobalFunctionCountersState;
 /// them.
 struct RuntimeObjectCacheSentinel {
   llvm::DenseMap<HeapObject *, RuntimeFunctionCountersState> Cache;
-  Mutex Lock;
+  StaticReadWriteLock Lock;
 };
 static Lazy<RuntimeObjectCacheSentinel> RuntimeObjectStateCache;
 
@@ -75,7 +73,7 @@ static const char *RuntimeFunctionNames[] {
 /// Define an enum where each enumerator corresponds to a runtime function being
 /// tracked. Their order is the same as the order of the counters in the
 /// RuntimeObjectState structure.
-enum RuntimeFunctionNamesIDs : std::uint32_t {
+enum RuntimeFunctionNamesIDs : uint32_t {
 /// Defines names of enum cases for each function being tracked.
 #define FUNCTION_TO_TRACK(RT_FUNCTION) RT_FUNCTION_ID(RT_FUNCTION),
 #include "RuntimeInvocationsTracking.def"
@@ -89,10 +87,10 @@ static RuntimeFunctionCountersUpdateHandler
 /// The offsets of the runtime function counters being tracked inside the
 /// RuntimeObjectState structure. The array is indexed by
 /// the enumerators from RuntimeFunctionNamesIDs.
-static std::uint16_t RuntimeFunctionCountersOffsets[] = {
+static uint16_t RuntimeFunctionCountersOffsets[] = {
 /// Define offset for each function being tracked.
 #define FUNCTION_TO_TRACK(RT_FUNCTION)                                         \
-  (sizeof(std::uint16_t) * (unsigned)RT_FUNCTION_ID(RT_FUNCTION)),
+  (sizeof(uint16_t) * (unsigned)RT_FUNCTION_ID(RT_FUNCTION)),
 #include "RuntimeInvocationsTracking.def"
 };
 
@@ -103,7 +101,7 @@ static std::uint16_t RuntimeFunctionCountersOffsets[] = {
   void SWIFT_RT_TRACK_INVOCATION_NAME(RT_FUNCTION)(HeapObject * object) {      \
     /* Update global counters. */                                              \
     if (UpdateGlobalRuntimeFunctionCounters) {                                 \
-      LazyMutex::ScopedLock lock(RuntimeGlobalFunctionCountersState.Lock);     \
+      StaticScopedWriteLock lock(RuntimeGlobalFunctionCountersState.Lock);     \
       RuntimeGlobalFunctionCountersState.State                                 \
           .SWIFT_RT_FUNCTION_INVOCATION_COUNTER_NAME(RT_FUNCTION)++;           \
       if (GlobalRuntimeFunctionCountersUpdateHandler) {                        \
@@ -119,7 +117,7 @@ static std::uint16_t RuntimeFunctionCountersOffsets[] = {
     /* Update per object counters. */                                          \
     if (UpdatePerObjectRuntimeFunctionCounters && object) {                    \
       auto &theSentinel = RuntimeObjectStateCache.get();                       \
-      Mutex::ScopedLock lock(theSentinel.Lock);                                \
+      StaticScopedWriteLock lock(theSentinel.Lock);                            \
       theSentinel.Cache[object].SWIFT_RT_FUNCTION_INVOCATION_COUNTER_NAME(     \
           RT_FUNCTION)++;                                                      \
       /* TODO: Remember the order/history of  operations? */                   \
@@ -133,7 +131,7 @@ static std::uint16_t RuntimeFunctionCountersOffsets[] = {
 void _swift_getObjectRuntimeFunctionCounters(
     HeapObject *object, RuntimeFunctionCountersState *result) {
   auto &theSentinel = RuntimeObjectStateCache.get();
-  Mutex::ScopedLock lock(theSentinel.Lock);
+  StaticScopedReadLock lock(theSentinel.Lock);
   *result = theSentinel.Cache[object];
 }
 
@@ -142,7 +140,7 @@ void _swift_getObjectRuntimeFunctionCounters(
 void _swift_setObjectRuntimeFunctionCounters(
     HeapObject *object, RuntimeFunctionCountersState *state) {
   auto &theSentinel = RuntimeObjectStateCache.get();
-  Mutex::ScopedLock lock(theSentinel.Lock);
+  StaticScopedWriteLock lock(theSentinel.Lock);
   theSentinel.Cache[object] = *state;
 }
 
@@ -150,14 +148,14 @@ void _swift_setObjectRuntimeFunctionCounters(
 /// each runtime function of interest.
 void _swift_getGlobalRuntimeFunctionCounters(
     RuntimeFunctionCountersState *result) {
-  LazyMutex::ScopedLock lock(RuntimeGlobalFunctionCountersState.Lock);
+  StaticScopedReadLock lock(RuntimeGlobalFunctionCountersState.Lock);
   *result = RuntimeGlobalFunctionCountersState.State;
 }
 
 /// Set the global runtime state of function pointers from a provided state.
 void _swift_setGlobalRuntimeFunctionCounters(
     RuntimeFunctionCountersState *state) {
-  LazyMutex::ScopedLock lock(RuntimeGlobalFunctionCountersState.Lock);
+  StaticScopedWriteLock lock(RuntimeGlobalFunctionCountersState.Lock);
   RuntimeGlobalFunctionCountersState.State = *state;
 }
 
@@ -171,17 +169,17 @@ const char **_swift_getRuntimeFunctionNames() {
 /// Return the offsets of the runtime function counters being tracked.
 /// Their order is the same as the order of the counters in the
 /// RuntimeObjectState structure.
-const std::uint16_t *_swift_getRuntimeFunctionCountersOffsets() {
+const uint16_t *_swift_getRuntimeFunctionCountersOffsets() {
   return RuntimeFunctionCountersOffsets;
 }
 
 /// Return the number of runtime functions being tracked.
-std::uint64_t _swift_getNumRuntimeFunctionCounters() {
+uint64_t _swift_getNumRuntimeFunctionCounters() {
   return ID_LastRuntimeFunctionName;
 }
 
 static void _swift_dumpRuntimeCounters(RuntimeFunctionCountersState *State) {
-  std::uint32_t tmp;
+  uint32_t tmp;
 /// Define how to dump the counter for a given runtime function.
 #define FUNCTION_TO_TRACK(RT_FUNCTION)                                         \
   tmp = State->SWIFT_RT_FUNCTION_INVOCATION_COUNTER_NAME(RT_FUNCTION);         \
@@ -194,7 +192,7 @@ static void _swift_dumpRuntimeCounters(RuntimeFunctionCountersState *State) {
 /// Dump all per-object runtime function pointers.
 void _swift_dumpObjectsRuntimeFunctionPointers() {
   auto &theSentinel = RuntimeObjectStateCache.get();
-  Mutex::ScopedLock lock(theSentinel.Lock);
+  StaticScopedReadLock lock(theSentinel.Lock);
   for (auto &Pair : theSentinel.Cache) {
     printf("\n\nRuntime counters for object at address %p:\n", Pair.getFirst());
     _swift_dumpRuntimeCounters(&Pair.getSecond());

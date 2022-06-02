@@ -19,20 +19,10 @@
 
 #include "swift/Runtime/Exclusivity.h"
 #include "swift/Runtime/FunctionReplacement.h"
-#include "swift/Threading/ThreadLocalStorage.h"
+#include "swift/Runtime/Once.h"
+#include "swift/Runtime/ThreadLocalStorage.h"
 
 using namespace swift;
-
-namespace {
-
-// Some threading libraries will need a global constructor here; that is
-// unavoidable in the general case, so turn off the warning just for this line.
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wglobal-constructors"
-SWIFT_THREAD_LOCAL_TYPE(uintptr_t, tls_key::compatibility50) compat50Key;
-#pragma clang diagnostic pop
-
-} // namespace
 
 __attribute__((visibility("hidden"), weak))
 extern "C" char *swift_getFunctionReplacement50(char **ReplFnPtr, char *CurrFn) {
@@ -50,11 +40,12 @@ extern "C" char *swift_getFunctionReplacement50(char **ReplFnPtr, char *CurrFn) 
   if (RawReplFn == CurrFn)
     return nullptr;
 
-  auto origKey = compat50Key.get();
+  auto origKey =
+      (uintptr_t)SWIFT_THREAD_GETSPECIFIC(SWIFT_COMPATIBILITY_50_TLS_KEY);
   if ((origKey & 0x1) != 0) {
     auto mask = ((uintptr_t)-1) < 1;
     auto resetKey = origKey & mask;
-    compat50Key.set(resetKey);
+    SWIFT_THREAD_SETSPECIFIC(SWIFT_COMPATIBILITY_50_TLS_KEY, (void *)resetKey);
     return nullptr;
   }
   return ReplFn;
@@ -67,9 +58,10 @@ extern "C" char *swift_getOrigOfReplaceable50(char **OrigFnPtr) {
     return swift_getOrigOfReplaceable(OrigFnPtr);
 
   char *OrigFn = *OrigFnPtr;
-  auto origKey = compat50Key.get();
+  auto origKey =
+      (uintptr_t)SWIFT_THREAD_GETSPECIFIC(SWIFT_COMPATIBILITY_50_TLS_KEY);
   auto newKey = origKey | 0x1;
-  compat50Key.set(newKey);
+  SWIFT_THREAD_SETSPECIFIC(SWIFT_COMPATIBILITY_50_TLS_KEY, (void *)newKey);
   return OrigFn;
 }
 

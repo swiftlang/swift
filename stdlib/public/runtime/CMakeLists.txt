@@ -33,6 +33,7 @@ set(swift_runtime_sources
     Bincompat.cpp
     Casting.cpp
     CrashReporter.cpp
+    CygwinPort.cpp
     Demangle.cpp
     DynamicCast.cpp
     Enum.cpp
@@ -58,6 +59,8 @@ set(swift_runtime_sources
     KnownMetadata.cpp
     Metadata.cpp
     MetadataLookup.cpp
+    MutexPThread.cpp
+    MutexWin32.cpp
     Numeric.cpp
     Once.cpp
     Portability.cpp
