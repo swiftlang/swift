@@ -342,3 +342,100 @@ extension _StringGuts {
     return Range(_uncheckedBounds: (l, u))
   }
 }
+
+// Temporary additions to deal with binary compatibility issues with existing
+// binaries that accidentally pass invalid indices to String APIs in cases that
+// were previously undiagnosed.
+//
+// FIXME: Remove these after a release or two.
+extension _StringGuts {
+  /// A version of `validateInclusiveSubscalarIndex` that only traps if the main
+  /// executable was linked with Swift Stdlib version 5.7 or better. This is
+  /// used to work around binary compatibility problems with existing apps that
+  /// pass invalid indices to String APIs.
+  internal func validateInclusiveSubscalarIndex_5_7(
+    _ i: String.Index
+  ) -> String.Index {
+    let i = ensureMatchingEncoding(i)
+    _precondition(
+      ifLinkedOnOrAfter: .v5_7_0,
+      i._encodedOffset <= count,
+      "String index is out of bounds")
+    return i
+  }
+
+  /// A version of `validateInclusiveScalarIndex` that only traps if the main
+  /// executable was linked with Swift Stdlib version 5.7 or better. This is
+  /// used to work around binary compatibility problems with existing apps that
+  /// pass invalid indices to String APIs.
+  internal func validateInclusiveScalarIndex_5_7(
+    _ i: String.Index
+  ) -> String.Index {
+    if isFastScalarIndex(i) {
+      _precondition(
+        ifLinkedOnOrAfter: .v5_7_0,
+        i._encodedOffset <= count,
+        "String index is out of bounds")
+      return i
+    }
+
+    return scalarAlign(validateInclusiveSubscalarIndex_5_7(i))
+  }
+
+  /// A version of `validateSubscalarRange` that only traps if the main
+  /// executable was linked with Swift Stdlib version 5.7 or better. This is
+  /// used to work around binary compatibility problems with existing apps that
+  /// pass invalid indices to String APIs.
+  internal func validateSubscalarRange_5_7(
+    _ range: Range<String.Index>
+  ) -> Range<String.Index> {
+    let upper = ensureMatchingEncoding(range.upperBound)
+    let lower = ensureMatchingEncoding(range.lowerBound)
+
+    _precondition(upper <= endIndex && lower <= upper,
+      "String index range is out of bounds")
+
+    return Range(_uncheckedBounds: (lower, upper))
+  }
+
+  /// A version of `validateScalarRange` that only traps if the main executable
+  /// was linked with Swift Stdlib version 5.7 or better. This is used to work
+  /// around binary compatibility problems with existing apps that pass invalid
+  /// indices to String APIs.
+  internal func validateScalarRange_5_7(
+    _ range: Range<String.Index>
+  ) -> Range<String.Index> {
+    if
+      isFastScalarIndex(range.lowerBound), isFastScalarIndex(range.upperBound)
+    {
+      _precondition(
+        ifLinkedOnOrAfter: .v5_7_0,
+        range.upperBound._encodedOffset <= count,
+        "String index range is out of bounds")
+      return range
+    }
+
+    let r = validateSubscalarRange_5_7(range)
+    return Range(
+      _uncheckedBounds: (scalarAlign(r.lowerBound), scalarAlign(r.upperBound)))
+  }
+
+  /// A version of `validateInclusiveCharacterIndex` that only traps if the main
+  /// executable was linked with Swift Stdlib version 5.7 or better. This is
+  /// used to work around binary compatibility problems with existing apps that
+  /// pass invalid indices to String APIs.
+  internal func validateInclusiveCharacterIndex_5_7(
+    _ i: String.Index
+  ) -> String.Index {
+    if isFastCharacterIndex(i) {
+      _precondition(
+        ifLinkedOnOrAfter: .v5_7_0,
+        i._encodedOffset <= count,
+        "String index is out of bounds")
+      return i
+    }
+
+    return roundDownToNearestCharacter(
+      scalarAlign(validateInclusiveSubscalarIndex_5_7(i)))
+  }
+}
