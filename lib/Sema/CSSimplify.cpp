@@ -3141,13 +3141,12 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       return result;
   }
 
-  if (hasLabelingFailures) {
-    SmallVector<Identifier, 4> correctLabels;
-    for (const auto &param : func2Params)
-      correctLabels.push_back(param.getLabel());
+  if (hasLabelingFailures && !hasFixFor(loc)) {
+    ConstraintFix *fix =
+        loc->isLastElement<LocatorPathElt::ApplyArgToParam>()
+            ? AllowArgumentMismatch::create(*this, func1, func2, loc)
+            : ContextualMismatch::create(*this, func1, func2, loc);
 
-    auto *fix = RelabelArguments::create(*this, correctLabels,
-                                         getConstraintLocator(argumentLocator));
     if (recordFix(fix))
       return getTypeMatchFailure(argumentLocator);
   }
