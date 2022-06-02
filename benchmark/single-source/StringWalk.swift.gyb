@@ -82,21 +82,53 @@ import TestsUtils
 //
 // Workloads
 //
-let ascii =
-  "siebenhundertsiebenundsiebzigtausendsiebenhundertsiebenundsiebzig"
-let emoji = "👍👩‍👩‍👧‍👧👨‍👨‍👦‍👦🇺🇸🇨🇦🇲🇽👍🏻👍🏼👍🏽👍🏾👍🏿"
+let ascii = String(
+  repeating: "siebenhundertsiebenundsiebzigtausendsiebenhundertsiebenundsiebenzig",
+  count: 50
+)
+
+let emoji = String(
+  repeating: "👍👩‍👩‍👧‍👧👨‍👨‍👦‍👦🇺🇸🇨🇦🇲🇽👍🏻👍🏼👍🏽👍🏾👍🏿",
+  count: 25
+)
+
 let utf16 = emoji + "the quick brown fox" + String(emoji.reversed())
 
-let japanese = "今回のアップデートでSwiftに大幅な改良が施され、安定していてしかも直感的に使うことができるAppleプラットフォーム向けプログラミング言語になりました。"
-let chinese = "Swift 是面向 Apple 平台的编程语言，功能强大且直观易用，而本次更新对其进行了全面优化。"
-let korean = "이번 업데이트에서는 강력하면서도 직관적인 Apple 플랫폼용 프로그래밍 언어인 Swift를 완벽히 개선하였습니다."
-let russian = "в чащах юга жил-был цитрус? да, но фальшивый экземпляр"
-let punctuated = "\u{201c}Hello\u{2010}world\u{2026}\u{201d}"
-let punctuatedJapanese = "\u{300c}\u{300e}今日は\u{3001}世界\u{3002}\u{300f}\u{300d}"
+let japanese = String(
+  repeating: "今回のアップデートでSwiftに大幅な改良が施され、安定していてしかも直感的に使うことができるAppleプラットフォーム向けプログラミング言語になりました。",
+  count: 50
+)
+
+let chinese = String(
+  repeating: "Swift 是面向 Apple 平台的编程语言，功能强大且直观易用，而本次更新对其进行了全面优化。",
+  count: 50
+)
+
+let korean = String(
+  repeating: "이번 업데이트에서는 강력하면서도 직관적인 Apple 플랫폼용 프로그래밍 언어인 Swift를 완벽히 개선하였습니다.",
+  count: 50
+)
+
+let russian = String(
+  repeating: "в чащах юга жил-был цитрус? да, но фальшивый экземпляр",
+  count: 50
+)
+
+let punctuated = String(
+  repeating: "\u{201c}Hello\u{2010}world\u{2026}\u{201d}",
+  count: 50
+)
+let punctuatedJapanese = String(
+  repeating: "\u{300c}\u{300e}今日は\u{3001}世界\u{3002}\u{300f}\u{300d}",
+  count: 50
+)
 
 // A workload that's mostly Latin characters, with occasional emoji
 // interspersed. Common for tweets.
-let tweet = "Worst thing about working on String is that it breaks *everything*. Asserts, debuggers, and *especially* printf-style debugging 😭"
+let tweet = String(
+  repeating: "Worst thing about working on String is that it breaks *everything*. Asserts, debuggers, and *especially* printf-style debugging 😭",
+  count: 40
+)
 
 //
 // Benchmarks
@@ -109,10 +141,7 @@ public func run_StringWalk(_ n: Int) {
 }
 
 // Extended String benchmarks:
-let baseMultiplier = 400
-let unicodeScalarsMultiplier = baseMultiplier
-let charactersMultiplier = baseMultiplier / 5
-let characters_by_indexMultiplier = baseMultiplier / 5
+let unicodeScalarsMultiplier = 5
 let stringWalkWarmupAmount = 5
 
 % Names = ["ascii", "utf16", "tweet", "japanese", "chinese", "korean", "russian", "punctuated", "punctuatedJapanese"]
@@ -161,14 +190,14 @@ public let benchmarks = [
 
 @inline(never)
 public func run_StringWalk_${Name}_${Kind}(_ n: Int) {
-  for _ in 1...${Kind}Multiplier*n {
+  for _ in 1...n {
     count_${Kind}(${Name}${View})
   }
 }
 
 @inline(never)
 public func run_StringWalk_${Name}_${Kind}_Backwards(_ n: Int) {
-  for _ in 1...${Kind}Multiplier*n {
+  for _ in 1...n {
     count_${Kind}_rev(${Name}${View}.reversed())
   }
 }
