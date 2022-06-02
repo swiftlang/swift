@@ -46,7 +46,7 @@ typedef std::int32_t ulock_t;
 inline int ulock_get_tid(void) {
   static __thread int tid;
   if (tid == 0)
-    tid = gettid();
+    tid = syscall(SYS_gettid);
   return tid;
 }
 
