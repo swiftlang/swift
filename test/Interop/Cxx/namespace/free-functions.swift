@@ -20,10 +20,9 @@ NamespacesTestSuite.test("Basic functions") {
   expectEqual(String(cString: basicFunctionLowestLevelCString!),
               "FunctionsNS1::FunctionsNS2::FunctionsNS3::basicFunctionLowestLevel")
 
-// TODO: check this again when operators are re-enabled: rdar://91070109
-//   let x = FunctionsNS1.X()
-//   expectEqual(String(cString: x + x),
-//               "FunctionsNS1::operator+(X, X)")
+  let x = FunctionsNS1.X()
+  expectEqual(String(cString: x + x),
+              "FunctionsNS1::operator+(X, X)")
 }
 
 NamespacesTestSuite.test("Forward declared functions") {
