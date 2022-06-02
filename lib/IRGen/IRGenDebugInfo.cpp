@@ -19,6 +19,7 @@
 #include "GenStruct.h"
 #include "GenType.h"
 #include "IRBuilder.h"
+#include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -61,10 +62,6 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Local.h"
-
-#ifndef NDEBUG
-#include "swift/AST/ASTDemangler.h"
-#endif
 
 #define DEBUG_TYPE "debug-info"
 
