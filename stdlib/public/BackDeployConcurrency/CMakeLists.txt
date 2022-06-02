@@ -66,3 +66,4 @@ set(LLVM_OPTIONAL_SOURCES
   TaskSleepDuration.swift)
 
 add_subdirectory(../Concurrency stdlib/public/BackDeployConcurrency)
+add_subdirectory(../Threading stdlib/public/BackDeployConcurrency)
