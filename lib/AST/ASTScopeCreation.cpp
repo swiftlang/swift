@@ -994,7 +994,7 @@ void SwitchStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
 
 void ForEachStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
-  scopeCreator.addToScopeTree(stmt->getSequence(), this);
+  scopeCreator.addToScopeTree(stmt->getParsedSequence(), this);
 
   // Add a child describing the scope of the pattern.
   // In error cases such as:

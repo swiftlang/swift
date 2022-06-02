@@ -454,3 +454,32 @@ func test_fallthrough_stmt() {
     }
   }()
 }
+
+// rdar://93061432 - No diagnostic for invalid `for-in` statement
+func test_missing_conformance_diagnostics_in_for_sequence() {
+  struct Event {}
+
+  struct S {
+    struct Iterator: IteratorProtocol {
+      typealias Element = (event: Event, timestamp: Double)
+
+      mutating func next() -> Element? { return nil }
+    }
+  }
+
+  func fn(_: () -> Void) {}
+
+  func test(_ iter: inout S.Iterator) {
+    fn {
+      for v in iter.next() { // expected-error {{for-in loop requires 'S.Iterator.Element?' (aka 'Optional<(event: Event, timestamp: Double)>') to conform to 'Sequence'; did you mean to unwrap optional?}}
+        _ = v.event
+      }
+    }
+
+    fn {
+      while let v = iter.next() { // ok
+        _ = v.event
+      }
+    }
+  }
+}
