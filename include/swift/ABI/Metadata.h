@@ -2837,6 +2837,9 @@ public:
 };
 using AnonymousContextDescriptor = TargetAnonymousContextDescriptor<InProcess>;
 
+template<template <typename Runtime> class ObjCInteropKind, unsigned PointerSize>
+using ExternalAnonymousContextDescriptor = TargetAnonymousContextDescriptor<External<ObjCInteropKind<RuntimeTarget<PointerSize>>>>;
+
 /// A protocol descriptor.
 ///
 /// Protocol descriptors contain information about the contents of a protocol:
