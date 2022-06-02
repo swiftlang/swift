@@ -123,3 +123,9 @@ public final class AFinalClass {
 
 }
 
+public struct AEIC {
+#if AFTER
+    @_alwaysEmitIntoClient
+    public var aeic: Int { return 0 }
+#endif
+}
