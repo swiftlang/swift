@@ -2340,11 +2340,10 @@ RValue RValueEmitter::visitTupleElementExpr(TupleElementExpr *E,
 
 RValue
 SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
-                                             ConcreteDeclRef defaultArgsOwner,
-                                             unsigned destIndex,
-                                             CanType resultType,
-                                             AbstractionPattern origResultType,
-                                             SGFContext C) {
+                                               ConcreteDeclRef defaultArgsOwner,
+                                               unsigned destIndex,
+                                               CanType resultType,
+                                               SGFContext C) {
   SILDeclRef generator 
     = SILDeclRef::getDefaultArgGenerator(defaultArgsOwner.getDecl(),
                                          destIndex);
@@ -2355,6 +2354,11 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
   SubstitutionMap subs;
   if (fnType->isPolymorphic())
     subs = defaultArgsOwner.getSubstitutions();
+
+  auto constantInfo = SGM.Types.getConstantInfo(
+      TypeExpansionContext::minimal(), generator);
+  AbstractionPattern origResultType =
+      constantInfo.FormalPattern.getFunctionResultType();
 
   auto substFnType =
       fnType->substGenericArgs(SGM.M, subs, getTypeExpansionContext());
