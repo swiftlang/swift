@@ -17,3 +17,12 @@
   // CHECK-NEXT: public var y: Swift.Int
   public var y: Int
 } // CHECK-NEXT: {{^}$}}
+
+public func someGenericFunction<T>(_ t: T) -> Int { return 0 }
+
+// CHECK: @_specialize(exported: true, kind: full, target: someGenericFunction(_:), where T == Swift.Int)
+// CHECK: internal func __specialize_someGenericFunction<T>(_ t: T)
+@_specialize(exported: true, target: someGenericFunction(_:), where T == Int)
+internal func __specialize_someGenericFunction<T>(_ t: T) -> Int {
+    fatalError("don't call")
+}
