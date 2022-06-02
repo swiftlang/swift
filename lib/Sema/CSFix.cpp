@@ -2373,7 +2373,12 @@ bool AddExplicitExistentialCoercion::isRequired(
   if (auto *anchor = getAsExpr(locator.getAnchor())) {
     // If this is erasure related to `Self`, let's look through
     // the call, if any.
-    if (isa<UnresolvedDotExpr>(anchor)) {
+    if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
+      // If this is an implicit `makeIterator` call, let's skip the check.
+      if (UDE->isImplicit() &&
+          cs.getContextualTypePurpose(UDE->getBase()) == CTP_ForEachSequence)
+        return false;
+
       auto parentExpr = cs.getParentExpr(anchor);
       if (parentExpr && isa<CallExpr>(parentExpr))
         anchor = parentExpr;

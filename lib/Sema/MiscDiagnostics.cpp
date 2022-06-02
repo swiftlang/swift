@@ -3784,7 +3784,7 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Stmt *S) {
   } else if (auto SS = dyn_cast<SwitchStmt>(S)) {
     checkStmtConditionTrailingClosure(ctx, SS->getSubjectExpr());
   } else if (auto FES = dyn_cast<ForEachStmt>(S)) {
-    checkStmtConditionTrailingClosure(ctx, FES->getSequence());
+    checkStmtConditionTrailingClosure(ctx, FES->getParsedSequence());
     checkStmtConditionTrailingClosure(ctx, FES->getWhere());
   } else if (auto DCS = dyn_cast<DoCatchStmt>(S)) {
     for (auto CS : DCS->getCatches())
@@ -5390,22 +5390,10 @@ bool swift::diagnoseUnhandledThrowsInAsyncContext(DeclContext *dc,
   if (!forEach->getAwaitLoc().isValid())
     return false;
 
-  auto &ctx = dc->getASTContext();
-
-  auto sequenceProto = TypeChecker::getProtocol(
-      ctx, forEach->getForLoc(), KnownProtocolKind::AsyncSequence);
-
-  if (!sequenceProto)
-    return false;
-
-  // fetch the sequence out of the statement
-  // else wise the value is potentially unresolved
-  auto Ty = forEach->getSequence()->getType();
-  auto module = dc->getParentModule();
-  auto conformanceRef = module->lookupConformance(Ty, sequenceProto);
-
+  auto conformanceRef = forEach->getSequenceConformance();
   if (conformanceRef.hasEffect(EffectKind::Throws) &&
       forEach->getTryLoc().isInvalid()) {
+    auto &ctx = dc->getASTContext();
     ctx.Diags
         .diagnose(forEach->getAwaitLoc(), diag::throwing_call_unhandled, "call")
         .fixItInsert(forEach->getAwaitLoc(), "try");
