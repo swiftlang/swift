@@ -3438,8 +3438,7 @@ void DelayedArgument::emitDefaultArgument(SILGenFunction &SGF,
   auto value = SGF.emitApplyOfDefaultArgGenerator(info.loc,
                                                   info.defaultArgsOwner,
                                                   info.destIndex,
-                                                  info.resultType,
-                                                  info.origResultType);
+                                                  info.resultType);
 
   SmallVector<ManagedValue, 4> loweredArgs;
   SmallVector<DelayedArgument, 4> delayedArgs;
