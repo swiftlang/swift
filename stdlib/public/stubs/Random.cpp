@@ -40,6 +40,7 @@
 #endif
 
 #include <stdlib.h>
+#include <unistd.h>
 
 #include "SwiftShims/Random.h"
 #include "swift/Runtime/Debug.h"
