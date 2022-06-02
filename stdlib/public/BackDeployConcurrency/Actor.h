@@ -31,11 +31,23 @@ public:
   // destructor does not destroy the actor instance; you must call
   // swift_defaultActor_{initialize,destroy} yourself.
   constexpr DefaultActor(const HeapMetadata *metadata)
-    : HeapObject(metadata), PrivateData{} {}
+    : HeapObject(metadata), PrivateData{} {
+    initHeapObject();
+  }
 
   constexpr DefaultActor(const HeapMetadata *metadata,
                          InlineRefCounts::Immortal_t immortal)
-    : HeapObject(metadata, immortal), PrivateData{} {}
+    : HeapObject(metadata, immortal), PrivateData{} {
+    // By a lucky coincidence, the modern bit pattern for immortal objects also
+    // sets the immortal bit for older runtimes, so we don't need an immortal
+    // equivalent to initHeapObject().
+  }
+
+  void initHeapObject() {
+#ifdef SWIFT_CONCURRENCY_BACK_DEPLOYMENT
+    _swift_instantiateInertHeapObject(this, metadata);
+#endif
+  }
 
   void *PrivateData[NumWords_DefaultActor];
 };
