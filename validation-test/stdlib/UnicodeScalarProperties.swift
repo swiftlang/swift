@@ -3,6 +3,7 @@
 // REQUIRES: long_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: objc_interop
+// REQUIRES: rdar94270193
 
 import StdlibUnittest
 import StdlibUnicodeUnittest
