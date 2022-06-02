@@ -113,6 +113,7 @@ let baseMultiplier = 250
 let unicodeScalarsMultiplier = baseMultiplier
 let charactersMultiplier = baseMultiplier / 5
 let characters_by_indexMultiplier = baseMultiplier / 5
+let stringWalkWarmupAmount = 5
 
 % Names = ["ascii", "utf16", "tweet", "japanese", "chinese", "korean", "russian", "punctuated", "punctuatedJapanese"]
 % Kinds = ["unicodeScalars", "characters", "characters_by_index"]
@@ -135,6 +136,7 @@ public let benchmarks = [
     name: "StringWalk_${Name}_${Kind}${Direction}",
     runFunction: run_StringWalk_${Name}_${Kind}${Direction},
     tags: [.api, .String],
+    setUpFunction: {run_StringWalk_${Name}_${Kind}${Direction}(stringWalkWarmupAmount)},
     legacyFactor: 40),
 
 %     end # Kinds
