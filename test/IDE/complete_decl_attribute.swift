@@ -173,6 +173,7 @@ actor MyGlobalActor {
 // ON_GLOBALVAR-DAG: Keyword/None:                       noDerivative[#Var Attribute#]; name=noDerivative
 // ON_GLOBALVAR-DAG: Keyword/None:                       exclusivity[#Var Attribute#]; name=exclusivity
 // ON_GLOBALVAR-DAG: Keyword/None:                       preconcurrency[#Var Attribute#]; name=preconcurrency
+// ON_GLOBALVAR-DAG: Keyword/None:                       ignoreDeprecationWarnings[#Var Attribute#]; name=ignoreDeprecationWarnings
 // ON_GLOBALVAR-NOT: Keyword
 // ON_GLOBALVAR-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // ON_GLOBALVAR-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#MyPropertyWrapper#]; name=MyPropertyWrapper
