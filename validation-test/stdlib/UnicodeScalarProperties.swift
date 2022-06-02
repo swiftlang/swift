@@ -5,6 +5,9 @@
 // REQUIRES: objc_interop
 // REQUIRES: rdar94270193
 
+@_spi(_Unicode)
+import Swift
+
 import StdlibUnittest
 import StdlibUnicodeUnittest
 
@@ -190,6 +193,26 @@ if #available(SwiftStdlib 5.6, *) {
       }
 
       expectEqual(scalar.properties.name, names[scalar])
+    }
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Case Folded
+//===----------------------------------------------------------------------===//
+
+if #available(SwiftStdlib 5.7, *) {
+  UnicodeScalarPropertiesTest.test("Scalar Case Folding") {
+    for i in 0x0 ... 0x10FFFF {
+      guard let scalar = Unicode.Scalar(i) else {
+        continue
+      }
+
+      if let mapping = caseFolding[scalar] {
+        expectEqual(scalar.properties._caseFolded, mapping)
+      } else {
+        expectEqual(scalar.properties._caseFolded, String(scalar))
+      }
     }
   }
 }
