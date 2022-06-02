@@ -558,29 +558,20 @@ bool TypeChecker::typeCheckForCodeCompletion(
     llvm::function_ref<void(const Solution &)> callback) {
   auto *DC = target.getDeclContext();
   auto &Context = DC->getASTContext();
-
-  auto *expr = target.getAsExpr();
-  if (!expr)
-    return false;
-
   // First of all, let's check whether given target expression
   // does indeed have the code completion location in it.
   {
-    auto range = expr->getSourceRange();
+    auto range = target.getSourceRange();
     if (range.isInvalid() ||
         !Context.SourceMgr.rangeContainsCodeCompletionLoc(range))
       return false;
   }
 
-  FrontendStatsTracer StatsTracer(Context.Stats,
-                                  "typecheck-for-code-completion", expr);
-  PrettyStackTraceExpr stackTrace(Context, "code-completion", expr);
+  auto node = target.getAsASTNode();
+  if (!node)
+    return false;
 
-  expr = expr->walk(SanitizeExpr(Context,
-                                 /*shouldReusePrecheckedType=*/false));
-  target.setExpr(expr);
-
-  CompletionContextFinder contextAnalyzer(expr, DC);
+  CompletionContextFinder contextAnalyzer(node, DC);
 
   // If there was no completion expr (e.g. if the code completion location was
   // among tokens that were skipped over during parser error recovery) bail.
@@ -674,7 +665,10 @@ bool TypeChecker::typeCheckForCodeCompletion(
   // Determine the best subexpression to use based on the collected context
   // of the code completion expression.
   if (auto fallback = contextAnalyzer.getFallbackCompletionExpr()) {
-    assert(fallback->E != expr);
+    if (auto *expr = target.getAsExpr()) {
+      assert(fallback->E != expr);
+      (void)expr;
+    }
     SolutionApplicationTarget completionTarget(fallback->E,
                                                fallback->DC, CTP_Unused,
                                                /*contextualType=*/Type(),
