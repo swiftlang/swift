@@ -1,4 +1,4 @@
-//===--- ThreadingError.cpp - Error handling support code -----------------===//
+//===--- Mutex.cpp - Mutex support code -----------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,17 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Threading/Errors.h"
-#include <cstdio>
-
 #include "Error.h"
 
-// Handle fatal errors from the threading library
-SWIFT_ATTRIBUTE_NORETURN
-SWIFT_FORMAT(1, 2)
-void swift::threading::fatal(const char *format, ...) {
-  va_list val;
+#define SWIFT_FATAL_ERROR swift_Concurrency_fatalError
 
-  va_start(val, format);
-  swift_Concurrency_fatalErrorv(0, format, val);
-}
+// Include the runtime's mutex support code.
+// FIXME: figure out some reasonable way to share this stuff
+
+#include "../runtime/MutexPThread.cpp"
+#include "../runtime/MutexWin32.cpp"
+#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+  #include "swift/Runtime/MutexSingleThreaded.h"
+#endif

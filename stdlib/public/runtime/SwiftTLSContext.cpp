@@ -11,57 +11,81 @@
 //===----------------------------------------------------------------------===//
 
 #include "SwiftTLSContext.h"
-
-#include "swift/Threading/Once.h"
-#include "swift/Threading/ThreadLocalStorage.h"
+#include "swift/Basic/Lazy.h"
+#include "swift/Runtime/Once.h"
+#include "swift/Runtime/ThreadLocalStorage.h"
 
 using namespace swift;
 using namespace swift::runtime;
 
+#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+
 SwiftTLSContext &SwiftTLSContext::get() {
+  static SwiftTLSContext TLSContext;
+  return TLSContext;
+}
 
-#if SWIFT_THREADING_USE_RESERVED_TLS_KEYS
+#elif SWIFT_TLS_HAS_RESERVED_PTHREAD_SPECIFIC
+// Use the reserved TSD key if possible.
 
-  // If we have reserved keys, use those
-  SwiftTLSContext *ctx =
-      static_cast<SwiftTLSContext *>(swift::tls_get(swift::tls_key::runtime));
+SwiftTLSContext &SwiftTLSContext::get() {
+  SwiftTLSContext *ctx = static_cast<SwiftTLSContext *>(
+      SWIFT_THREAD_GETSPECIFIC(SWIFT_RUNTIME_TLS_KEY));
   if (ctx)
     return *ctx;
 
-  static swift::once_t token;
-  swift::tls_init_once(token, swift::tls_key::runtime, [](void *pointer) {
-    delete static_cast<SwiftTLSContext *>(pointer);
-  });
+  static OnceToken_t setupToken;
+  SWIFT_ONCE_F(
+      setupToken,
+      [](void *) {
+        pthread_key_init_np(SWIFT_RUNTIME_TLS_KEY, [](void *pointer) {
+          delete static_cast<SwiftTLSContext *>(pointer);
+        });
+      },
+      nullptr);
 
   ctx = new SwiftTLSContext();
-  swift::tls_set(swift::tls_key::runtime, ctx);
+  SWIFT_THREAD_SETSPECIFIC(SWIFT_RUNTIME_TLS_KEY, ctx);
   return *ctx;
+}
 
-#elif defined(SWIFT_THREAD_LOCAL)
+#elif __has_feature(cxx_thread_local)
+// Second choice is direct language support for thread-locals.
 
-  // If we have the thread local attribute, use that
-  // (note that this happens for the no-threads case too)
-  static SWIFT_THREAD_LOCAL SwiftTLSContext TLSContext;
-  return TLSContext;
+namespace {
+
+static thread_local SwiftTLSContext TLSContext;
+
+} // anonymous namespace
+
+SwiftTLSContext &SwiftTLSContext::get() { return TLSContext; }
 
 #else
+// Use the platform thread-local data API.
 
-  // Otherwise, allocate ourselves a key and use that
-  static swift::tls_key_t runtimeKey;
-  static swift::once_t token;
-
-  swift::tls_alloc_once(token, runtimeKey, [](void *pointer) {
+static __swift_thread_key_t createSwiftThreadKey() {
+  __swift_thread_key_t key;
+  int result = SWIFT_THREAD_KEY_CREATE(&key, [](void *pointer) {
     delete static_cast<SwiftTLSContext *>(pointer);
   });
 
-  SwiftTLSContext *ctx =
-      static_cast<SwiftTLSContext *>(swift::tls_get(runtimeKey));
-  if (ctx)
-    return *ctx;
+  if (result != 0) {
+    fatalError(0, "couldn't create thread key for exclusivity: %s\n",
+               strerror(result));
+  }
+  return key;
+}
 
-  ctx = new SwiftTLSContext();
-  swift::tls_set(runtimeKey, ctx);
+static SwiftTLSContext &getTLSContext() {
+  static __swift_thread_key_t key = createSwiftThreadKey();
+
+  SwiftTLSContext *ctx =
+      static_cast<SwiftTLSContext *>(SWIFT_THREAD_GETSPECIFIC(key));
+  if (!ctx) {
+    ctx = new SwiftTLSContext();
+    SWIFT_THREAD_SETSPECIFIC(key, ctx);
+  }
   return *ctx;
+}
 
 #endif
-}

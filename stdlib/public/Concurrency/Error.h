@@ -17,19 +17,13 @@
 #ifndef SWIFT_CONCURRENCY_ERRORS_H
 #define SWIFT_CONCURRENCY_ERRORS_H
 
-#include "swift/Basic/Compiler.h"
-
 #include "../SwiftShims/Visibility.h"
-#include <cstdarg>
 #include <cstdint>
-#include <cstdlib>
+#include <stdlib.h>
 
 namespace swift {
 
-SWIFT_NORETURN SWIFT_FORMAT(2, 3) void swift_Concurrency_fatalError(
-    uint32_t flags, const char *format, ...);
-SWIFT_NORETURN SWIFT_VFORMAT(2) void swift_Concurrency_fatalErrorv(
-    uint32_t flags, const char *format, va_list val);
+SWIFT_NORETURN void swift_Concurrency_fatalError(uint32_t flags, const char *format, ...);
 
 } // namespace swift
 

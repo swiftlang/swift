@@ -23,7 +23,7 @@
 #include <DbgHelp.h>
 #endif
 
-#include "swift/Threading/Mutex.h"
+#include "swift/Runtime/Mutex.h"
 
 using namespace swift;
 
@@ -73,7 +73,7 @@ int swift::lookupSymbol(const void *address, SymbolInfo *info) {
 }
 
 #if defined(_WIN32)
-static LazyMutex mutex;
+static StaticMutex mutex;
 static bool isDbgHelpInitialized = false;
 
 void swift::_swift_withWin32DbgHelpLibrary(

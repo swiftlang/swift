@@ -14,14 +14,18 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Threading/Once.h"
 #include "Private.h"
+#include "swift/Runtime/Once.h"
 #include "swift/Runtime/Debug.h"
 #include <type_traits>
 
 using namespace swift;
 
-#if SWIFT_THREADING_DARWIN
+#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+
+// No dependencies on single-threaded environments.
+
+#elif defined(__APPLE__)
 
 // On macOS and iOS, swift_once is implemented using GCD.
 // The compiler emits an inline check matching the barrier-free inline fast
@@ -30,8 +34,12 @@ using namespace swift;
 #include <dispatch/dispatch.h>
 static_assert(std::is_same<swift_once_t, dispatch_once_t>::value,
               "swift_once_t and dispatch_once_t must stay in sync");
+#else
 
-#endif // SWIFT_THREADING_DARWIN
+// On non-Darwin platforms we do not assume any barrier-free inline path
+// and SwiftTargetInfo.OnceDonePredicateValue is unset in the compiler.
+
+#endif
 
 // The compiler generates the swift_once_t values as word-sized zero-initialized
 // variables, so we want to make sure swift_once_t isn't larger than the
@@ -44,5 +52,16 @@ static_assert(sizeof(swift_once_t) <= sizeof(void*),
 /// extent of type swift_once_t.
 void swift::swift_once(swift_once_t *predicate, void (*fn)(void *),
                        void *context) {
-  swift::once(*predicate, fn, context);
+#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+  if (! *predicate) {
+    *predicate = true;
+    fn(context);
+  }
+#elif defined(__APPLE__)
+  dispatch_once_f(predicate, context, fn);
+#elif defined(__CYGWIN__)
+  _swift_once_f(predicate, context, fn);
+#else
+  std::call_once(*predicate, [fn, context]() { fn(context); });
+#endif
 }

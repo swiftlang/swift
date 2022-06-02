@@ -14,27 +14,78 @@
 #define SWIFT_BASIC_LAZY_H
 
 #include <memory>
-
+#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+// No dependencies on single-threaded environments.
+#elif defined(__APPLE__)
+#include <dispatch/dispatch.h>
+#elif defined(__wasi__)
+// No pthread on wasi, see https://bugs.swift.org/browse/SR-12097 for more details.
+#else
+#include <mutex>
+#endif
 #include "swift/Basic/Malloc.h"
 #include "swift/Basic/type_traits.h"
-#include "swift/Threading/Once.h"
+
+#if defined(__wasi__)
+// Temporary single-threaded stub. Should be replaced with a thread-safe version
+// as soon as the WASI SDK allows it. See https://bugs.swift.org/browse/SR-12766.
+inline void wasi_call_once(int *flag, void *context, void (*func)(void *)) {
+  switch (*flag) {
+  case 0:
+    *flag = 1;
+    func(context);
+    return;
+  case 1:
+    return;
+  default:
+    assert(false && "wasi_call_once got invalid flag");
+    abort();
+  }
+}
+#endif
 
 namespace swift {
+
+#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+  using OnceToken_t = bool;
+# define SWIFT_ONCE_F(TOKEN, FUNC, CONTEXT) \
+  if (!TOKEN) { TOKEN = true; (FUNC)(CONTEXT); }
+#elif defined(__APPLE__)
+  using OnceToken_t = dispatch_once_t;
+# define SWIFT_ONCE_F(TOKEN, FUNC, CONTEXT) \
+  ::dispatch_once_f(&TOKEN, CONTEXT, FUNC)
+#elif defined(__CYGWIN__)
+  // _swift_once_f() is declared in Private.h.
+  // This prototype is copied instead including the header file.
+  void _swift_once_f(uintptr_t *predicate, void *context,
+                     void (*function)(void *));
+  using OnceToken_t = unsigned long;
+# define SWIFT_ONCE_F(TOKEN, FUNC, CONTEXT) \
+  _swift_once_f(&TOKEN, CONTEXT, FUNC)
+#elif defined(__wasi__)
+  using OnceToken_t = int;
+# define SWIFT_ONCE_F(TOKEN, FUNC, CONTEXT) \
+  ::wasi_call_once(&TOKEN, CONTEXT, FUNC)
+#else
+  using OnceToken_t = std::once_flag;
+# define SWIFT_ONCE_F(TOKEN, FUNC, CONTEXT) \
+  ::std::call_once(TOKEN, FUNC, CONTEXT)
+#endif
 
 /// A template for lazily-constructed, zero-initialized, leaked-on-exit
 /// global objects.
 template <class T> class Lazy {
   alignas(T) char Value[sizeof(T)] = { 0 };
 
-  swift::once_t OnceToken = {};
+  OnceToken_t OnceToken = {};
 
   static void defaultInitCallback(void *ValueAddr) {
     ::new (ValueAddr) T();
   }
-
+  
 public:
   using Type = T;
-
+  
   T &get(void (*initCallback)(void *) = defaultInitCallback);
 
   template<typename Arg1>
@@ -58,7 +109,7 @@ template <typename T> inline T &Lazy<T>::get(void (*initCallback)(void*)) {
   static_assert(std::is_literal_type<Lazy<T>>::value,
                 "Lazy<T> must be a literal type");
 
-  swift::once(OnceToken, initCallback, &Value);
+  SWIFT_ONCE_F(OnceToken, initCallback, &Value);
   return unsafeGetAlreadyInitialized();
 }
 
@@ -74,7 +125,7 @@ template <typename Arg1> inline T &Lazy<T>::getWithInit(Arg1 &&arg1) {
     }
   } data{&Value, static_cast<Arg1&&>(arg1)};
 
-  swift::once(OnceToken, &Data::init, &data);
+  SWIFT_ONCE_F(OnceToken, &Data::init, &data);
   return unsafeGetAlreadyInitialized();
 }
 
