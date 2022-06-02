@@ -2952,7 +2952,7 @@ void CompletionLookup::getAttributeDeclCompletions(bool IsInSil, bool isGlobalVa
   bool IsConcurrencyEnabled = Ctx.LangOpts.EnableExperimentalConcurrency;
   std::string Description = TargetName.str() + " Attribute";
 #define DECL_ATTR(KEYWORD, NAME, ...)                                          \
-  if (canUseAttributeOnDecl(DAK_##NAME, IsInSil, IsConcurrencyEnabled, 
+  if (canUseAttributeOnDecl(DAK_##NAME, IsInSil, IsConcurrencyEnabled,         \
                                                       isGlobalVariable,        \
                             DK))                         \
     addDeclAttrKeyword(#KEYWORD, Description);
