@@ -24,8 +24,7 @@ add_swift_host_library(swiftParse STATIC
   ParseType.cpp
   PersistentParserState.cpp
   SyntaxParsingCache.cpp
-  SyntaxParsingContext.cpp
-  SyntaxRegexFallbackLexing.cpp)
+  SyntaxParsingContext.cpp)
 _swift_gyb_target_sources(swiftParse PRIVATE
     ParsedSyntaxBuilders.cpp.gyb
     ParsedSyntaxNodes.cpp.gyb
