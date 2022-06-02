@@ -15,12 +15,12 @@
 #if SWIFT_OBJC_INTEROP
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Metadata.h"
+#include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/ObjCBridge.h"
 #include "swift/Runtime/Portability.h"
-#include "swift/Threading/Mutex.h"
-#import <CoreFoundation/CoreFoundation.h>
-#import <Foundation/Foundation.h>
 #include <vector>
+#import <Foundation/Foundation.h>
+#import <CoreFoundation/CoreFoundation.h>
 
 using namespace swift;
 
@@ -59,7 +59,7 @@ namespace {
 
 struct SwiftNullSentinelCache {
   std::vector<id> Cache;
-  Mutex Lock;
+  StaticReadWriteLock Lock;
 };
 
 static Lazy<SwiftNullSentinelCache> Sentinels;
@@ -73,7 +73,7 @@ static id getSentinelForDepth(unsigned depth) {
   auto &theSentinels = Sentinels.get();
   unsigned depthIndex = depth - 2;
   {
-    Mutex::ScopedLock lock(theSentinels.Lock);
+    StaticScopedReadLock lock(theSentinels.Lock);
     const auto &cache = theSentinels.Cache;
     if (depthIndex < cache.size()) {
       id cached = cache[depthIndex];
@@ -83,7 +83,7 @@ static id getSentinelForDepth(unsigned depth) {
   }
   // Make one if we need to.
   {
-    Mutex::ScopedLock lock(theSentinels.Lock);
+    StaticScopedWriteLock lock(theSentinels.Lock);
     if (depthIndex >= theSentinels.Cache.size())
       theSentinels.Cache.resize(depthIndex + 1);
     auto &cached = theSentinels.Cache[depthIndex];

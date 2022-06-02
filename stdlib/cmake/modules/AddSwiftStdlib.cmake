@@ -1,7 +1,6 @@
 
 include(AddSwift)
 include(SwiftSource)
-include(Threading)
 
 function(add_dependencies_multiple_targets)
   cmake_parse_arguments(
@@ -351,12 +350,9 @@ function(_add_target_variant_c_compile_flags)
     list(APPEND result "-DSWIFT_STDLIB_HAS_LOCALE")
   endif()
 
-  if(SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY)
-    list(APPEND result "-DSWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY")
+  if(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
+    list(APPEND result "-DSWIFT_STDLIB_SINGLE_THREADED_RUNTIME")
   endif()
-
-  threading_package_name("${CFLAGS_SDK}" _threading_package)
-  list(APPEND result "-DSWIFT_THREADING_${_threading_package}")
 
   if(SWIFT_STDLIB_OS_VERSIONING)
     list(APPEND result "-DSWIFT_RUNTIME_OS_VERSIONING")

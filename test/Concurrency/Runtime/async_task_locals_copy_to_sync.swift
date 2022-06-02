@@ -8,7 +8,7 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 // Disable on cooperative executor because it can't dispatch jobs before the end of main function
-// UNSUPPORTED: single_threaded_concurrency
+// UNSUPPORTED: single_threaded_runtime
 // REQUIRES: rdar80824152
 
 import Dispatch

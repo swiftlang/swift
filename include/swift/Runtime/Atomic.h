@@ -20,7 +20,6 @@
 #include "swift/Runtime/Config.h"
 #include <assert.h>
 #include <atomic>
-#include <cstdlib>
 #if defined(_WIN64)
 #include <intrin.h>
 #endif
@@ -49,7 +48,7 @@ namespace impl {
 ///
 /// TODO: should we make this use non-atomic operations when the runtime
 /// is single-threaded?
-template <class Value, std::size_t Size = sizeof(Value)>
+template <class Value, size_t Size = sizeof(Value)>
 class alignas(Size) atomic_impl {
   std::atomic<Value> value;
 public:

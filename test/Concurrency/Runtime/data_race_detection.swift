@@ -8,7 +8,7 @@
 // rdar://76038845
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
-// UNSUPPORTED: single_threaded_concurrency
+// UNSUPPORTED: single_threaded_runtime
 
 import _Concurrency
 import Dispatch
