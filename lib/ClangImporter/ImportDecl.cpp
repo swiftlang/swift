@@ -4153,6 +4153,17 @@ namespace {
       if (!dc)
         return nullptr;
 
+      bool isOperator = decl->getDeclName().getNameKind() ==
+                        clang::DeclarationName::CXXOperatorName;
+      bool isNonSubscriptOperator =
+          isOperator && (decl->getDeclName().getCXXOverloadedOperator() !=
+                         clang::OO_Subscript);
+
+      // For now, we don't support non-subscript operators which are templated
+      if (isNonSubscriptOperator && decl->isTemplated()) {
+        return nullptr;
+      }
+
       // Handle cases where 2 CXX methods differ strictly in "constness"
       // In such a case append a suffix ("Mutating") to the mutable version
       // of the method when importing to swift
