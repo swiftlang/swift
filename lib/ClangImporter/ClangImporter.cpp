@@ -78,7 +78,6 @@
 #include <algorithm>
 #include <string>
 #include <memory>
-#include <string>
 
 using namespace swift;
 using namespace importer;
