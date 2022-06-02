@@ -152,6 +152,7 @@ extension Task where Success == Never, Failure == Never {
   ///
   ///       try await Task.sleep(for: .seconds(3))
   ///
+  /// - Parameter duration: The duration to wait, in seconds.
   @available(SwiftStdlib 5.7, *)
   public static func sleep(
     for duration: Duration
