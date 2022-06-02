@@ -109,7 +109,7 @@ public func run_StringWalk(_ n: Int) {
 }
 
 // Extended String benchmarks:
-let baseMultiplier = 250
+let baseMultiplier = 400
 let unicodeScalarsMultiplier = baseMultiplier
 let charactersMultiplier = baseMultiplier / 5
 let characters_by_indexMultiplier = baseMultiplier / 5
