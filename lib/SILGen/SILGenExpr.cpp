@@ -3583,21 +3583,47 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
   /// Returns true if a key path component for the given property or
   /// subscript should be externally referenced.
   auto shouldUseExternalKeyPathComponent = [&]() -> bool {
-    return (!forPropertyDescriptor &&
-            (baseDecl->getModuleContext() != SwiftModule ||
-             baseDecl->isResilient(SwiftModule, expansion)) &&
-            // Protocol requirements don't have nor need property descriptors.
-            !isa<ProtocolDecl>(baseDecl->getDeclContext()) &&
-            // Properties that only dispatch via ObjC lookup do not have nor
-            // need property descriptors, since the selector identifies the
-            // storage.
-            // Properties that are not public don't need property descriptors
-            // either.
-            (!baseDecl->requiresOpaqueAccessors() ||
-             (!getAccessorDeclRef(getRepresentativeAccessorForKeyPath(baseDecl))
-                   .isForeign &&
-              getAccessorDeclRef(getRepresentativeAccessorForKeyPath(baseDecl))
-                      .getLinkage(ForDefinition) <= SILLinkage::PublicNonABI)));
+    // The property descriptor has the canonical key path component information
+    // so doesn't have to refer to another external descriptor.
+    if (forPropertyDescriptor) {
+      return false;
+    }
+    
+    // Don't need to use the external component if we're inside the resilience
+    // domain of its defining module.
+    if (baseDecl->getModuleContext() == SwiftModule
+        && !baseDecl->isResilient(SwiftModule, expansion)) {
+      return false;
+    }
+
+    // Protocol requirements don't have nor need property descriptors.
+    if (isa<ProtocolDecl>(baseDecl->getDeclContext())) {
+      return false;
+    }
+    
+    // Always-emit-into-client properties can't reliably refer to a property
+    // descriptor that may not exist in older versions of their home dylib.
+    // Their definition is also always entirely visible to clients so it isn't
+    // needed.
+    if (baseDecl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>()) {
+      return false;
+    }
+
+    // Properties that only dispatch via ObjC lookup do not have nor
+    // need property descriptors, since the selector identifies the
+    // storage.
+    // Properties that are not public don't need property descriptors
+    // either.
+    if (baseDecl->requiresOpaqueAccessors()) {
+      auto representative = getAccessorDeclRef(
+                           getRepresentativeAccessorForKeyPath(baseDecl));
+      if (representative.isForeign)
+        return false;
+      if (representative.getLinkage(ForDefinition) > SILLinkage::PublicNonABI)
+        return false;
+    }
+    
+    return true;
   };
 
   auto strategy = storage->getAccessStrategy(AccessSemantics::Ordinary,
