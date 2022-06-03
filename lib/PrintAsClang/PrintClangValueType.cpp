@@ -12,22 +12,36 @@
 
 #include "PrintClangValueType.h"
 #include "ClangSyntaxPrinter.h"
-#include "DeclAndTypePrinter.h"
 #include "OutputLanguageMode.h"
-#include "PrimitiveTypeMapping.h"
+#include "SwiftToClangInteropContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/IRGen/IRABIDetailsProvider.h"
 #include "llvm/ADT/STLExtras.h"
 
 using namespace swift;
 
 void ClangValueTypePrinter::printStructDecl(const StructDecl *SD) {
+  auto typeSizeAlign =
+      interopContext.getIrABIDetails().getTypeSizeAlignment(SD);
+  if (!typeSizeAlign) {
+    // FIXME: handle non-fixed layout structs.
+    return;
+  }
+  if (typeSizeAlign->size == 0) {
+    // FIXME: How to represent 0 sized structs?
+    return;
+  }
+
   os << "class ";
   ClangSyntaxPrinter(os).printIdentifier(SD->getName().str());
   os << " final {\n";
-  // FIXME: Print the members of the struct.
+  // FIXME: Print the other members of the struct.
+  os << "private:\n";
+  os << "  alignas(" << typeSizeAlign->alignment << ") ";
+  os << "char _storage[" << typeSizeAlign->size << "];\n";
   os << "};\n";
 }
