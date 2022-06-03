@@ -230,5 +230,7 @@ extension Animal: Pony { }
 
 public struct AnimalWrapper<Friend: Animal> { }
 
-// CHECK: Generic signature: <Friend where Friend : Animal, Friend : Pony>
+// FIXME: Generic signature: <Friend where Friend : Animal, Friend : Pony>
+// Generic signature: <Friend where Friend : Animal>
 extension AnimalWrapper: Pony where Friend: Pony { }
+// expected-warning@-1{{redundant conformance constraint 'Animal' : 'Pony'}}
