@@ -267,6 +267,7 @@ SIMPLE_DECL_ATTR(objcMembers, ObjCMembers,
   34)
 CONTEXTUAL_SIMPLE_DECL_ATTR(_compilerInitialized, CompilerInitialized,
   OnVar |
+  UserInaccessible |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   35)
 CONTEXTUAL_SIMPLE_DECL_ATTR(__consuming, Consuming,
@@ -726,6 +727,7 @@ DECL_ATTR(_backDeploy, BackDeploy,
 
 CONTEXTUAL_SIMPLE_DECL_ATTR(_local, KnownToBeLocal,
   DeclModifier | OnFunc | OnParam | OnVar |
+  UserInaccessible |
   ABIBreakingToAdd | ABIBreakingToRemove |
   APIBreakingToAdd | APIBreakingToRemove,
   130)
