@@ -608,9 +608,9 @@ extension Dictionary {
   public __consuming func filter(
     _ isIncluded: (Element) throws -> Bool
   ) rethrows -> [Key: Value] {
-    if _variant.isNative {
-      return Dictionary(_native: try _variant.asNative.filter(isIncluded))
-    } else {
+  #if _runtime(_ObjC)
+    guard _variant.isNative else {
+      // Slow path for bridged dictionaries
       var result = _NativeDictionary<Key, Value>()
       for element in self {
         if try isIncluded(element) {
@@ -619,6 +619,8 @@ extension Dictionary {
       }
       return Dictionary(_native: result)
     }
+  #endif
+    return Dictionary(_native: try _variant.asNative.filter(isIncluded))
   }
 }
 

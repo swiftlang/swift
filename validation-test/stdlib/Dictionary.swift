@@ -2013,6 +2013,19 @@ DictionaryTestSuite.test("mapValues(_:)") {
   }
 }
 
+DictionaryTestSuite.test("filter(_:)") {
+  let d1 = [1: 1, 2: 2, 3: 100, 4: 4, 5: 100, 6: 6]
+  let d2 = d1.filter() {key, value in key == value}
+
+  expectEqual(d2.count, 4)
+  for (key, value) in d2 {
+    expectEqual(key, value)
+  }
+
+  expectNil(d2[3])
+  expectNil(d2[5])
+}
+
 DictionaryTestSuite.test("capacity/init(minimumCapacity:)") {
   let d0 = Dictionary<String, Int>(minimumCapacity: 0)
   expectGE(d0.capacity, 0)

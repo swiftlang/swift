@@ -798,18 +798,18 @@ extension _NativeDictionary { // High-level operations
     _ isIncluded: (Element) throws -> Bool
   ) rethrows -> _NativeDictionary<Key, Value> {
     try _UnsafeBitset.withTemporaryBitset(
-        capacity: _storage._bucketCount
-      ) { bitset in
-        var count = 0
-        for bucket in hashTable {
-          if try isIncluded(
-            (uncheckedKey(at: bucket), uncheckedValue(at: bucket))
-          ) {
-            bitset.uncheckedInsert(bucket.offset)
-            count += 1
-          }
+      capacity: _storage._bucketCount
+    ) { bitset in
+      var count = 0
+      for bucket in hashTable {
+        if try isIncluded(
+          (uncheckedKey(at: bucket), uncheckedValue(at: bucket))
+        ) {
+          bitset.uncheckedInsert(bucket.offset)
+          count += 1
         }
-        return extractDictionary(using: bitset, count: count)
+      }
+      return extractDictionary(using: bitset, count: count)
     }
   }
 }
