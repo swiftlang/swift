@@ -40,6 +40,7 @@ add_swift_host_library(swiftIRGen STATIC
   GenTuple.cpp
   GenType.cpp
   GenValueWitness.cpp
+  IRABIDetailsProvider.cpp
   IRGen.cpp
   IRGenDebugInfo.cpp
   IRGenFunction.cpp
