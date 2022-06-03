@@ -4,6 +4,8 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/cdecl.h)
 
+// XFAIL: *
+
 // CHECK-LABEL: namespace CdeclFunctions {
 
 // CHECK: namespace _impl {

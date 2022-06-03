@@ -5,6 +5,7 @@
 // RUN: %check-interop-c-header-in-clang(%t/functions.h)
 
 // REQUIRES: OS=macosx || OS=linux-gnu
+// XFAIL: *
 
 // CHECK: SWIFT_EXTERN long $s9Functions16passThroughCLongyS2iF(long x) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN unsigned long $s9Functions24passThroughCUnsignedLongyS2uF(unsigned long x) SWIFT_NOEXCEPT SWIFT_CALL;

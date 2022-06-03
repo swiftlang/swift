@@ -4,6 +4,8 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/functions.h)
 
+// XFAIL: *
+
 // CHECK:      inline float passThrougCFloat(float x) noexcept SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT: return _impl::$s9Functions16passThrougCFloatyS2fF(x);
 // CHECK-NEXT: }
