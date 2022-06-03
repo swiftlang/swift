@@ -824,6 +824,12 @@ static void addStmtKeywords(CodeCompletionResultSink &Sink, DeclContext *DC,
   auto AddStmtKeyword = [&](StringRef Name, CodeCompletionKeywordKind Kind) {
     if (!MaybeFuncBody && Kind == CodeCompletionKeywordKind::kw_return)
       return;
+
+    // 'in' keyword is added in 'addClosureSignatureKeywordsIfApplicable' if
+    // needed.
+    if (Kind == CodeCompletionKeywordKind::kw_in)
+      return;
+
     addKeyword(Sink, Name, Kind, "", flair);
   };
 #define STMT_KEYWORD(kw) AddStmtKeyword(#kw, CodeCompletionKeywordKind::kw_##kw);
@@ -904,6 +910,18 @@ static void addAnyTypeKeyword(CodeCompletionResultSink &Sink, Type T) {
   Builder.addTypeAnnotation(T, PrintOptions());
 }
 
+static void
+addClosureSignatureKeywordsIfApplicable(CodeCompletionResultSink &Sink,
+                                        DeclContext *DC) {
+  ClosureExpr *closure = dyn_cast<ClosureExpr>(DC);
+  if (!closure)
+    return;
+  if (closure->getInLoc().isValid())
+    return;
+
+  addKeyword(Sink, "in", CodeCompletionKeywordKind::kw_in);
+}
+
 void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
                                               bool MaybeFuncBody) {
   switch (Kind) {
@@ -958,6 +976,8 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
     addDeclKeywords(Sink, CurDeclContext,
                     Context.LangOpts.EnableExperimentalConcurrency);
     addStmtKeywords(Sink, CurDeclContext, MaybeFuncBody);
+    addClosureSignatureKeywordsIfApplicable(Sink, CurDeclContext);
+
     LLVM_FALLTHROUGH;
   case CompletionKind::ReturnStmtExpr:
   case CompletionKind::YieldStmtExpr:
@@ -982,6 +1002,11 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
     break;
 
   case CompletionKind::PostfixExpr:
+    // Suggest 'in' for '{ value <HERE>'.
+    if (HasSpace)
+      addClosureSignatureKeywordsIfApplicable(Sink, CurDeclContext);
+
+    break;
   case CompletionKind::CaseStmtBeginning:
   case CompletionKind::TypeIdentifierWithDot:
   case CompletionKind::TypeIdentifierWithoutDot:
