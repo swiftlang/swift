@@ -109,6 +109,7 @@ SDKNodeDecl::SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind)
         IsOverriding(Info.IsOverriding),
         IsOpen(Info.IsOpen),
         IsInternal(Info.IsInternal), IsABIPlaceholder(Info.IsABIPlaceholder),
+        IsFromExtension(Info.IsFromExtension),
         ReferenceOwnership(uint8_t(Info.ReferenceOwnership)),
         GenericSig(Info.GenericSig),
         SugaredGenericSig(Info.SugaredGenericSig),
@@ -1376,6 +1377,13 @@ StringRef SDKContext::getInitKind(Decl *D) {
   return StringRef();
 }
 
+static bool isDeclaredInExtension(Decl *D) {
+  if (auto *DC = D->getDeclContext()->getAsDecl()) {
+    return isa<ExtensionDecl>(DC);
+  }
+  return false;
+}
+
 SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Decl *D):
       Ctx(Ctx), DKind(D->getKind()), Loc(D->getLoc()),
       Location(calculateLocation(Ctx, D)),
@@ -1394,6 +1402,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Decl *D):
       IsImplicit(D->isImplicit()),
       IsDeprecated(D->getAttrs().getDeprecated(D->getASTContext())),
       IsABIPlaceholder(isABIPlaceholderRecursive(D)),
+      IsFromExtension(isDeclaredInExtension(D)),
       DeclAttrs(collectDeclAttributes(D)) {}
 
 SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, OperatorDecl *OD):
@@ -2038,6 +2047,7 @@ void SDKNodeDecl::jsonize(json::Output &out) {
     uint8_t Raw = uint8_t(getReferenceOwnership());
     out.mapRequired(getKeyContent(Ctx, KeyKind::KK_ownership).data(), Raw);
   }
+  output(out, KeyKind::KK_isFromExtension, IsFromExtension);
 }
 
 void SDKNodeDeclAbstractFunc::jsonize(json::Output &out) {
