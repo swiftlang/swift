@@ -842,6 +842,8 @@ private:
     // throw them from C++ when emitting C++ inline thunks for the Swift
     // functions.
     // FIXME: Support throwing exceptions for Swift errors.
+    if (!funcTy->isThrowing())
+      os << " SWIFT_NOEXCEPT";
     if (!funcABI.useCCallingConvention())
       os << " SWIFT_CALL";
     printAvailability(FD);
@@ -878,6 +880,8 @@ private:
         FD, FD->getName().getBaseIdentifier().get(), resultTy,
         DeclAndTypeClangFunctionPrinter::FunctionSignatureKind::CxxInlineThunk);
     // FIXME: Support throwing exceptions for Swift errors.
+    if (!funcTy->isThrowing())
+      os << " noexcept";
     printFunctionClangAttributes(FD, funcTy);
     printAvailability(FD);
     os << " {\n";

@@ -4,8 +4,6 @@
 
 // RUN: %check-interop-c-header-in-clang(%t/functions.h)
 
-// XFAIL: *
-
 // CHECK: SWIFT_EXTERN float $s9Functions16passThrougCFloatyS2fF(float x) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN bool $s9Functions15passThroughBoolyS2bF(bool x) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN bool $s9Functions16passThroughCBoolyS2bF(bool x) SWIFT_NOEXCEPT SWIFT_CALL;

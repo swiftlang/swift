@@ -301,7 +301,10 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
     out << "#endif\n";
   };
   emitMacro("SWIFT_CALL", "__attribute__((swiftcall))");
-  // FIXME: Support throwing exceptions for Swift errors.
+  // SWIFT_NOEXCEPT applies 'noexcept' in C++ mode only.
+  emitCxxConditional(
+      out, [&] { emitMacro("SWIFT_NOEXCEPT", "noexcept"); },
+      [&] { emitMacro("SWIFT_NOEXCEPT"); });
   emitCxxConditional(out, [&] {
     out << "#if !defined(SWIFT_CXX_INT_DEFINED)\n";
     out << "#define SWIFT_CXX_INT_DEFINED\n";
