@@ -14,7 +14,8 @@
 #define SWIFT_IRGEN_IRABIDETAILSPROVIDER_H
 
 #include "llvm/ADT/Optional.h"
-#include <stdint.h>
+#include <cstdint>
+#include <memory>
 #include <utility>
 
 namespace swift {
