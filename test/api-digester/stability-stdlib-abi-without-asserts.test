@@ -95,6 +95,10 @@ Func UnsafeMutablePointer.withMemoryRebound(to:capacity:_:) has been removed
 Func UnsafePointer.withMemoryRebound(to:capacity:_:) has been removed
 Func UnsafeMutableRawBufferPointer.storeBytes(of:toByteOffset:as:) has been removed
 Func UnsafeMutableRawPointer.storeBytes(of:toByteOffset:as:) has been removed
+Func UnsafeMutableBufferPointer.assign(repeating:) has been removed
+Func UnsafeMutablePointer.assign(from:count:) has been removed
+Func UnsafeMutablePointer.assign(repeating:count:) has been removed
+Func UnsafeMutablePointer.moveAssign(from:count:) has been removed
 
 // These haven't actually been removed; they are simply marked unavailable.
 // This seems to be a false positive in the ABI checker. This is not an ABI
