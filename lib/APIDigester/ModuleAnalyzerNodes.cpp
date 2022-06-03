@@ -54,6 +54,16 @@ struct swift::ide::api::SDKNodeInitInfo {
   SDKNode* createSDKNode(SDKNodeKind Kind);
 };
 
+bool swift::ide::api::hasValidParentPtr(SDKNodeKind kind) {
+  switch(kind) {
+  case SDKNodeKind::Conformance:
+  case SDKNodeKind::DeclAccessor:
+    return false;
+  default:
+    return true;
+  }
+}
+
 SDKContext::SDKContext(CheckerOptions Opts): Diags(SourceMgr), Opts(Opts) {}
 
 DiagnosticEngine &SDKContext::getDiags(SourceLoc Loc) {
@@ -827,6 +837,25 @@ static bool hasSameParameterFlags(const SDKNodeType *Left, const SDKNodeType *Ri
   return true;
 }
 
+// Return whether a decl has been moved in/out to an extension
+static Optional<bool> isFromExtensionChanged(const SDKNode &L, const SDKNode &R) {
+  assert(L.getKind() == R.getKind());
+  // Version 8 starts to include whether a decl is from an extension.
+  if (L.getJsonFormatVersion() + R.getJsonFormatVersion() < 2 * 8) {
+    return llvm::None;
+  }
+  auto *Left = dyn_cast<SDKNodeDecl>(&L);
+  auto *Right = dyn_cast<SDKNodeDecl>(&R);
+  if (!Left) {
+    return llvm::None;
+  }
+  if (Left->isFromExtension() == Right->isFromExtension()) {
+    return llvm::None;
+  } else {
+    return Right->isFromExtension();
+  }
+}
+
 static bool isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) {
   auto *LeftAlias = dyn_cast<SDKNodeTypeAlias>(&L);
   auto *RightAlias = dyn_cast<SDKNodeTypeAlias>(&R);
@@ -966,6 +995,8 @@ static bool isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
     case SDKNodeKind::TypeWitness:
     case SDKNodeKind::DeclImport:
     case SDKNodeKind::Root: {
+      if (isFromExtensionChanged(L, R))
+        return false;
       return L.getPrintedName() == R.getPrintedName() &&
         L.hasSameChildren(R);
     }
@@ -2618,6 +2649,23 @@ void swift::ide::api::SDKNodeDeclAbstractFunc::diagnose(SDKNode *Right) {
   if (Ctx.checkingABI()) {
     if (reqNewWitnessTableEntry() != R->reqNewWitnessTableEntry()) {
       emitDiag(Loc, diag::decl_new_witness_table_entry, reqNewWitnessTableEntry());
+    }
+
+    // Diagnose moving a non-final class member to an extension.
+    if (hasValidParentPtr(getKind())) {
+      while(auto *parent = dyn_cast<SDKNodeDecl>(getParent())) {
+        if (parent->getDeclKind() != DeclKind::Class) {
+          break;
+        }
+        if (hasDeclAttribute(DeclAttrKind::DAK_Final)) {
+          break;
+        }
+        auto result = isFromExtensionChanged(*this, *Right);
+        if (result.hasValue() && *result) {
+          emitDiag(Loc, diag::class_member_moved_to_extension);
+        }
+        break;
+      }
     }
   }
 }
