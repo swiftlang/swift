@@ -71,7 +71,9 @@ static MutableArrayRef<CodeCompletionResult *> copyCodeCompletionResults(
     };
   } else {
     shouldIncludeResult = [](const ContextFreeCodeCompletionResult *R) -> bool {
-      return true;
+      // PrecedenceGroups are only valid in 'onlyPrecedenceGroups'.
+      return R->getAssociatedDeclKind() !=
+             CodeCompletionDeclKind::PrecedenceGroup;
     };
   }
 
