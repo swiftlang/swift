@@ -552,20 +552,21 @@ extension Array {
     Builtin.unreachable()
   }
 
-  @_specialize(
-    exported: true,
-    target: append(_:),
-    availability: SwiftStdlib 5.5, *;
-    where Element == Any)
-  @_specialize(
-    exported: true,
-    target: append(_:),
-    availability: SwiftStdlib 5.5, *;
-    where Element == String)
-  @available(SwiftStdlib 5.5, *)
-  mutating func __specialize_append(_: __owned Element) {
-    Builtin.unreachable()
-  }
+  // Would inhibt optimizations based on array semantics.
+  //@_specialize(
+  //  exported: true,
+  //  target: append(_:),
+  //  availability: SwiftStdlib 5.5, *;
+  //  where Element == Any)
+  //@_specialize(
+  //  exported: true,
+  //  target: append(_:),
+  //  availability: SwiftStdlib 5.5, *;
+  //  where Element == String)
+  //@available(SwiftStdlib 5.5, *)
+  //mutating func __specialize_append(_: __owned Element) {
+  //  Builtin.unreachable()
+  //}
 
   @_specialize(
     exported: true,
@@ -818,20 +819,20 @@ extension ContiguousArray {
     Builtin.unreachable()
   }
 
-  @_specialize(
-    exported: true,
-    target: append(_:),
-    availability: SwiftStdlib 5.5, *;
-    where Element == Any)
-  @_specialize(
-    exported: true,
-    target: append(_:),
-    availability: SwiftStdlib 5.5, *;
-    where Element == String)
-  @available(SwiftStdlib 5.5, *)
-  mutating func __specialize_append(_: __owned Element) {
-    Builtin.unreachable()
-  }
+  //@_specialize(
+  //  exported: true,
+  //  target: append(_:),
+  //  availability: SwiftStdlib 5.5, *;
+  //  where Element == Any)
+  //@_specialize(
+  //  exported: true,
+  //  target: append(_:),
+  //  availability: SwiftStdlib 5.5, *;
+  //  where Element == String)
+  //@available(SwiftStdlib 5.5, *)
+  //mutating func __specialize_append(_: __owned Element) {
+  //  Builtin.unreachable()
+  //}
 
   @_specialize(
     exported: true,
