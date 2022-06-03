@@ -42,6 +42,7 @@ template <> struct ScalarEnumerationTraits<file_types::ID> {
       std::string typeName = file_types::getTypeName(ty).str();
       out.enumCase(value, typeName.c_str(), ty);
     });
+    out.enumCase(value, "unknown", file_types::ID::TY_INVALID);
   }
 };
 
