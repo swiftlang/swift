@@ -431,11 +431,15 @@ bb0:
 // CHECK:   [[BORROWED_BAZ:%.*]] = begin_borrow [[BAZ]] : $Baz
 // CHECK:   [[X:%.*]] = struct_extract [[BORROWED_BAZ]] : $Baz, #Baz.x
 // CHECK:   [[BAR:%.*]] = struct_extract [[BORROWED_BAZ]] : $Baz, #Baz.bar
+
 // CHECK:   [[BAR_COPY:%.*]] = copy_value [[BAR]]
+// CHECK:   [[BAR_COPY_2:%.*]] = copy_value [[BAR_COPY]]
 // CHECK:   [[BAR2:%.*]] = struct_extract [[BORROWED_BAZ]] : $Baz, #Baz.bar
 // CHECK:   [[BAR2_COPY:%.*]] = copy_value [[BAR2]]
 // CHECK:   [[BAR2_COPY_BORROW:%.*]] = begin_borrow [[BAR2_COPY]]
+// CHECK:   [[LOAD_BORROW_EXT:%.*]] = struct_extract [[BORROWED_BAZ]]
 // CHECK:   apply {{%.*}}([[BAR_COPY]], [[BAR2_COPY_BORROW]], [[X]])
+// CHECK:   apply {{%.*}}([[BAR_COPY_2]], [[LOAD_BORROW_EXT]], [[X]])
 // CHECK:   end_borrow [[BAR2_COPY_BORROW]]
 // CHECK:   destroy_value [[BAR2_COPY]]
 // CHECK:   end_borrow [[BORROWED_BAZ]]
@@ -458,12 +462,17 @@ bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Baz>, %1 : @owned $<τ_0_0> { var τ_0
   %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <Baz>, 0
   %9 = struct_element_addr %1a : $*Baz, #Baz.x
   %10 = struct_element_addr %1a : $*Baz, #Baz.bar
+  %10a = struct_element_addr %1a : $*Baz, #Baz.bar
   %11 = load [trivial] %9 : $*Int
   %12 = load [copy] %10 : $*Bar
+  %12a = copy_value %12 : $Bar
   %13 = load [copy] %10 : $*Bar
   %14 = begin_borrow %13 : $Bar
   %15 = function_ref @destructured_baz_user : $@convention(thin) (@owned Bar, @guaranteed Bar, Int) -> ()
+  %16 = load_borrow %10a : $*Bar
   apply %15(%12, %14, %11) : $@convention(thin) (@owned Bar, @guaranteed Bar, Int) -> ()
+  apply %15(%12a, %16, %11) : $@convention(thin) (@owned Bar, @guaranteed Bar, Int) -> ()
+  end_borrow %16 : $Bar
   end_borrow %14 : $Bar
   destroy_value %13 : $Bar
 
