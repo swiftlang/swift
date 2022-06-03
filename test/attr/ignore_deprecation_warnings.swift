@@ -53,3 +53,13 @@ class anotherType {
     let shouldntWarn1 = deprecatedType()
     let shouldntWarn2 = deprecatedFuncWithReturnValue2()
 }
+
+@inlinable
+@ignoreDeprecationWarnings
+func multipleAttrsFunc() -> deprecatedType {
+    return deprecatedType()
+}
+
+@ignoreDeprecationWarnings
+@available(iOS 15.0, *)
+var multipleAttrsVar = 3
