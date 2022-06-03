@@ -152,7 +152,7 @@ bool SILType::isNoReturnFunction(SILModule &M,
 }
 
 std::string SILType::getMangledName() const {
-  Mangle::ASTMangler mangler(false/*use dwarf mangling*/);
+  Mangle::ASTMangler mangler;
   return mangler.mangleTypeWithoutPrefix(getASTType());
 }
 
