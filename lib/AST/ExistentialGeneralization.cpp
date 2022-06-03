@@ -175,6 +175,7 @@ private:
   INVALID_TO_GENERALIZE(SILBox)
   INVALID_TO_GENERALIZE(SILFunction)
   INVALID_TO_GENERALIZE(SILToken)
+  INVALID_TO_GENERALIZE(SILMoveOnly)
 #undef INVALID_TO_GENERALIZE
 
   /// Generalize the generic arguments of the given generic type.s

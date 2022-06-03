@@ -91,7 +91,8 @@ SILType SILType::getOptionalType(SILType type) {
   auto &ctx = type.getASTContext();
   auto optType = BoundGenericEnumType::get(ctx.getOptionalDecl(), Type(),
                                            { type.getASTType() });
-  return getPrimitiveType(CanType(optType), type.getCategory());
+  return getPrimitiveType(CanType(optType), type.getCategory())
+      .copyMoveOnly(type);
 }
 
 SILType SILType::getEmptyTupleType(const ASTContext &C) {
@@ -164,7 +165,7 @@ bool SILType::isNoReturnFunction(SILModule &M,
 
 std::string SILType::getMangledName() const {
   Mangle::ASTMangler mangler;
-  return mangler.mangleTypeWithoutPrefix(getASTType());
+  return mangler.mangleTypeWithoutPrefix(getRawASTType());
 }
 
 std::string SILType::getAsString() const {
@@ -287,11 +288,17 @@ SILType SILType::getFieldType(VarDecl *field, TypeConverter &TC,
     substFieldTy = origFieldTy.getType();
   } else {
     substFieldTy =
-      getASTType()->getTypeOfMember(&TC.M, field)->getCanonicalType();
+        getASTType()->getTypeOfMember(&TC.M, field)->getCanonicalType();
   }
 
   auto loweredTy =
       TC.getLoweredRValueType(context, origFieldTy, substFieldTy);
+
+  // If this type is not a class type, then we propagate "move only"-ness to the
+  // field. Example:
+  if (!getClassOrBoundGenericClass() && isMoveOnly())
+    loweredTy = SILMoveOnlyType::get(loweredTy);
+
   if (isAddress() || getClassOrBoundGenericClass() != nullptr) {
     return SILType::getPrimitiveAddressType(loweredTy);
   } else {
@@ -311,7 +318,7 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt, TypeConverter &TC,
 
   if (auto objectType = getASTType().getOptionalObjectType()) {
     assert(elt == TC.Context.getOptionalSomeDecl());
-    return SILType(objectType, getCategory());
+    return SILType(objectType, getCategory()).copyMoveOnly(*this);
   }
 
   // If the case is indirect, then the payload is boxed.
@@ -321,13 +328,12 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt, TypeConverter &TC,
                    getCategory());
   }
 
-  auto substEltTy =
-    getASTType()->getTypeOfMember(&TC.M, elt,
-                                  elt->getArgumentInterfaceType());
+  auto substEltTy = getASTType()->getTypeOfMember(
+      &TC.M, elt, elt->getArgumentInterfaceType());
   auto loweredTy = TC.getLoweredRValueType(
       context, TC.getAbstractionPattern(elt), substEltTy);
 
-  return SILType(loweredTy, getCategory());
+  return SILType(loweredTy, getCategory()).copyMoveOnly(*this);
 }
 
 SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M,
@@ -432,15 +438,15 @@ bool SILType::aggregateHasUnreferenceableStorage() const {
 
 SILType SILType::getOptionalObjectType() const {
   if (auto objectTy = getASTType().getOptionalObjectType()) {
-    return SILType(objectTy, getCategory());
+    return SILType(objectTy, getCategory()).copyMoveOnly(*this);
   }
 
   return SILType();
 }
 
 SILType SILType::unwrapOptionalType() const {
-  if (auto objectTy = getOptionalObjectType()) {
-    return objectTy;
+  if (auto objectTy = withoutMoveOnly().getOptionalObjectType()) {
+    return objectTy.copyMoveOnly(*this);
   }
 
   return *this;

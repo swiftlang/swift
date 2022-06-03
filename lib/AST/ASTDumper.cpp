@@ -3935,6 +3935,12 @@ namespace {
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
+    void visitSILMoveOnlyType(SILMoveOnlyType *T, StringRef label) {
+      printCommon(label, "sil_move_only_type");
+      printRec(T->getInnerType());
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
+
     void visitSILBoxType(SILBoxType *T, StringRef label) {
       printCommon(label, "sil_box_type");
       // FIXME: Print the structure of the type.

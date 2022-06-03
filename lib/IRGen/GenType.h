@@ -158,6 +158,9 @@ private:
   const TypeInfo *convertBoxType(SILBoxType *T);
   const TypeInfo *convertArchetypeType(ArchetypeType *T);
   const TypeInfo *convertInOutType(InOutType *T);
+  const TypeInfo *convertSILMoveOnlyType(SILMoveOnlyType *T) {
+    return convertType(T->getInnerType());
+  }
   const TypeInfo *convertExistentialMetatypeType(ExistentialMetatypeType *T);
   const TypeInfo *convertMetatypeType(MetatypeType *T);
   const TypeInfo *convertModuleType(ModuleType *T);

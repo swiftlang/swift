@@ -1921,6 +1921,7 @@ private:
   NEVER_VISIT(SILBlockStorageType)
   NEVER_VISIT(SILBoxType)
   NEVER_VISIT(SILTokenType)
+  NEVER_VISIT(SILMoveOnlyType)
 
   VISIT(ProtocolCompositionType, compose)
 
