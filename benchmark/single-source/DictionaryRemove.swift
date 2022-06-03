@@ -67,7 +67,7 @@ func removeObjects(n: Int) {
 }
 
 func filter(n: Int) {
-  for _ in 1...n {
+  for _ in 1...100*n {
     let dict = numberMap
     let result = dict.filter {key, value in value % 2 == 0}
     check(result.count == size/2)
@@ -75,7 +75,7 @@ func filter(n: Int) {
 }
 
 func filterObjects(n: Int) {
-  for _ in 1...n {
+  for _ in 1...100*n {
     let dict = boxedNumMap
     let result = dict.filter {key, value in value.value % 2 == 0}
     check(result.count == size/2)
