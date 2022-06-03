@@ -13,9 +13,7 @@
 
 // CHECK: }
 
-//XFAIL: *
-
-enum NaiveErrors: Error {
+enum NaiveErrors : Error {
     case returnError
     case throwError
 }
