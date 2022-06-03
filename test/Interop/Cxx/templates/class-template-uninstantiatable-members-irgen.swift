@@ -11,7 +11,7 @@ import ClassTemplateInstantiationErrors
 // CHECK: call {{.*}}i32 @{{_ZN21CannotBeInstantiantedI10IntWrapperE6getOneEv|"\?getOne@\?\$CannotBeInstantianted@UIntWrapper@@@@QEAAHXZ"}}(%struct.CannotBeInstantianted*
 // CHECK: ret i32
 
-// CHECK-LABEL: define {{.*}}i32 @{{_ZN21CannotBeInstantiantedI10IntWrapperE8incValueES0_|"\?incValue@\?\$CannotBeInstantianted@UIntWrapper@@@@QEAAHUIntWrapper@@@Z"}}(%struct.CannotBeInstantianted* {{.*}}, {{i32|i64|\[1 x i32\]|\%struct\.IntWrapper\* byval\(\%struct\.IntWrapper\)}}
+// CHECK-LABEL: define {{.*}}i32 @{{_ZN21CannotBeInstantiantedI10IntWrapperE8incValueES0_|"\?incValue@\?\$CannotBeInstantianted@UIntWrapper@@@@QEAAHUIntWrapper@@@Z"}}(%struct.CannotBeInstantianted* {{.*}}, {{i32|i64|\[1 x i32\]|\%struct\.IntWrapper\* .*byval\(\%struct\.IntWrapper\)}}
 // CHECK: call {{.*}}i32 @{{_ZN21CannotBeInstantiantedI10IntWrapperE6getOneEv|"\?getOne@\?\$CannotBeInstantianted@UIntWrapper@@@@QEAAHXZ"}}(%struct.CannotBeInstantianted*
 // CHECK: ret i32
 
