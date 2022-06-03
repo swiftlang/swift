@@ -9,7 +9,6 @@
 // RUN: %target-run %t/swift-functions-execution | %FileCheck %s
 
 // REQUIRES: executable_test
-// XFAIL: *
 
 #include <cassert>
 #include "functions.h"

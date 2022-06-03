@@ -4,8 +4,6 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/functions.h)
 
-// XFAIL: *
-
 // CHECK-LABEL: namespace Functions {
 
 // CHECK-LABEL: namespace _impl {

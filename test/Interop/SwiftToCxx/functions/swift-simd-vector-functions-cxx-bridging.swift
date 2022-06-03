@@ -4,8 +4,6 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/functions.h)
 
-// XFAIL: *
-
 // CHECK:      inline swift_double2 passThroughdouble2(swift_double2 x) noexcept SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:   return _impl::$s9Functions18passThroughdouble2y4simd7double2VAEF(x);
 // CHECK-NEXT: }
