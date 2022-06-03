@@ -2973,7 +2973,9 @@ public:
         if (FD->hasAsync()) {
           FD->setForeignAsyncConvention(*asyncConvention);
           getASTContext().Diags.diagnose(CDeclAttr->getLocation(),
-                                         diag::cdecl_async);
+                                         diag::attr_decl_async,
+                                         CDeclAttr->getAttrName(),
+                                         FD->getDescriptiveKind());
         } else if (FD->hasThrows()) {
           FD->setForeignErrorConvention(*errorConvention);
           getASTContext().Diags.diagnose(CDeclAttr->getLocation(),

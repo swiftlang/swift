@@ -501,6 +501,12 @@ validateIBActionSignature(ASTContext &ctx, DeclAttribute *attr,
     valid = false;
   }
 
+  if (FD->isAsyncContext()) {
+    ctx.Diags.diagnose(FD->getAsyncLoc(), diag::attr_decl_async,
+        attr->getAttrName(), FD->getDescriptiveKind());
+    valid = false;
+  }
+
   // We don't need to check here that parameter or return types are
   // ObjC-representable; IsObjCRequest will validate that.
 
@@ -526,12 +532,6 @@ void AttributeChecker::visitIBActionAttr(IBActionAttr *attr) {
   const FuncDecl *FD = cast<FuncDecl>(D);
   if (!FD->isPotentialIBActionTarget()) {
     diagnoseAndRemoveAttr(attr, diag::invalid_ibaction_decl,
-                          attr->getAttrName());
-    return;
-  }
-
-  if (FD->isAsyncContext()) {
-    diagnoseAndRemoveAttr(attr, diag::invalid_ibaction_decl_async,
                           attr->getAttrName());
     return;
   }
