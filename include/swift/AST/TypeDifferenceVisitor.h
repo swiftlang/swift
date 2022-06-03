@@ -333,6 +333,11 @@ public:
     return asImpl().visit(type1->getCaptureType(), type2->getCaptureType());
   }
 
+  bool visitSILMoveOnlyType(CanSILMoveOnlyType type1,
+                            CanSILMoveOnlyType type2) {
+    return asImpl().visit(type1->getInnerType(), type2->getInnerType());
+  }
+
   bool visitProtocolCompositionType(CanProtocolCompositionType type1,
                                     CanProtocolCompositionType type2) {
     return visitComponentArray(type1, type2,

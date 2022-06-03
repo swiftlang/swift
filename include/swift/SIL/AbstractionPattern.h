@@ -1337,6 +1337,14 @@ public:
     llvm_unreachable("bad kind");
   }
 
+  /// Given that the value being abstracted is a move only type, return the
+  /// abstraction pattern with the move only bit removed.
+  AbstractionPattern withoutMoveOnly() const;
+
+  /// Given that the value being abstracted is not a move only type, return the
+  /// abstraction pattern with the move only bit added.
+  AbstractionPattern withMoveOnly() const;
+
   /// Given that the value being abstracted is a tuple type, return
   /// the abstraction pattern for its object type.
   AbstractionPattern getTupleElementType(unsigned index) const;
