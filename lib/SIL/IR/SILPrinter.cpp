@@ -461,9 +461,12 @@ static void printSILTypeColorAndSigil(raw_ostream &OS, SILType t) {
 
 void SILType::print(raw_ostream &OS, const PrintOptions &PO) const {
   printSILTypeColorAndSigil(OS, *this);
-  
+
   // Print other types as their Swift representation.
-  getASTType().print(OS, PO);
+  //
+  // NOTE: We always print the Raw AST type so we don't look through
+  // move-onlyness.
+  getRawASTType().print(OS, PO);
 }
 
 void SILType::dump() const {
@@ -647,7 +650,7 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
   
   SILPrinter &operator<<(SILType t) {
     printSILTypeColorAndSigil(PrintState.OS, t);
-    t.getASTType().print(PrintState.OS, PrintState.ASTOptions);
+    t.getRawASTType().print(PrintState.OS, PrintState.ASTOptions);
     return *this;
   }
   

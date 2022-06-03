@@ -2840,6 +2840,12 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
     attrs.clearAttribute(TAK_box);
   }
 
+  // In SIL *only*, allow @moveOnly to specify a moveOnly type.
+  if ((options & TypeResolutionFlags::SILType) && attrs.has(TAK_moveOnly)) {
+    ty = SILMoveOnlyType::get(ty->getCanonicalType());
+    attrs.clearAttribute(TAK_moveOnly);
+  }
+
   // In SIL *only*, allow @dynamic_self to specify a dynamic Self type.
   if ((options & TypeResolutionFlags::SILMode) && attrs.has(TAK_dynamic_self)) {
     ty = rebuildWithDynamicSelf(getASTContext(), ty);

@@ -63,7 +63,7 @@ namespace api {
 ///
 /// When the json format changes in a way that requires version-specific handling, this number should be incremented.
 /// This ensures we could have backward compatibility so that version changes in the format won't stop the checker from working.
-const uint8_t DIGESTER_JSON_VERSION = 7; // push SDKNodeRoot to lower-level
+const uint8_t DIGESTER_JSON_VERSION = 8; // add isFromExtension
 const uint8_t DIGESTER_JSON_DEFAULT_VERSION = 0; // Use this version number for files before we have a version number in json.
 const StringRef ABIRootKey = "ABIRoot";
 const StringRef ConstValuesKey = "ConstValues";
@@ -354,6 +354,7 @@ class SDKNodeDecl: public SDKNode {
   bool IsOpen;
   bool IsInternal;
   bool IsABIPlaceholder;
+  bool IsFromExtension;
   uint8_t ReferenceOwnership;
   StringRef GenericSig;
   // In ABI mode, this field is populated as a user-friendly version of GenericSig.
@@ -392,6 +393,7 @@ public:
   bool isOpen() const { return IsOpen; }
   bool isInternal() const { return IsInternal; }
   bool isABIPlaceholder() const { return IsABIPlaceholder; }
+  bool isFromExtension() const { return IsFromExtension; }
   StringRef getGenericSignature() const { return GenericSig; }
   StringRef getSugaredGenericSignature() const { return SugaredGenericSig; }
   StringRef getScreenInfo() const;
@@ -710,6 +712,7 @@ public:
   void jsonize(json::Output &Out) override;
 };
 
+// Note: Accessor doesn't have Parent pointer.
 class SDKNodeDeclAccessor: public SDKNodeDeclAbstractFunc {
   SDKNodeDecl *Owner;
   AccessorKind AccKind;
@@ -828,6 +831,8 @@ int findDeclUsr(StringRef dumpPath, CheckerOptions Opts);
 
 void nodeSetDifference(ArrayRef<SDKNode*> Left, ArrayRef<SDKNode*> Right,
   NodeVector &LeftMinusRight, NodeVector &RightMinusLeft);
+
+bool hasValidParentPtr(SDKNodeKind kind);
 } // end of abi namespace
 } // end of ide namespace
 } // end of Swift namespace

@@ -136,6 +136,7 @@ KEY_BOOL(IsExternal, isExternal)
 KEY_BOOL(IsEnumExhaustive, isEnumExhaustive)
 KEY_BOOL(HasMissingDesignatedInitializers, hasMissingDesignatedInitializers)
 KEY_BOOL(InheritsConvenienceInitializers, inheritsConvenienceInitializers)
+KEY_BOOL(IsFromExtension, isFromExtension)
 
 KEY(kind)
 
