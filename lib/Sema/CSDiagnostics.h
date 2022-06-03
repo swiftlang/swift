@@ -1190,7 +1190,7 @@ public:
   SourceLoc getLoc() const override {
     auto *locator = getLocator();
 
-    if (locator->findLast<LocatorPathElt::ClosureBodyElement>()) {
+    if (locator->findLast<LocatorPathElt::SyntacticElement>()) {
       return constraints::getLoc(getAnchor());
     }
 
