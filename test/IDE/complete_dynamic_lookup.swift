@@ -56,6 +56,9 @@
 // RUN: %FileCheck %s -check-prefix=DL_CLASS_DOT < %t.dl.txt
 // RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=INITIALIZE_PAREN | %FileCheck %s -check-prefix=INITIALIZE_PAREN
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=GLOBAL_WITHINIT -code-complete-inits-in-postfix-expr | %FileCheck %s -check-prefix=GLOBAL_WITHINIT
+
 // REQUIRES: objc_interop
 
 import foo_swift_module
@@ -490,4 +493,17 @@ func testAnyObjectClassMethods1(_ dl: AnyObject) {
 
 func testAnyObjectClassMethods2(_ dl: AnyObject) {
   type(of: dl).#^DL_CLASS_DOT_1^#
+}
+
+func testAnyObjectInitialize() {
+  AnyObject(#^INITIALIZE_PAREN^#)
+// INITIALIZE_PAREN-NOT: Flair[ArgLabels]
+// INITIALIZE_PAREN-NOT: name=int:
+}
+
+func testGlobalInitializer() {
+  #^GLOBAL_WITHINIT^#
+// GLOBAL_WITHINIT-NOT: name=AnyObject(
+// GLOBAL_WITHINIT-DAG: Decl[TypeAlias]/OtherModule[Swift]/IsSystem: AnyObject[#Builtin.AnyObject#]; name=AnyObject
+// GLOBAL_WITHINIT-NOT: name=AnyObject(
 }
