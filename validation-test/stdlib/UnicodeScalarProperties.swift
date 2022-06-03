@@ -216,4 +216,52 @@ if #available(SwiftStdlib 5.7, *) {
   }
 }
 
+//===----------------------------------------------------------------------===//
+// Script/Script Extensions
+//===----------------------------------------------------------------------===//
+
+if #available(SwiftStdlib 5.7, *) {
+  UnicodeScalarPropertiesTest.test("Scalar Scripts") {
+    for i in 0x0 ... 0x10FFFF {
+      guard let scalar = Unicode.Scalar(i) else {
+        continue
+      }
+
+      let script = unsafeBitCast(
+        scalar.properties._script,
+        to: Unicode.Script.self
+      )
+
+      if let parsedScript = scripts[scalar] {
+        expectEqual(script, parsedScript)
+      } else {
+        expectEqual(script, .unknown)
+      }
+    }
+  }
+
+  UnicodeScalarPropertiesTest.test("Scalar Script Extensions") {
+    for i in 0x0 ... 0x10FFFF {
+      guard let scalar = Unicode.Scalar(i) else {
+        continue
+      }
+
+      let extensions = scalar.properties._scriptExtensions.map {
+        unsafeBitCast($0, to: Unicode.Script.self)
+      }
+
+      let script = unsafeBitCast(
+        scalar.properties._script,
+        to: Unicode.Script.self
+      )
+
+      if let parsedExtensions = scriptExtensions[scalar] {
+        expectEqual(extensions, parsedExtensions)
+      } else {
+        expectEqual(extensions, [script])
+      }
+    }
+  }
+}
+
 runAllTests()

@@ -379,7 +379,7 @@ bool swift::isAdditiveArithmeticConformanceDerivationEnabled(SourceFile &SF) {
   auto &ctx = SF.getASTContext();
   // Return true if `AdditiveArithmetic` derived conformances are explicitly
   // enabled.
-  if (ctx.LangOpts.EnableExperimentalAdditiveArithmeticDerivedConformances)
+  if (ctx.LangOpts.hasFeature(Feature::AdditiveArithmeticDerivedConformances))
     return true;
   // Otherwise, return true iff differentiable programming is enabled.
   // Differentiable programming depends on `AdditiveArithmetic` derived

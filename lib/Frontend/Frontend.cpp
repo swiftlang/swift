@@ -1168,8 +1168,13 @@ bool CompilerInstance::loadPartialModulesAndImplicitImports(
 bool CompilerInstance::forEachFileToTypeCheck(
     llvm::function_ref<bool(SourceFile &)> fn) {
   if (isWholeModuleCompilation()) {
-    for (auto fileName : getMainModule()->getFiles()) {
-      auto *SF = dyn_cast<SourceFile>(fileName);
+    // FIXME: Do not refactor this to use an iterator as long as
+    // ModuleDecl::addFile is called during Sema. Synthesized files pushed
+    // during semantic analysis will cause iterator invalidation here.
+    // See notes in SourceFile::getOrCreateSynthesizedFile() for more.
+    unsigned i = 0;
+    while (i < getMainModule()->getFiles().size()) {
+      auto *SF = dyn_cast<SourceFile>(getMainModule()->getFiles()[i++]);
       if (!SF) {
         continue;
       }

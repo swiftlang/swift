@@ -21,6 +21,7 @@
 #include "GenStruct.h"
 #include "GenType.h"
 #include "IRBuilder.h"
+#include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -63,10 +64,6 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Local.h"
-
-#ifndef NDEBUG
-#include "swift/AST/ASTDemangler.h"
-#endif
 
 using namespace swift;
 using namespace irgen;
@@ -915,7 +912,6 @@ private:
     if (!Opts.DisableRoundTripDebugTypes &&
         !Ty->getASTContext().LangOpts.EnableCXXInterop) {
       // Make sure we can reconstruct mangled types for the debugger.
-#ifndef NDEBUG
       auto &Ctx = Ty->getASTContext();
       Type Reconstructed = Demangle::getTypeForMangling(Ctx, Result);
       if (!Reconstructed) {
@@ -936,7 +932,6 @@ private:
         Reconstructed->dump(llvm::errs());
         abort();
       }
-#endif
     }
 
     return BumpAllocatedString(Result);

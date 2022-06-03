@@ -468,15 +468,11 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
 /// Generic types
 ///
 
-/// Form the interface type of an extension from the raw type and the
-/// extension's list of generic parameters.
-static Type formExtensionInterfaceType(
-                         ExtensionDecl *ext, Type type,
-                         const GenericParamList *genericParams,
-                         SmallVectorImpl<Requirement> &sameTypeReqs,
-                         bool &mustInferRequirements) {
+/// Collect additional requirements into \p sameTypeReqs.
+static void collectAdditionalExtensionRequirements(
+    Type type, SmallVectorImpl<Requirement> &sameTypeReqs) {
   if (type->is<ErrorType>())
-    return type;
+    return;
 
   // Find the nominal type declaration and its parent type.
   if (type->is<ProtocolCompositionType>())
@@ -484,7 +480,7 @@ static Type formExtensionInterfaceType(
 
   // A parameterized protocol type is not a nominal. Unwrap it to get
   // the underlying nominal, and record a same-type requirement for
-  // the primary associated type.
+  // the primary associated types.
   if (auto *paramProtoTy = type->getAs<ParameterizedProtocolType>()) {
     auto *protoTy = paramProtoTy->getBaseType();
     type = protoTy;
@@ -497,15 +493,9 @@ static Type formExtensionInterfaceType(
   Type parentType = type->getNominalParent();
   GenericTypeDecl *genericDecl = type->getAnyGeneric();
 
-  // Reconstruct the parent, if there is one.
+  // Visit the parent type, if there is one.
   if (parentType) {
-    // Build the nested extension type.
-    auto parentGenericParams = genericDecl->getGenericParams()
-                                 ? genericParams->getOuterParameters()
-                                 : genericParams;
-    parentType =
-      formExtensionInterfaceType(ext, parentType, parentGenericParams,
-                                 sameTypeReqs, mustInferRequirements);
+    collectAdditionalExtensionRequirements(parentType, sameTypeReqs);
   }
 
   // Find the nominal type.
@@ -516,59 +506,26 @@ static Type formExtensionInterfaceType(
     nominal = type->getNominalOrBoundGenericNominal();
   }
 
-  // Form the result.
-  Type resultType;
-  SmallVector<Type, 2> genericArgs;
-  if (!nominal->isGeneric() || isa<ProtocolDecl>(nominal)) {
-    resultType = NominalType::get(nominal, parentType,
-                                  nominal->getASTContext());
-  } else if (genericParams) {
-    auto currentBoundType = type->getAs<BoundGenericType>();
-
-    // Form the bound generic type with the type parameters provided.
-    unsigned gpIndex = 0;
-    for (auto gp : *genericParams) {
-      SWIFT_DEFER { ++gpIndex; };
-
+  // If we have a bound generic type, add same-type requirements for each of
+  // its generic arguments.
+  if (auto currentBoundType = type->getAs<BoundGenericType>()) {
+    auto *genericParams = currentBoundType->getDecl()->getGenericParams();
+    for (unsigned gpIndex : indices(genericParams->getParams())) {
+      auto *gp = genericParams->getParams()[gpIndex];
       auto gpType = gp->getDeclaredInterfaceType();
-      genericArgs.push_back(gpType);
 
-      if (currentBoundType) {
-        sameTypeReqs.emplace_back(RequirementKind::SameType, gpType,
-                                  currentBoundType->getGenericArgs()[gpIndex]);
-      }
+      sameTypeReqs.emplace_back(RequirementKind::SameType, gpType,
+                                currentBoundType->getGenericArgs()[gpIndex]);
     }
-
-    resultType = BoundGenericType::get(nominal, parentType, genericArgs);
   }
 
-  // If we have a typealias, try to form type sugar.
+  // If we have a passthrough typealias, add the requirements from its
+  // generic signature.
   if (typealias && TypeChecker::isPassThroughTypealias(
                        typealias, typealias->getUnderlyingType(), nominal)) {
-    auto typealiasSig = typealias->getGenericSignature();
-    SubstitutionMap subMap;
-    if (typealiasSig) {
-      subMap = typealiasSig->getIdentitySubstitutionMap();
-
-      mustInferRequirements = true;
-    }
-
-    resultType = TypeAliasType::get(typealias, parentType, subMap, resultType);
+    for (auto req : typealias->getGenericSignature().getRequirements())
+      sameTypeReqs.push_back(req);
   }
-
-
-  return resultType;
-}
-
-/// Retrieve the generic parameter depth of the extended type.
-static unsigned getExtendedTypeGenericDepth(ExtensionDecl *ext) {
-  auto nominal = ext->getSelfNominalTypeDecl();
-  if (!nominal) return static_cast<unsigned>(-1);
-
-  auto sig = nominal->getGenericSignatureOfContext();
-  if (!sig) return static_cast<unsigned>(-1);
-
-  return sig.getGenericParams().back()->getDepth();
 }
 
 GenericSignature
@@ -605,7 +562,7 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
   }
 
   bool allowConcreteGenericParams = false;
-  const auto *genericParams = GC->getGenericParams();
+  auto *genericParams = GC->getGenericParams();
   const auto *where = GC->getTrailingWhereClause();
 
   if (genericParams) {
@@ -650,10 +607,12 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
     return GC->getParentForLookup()->getGenericSignatureOfContext();
   }
 
-  auto parentSig = GC->getParentForLookup()->getGenericSignatureOfContext();
+  GenericSignature parentSig;
   SmallVector<TypeLoc, 2> inferenceSources;
   SmallVector<Requirement, 2> sameTypeReqs;
   if (auto VD = dyn_cast_or_null<ValueDecl>(GC->getAsDecl())) {
+    parentSig = GC->getParentForLookup()->getGenericSignatureOfContext();
+
     auto func = dyn_cast<AbstractFunctionDecl>(VD);
     auto subscr = dyn_cast<SubscriptDecl>(VD);
 
@@ -708,38 +667,23 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
       }
     }
   } else if (auto *ext = dyn_cast<ExtensionDecl>(GC)) {
-    // Form the interface type of the extension so we can use it as an inference
-    // source.
-    //
-    // FIXME: Push this into the "get interface type" request.
-    bool mustInferRequirements = false;
-    Type extInterfaceType =
-      formExtensionInterfaceType(ext, ext->getExtendedType(),
-                                 genericParams, sameTypeReqs,
-                                 mustInferRequirements);
+    parentSig = ext->getExtendedNominal()->getGenericSignatureOfContext();
+    genericParams = nullptr;
+
+    collectAdditionalExtensionRequirements(ext->getExtendedType(), sameTypeReqs);
     
-    auto cannotReuseNominalSignature = [&]() -> bool {
-      const auto finalDepth = genericParams->getParams().back()->getDepth();
-      return mustInferRequirements
-          || !sameTypeReqs.empty()
-          || ext->getTrailingWhereClause()
-          || (getExtendedTypeGenericDepth(ext) != finalDepth);
-    };
-    
-    // Re-use the signature of the type being extended by default.
-    if (!cannotReuseNominalSignature()) {
-      return ext->getSelfNominalTypeDecl()->getGenericSignatureOfContext();
+   // Re-use the signature of the type being extended by default.
+    if (sameTypeReqs.empty() && !ext->getTrailingWhereClause()) {
+      return parentSig;
     }
 
     // Allow parameters to be equated with concrete types.
     allowConcreteGenericParams = true;
-
-    inferenceSources.emplace_back(nullptr, extInterfaceType);
   }
 
   auto request = InferredGenericSignatureRequest{
       parentSig.getPointer(),
-      GC->getGenericParams(), WhereClauseOwner(GC),
+      genericParams, WhereClauseOwner(GC),
       sameTypeReqs, inferenceSources,
       allowConcreteGenericParams};
   auto sig = evaluateOrDefault(ctx.evaluator, request,

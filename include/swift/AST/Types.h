@@ -5822,7 +5822,6 @@ class OpenedArchetypeType final : public ArchetypeType,
   friend ArchetypeType;
   friend GenericEnvironment;
 
-  TypeBase *Opened;
   UUID ID;
 
   /// Create a new opened archetype in the given environment representing
@@ -6779,38 +6778,6 @@ inline TypeBase *TypeBase::getDesugaredType() {
   if (!isa<SugarType>(this))
     return this;
   return cast<SugarType>(this)->getSinglyDesugaredType()->getDesugaredType();
-}
-
-inline bool TypeBase::hasSimpleTypeRepr() const {
-  // NOTE: Please keep this logic in sync with TypeRepr::isSimple().
-  switch (getKind()) {
-  case TypeKind::Function:
-  case TypeKind::GenericFunction:
-    return false;
-
-  case TypeKind::Metatype:
-    return !cast<const AnyMetatypeType>(this)->hasRepresentation();
-
-  case TypeKind::ExistentialMetatype:
-  case TypeKind::Existential:
-    return false;
-
-  case TypeKind::OpaqueTypeArchetype:
-  case TypeKind::OpenedArchetype:
-    return false;
-
-  case TypeKind::ProtocolComposition: {
-    // 'Any', 'AnyObject' and single protocol compositions are simple
-    auto composition = cast<const ProtocolCompositionType>(this);
-    auto memberCount = composition->getMembers().size();
-    if (composition->hasExplicitAnyObject())
-      return memberCount == 0;
-    return memberCount <= 1;
-  }
-
-  default:
-    return true;
-  }
 }
 
 } // end namespace swift

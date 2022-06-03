@@ -3110,7 +3110,7 @@ void FindLocalVal::visitForEachStmt(ForEachStmt *S) {
   if (!isReferencePointInRange(S->getSourceRange()))
     return;
   visit(S->getBody());
-  if (!isReferencePointInRange(S->getSequence()->getSourceRange()))
+  if (!isReferencePointInRange(S->getParsedSequence()->getSourceRange()))
     checkPattern(S->getPattern(), DeclVisibilityKind::LocalVariable);
 }
 

@@ -64,13 +64,13 @@ TypeRefinementContext::createForDecl(ASTContext &Ctx, Decl *D,
       TypeRefinementContext(Ctx, D, Parent, SrcRange, Info, ExplicitInfo);
 }
 
-TypeRefinementContext *TypeRefinementContext::createForAPIBoundary(
+TypeRefinementContext *TypeRefinementContext::createForDeclImplicit(
     ASTContext &Ctx, Decl *D, TypeRefinementContext *Parent,
     const AvailabilityContext &Info, SourceRange SrcRange) {
   assert(D);
   assert(Parent);
   return new (Ctx) TypeRefinementContext(
-      Ctx, IntroNode(D, Reason::APIBoundary), Parent, SrcRange, Info,
+      Ctx, IntroNode(D, Reason::DeclImplicit), Parent, SrcRange, Info,
       AvailabilityContext::alwaysAvailable());
 }
 
@@ -180,7 +180,7 @@ void TypeRefinementContext::dump(raw_ostream &OS, SourceManager &SrcMgr) const {
 SourceLoc TypeRefinementContext::getIntroductionLoc() const {
   switch (getReason()) {
   case Reason::Decl:
-  case Reason::APIBoundary:
+  case Reason::DeclImplicit:
     return Node.getAsDecl()->getLoc();
 
   case Reason::IfStmtThenBranch:
@@ -294,7 +294,7 @@ TypeRefinementContext::getAvailabilityConditionVersionSourceRange(
       Node.getAsWhileStmt()->getCond(), Platform, Version);
 
   case Reason::Root:
-  case Reason::APIBoundary:
+  case Reason::DeclImplicit:
     return SourceRange();
   }
 
@@ -308,7 +308,7 @@ void TypeRefinementContext::print(raw_ostream &OS, SourceManager &SrcMgr,
 
   OS << " versions=" << AvailabilityInfo.getOSVersion().getAsString();
 
-  if (getReason() == Reason::Decl || getReason() == Reason::APIBoundary) {
+  if (getReason() == Reason::Decl || getReason() == Reason::DeclImplicit) {
     Decl *D = Node.getAsDecl();
     OS << " decl=";
     if (auto VD = dyn_cast<ValueDecl>(D)) {
@@ -350,8 +350,8 @@ StringRef TypeRefinementContext::getReasonName(Reason R) {
   case Reason::Decl:
     return "decl";
 
-  case Reason::APIBoundary:
-    return "api_boundary";
+  case Reason::DeclImplicit:
+    return "decl_implicit";
 
   case Reason::IfStmtThenBranch:
     return "if_then";

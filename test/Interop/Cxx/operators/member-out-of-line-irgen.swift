@@ -1,7 +1,7 @@
 // RUN: %target-swift-emit-ir %s -I %S/Inputs -enable-experimental-cxx-interop | %FileCheck %s
 //
-// We can't yet call member functions correctly on Windows (SR-13129).
-// XFAIL: *
+// We should be able to support windows now. We will remove XFAIL in follow up
+// XFAIL: windows
 
 import MemberOutOfLine
 

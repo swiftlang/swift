@@ -881,7 +881,8 @@ UnresolvedDeclRefExpr *Parser::parseExprOperator() {
 }
 
 void Parser::tryLexRegexLiteral(bool forUnappliedOperator) {
-  if (!Context.LangOpts.EnableBareSlashRegexLiterals)
+  if (!Context.LangOpts.hasFeature(Feature::BareSlashRegexLiterals) ||
+      !Context.LangOpts.EnableExperimentalStringProcessing)
     return;
 
   // Check to see if we have a regex literal `/.../`, optionally with a prefix
@@ -1114,7 +1115,7 @@ getMagicIdentifierLiteralKind(tok Kind, const LangOptions &Opts) {
   switch (Kind) {
   case tok::pound_file:
     // TODO: Enable by default at the next source break. (SR-13199)
-    return Opts.EnableConcisePoundFile
+    return Opts.hasFeature(Feature::ConciseMagicFile)
          ? MagicIdentifierLiteralExpr::FileIDSpelledAsFile
          : MagicIdentifierLiteralExpr::FilePathSpelledAsFile;
 #define MAGIC_IDENTIFIER_TOKEN(NAME, TOKEN) \

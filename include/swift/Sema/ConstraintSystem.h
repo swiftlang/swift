@@ -80,6 +80,10 @@ Optional<constraints::SolutionApplicationTarget>
 typeCheckExpression(constraints::SolutionApplicationTarget &target,
                     OptionSet<TypeCheckExprFlags> options);
 
+Optional<constraints::SolutionApplicationTarget>
+typeCheckTarget(constraints::SolutionApplicationTarget &target,
+                OptionSet<TypeCheckExprFlags> options);
+
 Type typeCheckParameterDefault(Expr *&, DeclContext *, Type, bool);
 
 } // end namespace TypeChecker
@@ -997,13 +1001,8 @@ struct CaseLabelItemInfo {
 /// Describes information about a for-each loop that needs to be tracked
 /// within the constraint system.
 struct ForEachStmtInfo {
-  ForEachStmt *stmt;
-
   /// The type of the sequence.
   Type sequenceType;
-
-  /// The type of the iterator.
-  Type iteratorType;
 
   /// The type of an element in the sequence.
   Type elementType;
@@ -1011,8 +1010,11 @@ struct ForEachStmtInfo {
   /// The type of the pattern that matches the elements.
   Type initType;
 
-  /// The "where" expression, if there is one.
-  Expr *whereExpr;
+  /// Implicit `$iterator = <sequence>.makeIterator()`
+  PatternBindingDecl *makeIteratorVar;
+
+  /// Implicit `$iterator.next()` call.
+  Expr *nextCall;
 };
 
 /// Key to the constraint solver's mapping from AST nodes to their corresponding
@@ -1704,6 +1706,7 @@ public:
     caseLabelItem,
     patternBinding,
     uninitializedVar,
+    forEachStmt,
   } kind;
 
 private:
@@ -1755,8 +1758,6 @@ private:
           /// The index into the pattern binding declaration, if any.
           unsigned patternBindingIndex;
         } initialization;
-
-        ForEachStmtInfo forEachStmt;
       };
     } expression;
 
@@ -1791,6 +1792,14 @@ private:
       /// Type associated with the declaration.
       Type type;
     } uninitializedVar;
+
+    struct {
+      ForEachStmt *stmt;
+      DeclContext *dc;
+      Pattern *pattern;
+      bool bindPatternVarsOneWay;
+      ForEachStmtInfo info;
+    } forEachStmt;
 
     PatternBindingDecl *patternBinding;
   };
@@ -1875,6 +1884,14 @@ public:
     uninitializedVar.type = patternTy;
   }
 
+  SolutionApplicationTarget(ForEachStmt *stmt, DeclContext *dc,
+                            bool bindPatternVarsOneWay)
+    : kind(Kind::forEachStmt) {
+    forEachStmt.stmt = stmt;
+    forEachStmt.dc = dc;
+    forEachStmt.bindPatternVarsOneWay = bindPatternVarsOneWay;
+  }
+
   /// Form a target for the initialization of a pattern from an expression.
   static SolutionApplicationTarget forInitialization(
       Expr *initializer, DeclContext *dc, Type patternType, Pattern *pattern,
@@ -1887,11 +1904,10 @@ public:
       PatternBindingDecl *patternBinding, unsigned patternBindingIndex,
       bool bindPatternVarsOneWay);
 
-  /// Form a target for a for-each loop.
+  /// Form a target for a for-in loop.
   static SolutionApplicationTarget forForEachStmt(
-      ForEachStmt *stmt, ProtocolDecl *sequenceProto, DeclContext *dc,
-      bool bindPatternVarsOneWay,
-      ContextualTypePurpose purpose = CTP_ForEachStmt);
+      ForEachStmt *stmt, DeclContext *dc,
+      bool bindPatternVarsOneWay);
 
   /// Form a target for a property with an attached property wrapper that is
   /// initialized out-of-line.
@@ -1916,6 +1932,39 @@ public:
     return {expr, dc, pattern, patternTy};
   }
 
+  /// This is useful for code completion.
+  ASTNode getAsASTNode() const {
+    switch (kind) {
+    case Kind::expression:
+      return expression.expression;
+
+    case Kind::closure:
+      return closure.closure;
+
+    case Kind::function: {
+      auto ref = *getAsFunction();
+      if (auto *func = ref.getAbstractFunctionDecl())
+        return func;
+      return ref.getAbstractClosureExpr();
+    }
+
+    case Kind::forEachStmt:
+      return getAsForEachStmt();
+
+    case Kind::stmtCondition:
+      return ASTNode();
+
+    case Kind::caseLabelItem:
+      return *getAsCaseLabelItem();
+
+    case Kind::patternBinding:
+      return getAsPatternBinding();
+
+    case Kind::uninitializedVar:
+      return getAsUninitializedVar();
+    }
+  }
+
   Expr *getAsExpr() const {
     switch (kind) {
     case Kind::expression:
@@ -1927,6 +1976,7 @@ public:
     case Kind::caseLabelItem:
     case Kind::patternBinding:
     case Kind::uninitializedVar:
+    case Kind::forEachStmt:
       return nullptr;
     }
     llvm_unreachable("invalid expression type");
@@ -1959,6 +2009,9 @@ public:
 
       return uninitializedVar.binding->getInitContext(uninitializedVar.index);
     }
+
+    case Kind::forEachStmt:
+      return forEachStmt.dc;
     }
     llvm_unreachable("invalid decl context type");
   }
@@ -2038,9 +2091,7 @@ public:
 
   /// Whether this target is for a for-in statement.
   bool isForEachStmt() const {
-    return kind == Kind::expression &&
-           (getExprContextualTypePurpose() == CTP_ForEachStmt ||
-            getExprContextualTypePurpose() == CTP_ForEachSequence);
+    return kind == Kind::forEachStmt;
   }
 
   /// Whether this is an initialization for an Optional.Some pattern.
@@ -2065,7 +2116,13 @@ public:
   /// Whether to bind the types of any variables within the pattern via
   /// one-way constraints.
   bool shouldBindPatternVarsOneWay() const {
-    return kind == Kind::expression && expression.bindPatternVarsOneWay;
+    if (kind == Kind::expression)
+      return expression.bindPatternVarsOneWay;
+
+    if (kind == Kind::forEachStmt)
+      return forEachStmt.bindPatternVarsOneWay;
+
+    return false;
   }
 
   /// Whether or not an opaque value placeholder should be injected into the
@@ -2119,12 +2176,12 @@ public:
 
   const ForEachStmtInfo &getForEachStmtInfo() const {
     assert(isForEachStmt());
-    return expression.forEachStmt;
+    return forEachStmt.info;
   }
 
   ForEachStmtInfo &getForEachStmtInfo() {
     assert(isForEachStmt());
-    return expression.forEachStmt;
+    return forEachStmt.info;
   }
 
   /// Whether this context infers an opaque return type.
@@ -2150,6 +2207,11 @@ public:
       return;
     }
 
+    if (kind == Kind::forEachStmt) {
+      forEachStmt.pattern = pattern;
+      return;
+    }
+
     assert(kind == Kind::expression);
     assert(expression.contextualPurpose == CTP_Initialization ||
            expression.contextualPurpose == CTP_ForEachStmt ||
@@ -2166,6 +2228,7 @@ public:
     case Kind::caseLabelItem:
     case Kind::patternBinding:
     case Kind::uninitializedVar:
+    case Kind::forEachStmt:
       return None;
 
     case Kind::function:
@@ -2182,6 +2245,7 @@ public:
     case Kind::caseLabelItem:
     case Kind::patternBinding:
     case Kind::uninitializedVar:
+    case Kind::forEachStmt:
       return None;
 
     case Kind::stmtCondition:
@@ -2198,6 +2262,7 @@ public:
     case Kind::stmtCondition:
     case Kind::patternBinding:
     case Kind::uninitializedVar:
+    case Kind::forEachStmt:
       return None;
 
     case Kind::caseLabelItem:
@@ -2214,6 +2279,7 @@ public:
     case Kind::stmtCondition:
     case Kind::caseLabelItem:
     case Kind::uninitializedVar:
+    case Kind::forEachStmt:
       return nullptr;
 
     case Kind::patternBinding:
@@ -2230,6 +2296,7 @@ public:
     case Kind::stmtCondition:
     case Kind::caseLabelItem:
     case Kind::patternBinding:
+    case Kind::forEachStmt:
       return nullptr;
 
     case Kind::uninitializedVar:
@@ -2246,10 +2313,28 @@ public:
     case Kind::stmtCondition:
     case Kind::caseLabelItem:
     case Kind::patternBinding:
+    case Kind::forEachStmt:
       return nullptr;
 
     case Kind::uninitializedVar:
       return uninitializedVar.declaration.dyn_cast<Pattern *>();
+    }
+    llvm_unreachable("invalid case label type");
+  }
+
+  ForEachStmt *getAsForEachStmt() const {
+    switch (kind) {
+    case Kind::expression:
+    case Kind::closure:
+    case Kind::function:
+    case Kind::stmtCondition:
+    case Kind::caseLabelItem:
+    case Kind::patternBinding:
+    case Kind::uninitializedVar:
+      return nullptr;
+
+    case Kind::forEachStmt:
+      return forEachStmt.stmt;
     }
     llvm_unreachable("invalid case label type");
   }
@@ -2262,6 +2347,7 @@ public:
     case Kind::stmtCondition:
     case Kind::caseLabelItem:
     case Kind::patternBinding:
+    case Kind::forEachStmt:
       return nullptr;
 
     case Kind::uninitializedVar:
@@ -2278,6 +2364,7 @@ public:
     case Kind::stmtCondition:
     case Kind::caseLabelItem:
     case Kind::patternBinding:
+    case Kind::forEachStmt:
       return nullptr;
 
     case Kind::uninitializedVar:
@@ -2294,6 +2381,7 @@ public:
     case Kind::stmtCondition:
     case Kind::caseLabelItem:
     case Kind::patternBinding:
+    case Kind::forEachStmt:
       return 0;
 
     case Kind::uninitializedVar:
@@ -2341,6 +2429,18 @@ public:
       }
       return uninitializedVar.declaration.get<Pattern *>()->getSourceRange();
     }
+
+    // For-in statement target doesn't cover the body.
+    case Kind::forEachStmt:
+      auto *stmt = forEachStmt.stmt;
+      SourceLoc startLoc = stmt->getForLoc();
+      SourceLoc endLoc = stmt->getParsedSequence()->getEndLoc();
+
+      if (auto *whereExpr = stmt->getWhere()) {
+        endLoc = whereExpr->getEndLoc();
+      }
+
+      return {startLoc, endLoc};
     }
     llvm_unreachable("invalid target type");
   }
@@ -2373,6 +2473,9 @@ public:
       }
       return uninitializedVar.declaration.get<Pattern *>()->getLoc();
     }
+
+    case Kind::forEachStmt:
+      return forEachStmt.stmt->getStartLoc();
     }
     llvm_unreachable("invalid target type");
   }
@@ -3212,6 +3315,10 @@ private:
   swift::TypeChecker::typeCheckExpression(
       SolutionApplicationTarget &target, OptionSet<TypeCheckExprFlags> options);
 
+  friend Optional<SolutionApplicationTarget>
+  swift::TypeChecker::typeCheckTarget(SolutionApplicationTarget &target,
+                                      OptionSet<TypeCheckExprFlags> options);
+
   friend Type swift::TypeChecker::typeCheckParameterDefault(Expr *&,
                                                             DeclContext *, Type,
                                                             bool);
@@ -3939,26 +4046,6 @@ public:
                                    useDC, functionRefKind,
                                    getConstraintLocator(locator)));
       }
-      break;
-    }
-  }
-
-  /// Add a value witness constraint to the constraint system.
-  void addValueWitnessConstraint(
-      Type baseTy, ValueDecl *requirement, Type memberTy, DeclContext *useDC,
-      FunctionRefKind functionRefKind, ConstraintLocatorBuilder locator) {
-    assert(baseTy);
-    assert(memberTy);
-    assert(requirement);
-    assert(useDC);
-    switch (simplifyValueWitnessConstraint(
-        ConstraintKind::ValueWitness, baseTy, requirement, memberTy, useDC,
-        functionRefKind, TMF_GenerateConstraints, locator)) {
-    case SolutionKind::Unsolved:
-      llvm_unreachable("Unsolved result when generating constraints!");
-
-    case SolutionKind::Solved:
-    case SolutionKind::Error:
       break;
     }
   }

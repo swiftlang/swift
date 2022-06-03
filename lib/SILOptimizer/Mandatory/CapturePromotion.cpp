@@ -697,6 +697,25 @@ void ClosureCloner::visitLoadBorrowInst(LoadBorrowInst *lbi) {
     return;
   }
 
+  auto *seai = dyn_cast<StructElementAddrInst>(lbi->getOperand());
+  if (!seai) {
+    SILCloner<ClosureCloner>::visitLoadBorrowInst(lbi);
+    return;
+  }
+
+  if (SILValue value = getProjectBoxMappedVal(seai->getOperand())) {
+    // Loads of a struct_element_addr of an argument get replaced with a
+    // struct_extract of the new passed in value. The value should be borrowed
+    // already, so we can just extract the value.
+    assert(
+        !getBuilder().getFunction().hasOwnership() ||
+        value.getOwnershipKind().isCompatibleWith(OwnershipKind::Guaranteed));
+    value = getBuilder().emitStructExtract(lbi->getLoc(), value,
+                                           seai->getField(), lbi->getType());
+    recordFoldedValue(lbi, value);
+    return;
+  }
+
   SILCloner<ClosureCloner>::visitLoadBorrowInst(lbi);
   return;
 }

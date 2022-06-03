@@ -38,7 +38,7 @@ Expr *getVoidExpr(ASTContext &ctx) {
 /// Find any type variable references inside of an AST node.
 class TypeVariableRefFinder : public ASTWalker {
   /// A stack of all closures the walker encountered so far.
-  SmallVector<DeclContext *> ClosureDCs;
+  SmallVector<DeclContext *, 2> ClosureDCs;
 
   ConstraintSystem &CS;
   ASTNode Parent;
@@ -284,14 +284,6 @@ ElementInfo makeElement(ASTNode node, ConstraintLocator *locator,
   return std::make_tuple(node, context, isDiscarded, locator);
 }
 
-static ProtocolDecl *getSequenceProtocol(ASTContext &ctx, SourceLoc loc,
-                                         bool inAsyncContext) {
-  return TypeChecker::getProtocol(ctx, loc,
-                                  inAsyncContext
-                                      ? KnownProtocolKind::AsyncSequence
-                                      : KnownProtocolKind::Sequence);
-}
-
 /// Statement visitor that generates constraints for a given closure body.
 class SyntacticElementConstraintGenerator
     : public StmtVisitor<SyntacticElementConstraintGenerator, void> {
@@ -382,121 +374,18 @@ private:
   ///
   /// - From sequence to pattern, when pattern has no type information.
   void visitForEachPattern(Pattern *pattern, ForEachStmt *forEachStmt) {
-    auto &ctx = cs.getASTContext();
+    auto target = SolutionApplicationTarget::forForEachStmt(
+        forEachStmt, context.getAsDeclContext(),
+        /*bindTypeVarsOneWay=*/false);
 
-    bool isAsync = forEachStmt->getAwaitLoc().isValid();
-
-    // Verify pattern.
-    {
-      auto contextualPattern =
-          ContextualPattern::forRawPattern(pattern, context.getAsDeclContext());
-      Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
-
-      if (patternType->hasError()) {
-        hadError = true;
-        return;
-      }
-    }
-
-    auto *sequenceProto =
-        getSequenceProtocol(ctx, forEachStmt->getForLoc(), isAsync);
-    if (!sequenceProto) {
+    if (cs.generateConstraints(target, FreeTypeVariableBinding::Disallow)) {
       hadError = true;
       return;
     }
-
-    auto *contextualLocator = cs.getConstraintLocator(
-        locator, LocatorPathElt::ContextualType(CTP_ForEachStmt));
-
-    // Generate constraints to initialize the pattern.
-    auto initType =
-        cs.generateConstraints(pattern, contextualLocator,
-                               /*shouldBindPatternOneWay=*/false,
-                               /*patternBinding=*/nullptr, /*patternIndex=*/0);
-
-    if (!initType) {
-      hadError = true;
-      return;
-    }
-
-    // Let's generate constraints for sequence associated with `for-in`
-    // statement. We can't do that separately because pattern can inform
-    // a type of the sequence e.g. `for in i: Int8 in 0 ..< 8 { ... }`
-
-    auto *sequenceExpr = forEachStmt->getSequence();
-    auto *sequenceLocator = cs.getConstraintLocator(sequenceExpr);
-
-    {
-      SolutionApplicationTarget target(
-          sequenceExpr, context.getAsDeclContext(), CTP_ForEachSequence,
-          sequenceProto->getDeclaredInterfaceType(),
-          /*isDiscarded=*/false);
-
-      if (cs.generateConstraints(target, FreeTypeVariableBinding::Disallow)) {
-        hadError = true;
-        return;
-      }
-
-      cs.setSolutionApplicationTarget(sequenceExpr, target);
-    }
-
-    Type sequenceType =
-        cs.createTypeVariable(sequenceLocator, TVO_CanBindToNoEscape);
-    // This "workaround" warrants an explanation for posterity.
-    //
-    // The reason why we can't simplify use \c getType(sequenceExpr) here
-    // is due to how dependent member types are handled by \c simplifyTypeImpl
-    // - if the base type didn't change (and it wouldn't because it's a fully
-    // resolved concrete type) after simplification attempt the
-    // whole dependent member type would be just re-created without attempting
-    // to resolve it, so we have to use an intermediary here so that
-    // \c elementType and \c iteratorType can be resolved correctly.
-    cs.addConstraint(ConstraintKind::Conversion, cs.getType(sequenceExpr),
-                     sequenceType, sequenceLocator);
-
-    auto elementAssocType = sequenceProto->getAssociatedType(ctx.Id_Element);
-    Type elementType = DependentMemberType::get(sequenceType, elementAssocType);
-
-    auto iteratorAssocType = sequenceProto->getAssociatedType(
-        isAsync ? ctx.Id_AsyncIterator : ctx.Id_Iterator);
-    Type iteratorType =
-        DependentMemberType::get(sequenceType, iteratorAssocType);
-
-    cs.addConstraint(
-        ConstraintKind::Conversion, elementType, initType,
-        cs.getConstraintLocator(sequenceLocator,
-                                ConstraintLocator::SequenceElementType));
-
-    // Reference the makeIterator witness.
-    FuncDecl *makeIterator = isAsync ? ctx.getAsyncSequenceMakeAsyncIterator()
-                                     : ctx.getSequenceMakeIterator();
-
-    Type makeIteratorType =
-        cs.createTypeVariable(locator, TVO_CanBindToNoEscape);
-    cs.addValueWitnessConstraint(
-        LValueType::get(sequenceType), makeIterator, makeIteratorType,
-        context.getAsDeclContext(), FunctionRefKind::Compound,
-        cs.getConstraintLocator(sequenceLocator, ConstraintLocator::Witness));
 
     // After successful constraint generation, let's record
     // solution application target with all relevant information.
-    {
-      auto target = SolutionApplicationTarget::forForEachStmt(
-          forEachStmt, sequenceProto, context.getAsDeclContext(),
-          /*bindTypeVarsOneWay=*/false,
-          /*contextualPurpose=*/CTP_ForEachSequence);
-
-      auto &targetInfo = target.getForEachStmtInfo();
-
-      targetInfo.sequenceType = sequenceType;
-      targetInfo.elementType = elementType;
-      targetInfo.iteratorType = iteratorType;
-      targetInfo.initType = initType;
-
-      target.setPattern(pattern);
-
-      cs.setSolutionApplicationTarget(forEachStmt, target);
-    }
+    cs.setSolutionApplicationTarget(forEachStmt, target);
   }
 
   void visitCaseItemPattern(Pattern *pattern, ContextualTypeInfo context) {
@@ -806,28 +695,10 @@ private:
 
     // For-each pattern.
     //
-    // Note that we don't record a sequence here, it would
-    // be handled together with pattern because pattern can
+    // Note that we don't record a sequence or where clause here,
+    // they would be handled together with pattern because pattern can
     // inform a type of sequence element e.g. `for i: Int8 in 0 ..< 8`
-    {
-      Pattern *pattern = TypeChecker::resolvePattern(forEachStmt->getPattern(),
-                                                     context.getAsDeclContext(),
-                                                     /*isStmtCondition=*/false);
-
-      if (!pattern) {
-        hadError = true;
-        return;
-      }
-
-      elements.push_back(makeElement(pattern, stmtLoc));
-    }
-
-    // `where` clause if any.
-    if (auto *whereClause = forEachStmt->getWhere()) {
-      elements.push_back(
-          makeElement(whereClause, stmtLoc, getContextForCondition()));
-    }
-
+    elements.push_back(makeElement(forEachStmt->getPattern(), stmtLoc));
     // Body of the `for-in` loop.
     elements.push_back(makeElement(forEachStmt->getBody(), stmtLoc));
 
@@ -1208,6 +1079,17 @@ private:
     return nullptr;
   }
 
+  ASTNode visit(Stmt *S) {
+    auto rewritten = ASTVisitor::visit(S);
+    if (!rewritten)
+      return {};
+
+    if (auto *stmt = getAsStmt(rewritten))
+      performStmtDiagnostics(stmt, context.getAsDeclContext());
+
+    return rewritten;
+  }
+
   void visitDecl(Decl *decl) {
     if (isa<IfConfigDecl>(decl))
       return;
@@ -1409,7 +1291,15 @@ private:
       }
 
       auto caseStmt = cast<CaseStmt>(rawCase.get<Stmt *>());
-      visitCaseStmt(caseStmt);
+      // Body of the `case` statement can contain a `fallthrough`
+      // statement that requires both source and destination
+      // `case` preambles to be type-checked, so bodies of `case`
+      // statements should be visited after preambles.
+      visitCaseStmtPreamble(caseStmt);
+    }
+
+    for (auto *caseStmt : switchStmt->getCases()) {
+      visitCaseStmtBody(caseStmt);
 
       // Check restrictions on '@unknown'.
       if (caseStmt->hasUnknownAttr()) {
@@ -1436,7 +1326,7 @@ private:
     return doStmt;
   }
 
-  ASTNode visitCaseStmt(CaseStmt *caseStmt) {
+  void visitCaseStmtPreamble(CaseStmt *caseStmt) {
     // Translate the patterns and guard expressions for each case label item.
     for (auto &caseItem : caseStmt->getMutableCaseLabelItems()) {
       SolutionApplicationTarget caseTarget(&caseItem,
@@ -1453,11 +1343,16 @@ private:
           solution.getType(prev)->mapTypeOutOfContext());
       expected->setInterfaceType(type);
     }
+  }
 
-    // Translate the body.
+  void visitCaseStmtBody(CaseStmt *caseStmt) {
     auto *newBody = visit(caseStmt->getBody()).get<Stmt *>();
     caseStmt->setBody(cast<BraceStmt>(newBody));
+  }
 
+  ASTNode visitCaseStmt(CaseStmt *caseStmt) {
+    visitCaseStmtPreamble(caseStmt);
+    visitCaseStmtBody(caseStmt);
     return caseStmt;
   }
 

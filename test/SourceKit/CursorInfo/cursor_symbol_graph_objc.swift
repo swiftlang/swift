@@ -89,7 +89,9 @@ func test(s: ObjCStruct) {
 // CHECK-FUNC:           {
 // CHECK-FUNC:             "text": "someFunc doc"
 // CHECK-FUNC:           }
-// CHECK-FUNC:         ]
+// CHECK-FUNC:         ],
+// CHECK-FUNC:         "module": "MyMod",
+// CHECK-FUNC:         "uri": "file://{{.*}}mod{{\\\\|/}}M.h"
 // CHECK-FUNC:       },
 // CHECK-FUNC:       "functionSignature": {
 // CHECK-FUNC:         "returns": [
@@ -164,7 +166,9 @@ struct ObjCStruct {
   // CHECK-SINGLE1-NEXT:      {
   // CHECK-SINGLE1-NEXT:        "text": "single line doc"
   // CHECK-SINGLE1-NEXT:      }
-  // CHECK-SINGLE1-NEXT:    ]
+  // CHECK-SINGLE1-NEXT:    ],
+  // CHECK-SINGLE1-NEXT:    "module": "MyMod",
+  // CHECK-SINGLE1-NEXT:    "uri": "file://{{.*}}mod{{\\\\|/}}M.h"
   // CHECK-SINGLE1-NEXT:  }
 
   //! single line doc
@@ -174,7 +178,9 @@ struct ObjCStruct {
   // CHECK-SINGLE2-NEXT:      {
   // CHECK-SINGLE2-NEXT:        "text": "single line doc"
   // CHECK-SINGLE2-NEXT:      }
-  // CHECK-SINGLE2-NEXT:    ]
+  // CHECK-SINGLE2-NEXT:    ],
+  // CHECK-SINGLE2-NEXT:    "module": "MyMod",
+  // CHECK-SINGLE2-NEXT:    "uri": "file://{{.*}}mod{{\\\\|/}}M.h"
   // CHECK-SINGLE2-NEXT:  }
 
   /** single line block doc */
@@ -184,7 +190,9 @@ struct ObjCStruct {
   // CHECK-BLOCK1-NEXT:      {
   // CHECK-BLOCK1-NEXT:        "text": "single line block doc "
   // CHECK-BLOCK1-NEXT:      }
-  // CHECK-BLOCK1-NEXT:    ]
+  // CHECK-BLOCK1-NEXT:    ],
+  // CHECK-BLOCK1-NEXT:    "module": "MyMod",
+  // CHECK-BLOCK1-NEXT:    "uri": "file://{{.*}}mod{{\\\\|/}}M.h"
   // CHECK-BLOCK1-NEXT:  }
 
   /*! single line block doc */
@@ -194,7 +202,9 @@ struct ObjCStruct {
   // CHECK-BLOCK2-NEXT:      {
   // CHECK-BLOCK2-NEXT:        "text": "single line block doc "
   // CHECK-BLOCK2-NEXT:      }
-  // CHECK-BLOCK2-NEXT:    ]
+  // CHECK-BLOCK2-NEXT:    ],
+  // CHECK-BLOCK2-NEXT:    "module": "MyMod",
+  // CHECK-BLOCK2-NEXT:    "uri": "file://{{.*}}mod{{\\\\|/}}M.h"
   // CHECK-BLOCK2-NEXT:  }
 
   /**
@@ -220,7 +230,9 @@ struct ObjCStruct {
   // DISABLED-CHECK-ART-NEXT:      {
   // DISABLED-CHECK-ART-NEXT:        "text": "   "
   // DISABLED-CHECK-ART-NEXT:      }
-  // DISABLED-CHECK-ART-NEXT:    ]
+  // DISABLED-CHECK-ART-NEXT:    ],
+  // DISABLED-CHECK-ART-NEXT:    "module": "MyMod",
+  // DISABLED-CHECK-ART-NEXT:    "uri": "file://{{.*}}mod{{\\\\|/}}M.h"
   // DISABLED-CHECK-ART-NEXT:  }
 
   /// doc1
@@ -237,7 +249,9 @@ struct ObjCStruct {
   // CHECK-MIXED-TYPE-NEXT:      {
   // CHECK-MIXED-TYPE-NEXT:        "text": "doc2 last"
   // CHECK-MIXED-TYPE-NEXT:      }
-  // CHECK-MIXED-TYPE-NEXT:    ]
+  // CHECK-MIXED-TYPE-NEXT:    ],
+  // CHECK-MIXED-TYPE-NEXT:    "module": "MyMod",
+  // CHECK-MIXED-TYPE-NEXT:    "uri": "file://{{.*}}mod{{\\\\|/}}M.h"
   // CHECK-MIXED-TYPE-NEXT:  }
 
   /// doc1
@@ -274,7 +288,9 @@ struct ObjCStruct {
   // DISABLED-CHECK-MIXED-DOC-NEXT:      {
   // DISABLED-CHECK-MIXED-DOC-NEXT:        "text": "doc3"
   // DISABLED-CHECK-MIXED-DOC-NEXT:      }
-  // DISABLED-CHECK-MIXED-DOC-NEXT:    ]
+  // DISABLED-CHECK-MIXED-DOC-NEXT:    ],
+  // DISABLED-CHECK-MIXED-DOC-NEXT:    "module": "MyMod",
+  // DISABLED-CHECK-MIXED-DOC-NEXT:    "uri": "file://{{.*}}mod{{\\\\|/}}M.h"
   // DISABLED-CHECK-MIXED-DOC-NEXT:  }
 };
 

@@ -5,6 +5,9 @@
 // RUN: %target-swift-emit-module-interface(%t/CoreChef.swiftinterface) %s -module-name CoreChef -I %t -disable-availability-checking -DLIB
 // RUN: %target-swift-typecheck-module-from-interface(%t/CoreChef.swiftinterface) -module-name CoreChef -I %t -disable-availability-checking
 
+// Also build the module itself with -g to exercise debug info round tripping.
+// RUN: %target-swift-frontend -emit-ir -g %s -I %t -disable-availability-checking
+
 // RUN: %FileCheck %s < %t/CoreChef.swiftinterface
 
 // REQUIRES: OS=macosx

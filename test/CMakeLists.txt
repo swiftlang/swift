@@ -219,6 +219,7 @@ set(TEST_MODES
     optimize_none_with_implicit_dynamic
     optimize_with_implicit_dynamic
     only_executable only_non_executable
+    with_cxx_interop
 )
 set(TEST_SUBSETS
     primary

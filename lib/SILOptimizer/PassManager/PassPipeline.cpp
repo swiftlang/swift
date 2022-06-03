@@ -116,7 +116,6 @@ static void addDefiniteInitialization(SILPassPipelinePlan &P) {
 static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("Mandatory Diagnostic Passes + Enabling Optimization Passes");
   P.addSILGenCleanup();
-  P.addAddressLowering();
   P.addDiagnoseInvalidEscapingCaptures();
   P.addDiagnoseStaticExclusivity();
   P.addNestedSemanticFunctionCheck();
@@ -129,6 +128,7 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.addAllocBoxToStack();
   P.addNoReturnFolding();
   addDefiniteInitialization(P);
+  P.addAddressLowering();
 
   P.addFlowIsolation();
 

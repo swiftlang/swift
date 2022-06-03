@@ -2,6 +2,11 @@
 
 #include "stdint.h"
 
+void void_ptr_func(void * _Nonnull buffer);
+void const_void_ptr_func(const void * _Nonnull buffer);
+void opt_void_ptr_func(void * _Nullable buffer);
+void const_opt_void_ptr_func(const void * _Nullable buffer);
+
 void char_ptr_func(char *  _Nonnull buffer);
 void const_char_ptr_func(const char *  _Nonnull buffer);
 

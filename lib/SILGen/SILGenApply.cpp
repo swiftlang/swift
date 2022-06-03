@@ -2924,7 +2924,6 @@ private:
     // substituted argument type by abstraction and/or bridging.
     auto paramSlice = claimNextParameters(1);
     SILParameterInfo param = paramSlice.front();
-
     assert(arg.hasLValueType() == param.isIndirectInOut());
 
     // Make sure we use the same value category for these so that we
@@ -3439,8 +3438,7 @@ void DelayedArgument::emitDefaultArgument(SILGenFunction &SGF,
   auto value = SGF.emitApplyOfDefaultArgGenerator(info.loc,
                                                   info.defaultArgsOwner,
                                                   info.destIndex,
-                                                  info.resultType,
-                                                  info.origResultType);
+                                                  info.resultType);
 
   SmallVector<ManagedValue, 4> loweredArgs;
   SmallVector<DelayedArgument, 4> delayedArgs;

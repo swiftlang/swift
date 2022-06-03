@@ -114,7 +114,7 @@ bool syntaxparse_lexRegexLiteral(
     case '\0': {
       if (Ptr - 1 == BufferEnd) {
         // Reached to EOF.
-        diagnose(BridgedDiagEngine, Ptr, diag::lex_regex_literal_unterminated);
+        diagnose(BridgedDiagEngine, Ptr - 1, diag::lex_regex_literal_unterminated);
         // In multi-line mode, we don't want to skip over what is likely
         // otherwise valid Swift code, so resume from the first newline.
         *InputPtr = firstNewline ? firstNewline : (Ptr - 1);

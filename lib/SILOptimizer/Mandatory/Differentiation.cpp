@@ -898,7 +898,7 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
     // - Functions with no return.
     // - Functions with unsupported control flow.
     if (context.getASTContext()
-            .LangOpts.EnableExperimentalForwardModeDifferentiation &&
+            .LangOpts.hasFeature(Feature::ForwardModeDifferentiation) &&
         (diagnoseNoReturn(context, witness->getOriginalFunction(), invoker) ||
          diagnoseUnsupportedControlFlow(
              context, witness->getOriginalFunction(), invoker)))
@@ -914,7 +914,7 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
     // generation because generated JVP may not match semantics of custom VJP.
     // Instead, create an empty JVP.
     if (context.getASTContext()
-            .LangOpts.EnableExperimentalForwardModeDifferentiation &&
+            .LangOpts.hasFeature(Feature::ForwardModeDifferentiation) &&
         !witness->getVJP()) {
       // JVP and differential generation do not currently support functions with
       // multiple basic blocks.

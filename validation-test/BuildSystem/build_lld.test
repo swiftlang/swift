@@ -1,0 +1,9 @@
+# RUN: %empty-directory(%t)
+# RUN: mkdir -p %t
+# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --build-lld 2>&1 | %FileCheck %s
+
+# REQUIRES: standalone_build
+
+# Check that lld is in LLVM_ENABLE_PROJECTS of the llvm-project/llvm build
+
+# CHECK: '-DLLVM_ENABLE_PROJECTS={{[^']*}}lld{{[^']*}}'{{.*}}llvm-project/llvm{{$}}

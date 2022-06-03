@@ -91,9 +91,9 @@ import Swift
 /// produces it:
 ///
 ///     for await quake in QuakeMonitor.quakes {
-///         print ("Quake: \(quake.date)")
+///         print("Quake: \(quake.date)")
 ///     }
-///     print ("Stream finished.")
+///     print("Stream finished.")
 ///
 @available(SwiftStdlib 5.1, *)
 public struct AsyncStream<Element> {
@@ -272,18 +272,18 @@ public struct AsyncStream<Element> {
   ///
   ///     let stream = AsyncStream<Int>(Int.self,
   ///                                   bufferingPolicy: .bufferingNewest(5)) { continuation in
-  ///             Task.detached {
-  ///                 for _ in 0..<100 {
-  ///                     await Task.sleep(1 * 1_000_000_000)
-  ///                     continuation.yield(Int.random(in: 1...10))
-  ///                 }
-  ///                 continuation.finish()
+  ///         Task.detached {
+  ///             for _ in 0..<100 {
+  ///                 await Task.sleep(1 * 1_000_000_000)
+  ///                 continuation.yield(Int.random(in: 1...10))
   ///             }
+  ///             continuation.finish()
   ///         }
+  ///     }
   ///
   ///     // Call point:
   ///     for await random in stream {
-  ///         print ("\(random)")
+  ///         print(random)
   ///     }
   ///
   public init(
@@ -319,15 +319,13 @@ public struct AsyncStream<Element> {
   /// the `unfolding` parameter label.
   ///
   ///     let stream = AsyncStream<Int> {
-  ///             await Task.sleep(1 * 1_000_000_000)
-  ///             return Int.random(in: 1...10)
-  ///         }
-  ///         onCancel: { @Sendable () in print ("Canceled.") }
-  ///     )
+  ///         await Task.sleep(1 * 1_000_000_000)
+  ///         return Int.random(in: 1...10)
+  ///     } onCancel: { @Sendable () in print("Canceled.") }
   ///
   ///     // Call point:
   ///     for await random in stream {
-  ///         print ("\(random)")
+  ///         print(random)
   ///     }
   ///
   ///

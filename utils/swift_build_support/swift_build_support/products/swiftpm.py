@@ -93,7 +93,7 @@ class SwiftPM(product.Product):
             ]
 
         # Pass Cross compile host info
-        if self.has_cross_compile_hosts(self.args):
+        if self.has_cross_compile_hosts():
             if self.is_darwin_host(host_target):
                 helper_cmd += ['--cross-compile-hosts']
                 for cross_compile_host in self.args.cross_compile_hosts:
@@ -132,10 +132,6 @@ class SwiftPM(product.Product):
 
     def should_install(self, host_target):
         return self.args.install_swiftpm
-
-    @classmethod
-    def has_cross_compile_hosts(self, args):
-        return args.cross_compile_hosts
 
     def install(self, host_target):
         install_destdir = self.host_install_destdir(host_target)

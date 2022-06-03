@@ -14,6 +14,19 @@ public enum HasRawValue: Int {
   // CHECK-DAG: }
 } // CHECK: {{^}$}}
 
+// CHECK-LABEL: @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *)
+// CHECK-NEXT: public enum HasRawValueAndAvailability : Swift.Int {
+@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *)
+public enum HasRawValueAndAvailability: Int {
+  // CHECK-NEXT: case a, b, c
+  case a, b, c
+  // CHECK-DAG: public typealias RawValue = Swift.Int
+  // CHECK-DAG: public init?(rawValue: Swift.Int)
+  // CHECK-DAG: public var rawValue: Swift.Int {
+  // CHECK-DAG:   get{{$}}
+  // CHECK-DAG: }
+} // CHECK: {{^}$}}
+
 @objc public enum ObjCEnum: Int32 {
   case a, b = 5, c
 }
@@ -48,6 +61,13 @@ extension NoRawValueWithExplicitHashable : Hashable {
 // CHECK: extension synthesized.HasRawValue : Swift.Equatable {}
 // CHECK: extension synthesized.HasRawValue : Swift.Hashable {}
 // CHECK: extension synthesized.HasRawValue : Swift.RawRepresentable {}
+
+// CHECK: @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *)
+// CHECK-NEXT: extension synthesized.HasRawValueAndAvailability : Swift.Equatable {}
+// CHECK: @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *)
+// CHECK-NEXT: extension synthesized.HasRawValueAndAvailability : Swift.Hashable {}
+// CHECK: @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *)
+// CHECK-NEXT: extension synthesized.HasRawValueAndAvailability : Swift.RawRepresentable {}
 
 // CHECK: extension synthesized.ObjCEnum : Swift.Equatable {}
 // CHECK: extension synthesized.ObjCEnum : Swift.Hashable {}

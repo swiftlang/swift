@@ -75,6 +75,9 @@ enum class SendableCheckReason {
   /// A reference to an actor from outside that actor.
   CrossActor,
 
+  /// Exiting an actor to non-isolated async code.
+  ExitingActor,
+
   /// A synchronous operation that was "promoted" to an asynchronous one
   /// because it was out of the actor's domain.
   SynchronousAsAsync,
@@ -82,6 +85,9 @@ enum class SendableCheckReason {
   /// A protocol conformance where the witness/requirement have different
   /// actor isolation.
   Conformance,
+
+  /// An override of a function.
+  Override,
 
   /// The declaration is being exposed to Objective-C.
   ObjC,
@@ -268,7 +274,8 @@ public:
 /// \returns true if an problem was detected, false otherwise.
 bool diagnoseNonSendableTypesInReference(
     ConcreteDeclRef declRef, const DeclContext *fromDC, SourceLoc loc,
-    SendableCheckReason refKind);
+    SendableCheckReason refKind,
+    Optional<ActorIsolation> knownIsolation = None);
 
 /// Produce a diagnostic for a missing conformance to Sendable.
 void diagnoseMissingSendableConformance(

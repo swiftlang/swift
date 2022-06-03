@@ -48,7 +48,7 @@ private:
   /// A backreference to the containing SILFunction.
   SILFunction *Parent;
 
-  /// PrevList - This is a list of all of the terminator operands that are
+  /// PredList - This is a list of all of the terminator operands that are
   /// branching to this block, forming the predecessor list.  This is
   /// automatically managed by the SILSuccessor class.
   SILSuccessor *PredList = nullptr;

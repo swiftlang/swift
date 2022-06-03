@@ -592,7 +592,7 @@ int parseFile(
   Invocation.getLangOptions().VerifySyntaxTree = options::VerifySyntaxTree;
   Invocation.getLangOptions().DisablePoundIfEvaluation = true;
   Invocation.getLangOptions().EnableExperimentalStringProcessing = true;
-  Invocation.getLangOptions().EnableBareSlashRegexLiterals = true;
+  Invocation.getLangOptions().Features.insert(Feature::BareSlashRegexLiterals);
 
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(InputFileName);
 

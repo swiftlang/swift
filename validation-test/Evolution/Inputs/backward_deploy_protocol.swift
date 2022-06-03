@@ -49,7 +49,7 @@ public struct NewConforms {
 }
 #endif
 
-// Protocol and type are always available, conformace is weak-linked
+// Protocol and type are always available, conformance is weak-linked
 public struct NewConformanceConforms {
   public init() {}
 }
