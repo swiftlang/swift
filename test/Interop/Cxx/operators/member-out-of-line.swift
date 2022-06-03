@@ -6,8 +6,6 @@
 
 // REQUIRES: executable_test
 
-// XFAIL: *
-
 import MemberOutOfLine
 import StdlibUnittest
 

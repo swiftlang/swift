@@ -17,7 +17,6 @@ var totalsum = nonTrivialInit(true)
 //CHECK-NOT: WZ
 //CHECK-NOT: totalsum
 //CHECK-NOT: inputval
-//CHECK: {{^}$}}
 func testit(_ x: Int) {
 	for _ in 0...10000000 {
 		totalsum += inputval

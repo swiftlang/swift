@@ -124,3 +124,29 @@ class FailableInit: E2 {
 }
 @_typeEraser(FailableInit) // expected-error {{type eraser 'FailableInit' has no viable initializer of the form 'init<T: E2>(erasing: T)'}}
 protocol E2 {}
+
+// SPI type eraser and non-SPI protocol
+@_spi(SPI)
+public struct AnyE3_SPI: E3 {
+  public init<T: E3>(erasing: T) {} // expected-note {{'init(erasing:)' is SPI, but protocol 'E3' is not}}
+}
+@_typeEraser(AnyE3_SPI) // expected-error {{type eraser 'AnyE3_SPI' has no viable initializer of the form 'init<T: E3>(erasing: T)'}}
+public protocol E3 {}
+
+// SPI type eraser and SPI protocol of different groups
+@_spi(SPI2)
+public struct AnyE4_SPI: E4 {
+  public init<T: E4>(erasing: T) {} // expected-note {{'init(erasing:)' is SPI, but protocol 'E4' is not in the same SPI groups as 'init(erasing:)'}}
+}
+@_spi(SPI1) @_spi(SPI2)
+@_typeEraser(AnyE4_SPI) // expected-error {{type eraser 'AnyE4_SPI' has no viable initializer of the form 'init<T: E4>(erasing: T)'}}
+public protocol E4 {}
+
+// Same-group SPI type eraser and protocol
+@_spi(SPI1) @_spi(SPI2)
+public struct AnyE5_SPI: E5 {
+  public init<T: E5>(erasing: T) {}
+}
+@_spi(SPI2) @_spi(SPI1)
+@_typeEraser(AnyE5_SPI) // same SPI groups, okay
+public protocol E5 {}

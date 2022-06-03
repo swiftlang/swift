@@ -1,11 +1,11 @@
 // RUN: rm -rf %t
 // RUN: %target-swift-frontend -disable-implicit-concurrency-module-import -index-store-path %t/idx -primary-file %s -o %t/s1.o -I %S/Inputs -typecheck -module-cache-path %t/mcp -enable-objc-interop
-// RUN: c-index-test core -print-unit %t/idx | %FileCheck %s -check-prefix=FILE1
+// RUN: c-index-test core -print-unit %t/idx | %FileCheck %s -check-prefixes=FILE1,FILE1-PCM
 
 // If the module cache already exists, the pcm gets indexed.
 // RUN: rm -rf %t/idx
 // RUN: %target-swift-frontend -disable-implicit-concurrency-module-import -index-store-path %t/idx -primary-file %s -o %t/s1.o -I %S/Inputs -typecheck -module-cache-path %t/mcp -enable-objc-interop
-// RUN: c-index-test core -print-unit %t/idx | %FileCheck %s -check-prefix=FILE1
+// RUN: c-index-test core -print-unit %t/idx | %FileCheck %s -check-prefixes=FILE1,FILE1-PCM
 
 // FIXME: index the bridging header!
 
@@ -13,8 +13,18 @@
 // RUN: echo 'import ClangModuleA' > %t/s2.swift
 // RUN: %target-swift-frontend -disable-implicit-concurrency-module-import -index-store-path %t/idx %s %t/s2.swift -o %t/s1.o -o %t/s2.o -I %S/Inputs -c -emit-module -module-name main -emit-module-path %t/main.swiftmodule -module-cache-path %t/mcp -enable-objc-interop
 // RUN: c-index-test core -print-unit %t/idx > %t/both.txt
-// RUN: %FileCheck %s -check-prefix=FILE1 < %t/both.txt
-// RUN: %FileCheck %s -check-prefix=FILE2 < %t/both.txt
+// RUN: %FileCheck %s -check-prefixes=FILE1,FILE1-PCM < %t/both.txt
+// RUN: %FileCheck %s -check-prefixes=FILE2,FILE2-PCM < %t/both.txt
+
+
+// Test -index-ignore-clang-modules.
+
+// RUN: %empty-directory(%t)
+// RUN: echo 'import ClangModuleA' > %t/s2.swift
+// RUN: %target-swift-frontend -disable-implicit-concurrency-module-import -index-store-path %t/idx -index-ignore-clang-modules %s %t/s2.swift -o %t/s1.o -o %t/s2.o -I %S/Inputs -c -emit-module -module-name main -emit-module-path %t/main.swiftmodule -module-cache-path %t/mcp -enable-objc-interop
+// RUN: c-index-test core -print-unit %t/idx > %t/both.txt
+// RUN: %FileCheck %s -check-prefixes=FILE1,FILE1-IGNORE < %t/both.txt --dump-input-filter all
+// RUN: %FileCheck %s -check-prefixes=FILE2,FILE2-IGNORE < %t/both.txt
 
 
 import ClangModuleB
@@ -26,22 +36,26 @@ func test() {
   funcB()
 }
 
-// FILE1: ClangModuleA-
-// FILE1: --------
-// FILE1: is-system: 0
-// FILE1: has-main: 0
-// FILE1: DEPEND START
-// FILE1: Record | user | {{.*}}ClangModuleA.h | ClangModuleA.h-
-// FILE1: DEPEND END
+// FILE1-IGNORE-NOT: ClangModuleA-
 
-// FILE1: ClangModuleB-
-// FILE1: --------
-// FILE1: is-system: 0
-// FILE1: has-main: 0
-// FILE1: DEPEND START
-// FILE1: Unit | user | ClangModuleA | {{.*}}ClangModuleA-{{.*}}.pcm | ClangModuleA-{{.*}}.pcm-
-// FILE1: Record | user | {{.*}}ClangModuleB.h | ClangModuleB.h-
-// FILE1: DEPEND END
+// FILE1-PCM: ClangModuleA-
+// FILE1-PCM: --------
+// FILE1-PCM: is-system: 0
+// FILE1-PCM: has-main: 0
+// FILE1-PCM: DEPEND START
+// FILE1-PCM: Record | user | {{.*}}ClangModuleA.h | ClangModuleA.h-
+// FILE1-PCM: DEPEND END
+
+// FILE1-IGNORE-NOT: ClangModuleB-
+
+// FILE1-PCM: ClangModuleB-
+// FILE1-PCM: --------
+// FILE1-PCM: is-system: 0
+// FILE1-PCM: has-main: 0
+// FILE1-PCM: DEPEND START
+// FILE1-PCM: Unit | user | ClangModuleA | {{.*}}ClangModuleA-{{.*}}.pcm | ClangModuleA-{{.*}}.pcm-
+// FILE1-PCM: Record | user | {{.*}}ClangModuleB.h | ClangModuleB.h-
+// FILE1-PCM: DEPEND END
 
 // FILE1: s1.o-
 // FILE1: --------
@@ -51,8 +65,10 @@ func test() {
 // FILE1-NOT: Unit |{{.*}}ClangModuleA
 // FILE1: Unit | system | Swift | {{.*}}Swift.swiftmodule
 // FILE1-NOT: Unit |{{.*}}ClangModuleA
-// FILE1: Unit | user | ClangModuleB | {{.*}}ClangModuleB-{{[A-Z0-9]*}}.pcm | ClangModuleB-{{[A-Z0-9]*}}.pcm-
-// FILE1: Unit | user | ClangModuleC | {{.*}}ClangModuleC-{{[A-Z0-9]*}}.pcm | ClangModuleC-{{[A-Z0-9]*}}.pcm-
+// FILE1-PCM: Unit | user | ClangModuleB | {{.*}}ClangModuleB-{{[A-Z0-9]*}}.pcm | ClangModuleB-{{[A-Z0-9]*}}.pcm-
+// FILE1-PCM: Unit | user | ClangModuleC | {{.*}}ClangModuleC-{{[A-Z0-9]*}}.pcm | ClangModuleC-{{[A-Z0-9]*}}.pcm-
+// FILE1-IGNORE: Unit | user | ClangModuleB | {{.*}}ClangModuleB-{{[A-Z0-9]*}}.pcm
+// FILE1-IGNORE: Unit | user | ClangModuleC | {{.*}}ClangModuleC-{{[A-Z0-9]*}}.pcm
 // FILE1-NOT: Unit |{{.*}}ClangModuleA
 // FILE1: Record | user | {{.*}}unit-pcm-dependency.swift | unit-pcm-dependency.swift-
 // FILE1-NOT: Unit |{{.*}}ClangModuleA
@@ -71,7 +87,8 @@ func test() {
 // FILE2: Unit | system | Swift | {{.*}}Swift.swiftmodule
 // FILE2-NOT: Unit |{{.*}}ClangModuleB
 // FILE2-NOT: Record
-// FILE2: Unit | user | ClangModuleA | {{.*}}ClangModuleA-{{[A-Z0-9]*}}.pcm | ClangModuleA-{{[A-Z0-9]*}}.pcm-
+// FILE2-PCM: Unit | user | ClangModuleA | {{.*}}ClangModuleA-{{[A-Z0-9]*}}.pcm | ClangModuleA-{{[A-Z0-9]*}}.pcm-
+// FILE2-IGNORE: Unit | user | ClangModuleA | {{.*}}ClangModuleA-{{[A-Z0-9]*}}.pcm
 // FILE2: Record | user | {{.*}}s2.swift | s2.swift-
 // FILE2-NOT: Unit |{{.*}}ClangModuleB
 // FILE2-NOT: Record

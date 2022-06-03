@@ -3,7 +3,7 @@
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
-// UNSUPPORTED: linux
+// UNSUPPORTED: OS=linux-gnu
 
 // REQUIRES: rdar86028226
 

@@ -219,7 +219,7 @@ protocol Other1 {
   {
     key.kind: source.lang.swift.ref.generic_type_param,
     key.name: "T",
-    key.usr: "s:16UnderscoredProto1AVAASSRszlE1Txmfp",
+    key.usr: "s:16UnderscoredProto1AV1Txmfp",
     key.offset: 227,
     key.length: 1
   },
@@ -849,7 +849,7 @@ protocol Other1 {
   {
     key.kind: source.lang.swift.ref.generic_type_param,
     key.name: "T",
-    key.usr: "s:16UnderscoredProto1DVAASQRzrlE1Txmfp",
+    key.usr: "s:16UnderscoredProto1DV1Txmfp",
     key.offset: 1411,
     key.length: 1
   },
@@ -911,7 +911,7 @@ protocol Other1 {
   {
     key.kind: source.lang.swift.ref.generic_type_param,
     key.name: "T",
-    key.usr: "s:16UnderscoredProto1DVAASQRzrlE1Txmfp",
+    key.usr: "s:16UnderscoredProto1DV1Txmfp",
     key.offset: 1484,
     key.length: 1
   },
@@ -1050,6 +1050,11 @@ protocol Other1 {
   },
   {
     key.kind: source.lang.swift.decl.extension.struct,
+    key.generic_params: [
+      {
+        key.name: "T"
+      }
+    ],
     key.generic_requirements: [
       {
         key.description: "T == String"
@@ -1057,7 +1062,7 @@ protocol Other1 {
     ],
     key.offset: 209,
     key.length: 185,
-    key.fully_annotated_decl: "<decl.extension.struct><syntaxtype.keyword>extension</syntaxtype.keyword> <decl.name><ref.struct usr=\"s:16UnderscoredProto1AV\">A</ref.struct></decl.name> : <ref.protocol usr=\"s:16UnderscoredProto01_A6Proto2P\">_UnderscoredProto2</ref.protocol> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:16UnderscoredProto1AVAASSRszlE1Txmfp\">T</ref.generic_type_param> == <ref.struct usr=\"s:SS\">String</ref.struct></decl.generic_type_requirement></decl.extension.struct>",
+    key.fully_annotated_decl: "<decl.extension.struct><syntaxtype.keyword>extension</syntaxtype.keyword> <decl.name><ref.struct usr=\"s:16UnderscoredProto1AV\">A</ref.struct></decl.name> : <ref.protocol usr=\"s:16UnderscoredProto01_A6Proto2P\">_UnderscoredProto2</ref.protocol> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:16UnderscoredProto1AV1Txmfp\">T</ref.generic_type_param> == <ref.struct usr=\"s:SS\">String</ref.struct></decl.generic_type_requirement></decl.extension.struct>",
     key.conforms: [
       {
         key.kind: source.lang.swift.ref.protocol,
@@ -1520,6 +1525,14 @@ protocol Other1 {
   },
   {
     key.kind: source.lang.swift.decl.extension.struct,
+    key.generic_params: [
+      {
+        key.name: "T"
+      },
+      {
+        key.name: "U"
+      }
+    ],
     key.generic_requirements: [
       {
         key.description: "T : Equatable"
@@ -1527,7 +1540,7 @@ protocol Other1 {
     ],
     key.offset: 1393,
     key.length: 59,
-    key.fully_annotated_decl: "<decl.extension.struct><syntaxtype.keyword>extension</syntaxtype.keyword> <decl.name><ref.struct usr=\"s:16UnderscoredProto1DV\">D</ref.struct></decl.name> : <ref.protocol usr=\"s:16UnderscoredProto05_SomeB0P\">_SomeProto</ref.protocol> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:16UnderscoredProto1DVAASQRzrlE1Txmfp\">T</ref.generic_type_param> : <ref.protocol usr=\"s:SQ\">Equatable</ref.protocol></decl.generic_type_requirement></decl.extension.struct>",
+    key.fully_annotated_decl: "<decl.extension.struct><syntaxtype.keyword>extension</syntaxtype.keyword> <decl.name><ref.struct usr=\"s:16UnderscoredProto1DV\">D</ref.struct></decl.name> : <ref.protocol usr=\"s:16UnderscoredProto05_SomeB0P\">_SomeProto</ref.protocol> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:16UnderscoredProto1DV1Txmfp\">T</ref.generic_type_param> : <ref.protocol usr=\"s:SQ\">Equatable</ref.protocol></decl.generic_type_requirement></decl.extension.struct>",
     key.conforms: [
       {
         key.kind: source.lang.swift.ref.protocol,
@@ -1560,6 +1573,14 @@ protocol Other1 {
   },
   {
     key.kind: source.lang.swift.decl.extension.struct,
+    key.generic_params: [
+      {
+        key.name: "T"
+      },
+      {
+        key.name: "U"
+      }
+    ],
     key.generic_requirements: [
       {
         key.description: "T : Other1"
@@ -1570,7 +1591,7 @@ protocol Other1 {
     ],
     key.offset: 1454,
     key.length: 135,
-    key.fully_annotated_decl: "<syntaxtype.keyword>extension</syntaxtype.keyword> <ref.struct usr=\"s:16UnderscoredProto1DV\">D</ref.struct> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:16UnderscoredProto1DV1Txmfp\">T</ref.generic_type_param> : <ref.protocol usr=\"s:16UnderscoredProto6Other1P\">Other1</ref.protocol></decl.generic_type_requirement>, <decl.generic_type_requirement><ref.generic_type_param usr=\"s:16UnderscoredProto1DVAASQRzrlE1Txmfp\">T</ref.generic_type_param> : <ref.protocol usr=\"s:SQ\">Equatable</ref.protocol></decl.generic_type_requirement>",
+    key.fully_annotated_decl: "<syntaxtype.keyword>extension</syntaxtype.keyword> <ref.struct usr=\"s:16UnderscoredProto1DV\">D</ref.struct> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:16UnderscoredProto1DV1Txmfp\">T</ref.generic_type_param> : <ref.protocol usr=\"s:16UnderscoredProto6Other1P\">Other1</ref.protocol></decl.generic_type_requirement>, <decl.generic_type_requirement><ref.generic_type_param usr=\"s:16UnderscoredProto1DV1Txmfp\">T</ref.generic_type_param> : <ref.protocol usr=\"s:SQ\">Equatable</ref.protocol></decl.generic_type_requirement>",
     key.extends: {
       key.kind: source.lang.swift.ref.struct,
       key.name: "D",

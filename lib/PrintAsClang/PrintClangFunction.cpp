@@ -102,11 +102,15 @@ void DeclAndTypeClangFunctionPrinter::printFunctionSignature(
                                       : OutputLanguageMode::Cxx;
   // FIXME: Might need a PrintMultiPartType here.
   auto print = [&, this](Type ty, Optional<OptionalTypeKind> optionalKind,
-                         StringRef name) {
+                         StringRef name, bool isInOutParam) {
     // FIXME: add support for noescape and PrintMultiPartType,
     // see DeclAndTypePrinter::print.
     CFunctionSignatureTypePrinter typePrinter(os, typeMapping, outputLang);
     typePrinter.visit(ty, optionalKind);
+
+    if (isInOutParam) {
+      os << (outputLang == OutputLanguageMode::Cxx ? " &" : " *");
+    }
 
     if (!name.empty()) {
       os << ' ';
@@ -142,7 +146,7 @@ void DeclAndTypeClangFunctionPrinter::printFunctionSignature(
         llvm::raw_string_ostream os(paramName);
         os << "_" << paramIndex;
       }
-      print(objTy, argKind, paramName);
+      print(objTy, argKind, paramName, param->isInOut());
       ++paramIndex;
     });
   } else if (kind == FunctionSignatureKind::CFunctionProto) {

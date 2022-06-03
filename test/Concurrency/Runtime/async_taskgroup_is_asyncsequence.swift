@@ -7,7 +7,7 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
-// UNSUPPORTED: linux
+// UNSUPPORTED: OS=linux-gnu
 
 @available(SwiftStdlib 5.1, *)
 func test_taskGroup_is_asyncSequence() async {

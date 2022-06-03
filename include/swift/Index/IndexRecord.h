@@ -34,6 +34,9 @@ namespace index {
 ///
 /// \param indexStorePath The location to write the indexing data to.
 ///
+/// \param indexClangModules If true, emit index data for imported clang modules
+/// (pcms).
+///
 /// \param indexSystemModules If true, emit index data for imported serialized
 /// swift system modules.
 ///
@@ -48,9 +51,9 @@ namespace index {
 ///
 /// \param pathRemapper Remapper to use for paths in index data.
 bool indexAndRecord(SourceFile *primarySourceFile, StringRef indexUnitToken,
-                    StringRef indexStorePath, bool indexSystemModules,
-                    bool skipStdlib, bool isDebugCompilation,
-                    StringRef targetTriple,
+                    StringRef indexStorePath, bool indexClangModules,
+                    bool indexSystemModules, bool skipStdlib,
+                    bool isDebugCompilation, StringRef targetTriple,
                     const DependencyTracker &dependencyTracker,
                     const PathRemapper &pathRemapper);
 
@@ -69,6 +72,9 @@ bool indexAndRecord(SourceFile *primarySourceFile, StringRef indexUnitToken,
 ///
 /// \param indexStorePath The location to write the indexing data to.
 ///
+/// \param indexClangModules If true, emit index data for imported clang modules
+/// (pcms).
+///
 /// \param indexSystemModules If true, emit index data for imported serialized
 /// swift system modules.
 ///
@@ -84,8 +90,9 @@ bool indexAndRecord(SourceFile *primarySourceFile, StringRef indexUnitToken,
 /// \param pathRemapper Remapper to use for paths in index data.
 bool indexAndRecord(ModuleDecl *module, ArrayRef<std::string> indexUnitTokens,
                     StringRef moduleUnitToken, StringRef indexStorePath,
-                    bool indexSystemModules, bool skipStdlib,
-                    bool isDebugCompilation, StringRef targetTriple,
+                    bool indexClangModules, bool indexSystemModules,
+                    bool skipStdlib, bool isDebugCompilation,
+                    StringRef targetTriple,
                     const DependencyTracker &dependencyTracker,
                     const PathRemapper &pathRemapper);
 // FIXME: indexUnitTokens could be StringRef, but that creates an impedance

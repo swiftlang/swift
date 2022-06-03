@@ -13,23 +13,24 @@
 #ifndef SWIFT_BASIC_FEATURES_H
 #define SWIFT_BASIC_FEATURES_H
 
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
 
 namespace swift {
 
 class LangOptions;
-  
+
 /// Enumeration describing all of the named features.
 enum class Feature {
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option) \
-  FeatureName,
-  #include "swift/Basic/Features.def"
+FeatureName,
+#include "swift/Basic/Features.def"
 };
 
 constexpr unsigned numFeatures() {
   enum Features {
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option) \
-    FeatureName,
+FeatureName,
 #include "swift/Basic/Features.def"
     NumFeatures
   };
@@ -50,6 +51,17 @@ inline bool featureImpliesFeature(Feature feature, Feature implied) {
   // addition in Features.def.
   return (unsigned) feature < (unsigned) implied;
 }
+
+/// Get the feature corresponding to this "future" feature, if there is one.
+llvm::Optional<Feature> getFutureFeature(llvm::StringRef name);
+
+/// Get the feature corresponding to this "experimental" feature, if there is
+/// one.
+llvm::Optional<Feature> getExperimentalFeature(llvm::StringRef name);
+
+/// Get the major language version in which this feature was introduced, or
+/// \c None if it does not have such a version.
+llvm::Optional<unsigned> getFeatureLanguageVersion(Feature feature);
 
 }
 

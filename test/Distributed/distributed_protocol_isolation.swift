@@ -127,7 +127,8 @@ protocol Server {
   func send<Message: Codable>(message: Message) async throws -> String
 }
 actor MyServer : Server {
-  func send<Message: Codable>(message: Message) throws -> String { "" }  // expected-warning{{non-sendable type 'Message' in parameter of actor-isolated instance method 'send(message:)' satisfying non-isolated protocol requirement cannot cross actor boundary}}
+  // expected-note@+1{{consider making generic parameter 'Message' conform to the 'Sendable' protocol}} {{29-29=, Sendable}}
+  func send<Message: Codable>(message: Message) throws -> String { "" }  // expected-warning{{non-sendable type 'Message' in parameter of actor-isolated instance method 'send(message:)' satisfying protocol requirement cannot cross actor boundary}}
 }
 
 protocol AsyncThrowsAll {

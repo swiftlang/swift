@@ -8,7 +8,7 @@
 
 // REQUIRES: executable_test
 
-// UNSUPPORTED: linux
+// UNSUPPORTED: OS=linux-gnu
 
 import first
 import second

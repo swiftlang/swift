@@ -17,8 +17,6 @@
 // REQUIRES: CPU=x86_64 || CPU=arm64
 // REQUIRES: optimized_stdlib
 
-// REQUIRES: rdar93031874
-
 //////////////////
 // Declarations //
 //////////////////
@@ -300,7 +298,7 @@ public func varSimpleTestVar() async {
 
 // CHECK-LABEL: define internal swifttailcc void @"$s27move_function_dbginfo_async20letArgCCFlowTrueTestyyxnYalFTQ0_"(
 // CHECK:  call void @llvm.dbg.addr(metadata i8* %{{[0-9]+}}, metadata !{{[0-9]+}}, metadata !DIExpression(DW_OP_deref, DW_OP_plus_uconst, 16, DW_OP_plus_uconst, 8, DW_OP_deref)),
-// CHECK:  musttail call swifttailcc void @swift_task_switch(%swift.context* swiftasync %{{[0-9]+}}, i8* bitcast (void (i8*)* @"$s27move_function_dbginfo_async20letArgCCFlowTrueTestyyxnYalFTY1_" to i8*), i64 0, i64 0) #4,
+// CHECK:  musttail call swifttailcc void @swift_task_switch(%swift.context* swiftasync %{{[0-9]+}}, i8* bitcast (void (i8*)* @"$s27move_function_dbginfo_async20letArgCCFlowTrueTestyyxnYalFTY1_" to i8*), i64 0, i64 0)
 // CHECK-NEXT: ret void
 // CHECK-NEXT: }
 
@@ -344,6 +342,45 @@ public func varSimpleTestVar() async {
 // This is the continuation block
 // CHECK-LABEL: define internal swifttailcc void @"$s27move_function_dbginfo_async20letArgCCFlowTrueTestyyxnYalFTQ4_"(
 // CHECK:  call void @llvm.dbg.value(metadata %swift.opaque* undef, metadata !{{.*}}, metadata !DIExpression(DW_OP_deref)),
+
+// DWARF: DW_TAG_subprogram
+// DWARF: DW_AT_linkage_name	("$s3out20letArgCCFlowTrueTestyyxnYalF")
+// DWARF: DW_AT_name	("letArgCCFlowTrueTest")
+
+// DWARF: DW_TAG_formal_parameter
+// DWARF-NEXT: DW_AT_location	(DW_OP_entry_value([[ASYNC_REG]]), DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x8, DW_OP_deref)
+// DWARF-NEXT: DW_AT_name	("msg")
+//
+// DWARF: DW_AT_linkage_name	("$s3out20letArgCCFlowTrueTestyyxnYalFTQ0_")
+// DWARF-NEXT: DW_AT_name	("letArgCCFlowTrueTest")
+// DWARF: DW_TAG_formal_parameter
+// DWARF-NEXT: DW_AT_location	(DW_OP_entry_value([[ASYNC_REG]]), DW_OP_deref, DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x8, DW_OP_deref)
+// DWARF-NEXT: DW_AT_name	("msg")
+//
+// DWARF: DW_AT_linkage_name	("$s3out20letArgCCFlowTrueTestyyxnYalFTY1_")
+// DWARF-NEXT: DW_AT_name	("letArgCCFlowTrueTest")
+// DWARF: DW_TAG_formal_parameter
+// DWARF-NEXT: DW_AT_location	(0x{{[a-f0-9]+}}:
+// DWARF-NEXT:    [0x{{[a-f0-9]+}}, 0x{{[a-f0-9]+}}): DW_OP_entry_value([[ASYNC_REG]]), DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x8, DW_OP_deref
+// DWARF-NEXT:    [0x{{[a-f0-9]+}}, 0x{{[a-f0-9]+}}): DW_OP_entry_value([[ASYNC_REG]]), DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x8, DW_OP_deref)
+// DWARF-NEXT: DW_AT_name	("msg")
+//
+// DWARF: DW_AT_linkage_name	("$s3out20letArgCCFlowTrueTestyyxnYalFTQ2_")
+// DWARF-NEXT: DW_AT_name	("letArgCCFlowTrueTest")
+// DWARF: DW_TAG_formal_parameter
+// DWARF-NEXT: DW_AT_name	("msg")
+//
+// DWARF: DW_AT_linkage_name	("$s3out20letArgCCFlowTrueTestyyxnYalFTQ3_")
+// DWARF-NEXT: DW_AT_name	("letArgCCFlowTrueTest")
+// DWARF: DW_TAG_formal_parameter
+// DWARF-NEXT: DW_AT_location	(0x{{[a-f0-9]+}}:
+// DWARF-NEXT:                        [0x{{[a-f0-9]+}}, 0x{{[a-f0-9]+}}): DW_OP_entry_value([[ASYNC_REG]]), DW_OP_deref, DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x8, DW_OP_deref)
+// DWARF-NEXT: DW_AT_name	("msg")
+//
+// DWARF: DW_AT_linkage_name	("$s3out20letArgCCFlowTrueTestyyxnYalFTQ4_")
+// DWARF-NEXT: DW_AT_name	("letArgCCFlowTrueTest")
+// DWARF: DW_TAG_formal_parameter
+// DWARF-NEXT: DW_AT_name	("msg")
 public func letArgCCFlowTrueTest<T>(_ msg: __owned T) async {
     await forceSplit1()
     if trueValue {
@@ -443,6 +480,58 @@ public func letArgCCFlowTrueTest<T>(_ msg: __owned T) async {
 // CHECK:  musttail call swifttailcc void %{{[0-9]+}}(%swift.context* swiftasync
 // CHECK-NEXT:  ret void,
 // CHECK-NEXT: }
+
+// DWARF: DW_AT_linkage_name	("$s3out20varArgCCFlowTrueTestyyxzYaAA1PRzlF")
+// DWARF: DW_AT_name	("varArgCCFlowTrueTest")
+// DWARF: DW_TAG_formal_parameter
+// DWARF-NEXT:                     DW_AT_location	(DW_OP_entry_value([[ASYNC_REG]]), DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x30, DW_OP_deref)
+// DWARF-NEXT:                     DW_AT_name	("msg")
+//
+// DWARF: DW_AT_linkage_name	("$s3out20varArgCCFlowTrueTestyyxzYaAA1PRzlFTQ0_")
+// DWARF-NEXT: DW_AT_name	("varArgCCFlowTrueTest")
+// DWARF: DW_TAG_formal_parameter
+// DWARF-NEXT:   DW_AT_location	(DW_OP_entry_value([[ASYNC_REG]]), DW_OP_deref, DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x30, DW_OP_deref)
+// DWARF-NEXT:   DW_AT_name	("msg")
+//
+// DWARF: DW_AT_linkage_name	("$s3out20varArgCCFlowTrueTestyyxzYaAA1PRzlFTY1_")
+// DWARF-NEXT: DW_AT_name	("varArgCCFlowTrueTest")
+// DWARF: DW_TAG_formal_parameter
+// DWARF-NEXT: DW_AT_location	(0x{{[a-f0-9]+}}:
+// DWARF-NEXT:    [0x{{[a-f0-9]+}}, 0x{{[a-f0-9]+}}): DW_OP_entry_value([[ASYNC_REG]]), DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x30, DW_OP_deref
+// DWARF-NEXT:    [0x{{[a-f0-9]+}}, 0x{{[a-f0-9]+}}): DW_OP_entry_value([[ASYNC_REG]]), DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x30, DW_OP_deref)
+// DWARF-NEXT: DW_AT_name	("msg")
+//
+// DWARF: DW_AT_linkage_name	("$s3out20varArgCCFlowTrueTestyyxzYaAA1PRzlFTQ2_")
+// DWARF-NEXT: DW_AT_name	("varArgCCFlowTrueTest")
+// DWARF: DW_TAG_formal_parameter
+// DWARF-NEXT: DW_AT_name	("msg")
+//
+// DWARF: DW_AT_linkage_name	("$s3out20varArgCCFlowTrueTestyyxzYaAA1PRzlFTY3_")
+// DWARF-NEXT: DW_AT_name	("varArgCCFlowTrueTest")
+// DWARF: DW_TAG_formal_parameter
+// DWARF-NEXT: DW_AT_location	(0x{{[a-f0-9]+}}:
+// DWARF-NEXT:    [0x{{[a-f0-9]+}}, 0x{{[a-f0-9]+}}): DW_OP_entry_value([[ASYNC_REG]]), DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x30, DW_OP_deref)
+// DWARF-NEXT: DW_AT_name	("msg")
+//
+// DWARF: DW_AT_linkage_name	("$s3out20varArgCCFlowTrueTestyyxzYaAA1PRzlFTQ4_")
+// DWARF-NEXT: DW_AT_name	("varArgCCFlowTrueTest")
+// DWARF: DW_TAG_formal_parameter
+// DWARF-NEXT: DW_AT_location	(0x{{[a-f0-9]+}}:
+// DWARF-NEXT:    [0x{{[a-f0-9]+}}, 0x{{[a-f0-9]+}}): DW_OP_entry_value([[ASYNC_REG]]), DW_OP_deref, DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x30, DW_OP_deref)
+// DWARF-NEXT: DW_AT_name	("msg")
+//
+// DWARF: DW_AT_linkage_name	("$s3out20varArgCCFlowTrueTestyyxzYaAA1PRzlFTY5_")
+// DWARF-NEXT: DW_AT_name	("varArgCCFlowTrueTest")
+// DWARF: DW_TAG_formal_parameter
+// DWARF-NEXT: DW_AT_location	(0x{{[a-f0-9]+}}:
+// DWARF-NEXT:    [0x{{[a-f0-9]+}}, 0x{{[a-f0-9]+}}): DW_OP_entry_value([[ASYNC_REG]]), DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x30, DW_OP_deref)
+// DWARF-NEXT: DW_AT_name	("msg")
+//
+// DWARF: DW_AT_linkage_name	("$s3out20varArgCCFlowTrueTestyyxzYaAA1PRzlFTQ6_")
+// DWARF-NEXT: DW_AT_name	("varArgCCFlowTrueTest")
+// DWARF: DW_TAG_formal_parameter
+// DWARF-NEXT: DW_AT_location	(DW_OP_entry_value([[ASYNC_REG]]), DW_OP_deref, DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x30, DW_OP_deref)
+// DWARF-NEXT: DW_AT_name	("msg")
 public func varArgCCFlowTrueTest<T : P>(_ msg: inout T) async {
     await forceSplit1()
     if trueValue {

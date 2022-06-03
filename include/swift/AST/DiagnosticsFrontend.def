@@ -36,6 +36,10 @@ ERROR(error_unsupported_target_os, none,
 ERROR(error_unsupported_target_arch, none,
       "unsupported target architecture: '%0'", (StringRef))
 
+ERROR(error_experimental_feature_not_available, none,
+      "experimental feature '%0' cannot be enabled in a production compiler",
+      (StringRef))
+
 ERROR(error_unknown_library_level, none,
       "unknown library level '%0', "
       "expected one of 'api', 'spi' or 'other'", (StringRef))

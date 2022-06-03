@@ -24,9 +24,9 @@ extension AsyncSequence {
   ///     let stream = Counter(howHigh: 10)
   ///         .filter { $0 % 2 == 0 }
   ///     for await number in stream {
-  ///         print("\(number) ", terminator: " ")
+  ///         print(number, terminator: " ")
   ///     }
-  ///     // Prints: 2  4  6  8  10
+  ///     // Prints "2 4 6 8 10"
   ///
   /// - Parameter isIncluded: A closure that takes an element of the
   ///   asynchronous sequence as its argument and returns a Boolean value

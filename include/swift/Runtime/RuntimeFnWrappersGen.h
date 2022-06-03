@@ -25,6 +25,10 @@ namespace swift {
 class AvailabilityContext;
 class ASTContext;
 
+namespace irgen {
+class IRGenModule;
+}
+
 enum class RuntimeAvailability {
   AlwaysAvailable,
   AvailableByCompatibilityLibrary,
@@ -39,7 +43,8 @@ llvm::Constant *getRuntimeFn(llvm::Module &Module, llvm::Constant *&cache,
                              RuntimeAvailability availability,
                              llvm::ArrayRef<llvm::Type *> retTypes,
                              llvm::ArrayRef<llvm::Type *> argTypes,
-                             llvm::ArrayRef<llvm::Attribute::AttrKind> attrs);
+                             llvm::ArrayRef<llvm::Attribute::AttrKind> attrs,
+                             irgen::IRGenModule *IGM = nullptr);
 
 } // namespace swift
 #endif

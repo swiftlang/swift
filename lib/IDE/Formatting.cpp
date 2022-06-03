@@ -2246,7 +2246,7 @@ private:
         if (Range.isValid() && overlapsTarget(Range))
           return IndentContext {ForLoc, !OutdentChecker::hasOutdent(SM, P)};
       }
-      if (auto *E = FS->getSequence()) {
+      if (auto *E = FS->getParsedSequence()) {
         SourceRange Range = FS->getInLoc();
         widenOrSet(Range, E->getSourceRange());
         if (Range.isValid() && isTargetContext(Range)) {

@@ -7,7 +7,7 @@
 // UNSUPPORTED: back_deployment_runtime
 
 // https://bugs.swift.org/browse/SR-14461
-// UNSUPPORTED: linux
+// UNSUPPORTED: OS=linux-gnu
 
 // REQUIRES: rdar78325660
 

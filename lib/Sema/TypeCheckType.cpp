@@ -629,15 +629,8 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
   auto &diags = ctx.Diags;
 
   if (auto *protoType = type->getAs<ProtocolType>()) {
-    // Build ParameterizedProtocolType if the protocol has a primary associated
-    // type and we're in a supported context (for now just generic requirements,
-    // inheritance clause, extension binding).
-    if (!resolution.getOptions().isParameterizedProtocolSupported(ctx.LangOpts)) {
-      diags.diagnose(loc, diag::parameterized_protocol_not_supported);
-      return ErrorType::get(ctx);
-    }
-
     auto *protoDecl = protoType->getDecl();
+
     auto assocTypes = protoDecl->getPrimaryAssociatedTypes();
     if (assocTypes.empty()) {
       diags.diagnose(loc, diag::protocol_does_not_have_primary_assoc_type,
@@ -653,6 +646,18 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
                      diag::parameterized_protocol_type_argument_count_mismatch,
                      protoType, genericArgs.size(), assocTypes.size(),
                      (genericArgs.size() < assocTypes.size()) ? 1 : 0);
+
+      return ErrorType::get(ctx);
+    }
+
+    // Build ParameterizedProtocolType if the protocol has a primary associated
+    // type and we're in a supported context (for now just generic requirements,
+    // inheritance clause, extension binding).
+    if (!resolution.getOptions().isParameterizedProtocolSupported()) {
+      diags.diagnose(loc, diag::existential_requires_any,
+                     protoDecl->getDeclaredInterfaceType(),
+                     protoDecl->getExistentialType(),
+                     /*isAlias=*/isa<TypeAliasType>(type.getPointer()));
 
       return ErrorType::get(ctx);
     }
@@ -3815,7 +3820,7 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
 
   bool complained = false;
   if (repr->hasEllipsis()) {
-    if (getASTContext().LangOpts.EnableExperimentalVariadicGenerics &&
+    if (getASTContext().LangOpts.hasFeature(Feature::VariadicGenerics) &&
         repr->getNumElements() == 1 && !repr->hasElementNames()) {
       // This is probably a pack expansion. Try to resolve the pattern type.
       auto patternTy = resolveType(repr->getElementType(0), elementOptions);
@@ -3932,18 +3937,33 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
     }
 
     // FIXME: Support compositions involving parameterized protocol types,
-    // like Collection<String> & Sendable, etc.
-    if (ty->isConstraintType() &&
-        !ty->is<ParameterizedProtocolType>()) {
-      auto layout = ty->getExistentialLayout();
-      if (auto superclass = layout.explicitSuperclass)
-        if (checkSuperclass(tyR->getStartLoc(), superclass))
-          continue;
-      if (!layout.getProtocols().empty())
+    // like 'any Collection<String> & Sendable', etc.
+    if (ty->isConstraintType()) {
+      if (ty->is<ProtocolType>()) {
         HasProtocol = true;
+        Members.push_back(ty);
+        continue;
+      }
 
-      Members.push_back(ty);
-      continue;
+      if (ty->is<ParameterizedProtocolType>() &&
+          options.isParameterizedProtocolSupported() &&
+          options.getContext() != TypeResolverContext::ExistentialConstraint) {
+        HasProtocol = true;
+        Members.push_back(ty);
+        continue;
+      }
+
+      if (ty->is<ProtocolCompositionType>()) {
+        auto layout = ty->getExistentialLayout();
+        if (auto superclass = layout.explicitSuperclass)
+          if (checkSuperclass(tyR->getStartLoc(), superclass))
+            continue;
+        if (!layout.getProtocols().empty())
+          HasProtocol = true;
+
+        Members.push_back(ty);
+        continue;
+      }
     }
 
     diagnose(tyR->getStartLoc(),
@@ -3987,7 +4007,7 @@ TypeResolver::resolveExistentialType(ExistentialTypeRepr *repr,
   if (constraintType->hasError())
     return ErrorType::get(getASTContext());
 
-  if (!constraintType->isExistentialType()) {
+  if (!constraintType->isConstraintType()) {
     // Emit a tailored diagnostic for the incorrect optional
     // syntax 'any P?' with a fix-it to add parenthesis.
     auto wrapped = constraintType->getOptionalObjectType();
@@ -4001,14 +4021,18 @@ TypeResolver::resolveExistentialType(ExistentialTypeRepr *repr,
         .fixItReplace(repr->getSourceRange(), fix);
       return constraintType;
     }
+    
+    // Diagnose redundant `any` on an already existential type e.g. any (any P)
+    // with a fix-it to remove first any.
+    if (constraintType->is<ExistentialType>()) {
+      diagnose(repr->getLoc(), diag::redundant_any_in_existential, constraintType)
+          .fixItRemove(repr->getAnyLoc());
+      return constraintType;
+    }
 
-    auto anyStart = repr->getAnyLoc();
-    auto anyEnd = Lexer::getLocForEndOfToken(getASTContext().SourceMgr,
-                                             anyStart);
     diagnose(repr->getLoc(), diag::any_not_existential,
-             constraintType->isTypeParameter(),
-             constraintType)
-      .fixItRemove({anyStart, anyEnd});
+             constraintType->isTypeParameter(), constraintType)
+        .fixItRemove(repr->getAnyLoc());
     return constraintType;
   }
 

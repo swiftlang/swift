@@ -2795,7 +2795,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     if (parseSILDebugLocation(InstLoc, B))
       return true;
     ResultVal = B.createAllocBox(InstLoc, Ty.castTo<SILBoxType>(), VarInfo,
-                                 hasDynamicLifetime);
+                                 hasDynamicLifetime, hasReflection);
     break;
   }
   case SILInstructionKind::ApplyInst:
