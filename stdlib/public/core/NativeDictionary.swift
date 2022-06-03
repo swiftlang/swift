@@ -600,7 +600,7 @@ extension _NativeDictionary {
     (_values + b.offset).initialize(to: value)
   }
   
-  @inlinable 
+  @_alwaysEmitIntoClient
   internal func extractDictionary(
     using bitset: _UnsafeBitset, 
     count: Int
@@ -793,7 +793,7 @@ extension _NativeDictionary { // High-level operations
     }
   }
 
-  @inlinable
+  @_alwaysEmitIntoClient
   internal func filter(
     _ isIncluded: (Element) throws -> Bool
   ) rethrows -> _NativeDictionary<Key, Value> {
