@@ -1,3 +1,4 @@
+
 // RUN: %target-typecheck-verify-swift -swift-version 5 -enable-experimental-static-assert
 
 func isInt<T>(_ value: T) -> Bool {
@@ -376,6 +377,37 @@ func test_diagnosing_on_missing_member_in_case() {
     switch $0 {
     case .one: break
     case .unknown: break // expected-error {{type 'E' has no member 'unknown'}}
+    }
+  }
+}
+
+// rdar://92757114 - fallback diagnostic when member doesn't exist in a nested closure
+func test_diagnose_missing_member_in_inner_closure() {
+  struct B {
+    static var member: any StringProtocol = ""
+  }
+
+  struct Cont<T, E: Error> {
+    func resume(returning value: T) {}
+  }
+
+  func withCont<T>(function: String = #function,
+                   _ body: (Cont<T, Never>) -> Void) -> T {
+    fatalError()
+  }
+
+  func test(vals: [Int]?) -> [Int] {
+    withCont { continuation in
+      guard let vals = vals else {
+        return continuation.resume(returning: [])
+      }
+
+      B.member.get(0, // expected-error {{value of type 'any StringProtocol' has no member 'get'}}
+                   type: "type",
+                   withinSecs: Int(60*60)) { arr in
+        let result = arr.compactMap { $0 }
+        return continuation.resume(returning: result)
+      }
     }
   }
 }
