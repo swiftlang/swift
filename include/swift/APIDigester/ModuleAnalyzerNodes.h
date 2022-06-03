@@ -712,6 +712,7 @@ public:
   void jsonize(json::Output &Out) override;
 };
 
+// Note: Accessor doesn't have Parent pointer.
 class SDKNodeDeclAccessor: public SDKNodeDeclAbstractFunc {
   SDKNodeDecl *Owner;
   AccessorKind AccKind;
@@ -830,6 +831,8 @@ int findDeclUsr(StringRef dumpPath, CheckerOptions Opts);
 
 void nodeSetDifference(ArrayRef<SDKNode*> Left, ArrayRef<SDKNode*> Right,
   NodeVector &LeftMinusRight, NodeVector &RightMinusLeft);
+
+bool hasValidParentPtr(SDKNodeKind kind);
 } // end of abi namespace
 } // end of ide namespace
 } // end of Swift namespace
