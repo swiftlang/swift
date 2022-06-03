@@ -1092,7 +1092,7 @@ class ExprContextAnalyzer {
       break;
     }
     case StmtKind::ForEach:
-      if (auto SEQ = cast<ForEachStmt>(Parent)->getSequence()) {
+      if (auto SEQ = cast<ForEachStmt>(Parent)->getParsedSequence()) {
         if (containsTarget(SEQ)) {
           recordPossibleType(Context.getSequenceType());
         }

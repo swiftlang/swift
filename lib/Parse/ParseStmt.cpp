@@ -2719,7 +2719,7 @@ ParserResult<Stmt> Parser::parseStmtPoundAssert() {
 
   // We check this after consuming everything, so that the SyntaxContext
   // understands this statement even when the feature is disabled.
-  if (!Context.LangOpts.EnableExperimentalStaticAssert) {
+  if (!Context.LangOpts.hasFeature(Feature::StaticAssert)) {
     diagnose(startLoc, diag::pound_assert_disabled);
     return makeParserError();
   }

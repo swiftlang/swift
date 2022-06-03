@@ -1,4 +1,4 @@
-// UNSUPPORTED: windows
+// UNSUPPORTED: OS=windows-msvc
 // RUN: %empty-directory(%t)
 // RUN: touch %t/a.swift %t/b.swift %t/c.swift
 

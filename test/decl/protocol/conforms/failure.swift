@@ -214,7 +214,7 @@ protocol P11 {
   associatedtype A: Equatable
   // FIXME: Should not resolve witness for 'method', but Type::subst doesn't care
   // about conditional requirements when querying type witnesses.
-  // expected-note@+1 {{protocol requires function 'method()' with type '() -> Conformer.A' (aka '() -> Array<P11>'); do you want to add a stub?}}
+  // expected-note@+1 {{protocol requires function 'method()' with type '() -> Conformer.A' (aka '() -> Array<any P11>'); do you want to add a stub?}}
   func method() -> A
 }
 do {
@@ -223,7 +223,7 @@ do {
     // expected-error@-2 {{type 'any P11' does not conform to protocol 'Equatable'}} // FIXME: Crappy diagnostics
     // expected-error@-3 {{'P11' requires that 'any P11' conform to 'Equatable'}}
     // expected-note@-4 {{requirement specified as 'any P11' : 'Equatable'}}
-    // expected-note@-5 {{requirement from conditional conformance of 'Conformer.A' (aka 'Array<P11>') to 'Equatable'}}
+    // expected-note@-5 {{requirement from conditional conformance of 'Conformer.A' (aka 'Array<any P11>') to 'Equatable'}}
     typealias A = Array<any P11>
   }
 }

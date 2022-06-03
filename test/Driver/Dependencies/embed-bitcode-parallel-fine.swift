@@ -1,5 +1,5 @@
 // Windows doesn't support parallel execution yet
-// XFAIL: windows
+// XFAIL: OS=windows-msvc
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/one-way-fine/* %t
 // RUN: touch -t 201401240005 %t/*

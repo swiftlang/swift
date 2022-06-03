@@ -11,8 +11,8 @@
 // CHECK-tvos: {{^}}(root versions=[9.0,+Inf)
 // CHECK-watchos: {{^}}(root versions=[2.0,+Inf)
 
-// CHECK-macosx-NEXT: {{^}}  (api_boundary versions=[10.15.0,+Inf) decl=foo()
-// CHECK-ios-NEXT: {{^}}  (api_boundary versions=[13.0.0,+Inf) decl=foo()
-// CHECK-tvos-NEXT: {{^}}  (api_boundary versions=[13.0.0,+Inf) decl=foo()
-// CHECK-watchos-NEXT: {{^}}  (api_boundary versions=[6.0.0,+Inf) decl=foo()
+// CHECK-macosx-NEXT: {{^}}  (decl_implicit versions=[10.15.0,+Inf) decl=foo()
+// CHECK-ios-NEXT: {{^}}  (decl_implicit versions=[13.0.0,+Inf) decl=foo()
+// CHECK-tvos-NEXT: {{^}}  (decl_implicit versions=[13.0.0,+Inf) decl=foo()
+// CHECK-watchos-NEXT: {{^}}  (decl_implicit versions=[6.0.0,+Inf) decl=foo()
 func foo() {}

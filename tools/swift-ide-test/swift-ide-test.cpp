@@ -4299,13 +4299,13 @@ int main(int argc, char *argv[]) {
     InitInvok.getLangOptions().DisableImplicitStringProcessingModuleImport = true;
   }
   if (options::EnableExperimentalNamedOpaqueTypes) {
-    InitInvok.getLangOptions().EnableExperimentalNamedOpaqueTypes = true;
+    InitInvok.getLangOptions().Features.insert(Feature::NamedOpaqueTypes);
   }
   if (options::EnableExperimentalStringProcessing) {
     InitInvok.getLangOptions().EnableExperimentalStringProcessing = true;
   }
   if (options::EnableBareSlashRegexLiterals) {
-    InitInvok.getLangOptions().EnableBareSlashRegexLiterals = true;
+    InitInvok.getLangOptions().Features.insert(Feature::BareSlashRegexLiterals);
     InitInvok.getLangOptions().EnableExperimentalStringProcessing = true;
   }
 

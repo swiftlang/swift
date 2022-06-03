@@ -1,5 +1,5 @@
 // swift-interface-format-version: 1.0
-// swift-module-flags: -target x86_64-apple-macos10.9 -module-name SilencePreconcurrency
+// swift-module-flags: -module-name SilencePreconcurrency
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -compile-module-from-interface -o %/t/SilencePreconcurrency.swiftmodule %s -verify

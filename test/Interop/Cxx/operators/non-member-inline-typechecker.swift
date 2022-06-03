@@ -1,7 +1,5 @@
 // RUN: %target-typecheck-verify-swift -I %S/Inputs -enable-experimental-cxx-interop
 
-// XFAIL: *
-
 import NonMemberInline
 
 let lhs = LoadableIntWrapper(value: 42)

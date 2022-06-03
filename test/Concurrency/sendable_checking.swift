@@ -4,6 +4,7 @@
 
 @available(SwiftStdlib 5.1, *)
 struct NS1 { }
+// expected-note@-1 2{{consider making struct 'NS1' conform to the 'Sendable' protocol}}
 
 @available(SwiftStdlib 5.1, *)
 @available(*, unavailable)
@@ -69,9 +70,20 @@ public protocol MyProto {
 }
 
 @available(SwiftStdlib 5.1, *)
+func nonisolatedAsyncFunc1(_: NS1) async { }
+
+@available(SwiftStdlib 5.1, *)
+func nonisolatedAsyncFunc2() async -> NS1 { NS1() }
+
+@available(SwiftStdlib 5.1, *)
 public actor MyActor: MyProto {
   public func foo<F>(aFoo: F) async where F: Sendable { }
   public func bar<B>(aBar: B) async where B: Sendable { }
+
+  func g(ns1: NS1) async {
+    await nonisolatedAsyncFunc1(ns1) // expected-warning{{non-sendable type 'NS1' exiting actor-isolated context in call to non-isolated global function 'nonisolatedAsyncFunc1' cannot cross actor boundary}}
+    _ = await nonisolatedAsyncFunc2() // expected-warning{{non-sendable type 'NS1' returned by call from actor-isolated context to non-isolated global function 'nonisolatedAsyncFunc2()' cannot cross actor boundary}}
+  }
 }
 
 // rdar://82452688 - make sure sendable checking doesn't fire for a capture
@@ -82,4 +94,22 @@ func f() async {
   @Sendable func nested() {
     n.pointee += 1
   }
+}
+
+// Make sure the generic signature doesn't minimize away Sendable requirements.
+@_nonSendable class NSClass { }
+
+struct WrapClass<T: NSClass> {
+  var t: T
+}
+
+extension WrapClass: Sendable where T: Sendable { }
+
+// Make sure we don't inherit the unavailable Sendable conformance from
+// our superclass.
+class SendableSubclass: NSClass, @unchecked Sendable { }
+
+@available(SwiftStdlib 5.1, *)
+func testSubclassing(obj: SendableSubclass) async {
+  acceptCV(obj) // okay!
 }

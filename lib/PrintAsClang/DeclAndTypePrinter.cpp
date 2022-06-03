@@ -14,6 +14,7 @@
 #include "ClangSyntaxPrinter.h"
 #include "PrimitiveTypeMapping.h"
 #include "PrintClangFunction.h"
+#include "PrintClangValueType.h"
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
@@ -289,8 +290,8 @@ private:
     printDocumentationComment(CD);
 
     // This is just for testing, so we check explicitly for the attribute instead
-    // of asking if the class is weak imported. If the class has availablility,
-    // we'll print a SWIFT_AVAIALBLE() which implies __attribute__((weak_imported))
+    // of asking if the class is weak imported. If the class has availability,
+    // we'll print a SWIFT_AVAILABLE() which implies __attribute__((weak_imported))
     // already.
     if (CD->getAttrs().hasAttribute<WeakLinkedAttr>())
       os << "SWIFT_WEAK_IMPORT\n";
@@ -325,6 +326,14 @@ private:
     os << "\n";
     printMembers(CD->getMembers());
     os << "@end\n";
+  }
+
+  void visitStructDecl(StructDecl *SD) {
+    if (outputLang != OutputLanguageMode::Cxx)
+      return;
+    // FIXME: Print struct's availability.
+    ClangValueTypePrinter printer(os, owningPrinter.interopContext);
+    printer.printStructDecl(SD);
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
@@ -880,6 +889,10 @@ private:
     if (params->size()) {
       size_t index = 1;
       interleaveComma(*params, os, [&](const ParamDecl *param) {
+        if (param->isInOut()) {
+          os << "&";
+        }
+
         if (param->hasName()) {
           ClangSyntaxPrinter(os).printIdentifier(param->getName().str());
         } else {

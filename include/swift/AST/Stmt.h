@@ -743,8 +743,8 @@ class ForEachStmt : public LabeledStmt {
 
   // Set by Sema:
   ProtocolConformanceRef sequenceConformance = ProtocolConformanceRef();
-  VarDecl *iteratorVar = nullptr;
-  Expr *iteratorVarRef = nullptr;
+  PatternBindingDecl *iteratorVar = nullptr;
+  Expr *nextCall = nullptr;
   OpaqueValueExpr *elementExpr = nullptr;
   Expr *convertElementExpr = nullptr;
 
@@ -759,11 +759,11 @@ public:
     setPattern(Pat);
   }
 
-  void setIteratorVar(VarDecl *var) { iteratorVar = var; }
-  VarDecl *getIteratorVar() const { return iteratorVar; }
+  void setIteratorVar(PatternBindingDecl *var) { iteratorVar = var; }
+  PatternBindingDecl *getIteratorVar() const { return iteratorVar; }
 
-  void setIteratorVarRef(Expr *var) { iteratorVarRef = var; }
-  Expr *getIteratorVarRef() const { return iteratorVarRef; }
+  void setNextCall(Expr *next) { nextCall = next; }
+  Expr *getNextCall() const { return nextCall; }
 
   void setElementExpr(OpaqueValueExpr *expr) { elementExpr = expr; }
   OpaqueValueExpr *getElementExpr() const { return elementExpr; }
@@ -802,8 +802,12 @@ public:
   /// by this foreach loop, as it was written in the source code and
   /// subsequently type-checked. To determine the semantic behavior of this
   /// expression to extract a range, use \c getRangeInit().
-  Expr *getSequence() const { return Sequence; }
-  void setSequence(Expr *S) { Sequence = S; }
+  Expr *getParsedSequence() const { return Sequence; }
+  void setParsedSequence(Expr *S) { Sequence = S; }
+
+  /// Type-checked version of the sequence or nullptr if this statement
+  /// yet to be type-checked.
+  Expr *getTypeCheckedSequence() const;
 
   /// getBody - Retrieve the body of the loop.
   BraceStmt *getBody() const { return Body; }

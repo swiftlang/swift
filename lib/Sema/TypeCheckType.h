@@ -132,7 +132,7 @@ enum class TypeResolverContext : uint8_t {
   /// Whether we are in the constraint type of an existential type.
   ExistentialConstraint,
 
-  /// Whether we are in a requirement of a generic declaration.
+  /// Whether we are in the constraint type of a conformance requirement.
   GenericRequirement,
 
   /// Whether we are in a same-type requirement of a generic
@@ -284,21 +284,17 @@ public:
   }
 
   /// Whether parameterized protocol types are supported in this context.
-  ///
-  /// FIXME: Remove LangOptions parameter once EnableParameterizedExistentialTypes
-  /// staging flag is gone.
-  bool isParameterizedProtocolSupported(const LangOptions &opts) const {
+  bool isParameterizedProtocolSupported() const {
     switch (context) {
     case Context::Inherited:
     case Context::ExtensionBinding:
-    case Context::GenericRequirement:
-      return true;
-    case Context::ExistentialConstraint:
-    case Context::MetatypeBase:
-      return opts.EnableParameterizedExistentialTypes;
-    case Context::None:
     case Context::TypeAliasDecl:
     case Context::GenericTypeAliasDecl:
+    case Context::GenericRequirement:
+    case Context::ExistentialConstraint:
+    case Context::MetatypeBase:
+      return true;
+    case Context::None:
     case Context::InExpression:
     case Context::ExplicitCastExpr:
     case Context::ForEachStmt:

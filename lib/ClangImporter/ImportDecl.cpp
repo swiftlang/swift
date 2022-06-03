@@ -3593,6 +3593,26 @@ namespace {
           // by changing the name of one. That changed method needs to be added
           // to the lookup table since it cannot be found lazily.
           if (auto cxxMethod = dyn_cast<clang::CXXMethodDecl>(m)) {
+            auto cxxOperatorKind = cxxMethod->getOverloadedOperator();
+
+            // Check if this method _is_ an overloaded operator but is not a
+            // call / subscript. Those 2 operators do not need static versions
+            if (cxxOperatorKind != clang::OverloadedOperatorKind::OO_None &&
+                cxxOperatorKind != clang::OverloadedOperatorKind::OO_Call &&
+                cxxOperatorKind !=
+                    clang::OverloadedOperatorKind::OO_Subscript) {
+
+              auto opFuncDecl = makeOperator(MD, cxxMethod);
+
+              Impl.addAlternateDecl(MD, opFuncDecl);
+
+              auto msg = "use " + std::string{clang::getOperatorSpelling(cxxOperatorKind)} + " instead";
+              Impl.markUnavailable(MD,msg);
+
+              // Make the actual member operator private.
+              MD->overwriteAccess(AccessLevel::Private);
+            }
+
             if (cxxMethod->getDeclName().isIdentifier()) {
               auto &mutableFuncPtrs = Impl.cxxMethods[cxxMethod->getName()].second;
               if(mutableFuncPtrs.contains(cxxMethod)) {
@@ -4133,10 +4153,16 @@ namespace {
       if (!dc)
         return nullptr;
 
-      // Support for importing operators is temporarily disabled: rdar://91070109
-      if (decl->getDeclName().getNameKind() == clang::DeclarationName::CXXOperatorName &&
-          decl->getDeclName().getCXXOverloadedOperator() != clang::OO_Subscript)
+      bool isOperator = decl->getDeclName().getNameKind() ==
+                        clang::DeclarationName::CXXOperatorName;
+      bool isNonSubscriptOperator =
+          isOperator && (decl->getDeclName().getCXXOverloadedOperator() !=
+                         clang::OO_Subscript);
+
+      // For now, we don't support non-subscript operators which are templated
+      if (isNonSubscriptOperator && decl->isTemplated()) {
         return nullptr;
+      }
 
       // Handle cases where 2 CXX methods differ strictly in "constness"
       // In such a case append a suffix ("Mutating") to the mutable version
@@ -4285,16 +4311,7 @@ namespace {
             templateParams);
 
         if (auto *mdecl = dyn_cast<clang::CXXMethodDecl>(decl)) {
-          // Subscripts and call operators are imported as normal methods.
-          bool staticOperator = mdecl->isOverloadedOperator() &&
-                                mdecl->getOverloadedOperator() != clang::OO_Call &&
-                                mdecl->getOverloadedOperator() != clang::OO_Subscript;
-          if (mdecl->isStatic() ||
-              // C++ operators that are implemented as non-static member
-              // functions get imported into Swift as static member functions
-              // that use an additional parameter for the left-hand side operand
-              // instead of the receiver object.
-              staticOperator) {
+          if (mdecl->isStatic()) {
             selfIdx = None;
           } else {
             // Swift imports the "self" param last, even for clang functions.
@@ -5393,8 +5410,12 @@ namespace {
     /// \param setter function returning `UnsafeMutablePointer<T>`
     /// \return subscript declaration
     SubscriptDecl *makeSubscript(FuncDecl *getter, FuncDecl *setter);
+    FuncDecl *makeOperator(FuncDecl *operatorMethod,
+                           clang::CXXMethodDecl *clangOperator);
+
     VarDecl *makeComputedPropertyFromCXXMethods(FuncDecl *getter,
                                                 FuncDecl *setter);
+
 
     /// Import the accessor and its attributes.
     AccessorDecl *importAccessor(const clang::ObjCMethodDecl *clangAccessor,
@@ -8078,6 +8099,133 @@ SwiftDeclConverter::makeSubscript(FuncDecl *getter, FuncDecl *setter) {
                                    getterImpl->isImplicitlyUnwrappedOptional());
 
   return subscript;
+}
+
+static std::pair<BraceStmt *, bool>
+synthesizeOperatorMethodBody(AbstractFunctionDecl *afd, void *context) {
+  ASTContext &ctx = afd->getASTContext();
+
+  auto funcDecl = cast<FuncDecl>(afd);
+  auto methodDecl =
+      static_cast<FuncDecl *>(context); /* Swift version of CXXMethod */
+
+  SmallVector<Expr *, 8> forwardingParams;
+
+  // We start from +1 since the first param is our lhs. All other params are
+  // forwarded
+  for (auto itr = funcDecl->getParameters()->begin() + 1;
+       itr != funcDecl->getParameters()->end(); itr++) {
+    auto param = *itr;
+    Expr *paramRefExpr =
+        new (ctx) DeclRefExpr(param, DeclNameLoc(), /*Implicit=*/true);
+    paramRefExpr->setType(param->getType());
+
+    if (param->isInOut()) {
+      paramRefExpr->setType(LValueType::get(param->getType()));
+
+      paramRefExpr = new (ctx) InOutExpr(SourceLoc(), paramRefExpr,
+                                         param->getType(), /*isImplicit*/ true);
+      paramRefExpr->setType(InOutType::get(param->getType()));
+    }
+
+    forwardingParams.push_back(paramRefExpr);
+  }
+
+  auto methodExpr =
+      new (ctx) DeclRefExpr(methodDecl, DeclNameLoc(), /*implicit*/ true);
+  methodExpr->setType(methodDecl->getInterfaceType());
+
+  // Lhs parameter
+  auto baseParam = funcDecl->getParameters()->front();
+  Expr *baseExpr =
+      new (ctx) DeclRefExpr(baseParam, DeclNameLoc(), /*implicit*/ true);
+  baseExpr->setType(baseParam->getType());
+  if (baseParam->isInOut()) {
+    baseExpr->setType(LValueType::get(baseParam->getType()));
+
+    baseExpr = new (ctx) InOutExpr(SourceLoc(), baseExpr, baseParam->getType(),
+                                   /*isImplicit*/ true);
+    baseExpr->setType(InOutType::get(baseParam->getType()));
+  }
+
+  auto dotCallExpr =
+      DotSyntaxCallExpr::create(ctx, methodExpr, SourceLoc(), baseExpr);
+  dotCallExpr->setType(methodDecl->getMethodInterfaceType());
+  dotCallExpr->setThrows(false);
+
+  auto *argList = ArgumentList::forImplicitUnlabeled(ctx, forwardingParams);
+  auto callExpr = CallExpr::createImplicit(ctx, dotCallExpr, argList);
+  callExpr->setType(funcDecl->getResultInterfaceType());
+  callExpr->setThrows(false);
+
+  auto returnStmt = new (ctx) ReturnStmt(SourceLoc(), callExpr,
+                                         /*implicit=*/true);
+
+  auto body = BraceStmt::create(ctx, SourceLoc(), {returnStmt}, SourceLoc(),
+                                /*implicit=*/true);
+  return {body, /*isTypeChecked=*/true};
+}
+
+FuncDecl *
+SwiftDeclConverter::makeOperator(FuncDecl *operatorMethod,
+                                 clang::CXXMethodDecl *clangOperator) {
+  auto &ctx = Impl.SwiftContext;
+  auto opName =
+      clang::getOperatorSpelling(clangOperator->getOverloadedOperator());
+  auto paramList = operatorMethod->getParameters();
+  auto genericParamList = operatorMethod->getGenericParams();
+
+  auto opId = ctx.getIdentifier(opName);
+
+  auto parentCtx = operatorMethod->getDeclContext();
+
+  auto lhsParam = new (ctx) ParamDecl(
+          SourceLoc(),
+          SourceLoc(),Identifier(),
+          SourceLoc(),ctx.getIdentifier("lhs"),
+          parentCtx);
+
+  lhsParam->setInterfaceType(operatorMethod->getDeclContext()->getSelfInterfaceType());
+
+  if (operatorMethod->isMutating()) {
+    // This implicitly makes the parameter indirect.
+    lhsParam->setSpecifier(ParamSpecifier::InOut);
+  } else {
+    lhsParam->setSpecifier(ParamSpecifier::Default);
+  }
+
+  SmallVector<ParamDecl *, 4> newParams;
+  newParams.push_back(lhsParam);
+
+  for (auto param : *paramList) {
+    newParams.push_back(param);
+  }
+
+  auto oldArgNames = operatorMethod->getName().getArgumentNames();
+  SmallVector<Identifier, 4> newArgNames;
+  newArgNames.push_back(Identifier());
+
+  for (auto id : oldArgNames) {
+    newArgNames.push_back(id);
+  }
+
+  auto opDeclName = DeclName(
+          ctx,opId,
+          {newArgNames.begin(), newArgNames.end()});
+
+  auto topLevelStaticFuncDecl = FuncDecl::createImplicit(
+      ctx, StaticSpellingKind::None, opDeclName, SourceLoc(),
+      /*Async*/ false, /*Throws*/ false, genericParamList,
+      ParameterList::create(ctx, newParams),
+      operatorMethod->getResultInterfaceType(), parentCtx);
+
+  topLevelStaticFuncDecl->setAccess(AccessLevel::Public);
+  topLevelStaticFuncDecl->setIsDynamic(false);
+  topLevelStaticFuncDecl->setStatic();
+  topLevelStaticFuncDecl->setBodySynthesizer(synthesizeOperatorMethodBody,
+                                             operatorMethod);
+
+  return topLevelStaticFuncDecl;
 }
 
 void SwiftDeclConverter::addProtocols(

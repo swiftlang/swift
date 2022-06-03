@@ -3,7 +3,7 @@
 // all. There are other tests testing liveness and representation.
 
 // rdar://problem/57611302
-// XFAIL: windows
+// XFAIL: OS=windows-msvc
 
 // RUN: %gyb %s -o %t.swift
 // RUN: %target-swift-frontend %t.swift -g -emit-ir -o - | %FileCheck %t.swift
