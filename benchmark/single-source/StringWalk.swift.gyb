@@ -28,21 +28,21 @@ import TestsUtils
 // Helper functionality
 //
 
-@inline(never) func count_unicodeScalars(_ s: String.UnicodeScalarView) {
+@inline(never) func count_scalars(_ s: String.UnicodeScalarView) {
   var count = 0
   for _ in s {
     count += 1
   }
   blackHole(count)
 }
-@inline(never) func count_characters(_ s: String) {
+@inline(never) func count_chars(_ s: String) {
   var count = 0
   for _ in s {
     count += 1
   }
   blackHole(count)
 }
-@inline(never) func count_unicodeScalars_rev(
+@inline(never) func count_scalars_rev(
   _ s: ReversedCollection<String.UnicodeScalarView>
 ) {
   var count = 0
@@ -51,7 +51,7 @@ import TestsUtils
   }
   blackHole(count)
 }
-@inline(never) func count_characters_rev(
+@inline(never) func count_chars_rev(
   _ s: ReversedCollection<String>
 ) {
   var count = 0
@@ -60,7 +60,7 @@ import TestsUtils
   }
   blackHole(count)
 }
-@inline(never) func count_characters_by_index(_ s: String) {
+@inline(never) func count_charsByIdx(_ s: String) {
   var idx = s.startIndex
   while idx != s.endIndex {
     blackHole(s[idx])
@@ -68,7 +68,7 @@ import TestsUtils
   }
 }
 
-@inline(never) func count_characters_by_index_rev(
+@inline(never) func count_charsByIdx_rev(
     _ s: ReversedCollection<String>
   ) {
   var idx = s.endIndex
@@ -116,11 +116,11 @@ let russian = String(
 
 let punctuated = String(
   repeating: "\u{201c}Hello\u{2010}world\u{2026}\u{201d}",
-  count: 50
+  count: 100
 )
 let punctuatedJapanese = String(
   repeating: "\u{300c}\u{300e}今日は\u{3001}世界\u{3002}\u{300f}\u{300d}",
-  count: 50
+  count: 100
 )
 
 // A workload that's mostly Latin characters, with occasional emoji
@@ -137,16 +137,16 @@ let tweet = String(
 // Pre-commit benchmark: simple scalar walk
 @inline(never)
 public func run_StringWalk(_ n: Int) {
-  return run_StringWalk_ascii_unicodeScalars(n)
+  return run_StringWalk_ascii_scalars(n)
 }
 
 // Extended String benchmarks:
-let unicodeScalarsMultiplier = 5
-let stringWalkWarmupAmount = 5
+let unicodeScalarsMultiplier = 250
+let stringWalkWarmup = 5
 
 % Names = ["ascii", "utf16", "tweet", "japanese", "chinese", "korean", "russian", "punctuated", "punctuatedJapanese"]
-% Kinds = ["unicodeScalars", "characters", "characters_by_index"]
-% Directions = ["", "_Backwards"]
+% Kinds = ["scalars", "chars", "charsByIdx"]
+% Directions = ["", "Backwards"]
 
 // An extended benchmark suite exercising finer-granularity behavior of our
 // Strings.
@@ -162,26 +162,37 @@ public let benchmarks = [
 %     for Kind in Kinds:
 
   BenchmarkInfo(
-    name: "StringWalk_${Name}_${Kind}${Direction}",
+    name: "StringWalk.${Name}.${Kind}${Direction}",
     runFunction: run_StringWalk_${Name}_${Kind}${Direction},
     tags: [.api, .String],
-    setUpFunction: {run_StringWalk_${Name}_${Kind}${Direction}(stringWalkWarmupAmount)},
+    setUpFunction: {run_StringWalk_${Name}_${Kind}${Direction}(stringWalkWarmup)},
     legacyFactor: 40),
 
 %     end # Kinds
-
+%     end # Directions
   BenchmarkInfo(
-    name: "CharIteration_${Name}_unicodeScalars${Direction}",
-    runFunction: run_CharIteration_${Name}_unicodeScalars${Direction},
+    name: "CharIteration_${Name}_unicodeScalars",
+    runFunction: run_CharIteration_${Name}_unicodeScalars,
     tags: [.validation, .api, .String],
     legacyFactor: 40),
 
   BenchmarkInfo(
-    name: "CharIndexing_${Name}_unicodeScalars${Direction}",
-    runFunction: run_CharIndexing_${Name}_unicodeScalars${Direction},
+    name: "CharIndexing_${Name}_unicodeScalars",
+    runFunction: run_CharIndexing_${Name}_unicodeScalars,
     tags: [.validation, .api, .String],
     legacyFactor: 40),
-%   end # Directions
+
+  BenchmarkInfo(
+    name: "CharIteration_${Name}_unicodeScalars_Backwards",
+    runFunction: run_CharIteration_${Name}_unicodeScalars_Backwards,
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
+
+  BenchmarkInfo(
+    name: "CharIndexing_${Name}_unicodeScalars_Backwards",
+    runFunction: run_CharIndexing_${Name}_unicodeScalars_Backwards,
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
 % end # Names
 ]
 
@@ -196,7 +207,7 @@ public func run_StringWalk_${Name}_${Kind}(_ n: Int) {
 }
 
 @inline(never)
-public func run_StringWalk_${Name}_${Kind}_Backwards(_ n: Int) {
+public func run_StringWalk_${Name}_${Kind}Backwards(_ n: Int) {
   for _ in 1...n {
     count_${Kind}_rev(${Name}${View}.reversed())
   }

@@ -27,21 +27,21 @@ import TestsUtils
 // Helper functionality
 //
 
-@inline(never) func count_unicodeScalars(_ s: String.UnicodeScalarView) {
+@inline(never) func count_scalars(_ s: String.UnicodeScalarView) {
   var count = 0
   for _ in s {
     count += 1
   }
   blackHole(count)
 }
-@inline(never) func count_characters(_ s: String) {
+@inline(never) func count_chars(_ s: String) {
   var count = 0
   for _ in s {
     count += 1
   }
   blackHole(count)
 }
-@inline(never) func count_unicodeScalars_rev(
+@inline(never) func count_scalars_rev(
   _ s: ReversedCollection<String.UnicodeScalarView>
 ) {
   var count = 0
@@ -50,7 +50,7 @@ import TestsUtils
   }
   blackHole(count)
 }
-@inline(never) func count_characters_rev(
+@inline(never) func count_chars_rev(
   _ s: ReversedCollection<String>
 ) {
   var count = 0
@@ -59,7 +59,7 @@ import TestsUtils
   }
   blackHole(count)
 }
-@inline(never) func count_characters_by_index(_ s: String) {
+@inline(never) func count_charsByIdx(_ s: String) {
   var idx = s.startIndex
   while idx != s.endIndex {
     blackHole(s[idx])
@@ -67,7 +67,7 @@ import TestsUtils
   }
 }
 
-@inline(never) func count_characters_by_index_rev(
+@inline(never) func count_charsByIdx_rev(
     _ s: ReversedCollection<String>
   ) {
   var idx = s.endIndex
@@ -115,11 +115,11 @@ let russian = String(
 
 let punctuated = String(
   repeating: "\u{201c}Hello\u{2010}world\u{2026}\u{201d}",
-  count: 50
+  count: 100
 )
 let punctuatedJapanese = String(
   repeating: "\u{300c}\u{300e}今日は\u{3001}世界\u{3002}\u{300f}\u{300d}",
-  count: 50
+  count: 100
 )
 
 // A workload that's mostly Latin characters, with occasional emoji
@@ -136,12 +136,12 @@ let tweet = String(
 // Pre-commit benchmark: simple scalar walk
 @inline(never)
 public func run_StringWalk(_ n: Int) {
-  return run_StringWalk_ascii_unicodeScalars(n)
+  return run_StringWalk_ascii_scalars(n)
 }
 
 // Extended String benchmarks:
-let unicodeScalarsMultiplier = 5
-let stringWalkWarmupAmount = 5
+let unicodeScalarsMultiplier = 250
+let stringWalkWarmup = 5
 
 
 // An extended benchmark suite exercising finer-granularity behavior of our
@@ -155,28 +155,51 @@ public let benchmarks = [
 
 
   BenchmarkInfo(
-    name: "StringWalk_ascii_unicodeScalars",
-    runFunction: run_StringWalk_ascii_unicodeScalars,
+    name: "StringWalk.ascii.scalars",
+    runFunction: run_StringWalk_ascii_scalars,
     tags: [.api, .String],
-    setUpFunction: {run_StringWalk_ascii_unicodeScalars(stringWalkWarmupAmount)},
+    setUpFunction: {run_StringWalk_ascii_scalars(stringWalkWarmup)},
     legacyFactor: 40),
 
 
   BenchmarkInfo(
-    name: "StringWalk_ascii_characters",
-    runFunction: run_StringWalk_ascii_characters,
+    name: "StringWalk.ascii.chars",
+    runFunction: run_StringWalk_ascii_chars,
     tags: [.api, .String],
-    setUpFunction: {run_StringWalk_ascii_characters(stringWalkWarmupAmount)},
+    setUpFunction: {run_StringWalk_ascii_chars(stringWalkWarmup)},
     legacyFactor: 40),
 
 
   BenchmarkInfo(
-    name: "StringWalk_ascii_characters_by_index",
-    runFunction: run_StringWalk_ascii_characters_by_index,
+    name: "StringWalk.ascii.charsByIdx",
+    runFunction: run_StringWalk_ascii_charsByIdx,
     tags: [.api, .String],
-    setUpFunction: {run_StringWalk_ascii_characters_by_index(stringWalkWarmupAmount)},
+    setUpFunction: {run_StringWalk_ascii_charsByIdx(stringWalkWarmup)},
     legacyFactor: 40),
 
+
+  BenchmarkInfo(
+    name: "StringWalk.ascii.scalarsBackwards",
+    runFunction: run_StringWalk_ascii_scalarsBackwards,
+    tags: [.api, .String],
+    setUpFunction: {run_StringWalk_ascii_scalarsBackwards(stringWalkWarmup)},
+    legacyFactor: 40),
+
+
+  BenchmarkInfo(
+    name: "StringWalk.ascii.charsBackwards",
+    runFunction: run_StringWalk_ascii_charsBackwards,
+    tags: [.api, .String],
+    setUpFunction: {run_StringWalk_ascii_charsBackwards(stringWalkWarmup)},
+    legacyFactor: 40),
+
+
+  BenchmarkInfo(
+    name: "StringWalk.ascii.charsByIdxBackwards",
+    runFunction: run_StringWalk_ascii_charsByIdxBackwards,
+    tags: [.api, .String],
+    setUpFunction: {run_StringWalk_ascii_charsByIdxBackwards(stringWalkWarmup)},
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "CharIteration_ascii_unicodeScalars",
@@ -191,30 +214,6 @@ public let benchmarks = [
     legacyFactor: 40),
 
   BenchmarkInfo(
-    name: "StringWalk_ascii_unicodeScalars_Backwards",
-    runFunction: run_StringWalk_ascii_unicodeScalars_Backwards,
-    tags: [.api, .String],
-    setUpFunction: {run_StringWalk_ascii_unicodeScalars_Backwards(stringWalkWarmupAmount)},
-    legacyFactor: 40),
-
-
-  BenchmarkInfo(
-    name: "StringWalk_ascii_characters_Backwards",
-    runFunction: run_StringWalk_ascii_characters_Backwards,
-    tags: [.api, .String],
-    setUpFunction: {run_StringWalk_ascii_characters_Backwards(stringWalkWarmupAmount)},
-    legacyFactor: 40),
-
-
-  BenchmarkInfo(
-    name: "StringWalk_ascii_characters_by_index_Backwards",
-    runFunction: run_StringWalk_ascii_characters_by_index_Backwards,
-    tags: [.api, .String],
-    setUpFunction: {run_StringWalk_ascii_characters_by_index_Backwards(stringWalkWarmupAmount)},
-    legacyFactor: 40),
-
-
-  BenchmarkInfo(
     name: "CharIteration_ascii_unicodeScalars_Backwards",
     runFunction: run_CharIteration_ascii_unicodeScalars_Backwards,
     tags: [.validation, .api, .String],
@@ -227,28 +226,51 @@ public let benchmarks = [
     legacyFactor: 40),
 
   BenchmarkInfo(
-    name: "StringWalk_utf16_unicodeScalars",
-    runFunction: run_StringWalk_utf16_unicodeScalars,
+    name: "StringWalk.utf16.scalars",
+    runFunction: run_StringWalk_utf16_scalars,
     tags: [.api, .String],
-    setUpFunction: {run_StringWalk_utf16_unicodeScalars(stringWalkWarmupAmount)},
+    setUpFunction: {run_StringWalk_utf16_scalars(stringWalkWarmup)},
     legacyFactor: 40),
 
 
   BenchmarkInfo(
-    name: "StringWalk_utf16_characters",
-    runFunction: run_StringWalk_utf16_characters,
+    name: "StringWalk.utf16.chars",
+    runFunction: run_StringWalk_utf16_chars,
     tags: [.api, .String],
-    setUpFunction: {run_StringWalk_utf16_characters(stringWalkWarmupAmount)},
+    setUpFunction: {run_StringWalk_utf16_chars(stringWalkWarmup)},
     legacyFactor: 40),
 
 
   BenchmarkInfo(
-    name: "StringWalk_utf16_characters_by_index",
-    runFunction: run_StringWalk_utf16_characters_by_index,
+    name: "StringWalk.utf16.charsByIdx",
+    runFunction: run_StringWalk_utf16_charsByIdx,
     tags: [.api, .String],
-    setUpFunction: {run_StringWalk_utf16_characters_by_index(stringWalkWarmupAmount)},
+    setUpFunction: {run_StringWalk_utf16_charsByIdx(stringWalkWarmup)},
     legacyFactor: 40),
 
+
+  BenchmarkInfo(
+    name: "StringWalk.utf16.scalarsBackwards",
+    runFunction: run_StringWalk_utf16_scalarsBackwards,
+    tags: [.api, .String],
+    setUpFunction: {run_StringWalk_utf16_scalarsBackwards(stringWalkWarmup)},
+    legacyFactor: 40),
+
+
+  BenchmarkInfo(
+    name: "StringWalk.utf16.charsBackwards",
+    runFunction: run_StringWalk_utf16_charsBackwards,
+    tags: [.api, .String],
+    setUpFunction: {run_StringWalk_utf16_charsBackwards(stringWalkWarmup)},
+    legacyFactor: 40),
+
+
+  BenchmarkInfo(
+    name: "StringWalk.utf16.charsByIdxBackwards",
+    runFunction: run_StringWalk_utf16_charsByIdxBackwards,
+    tags: [.api, .String],
+    setUpFunction: {run_StringWalk_utf16_charsByIdxBackwards(stringWalkWarmup)},
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "CharIteration_utf16_unicodeScalars",
@@ -263,30 +285,6 @@ public let benchmarks = [
     legacyFactor: 40),
 
   BenchmarkInfo(
-    name: "StringWalk_utf16_unicodeScalars_Backwards",
-    runFunction: run_StringWalk_utf16_unicodeScalars_Backwards,
-    tags: [.api, .String],
-    setUpFunction: {run_StringWalk_utf16_unicodeScalars_Backwards(stringWalkWarmupAmount)},
-    legacyFactor: 40),
-
-
-  BenchmarkInfo(
-    name: "StringWalk_utf16_characters_Backwards",
-    runFunction: run_StringWalk_utf16_characters_Backwards,
-    tags: [.api, .String],
-    setUpFunction: {run_StringWalk_utf16_characters_Backwards(stringWalkWarmupAmount)},
-    legacyFactor: 40),
-
-
-  BenchmarkInfo(
-    name: "StringWalk_utf16_characters_by_index_Backwards",
-    runFunction: run_StringWalk_utf16_characters_by_index_Backwards,
-    tags: [.api, .String],
-    setUpFunction: {run_StringWalk_utf16_characters_by_index_Backwards(stringWalkWarmupAmount)},
-    legacyFactor: 40),
-
-
-  BenchmarkInfo(
     name: "CharIteration_utf16_unicodeScalars_Backwards",
     runFunction: run_CharIteration_utf16_unicodeScalars_Backwards,
     tags: [.validation, .api, .String],
@@ -299,28 +297,51 @@ public let benchmarks = [
     legacyFactor: 40),
 
   BenchmarkInfo(
-    name: "StringWalk_tweet_unicodeScalars",
-    runFunction: run_StringWalk_tweet_unicodeScalars,
+    name: "StringWalk.tweet.scalars",
+    runFunction: run_StringWalk_tweet_scalars,
     tags: [.api, .String],
-    setUpFunction: {run_StringWalk_tweet_unicodeScalars(stringWalkWarmupAmount)},
+    setUpFunction: {run_StringWalk_tweet_scalars(stringWalkWarmup)},
     legacyFactor: 40),
 
 
   BenchmarkInfo(
-    name: "StringWalk_tweet_characters",
-    runFunction: run_StringWalk_tweet_characters,
+    name: "StringWalk.tweet.chars",
+    runFunction: run_StringWalk_tweet_chars,
     tags: [.api, .String],
-    setUpFunction: {run_StringWalk_tweet_characters(stringWalkWarmupAmount)},
+    setUpFunction: {run_StringWalk_tweet_chars(stringWalkWarmup)},
     legacyFactor: 40),
 
 
   BenchmarkInfo(
-    name: "StringWalk_tweet_characters_by_index",
-    runFunction: run_StringWalk_tweet_characters_by_index,
+    name: "StringWalk.tweet.charsByIdx",
+    runFunction: run_StringWalk_tweet_charsByIdx,
     tags: [.api, .String],
-    setUpFunction: {run_StringWalk_tweet_characters_by_index(stringWalkWarmupAmount)},
+    setUpFunction: {run_StringWalk_tweet_charsByIdx(stringWalkWarmup)},
     legacyFactor: 40),
 
+
+  BenchmarkInfo(
+    name: "StringWalk.tweet.scalarsBackwards",
+    runFunction: run_StringWalk_tweet_scalarsBackwards,
+    tags: [.api, .String],
+    setUpFunction: {run_StringWalk_tweet_scalarsBackwards(stringWalkWarmup)},
+    legacyFactor: 40),
+
+
+  BenchmarkInfo(
+    name: "StringWalk.tweet.charsBackwards",
+    runFunction: run_StringWalk_tweet_charsBackwards,
+    tags: [.api, .String],
+    setUpFunction: {run_StringWalk_tweet_charsBackwards(stringWalkWarmup)},
+    legacyFactor: 40),
+
+
+  BenchmarkInfo(
+    name: "StringWalk.tweet.charsByIdxBackwards",
+    runFunction: run_StringWalk_tweet_charsByIdxBackwards,
+    tags: [.api, .String],
+    setUpFunction: {run_StringWalk_tweet_charsByIdxBackwards(stringWalkWarmup)},
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "CharIteration_tweet_unicodeScalars",
@@ -335,30 +356,6 @@ public let benchmarks = [
     legacyFactor: 40),
 
   BenchmarkInfo(
-    name: "StringWalk_tweet_unicodeScalars_Backwards",
-    runFunction: run_StringWalk_tweet_unicodeScalars_Backwards,
-    tags: [.api, .String],
-    setUpFunction: {run_StringWalk_tweet_unicodeScalars_Backwards(stringWalkWarmupAmount)},
-    legacyFactor: 40),
-
-
-  BenchmarkInfo(
-    name: "StringWalk_tweet_characters_Backwards",
-    runFunction: run_StringWalk_tweet_characters_Backwards,
-    tags: [.api, .String],
-    setUpFunction: {run_StringWalk_tweet_characters_Backwards(stringWalkWarmupAmount)},
-    legacyFactor: 40),
-
-
-  BenchmarkInfo(
-    name: "StringWalk_tweet_characters_by_index_Backwards",
-    runFunction: run_StringWalk_tweet_characters_by_index_Backwards,
-    tags: [.api, .String],
-    setUpFunction: {run_StringWalk_tweet_characters_by_index_Backwards(stringWalkWarmupAmount)},
-    legacyFactor: 40),
-
-
-  BenchmarkInfo(
     name: "CharIteration_tweet_unicodeScalars_Backwards",
     runFunction: run_CharIteration_tweet_unicodeScalars_Backwards,
     tags: [.validation, .api, .String],
@@ -371,28 +368,51 @@ public let benchmarks = [
     legacyFactor: 40),
 
   BenchmarkInfo(
-    name: "StringWalk_japanese_unicodeScalars",
-    runFunction: run_StringWalk_japanese_unicodeScalars,
+    name: "StringWalk.japanese.scalars",
+    runFunction: run_StringWalk_japanese_scalars,
     tags: [.api, .String],
-    setUpFunction: {run_StringWalk_japanese_unicodeScalars(stringWalkWarmupAmount)},
+    setUpFunction: {run_StringWalk_japanese_scalars(stringWalkWarmup)},
     legacyFactor: 40),
 
 
   BenchmarkInfo(
-    name: "StringWalk_japanese_characters",
-    runFunction: run_StringWalk_japanese_characters,
+    name: "StringWalk.japanese.chars",
+    runFunction: run_StringWalk_japanese_chars,
     tags: [.api, .String],
-    setUpFunction: {run_StringWalk_japanese_characters(stringWalkWarmupAmount)},
+    setUpFunction: {run_StringWalk_japanese_chars(stringWalkWarmup)},
     legacyFactor: 40),
 
 
   BenchmarkInfo(
-    name: "StringWalk_japanese_characters_by_index",
-    runFunction: run_StringWalk_japanese_characters_by_index,
+    name: "StringWalk.japanese.charsByIdx",
+    runFunction: run_StringWalk_japanese_charsByIdx,
     tags: [.api, .String],
-    setUpFunction: {run_StringWalk_japanese_characters_by_index(stringWalkWarmupAmount)},
+    setUpFunction: {run_StringWalk_japanese_charsByIdx(stringWalkWarmup)},
     legacyFactor: 40),
 
+
+  BenchmarkInfo(
+    name: "StringWalk.japanese.scalarsBackwards",
+    runFunction: run_StringWalk_japanese_scalarsBackwards,
+    tags: [.api, .String],
+    setUpFunction: {run_StringWalk_japanese_scalarsBackwards(stringWalkWarmup)},
+    legacyFactor: 40),
+
+
+  BenchmarkInfo(
+    name: "StringWalk.japanese.charsBackwards",
+    runFunction: run_StringWalk_japanese_charsBackwards,
+    tags: [.api, .String],
+    setUpFunction: {run_StringWalk_japanese_charsBackwards(stringWalkWarmup)},
+    legacyFactor: 40),
+
+
+  BenchmarkInfo(
+    name: "StringWalk.japanese.charsByIdxBackwards",
+    runFunction: run_StringWalk_japanese_charsByIdxBackwards,
+    tags: [.api, .String],
+    setUpFunction: {run_StringWalk_japanese_charsByIdxBackwards(stringWalkWarmup)},
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "CharIteration_japanese_unicodeScalars",
@@ -407,30 +427,6 @@ public let benchmarks = [
     legacyFactor: 40),
 
   BenchmarkInfo(
-    name: "StringWalk_japanese_unicodeScalars_Backwards",
-    runFunction: run_StringWalk_japanese_unicodeScalars_Backwards,
-    tags: [.api, .String],
-    setUpFunction: {run_StringWalk_japanese_unicodeScalars_Backwards(stringWalkWarmupAmount)},
-    legacyFactor: 40),
-
-
-  BenchmarkInfo(
-    name: "StringWalk_japanese_characters_Backwards",
-    runFunction: run_StringWalk_japanese_characters_Backwards,
-    tags: [.api, .String],
-    setUpFunction: {run_StringWalk_japanese_characters_Backwards(stringWalkWarmupAmount)},
-    legacyFactor: 40),
-
-
-  BenchmarkInfo(
-    name: "StringWalk_japanese_characters_by_index_Backwards",
-    runFunction: run_StringWalk_japanese_characters_by_index_Backwards,
-    tags: [.api, .String],
-    setUpFunction: {run_StringWalk_japanese_characters_by_index_Backwards(stringWalkWarmupAmount)},
-    legacyFactor: 40),
-
-
-  BenchmarkInfo(
     name: "CharIteration_japanese_unicodeScalars_Backwards",
     runFunction: run_CharIteration_japanese_unicodeScalars_Backwards,
     tags: [.validation, .api, .String],
@@ -443,28 +439,51 @@ public let benchmarks = [
     legacyFactor: 40),
 
   BenchmarkInfo(
-    name: "StringWalk_chinese_unicodeScalars",
-    runFunction: run_StringWalk_chinese_unicodeScalars,
+    name: "StringWalk.chinese.scalars",
+    runFunction: run_StringWalk_chinese_scalars,
     tags: [.api, .String],
-    setUpFunction: {run_StringWalk_chinese_unicodeScalars(stringWalkWarmupAmount)},
+    setUpFunction: {run_StringWalk_chinese_scalars(stringWalkWarmup)},
     legacyFactor: 40),
 
 
   BenchmarkInfo(
-    name: "StringWalk_chinese_characters",
-    runFunction: run_StringWalk_chinese_characters,
+    name: "StringWalk.chinese.chars",
+    runFunction: run_StringWalk_chinese_chars,
     tags: [.api, .String],
-    setUpFunction: {run_StringWalk_chinese_characters(stringWalkWarmupAmount)},
+    setUpFunction: {run_StringWalk_chinese_chars(stringWalkWarmup)},
     legacyFactor: 40),
 
 
   BenchmarkInfo(
-    name: "StringWalk_chinese_characters_by_index",
-    runFunction: run_StringWalk_chinese_characters_by_index,
+    name: "StringWalk.chinese.charsByIdx",
+    runFunction: run_StringWalk_chinese_charsByIdx,
     tags: [.api, .String],
-    setUpFunction: {run_StringWalk_chinese_characters_by_index(stringWalkWarmupAmount)},
+    setUpFunction: {run_StringWalk_chinese_charsByIdx(stringWalkWarmup)},
     legacyFactor: 40),
 
+
+  BenchmarkInfo(
+    name: "StringWalk.chinese.scalarsBackwards",
+    runFunction: run_StringWalk_chinese_scalarsBackwards,
+    tags: [.api, .String],
+    setUpFunction: {run_StringWalk_chinese_scalarsBackwards(stringWalkWarmup)},
+    legacyFactor: 40),
+
+
+  BenchmarkInfo(
+    name: "StringWalk.chinese.charsBackwards",
+    runFunction: run_StringWalk_chinese_charsBackwards,
+    tags: [.api, .String],
+    setUpFunction: {run_StringWalk_chinese_charsBackwards(stringWalkWarmup)},
+    legacyFactor: 40),
+
+
+  BenchmarkInfo(
+    name: "StringWalk.chinese.charsByIdxBackwards",
+    runFunction: run_StringWalk_chinese_charsByIdxBackwards,
+    tags: [.api, .String],
+    setUpFunction: {run_StringWalk_chinese_charsByIdxBackwards(stringWalkWarmup)},
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "CharIteration_chinese_unicodeScalars",
@@ -479,30 +498,6 @@ public let benchmarks = [
     legacyFactor: 40),
 
   BenchmarkInfo(
-    name: "StringWalk_chinese_unicodeScalars_Backwards",
-    runFunction: run_StringWalk_chinese_unicodeScalars_Backwards,
-    tags: [.api, .String],
-    setUpFunction: {run_StringWalk_chinese_unicodeScalars_Backwards(stringWalkWarmupAmount)},
-    legacyFactor: 40),
-
-
-  BenchmarkInfo(
-    name: "StringWalk_chinese_characters_Backwards",
-    runFunction: run_StringWalk_chinese_characters_Backwards,
-    tags: [.api, .String],
-    setUpFunction: {run_StringWalk_chinese_characters_Backwards(stringWalkWarmupAmount)},
-    legacyFactor: 40),
-
-
-  BenchmarkInfo(
-    name: "StringWalk_chinese_characters_by_index_Backwards",
-    runFunction: run_StringWalk_chinese_characters_by_index_Backwards,
-    tags: [.api, .String],
-    setUpFunction: {run_StringWalk_chinese_characters_by_index_Backwards(stringWalkWarmupAmount)},
-    legacyFactor: 40),
-
-
-  BenchmarkInfo(
     name: "CharIteration_chinese_unicodeScalars_Backwards",
     runFunction: run_CharIteration_chinese_unicodeScalars_Backwards,
     tags: [.validation, .api, .String],
@@ -515,28 +510,51 @@ public let benchmarks = [
     legacyFactor: 40),
 
   BenchmarkInfo(
-    name: "StringWalk_korean_unicodeScalars",
-    runFunction: run_StringWalk_korean_unicodeScalars,
+    name: "StringWalk.korean.scalars",
+    runFunction: run_StringWalk_korean_scalars,
     tags: [.api, .String],
-    setUpFunction: {run_StringWalk_korean_unicodeScalars(stringWalkWarmupAmount)},
+    setUpFunction: {run_StringWalk_korean_scalars(stringWalkWarmup)},
     legacyFactor: 40),
 
 
   BenchmarkInfo(
-    name: "StringWalk_korean_characters",
-    runFunction: run_StringWalk_korean_characters,
+    name: "StringWalk.korean.chars",
+    runFunction: run_StringWalk_korean_chars,
     tags: [.api, .String],
-    setUpFunction: {run_StringWalk_korean_characters(stringWalkWarmupAmount)},
+    setUpFunction: {run_StringWalk_korean_chars(stringWalkWarmup)},
     legacyFactor: 40),
 
 
   BenchmarkInfo(
-    name: "StringWalk_korean_characters_by_index",
-    runFunction: run_StringWalk_korean_characters_by_index,
+    name: "StringWalk.korean.charsByIdx",
+    runFunction: run_StringWalk_korean_charsByIdx,
     tags: [.api, .String],
-    setUpFunction: {run_StringWalk_korean_characters_by_index(stringWalkWarmupAmount)},
+    setUpFunction: {run_StringWalk_korean_charsByIdx(stringWalkWarmup)},
     legacyFactor: 40),
 
+
+  BenchmarkInfo(
+    name: "StringWalk.korean.scalarsBackwards",
+    runFunction: run_StringWalk_korean_scalarsBackwards,
+    tags: [.api, .String],
+    setUpFunction: {run_StringWalk_korean_scalarsBackwards(stringWalkWarmup)},
+    legacyFactor: 40),
+
+
+  BenchmarkInfo(
+    name: "StringWalk.korean.charsBackwards",
+    runFunction: run_StringWalk_korean_charsBackwards,
+    tags: [.api, .String],
+    setUpFunction: {run_StringWalk_korean_charsBackwards(stringWalkWarmup)},
+    legacyFactor: 40),
+
+
+  BenchmarkInfo(
+    name: "StringWalk.korean.charsByIdxBackwards",
+    runFunction: run_StringWalk_korean_charsByIdxBackwards,
+    tags: [.api, .String],
+    setUpFunction: {run_StringWalk_korean_charsByIdxBackwards(stringWalkWarmup)},
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "CharIteration_korean_unicodeScalars",
@@ -551,30 +569,6 @@ public let benchmarks = [
     legacyFactor: 40),
 
   BenchmarkInfo(
-    name: "StringWalk_korean_unicodeScalars_Backwards",
-    runFunction: run_StringWalk_korean_unicodeScalars_Backwards,
-    tags: [.api, .String],
-    setUpFunction: {run_StringWalk_korean_unicodeScalars_Backwards(stringWalkWarmupAmount)},
-    legacyFactor: 40),
-
-
-  BenchmarkInfo(
-    name: "StringWalk_korean_characters_Backwards",
-    runFunction: run_StringWalk_korean_characters_Backwards,
-    tags: [.api, .String],
-    setUpFunction: {run_StringWalk_korean_characters_Backwards(stringWalkWarmupAmount)},
-    legacyFactor: 40),
-
-
-  BenchmarkInfo(
-    name: "StringWalk_korean_characters_by_index_Backwards",
-    runFunction: run_StringWalk_korean_characters_by_index_Backwards,
-    tags: [.api, .String],
-    setUpFunction: {run_StringWalk_korean_characters_by_index_Backwards(stringWalkWarmupAmount)},
-    legacyFactor: 40),
-
-
-  BenchmarkInfo(
     name: "CharIteration_korean_unicodeScalars_Backwards",
     runFunction: run_CharIteration_korean_unicodeScalars_Backwards,
     tags: [.validation, .api, .String],
@@ -587,28 +581,51 @@ public let benchmarks = [
     legacyFactor: 40),
 
   BenchmarkInfo(
-    name: "StringWalk_russian_unicodeScalars",
-    runFunction: run_StringWalk_russian_unicodeScalars,
+    name: "StringWalk.russian.scalars",
+    runFunction: run_StringWalk_russian_scalars,
     tags: [.api, .String],
-    setUpFunction: {run_StringWalk_russian_unicodeScalars(stringWalkWarmupAmount)},
+    setUpFunction: {run_StringWalk_russian_scalars(stringWalkWarmup)},
     legacyFactor: 40),
 
 
   BenchmarkInfo(
-    name: "StringWalk_russian_characters",
-    runFunction: run_StringWalk_russian_characters,
+    name: "StringWalk.russian.chars",
+    runFunction: run_StringWalk_russian_chars,
     tags: [.api, .String],
-    setUpFunction: {run_StringWalk_russian_characters(stringWalkWarmupAmount)},
+    setUpFunction: {run_StringWalk_russian_chars(stringWalkWarmup)},
     legacyFactor: 40),
 
 
   BenchmarkInfo(
-    name: "StringWalk_russian_characters_by_index",
-    runFunction: run_StringWalk_russian_characters_by_index,
+    name: "StringWalk.russian.charsByIdx",
+    runFunction: run_StringWalk_russian_charsByIdx,
     tags: [.api, .String],
-    setUpFunction: {run_StringWalk_russian_characters_by_index(stringWalkWarmupAmount)},
+    setUpFunction: {run_StringWalk_russian_charsByIdx(stringWalkWarmup)},
     legacyFactor: 40),
 
+
+  BenchmarkInfo(
+    name: "StringWalk.russian.scalarsBackwards",
+    runFunction: run_StringWalk_russian_scalarsBackwards,
+    tags: [.api, .String],
+    setUpFunction: {run_StringWalk_russian_scalarsBackwards(stringWalkWarmup)},
+    legacyFactor: 40),
+
+
+  BenchmarkInfo(
+    name: "StringWalk.russian.charsBackwards",
+    runFunction: run_StringWalk_russian_charsBackwards,
+    tags: [.api, .String],
+    setUpFunction: {run_StringWalk_russian_charsBackwards(stringWalkWarmup)},
+    legacyFactor: 40),
+
+
+  BenchmarkInfo(
+    name: "StringWalk.russian.charsByIdxBackwards",
+    runFunction: run_StringWalk_russian_charsByIdxBackwards,
+    tags: [.api, .String],
+    setUpFunction: {run_StringWalk_russian_charsByIdxBackwards(stringWalkWarmup)},
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "CharIteration_russian_unicodeScalars",
@@ -623,30 +640,6 @@ public let benchmarks = [
     legacyFactor: 40),
 
   BenchmarkInfo(
-    name: "StringWalk_russian_unicodeScalars_Backwards",
-    runFunction: run_StringWalk_russian_unicodeScalars_Backwards,
-    tags: [.api, .String],
-    setUpFunction: {run_StringWalk_russian_unicodeScalars_Backwards(stringWalkWarmupAmount)},
-    legacyFactor: 40),
-
-
-  BenchmarkInfo(
-    name: "StringWalk_russian_characters_Backwards",
-    runFunction: run_StringWalk_russian_characters_Backwards,
-    tags: [.api, .String],
-    setUpFunction: {run_StringWalk_russian_characters_Backwards(stringWalkWarmupAmount)},
-    legacyFactor: 40),
-
-
-  BenchmarkInfo(
-    name: "StringWalk_russian_characters_by_index_Backwards",
-    runFunction: run_StringWalk_russian_characters_by_index_Backwards,
-    tags: [.api, .String],
-    setUpFunction: {run_StringWalk_russian_characters_by_index_Backwards(stringWalkWarmupAmount)},
-    legacyFactor: 40),
-
-
-  BenchmarkInfo(
     name: "CharIteration_russian_unicodeScalars_Backwards",
     runFunction: run_CharIteration_russian_unicodeScalars_Backwards,
     tags: [.validation, .api, .String],
@@ -659,28 +652,51 @@ public let benchmarks = [
     legacyFactor: 40),
 
   BenchmarkInfo(
-    name: "StringWalk_punctuated_unicodeScalars",
-    runFunction: run_StringWalk_punctuated_unicodeScalars,
+    name: "StringWalk.punctuated.scalars",
+    runFunction: run_StringWalk_punctuated_scalars,
     tags: [.api, .String],
-    setUpFunction: {run_StringWalk_punctuated_unicodeScalars(stringWalkWarmupAmount)},
+    setUpFunction: {run_StringWalk_punctuated_scalars(stringWalkWarmup)},
     legacyFactor: 40),
 
 
   BenchmarkInfo(
-    name: "StringWalk_punctuated_characters",
-    runFunction: run_StringWalk_punctuated_characters,
+    name: "StringWalk.punctuated.chars",
+    runFunction: run_StringWalk_punctuated_chars,
     tags: [.api, .String],
-    setUpFunction: {run_StringWalk_punctuated_characters(stringWalkWarmupAmount)},
+    setUpFunction: {run_StringWalk_punctuated_chars(stringWalkWarmup)},
     legacyFactor: 40),
 
 
   BenchmarkInfo(
-    name: "StringWalk_punctuated_characters_by_index",
-    runFunction: run_StringWalk_punctuated_characters_by_index,
+    name: "StringWalk.punctuated.charsByIdx",
+    runFunction: run_StringWalk_punctuated_charsByIdx,
     tags: [.api, .String],
-    setUpFunction: {run_StringWalk_punctuated_characters_by_index(stringWalkWarmupAmount)},
+    setUpFunction: {run_StringWalk_punctuated_charsByIdx(stringWalkWarmup)},
     legacyFactor: 40),
 
+
+  BenchmarkInfo(
+    name: "StringWalk.punctuated.scalarsBackwards",
+    runFunction: run_StringWalk_punctuated_scalarsBackwards,
+    tags: [.api, .String],
+    setUpFunction: {run_StringWalk_punctuated_scalarsBackwards(stringWalkWarmup)},
+    legacyFactor: 40),
+
+
+  BenchmarkInfo(
+    name: "StringWalk.punctuated.charsBackwards",
+    runFunction: run_StringWalk_punctuated_charsBackwards,
+    tags: [.api, .String],
+    setUpFunction: {run_StringWalk_punctuated_charsBackwards(stringWalkWarmup)},
+    legacyFactor: 40),
+
+
+  BenchmarkInfo(
+    name: "StringWalk.punctuated.charsByIdxBackwards",
+    runFunction: run_StringWalk_punctuated_charsByIdxBackwards,
+    tags: [.api, .String],
+    setUpFunction: {run_StringWalk_punctuated_charsByIdxBackwards(stringWalkWarmup)},
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "CharIteration_punctuated_unicodeScalars",
@@ -695,30 +711,6 @@ public let benchmarks = [
     legacyFactor: 40),
 
   BenchmarkInfo(
-    name: "StringWalk_punctuated_unicodeScalars_Backwards",
-    runFunction: run_StringWalk_punctuated_unicodeScalars_Backwards,
-    tags: [.api, .String],
-    setUpFunction: {run_StringWalk_punctuated_unicodeScalars_Backwards(stringWalkWarmupAmount)},
-    legacyFactor: 40),
-
-
-  BenchmarkInfo(
-    name: "StringWalk_punctuated_characters_Backwards",
-    runFunction: run_StringWalk_punctuated_characters_Backwards,
-    tags: [.api, .String],
-    setUpFunction: {run_StringWalk_punctuated_characters_Backwards(stringWalkWarmupAmount)},
-    legacyFactor: 40),
-
-
-  BenchmarkInfo(
-    name: "StringWalk_punctuated_characters_by_index_Backwards",
-    runFunction: run_StringWalk_punctuated_characters_by_index_Backwards,
-    tags: [.api, .String],
-    setUpFunction: {run_StringWalk_punctuated_characters_by_index_Backwards(stringWalkWarmupAmount)},
-    legacyFactor: 40),
-
-
-  BenchmarkInfo(
     name: "CharIteration_punctuated_unicodeScalars_Backwards",
     runFunction: run_CharIteration_punctuated_unicodeScalars_Backwards,
     tags: [.validation, .api, .String],
@@ -731,28 +723,51 @@ public let benchmarks = [
     legacyFactor: 40),
 
   BenchmarkInfo(
-    name: "StringWalk_punctuatedJapanese_unicodeScalars",
-    runFunction: run_StringWalk_punctuatedJapanese_unicodeScalars,
+    name: "StringWalk.punctuatedJapanese.scalars",
+    runFunction: run_StringWalk_punctuatedJapanese_scalars,
     tags: [.api, .String],
-    setUpFunction: {run_StringWalk_punctuatedJapanese_unicodeScalars(stringWalkWarmupAmount)},
+    setUpFunction: {run_StringWalk_punctuatedJapanese_scalars(stringWalkWarmup)},
     legacyFactor: 40),
 
 
   BenchmarkInfo(
-    name: "StringWalk_punctuatedJapanese_characters",
-    runFunction: run_StringWalk_punctuatedJapanese_characters,
+    name: "StringWalk.punctuatedJapanese.chars",
+    runFunction: run_StringWalk_punctuatedJapanese_chars,
     tags: [.api, .String],
-    setUpFunction: {run_StringWalk_punctuatedJapanese_characters(stringWalkWarmupAmount)},
+    setUpFunction: {run_StringWalk_punctuatedJapanese_chars(stringWalkWarmup)},
     legacyFactor: 40),
 
 
   BenchmarkInfo(
-    name: "StringWalk_punctuatedJapanese_characters_by_index",
-    runFunction: run_StringWalk_punctuatedJapanese_characters_by_index,
+    name: "StringWalk.punctuatedJapanese.charsByIdx",
+    runFunction: run_StringWalk_punctuatedJapanese_charsByIdx,
     tags: [.api, .String],
-    setUpFunction: {run_StringWalk_punctuatedJapanese_characters_by_index(stringWalkWarmupAmount)},
+    setUpFunction: {run_StringWalk_punctuatedJapanese_charsByIdx(stringWalkWarmup)},
     legacyFactor: 40),
 
+
+  BenchmarkInfo(
+    name: "StringWalk.punctuatedJapanese.scalarsBackwards",
+    runFunction: run_StringWalk_punctuatedJapanese_scalarsBackwards,
+    tags: [.api, .String],
+    setUpFunction: {run_StringWalk_punctuatedJapanese_scalarsBackwards(stringWalkWarmup)},
+    legacyFactor: 40),
+
+
+  BenchmarkInfo(
+    name: "StringWalk.punctuatedJapanese.charsBackwards",
+    runFunction: run_StringWalk_punctuatedJapanese_charsBackwards,
+    tags: [.api, .String],
+    setUpFunction: {run_StringWalk_punctuatedJapanese_charsBackwards(stringWalkWarmup)},
+    legacyFactor: 40),
+
+
+  BenchmarkInfo(
+    name: "StringWalk.punctuatedJapanese.charsByIdxBackwards",
+    runFunction: run_StringWalk_punctuatedJapanese_charsByIdxBackwards,
+    tags: [.api, .String],
+    setUpFunction: {run_StringWalk_punctuatedJapanese_charsByIdxBackwards(stringWalkWarmup)},
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "CharIteration_punctuatedJapanese_unicodeScalars",
@@ -765,30 +780,6 @@ public let benchmarks = [
     runFunction: run_CharIndexing_punctuatedJapanese_unicodeScalars,
     tags: [.validation, .api, .String],
     legacyFactor: 40),
-
-  BenchmarkInfo(
-    name: "StringWalk_punctuatedJapanese_unicodeScalars_Backwards",
-    runFunction: run_StringWalk_punctuatedJapanese_unicodeScalars_Backwards,
-    tags: [.api, .String],
-    setUpFunction: {run_StringWalk_punctuatedJapanese_unicodeScalars_Backwards(stringWalkWarmupAmount)},
-    legacyFactor: 40),
-
-
-  BenchmarkInfo(
-    name: "StringWalk_punctuatedJapanese_characters_Backwards",
-    runFunction: run_StringWalk_punctuatedJapanese_characters_Backwards,
-    tags: [.api, .String],
-    setUpFunction: {run_StringWalk_punctuatedJapanese_characters_Backwards(stringWalkWarmupAmount)},
-    legacyFactor: 40),
-
-
-  BenchmarkInfo(
-    name: "StringWalk_punctuatedJapanese_characters_by_index_Backwards",
-    runFunction: run_StringWalk_punctuatedJapanese_characters_by_index_Backwards,
-    tags: [.api, .String],
-    setUpFunction: {run_StringWalk_punctuatedJapanese_characters_by_index_Backwards(stringWalkWarmupAmount)},
-    legacyFactor: 40),
-
 
   BenchmarkInfo(
     name: "CharIteration_punctuatedJapanese_unicodeScalars_Backwards",
@@ -805,46 +796,46 @@ public let benchmarks = [
 
 
 @inline(never)
-public func run_StringWalk_ascii_unicodeScalars(_ n: Int) {
+public func run_StringWalk_ascii_scalars(_ n: Int) {
   for _ in 1...n {
-    count_unicodeScalars(ascii.unicodeScalars)
+    count_scalars(ascii.unicodeScalars)
   }
 }
 
 @inline(never)
-public func run_StringWalk_ascii_unicodeScalars_Backwards(_ n: Int) {
+public func run_StringWalk_ascii_scalarsBackwards(_ n: Int) {
   for _ in 1...n {
-    count_unicodeScalars_rev(ascii.unicodeScalars.reversed())
-  }
-}
-
-
-@inline(never)
-public func run_StringWalk_ascii_characters(_ n: Int) {
-  for _ in 1...n {
-    count_characters(ascii)
-  }
-}
-
-@inline(never)
-public func run_StringWalk_ascii_characters_Backwards(_ n: Int) {
-  for _ in 1...n {
-    count_characters_rev(ascii.reversed())
+    count_scalars_rev(ascii.unicodeScalars.reversed())
   }
 }
 
 
 @inline(never)
-public func run_StringWalk_ascii_characters_by_index(_ n: Int) {
+public func run_StringWalk_ascii_chars(_ n: Int) {
   for _ in 1...n {
-    count_characters_by_index(ascii)
+    count_chars(ascii)
   }
 }
 
 @inline(never)
-public func run_StringWalk_ascii_characters_by_index_Backwards(_ n: Int) {
+public func run_StringWalk_ascii_charsBackwards(_ n: Int) {
   for _ in 1...n {
-    count_characters_by_index_rev(ascii.reversed())
+    count_chars_rev(ascii.reversed())
+  }
+}
+
+
+@inline(never)
+public func run_StringWalk_ascii_charsByIdx(_ n: Int) {
+  for _ in 1...n {
+    count_charsByIdx(ascii)
+  }
+}
+
+@inline(never)
+public func run_StringWalk_ascii_charsByIdxBackwards(_ n: Int) {
+  for _ in 1...n {
+    count_charsByIdx_rev(ascii.reversed())
   }
 }
 
@@ -908,46 +899,46 @@ public func run_CharIndexing_ascii_unicodeScalars_Backwards(_ n: Int) {
 
 
 @inline(never)
-public func run_StringWalk_utf16_unicodeScalars(_ n: Int) {
+public func run_StringWalk_utf16_scalars(_ n: Int) {
   for _ in 1...n {
-    count_unicodeScalars(utf16.unicodeScalars)
+    count_scalars(utf16.unicodeScalars)
   }
 }
 
 @inline(never)
-public func run_StringWalk_utf16_unicodeScalars_Backwards(_ n: Int) {
+public func run_StringWalk_utf16_scalarsBackwards(_ n: Int) {
   for _ in 1...n {
-    count_unicodeScalars_rev(utf16.unicodeScalars.reversed())
-  }
-}
-
-
-@inline(never)
-public func run_StringWalk_utf16_characters(_ n: Int) {
-  for _ in 1...n {
-    count_characters(utf16)
-  }
-}
-
-@inline(never)
-public func run_StringWalk_utf16_characters_Backwards(_ n: Int) {
-  for _ in 1...n {
-    count_characters_rev(utf16.reversed())
+    count_scalars_rev(utf16.unicodeScalars.reversed())
   }
 }
 
 
 @inline(never)
-public func run_StringWalk_utf16_characters_by_index(_ n: Int) {
+public func run_StringWalk_utf16_chars(_ n: Int) {
   for _ in 1...n {
-    count_characters_by_index(utf16)
+    count_chars(utf16)
   }
 }
 
 @inline(never)
-public func run_StringWalk_utf16_characters_by_index_Backwards(_ n: Int) {
+public func run_StringWalk_utf16_charsBackwards(_ n: Int) {
   for _ in 1...n {
-    count_characters_by_index_rev(utf16.reversed())
+    count_chars_rev(utf16.reversed())
+  }
+}
+
+
+@inline(never)
+public func run_StringWalk_utf16_charsByIdx(_ n: Int) {
+  for _ in 1...n {
+    count_charsByIdx(utf16)
+  }
+}
+
+@inline(never)
+public func run_StringWalk_utf16_charsByIdxBackwards(_ n: Int) {
+  for _ in 1...n {
+    count_charsByIdx_rev(utf16.reversed())
   }
 }
 
@@ -1011,46 +1002,46 @@ public func run_CharIndexing_utf16_unicodeScalars_Backwards(_ n: Int) {
 
 
 @inline(never)
-public func run_StringWalk_tweet_unicodeScalars(_ n: Int) {
+public func run_StringWalk_tweet_scalars(_ n: Int) {
   for _ in 1...n {
-    count_unicodeScalars(tweet.unicodeScalars)
+    count_scalars(tweet.unicodeScalars)
   }
 }
 
 @inline(never)
-public func run_StringWalk_tweet_unicodeScalars_Backwards(_ n: Int) {
+public func run_StringWalk_tweet_scalarsBackwards(_ n: Int) {
   for _ in 1...n {
-    count_unicodeScalars_rev(tweet.unicodeScalars.reversed())
-  }
-}
-
-
-@inline(never)
-public func run_StringWalk_tweet_characters(_ n: Int) {
-  for _ in 1...n {
-    count_characters(tweet)
-  }
-}
-
-@inline(never)
-public func run_StringWalk_tweet_characters_Backwards(_ n: Int) {
-  for _ in 1...n {
-    count_characters_rev(tweet.reversed())
+    count_scalars_rev(tweet.unicodeScalars.reversed())
   }
 }
 
 
 @inline(never)
-public func run_StringWalk_tweet_characters_by_index(_ n: Int) {
+public func run_StringWalk_tweet_chars(_ n: Int) {
   for _ in 1...n {
-    count_characters_by_index(tweet)
+    count_chars(tweet)
   }
 }
 
 @inline(never)
-public func run_StringWalk_tweet_characters_by_index_Backwards(_ n: Int) {
+public func run_StringWalk_tweet_charsBackwards(_ n: Int) {
   for _ in 1...n {
-    count_characters_by_index_rev(tweet.reversed())
+    count_chars_rev(tweet.reversed())
+  }
+}
+
+
+@inline(never)
+public func run_StringWalk_tweet_charsByIdx(_ n: Int) {
+  for _ in 1...n {
+    count_charsByIdx(tweet)
+  }
+}
+
+@inline(never)
+public func run_StringWalk_tweet_charsByIdxBackwards(_ n: Int) {
+  for _ in 1...n {
+    count_charsByIdx_rev(tweet.reversed())
   }
 }
 
@@ -1114,46 +1105,46 @@ public func run_CharIndexing_tweet_unicodeScalars_Backwards(_ n: Int) {
 
 
 @inline(never)
-public func run_StringWalk_japanese_unicodeScalars(_ n: Int) {
+public func run_StringWalk_japanese_scalars(_ n: Int) {
   for _ in 1...n {
-    count_unicodeScalars(japanese.unicodeScalars)
+    count_scalars(japanese.unicodeScalars)
   }
 }
 
 @inline(never)
-public func run_StringWalk_japanese_unicodeScalars_Backwards(_ n: Int) {
+public func run_StringWalk_japanese_scalarsBackwards(_ n: Int) {
   for _ in 1...n {
-    count_unicodeScalars_rev(japanese.unicodeScalars.reversed())
-  }
-}
-
-
-@inline(never)
-public func run_StringWalk_japanese_characters(_ n: Int) {
-  for _ in 1...n {
-    count_characters(japanese)
-  }
-}
-
-@inline(never)
-public func run_StringWalk_japanese_characters_Backwards(_ n: Int) {
-  for _ in 1...n {
-    count_characters_rev(japanese.reversed())
+    count_scalars_rev(japanese.unicodeScalars.reversed())
   }
 }
 
 
 @inline(never)
-public func run_StringWalk_japanese_characters_by_index(_ n: Int) {
+public func run_StringWalk_japanese_chars(_ n: Int) {
   for _ in 1...n {
-    count_characters_by_index(japanese)
+    count_chars(japanese)
   }
 }
 
 @inline(never)
-public func run_StringWalk_japanese_characters_by_index_Backwards(_ n: Int) {
+public func run_StringWalk_japanese_charsBackwards(_ n: Int) {
   for _ in 1...n {
-    count_characters_by_index_rev(japanese.reversed())
+    count_chars_rev(japanese.reversed())
+  }
+}
+
+
+@inline(never)
+public func run_StringWalk_japanese_charsByIdx(_ n: Int) {
+  for _ in 1...n {
+    count_charsByIdx(japanese)
+  }
+}
+
+@inline(never)
+public func run_StringWalk_japanese_charsByIdxBackwards(_ n: Int) {
+  for _ in 1...n {
+    count_charsByIdx_rev(japanese.reversed())
   }
 }
 
@@ -1217,46 +1208,46 @@ public func run_CharIndexing_japanese_unicodeScalars_Backwards(_ n: Int) {
 
 
 @inline(never)
-public func run_StringWalk_chinese_unicodeScalars(_ n: Int) {
+public func run_StringWalk_chinese_scalars(_ n: Int) {
   for _ in 1...n {
-    count_unicodeScalars(chinese.unicodeScalars)
+    count_scalars(chinese.unicodeScalars)
   }
 }
 
 @inline(never)
-public func run_StringWalk_chinese_unicodeScalars_Backwards(_ n: Int) {
+public func run_StringWalk_chinese_scalarsBackwards(_ n: Int) {
   for _ in 1...n {
-    count_unicodeScalars_rev(chinese.unicodeScalars.reversed())
-  }
-}
-
-
-@inline(never)
-public func run_StringWalk_chinese_characters(_ n: Int) {
-  for _ in 1...n {
-    count_characters(chinese)
-  }
-}
-
-@inline(never)
-public func run_StringWalk_chinese_characters_Backwards(_ n: Int) {
-  for _ in 1...n {
-    count_characters_rev(chinese.reversed())
+    count_scalars_rev(chinese.unicodeScalars.reversed())
   }
 }
 
 
 @inline(never)
-public func run_StringWalk_chinese_characters_by_index(_ n: Int) {
+public func run_StringWalk_chinese_chars(_ n: Int) {
   for _ in 1...n {
-    count_characters_by_index(chinese)
+    count_chars(chinese)
   }
 }
 
 @inline(never)
-public func run_StringWalk_chinese_characters_by_index_Backwards(_ n: Int) {
+public func run_StringWalk_chinese_charsBackwards(_ n: Int) {
   for _ in 1...n {
-    count_characters_by_index_rev(chinese.reversed())
+    count_chars_rev(chinese.reversed())
+  }
+}
+
+
+@inline(never)
+public func run_StringWalk_chinese_charsByIdx(_ n: Int) {
+  for _ in 1...n {
+    count_charsByIdx(chinese)
+  }
+}
+
+@inline(never)
+public func run_StringWalk_chinese_charsByIdxBackwards(_ n: Int) {
+  for _ in 1...n {
+    count_charsByIdx_rev(chinese.reversed())
   }
 }
 
@@ -1320,46 +1311,46 @@ public func run_CharIndexing_chinese_unicodeScalars_Backwards(_ n: Int) {
 
 
 @inline(never)
-public func run_StringWalk_korean_unicodeScalars(_ n: Int) {
+public func run_StringWalk_korean_scalars(_ n: Int) {
   for _ in 1...n {
-    count_unicodeScalars(korean.unicodeScalars)
+    count_scalars(korean.unicodeScalars)
   }
 }
 
 @inline(never)
-public func run_StringWalk_korean_unicodeScalars_Backwards(_ n: Int) {
+public func run_StringWalk_korean_scalarsBackwards(_ n: Int) {
   for _ in 1...n {
-    count_unicodeScalars_rev(korean.unicodeScalars.reversed())
-  }
-}
-
-
-@inline(never)
-public func run_StringWalk_korean_characters(_ n: Int) {
-  for _ in 1...n {
-    count_characters(korean)
-  }
-}
-
-@inline(never)
-public func run_StringWalk_korean_characters_Backwards(_ n: Int) {
-  for _ in 1...n {
-    count_characters_rev(korean.reversed())
+    count_scalars_rev(korean.unicodeScalars.reversed())
   }
 }
 
 
 @inline(never)
-public func run_StringWalk_korean_characters_by_index(_ n: Int) {
+public func run_StringWalk_korean_chars(_ n: Int) {
   for _ in 1...n {
-    count_characters_by_index(korean)
+    count_chars(korean)
   }
 }
 
 @inline(never)
-public func run_StringWalk_korean_characters_by_index_Backwards(_ n: Int) {
+public func run_StringWalk_korean_charsBackwards(_ n: Int) {
   for _ in 1...n {
-    count_characters_by_index_rev(korean.reversed())
+    count_chars_rev(korean.reversed())
+  }
+}
+
+
+@inline(never)
+public func run_StringWalk_korean_charsByIdx(_ n: Int) {
+  for _ in 1...n {
+    count_charsByIdx(korean)
+  }
+}
+
+@inline(never)
+public func run_StringWalk_korean_charsByIdxBackwards(_ n: Int) {
+  for _ in 1...n {
+    count_charsByIdx_rev(korean.reversed())
   }
 }
 
@@ -1423,46 +1414,46 @@ public func run_CharIndexing_korean_unicodeScalars_Backwards(_ n: Int) {
 
 
 @inline(never)
-public func run_StringWalk_russian_unicodeScalars(_ n: Int) {
+public func run_StringWalk_russian_scalars(_ n: Int) {
   for _ in 1...n {
-    count_unicodeScalars(russian.unicodeScalars)
+    count_scalars(russian.unicodeScalars)
   }
 }
 
 @inline(never)
-public func run_StringWalk_russian_unicodeScalars_Backwards(_ n: Int) {
+public func run_StringWalk_russian_scalarsBackwards(_ n: Int) {
   for _ in 1...n {
-    count_unicodeScalars_rev(russian.unicodeScalars.reversed())
-  }
-}
-
-
-@inline(never)
-public func run_StringWalk_russian_characters(_ n: Int) {
-  for _ in 1...n {
-    count_characters(russian)
-  }
-}
-
-@inline(never)
-public func run_StringWalk_russian_characters_Backwards(_ n: Int) {
-  for _ in 1...n {
-    count_characters_rev(russian.reversed())
+    count_scalars_rev(russian.unicodeScalars.reversed())
   }
 }
 
 
 @inline(never)
-public func run_StringWalk_russian_characters_by_index(_ n: Int) {
+public func run_StringWalk_russian_chars(_ n: Int) {
   for _ in 1...n {
-    count_characters_by_index(russian)
+    count_chars(russian)
   }
 }
 
 @inline(never)
-public func run_StringWalk_russian_characters_by_index_Backwards(_ n: Int) {
+public func run_StringWalk_russian_charsBackwards(_ n: Int) {
   for _ in 1...n {
-    count_characters_by_index_rev(russian.reversed())
+    count_chars_rev(russian.reversed())
+  }
+}
+
+
+@inline(never)
+public func run_StringWalk_russian_charsByIdx(_ n: Int) {
+  for _ in 1...n {
+    count_charsByIdx(russian)
+  }
+}
+
+@inline(never)
+public func run_StringWalk_russian_charsByIdxBackwards(_ n: Int) {
+  for _ in 1...n {
+    count_charsByIdx_rev(russian.reversed())
   }
 }
 
@@ -1526,46 +1517,46 @@ public func run_CharIndexing_russian_unicodeScalars_Backwards(_ n: Int) {
 
 
 @inline(never)
-public func run_StringWalk_punctuated_unicodeScalars(_ n: Int) {
+public func run_StringWalk_punctuated_scalars(_ n: Int) {
   for _ in 1...n {
-    count_unicodeScalars(punctuated.unicodeScalars)
+    count_scalars(punctuated.unicodeScalars)
   }
 }
 
 @inline(never)
-public func run_StringWalk_punctuated_unicodeScalars_Backwards(_ n: Int) {
+public func run_StringWalk_punctuated_scalarsBackwards(_ n: Int) {
   for _ in 1...n {
-    count_unicodeScalars_rev(punctuated.unicodeScalars.reversed())
-  }
-}
-
-
-@inline(never)
-public func run_StringWalk_punctuated_characters(_ n: Int) {
-  for _ in 1...n {
-    count_characters(punctuated)
-  }
-}
-
-@inline(never)
-public func run_StringWalk_punctuated_characters_Backwards(_ n: Int) {
-  for _ in 1...n {
-    count_characters_rev(punctuated.reversed())
+    count_scalars_rev(punctuated.unicodeScalars.reversed())
   }
 }
 
 
 @inline(never)
-public func run_StringWalk_punctuated_characters_by_index(_ n: Int) {
+public func run_StringWalk_punctuated_chars(_ n: Int) {
   for _ in 1...n {
-    count_characters_by_index(punctuated)
+    count_chars(punctuated)
   }
 }
 
 @inline(never)
-public func run_StringWalk_punctuated_characters_by_index_Backwards(_ n: Int) {
+public func run_StringWalk_punctuated_charsBackwards(_ n: Int) {
   for _ in 1...n {
-    count_characters_by_index_rev(punctuated.reversed())
+    count_chars_rev(punctuated.reversed())
+  }
+}
+
+
+@inline(never)
+public func run_StringWalk_punctuated_charsByIdx(_ n: Int) {
+  for _ in 1...n {
+    count_charsByIdx(punctuated)
+  }
+}
+
+@inline(never)
+public func run_StringWalk_punctuated_charsByIdxBackwards(_ n: Int) {
+  for _ in 1...n {
+    count_charsByIdx_rev(punctuated.reversed())
   }
 }
 
@@ -1629,46 +1620,46 @@ public func run_CharIndexing_punctuated_unicodeScalars_Backwards(_ n: Int) {
 
 
 @inline(never)
-public func run_StringWalk_punctuatedJapanese_unicodeScalars(_ n: Int) {
+public func run_StringWalk_punctuatedJapanese_scalars(_ n: Int) {
   for _ in 1...n {
-    count_unicodeScalars(punctuatedJapanese.unicodeScalars)
+    count_scalars(punctuatedJapanese.unicodeScalars)
   }
 }
 
 @inline(never)
-public func run_StringWalk_punctuatedJapanese_unicodeScalars_Backwards(_ n: Int) {
+public func run_StringWalk_punctuatedJapanese_scalarsBackwards(_ n: Int) {
   for _ in 1...n {
-    count_unicodeScalars_rev(punctuatedJapanese.unicodeScalars.reversed())
-  }
-}
-
-
-@inline(never)
-public func run_StringWalk_punctuatedJapanese_characters(_ n: Int) {
-  for _ in 1...n {
-    count_characters(punctuatedJapanese)
-  }
-}
-
-@inline(never)
-public func run_StringWalk_punctuatedJapanese_characters_Backwards(_ n: Int) {
-  for _ in 1...n {
-    count_characters_rev(punctuatedJapanese.reversed())
+    count_scalars_rev(punctuatedJapanese.unicodeScalars.reversed())
   }
 }
 
 
 @inline(never)
-public func run_StringWalk_punctuatedJapanese_characters_by_index(_ n: Int) {
+public func run_StringWalk_punctuatedJapanese_chars(_ n: Int) {
   for _ in 1...n {
-    count_characters_by_index(punctuatedJapanese)
+    count_chars(punctuatedJapanese)
   }
 }
 
 @inline(never)
-public func run_StringWalk_punctuatedJapanese_characters_by_index_Backwards(_ n: Int) {
+public func run_StringWalk_punctuatedJapanese_charsBackwards(_ n: Int) {
   for _ in 1...n {
-    count_characters_by_index_rev(punctuatedJapanese.reversed())
+    count_chars_rev(punctuatedJapanese.reversed())
+  }
+}
+
+
+@inline(never)
+public func run_StringWalk_punctuatedJapanese_charsByIdx(_ n: Int) {
+  for _ in 1...n {
+    count_charsByIdx(punctuatedJapanese)
+  }
+}
+
+@inline(never)
+public func run_StringWalk_punctuatedJapanese_charsByIdxBackwards(_ n: Int) {
+  for _ in 1...n {
+    count_charsByIdx_rev(punctuatedJapanese.reversed())
   }
 }
 
