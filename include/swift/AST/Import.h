@@ -85,7 +85,10 @@ enum class ImportFlags {
   Preconcurrency = 0x20,
 
   /// Used for DenseMap.
-  Reserved = 0x80
+  Reserved = 0x80,
+
+  /// Silence all deprecation warnings coming from symbols imported from the module
+  IgnoresDeprecationWarnings = 0x90
 };
 
 /// \see ImportFlags

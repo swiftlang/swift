@@ -467,6 +467,8 @@ bool isPotentiallyIsolatedActor(
     VarDecl *var, llvm::function_ref<bool(ParamDecl *)> isIsolated =
                       [](ParamDecl *P) { return P->isIsolated(); });
 
+Optional<AttributedImport<ImportedModule>> findImportFor(
+    ModuleDecl *nominalModule, ASTContext *nominalASTCtx, const DeclContext *fromDC);
 } // end namespace swift
 
 #endif /* SWIFT_SEMA_TYPECHECKCONCURRENCY_H */
