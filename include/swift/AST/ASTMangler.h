@@ -297,7 +297,8 @@ public:
 
   std::string mangleTypeAsContextUSR(const NominalTypeDecl *type);
 
-  std::string mangleAnyDecl(const ValueDecl *Decl, bool prefix);
+  std::string mangleAnyDecl(const ValueDecl *Decl, bool prefix,
+                            bool respectOriginallyDefinedIn = false);
   std::string mangleDeclAsUSR(const ValueDecl *Decl, StringRef USRPrefix);
 
   std::string mangleAccessorEntityAsUSR(AccessorKind kind,
