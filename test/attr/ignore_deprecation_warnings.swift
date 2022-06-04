@@ -19,6 +19,12 @@ var deprecatedVariable = ""
 @available(*, deprecated)
 struct deprecatedType {}
 
+
+@ignoreDeprecationWarnings 
+// FIXME: deprecation warnings are still diagnosed for top-level variable declaration
+// this has to do with Swift diagnosing deprecation warnings for deprecated top-level variables which are assigned to a deprecated property
+var topLevelDecl = deprecatedVariable() // expected-warning {{'deprecatedVariable' is deprecated}}
+
 @ignoreDeprecationWarnings
 func x() {
     deprecatedFunc()
