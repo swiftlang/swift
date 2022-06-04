@@ -1408,8 +1408,6 @@ ERROR(transparent_in_protocols_not_supported,none,
 ERROR(transparent_in_classes_not_supported,none,
       "'@_transparent' attribute is not supported on declarations within classes", ())
 
-ERROR(invalid_iboutlet,none,
-      "only instance properties can be declared @IBOutlet", ())
 ERROR(iboutlet_nonobjc_class,none,
       "@IBOutlet property cannot %select{have|be an array of}0 "
       "non-'@objc' class type %1", (bool, Type))
@@ -1431,8 +1429,8 @@ NOTE(note_make_implicitly_unwrapped_optional,none,
 ERROR(invalid_ibdesignable_extension,none,
       "@IBDesignable can only be applied to classes and extensions "
       "of classes", ())
-ERROR(invalid_ibinspectable,none,
-      "only instance properties can be declared @%0", (StringRef))
+ERROR(attr_must_be_used_on_class_instance,none,
+      "only class instance properties can be declared @%0", (StringRef))
 ERROR(invalid_ibaction_decl,none,
       "only instance methods can be declared @%0", (StringRef))
 ERROR(invalid_ibaction_result,none,
