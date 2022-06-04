@@ -17,6 +17,7 @@ namespace {
 static PrintOptions getTypePrintOpts(CheckerOptions CheckerOpts) {
   PrintOptions Opts;
   Opts.SynthesizeSugarOnTypes = true;
+  Opts.UseOriginallyDefinedInModuleNames = true;
   if (!CheckerOpts.Migrator) {
     // We should always print fully qualified type names for checking either
     // API or ABI stability.
@@ -1096,7 +1097,8 @@ static StringRef calculateMangledName(SDKContext &Ctx, ValueDecl *VD) {
     return Ctx.buffer(attr->Name);
   }
   Mangle::ASTMangler NewMangler;
-  return Ctx.buffer(NewMangler.mangleAnyDecl(VD, true));
+  return Ctx.buffer(NewMangler.mangleAnyDecl(VD, true,
+                                    /*bool respectOriginallyDefinedIn*/true));
 }
 
 static StringRef calculateLocation(SDKContext &SDKCtx, Decl *D) {
