@@ -632,16 +632,16 @@ void AttributeChecker::visitIBInspectableAttr(IBInspectableAttr *attr) {
   // Only instance properties can be 'IBInspectable'.
   auto *VD = cast<VarDecl>(D);
   if (!VD->getDeclContext()->getSelfClassDecl() || VD->isStatic())
-    diagnoseAndRemoveAttr(attr, diag::invalid_ibinspectable,
-                                 attr->getAttrName());
+    diagnoseAndRemoveAttr(attr, diag::attr_must_be_used_on_class_instance,
+                          attr->getAttrName());
 }
 
 void AttributeChecker::visitGKInspectableAttr(GKInspectableAttr *attr) {
   // Only instance properties can be 'GKInspectable'.
   auto *VD = cast<VarDecl>(D);
   if (!VD->getDeclContext()->getSelfClassDecl() || VD->isStatic())
-    diagnoseAndRemoveAttr(attr, diag::invalid_ibinspectable,
-                                 attr->getAttrName());
+    diagnoseAndRemoveAttr(attr, diag::attr_must_be_used_on_class_instance,
+                          attr->getAttrName());
 }
 
 static Optional<Diag<bool,Type>>
@@ -690,7 +690,8 @@ void AttributeChecker::visitIBOutletAttr(IBOutletAttr *attr) {
   // Only instance properties can be 'IBOutlet'.
   auto *VD = cast<VarDecl>(D);
   if (!VD->getDeclContext()->getSelfClassDecl() || VD->isStatic())
-    diagnoseAndRemoveAttr(attr, diag::invalid_iboutlet);
+    diagnoseAndRemoveAttr(attr, diag::attr_must_be_used_on_class_instance,
+                          attr->getAttrName());
 
   if (!VD->isSettable(nullptr)) {
     // Allow non-mutable IBOutlet properties in module interfaces,
