@@ -633,7 +633,7 @@ void AttributeChecker::visitIBInspectableAttr(IBInspectableAttr *attr) {
   auto *VD = cast<VarDecl>(D);
   if (!VD->getDeclContext()->getSelfClassDecl() || VD->isStatic())
     diagnoseAndRemoveAttr(attr, diag::attr_must_be_used_on_class_instance,
-                                 attr->getAttrName());
+                          attr->getAttrName());
 }
 
 void AttributeChecker::visitGKInspectableAttr(GKInspectableAttr *attr) {
@@ -641,7 +641,7 @@ void AttributeChecker::visitGKInspectableAttr(GKInspectableAttr *attr) {
   auto *VD = cast<VarDecl>(D);
   if (!VD->getDeclContext()->getSelfClassDecl() || VD->isStatic())
     diagnoseAndRemoveAttr(attr, diag::attr_must_be_used_on_class_instance,
-                                 attr->getAttrName());
+                          attr->getAttrName());
 }
 
 static Optional<Diag<bool,Type>>
@@ -691,7 +691,7 @@ void AttributeChecker::visitIBOutletAttr(IBOutletAttr *attr) {
   auto *VD = cast<VarDecl>(D);
   if (!VD->getDeclContext()->getSelfClassDecl() || VD->isStatic())
     diagnoseAndRemoveAttr(attr, diag::attr_must_be_used_on_class_instance,
-                                 attr->getAttrName());
+                          attr->getAttrName());
 
   if (!VD->isSettable(nullptr)) {
     // Allow non-mutable IBOutlet properties in module interfaces,
