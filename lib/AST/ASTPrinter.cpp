@@ -5303,6 +5303,16 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
       Name = Mod->getASTContext().getIdentifier(ExportedModuleName);
     }
 
+    if (Options.UseOriginallyDefinedInModuleNames) {
+      Decl *D = Ty->getDecl();
+      for (auto attr: D->getAttrs().getAttributes<OriginallyDefinedInAttr>()) {
+        Name = Mod->getASTContext()
+          .getIdentifier(const_cast<OriginallyDefinedInAttr*>(attr)
+                         ->OriginalModuleName);
+        break;
+      }
+    }
+
     Printer.printModuleRef(Mod, Name);
     Printer << ".";
   }
