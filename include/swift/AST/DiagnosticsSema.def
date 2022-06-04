@@ -1451,6 +1451,8 @@ NOTE(fixit_rename_in_swift,none,
      "change Swift name to %0", (DeclName))
 NOTE(fixit_rename_in_objc,none,
      "change Objective-C selector to %0", (ObjCSelector))
+NOTE(remove_async_add_task,none,
+     "remove 'async' and wrap in 'Task' to use concurrency in %0", (DeclName))
 ERROR(no_objc_tagged_pointer_not_class_protocol,none,
       "@unsafe_no_objc_tagged_pointer can only be applied to class protocols",
       ())

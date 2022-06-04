@@ -504,6 +504,9 @@ validateIBActionSignature(ASTContext &ctx, DeclAttribute *attr,
   if (FD->isAsyncContext()) {
     ctx.Diags.diagnose(FD->getAsyncLoc(), diag::attr_decl_async,
         attr->getAttrName(), FD->getDescriptiveKind());
+
+    ctx.Diags.diagnose(FD->getAsyncLoc(), diag::remove_async_add_task,
+                       FD->getName());
     valid = false;
   }
 
