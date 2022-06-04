@@ -1637,6 +1637,40 @@
       },
       {
         "kind": "TypeDecl",
+        "name": "SinkingClass",
+        "printedName": "SinkingClass",
+        "children": [
+          {
+            "kind": "Constructor",
+            "name": "init",
+            "printedName": "init()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "SinkingClass",
+                "printedName": "Bread.SinkingClass",
+                "usr": "s:4cake12SinkingClassC"
+              }
+            ],
+            "declKind": "Constructor",
+            "usr": "s:4cake12SinkingClassCACycfc",
+            "mangledName": "$s5Bread12SinkingClassCACycfc",
+            "moduleName": "cake",
+            "init_kind": "Designated"
+          }
+        ],
+        "declKind": "Class",
+        "usr": "s:4cake12SinkingClassC",
+        "mangledName": "$s5Bread12SinkingClassC",
+        "moduleName": "cake",
+        "intro_Macosx": "10.7",
+        "declAttributes": [
+          "OriginallyDefinedIn",
+          "Available"
+        ]
+      },
+      {
+        "kind": "TypeDecl",
         "name": "Int",
         "printedName": "Int",
         "children": [

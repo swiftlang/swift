@@ -145,3 +145,9 @@ public func emitIntoClientFunc() {}
 
 @_silgen_name("silgenName")
 public func silgenNamedFunc() {}
+
+@available(OSX 10.7, *)
+@_originallyDefinedIn(module: "Bread", OSX 10.9)
+public class SinkingClass {
+  public init() {}
+}
