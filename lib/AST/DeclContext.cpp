@@ -20,6 +20,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/ParseRequests.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Types.h"
