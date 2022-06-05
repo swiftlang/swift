@@ -2338,7 +2338,8 @@ public:
         CompilerStyleDiags || !SerializedDiagPath.empty();
     for (auto Arg : Args)
       CheckerOpts.ToolArgs.push_back(Arg);
-
+    for(auto spi: ParsedArgs.getAllArgValues(OPT_ignore_spi_groups))
+      CheckerOpts.SPIGroupNamesToIgnore.insert(spi);
     if (!SDK.empty()) {
       auto Ver = getSDKBuildVersion(SDK);
       if (!Ver.empty()) {
