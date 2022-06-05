@@ -45,6 +45,11 @@ class IBActionWrapperTy {
   func moreMagic(_: AnyObject, _: AnyObject, _: AnyObject) -> AnyObject {} // no-warning
   @objc @IBSegueAction
   func evenMoreMagic(_: AnyObject, _: AnyObject, _: AnyObject) -> AnyObject {} // no-warning
+
+  @available(SwiftStdlib 5.5, *) @IBSegueAction
+  func process(_: AnyObject, _: AnyObject, _: AnyObject) async -> AnyObject { }
+  // expected-error@-1 {{@IBSegueAction instance method cannot be asynchronous}}
+  // expected-note@-2 {{remove 'async' and wrap in 'Task' to use concurrency in 'process'}}{{49:3-50:80=@available(SwiftStdlib 5.5, *) @IBSegueAction\n  func process(_: AnyObject, _: AnyObject, _: AnyObject) -> AnyObject {\nTask { @MainActor in \}\n\}}}
 }
 
 struct S { }
