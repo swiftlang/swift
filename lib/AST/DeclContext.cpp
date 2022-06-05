@@ -271,6 +271,37 @@ ModuleDecl *DeclContext::getParentModule() const {
   return const_cast<ModuleDecl *>(cast<ModuleDecl>(DC));
 }
 
+/// Find the import that makes the given nominal declaration available.
+Optional<AttributedImport<ImportedModule>>
+DeclContext::findImportFor(ModuleDecl *nominalModule) {
+  // If the nominal type is from the current module, there's no import.
+  if (nominalModule == getParentModule())
+    return None;
+
+  auto fromSourceFile = getParentSourceFile();
+  if (!fromSourceFile)
+    return None;
+
+  // Look to see if the owning module was directly imported.
+  for (const auto &import : fromSourceFile->getImports()) {
+    if (import.module.importedModule == nominalModule)
+      return import;
+  }
+
+  // Now look for transitive imports.
+  auto &importCache = nominalModule->getASTContext().getImportCache();
+  for (const auto &import : fromSourceFile->getImports()) {
+    auto &importSet = importCache.getImportSet(import.module.importedModule);
+    for (const auto &transitive : importSet.getTransitiveImports()) {
+      if (transitive.importedModule == nominalModule) {
+        return import;
+      }
+    }
+  }
+
+  return None;
+}
+
 SourceFile *DeclContext::getParentSourceFile() const {
   const DeclContext *DC = this;
   while (!DC->isModuleScopeContext())

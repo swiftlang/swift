@@ -289,36 +289,7 @@ public:
       reinterpret_cast<Decl*>(this + 1) : nullptr;
   }
 
-  /// Find the import that makes the given nominal declaration available.
-  Optional<AttributedImport<ImportedModule>> findImportFor(
-      ModuleDecl *nominalModule) {
-    // If the nominal type is from the current module, there's no import.
-    if (nominalModule == getParentModule())
-      return None;
-
-    auto fromSourceFile = getParentSourceFile();
-    if (!fromSourceFile)
-      return None;
-
-    // Look to see if the owning module was directly imported.
-    for (const auto &import : fromSourceFile->getImports()) {
-      if (import.module.importedModule == nominalModule)
-        return import;
-    }
-
-    // Now look for transitive imports.
-    auto &importCache = nominalModule->getASTContext().getImportCache();
-    for (const auto &import : fromSourceFile->getImports()) {
-      auto &importSet = importCache.getImportSet(import.module.importedModule);
-      for (const auto &transitive : importSet.getTransitiveImports()) {
-        if (transitive.importedModule == nominalModule) {
-          return import;
-        }
-      }
-    }
-
-    return None;
-  }
+  Optional<AttributedImport<ImportedModule>> findImportFor(ModuleDecl *nominalModule);
 
   const Decl *getAsDecl() const {
     return const_cast<DeclContext*>(this)->getAsDecl();
