@@ -734,7 +734,7 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(_local, KnownToBeLocal,
   130)
 
 SIMPLE_DECL_ATTR(ignoreDeprecationWarnings, IgnoreDeprecationWarnings,
-  OnAbstractFunction | OnGenericType | OnVar | OnSubscript | OnEnumElement | OnImport
+  OnAbstractFunction | OnGenericType | OnVar | OnSubscript | OnEnumElement | OnImport |
   OnExtension | AllowMultipleAttributes |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   131)

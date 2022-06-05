@@ -24,6 +24,7 @@
 #include "swift/AST/LookupKinds.h"
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/AST/TypeAlignments.h"
+#include "swift/AST/Import.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/Fingerprint.h"
 #include "swift/Basic/LLVM.h"
