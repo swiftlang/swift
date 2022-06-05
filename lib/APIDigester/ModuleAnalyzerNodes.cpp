@@ -114,7 +114,9 @@ SDKNodeDecl::SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind)
       : SDKNode(Info, Kind), DKind(Info.DKind), Usr(Info.Usr),
         MangledName(Info.MangledName), Loc(Info.Loc),
         Location(Info.Location), ModuleName(Info.ModuleName),
-        DeclAttributes(Info.DeclAttrs), IsImplicit(Info.IsImplicit),
+        DeclAttributes(Info.DeclAttrs),
+        SPIGroups(Info.SPIGroups),
+        IsImplicit(Info.IsImplicit),
         IsStatic(Info.IsStatic), IsDeprecated(Info.IsDeprecated),
         IsProtocolReq(Info.IsProtocolReq),
         IsOverriding(Info.IsOverriding),
@@ -1436,7 +1438,12 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Decl *D):
       IsDeprecated(D->getAttrs().getDeprecated(D->getASTContext())),
       IsABIPlaceholder(isABIPlaceholderRecursive(D)),
       IsFromExtension(isDeclaredInExtension(D)),
-      DeclAttrs(collectDeclAttributes(D)) {}
+      DeclAttrs(collectDeclAttributes(D)) {
+  // Keep track of SPI group names
+  for (auto id: D->getSPIGroups()) {
+    SPIGroups.push_back(id.str());
+  }
+}
 
 SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, OperatorDecl *OD):
     SDKNodeInitInfo(Ctx, cast<Decl>(OD)) {
@@ -2083,6 +2090,7 @@ void SDKNodeDecl::jsonize(json::Output &out) {
     out.mapRequired(getKeyContent(Ctx, KeyKind::KK_ownership).data(), Raw);
   }
   output(out, KeyKind::KK_isFromExtension, IsFromExtension);
+  out.mapOptional(getKeyContent(Ctx, KeyKind::KK_spi_group_names).data(), SPIGroups);
 }
 
 void SDKNodeDeclAbstractFunc::jsonize(json::Output &out) {

@@ -1517,6 +1517,10 @@
             "usr": "s:4cake12SinkingClassCACycfc",
             "mangledName": "$s5Bread12SinkingClassCACycfc",
             "moduleName": "cake",
+            "spi_group_names": [
+              "top_secret_2",
+              "top_secret_1"
+            ],
             "init_kind": "Designated"
           }
         ],
@@ -1526,8 +1530,14 @@
         "moduleName": "cake",
         "intro_Macosx": "10.7",
         "declAttributes": [
+          "SPIAccessControl",
+          "SPIAccessControl",
           "OriginallyDefinedIn",
           "Available"
+        ],
+        "spi_group_names": [
+          "top_secret_2",
+          "top_secret_1"
         ]
       },
       {

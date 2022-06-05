@@ -161,6 +161,7 @@ struct CheckerOptions {
   bool Migrator;
   StringRef LocationFilter;
   std::vector<std::string> ToolArgs;
+  llvm::StringSet<> SPIGroupNamesToIgnore;
 };
 
 class SDKContext {
@@ -346,6 +347,7 @@ class SDKNodeDecl: public SDKNode {
   StringRef Location;
   StringRef ModuleName;
   std::vector<DeclAttrKind> DeclAttributes;
+  std::vector<StringRef> SPIGroups;
   bool IsImplicit;
   bool IsStatic;
   bool IsDeprecated;
@@ -373,6 +375,7 @@ public:
   StringRef getModuleName() const {return ModuleName;}
   StringRef getHeaderName() const;
   ArrayRef<DeclAttrKind> getDeclAttributes() const;
+  ArrayRef<StringRef> getSPIGroups() const { return SPIGroups; }
   bool hasAttributeChange(const SDKNodeDecl &Another) const;
   swift::ReferenceOwnership getReferenceOwnership() const {
     return swift::ReferenceOwnership(ReferenceOwnership);
@@ -414,6 +417,12 @@ public:
     if (Ctx.getOpts().SwiftOnly) {
       if (isObjc())
         return;
+    }
+    // Don't emit SPIs if the group name is out-out.
+    for (auto spi: getSPIGroups()) {
+      if (Ctx.getOpts().SPIGroupNamesToIgnore.contains(spi)) {
+        return;
+      }
     }
     Ctx.getDiags(Loc).diagnose(Loc, ID, getScreenInfo(), std::move(Args)...);
   }
