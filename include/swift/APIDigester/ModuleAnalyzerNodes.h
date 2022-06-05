@@ -161,6 +161,7 @@ struct CheckerOptions {
   bool Migrator;
   StringRef LocationFilter;
   std::vector<std::string> ToolArgs;
+  llvm::StringSet<> SPIGroupNamesToIgnore;
 };
 
 class SDKContext {
@@ -414,6 +415,12 @@ public:
     if (Ctx.getOpts().SwiftOnly) {
       if (isObjc())
         return;
+    }
+    // Don't emit SPIs if the group name is out-out.
+    for (auto spi: getSPIGroups()) {
+      if (Ctx.getOpts().SPIGroupNamesToIgnore.contains(spi)) {
+        return;
+      }
     }
     Ctx.getDiags(Loc).diagnose(Loc, ID, getScreenInfo(), std::move(Args)...);
   }
