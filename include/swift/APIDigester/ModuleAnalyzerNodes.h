@@ -347,6 +347,7 @@ class SDKNodeDecl: public SDKNode {
   StringRef Location;
   StringRef ModuleName;
   std::vector<DeclAttrKind> DeclAttributes;
+  std::vector<StringRef> SPIGroups;
   bool IsImplicit;
   bool IsStatic;
   bool IsDeprecated;
@@ -374,6 +375,7 @@ public:
   StringRef getModuleName() const {return ModuleName;}
   StringRef getHeaderName() const;
   ArrayRef<DeclAttrKind> getDeclAttributes() const;
+  ArrayRef<StringRef> getSPIGroups() const { return SPIGroups; }
   bool hasAttributeChange(const SDKNodeDecl &Another) const;
   swift::ReferenceOwnership getReferenceOwnership() const {
     return swift::ReferenceOwnership(ReferenceOwnership);
