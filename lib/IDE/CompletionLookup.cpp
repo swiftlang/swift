@@ -2930,11 +2930,11 @@ bool CompletionLookup::canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
     return false;
   if (!DK.hasValue())
     return true;
-
   return DeclAttribute::canAttributeAppearOnDeclKind(DAK, DK.getValue());
 }
 
-void CompletionLookup::getAttributeDeclCompletions(bool IsInSil, Optional<DeclKind> DK) {
+void CompletionLookup::getAttributeDeclCompletions(bool IsInSil, 
+                                                  Optional<DeclKind> DK) {
   // FIXME: also include user-defined attribute keywords
   StringRef TargetName = "Declaration";
   if (DK.hasValue()) {

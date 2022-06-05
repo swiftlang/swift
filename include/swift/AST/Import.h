@@ -86,10 +86,10 @@ enum class ImportFlags {
 
 
   /// Silence all deprecation warnings coming from symbols imported from the module
-  IgnoresDeprecationWarnings = 0x40
+  IgnoresDeprecationWarnings = 0x40,
 
   /// Used for DenseMap.
-  Reserved = 0x80,
+  Reserved = 0x80
 };
 
 /// \see ImportFlags
