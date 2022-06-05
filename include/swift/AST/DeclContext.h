@@ -291,7 +291,7 @@ public:
 
   /// Find the import that makes the given nominal declaration available.
   Optional<AttributedImport<ImportedModule>> findImportFor(
-      ModuleDecl *nominalModule, ASTContext *nominalASTCtx) {
+      ModuleDecl *nominalModule) {
     // If the nominal type is from the current module, there's no import.
     if (nominalModule == getParentModule())
       return None;
@@ -307,7 +307,7 @@ public:
     }
 
     // Now look for transitive imports.
-    auto &importCache = nominalASTCtx.getImportCache();
+    auto &importCache = nominalModule->getASTContext().getImportCache();
     for (const auto &import : fromSourceFile->getImports()) {
       auto &importSet = importCache.getImportSet(import.module.importedModule);
       for (const auto &transitive : importSet.getTransitiveImports()) {

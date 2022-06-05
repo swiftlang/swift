@@ -705,7 +705,7 @@ DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
     NominalTypeDecl *nominal) const {
   // Determine whether this nominal type is visible via a @preconcurrency
   // import.
-  auto import = fromDC->findImportFor(nominal->getParentModule(), nominal->getASTContext());
+  auto import = fromDC->findImportFor(nominal->getParentModule());
   auto sourceFile = fromDC->getParentSourceFile();
 
   // When the type is explicitly non-Sendable...
@@ -777,7 +777,7 @@ bool swift::diagnoseSendabilityErrorBasedOn(
     Optional<AttributedImport<swift::ImportedModule>> import;
     SourceFile *sourceFile = fromContext.fromDC->getParentSourceFile();
     if (sourceFile) {
-      import = fromContext.fromDC->findImportFor(nominal->getParentModule(), nominal->getASTContext());
+      import = fromContext.fromDC->findImportFor(nominal->getParentModule());
     }
 
     // If we found the import that makes this nominal type visible, remark
