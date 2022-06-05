@@ -14,29 +14,31 @@ import Foundation
 
 let StringWordBreaking = TestSuite("StringWordBreaking")
 
-@available(SwiftStdlib 5.7, *)
-extension String._WordView {
-  var backwardsCount: Int {
-    var c = 0
-    var index = endIndex
-    while index != startIndex {
-      c += 1
-      formIndex(before: &index)
-    }
-    return c
-  }
-}
+// FIXME: Reenable once we figure out what to do with WordView
+// @available(SwiftStdlib 5.7, *)
+// extension String._WordView {
+//   var backwardsCount: Int {
+//     var c = 0
+//     var index = endIndex
+//     while index != startIndex {
+//       c += 1
+//       formIndex(before: &index)
+//     }
+//     return c
+//   }
+// }
 
 if #available(SwiftStdlib 5.7, *) {
   StringWordBreaking.test("word breaking") {
     for wordBreakTest in wordBreakTests {
       expectEqual(
         wordBreakTest.1,
-        Array(wordBreakTest.0._words).map { String($0) },
+        wordBreakTest.0._words().map { String($0) },
         "string: \(String(reflecting: wordBreakTest.0))")
+      // FIXME: Reenable once we figure out what to do with WordView
       // expectEqual(
       //   wordBreakTest.1.reversed(),
-      //   Array(wordBreakTest.0._words.reversed()).map { String($0) },
+      //   wordBreakTest.0._words().reversed().map { String($0) },
       //   "string: \(String(reflecting: wordBreakTest.0))")
     }
   }
@@ -94,25 +96,26 @@ func getUTF16Array(from string: String) -> [UInt16] {
   return result
 }
 
-// if #available(SwiftStdlib 5.7, *) {
-//   StringWordBreaking.test("word breaking foreign") {
-//     for wordBreakTest in wordBreakTests {
-//       let foreignTest = NonContiguousNSString(
-//         getUTF16Array(from: wordBreakTest.0)
-//       )
-//       let test = foreignTest as String
+if #available(SwiftStdlib 5.7, *) {
+  StringWordBreaking.test("word breaking foreign") {
+    for wordBreakTest in wordBreakTests {
+      let foreignTest = NonContiguousNSString(
+        getUTF16Array(from: wordBreakTest.0)
+      )
+      let test = foreignTest as String
 
-//       expectTrue(test._guts._isForeign())
-//       expectEqual(
-//         wordBreakTest.1,
-//         Array(test._words).map { String($0) },
-//         "string: \(String(reflecting: wordBreakTest.0))")
-//       expectEqual(
-//         wordBreakTest.1,
-//         Array(test._words.reversed()).map { String($0) },
-//         "string: \(String(reflecting: wordBreakTest.0))")
-//     }
-//   }
-// }
+      expectTrue(test._guts._isForeign())
+      expectEqual(
+        wordBreakTest.1,
+        test._words().map { String($0) },
+        "string: \(String(reflecting: wordBreakTest.0))")
+      // FIXME: Reenable once we figure out what to do with WordView
+      // expectEqual(
+      //   wordBreakTest.1,
+      //   test._words().reversed().map { String($0) },
+      //   "string: \(String(reflecting: wordBreakTest.0))")
+    }
+  }
+}
 
 runAllTests()

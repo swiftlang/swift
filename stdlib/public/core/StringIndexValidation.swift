@@ -21,11 +21,6 @@ extension _StringGuts {
   internal func isFastCharacterIndex(_ i: String.Index) -> Bool {
     hasMatchingEncoding(i) && i._isCharacterAligned
   }
-
-  @_alwaysEmitIntoClient @inline(__always)
-  internal func isFastWordIndex(_ i: String.Index) -> Bool {
-    hasMatchingEncoding(i) && i._isWordAligned
-  }
 }
 
 // Subscalar index validation (UTF-8 & UTF-16 views)
@@ -305,47 +300,6 @@ extension _StringGuts {
       scalarAlign(validateInclusiveSubscalarIndex(i, in: bounds)),
       in: bounds)
   }
-
-  internal func validateCharacterRange(
-    _ range: Range<String.Index>
-  ) -> Range<String.Index> {
-    if
-      isFastCharacterIndex(range.lowerBound),
-      isFastCharacterIndex(range.upperBound)
-    {
-      _precondition(range.upperBound._encodedOffset <= count,
-        "String index range is out of bounds")
-      return range
-    }
-
-    let r = validateSubscalarRange(range)
-    let l = roundDownToNearestCharacter(scalarAlign(r.lowerBound))
-    let u = roundDownToNearestCharacter(scalarAlign(r.upperBound))
-    return Range(_uncheckedBounds: (l, u))
-  }
-
-  internal func validateCharacterRange(
-    _ range: Range<String.Index>,
-    in bounds: Range<String.Index>
-  ) -> Range<String.Index> {
-    _internalInvariant(bounds.upperBound <= endIndex)
-
-    if
-      isFastCharacterIndex(range.lowerBound),
-      isFastCharacterIndex(range.upperBound)
-    {
-      _precondition(
-        range.lowerBound >= bounds.lowerBound
-        && range.upperBound <= bounds.upperBound,
-        "String index range is out of bounds")
-      return range
-    }
-
-    let r = validateSubscalarRange(range, in: bounds)
-    let l = roundDownToNearestCharacter(scalarAlign(r.lowerBound), in: bounds)
-    let u = roundDownToNearestCharacter(scalarAlign(r.upperBound), in: bounds)
-    return Range(_uncheckedBounds: (l, u))
-  }
 }
 
 // Temporary additions to deal with binary compatibility issues with existing
@@ -448,24 +402,24 @@ extension _StringGuts {
 // Word index validation (String)
 extension _StringGuts {
   @available(SwiftStdlib 5.7, *)
-  internal func validateWordIndex(_ i: String.Index) -> String.Index {
-    if isFastWordIndex(i) {
-      _precondition(i._encodedOffset < count, "String index is out of bounds")
-      return i
-    }
+  internal func validateWordIndex(
+    _ i: String._WordView.Index
+  ) -> String._WordView.Index {
+    let i = String.Index(_encodedOffset: i._encodedOffset)
 
-    return roundDownToNearestWord(scalarAlign(validateSubscalarIndex(i)))
+    return roundDownToNearestWord(
+      String._WordView.Index(scalarAlign(validateSubscalarIndex(i)))
+    )
   }
 
   @available(SwiftStdlib 5.7, *)
-  internal func validateInclusiveWordIndex(_ i: String.Index) -> String.Index {
-    if isFastWordIndex(i) {
-      _precondition(i._encodedOffset < count, "String index is out of bounds")
-      return i
-    }
+  internal func validateInclusiveWordIndex(
+    _ i: String._WordView.Index
+  ) -> String._WordView.Index {
+    let i = String.Index(_encodedOffset: i._encodedOffset)
 
-    return roundDownToNearestCharacter(
-      scalarAlign(validateInclusiveSubscalarIndex(i))
+    return roundDownToNearestWord(
+      String._WordView.Index(scalarAlign(validateInclusiveSubscalarIndex(i)))
     )
   }
 }

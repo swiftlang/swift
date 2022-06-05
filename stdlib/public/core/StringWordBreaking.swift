@@ -11,42 +11,119 @@
 
 extension _StringGuts {
   @inline(__always)
-  @available(SwiftStdlib 5.7, *)
-  internal func roundDownToNearestWord(_ i: String.Index) -> String.Index {
-    _internalInvariant(i._isScalarAligned)
-    _internalInvariant(hasMatchingEncoding(i))
+  internal func roundDownToNearestWord(
+    _ i: String._WordView.Index
+  ) -> String._WordView.Index {
     _internalInvariant(i._encodedOffset <= count)
-
-    if _fastPath(i._isWordAligned) {
-      return i
-    }
 
     let offset = i._encodedOffset
 
     if offset == 0 || offset == count {
-      return i._wordAligned
+      return i
     }
 
     return _slowRoundDownToNearestWord(i)
   }
 
   @inline(never)
-  @available(SwiftStdlib 5.7, *)
-  internal func _slowRoundDownToNearestWord(_ i: String.Index) -> String.Index {
-    let words = String._WordView(self)
-
+  internal func _slowRoundDownToNearestWord(
+    _ i: String._WordView.Index
+  ) -> String._WordView.Index {
     let offset = i._encodedOffset
-    let start = offset &- words._uncheckedIndex(before: i)._encodedOffset
-    let startIndex = String.Index(_encodedOffset: start)._wordAligned
-    let stride = words._uncheckedIndex(after: startIndex)._encodedOffset
+    let start = _opaquePreviousWordIndex(endingAt: offset)
+    let stride = _opaqueNextWordIndex(startingAt: start) &- start
     _internalInvariant(offset <= start + stride, "Word breaking inconsistency")
 
     if offset >= start + stride {
-      return i._wordAligned
+      return i
     }
 
-    let r = String.Index(_encodedOffset: start)._wordAligned
-    return markEncoding(r)
+    return String._WordView.Index(_encodedOffset: start)
+  }
+
+  @inline(never)
+  @_effects(releasenone)
+  internal func _opaqueNextWordIndex(startingAt i: Int) -> Int {
+    if _slowPath(isForeign) {
+      return _foreignOpaqueNextWordIndex(startingAt: i)
+    }
+
+    return withFastUTF8 { utf8 in
+      nextWordBoundary(startingAt: i) {
+        _internalInvariant($0 >= 0)
+
+        guard $0 < utf8.count else {
+          return nil
+        }
+
+        let (scalar, len) = _decodeScalar(utf8, startingAt: $0)
+        return (scalar, $0 &+ len)
+      }
+    }
+  }
+
+  internal func _foreignOpaqueNextWordIndex(startingAt i: Int) -> Int {
+#if _runtime(_ObjC)
+    return nextWordBoundary(startingAt: i) {
+      _internalInvariant($0 >= 0)
+
+      guard $0 < count else {
+        return nil
+      }
+
+      let scalars = String.UnicodeScalarView(self)
+      let idx = String.Index(_encodedOffset: $0)
+
+      let scalar = scalars[idx]
+      let nextIndex = scalars.index(after: idx)
+
+      return (scalar, nextIndex._encodedOffset)
+    }
+#else
+    fatalError("No foreign strings on this platform in this version of Swift.")
+#endif
+  }
+
+  internal func _opaquePreviousWordIndex(endingAt i: Int) -> Int {
+    if _slowPath(isForeign) {
+      return _foreignOpaquePreviousWordIndex(endingAt: i)
+    }
+
+    return withFastUTF8 { utf8 in
+      previousWordBoundary(endingAt: i) {
+        _internalInvariant($0 <= count)
+
+        guard $0 > 0 else {
+          return nil
+        }
+
+        let (scalar, len) = _decodeScalar(utf8, endingAt: $0)
+        return (scalar, $0 &- len)
+      }
+    }
+  }
+
+  @inline(never)
+  internal func _foreignOpaquePreviousWordIndex(endingAt i: Int) -> Int {
+    #if _runtime(_ObjC)
+    return previousWordBoundary(endingAt: i) {
+      _internalInvariant($0 <= count)
+
+      guard $0 > 0 else {
+        return nil
+      }
+
+      let scalars = String.UnicodeScalarView(self)
+      let idx = String.Index(_encodedOffset: $0)
+
+      let previousIndex = scalars.index(before: idx)
+      let scalar = scalars[previousIndex]
+
+      return (scalar, previousIndex._encodedOffset)
+    }
+#else
+    fatalError("No foreign strings on this platform in this version of Swift.")
+#endif
   }
 }
 
@@ -77,10 +154,9 @@ internal struct _WordBreakingState {
   var shouldBreakRI = false
 }
 
-@available(SwiftStdlib 5.7, *)
-extension String._WordView {
+extension _StringGuts {
   // Returns the stride of the next word at the previous boundary offset.
-  internal func nextBoundary(
+  internal func nextWordBoundary(
     startingAt index: Int,
     nextScalar: (Int) -> (scalar: Unicode.Scalar, end: Int)?
   ) -> Int {
@@ -109,7 +185,7 @@ extension String._WordView {
   }
 
   // Returns the stride of the previous word at the current boundary offset.
-  internal func previousBoundary(
+  internal func previousWordBoundary(
     endingAt index: Int,
     previousScalar: (Int) -> (scalar: Unicode.Scalar, start: Int)?
   ) -> Int {
@@ -145,8 +221,7 @@ extension String._WordView {
   }
 }
 
-@available(SwiftStdlib 5.7, *)
-extension String._WordView {
+extension _StringGuts {
   // The "algorithm" that determines whether or not we should break between
   // certain word break properties.
   //
@@ -345,8 +420,7 @@ extension String._WordView {
   }
 }
 
-@available(SwiftStdlib 5.7, *)
-extension String._WordView {
+extension _StringGuts {
   // The "algorithm" that determines whether or not we should break between
   // certain word break properties.
   //

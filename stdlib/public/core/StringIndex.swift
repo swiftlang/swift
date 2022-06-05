@@ -17,7 +17,7 @@ import SwiftShims
 String's Index has the following layout:
 
  ┌──────────┬────────────────╥────────────────┬───────╥───────┐
- │ b63:b16  │      b15:b14   ║     b13:b8     │ b7:b5 ║ b4:b0 │
+ │ b63:b16  │      b15:b14   ║     b13:b8     │ b7:b4 ║ b3:b0 │
  ├──────────┼────────────────╫────────────────┼───────╫───────┤
  │ position │ transc. offset ║ grapheme cache │ rsvd  ║ flags │
  └──────────┴────────────────╨────────────────┴───────╨───────┘
@@ -43,7 +43,7 @@ isn't frozen.
   looking back at scalars preceding the index. (Substrings that don't start on a
   `Character` boundary heavily rely on this.)
 
-- reserved: 3 unused bits available for future flags etc. The meaning of each
+- reserved: 4 unused bits available for future flags etc. The meaning of each
   bit may change between stdlib versions. These must be set to zero if
   constructing an index in inlinable code.
 
@@ -68,11 +68,6 @@ isn't frozen.
   * b3: UTF-16 encoding
 
     If set, the position is known to be expressed in UTF-16 code units.
-    (Introduced in Swift 5.7)
-
-  * b4: `_isWordAligned`
-
-    If set, the index is known to be on a Unicode word boundary.
     (Introduced in Swift 5.7)
 
 Before Swift 5.7, bits b1, b2 and b3 used to be part of the resilient slice. See
@@ -267,9 +262,6 @@ extension String.Index {
   internal static var __utf16Bit: UInt64 { 0x8 }
 
   @_alwaysEmitIntoClient @inline(__always) // Swift 5.7
-  internal static var __wordAlignmentBit: UInt64 { 0x10 }
-
-  @_alwaysEmitIntoClient @inline(__always) // Swift 5.7
   internal static func __encodingBit(utf16: Bool) -> UInt64 {
     let utf16 = Int8(Builtin.zext_Int1_Int8(utf16._value))
     return __utf8Bit &<< utf16
@@ -373,35 +365,11 @@ extension String.Index {
   }
 }
 
-// ### Word Alignment
-//
-// Enter some pretty cool information about Unicode words
-extension String.Index {
-  @_alwaysEmitIntoClient // Swift 5.7
-  @inline(__always)
-  internal var _isWordAligned: Bool {
-    _rawBits & Self.__wordAlignmentBit != 0
-  }
-
-  @_alwaysEmitIntoClient // Swift 5.7
-  @inline(__always)
-  internal var _wordAligned: String.Index {
-    let r = _rawBits
-      | Self.__wordAlignmentBit
-      | Self.__characterAlignmentBit
-      | Self.__scalarAlignmentBit
-    let idx = Self(r)
-    idx._invariantCheck()
-    return idx
-  }
-}
-
 extension String.Index {
   @_alwaysEmitIntoClient // Swift 5.7
   internal func _copyingAlignment(from index: Self) -> Self {
     let mask = Self.__scalarAlignmentBit
       | Self.__characterAlignmentBit
-      | Self.__wordAlignmentBit
     return Self((_rawBits & ~mask) | (index._rawBits & mask))
   }
 }
