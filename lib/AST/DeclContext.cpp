@@ -274,7 +274,7 @@ ModuleDecl *DeclContext::getParentModule() const {
 
 /// Find the import that makes the given nominal declaration available.
 Optional<AttributedImport<ImportedModule>>
-DeclContext::findImportFor(ModuleDecl *nominalModule) {
+DeclContext::findImportFor(ModuleDecl *nominalModule) const {
   // If the nominal type is from the current module, there's no import.
   if (nominalModule == getParentModule())
     return None;

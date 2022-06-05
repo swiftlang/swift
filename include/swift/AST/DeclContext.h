@@ -290,7 +290,7 @@ public:
       reinterpret_cast<Decl*>(this + 1) : nullptr;
   }
 
-  Optional<AttributedImport<ImportedModule>> findImportFor(ModuleDecl *nominalModule);
+  Optional<AttributedImport<ImportedModule>> findImportFor(ModuleDecl *nominalModule) const;
 
   const Decl *getAsDecl() const {
     return const_cast<DeclContext*>(this)->getAsDecl();
