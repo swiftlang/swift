@@ -574,7 +574,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   ///     return collected
   ///
   /// Awaiting on an empty group
-  /// immediate returns `nil` without suspending.
+  /// immediately returns `nil` without suspending.
   ///
   /// You can also use a `for`-`await`-`in` loop to collect results of a task group:
   ///
