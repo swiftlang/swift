@@ -16,8 +16,10 @@
 //===----------------------------------------------------------------------===//
 #include <cinttypes>
 
+#include "ConcurrencyRuntime.h"
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/Metadata.h"
+#include "llvm/Support/AllocatorBase.h"
 
 using namespace swift;
 
