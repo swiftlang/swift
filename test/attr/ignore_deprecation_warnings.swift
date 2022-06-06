@@ -89,3 +89,7 @@ extension aNormalType: aProtocol {
 func b() -> Int {
     return aNormalType(someNumber: 420).multipliedByTwo
 }
+
+func c() -> Int{
+    return aNormalType(someNumber: 69).multipliedByTwo // expected-warning {{'multipliedByTwo' is deprecated}}
+}
