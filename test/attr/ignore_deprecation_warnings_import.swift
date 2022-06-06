@@ -31,7 +31,7 @@ struct someType {
 
 func doSomething(_ b: importedDeprecatedType) { 
     _ = b.memberFunc()
-    let b = importedDeprecatedVar
+    let someRandom = importedDeprecatedVar
 }
 
 extension someType: importedDeprecatedProtocol {
