@@ -21,13 +21,13 @@
 #include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Import.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeDeclFinder.h"
-#include "swift/AST/Import.h"
 #include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
@@ -42,8 +42,9 @@ using namespace swift;
 
 ExportContext::ExportContext(DeclContext *DC,
                              AvailabilityContext runningOSVersion,
-                             FragileFunctionKind kind,
-                             bool spi, bool exported, bool implicit, bool deprecated, bool ignoresDeprecation,
+                             FragileFunctionKind kind, bool spi, bool exported,
+                             bool implicit, bool deprecated,
+                             bool ignoresDeprecation,
                              Optional<PlatformKind> unavailablePlatformKind)
     : DC(DC), RunningOSVersion(runningOSVersion), FragileKind(kind) {
   SPI = spi;
@@ -254,17 +255,15 @@ ExportContext ExportContext::forFunctionBody(DeclContext *DC, SourceLoc loc) {
   bool deprecated = false;
   bool ignoresDeprecated = false;
   Optional<PlatformKind> unavailablePlatformKind;
-  forEachOuterDecl(DC,
-                   [&](Decl *D) {
-                     computeExportContextBits(Ctx, D,
-                                              &spi, &implicit, &deprecated, &ignoresDeprecated,
-                                              &unavailablePlatformKind);
-                   });
+  forEachOuterDecl(DC, [&](Decl *D) {
+    computeExportContextBits(Ctx, D, &spi, &implicit, &deprecated,
+                             &ignoresDeprecated, &unavailablePlatformKind);
+  });
 
   bool exported = false;
 
-  return ExportContext(DC, runningOSVersion, fragileKind,
-                       spi, exported, implicit, deprecated, ignoresDeprecated,
+  return ExportContext(DC, runningOSVersion, fragileKind, spi, exported,
+                       implicit, deprecated, ignoresDeprecated,
                        unavailablePlatformKind);
 }
 
@@ -2455,7 +2454,8 @@ void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
 
   auto *ReferenceDC = Where.getDeclContext();
   auto declImport = ReferenceDC->findImportFor(ReferenceDC->getParentModule());
-  if (declImport && declImport->options.contains(ImportFlags::IgnoresDeprecationWarnings)) {
+  if (declImport &&
+      declImport->options.contains(ImportFlags::IgnoresDeprecationWarnings)) {
     return;
   }
 
@@ -2541,7 +2541,8 @@ bool TypeChecker::diagnoseIfDeprecated(SourceLoc loc,
 
   auto *dc = where.getDeclContext();
   auto declImport = dc->findImportFor(dc->getParentModule());
-  if (declImport && declImport->options.contains(ImportFlags::IgnoresDeprecationWarnings)) {
+  if (declImport &&
+      declImport->options.contains(ImportFlags::IgnoresDeprecationWarnings)) {
     return false;
   }
 
