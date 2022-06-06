@@ -76,20 +76,13 @@ namespace swift {
 
 #ifdef SWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES
 
-// Call directly through to the original implementation when we don't support
-// overrides.
-#define COMPATIBILITY_OVERRIDE(name, ret, attrs, ccAttrs, namespace,           \
-                               typedArgs, namedArgs)                           \
-  attrs ccAttrs ret namespace swift_##name COMPATIBILITY_PAREN(typedArgs) {    \
-    return swift_##name##Impl COMPATIBILITY_PAREN(namedArgs);                  \
-  }
+# error Back-deployment library must always be built with compatibilty overrides
 
 #else // #ifdef SWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES
 
 // Override section name computation. `COMPATIBILITY_OVERRIDE_SECTION_NAME` will
 // resolve to string literal containing the appropriate section name for the
 // current library.
-#define COMPATIBILITY_OVERRIDE_SECTION_NAME_swiftRuntime "__swift56_hooks"
 #define COMPATIBILITY_OVERRIDE_SECTION_NAME_swift_Concurrency "__s_async_hook"
 
 #define COMPATIBILITY_OVERRIDE_SECTION_NAME                                    \
