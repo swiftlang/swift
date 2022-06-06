@@ -69,3 +69,23 @@ func multipleAttrsFunc() -> deprecatedType {
 @ignoreDeprecationWarnings
 @available(iOS 15.0, *)
 var multipleAttrsVar = 3
+
+struct aNormalType {
+    var someNumber: Int   
+}
+
+protocol aProtocol {
+    var multipliedByTwo: Int { get }
+}
+
+@available(*, deprecated)
+extension aNormalType: aProtocol {
+    var multipliedByTwo: Int {
+        self.someNumber * 2
+    }
+}
+
+@ignoreDeprecationWarnings
+func b() -> Int {
+    return aNormalType(someNumber: 420).multipliedByTwo
+}
