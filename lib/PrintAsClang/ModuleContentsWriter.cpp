@@ -131,10 +131,11 @@ class ModuleWriter {
 public:
   ModuleWriter(raw_ostream &os, raw_ostream &prologueOS,
                llvm::SmallPtrSetImpl<ImportModuleTy> &imports, ModuleDecl &mod,
-               AccessLevel access, OutputLanguageMode outputLang)
+               SwiftToClangInteropContext &interopContext, AccessLevel access,
+               OutputLanguageMode outputLang)
       : os(os), imports(imports), M(mod),
-        printer(M, os, prologueOS, delayedMembers, typeMapping, access,
-                outputLang),
+        printer(M, os, prologueOS, delayedMembers, typeMapping, interopContext,
+                access, outputLang),
         outputLangMode(outputLang) {}
 
   /// Returns true if we added the decl's module to the import set, false if
@@ -638,26 +639,25 @@ static AccessLevel getRequiredAccess(const ModuleDecl &M) {
   return M.isExternallyConsumed() ? AccessLevel::Public : AccessLevel::Internal;
 }
 
-void
-swift::printModuleContentsAsObjC(raw_ostream &os,
-                                 llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
-                                 ModuleDecl &M) {
+void swift::printModuleContentsAsObjC(
+    raw_ostream &os, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
+    ModuleDecl &M, SwiftToClangInteropContext &interopContext) {
   llvm::raw_null_ostream prologueOS;
-  ModuleWriter(os, prologueOS, imports, M, getRequiredAccess(M),
+  ModuleWriter(os, prologueOS, imports, M, interopContext, getRequiredAccess(M),
                OutputLanguageMode::ObjC)
       .write();
 }
 
 void swift::printModuleContentsAsCxx(
     raw_ostream &os, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
-    ModuleDecl &M) {
+    ModuleDecl &M, SwiftToClangInteropContext &interopContext) {
   std::string moduleContentsBuf;
   llvm::raw_string_ostream moduleOS{moduleContentsBuf};
   std::string modulePrologueBuf;
   llvm::raw_string_ostream prologueOS{modulePrologueBuf};
 
-  ModuleWriter(moduleOS, prologueOS, imports, M, getRequiredAccess(M),
-               OutputLanguageMode::Cxx)
+  ModuleWriter(moduleOS, prologueOS, imports, M, interopContext,
+               getRequiredAccess(M), OutputLanguageMode::Cxx)
       .write();
 
   // FIXME: refactor.

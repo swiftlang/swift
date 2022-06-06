@@ -559,7 +559,7 @@ void TBDGenVisitor::addAutoDiffLinearMapFunction(AbstractFunctionDecl *original,
 
   // Differential functions are emitted only when forward-mode is enabled.
   if (kind == AutoDiffLinearMapKind::Differential &&
-      !ctx.LangOpts.EnableExperimentalForwardModeDifferentiation)
+      !ctx.LangOpts.hasFeature(Feature::ForwardModeDifferentiation))
     return;
   auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
       config.parameterIndices,

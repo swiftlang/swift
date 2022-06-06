@@ -112,7 +112,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
 * [SE-0346][]:
 
-  Protocols can now declare a list of one or more primary associated types:
+  Protocols can now declare a list of one or more _primary associated types_, which enable writing same-type requirements on those associated types using angle bracket syntax:
 
   ```swift
     protocol Graph<Vertex, Edge> {
@@ -121,31 +121,30 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
     }
   ```
 
-  A protocol-constrained type like `Graph<Int>` can now be written anywhere that
-  expects the right-hand side of a protocol conformance requirement:
+  You can now write a protocol name followed by type arguments in angle brackets, like
+  `Graph<Int, String>`, anywhere that a protocol conformance requirement may appear:
 
   ```swift
-    func shortestPath<V, E>(_: some Graph<V>, from: V, to: V) -> [E]
+    func shortestPath<V, E>(_: some Graph<V, E>, from: V, to: V) -> [E]
 
-    extension Graph<Int> {...}
+    extension Graph<Int, String> {...}
 
-    func build() -> some Graph<String> {}
+    func build() -> some Graph<Int, String> {}
   ```
 
-  A protocol-constrained type is equivalent to a conformance requirement to the protocol
-  itself together with a same-type requirement constraining the primary associated type.
+  A protocol name followed by angle brackets is shorthand for a conformance requirement,
+  together with a same-type requirement for the protocol's primary associated types.
   The first two examples above are equivalent to the following:
 
   ```swift
     func shortestPath<V, E, G>(_: G, from: V, to: V) -> [E]
-      where G: Graph, G.Vertex == V, G.Edge == V
+      where G: Graph, G.Vertex == V, G.Edge == E
 
-    extension Graph where Vertex == Int {...}
+    extension Graph where Vertex == Int, Edge == String {...}
   ```
 
-  The `build()` function returning `some Graph<String>` cannot be written using a `where`
-  clause; this is an example of a constrained opaque result type, which could not be written
-  before.
+  The `build()` function returning `some Graph<Int, String>` can't be written using a
+  `where` clause; this is an example of a constrained opaque result type, which is new expressivity in Swift 5.7.
 
 * [SE-0353][]:
 

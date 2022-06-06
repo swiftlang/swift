@@ -464,6 +464,7 @@ struct ASTContext::Implementation {
   llvm::FoldingSet<GenericFunctionType> GenericFunctionTypes;
   llvm::FoldingSet<SILFunctionType> SILFunctionTypes;
   llvm::DenseMap<CanType, SILBlockStorageType *> SILBlockStorageTypes;
+  llvm::DenseMap<CanType, SILMoveOnlyType *> SILMoveOnlyTypes;
   llvm::FoldingSet<SILBoxType> SILBoxTypes;
   llvm::DenseMap<BuiltinIntegerWidth, BuiltinIntegerType*> IntegerTypes;
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
@@ -4065,6 +4066,19 @@ SILFunctionType::SILFunctionType(
     }
   }
 #endif
+}
+
+CanSILMoveOnlyType SILMoveOnlyType::get(CanType innerType) {
+  ASTContext &ctx = innerType->getASTContext();
+  auto found = ctx.getImpl().SILMoveOnlyTypes.find(innerType);
+  if (found != ctx.getImpl().SILMoveOnlyTypes.end())
+    return CanSILMoveOnlyType(found->second);
+
+  void *mem = ctx.Allocate(sizeof(SILMoveOnlyType), alignof(SILMoveOnlyType));
+
+  auto *storageTy = new (mem) SILMoveOnlyType(innerType);
+  ctx.getImpl().SILMoveOnlyTypes.insert({innerType, storageTy});
+  return CanSILMoveOnlyType(storageTy);
 }
 
 CanSILBlockStorageType SILBlockStorageType::get(CanType captureType) {

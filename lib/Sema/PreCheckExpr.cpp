@@ -586,10 +586,19 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     }
 
     auto emitBasicError = [&] {
-      Context.Diags
-          .diagnose(Loc, diag::cannot_find_in_scope, Name,
-                    Name.isOperator())
-          .highlight(UDRE->getSourceRange());
+      
+      if (Name.isSimpleName(Context.Id_self)) {
+        // `self` gets diagnosed with a different error when it can't be found.
+        Context.Diags
+            .diagnose(Loc, diag::cannot_find_self_in_scope)
+            .highlight(UDRE->getSourceRange());
+      } else {
+        Context.Diags
+            .diagnose(Loc, diag::cannot_find_in_scope, Name,
+                      Name.isOperator())
+            .highlight(UDRE->getSourceRange());
+      }
+
       if (!Context.LangOpts.DisableExperimentalClangImporterDiagnostics) {
         Context.getClangModuleLoader()->diagnoseTopLevelValue(
             Name.getFullName());
@@ -2124,19 +2133,27 @@ bool ConstraintSystem::preCheckTarget(SolutionApplicationTarget &target,
   }
 
   if (target.isForEachStmt()) {
-    auto &info = target.getForEachStmtInfo();
+    auto *stmt = target.getAsForEachStmt();
 
-    if (info.whereExpr)
-      hadErrors |= preCheckExpression(info.whereExpr, DC,
+    auto *sequenceExpr = stmt->getParsedSequence();
+    auto *whereExpr = stmt->getWhere();
+
+    hadErrors |= preCheckExpression(sequenceExpr, DC,
+                                    /*replaceInvalidRefsWithErrors=*/true,
+                                    /*leaveClosureBodiesUnchecked=*/false);
+
+    if (whereExpr) {
+      hadErrors |= preCheckExpression(whereExpr, DC,
                                       /*replaceInvalidRefsWithErrors=*/true,
                                       /*leaveClosureBodiesUnchecked=*/false);
+    }
 
     // Update sequence and where expressions to pre-checked versions.
     if (!hadErrors) {
-      info.stmt->setSequence(target.getAsExpr());
+      stmt->setParsedSequence(sequenceExpr);
 
-      if (info.whereExpr)
-        info.stmt->setWhere(info.whereExpr);
+      if (whereExpr)
+        stmt->setWhere(whereExpr);
     }
   }
 

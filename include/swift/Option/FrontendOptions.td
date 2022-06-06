@@ -388,6 +388,12 @@ def warn_redundant_requirements : Flag<["-"], "warn-redundant-requirements">,
 def dump_type_witness_systems : Flag<["-"], "dump-type-witness-systems">,
   HelpText<"Enables dumping type witness systems from associated type inference">;
 
+def enable_round_trip_debug_types : Flag<["-"], "enable-round-trip-debug-types">,
+  HelpText<"Enables verification of debug info mangling">;
+
+def disable_round_trip_debug_types : Flag<["-"], "disable-round-trip-debug-types">,
+  HelpText<"Disables verification of debug info mangling">;
+
 def debug_generic_signatures : Flag<["-"], "debug-generic-signatures">,
   HelpText<"Debug generic signatures">;
 

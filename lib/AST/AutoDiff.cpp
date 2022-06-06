@@ -112,7 +112,7 @@ void AutoDiffConfig::print(llvm::raw_ostream &s) const {
 bool swift::isDifferentiableProgrammingEnabled(SourceFile &SF) {
   auto &ctx = SF.getASTContext();
   // Return true if differentiable programming is explicitly enabled.
-  if (ctx.LangOpts.EnableExperimentalDifferentiableProgramming)
+  if (ctx.LangOpts.hasFeature(Feature::DifferentiableProgramming))
     return true;
   // Otherwise, return true iff the `_Differentiation` module is imported in
   // the given source file.

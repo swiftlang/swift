@@ -1678,7 +1678,6 @@ public:
                                         ConcreteDeclRef defaultArgsOwner,
                                         unsigned destIndex,
                                         CanType resultType,
-                                        AbstractionPattern origResultType,
                                         SGFContext C = SGFContext());
 
   RValue emitApplyOfStoredPropertyInitializer(

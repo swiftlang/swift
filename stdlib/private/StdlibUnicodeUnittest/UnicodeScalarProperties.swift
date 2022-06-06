@@ -35,6 +35,8 @@ func readInputFile(_ filename: String) -> String {
 }
 
 func parseScalars(_ string: String) -> ClosedRange<UInt32> {
+  let string = string.filter { !$0.isWhitespace }
+
   // If we have . appear, it means we have a legitimate range. Otherwise,
   // it's a singular scalar.
   if string.contains(".") {
@@ -680,6 +682,435 @@ public let caseFolding: [Unicode.Scalar: String] = {
 
   let caseFolding = readInputFile("CaseFolding.txt")
   parseCaseFoldings(caseFolding, into: &result)
+
+  return result
+}()
+
+//===----------------------------------------------------------------------===//
+// Script/Script Extensions
+//===----------------------------------------------------------------------===//
+
+extension Unicode {
+  // Note: The `Script` enum includes the "meta" script type "Katakana_Or_Hiragana", which
+  // isn't defined by https://www.unicode.org/Public/UCD/latest/ucd/Scripts.txt,
+  // but is defined by https://www.unicode.org/Public/UCD/latest/ucd/PropertyValueAliases.txt.
+  // We may want to split it out, as it's the only case that is a union of
+  // other script types.
+
+  /// Character script types.
+  public enum Script: String, Hashable {
+    case adlam = "Adlam"
+    case ahom = "Ahom"
+    case anatolianHieroglyphs = "Anatolian_Hieroglyphs"
+    case arabic = "Arabic"
+    case armenian = "Armenian"
+    case avestan = "Avestan"
+    case balinese = "Balinese"
+    case bamum = "Bamum"
+    case bassaVah = "Bassa_Vah"
+    case batak = "Batak"
+    case bengali = "Bengali"
+    case bhaiksuki = "Bhaiksuki"
+    case bopomofo = "Bopomofo"
+    case brahmi = "Brahmi"
+    case braille = "Braille"
+    case buginese = "Buginese"
+    case buhid = "Buhid"
+    case canadianAboriginal = "Canadian_Aboriginal"
+    case carian = "Carian"
+    case caucasianAlbanian = "Caucasian_Albanian"
+    case chakma = "Chakma"
+    case cham = "Cham"
+    case cherokee = "Cherokee"
+    case chorasmian = "Chorasmian"
+    case common = "Common"
+    case coptic = "Coptic"
+    case cuneiform = "Cuneiform"
+    case cypriot = "Cypriot"
+    case cyrillic = "Cyrillic"
+    case cyproMinoan = "Cypro_Minoan"
+    case deseret = "Deseret"
+    case devanagari = "Devanagari"
+    case divesAkuru = "Dives_Akuru"
+    case dogra = "Dogra"
+    case duployan = "Duployan"
+    case egyptianHieroglyphs = "Egyptian_Hieroglyphs"
+    case elbasan = "Elbasan"
+    case elymaic = "Elymaic"
+    case ethiopic = "Ethiopic"
+    case georgian = "Georgian"
+    case glagolitic = "Glagolitic"
+    case gothic = "Gothic"
+    case grantha = "Grantha"
+    case greek = "Greek"
+    case gujarati = "Gujarati"
+    case gunjalaGondi = "Gunjala_Gondi"
+    case gurmukhi = "Gurmukhi"
+    case han = "Han"
+    case hangul = "Hangul"
+    case hanifiRohingya = "Hanifi_Rohingya"
+    case hanunoo = "Hanunoo"
+    case hatran = "Hatran"
+    case hebrew = "Hebrew"
+    case hiragana = "Hiragana"
+    case imperialAramaic = "Imperial_Aramaic"
+    case inherited = "Inherited"
+    case inscriptionalPahlavi = "Inscriptional_Pahlavi"
+    case inscriptionalParthian = "Inscriptional_Parthian"
+    case javanese = "Javanese"
+    case kaithi = "Kaithi"
+    case kannada = "Kannada"
+    case katakana = "Katakana"
+    case katakanaOrHiragana = "Katakana_Or_Hiragana"
+    case kayahLi = "Kayah_Li"
+    case kharoshthi = "Kharoshthi"
+    case khitanSmallScript = "Khitan_Small_Script"
+    case khmer = "Khmer"
+    case khojki = "Khojki"
+    case khudawadi = "Khudawadi"
+    case lao = "Lao"
+    case latin = "Latin"
+    case lepcha = "Lepcha"
+    case limbu = "Limbu"
+    case linearA = "Linear_A"
+    case linearB = "Linear_B"
+    case lisu = "Lisu"
+    case lycian = "Lycian"
+    case lydian = "Lydian"
+    case mahajani = "Mahajani"
+    case makasar = "Makasar"
+    case malayalam = "Malayalam"
+    case mandaic = "Mandaic"
+    case manichaean = "Manichaean"
+    case marchen = "Marchen"
+    case masaramGondi = "Masaram_Gondi"
+    case medefaidrin = "Medefaidrin"
+    case meeteiMayek = "Meetei_Mayek"
+    case mendeKikakui = "Mende_Kikakui"
+    case meroiticCursive = "Meroitic_Cursive"
+    case meroiticHieroglyphs = "Meroitic_Hieroglyphs"
+    case miao = "Miao"
+    case modi = "Modi"
+    case mongolian = "Mongolian"
+    case mro = "Mro"
+    case multani = "Multani"
+    case myanmar = "Myanmar"
+    case nabataean = "Nabataean"
+    case nandinagari = "Nandinagari"
+    case newa = "Newa"
+    case newTaiLue = "New_Tai_Lue"
+    case nko = "Nko"
+    case nushu = "Nushu"
+    case nyiakengPuachueHmong = "Nyiakeng_Puachue_Hmong"
+    case ogham = "Ogham"
+    case olChiki = "Ol_Chiki"
+    case oldHungarian = "Old_Hungarian"
+    case oldItalic = "Old_Italic"
+    case oldNorthArabian = "Old_North_Arabian"
+    case oldPermic = "Old_Permic"
+    case oldPersian = "Old_Persian"
+    case oldSogdian = "Old_Sogdian"
+    case oldSouthArabian = "Old_South_Arabian"
+    case oldTurkic = "Old_Turkic"
+    case oldUyghur = "Old_Uyghur"
+    case oriya = "Oriya"
+    case osage = "Osage"
+    case osmanya = "Osmanya"
+    case pahawhHmong = "Pahawh_Hmong"
+    case palmyrene = "Palmyrene"
+    case pauCinHau = "Pau_Cin_Hau"
+    case phagsPa = "Phags_Pa"
+    case phoenician = "Phoenician"
+    case psalterPahlavi = "Psalter_Pahlavi"
+    case rejang = "Rejang"
+    case runic = "Runic"
+    case samaritan = "Samaritan"
+    case saurashtra = "Saurashtra"
+    case sharada = "Sharada"
+    case shavian = "Shavian"
+    case siddham = "Siddham"
+    case signWriting = "SignWriting"
+    case sinhala = "Sinhala"
+    case sogdian = "Sogdian"
+    case soraSompeng = "Sora_Sompeng"
+    case soyombo = "Soyombo"
+    case sundanese = "Sundanese"
+    case sylotiNagri = "Syloti_Nagri"
+    case syriac = "Syriac"
+    case tagalog = "Tagalog"
+    case tagbanwa = "Tagbanwa"
+    case taiLe = "Tai_Le"
+    case taiTham = "Tai_Tham"
+    case taiViet = "Tai_Viet"
+    case takri = "Takri"
+    case tamil = "Tamil"
+    case tangsa = "Tangsa"
+    case tangut = "Tangut"
+    case telugu = "Telugu"
+    case thaana = "Thaana"
+    case thai = "Thai"
+    case tibetan = "Tibetan"
+    case tifinagh = "Tifinagh"
+    case tirhuta = "Tirhuta"
+    case toto = "Toto"
+    case ugaritic = "Ugaritic"
+    case unknown = "Unknown"
+    case vai = "Vai"
+    case vithkuqi = "Vithkuqi"
+    case wancho = "Wancho"
+    case warangCiti = "Warang_Citi"
+    case yezidi = "Yezidi"
+    case yi = "Yi"
+    case zanabazarSquare = "Zanabazar_Square"
+  }
+}
+
+extension Character {
+  /// Whether this character represents whitespace,
+  /// for the purposes of pattern parsing.
+  var isPatternWhitespace: Bool {
+    unicodeScalars.first!.properties.isPatternWhitespace
+  }
+}
+
+func withNormalizedForms<T>(
+  _ str: String, requireInPrefix: Bool = false, match: (String) throws -> T?
+) rethrows -> T? {
+  // This follows the rules provided by UAX44-LM3, including trying to drop an
+  // "is" prefix, which isn't required by UTS#18 RL1.2, but is nice for
+  // consistency with other engines and the Unicode.Scalar.Properties names.
+  let str = str.filter { !$0.isPatternWhitespace && $0 != "_" && $0 != "-" }
+               .lowercased()
+  if requireInPrefix {
+    guard str.hasPrefix("in") else { return nil }
+    return try match(String(str.dropFirst(2)))
+  }
+  if let m = try match(str) {
+    return m
+  }
+  if str.hasPrefix("is"), let m = try match(String(str.dropFirst(2))) {
+    return m
+  }
+  return nil
+}
+
+func classifyScriptProperty(
+  _ value: String
+) -> Unicode.Script? {
+  // This uses the aliases defined in
+  // https://www.unicode.org/Public/UCD/latest/ucd/PropertyValueAliases.txt.
+  withNormalizedForms(value) { str in
+    switch str {
+    case "adlm", "adlam":                 return .adlam
+    case "aghb", "caucasianalbanian":     return .caucasianAlbanian
+    case "ahom":                          return .ahom
+    case "arab", "arabic":                return .arabic
+    case "armi", "imperialaramaic":       return .imperialAramaic
+    case "armn", "armenian":              return .armenian
+    case "avst", "avestan":               return .avestan
+    case "bali", "balinese":              return .balinese
+    case "bamu", "bamum":                 return .bamum
+    case "bass", "bassavah":              return .bassaVah
+    case "batk", "batak":                 return .batak
+    case "beng", "bengali":               return .bengali
+    case "bhks", "bhaiksuki":             return .bhaiksuki
+    case "bopo", "bopomofo":              return .bopomofo
+    case "brah", "brahmi":                return .brahmi
+    case "brai", "braille":               return .braille
+    case "bugi", "buginese":              return .buginese
+    case "buhd", "buhid":                 return .buhid
+    case "cakm", "chakma":                return .chakma
+    case "cans", "canadianaboriginal":    return .canadianAboriginal
+    case "cari", "carian":                return .carian
+    case "cham":                          return .cham
+    case "cher", "cherokee":              return .cherokee
+    case "chrs", "chorasmian":            return .chorasmian
+    case "copt", "coptic", "qaac":        return .coptic
+    case "cpmn", "cyprominoan":           return .cyproMinoan
+    case "cprt", "cypriot":               return .cypriot
+    case "cyrl", "cyrillic":              return .cyrillic
+    case "deva", "devanagari":            return .devanagari
+    case "diak", "divesakuru":            return .divesAkuru
+    case "dogr", "dogra":                 return .dogra
+    case "dsrt", "deseret":               return .deseret
+    case "dupl", "duployan":              return .duployan
+    case "egyp", "egyptianhieroglyphs":   return .egyptianHieroglyphs
+    case "elba", "elbasan":               return .elbasan
+    case "elym", "elymaic":               return .elymaic
+    case "ethi", "ethiopic":              return .ethiopic
+    case "geor", "georgian":              return .georgian
+    case "glag", "glagolitic":            return .glagolitic
+    case "gong", "gunjalagondi":          return .gunjalaGondi
+    case "gonm", "masaramgondi":          return .masaramGondi
+    case "goth", "gothic":                return .gothic
+    case "gran", "grantha":               return .grantha
+    case "grek", "greek":                 return .greek
+    case "gujr", "gujarati":              return .gujarati
+    case "guru", "gurmukhi":              return .gurmukhi
+    case "hang", "hangul":                return .hangul
+    case "hani", "han":                   return .han
+    case "hano", "hanunoo":               return .hanunoo
+    case "hatr", "hatran":                return .hatran
+    case "hebr", "hebrew":                return .hebrew
+    case "hira", "hiragana":              return .hiragana
+    case "hluw", "anatolianhieroglyphs":  return .anatolianHieroglyphs
+    case "hmng", "pahawhhmong":           return .pahawhHmong
+    case "hmnp", "nyiakengpuachuehmong":  return .nyiakengPuachueHmong
+    case "hrkt", "katakanaorhiragana":    return .katakanaOrHiragana
+    case "hung", "oldhungarian":          return .oldHungarian
+    case "ital", "olditalic":             return .oldItalic
+    case "java", "javanese":              return .javanese
+    case "kali", "kayahli":               return .kayahLi
+    case "kana", "katakana":              return .katakana
+    case "khar", "kharoshthi":            return .kharoshthi
+    case "khmr", "khmer":                 return .khmer
+    case "khoj", "khojki":                return .khojki
+    case "kits", "khitansmallscript":     return .khitanSmallScript
+    case "knda", "kannada":               return .kannada
+    case "kthi", "kaithi":                return .kaithi
+    case "lana", "taitham":               return .taiTham
+    case "laoo", "lao":                   return .lao
+    case "latn", "latin":                 return .latin
+    case "lepc", "lepcha":                return .lepcha
+    case "limb", "limbu":                 return .limbu
+    case "lina", "lineara":               return .linearA
+    case "linb", "linearb":               return .linearB
+    case "lisu":                          return .lisu
+    case "lyci", "lycian":                return .lycian
+    case "lydi", "lydian":                return .lydian
+    case "mahj", "mahajani":              return .mahajani
+    case "maka", "makasar":               return .makasar
+    case "mand", "mandaic":               return .mandaic
+    case "mani", "manichaean":            return .manichaean
+    case "marc", "marchen":               return .marchen
+    case "medf", "medefaidrin":           return .medefaidrin
+    case "mend", "mendekikakui":          return .mendeKikakui
+    case "merc", "meroiticcursive":       return .meroiticCursive
+    case "mero", "meroitichieroglyphs":   return .meroiticHieroglyphs
+    case "mlym", "malayalam":             return .malayalam
+    case "modi":                          return .modi
+    case "mong", "mongolian":             return .mongolian
+    case "mroo", "mro":                   return .mro
+    case "mtei", "meeteimayek":           return .meeteiMayek
+    case "mult", "multani":               return .multani
+    case "mymr", "myanmar":               return .myanmar
+    case "nand", "nandinagari":           return .nandinagari
+    case "narb", "oldnortharabian":       return .oldNorthArabian
+    case "nbat", "nabataean":             return .nabataean
+    case "newa":                          return .newa
+    case "nkoo", "nko":                   return .nko
+    case "nshu", "nushu":                 return .nushu
+    case "ogam", "ogham":                 return .ogham
+    case "olck", "olchiki":               return .olChiki
+    case "orkh", "oldturkic":             return .oldTurkic
+    case "orya", "oriya":                 return .oriya
+    case "osge", "osage":                 return .osage
+    case "osma", "osmanya":               return .osmanya
+    case "ougr", "olduyghur":             return .oldUyghur
+    case "palm", "palmyrene":             return .palmyrene
+    case "pauc", "paucinhau":             return .pauCinHau
+    case "perm", "oldpermic":             return .oldPermic
+    case "phag", "phagspa":               return .phagsPa
+    case "phli", "inscriptionalpahlavi":  return .inscriptionalPahlavi
+    case "phlp", "psalterpahlavi":        return .psalterPahlavi
+    case "phnx", "phoenician":            return .phoenician
+    case "plrd", "miao":                  return .miao
+    case "prti", "inscriptionalparthian": return .inscriptionalParthian
+    case "rjng", "rejang":                return .rejang
+    case "rohg", "hanifirohingya":        return .hanifiRohingya
+    case "runr", "runic":                 return .runic
+    case "samr", "samaritan":             return .samaritan
+    case "sarb", "oldsoutharabian":       return .oldSouthArabian
+    case "saur", "saurashtra":            return .saurashtra
+    case "sgnw", "signwriting":           return .signWriting
+    case "shaw", "shavian":               return .shavian
+    case "shrd", "sharada":               return .sharada
+    case "sidd", "siddham":               return .siddham
+    case "sind", "khudawadi":             return .khudawadi
+    case "sinh", "sinhala":               return .sinhala
+    case "sogd", "sogdian":               return .sogdian
+    case "sogo", "oldsogdian":            return .oldSogdian
+    case "sora", "sorasompeng":           return .soraSompeng
+    case "soyo", "soyombo":               return .soyombo
+    case "sund", "sundanese":             return .sundanese
+    case "sylo", "sylotinagri":           return .sylotiNagri
+    case "syrc", "syriac":                return .syriac
+    case "tagb", "tagbanwa":              return .tagbanwa
+    case "takr", "takri":                 return .takri
+    case "tale", "taile":                 return .taiLe
+    case "talu", "newtailue":             return .newTaiLue
+    case "taml", "tamil":                 return .tamil
+    case "tang", "tangut":                return .tangut
+    case "tavt", "taiviet":               return .taiViet
+    case "telu", "telugu":                return .telugu
+    case "tfng", "tifinagh":              return .tifinagh
+    case "tglg", "tagalog":               return .tagalog
+    case "thaa", "thaana":                return .thaana
+    case "thai":                          return .thai
+    case "tibt", "tibetan":               return .tibetan
+    case "tirh", "tirhuta":               return .tirhuta
+    case "tnsa", "tangsa":                return .tangsa
+    case "toto":                          return .toto
+    case "ugar", "ugaritic":              return .ugaritic
+    case "vaii", "vai":                   return .vai
+    case "vith", "vithkuqi":              return .vithkuqi
+    case "wara", "warangciti":            return .warangCiti
+    case "wcho", "wancho":                return .wancho
+    case "xpeo", "oldpersian":            return .oldPersian
+    case "xsux", "cuneiform":             return .cuneiform
+    case "yezi", "yezidi":                return .yezidi
+    case "yiii", "yi":                    return .yi
+    case "zanb", "zanabazarsquare":       return .zanabazarSquare
+    case "zinh", "inherited", "qaai":     return .inherited
+    case "zyyy", "common":                return .common
+    case "zzzz", "unknown":               return .unknown
+    default:                              return nil
+    }
+  }
+}
+
+func parseScripts(
+  _ data: String
+) -> [Unicode.Scalar: [Unicode.Script]] {
+  var result: [Unicode.Scalar: [Unicode.Script]] = [:]
+
+  for line in data.split(separator: "\n") {
+    // Skip comments
+    guard !line.hasPrefix("#") else {
+      continue
+    }
+
+    let components = line.split(separator: ";")
+    let scriptStr = components[1].split(separator: "#")[0].split(separator: " ")
+
+    let scripts = scriptStr.map {
+      classifyScriptProperty(String($0))!
+    }
+
+    let scalars = parseScalars(String(components[0]))
+
+    for scalar in scalars {
+      result[Unicode.Scalar(scalar)!] = scripts
+    }
+  }
+
+  return result
+}
+
+public let scripts: [Unicode.Scalar: Unicode.Script] = {
+  let scripts = readInputFile("Scripts.txt")
+  // Parse scripts will return an array for each scalar, but this file only
+  // defines a single script per scalar.
+  let result = parseScripts(scripts).mapValues {
+    $0[0]
+  }
+
+  return result
+}()
+
+public let scriptExtensions: [Unicode.Scalar: [Unicode.Script]] = {
+  let scripts = readInputFile("ScriptExtensions.txt")
+  let result = parseScripts(scripts)
 
   return result
 }()
