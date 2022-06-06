@@ -2454,8 +2454,8 @@ void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
   }
 
   auto *ReferenceDC = Where.getDeclContext();
-  auto *moduleImportedFrom = ReferenceDC->findImportFor(ReferenceDC->getParentModule());
-  if (moduleImportedFrom.hasValue() && moduleImportedFrom.getValue().options.contains(ImportFlags::IgnoresDeprecationWarnings)) {
+  auto declImport = ReferenceDC->findImportFor(ReferenceDC->getParentModule());
+  if (declImport && declImport->options.contains(ImportFlags::IgnoresDeprecationWarnings)) {
     return;
   }
 
@@ -2540,8 +2540,8 @@ bool TypeChecker::diagnoseIfDeprecated(SourceLoc loc,
   }
 
   auto *dc = where.getDeclContext();
-  auto moduleImportedFrom = dc->findImportFor(dc->getParentModule());
-  if (moduleImportedFrom.hasValue() && moduleImportedFrom.getValue().options.contains(ImportFlags::IgnoresDeprecationWarnings)) {
+  auto declImport = dc->findImportFor(dc->getParentModule());
+  if (declImport && declImport->options.contains(ImportFlags::IgnoresDeprecationWarnings)) {
     return false;
   }
 

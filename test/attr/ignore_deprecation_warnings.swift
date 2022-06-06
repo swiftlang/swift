@@ -60,7 +60,7 @@ class anotherType {
     let shouldntWarn2 = deprecatedFuncWithReturnValue2()
 }
 
-@inlinable
+@discardableResult
 @ignoreDeprecationWarnings
 func multipleAttrsFunc() -> deprecatedType {
     return deprecatedType()
