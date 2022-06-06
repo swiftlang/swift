@@ -52,7 +52,12 @@ def read_features(from_file, add_prefix):
         if "name" not in feature:
             invalid_file(from_file, "missing name in features list")
 
-        features.append({"name": add_prefix + feature["name"]})
+        new_feature = {"name": add_prefix + feature["name"]}
+
+        if "value" in feature:
+            new_feature.update({"value" : feature["value"]})
+
+        features.append(new_feature)
     return features
 
 
