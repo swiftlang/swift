@@ -3662,6 +3662,12 @@ void AttributeChecker::checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs) {
       }
     }
 
+    if (isa<DestructorDecl>(D) || isa<ConstructorDecl>(D)) {
+      diagnoseAndRemoveAttr(Attr, diag::attr_invalid_on_decl_kind, Attr,
+                            D->getDescriptiveKind());
+      continue;
+    }
+
     auto AtLoc = Attr->AtLoc;
     auto Platform = Attr->Platform;
 
