@@ -173,12 +173,37 @@ bool TreatArrayLiteralAsDictionary::diagnose(const Solution &solution,
 }
 
 TreatArrayLiteralAsDictionary *
-TreatArrayLiteralAsDictionary::create(ConstraintSystem &cs,
-                                      Type dictionaryTy, Type arrayTy,
-                                      ConstraintLocator *locator) {
-  assert(getAsExpr<ArrayExpr>(locator->getAnchor())->getNumElements() <= 1);
+TreatArrayLiteralAsDictionary::attempt(ConstraintSystem &cs, Type dictionaryTy,
+                                       Type arrayTy,
+                                       ConstraintLocator *locator) {
+  if (!cs.isArrayType(arrayTy))
+    return nullptr;
+
+  // Determine the ArrayExpr from the locator.
+  auto *expr = getAsExpr(simplifyLocatorToAnchor(locator));
+  if (!expr)
+    return nullptr;
+
+  if (auto *AE = dyn_cast<AssignExpr>(expr))
+    expr = AE->getSrc();
+
+  auto *arrayExpr = dyn_cast<ArrayExpr>(expr);
+  if (!arrayExpr)
+    return nullptr;
+
+  // This fix only applies if the array is used as a dictionary.
+  auto unwrappedDict = dictionaryTy->lookThroughAllOptionalTypes();
+  if (unwrappedDict->isTypeVariableOrMember())
+    return nullptr;
+
+  if (!TypeChecker::conformsToKnownProtocol(
+          unwrappedDict, KnownProtocolKind::ExpressibleByDictionaryLiteral,
+          cs.DC->getParentModule()))
+    return nullptr;
+
+  auto arrayLoc = cs.getConstraintLocator(arrayExpr);
   return new (cs.getAllocator())
-      TreatArrayLiteralAsDictionary(cs, dictionaryTy, arrayTy, locator);
+      TreatArrayLiteralAsDictionary(cs, dictionaryTy, arrayTy, arrayLoc);
 }
 
 bool MarkExplicitlyEscaping::diagnose(const Solution &solution,

@@ -4225,52 +4225,25 @@ static bool repairArrayLiteralUsedAsDictionary(
     ConstraintKind matchKind,
     SmallVectorImpl<RestrictionOrFix> &conversionsOrFixes,
     ConstraintLocator *loc) {
+  if (auto *fix = TreatArrayLiteralAsDictionary::attempt(cs, dictType,
+                                                         arrayType, loc)) {
+    // Ignore any attempts at promoting the value to an optional as even after
+    // stripping off all optionals above the underlying types don't match (array
+    // vs dictionary).
+    conversionsOrFixes.erase(
+        llvm::remove_if(conversionsOrFixes,
+                        [&](RestrictionOrFix &E) {
+                          if (auto restriction = E.getRestriction())
+                            return *restriction ==
+                                   ConversionRestrictionKind::ValueToOptional;
+                          return false;
+                        }),
+        conversionsOrFixes.end());
 
-  if (!cs.isArrayType(arrayType))
-    return false;
-
-  // Determine the ArrayExpr from the locator.
-  auto *expr = getAsExpr(simplifyLocatorToAnchor(loc));
-  if (!expr)
-    return false;
-
-  if (auto *AE = dyn_cast<AssignExpr>(expr))
-    expr = AE->getSrc();
-
-  auto *arrayExpr = dyn_cast<ArrayExpr>(expr);
-  if (!arrayExpr)
-    return false;
-
-  // This fix currently only handles empty and single-element arrays:
-  //   [] => [:] and [1] => [1:_]
-  if (arrayExpr->getNumElements() > 1)
-    return false;
-
-  // This fix only applies if the array is used as a dictionary.
-  auto unwrappedDict = dictType->lookThroughAllOptionalTypes();
-  if (unwrappedDict->isTypeVariableOrMember())
-    return false;
-
-  if (!TypeChecker::conformsToKnownProtocol(
-          unwrappedDict,
-          KnownProtocolKind::ExpressibleByDictionaryLiteral,
-          cs.DC->getParentModule()))
-    return false;
-
-  // Ignore any attempts at promoting the value to an optional as even after
-  // stripping off all optionals above the underlying types don't match (array
-  // vs dictionary).
-  conversionsOrFixes.erase(llvm::remove_if(conversionsOrFixes,
-                                           [&](RestrictionOrFix &E) {
-    if (auto restriction = E.getRestriction())
-      return *restriction == ConversionRestrictionKind::ValueToOptional;
-    return false;
-  }), conversionsOrFixes.end());
-
-  auto argLoc = cs.getConstraintLocator(arrayExpr);
-  conversionsOrFixes.push_back(TreatArrayLiteralAsDictionary::create(
-      cs, dictType, arrayType, argLoc));
-  return true;
+    conversionsOrFixes.push_back(fix);
+    return true;
+  }
+  return false;
 }
 
 /// Let's check whether this is an out-of-order argument in binary
@@ -5562,6 +5535,17 @@ bool ConstraintSystem::repairFailures(
       // don't record a ContextualMismatch here.
       if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality))
         break;
+
+      // We already have a fix for trying to initialize/assign an array literal
+      // to a dictionary type. In this case elements mismatch only add extra
+      // verbosity to the diagnostic. So let's skip the fix and only increase
+      // the score to focus on suggesting using dictionary literal instead.
+      path.pop_back();
+      auto loc = getConstraintLocator(anchor, path);
+      if (hasFixFor(loc, FixKind::TreatArrayLiteralAsDictionary)) {
+        increaseScore(SK_Fix);
+        return true;
+      }
 
       conversionsOrFixes.push_back(CollectionElementContextualMismatch::create(
           *this, lhs, rhs, getConstraintLocator(locator)));
