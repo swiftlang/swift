@@ -1,4 +1,4 @@
-// XFAIL: OS=freebsd, OS=openbsd, OS=linux-gnu, OS=windows-msvc
+// XFAIL: OS=freebsd, OS=openbsd, OS=linux-gnu, OS=windows-msvc, OS=linux-android, OS=linux-androideabi
 
 // Test SDK detection for immediate mode.
 // RUN: %empty-directory(%t)

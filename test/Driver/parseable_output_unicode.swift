@@ -2,7 +2,7 @@
 // RUN: cat "%S/Inputs/unicode.txt" >> %t.rsp
 // RUN: %swiftc_driver_plain -emit-executable @%t.rsp -o %t.out -emit-module -emit-module-path %t.swiftmodule -emit-objc-header-path %t.h -serialize-diagnostics -emit-dependencies -parseable-output -driver-skip-execution 2>&1 | %FileCheck %s
 
-// XFAIL: OS=freebsd, OS=openbsd, OS=linux-gnu
+// XFAIL: OS=freebsd, OS=openbsd, OS=linux-gnu, OS=linux-android, OS=linux-androideabi
 
 // CHECK: {{[1-9][0-9]*}}
 // CHECK-NEXT: {
