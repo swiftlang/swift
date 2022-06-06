@@ -1244,12 +1244,13 @@ AllocStackInst *OpaqueStorageAllocation::createStackAllocation(SILValue value) {
     deallocBuilder.createDeallocStack(pass.genLoc(), alloc);
   };
   if (latestOpeningInst) {
-    // Deallocate at the dominance frontier to ensure that allocation encloses
-    // not only the uses of the current value, but also of any values reusing
-    // this storage as a use projection.
-    SmallVector<SILBasicBlock *, 4> frontier;
-    computeDominanceFrontier(alloc->getParent(), pass.domInfo, frontier);
-    for (SILBasicBlock *deallocBlock : frontier) {
+    // Deallocate at the predecessors of dominance frontier blocks that are
+    // dominated by the alloc to ensure that allocation encloses not only the
+    // uses of the current value, but also of any values reusing this storage as
+    // a use projection.
+    SmallVector<SILBasicBlock *, 4> boundary;
+    computeDominatedBoundaryBlocks(alloc->getParent(), pass.domInfo, boundary);
+    for (SILBasicBlock *deallocBlock : boundary) {
       dealloc(deallocBlock->getTerminator()->getIterator());
     }
   } else {

@@ -973,6 +973,54 @@ bb0(%0 : @owned $P):
   return %16 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @f162_testOpenedArchetype :
+// CHECK:  [[STK:%.*]] = alloc_stack $Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P>
+// CHECK: bb6:
+// CHECK:   dealloc_stack [[STK]] : $*Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P>
+// CHECK:   br bb7
+// CHECK-LABEL: } // end sil function 'f162_testOpenedArchetype'
+sil [ossa] @f162_testOpenedArchetype : $@convention(thin) (@in P) -> () {
+bb0(%0 : @owned $P):
+  cond_br undef, bb1, bb5
+
+bb1:
+  %2 = alloc_stack $P, var, name "q"
+  %3 = copy_value %0 : $P
+  store %3 to [init] %2 : $*P
+  %5 = begin_borrow %0 : $P
+  %6 = open_existential_value %5 : $P to $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P
+  %7 = witness_method $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P, #P.foo : <Self where Self : P> (Self) -> () -> (), %6 : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %8 = copy_value %6 : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P
+  end_borrow %5 : $P
+  %10 = enum $Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P>, #Optional.some!enumelt, %8 : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P
+  %11 = unchecked_enum_data %10 : $Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P>, #Optional.some!enumelt
+  %12 = apply %7<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P>(%11) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  destroy_value %11 : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P
+  destroy_addr %2 : $*P
+  dealloc_stack %2 : $*P
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb4
+
+bb3:
+  br bb4
+
+bb4:
+  br bb6
+
+bb5:
+  br bb7
+
+bb6:
+  br bb7
+
+bb7:
+  destroy_value %0 : $P
+  %23 = tuple ()
+  return %23 : $()
+}
+
 // CHECK-LABEL: sil [ossa] @f170_compare : $@convention(thin) <T where T : Comparable> (@in_guaranteed T, @in_guaranteed T) -> @out T {
 // CHECK: bb0(%0 : $*T, %1 : $*T, %2 : $*T):
 // CHECK:   [[WT:%.*]] = witness_method $T, #Comparable."<" : <Self where Self : Comparable> (Self.Type) -> (Self, Self) -> Builtin.Int1 : $@convention(witness_method: Comparable) <τ_0_0 where τ_0_0 : Comparable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> Builtin.Int1
