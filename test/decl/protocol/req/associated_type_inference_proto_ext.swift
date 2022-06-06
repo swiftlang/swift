@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
+func assertEqualTypes<T>(_: T.Type, _: T.Type) {}
+
 struct Pair<A, B> {
     var a: A
     var b: B
@@ -27,4 +29,34 @@ extension Pair: Collection where A == B {
         precondition(i < endIndex, "Can't advance beyond endIndex")
         return i + 1
     }
+}
+
+// https://github.com/apple/swift/issues/52024
+protocol VectorBase : RandomAccessCollection where Index == Int, Element == Elle {
+  associatedtype Elle
+
+  var data: Array<Elle> { get set }
+  init(data: Array<Elle>)
+}
+
+protocol Vector: VectorBase {}
+extension Vector where Elle: FloatingPoint {
+  // RandomAccessCollection
+  var indices: Range<Int> { get {} }
+  var startIndex: Int { get {} }
+  var endIndex: Int { get {} }
+
+  // MutableCollection
+  subscript(i: Index) -> Elle {
+    get {} set {}
+  }
+}
+
+do {
+  struct VectorF: Vector {
+    var data: Array<Float>
+    init(data: Array<Float>) {}
+  }
+
+  assertEqualTypes(VectorF.Elle.self, Float.self)
 }
