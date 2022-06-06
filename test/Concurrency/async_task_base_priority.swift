@@ -7,6 +7,7 @@
 // rdar://76038845
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
+// UNSUPPORTED: back_deploy_concurrency
 
 import StdlibUnittest
 import Dispatch

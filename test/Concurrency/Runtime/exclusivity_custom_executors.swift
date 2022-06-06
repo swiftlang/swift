@@ -6,11 +6,10 @@
 // rdar://76038845
 // UNSUPPORTED: back_deployment_runtime
 // REQUIRES: concurrency_runtime
+// UNSUPPORTED: back_deploy_concurrency
 
 // Crash expectations can't be implemented on WASI/WebAssembly.
 // UNSUPPORTED: OS=wasi
-
-// UNSUPPORTED: use_os_stdlib
 
 // This test makes sure that we properly save/restore access when we
 // synchronously launch a task from a serial executor. The access from the task
