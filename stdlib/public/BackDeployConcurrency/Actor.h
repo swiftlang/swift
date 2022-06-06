@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_ABI_ACTOR_H
-#define SWIFT_ABI_ACTOR_H
+#ifndef SWIFT_ABI_ACTOR_BACKDEPLOYED_H
+#define SWIFT_ABI_ACTOR_BACKDEPLOYED_H
 
 #include "swift/ABI/HeapObject.h"
 #include "swift/ABI/MetadataValues.h"
@@ -44,9 +44,7 @@ public:
   }
 
   void initHeapObject() {
-#ifdef SWIFT_CONCURRENCY_BACK_DEPLOYMENT
     _swift_instantiateInertHeapObject(this, metadata);
-#endif
   }
 
   void *PrivateData[NumWords_DefaultActor];

@@ -125,9 +125,7 @@ public:
   }
 
   void initHeapObject() {
-#ifdef SWIFT_CONCURRENCY_BACK_DEPLOYMENT
     _swift_instantiateInertHeapObject(this, metadata);
-#endif
   }
 
   ~Job() { swift_voucher_release(Voucher); }
