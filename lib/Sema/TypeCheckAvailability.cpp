@@ -27,6 +27,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeDeclFinder.h"
+#include "swift/AST/Import.h"
 #include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
@@ -2453,6 +2454,10 @@ void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
   }
 
   auto *ReferenceDC = Where.getDeclContext();
+  auto *moduleImportedFrom = ReferenceDC->findImportModule(ReferenceDC->getParentModule());
+  if (moduleImportedFrom->hasValue() && moduleImportedFrom->getValue().options.contains(ImportFlags::IgnoresDeprecationWarnings)) {
+    return;
+  }
 
   auto &Context = ReferenceDC->getASTContext();
   if (!Context.LangOpts.DisableAvailabilityChecking) {
@@ -2535,6 +2540,10 @@ bool TypeChecker::diagnoseIfDeprecated(SourceLoc loc,
   }
 
   auto *dc = where.getDeclContext();
+  auto *moduleImportedFrom = dc->findImportModule(dc->getParentModule());
+  if (moduleImportedFrom->hasValue() && moduleImportedFrom->getValue().options.contains(ImportFlags::IgnoresDeprecationWarnings)) {
+    return false;
+  }
 
   auto &ctx = dc->getASTContext();
   if (!ctx.LangOpts.DisableAvailabilityChecking) {

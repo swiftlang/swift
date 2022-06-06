@@ -84,7 +84,6 @@ enum class ImportFlags {
   /// concurrency.
   Preconcurrency = 0x20,
 
-
   /// Silence all deprecation warnings coming from symbols imported from the module
   IgnoresDeprecationWarnings = 0x40,
 
