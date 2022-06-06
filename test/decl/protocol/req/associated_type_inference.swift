@@ -684,6 +684,27 @@ struct S40<E: Equatable>: P40c {
   typealias B = Self
 }
 
+protocol P41a {
+  associatedtype A
+  associatedtype B
+
+  func bar(_: B) -> A?
+}
+protocol P42b: P41a {
+  associatedtype A
+  associatedtype B
+
+  func foo(_: A, _: B)
+}
+extension P42b {
+  func bar(_: B) -> A? {}
+}
+do {
+  class Conformer: P42b {
+    func foo(_: Bool, _: String) {}
+  }
+}
+
 // Fails to find the fixed type witness B == FIXME_S1<A>.
 protocol FIXME_P1a {
   associatedtype A: Equatable = Never // expected-note {{protocol requires nested type 'A'}}
