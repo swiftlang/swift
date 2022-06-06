@@ -759,9 +759,12 @@ std::string ASTMangler::mangleTypeAsUSR(Type Ty) {
   return finalize();
 }
 
-std::string ASTMangler::mangleAnyDecl(const ValueDecl *Decl, bool prefix) {
+std::string
+ASTMangler::mangleAnyDecl(const ValueDecl *Decl,
+                          bool prefix,
+                          bool respectOriginallyDefinedIn) {
   DWARFMangling = true;
-  RespectOriginallyDefinedIn = false;
+  RespectOriginallyDefinedIn = respectOriginallyDefinedIn;
   if (prefix) {
     beginMangling();
   } else {
