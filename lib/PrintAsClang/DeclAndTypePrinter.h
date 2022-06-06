@@ -27,6 +27,7 @@ namespace swift {
 
 class PrimitiveTypeMapping;
 class ValueDecl;
+class SwiftToClangInteropContext;
 
 /// Responsible for printing a Swift Decl or Type in Objective-C, to be
 /// included in a Swift module's ObjC compatibility header.
@@ -43,6 +44,7 @@ private:
   raw_ostream &prologueOS;
   const DelayedMemberSet &delayedMembers;
   PrimitiveTypeMapping &typeMapping;
+  SwiftToClangInteropContext &interopContext;
   AccessLevel minRequiredAccess;
   OutputLanguageMode outputLang;
 
@@ -56,11 +58,12 @@ private:
 public:
   DeclAndTypePrinter(ModuleDecl &mod, raw_ostream &out, raw_ostream &prologueOS,
                      DelayedMemberSet &delayed,
-                     PrimitiveTypeMapping &typeMapping, AccessLevel access,
-                     OutputLanguageMode outputLang)
+                     PrimitiveTypeMapping &typeMapping,
+                     SwiftToClangInteropContext &interopContext,
+                     AccessLevel access, OutputLanguageMode outputLang)
       : M(mod), os(out), prologueOS(prologueOS), delayedMembers(delayed),
-        typeMapping(typeMapping), minRequiredAccess(access),
-        outputLang(outputLang) {}
+        typeMapping(typeMapping), interopContext(interopContext),
+        minRequiredAccess(access), outputLang(outputLang) {}
 
   /// Returns true if \p VD should be included in a compatibility header for
   /// the options the printer was constructed with.

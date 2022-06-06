@@ -1919,6 +1919,7 @@ private:
   NEVER_VISIT(SILBlockStorageType)
   NEVER_VISIT(SILBoxType)
   NEVER_VISIT(SILTokenType)
+  NEVER_VISIT(SILMoveOnlyType)
 
   VISIT(ProtocolCompositionType, compose)
 
@@ -2211,39 +2212,6 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
   SmallVector<ParamDecl *, 4> parameters;
   unsigned index = 0;
   SmallBitVector nonNullArgs = getNonNullArgs(clangDecl, params);
-
-  // C++ operators that are implemented as non-static member functions get
-  // imported into Swift as static methods that have an additional
-  // parameter for the left-hand side operand instead of the receiver object.
-  if (auto CMD = dyn_cast<clang::CXXMethodDecl>(clangDecl)) {
-    // Subscripts and call operators are imported as normal methods.
-    bool staticOperator = clangDecl->isOverloadedOperator() &&
-                          clangDecl->getOverloadedOperator() != clang::OO_Call &&
-                          clangDecl->getOverloadedOperator() != clang::OO_Subscript;
-    if (staticOperator) {
-      auto param = new (SwiftContext)
-          ParamDecl(SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
-                    SwiftContext.getIdentifier("lhs"), dc);
-
-      auto parent = CMD->getParent();
-      auto parentType = importType(
-          parent->getASTContext().getRecordType(parent),
-          ImportTypeKind::Parameter, ImportDiagnosticAdder(*this, clangDecl),
-          allowNSUIntegerAsInt, Bridgeability::None,
-          getImportTypeAttrs(clangDecl));
-
-      param->setInterfaceType(parentType.getType());
-
-      if (SwiftContext.getClangModuleLoader()->isCXXMethodMutating(CMD)) {
-        // This implicitly makes the parameter indirect.
-        param->setSpecifier(ParamSpecifier::InOut);
-      } else {
-        param->setSpecifier(ParamSpecifier::Default);
-      }
-
-      parameters.push_back(param);
-    }
-  }
 
   for (auto param : params) {
     auto paramTy = param->getType();

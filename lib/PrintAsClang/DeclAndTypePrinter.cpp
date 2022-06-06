@@ -332,7 +332,7 @@ private:
     if (outputLang != OutputLanguageMode::Cxx)
       return;
     // FIXME: Print struct's availability.
-    ClangValueTypePrinter printer(os);
+    ClangValueTypePrinter printer(os, owningPrinter.interopContext);
     printer.printStructDecl(SD);
   }
 
@@ -889,6 +889,10 @@ private:
     if (params->size()) {
       size_t index = 1;
       interleaveComma(*params, os, [&](const ParamDecl *param) {
+        if (param->isInOut()) {
+          os << "&";
+        }
+
         if (param->hasName()) {
           ClangSyntaxPrinter(os).printIdentifier(param->getName().str());
         } else {

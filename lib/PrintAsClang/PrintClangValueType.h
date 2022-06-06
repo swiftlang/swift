@@ -19,12 +19,15 @@
 namespace swift {
 
 class StructDecl;
+class SwiftToClangInteropContext;
 
 /// Responsible for printing a Swift struct or enum decl or in C or C++ mode, to
 /// be included in a Swift module's generated clang header.
 class ClangValueTypePrinter {
 public:
-  ClangValueTypePrinter(raw_ostream &os) : os(os) {}
+  ClangValueTypePrinter(raw_ostream &os,
+                        SwiftToClangInteropContext &interopContext)
+      : os(os), interopContext(interopContext) {}
 
   /// Print the C struct thunk or the C++ class definition that
   /// corresponds to the given structure declaration.
@@ -32,6 +35,7 @@ public:
 
 private:
   raw_ostream &os;
+  SwiftToClangInteropContext &interopContext;
 };
 
 } // end namespace swift

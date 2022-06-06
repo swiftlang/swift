@@ -905,6 +905,8 @@ ERROR(cannot_find_in_scope,none,
 ERROR(cannot_find_in_scope_corrected,none,
       "cannot %select{find|find operator}1 %0 in scope; did you mean '%2'?",
       (DeclNameRef, bool, StringRef))
+ERROR(cannot_find_self_in_scope,none,
+      "cannot find 'self' in scope; did you mean to use it in a type or extension context?", ())
 NOTE(confusable_character,none,
       "%select{identifier|operator}0 '%1' contains possibly confused characters; "
       "did you mean to use '%2'?",
@@ -1406,8 +1408,6 @@ ERROR(transparent_in_protocols_not_supported,none,
 ERROR(transparent_in_classes_not_supported,none,
       "'@_transparent' attribute is not supported on declarations within classes", ())
 
-ERROR(invalid_iboutlet,none,
-      "only instance properties can be declared @IBOutlet", ())
 ERROR(iboutlet_nonobjc_class,none,
       "@IBOutlet property cannot %select{have|be an array of}0 "
       "non-'@objc' class type %1", (bool, Type))
@@ -1429,8 +1429,8 @@ NOTE(note_make_implicitly_unwrapped_optional,none,
 ERROR(invalid_ibdesignable_extension,none,
       "@IBDesignable can only be applied to classes and extensions "
       "of classes", ())
-ERROR(invalid_ibinspectable,none,
-      "only instance properties can be declared @%0", (StringRef))
+ERROR(attr_must_be_used_on_class_instance,none,
+      "only class instance properties can be declared @%0", (StringRef))
 ERROR(invalid_ibaction_decl,none,
       "only instance methods can be declared @%0", (StringRef))
 ERROR(invalid_ibaction_result,none,
@@ -3748,8 +3748,6 @@ ERROR(protocol_declares_unknown_primary_assoc_type,none,
       (Identifier, Type))
 ERROR(protocol_declares_duplicate_primary_assoc_type,none,
       "duplicate primary associated type name %0", (Identifier))
-ERROR(parameterized_protocol_not_supported,none,
-      "protocol type with type arguments can only be used as a generic constraint", ())
 ERROR(protocol_does_not_have_primary_assoc_type,none,
       "cannot specialize protocol type %0", (Type))
 ERROR(parameterized_protocol_type_argument_count_mismatch,none,
@@ -5490,6 +5488,9 @@ NOTE(type_eraser_init_not_accessible,none,
      "cannot have more restrictive access than protocol %1 "
      "(which is %select{private|fileprivate|internal|public|open}2)",
      (AccessLevel, Type, AccessLevel))
+NOTE(type_eraser_init_spi,none,
+     "'init(erasing:)' is SPI, but protocol %0 is not"
+     "%select{| in the same SPI groups as 'init(erasing:)'}1", (Type, bool))
 
 //------------------------------------------------------------------------------
 // MARK: @available

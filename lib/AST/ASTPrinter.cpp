@@ -3035,6 +3035,22 @@ static bool usesFeatureTypeWitnessSystemInference(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureBoundGenericExtensions(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureDifferentiableProgramming(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureForwardModeDifferentiation(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureAdditiveArithmeticDerivedConformances(Decl *decl) {
+  return false;
+}
+
 static void
 suppressingFeatureNoAsyncAvailability(PrintOptions &options,
                                       llvm::function_ref<void()> action) {
@@ -5287,6 +5303,16 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
       Name = Mod->getASTContext().getIdentifier(ExportedModuleName);
     }
 
+    if (Options.UseOriginallyDefinedInModuleNames) {
+      Decl *D = Ty->getDecl();
+      for (auto attr: D->getAttrs().getAttributes<OriginallyDefinedInAttr>()) {
+        Name = Mod->getASTContext()
+          .getIdentifier(const_cast<OriginallyDefinedInAttr*>(attr)
+                         ->OriginalModuleName);
+        break;
+      }
+    }
+
     Printer.printModuleRef(Mod, Name);
     Printer << ".";
   }
@@ -6177,6 +6203,11 @@ public:
     }
   }
 
+  void visitSILMoveOnlyType(SILMoveOnlyType *T) {
+    Printer << "@moveOnly ";
+    printWithParensIfNotSimple(T->getInnerType());
+  }
+
   void visitArraySliceType(ArraySliceType *T) {
     Printer << "[";
     visit(T->getBaseType());
@@ -6273,8 +6304,7 @@ public:
 
   void visitOpenedArchetypeType(OpenedArchetypeType *T) {
     if (auto parent = T->getParent()) {
-      visitParentType(parent);
-      printArchetypeCommon(T, getAbstractTypeParamDecl(T));
+      printArchetypeCommon(T);
       return;
     }
 
@@ -6283,8 +6313,20 @@ public:
     visit(T->getExistentialType());
   }
 
-  void printArchetypeCommon(ArchetypeType *T,
-                            const AbstractTypeParamDecl *Decl) {
+  void printDependentMember(DependentMemberType *T) {
+    if (auto *const Assoc = T->getAssocType()) {
+      if (Options.ProtocolQualifiedDependentMemberTypes) {
+        Printer << "[";
+        Printer.printName(Assoc->getProtocol()->getName());
+        Printer << "]";
+      }
+      Printer.printTypeRef(T, Assoc, T->getName());
+    } else {
+      Printer.printName(T->getName());
+    }
+  }
+
+  void printArchetypeCommon(ArchetypeType *T) {
     if (Options.AlternativeTypeNames) {
       auto found = Options.AlternativeTypeNames->find(T->getCanonicalType());
       if (found != Options.AlternativeTypeNames->end()) {
@@ -6293,36 +6335,22 @@ public:
       }
     }
 
-    const auto Name = T->getName();
-    if (Name.empty()) {
-      Printer << "<anonymous>";
-    } else if (Decl) {
-      Printer.printTypeRef(T, Decl, Name);
+    auto interfaceType = T->getInterfaceType();
+    if (auto *dependentMember = interfaceType->getAs<DependentMemberType>()) {
+      visitParentType(T->getParent());
+      printDependentMember(dependentMember);
     } else {
-      Printer.printName(Name);
+      visit(interfaceType);
     }
-  }
-
-  static AbstractTypeParamDecl *getAbstractTypeParamDecl(ArchetypeType *T) {
-    if (auto gp = T->getInterfaceType()->getAs<GenericTypeParamType>()) {
-      return gp->getDecl();
-    }
-
-    auto depMemTy = T->getInterfaceType()->castTo<DependentMemberType>();
-    return depMemTy->getAssocType();
   }
 
   void visitPrimaryArchetypeType(PrimaryArchetypeType *T) {
-    if (auto parent = T->getParent())
-      visitParentType(parent);
-
-    printArchetypeCommon(T, getAbstractTypeParamDecl(T));
+    printArchetypeCommon(T);
   }
 
   void visitOpaqueTypeArchetypeType(OpaqueTypeArchetypeType *T) {
     if (auto parent = T->getParent()) {
-      visitParentType(parent);
-      printArchetypeCommon(T, getAbstractTypeParamDecl(T));
+      printArchetypeCommon(T);
       return;
     }
 
@@ -6399,9 +6427,7 @@ public:
   }
 
   void visitSequenceArchetypeType(SequenceArchetypeType *T) {
-    if (auto parent = T->getParent())
-      visitParentType(parent);
-    printArchetypeCommon(T, getAbstractTypeParamDecl(T));
+    printArchetypeCommon(T);
   }
 
   void visitGenericTypeParamType(GenericTypeParamType *T) {
@@ -6459,16 +6485,7 @@ public:
 
   void visitDependentMemberType(DependentMemberType *T) {
     visitParentType(T->getBase());
-    if (auto *const Assoc = T->getAssocType()) {
-      if (Options.ProtocolQualifiedDependentMemberTypes) {
-        Printer << "[";
-        Printer.printName(Assoc->getProtocol()->getName());
-        Printer << "]";
-      }
-      Printer.printTypeRef(T, Assoc, T->getName());
-    } else {
-      Printer.printName(T->getName());
-    }
+    printDependentMember(T);
   }
 
 #define REF_STORAGE(Name, name, ...) \
