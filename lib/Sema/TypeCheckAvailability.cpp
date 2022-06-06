@@ -2453,7 +2453,7 @@ void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
   }
 
   auto *ReferenceDC = Where.getDeclContext();
-  auto declImport = ReferenceDC->findImportFor(ReferenceDC->getParentModule());
+  auto declImport = ReferenceDC->findImportFor(DeprecatedDecl->getDeclContext()->getParentModule());
   if (declImport &&
       declImport->options.contains(ImportFlags::IgnoresDeprecationWarnings)) {
     return;
@@ -2540,7 +2540,7 @@ bool TypeChecker::diagnoseIfDeprecated(SourceLoc loc,
   }
 
   auto *dc = where.getDeclContext();
-  auto declImport = dc->findImportFor(dc->getParentModule());
+  auto declImport = dc->findImportFor(ext->getDeclContext()->getParentModule());
   if (declImport &&
       declImport->options.contains(ImportFlags::IgnoresDeprecationWarnings)) {
     return false;
