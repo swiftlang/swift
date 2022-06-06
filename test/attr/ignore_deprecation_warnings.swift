@@ -93,3 +93,6 @@ func b() -> Int {
 func c() -> Int{
     return aNormalType(someNumber: 69).multipliedByTwo // expected-warning {{'multipliedByTwo' is deprecated}}
 }
+
+@ignoreDeprecationWarnings
+func t(_ x: deprecatedType) {}

@@ -15,4 +15,26 @@ func voidFunc() {
 
 struct someType {
     let b: importedDeprecatedType
+
+    var ownX: String {
+        return b.x
+    }
+
+    var t: String {
+        importedDeprecatedType.m
+    }
+
+    func testDeprecatedConformance() {
+        _ = self.b.a
+    }
+}
+
+func doSomething(_ b: importedDeprecatedType) { 
+    _ = b.memberFunc()
+}
+
+extension someType: importedDeprecatedProtocol {
+    var val: String {
+        return ""
+    }
 }

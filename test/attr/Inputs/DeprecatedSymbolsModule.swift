@@ -1,20 +1,42 @@
 @available(*, deprecated)
-func importedDeprecatedFunc() {}
+public func importedDeprecatedFunc() {}
 
 @available(*, deprecated)
-func importedDeprecatedFuncWithReturn() -> String {
+public func importedDeprecatedFuncWithReturn() -> String {
     return "Donda"
 }
 
 @available(*, deprecated)
-var importedDeprecatedVar = "910210"
+public var importedDeprecatedVar = "910210"
 
 @available(*, deprecated)
-struct importedDeprecatedType {
-    var x = ""
-    static let m = 22
+public struct importedDeprecatedType {
+    public var x = ""
+    public static let m = 22
 
-    func memberFunc() -> Int {
+    public func memberFunc() -> Int {
         40
+    }
+}
+
+@available(*, deprecated)
+public protocol importedDeprecatedProtocol {
+    var val: String { get }
+}
+
+public protocol ImprotedNonDeprecatedProtocol {
+    var a: String { get }
+}
+
+public extension importedDeprecatedType: importedDeprecatedProtocol {
+    public var val: String {
+        return "someValHere"
+    }
+}
+
+@available(*, deprecated)
+public extension importedDeprecatedType: ImprotedNonDeprecatedProtocol {
+    public var a: String {
+        return "hello"
     }
 }
