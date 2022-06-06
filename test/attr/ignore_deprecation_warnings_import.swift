@@ -31,6 +31,7 @@ struct someType {
 
 func doSomething(_ b: importedDeprecatedType) { 
     _ = b.memberFunc()
+    let b = importedDeprecatedVar
 }
 
 extension someType: importedDeprecatedProtocol {
