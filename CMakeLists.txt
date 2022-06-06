@@ -315,7 +315,7 @@ set(SWIFT_ANDROID_API_LEVEL "" CACHE STRING
 
 set(SWIFT_ANDROID_NDK_PATH "" CACHE STRING
   "Path to the directory that contains the Android NDK tools that are executable on the build machine")
-set(SWIFT_ANDROID_NDK_CLANG_VERSION "12.0.8" CACHE STRING
+set(SWIFT_ANDROID_NDK_CLANG_VERSION "12.0.9" CACHE STRING
   "The Clang version to use when building for Android.")
 set(SWIFT_ANDROID_DEPLOY_DEVICE_PATH "" CACHE STRING
   "Path on an Android device where build products will be pushed. These are used when running the test suite against the device")
