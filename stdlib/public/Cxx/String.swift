@@ -22,5 +22,6 @@ extension std.string {
 extension String {
   public init(cxxString: std.string) {
     self.init(cString: cxxString.c_str())
+    withExtendedLifetime(cxxString) {}
   }
 }
