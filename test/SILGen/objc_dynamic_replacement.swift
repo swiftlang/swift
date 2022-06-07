@@ -9,25 +9,25 @@ import Foundation
 
 extension Object {
 // CHECK-DAG: sil hidden [ossa] @$s10SomeModule6ObjectC24objc_dynamic_replacementE0F0yyF
-// CHECK-DAG: sil hidden [thunk] [objc_replacement_for "implicitObjCMethod"] [ossa] @$s10SomeModule6ObjectC24objc_dynamic_replacementE0F0yyFTo
+// CHECK-DAG: sil private [thunk] [objc_replacement_for "implicitObjCMethod"] [ossa] @$s10SomeModule6ObjectC24objc_dynamic_replacementE0F0yyFTo
   @_dynamicReplacement(for: implicitObjCMethod())
   func replacement() {
   }
 
 // CHECK-DAG: sil hidden [ossa] @$s10SomeModule6ObjectC24objc_dynamic_replacementE12replacement2yyF
-// CHECK-DAG: sil hidden [thunk] [objc_replacement_for "objCMethod"] [ossa] @$s10SomeModule6ObjectC24objc_dynamic_replacementE12replacement2yyFTo
+// CHECK-DAG: sil private [thunk] [objc_replacement_for "objCMethod"] [ossa] @$s10SomeModule6ObjectC24objc_dynamic_replacementE12replacement2yyFTo
   @_dynamicReplacement(for: objCMethod())
   func replacement2() {
   }
 
-// CHECK-DAG: sil hidden [thunk] [objc_replacement_for "objcProperty"] [ossa] @$s10SomeModule6ObjectC24objc_dynamic_replacementE12replacement3SivgTo
+// CHECK-DAG: sil private [thunk] [objc_replacement_for "objcProperty"] [ossa] @$s10SomeModule6ObjectC24objc_dynamic_replacementE12replacement3SivgTo
 // CHECK-DAG: sil hidden [ossa] @$s10SomeModule6ObjectC24objc_dynamic_replacementE12replacement3Sivg
   @_dynamicReplacement(for: objcProperty)
   var replacement3 : Int {
     return 2
   }
 
-// CHECK-DAG: sil hidden [thunk] [objc_replacement_for "objcProperty2"] [ossa] @$s10SomeModule6ObjectC24objc_dynamic_replacementE12replacement4SivgTo
+// CHECK-DAG: sil private [thunk] [objc_replacement_for "objcProperty2"] [ossa] @$s10SomeModule6ObjectC24objc_dynamic_replacementE12replacement4SivgTo
 // CHECK-DAG: sil hidden [ossa] @$s10SomeModule6ObjectC24objc_dynamic_replacementE12replacement4Sivg
   @_dynamicReplacement(for: objcProperty2)
   var replacement4 : Int {

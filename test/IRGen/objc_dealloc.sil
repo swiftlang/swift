@@ -48,7 +48,7 @@ bb0(%0 : @owned $SwiftGizmo):
   return %5 : $Builtin.NativeObject              // id: %6
 }
 
-sil [ossa] @$s12objc_dealloc10SwiftGizmoC1xAA1XCfgTo : $@convention(objc_method) (SwiftGizmo) -> @autoreleased X {
+sil private [ossa] @$s12objc_dealloc10SwiftGizmoC1xAA1XCfgTo : $@convention(objc_method) (SwiftGizmo) -> @autoreleased X {
 bb0(%0 : @unowned $SwiftGizmo):
   %1 = unchecked_ownership_conversion %0 : $SwiftGizmo, @unowned to @guaranteed
   %2 = ref_element_addr %1 : $SwiftGizmo, #SwiftGizmo.x      // user: %2
@@ -57,7 +57,7 @@ bb0(%0 : @unowned $SwiftGizmo):
   return %3 : $X                                  // id: %4
 }
 
-sil [ossa] @$s12objc_dealloc10SwiftGizmoC1xAA1XCfsTo : $@convention(objc_method) (X, SwiftGizmo) -> () {
+sil private [ossa] @$s12objc_dealloc10SwiftGizmoC1xAA1XCfsTo : $@convention(objc_method) (X, SwiftGizmo) -> () {
 bb0(%0 : @unowned $X, %1 : @unowned $SwiftGizmo):
   %2 = copy_value %0 : $X
   %3 = copy_value %1 : $SwiftGizmo
@@ -71,7 +71,7 @@ bb0(%0 : @unowned $X, %1 : @unowned $SwiftGizmo):
 }
 
 // CHECK: define internal void @"$s12objc_dealloc10SwiftGizmoCfDTo"([[OPAQUE:%.*]]* %0, i8* %1) {{[#0-9]*}} {
-sil [ossa] @$s12objc_dealloc10SwiftGizmoCfDTo : $@convention(objc_method) (SwiftGizmo) -> () {
+sil private [ossa] @$s12objc_dealloc10SwiftGizmoCfDTo : $@convention(objc_method) (SwiftGizmo) -> () {
 bb0(%0 : @unowned $SwiftGizmo):
   // CHECK-NEXT: entry
   // CHECK-NEXT: [[OBJC_SUPER:%[a-zA-Z0-9_]+]] = alloca %objc_super, align 8

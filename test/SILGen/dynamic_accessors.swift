@@ -5,24 +5,24 @@
 
 public class MyObjCClass {
   @objc public dynamic var a: Int {
-    // CHECK-LABEL: sil [thunk] [ossa] @$s17dynamic_accessors11MyObjCClassC1aSivgTo : $@convention(objc_method) (MyObjCClass) -> Int {
+    // CHECK-LABEL: sil private [thunk] [ossa] @$s17dynamic_accessors11MyObjCClassC1aSivgTo : $@convention(objc_method) (MyObjCClass) -> Int {
     // CHECK:  function_ref @$s17dynamic_accessors11MyObjCClassC1aSivg
     // CHECK: }
     get { return 4 }
 
-    // CHECK-LABEL: sil [thunk] [ossa] @$s17dynamic_accessors11MyObjCClassC1aSivsTo : $@convention(objc_method) (Int, MyObjCClass) -> () {
+    // CHECK-LABEL: sil private [thunk] [ossa] @$s17dynamic_accessors11MyObjCClassC1aSivsTo : $@convention(objc_method) (Int, MyObjCClass) -> () {
     // CHECK: function_ref @$s17dynamic_accessors11MyObjCClassC1aSivs
     // CHECK: }
     set {}
   }
 
   @objc public dynamic subscript(x: Int) -> Int {
-    // CHECK-LABEL: sil [thunk] [ossa] @$s17dynamic_accessors11MyObjCClassCyS2icigTo : $@convention(objc_method) (Int, MyObjCClass) -> Int {
+    // CHECK-LABEL: sil private [thunk] [ossa] @$s17dynamic_accessors11MyObjCClassCyS2icigTo : $@convention(objc_method) (Int, MyObjCClass) -> Int {
     // CHECK: function_ref @$s17dynamic_accessors11MyObjCClassCyS2icig
     // CHECK: }
     get { return x }
 
-    // CHECK-LABEL: sil [thunk] [ossa] @$s17dynamic_accessors11MyObjCClassCyS2icisTo : $@convention(objc_method) (Int, Int, MyObjCClass) -> () {
+    // CHECK-LABEL: sil private [thunk] [ossa] @$s17dynamic_accessors11MyObjCClassCyS2icisTo : $@convention(objc_method) (Int, Int, MyObjCClass) -> () {
     // CHECK: function_ref @$s17dynamic_accessors11MyObjCClassCyS2icis
     // CHECK: }
     set {}
