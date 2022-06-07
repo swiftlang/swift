@@ -86,6 +86,8 @@ enum class SILValueCategory : uint8_t {
   Address,
 };
 
+class SILPrinter;
+
 /// SILType - A Swift type that has been lowered to a SIL representation type.
 /// In addition to the Swift type system, SIL adds "address" types that can
 /// reference any Swift type (but cannot take the address of an address). *T
@@ -113,6 +115,8 @@ private:
 
   friend class Lowering::TypeConverter;
   friend struct llvm::DenseMapInfo<SILType>;
+  friend class SILPrinter;
+
 public:
   SILType() = default;
 
@@ -186,6 +190,7 @@ public:
   ///    move only-ness of the value (which we can query separately anyways).
   CanType getASTType() const { return withoutMoveOnly().getRawASTType(); }
 
+private:
   /// Returns the canonical AST type references by this SIL type without looking
   /// through move only. Should only be used by internal utilities of SILType.
   CanType getRawASTType() const { return CanType(value.getPointer()); }
