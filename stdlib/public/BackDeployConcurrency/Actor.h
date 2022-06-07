@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_ABI_ACTOR_H
-#define SWIFT_ABI_ACTOR_H
+#ifndef SWIFT_ABI_ACTOR_BACKDEPLOYED_H
+#define SWIFT_ABI_ACTOR_BACKDEPLOYED_H
 
 #include "swift/ABI/HeapObject.h"
 #include "swift/ABI/MetadataValues.h"
@@ -31,11 +31,21 @@ public:
   // destructor does not destroy the actor instance; you must call
   // swift_defaultActor_{initialize,destroy} yourself.
   constexpr DefaultActor(const HeapMetadata *metadata)
-    : HeapObject(metadata), PrivateData{} {}
+    : HeapObject(metadata), PrivateData{} {
+    initHeapObject();
+  }
 
   constexpr DefaultActor(const HeapMetadata *metadata,
                          InlineRefCounts::Immortal_t immortal)
-    : HeapObject(metadata, immortal), PrivateData{} {}
+    : HeapObject(metadata, immortal), PrivateData{} {
+    // By a lucky coincidence, the modern bit pattern for immortal objects also
+    // sets the immortal bit for older runtimes, so we don't need an immortal
+    // equivalent to initHeapObject().
+  }
+
+  void initHeapObject() {
+    _swift_instantiateInertHeapObject(this, metadata);
+  }
 
   void *PrivateData[NumWords_DefaultActor];
 };
