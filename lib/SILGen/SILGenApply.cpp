@@ -1142,6 +1142,8 @@ public:
     }
 
     auto captureInfo = SGF.SGM.Types.getLoweredLocalCaptures(constant);
+    SGF.SGM.Types.setCaptureTypeExpansionContext(constant, SGF.SGM.M);
+    
     if (afd->getDeclContext()->isLocalContext() &&
         !captureInfo.hasGenericParamCaptures())
       subs = SubstitutionMap();
@@ -1207,6 +1209,9 @@ public:
   }
   
   void visitAbstractClosureExpr(AbstractClosureExpr *e) {
+    SILDeclRef constant(e);
+
+    SGF.SGM.Types.setCaptureTypeExpansionContext(constant, SGF.SGM.M);
     // Emit the closure body.
     SGF.SGM.emitClosure(e);
 
@@ -1219,7 +1224,6 @@ public:
     
     // A directly-called closure can be emitted as a direct call instead of
     // really producing a closure object.
-    SILDeclRef constant(e);
 
     auto captureInfo = SGF.SGM.M.Types.getLoweredLocalCaptures(constant);
 

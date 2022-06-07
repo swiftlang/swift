@@ -441,7 +441,8 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
                                  SubstitutionMap subs,
                                  bool alreadyConverted) {
   auto loweredCaptureInfo = SGM.Types.getLoweredLocalCaptures(constant);
-
+  SGM.Types.setCaptureTypeExpansionContext(constant, SGM.M);
+  
   auto constantInfo = getConstantInfo(getTypeExpansionContext(), constant);
   SILValue functionRef = emitGlobalFunctionRef(loc, constant, constantInfo);
   SILType functionTy = functionRef->getType();
