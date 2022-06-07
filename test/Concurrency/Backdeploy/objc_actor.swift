@@ -1,8 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -target x86_64-apple-macosx10.15 %s -o %t/test_backdeploy -Xfrontend -parse-as-library
+// RUN: %target-build-swift -target %target-cpu-apple-macosx11 %s -o %t/test_backdeploy -Xfrontend -parse-as-library
 // RUN: %target-run %t/test_backdeploy
 
-// REQUIRES: CPU=x86_64
 // REQUIRES: OS=macosx
 // REQUIRES: executable_test
 // REQUIRES: concurrency_runtime
