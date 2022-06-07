@@ -1110,9 +1110,9 @@ private:
 
   void visitFuncDecl(FuncDecl *FD) {
     if (outputLang == OutputLanguageMode::Cxx) {
-      // Don't expose async functions or transparent functions
+      // Don't expose async functions or @_alwaysEmitIntoClient functions
       // because they're currently unsupported
-      if (FD->hasAsync() || FD->isTransparent()) {
+      if (FD->hasAsync() || FD->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>()) {
         return;
       }
 
