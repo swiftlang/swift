@@ -36,5 +36,5 @@ extension someType: importedDeprecatedProtocol {
     }
 }
 
-func testDeprecatedConformance<T: ImprotedNonDeprecatedProtocol>(_ x: T.Type) {}
-testDeprecatedConformance(someType.self) // expected-warning {{conformance of 'someType' to 'ImprotedNonDeprecatedProtocol' is deprecated}}
+func testDeprecatedConformance<T: ImprotedDeprecatedProtocol>(_ x: T.Type) {}
+testDeprecatedConformance(importedDeprecatedType.self)
