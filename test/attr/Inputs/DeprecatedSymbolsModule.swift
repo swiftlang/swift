@@ -28,14 +28,16 @@ public protocol ImprotedNonDeprecatedProtocol {
     var a: String { get }
 }
 
-public extension importedDeprecatedType: importedDeprecatedProtocol {
+// expected-warning {{'importedDeprecatedType' is deprecated}}
+// expected-warning {{'importedDeprecatedProtocol' is deprecated}}
+extension importedDeprecatedType: importedDeprecatedProtocol { 
     public var val: String {
         return "someValHere"
     }
 }
 
 @available(*, deprecated)
-public extension importedDeprecatedType: ImprotedNonDeprecatedProtocol {
+extension importedDeprecatedType: ImprotedNonDeprecatedProtocol {
     public var a: String {
         return "hello"
     }
