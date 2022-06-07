@@ -1,3 +1,4 @@
+// RUN: %target-typecheck-verify-swift
 @available(*, deprecated)
 public func importedDeprecatedFunc() {}
 
