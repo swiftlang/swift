@@ -20,14 +20,14 @@ struct someType {
         return b.x
     }
 
-    var t: String {
+    var t: Int {
         importedDeprecatedType.m
     }
 }
 
 func doSomething(_ b: importedDeprecatedType) { 
     _ = b.memberFunc()
-    let someRandom = importedDeprecatedVar
+    _ = importedDeprecatedVar
 }
 
 extension someType: importedDeprecatedProtocol {
