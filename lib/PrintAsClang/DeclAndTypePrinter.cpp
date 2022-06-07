@@ -1110,6 +1110,12 @@ private:
 
   void visitFuncDecl(FuncDecl *FD) {
     if (outputLang == OutputLanguageMode::Cxx) {
+      // Don't expose async functions or transparent functions
+      // because they're currently unsupported
+      if (FD->hasAsync() || FD->isTransparent()) {
+        return;
+      }
+
       // Emit the underlying C signature that matches the Swift ABI
       // in the generated C++ implementation prologue for the module.
       auto funcABI = getModuleProloguePrinter()
