@@ -396,13 +396,20 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
     if (fn->hasForcedStaticDispatch()) {
       limit = Limit::OnDemand;
     }
+  }
 
+  if (auto fn = dyn_cast<AbstractFunctionDecl>(d)) {
     // Native-to-foreign thunks for top-level decls are created on-demand,
     // unless they are marked @_cdecl, in which case they expose a dedicated
     // entry-point with the visibility of the function.
+    //
+    // Native-to-foreign thunks for methods are always just private, since
+    // they're anchored by Objective-C metadata.
     if (isNativeToForeignThunk() && !fn->getAttrs().hasAttribute<CDeclAttr>()) {
       if (fn->getDeclContext()->isModuleScopeContext())
         limit = Limit::OnDemand;
+      else
+        return SILLinkage::Private;
     }
   }
 
