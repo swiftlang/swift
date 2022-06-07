@@ -175,6 +175,8 @@ class S59215 {
     // expected-note@-1{{did you mean to use a dictionary literal instead?}} {{17-18=:}}
     m["a"] = [1 , 1] //expected-error{{dictionary of type '[String : String]' cannot be used with array literal}}
     // expected-note@-1{{did you mean to use a dictionary literal instead?}} {{17-18=:}}
+    m["a"] = Optional(["", ""]) //expected-error{{dictionary of type '[String : String]' cannot be used with array literal}}
+    // expected-note@-1{{did you mean to use a dictionary literal instead?}} {{26-27=:}}
   }
 }
 

@@ -4228,14 +4228,16 @@ static bool repairArrayLiteralUsedAsDictionary(
   if (auto *fix = TreatArrayLiteralAsDictionary::attempt(cs, dictType,
                                                          arrayType, loc)) {
     // Ignore any attempts at promoting the value to an optional as even after
-    // stripping off all optionals above the underlying types don't match (array
+    // stripping off all optionals above the underlying types won't match (array
     // vs dictionary).
     conversionsOrFixes.erase(
         llvm::remove_if(conversionsOrFixes,
                         [&](RestrictionOrFix &E) {
                           if (auto restriction = E.getRestriction())
-                            return *restriction ==
-                                   ConversionRestrictionKind::ValueToOptional;
+                            return *restriction == ConversionRestrictionKind::
+                                                       ValueToOptional ||
+                                   *restriction == ConversionRestrictionKind::
+                                                       OptionalToOptional;
                           return false;
                         }),
         conversionsOrFixes.end());
@@ -4702,6 +4704,12 @@ bool ConstraintSystem::repairFailures(
         return true;
       }
 
+      // If we are trying to assign e.g. `Array<Int>` to `Array<Float>` let's
+      // give solver a chance to determine which generic parameters are
+      // mismatched and produce a fix for that.
+      if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality))
+        return false;
+
       // An attempt to assign `Int?` to `String?`.
       if (hasConversionOrRestriction(
               ConversionRestrictionKind::OptionalToOptional)) {
@@ -4709,12 +4717,6 @@ bool ConstraintSystem::repairFailures(
             *this, lhs, rhs, getConstraintLocator(locator)));
         return true;
       }
-
-      // If we are trying to assign e.g. `Array<Int>` to `Array<Float>` let's
-      // give solver a chance to determine which generic parameters are
-      // mismatched and produce a fix for that.
-      if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality))
-        return false;
 
       // If the situation has to do with protocol composition types and
       // destination doesn't have one of the conformances e.g. source is
