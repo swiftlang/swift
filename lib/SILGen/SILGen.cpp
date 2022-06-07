@@ -1421,6 +1421,8 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
 }
 
 void SILGenModule::emitFunction(FuncDecl *fd) {
+  Types.setCaptureTypeExpansionContext(SILDeclRef(fd), M);
+
   SILDeclRef::Loc decl = fd;
 
   emitAbstractFuncDecl(fd);

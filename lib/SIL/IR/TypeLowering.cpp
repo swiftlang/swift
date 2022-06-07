@@ -3623,6 +3623,19 @@ TypeConverter::getConstantAbstractionPattern(SILDeclRef constant) {
   return None;
 }
 
+TypeExpansionContext
+TypeConverter::getCaptureTypeExpansionContext(SILDeclRef constant) {
+  auto found = CaptureTypeExpansionContexts.find(constant);
+  if (found != CaptureTypeExpansionContexts.end()) {
+    return found->second;
+  }
+  // Insert a minimal type expansion context into the cache, so that further
+  // attempts to change it raise an error.
+  auto minimal = TypeExpansionContext::minimal();
+  CaptureTypeExpansionContexts.insert({constant, minimal});
+  return minimal;
+}
+
 void TypeConverter::setAbstractionPattern(AbstractClosureExpr *closure,
                                           AbstractionPattern pattern) {
   auto existing = ClosureAbstractionPatterns.find(closure);
@@ -3631,6 +3644,31 @@ void TypeConverter::setAbstractionPattern(AbstractClosureExpr *closure,
      && "closure shouldn't be emitted at different abstraction level contexts");
   } else {
     ClosureAbstractionPatterns[closure] = pattern;
+  }
+}
+
+void TypeConverter::setCaptureTypeExpansionContext(SILDeclRef constant,
+                                                   SILModule &M) {
+  if (!hasLoweredLocalCaptures(constant)) {
+    return;
+  }
+  
+  TypeExpansionContext context = constant.isSerialized()
+    ? TypeExpansionContext::minimal()
+    : TypeExpansionContext::maximal(constant.getAnyFunctionRef()->getAsDeclContext(),
+                                    M.isWholeModule());
+
+  auto existing = CaptureTypeExpansionContexts.find(constant);
+  if (existing != CaptureTypeExpansionContexts.end()) {
+    assert(existing->second == context
+     && "closure shouldn't be emitted with different capture type expansion contexts");
+  } else {
+    // Lower in the context of the closure. Since the set of captures is a
+    // private contract between the closure and its enclosing context, we
+    // don't need to keep its capture types opaque.
+    // The exception is if it's inlinable, in which case it might get inlined into
+    // some place we need to keep opaque types opaque.
+    CaptureTypeExpansionContexts.insert({constant, context});
   }
 }
 

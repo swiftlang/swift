@@ -752,6 +752,8 @@ class TypeConverter {
   
   llvm::DenseMap<AbstractClosureExpr *, Optional<AbstractionPattern>>
     ClosureAbstractionPatterns;
+  llvm::DenseMap<SILDeclRef, TypeExpansionContext>
+    CaptureTypeExpansionContexts;
 
   CanAnyFunctionType makeConstantInterfaceType(SILDeclRef constant);
   
@@ -1156,6 +1158,7 @@ public:
   /// the abstraction pattern is queried using this function. Once the
   /// abstraction pattern has been asked for, it may not be changed.
   Optional<AbstractionPattern> getConstantAbstractionPattern(SILDeclRef constant);
+  TypeExpansionContext getCaptureTypeExpansionContext(SILDeclRef constant);
   
   /// Set the preferred abstraction pattern for a closure.
   ///
@@ -1165,6 +1168,8 @@ public:
   void setAbstractionPattern(AbstractClosureExpr *closure,
                              AbstractionPattern pattern);
   
+  void setCaptureTypeExpansionContext(SILDeclRef constant,
+                                      SILModule &M);
 private:
   CanType computeLoweredRValueType(TypeExpansionContext context,
                                    AbstractionPattern origType,
