@@ -36,5 +36,5 @@ extension someType: importedDeprecatedProtocol {
     }
 }
 
-func testDeprecatedConformance<T: ImprotedDeprecatedProtocol>(_ x: T.Type) {}
+func testDeprecatedConformance<T: ImprotedNonDeprecatedProtocol>(_ x: T.Type) {}
 testDeprecatedConformance(importedDeprecatedType.self)
