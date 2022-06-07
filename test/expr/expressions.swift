@@ -559,8 +559,8 @@ struct SpecialPi {} // Type with no implicit construction.
 
 var pi_s: SpecialPi
 
-func getPi() -> Float {}
-func getPi() -> Double {}
+func getPi() -> Float {}  // expected-note 3 {{found this candidate}}
+func getPi() -> Double {} // expected-note 3 {{found this candidate}}
 func getPi() -> SpecialPi {}
 
 enum Empty { }
@@ -582,12 +582,12 @@ func conversionTest(_ a: inout Double, b: inout Int) {
   var pi_d1 = Double(pi_d)
   var pi_s1 = SpecialPi(pi_s) // expected-error {{argument passed to call that takes no arguments}}
 
-  var pi_f2 = Float(getPi()) // expected-error {{ambiguous use of 'init(_:)'}}
-  var pi_d2 = Double(getPi()) // expected-error {{ambiguous use of 'init(_:)'}}
+  var pi_f2 = Float(getPi()) // expected-error {{ambiguous use of 'getPi()'}}
+  var pi_d2 = Double(getPi()) // expected-error {{ambiguous use of 'getPi()'}}
   var pi_s2: SpecialPi = getPi() // no-warning
   
   var float = Float.self
-  var pi_f3 = float.init(getPi()) // expected-error {{ambiguous use of 'init(_:)'}}
+  var pi_f3 = float.init(getPi()) // expected-error {{ambiguous use of 'getPi()'}}
   var pi_f4 = float.init(pi_f)
 
   var e = Empty(f) // expected-warning {{variable 'e' inferred to have type 'Empty', which is an enum with no cases}} expected-note {{add an explicit type annotation to silence this warning}}  {{8-8=: Empty}}
