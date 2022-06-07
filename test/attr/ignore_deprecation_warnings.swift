@@ -90,9 +90,6 @@ func b() -> Int {
     return aNormalType(someNumber: 420).multipliedByTwo
 }
 
-func c() -> Int {
-    return aNormalType(someNumber: 69).multipliedByTwo // expected-warning {{'multipliedByTwo' is deprecated}}
-}
+func useConformance<T: aProtocol>(_ x: T.Type) {}
+useConformance(aNormalType.self) // expected-warning {{conformance of 'aNormalType' to 'aProtocol' is deprecated}}
 
-@ignoreDeprecationWarnings
-func t(_ x: deprecatedType) {}

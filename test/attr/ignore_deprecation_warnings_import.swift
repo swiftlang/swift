@@ -23,10 +23,6 @@ struct someType {
     var t: String {
         importedDeprecatedType.m
     }
-
-    func testDeprecatedConformance() {
-        _ = self.b.a
-    }
 }
 
 func doSomething(_ b: importedDeprecatedType) { 
@@ -39,3 +35,6 @@ extension someType: importedDeprecatedProtocol {
         return ""
     }
 }
+
+func testDeprecatedConformance<T: ImprotedNonDeprecatedProtocol>(_ x: T.Type) {}
+testDeprecatedConformance(someType.self) // expected-warning {{conformance of 'someType' to 'ImprotedNonDeprecatedProtocol' is deprecated}}
