@@ -14,10 +14,9 @@
 #include "swift/Runtime/Atomic.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Once.h"
-#include "swift/Runtime/Mutex.h"
 #include "ConcurrencyRuntime.h"
-#include "swift/Runtime/ThreadLocal.h"
-#include "swift/Runtime/ThreadLocalStorage.h"
+#include "swift/Threading/Mutex.h"
+#include "swift/Threading/ThreadLocalStorage.h"
 #include "swift/ABI/Metadata.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "Actor.h"
@@ -32,14 +31,8 @@
 #include <android/log.h>
 #endif
 
-#if HAVE_PTHREAD_H
-#include <pthread.h>
-#endif
-
 #if defined(_WIN32)
 #include <io.h>
-#include <handleapi.h>
-#include <processthreadsapi.h>
 #endif
 
 using namespace swift;
@@ -58,9 +51,8 @@ template <class T> struct Pointer {
 
 /// THIS IS RUNTIME INTERNAL AND NOT ABI.
 class FallbackTaskLocalStorage {
-  static SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(
-      Pointer<TaskLocal::Storage>, Value,
-      SWIFT_CONCURRENCY_FALLBACK_TASK_LOCAL_STORAGE_KEY);
+  static SWIFT_THREAD_LOCAL_TYPE(Pointer<TaskLocal::Storage>,
+                                 tls_key::concurrency_fallback) Value;
 
 public:
   static void set(TaskLocal::Storage *task) { Value.set(task); }
@@ -68,9 +60,10 @@ public:
 };
 
 /// Define the thread-locals.
-SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(
-    Pointer<TaskLocal::Storage>, FallbackTaskLocalStorage::Value,
-    SWIFT_CONCURRENCY_FALLBACK_TASK_LOCAL_STORAGE_KEY);
+SWIFT_THREAD_LOCAL_TYPE(
+    Pointer<TaskLocal::Storage>,
+    tls_key::concurrency_fallback)
+FallbackTaskLocalStorage::Value;
 
 // ==== ABI --------------------------------------------------------------------
 
