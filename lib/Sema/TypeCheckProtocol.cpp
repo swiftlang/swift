@@ -1315,25 +1315,41 @@ WitnessChecker::lookupValueWitnesses(ValueDecl *req, bool *ignoringNames) {
   auto reqName = req->createNameRef();
   auto reqBaseName = reqName.withoutArgumentLabels();
 
-  if (req->isOperator()) {
-    // Operator lookup is always global.
+  // An operator function is the only kind of witness that requires global
+  // lookup. However, because global lookup doesn't enter local contexts,
+  // an additional, qualified lookup is warranted when the conforming type
+  // is declared in a local context.
+  const bool doUnqualifiedLookup = req->isOperator();
+  const bool doQualifiedLookup =
+      !req->isOperator() || DC->getParent()->getLocalContext();
+
+  if (doUnqualifiedLookup) {
     auto lookup = TypeChecker::lookupUnqualified(DC->getModuleScopeContext(),
                                                  reqBaseName, SourceLoc(),
                                                  defaultUnqualifiedLookupOptions);
     for (auto candidate : lookup) {
       auto decl = candidate.getValueDecl();
-      if (swift::isMemberOperator(cast<FuncDecl>(decl), Adoptee)) {
+      if (!isa<ProtocolDecl>(decl->getDeclContext()) &&
+          swift::isMemberOperator(cast<FuncDecl>(decl), Adoptee)) {
         witnesses.push_back(decl);
       }
     }
-  } else {
-    // Variable/function/subscript requirements.
+  }
+
+  if (doQualifiedLookup) {
     auto *nominal = Adoptee->getAnyNominal();
     nominal->synthesizeSemanticMembersIfNeeded(reqName.getFullName());
 
+    // Unqualified lookup would have already found candidates from protocol
+    // extensions, including those that match only by base name. Take care not
+    // to restate them in the resulting list, or else an otherwise valid
+    // conformance will become ambiguous.
+    const NLOptions options =
+        doUnqualifiedLookup ? NLOptions(0) : NL_ProtocolMembers;
+
     SmallVector<ValueDecl *, 4> lookupResults;
     bool addedAny = false;
-    DC->lookupQualified(nominal, reqName, NL_ProtocolMembers, lookupResults);
+    DC->lookupQualified(nominal, reqName, options, lookupResults);
     for (auto *decl : lookupResults) {
       if (!isa<ProtocolDecl>(decl->getDeclContext())) {
         witnesses.push_back(decl);
@@ -1345,7 +1361,7 @@ WitnessChecker::lookupValueWitnesses(ValueDecl *req, bool *ignoringNames) {
     // again using only the base name.
     if (!addedAny && ignoringNames) {
       lookupResults.clear();
-      DC->lookupQualified(nominal, reqBaseName, NL_ProtocolMembers, lookupResults);
+      DC->lookupQualified(nominal, reqBaseName, options, lookupResults);
       for (auto *decl : lookupResults) {
         if (!isa<ProtocolDecl>(decl->getDeclContext()))
           witnesses.push_back(decl);
@@ -1357,6 +1373,10 @@ WitnessChecker::lookupValueWitnesses(ValueDecl *req, bool *ignoringNames) {
     removeOverriddenDecls(witnesses);
     removeShadowedDecls(witnesses, DC);
   }
+
+  assert(llvm::none_of(witnesses, [](ValueDecl *decl) {
+    return isa<ProtocolDecl>(decl->getDeclContext());
+  }));
 
   return witnesses;
 }
