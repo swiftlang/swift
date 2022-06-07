@@ -6,7 +6,7 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: OS=wasi
-// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deploy_concurrency
 
 // This test makes sure that:
 //
