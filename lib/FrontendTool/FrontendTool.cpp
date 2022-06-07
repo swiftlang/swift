@@ -602,6 +602,7 @@ static swift::file_types::ID computeFileTypeForPath(const StringRef Path) {
     // then iterate over all preceeding possible extension variants.
     while (llvm::sys::path::has_extension(PathStem)) {
       auto NextExtension = llvm::sys::path::extension(PathStem);
+      PathStem = llvm::sys::path::stem(PathStem);
       Extension = NextExtension.str() + Extension;
       FileType = file_types::lookupTypeForExtension(Extension);
       if (FileType != swift::file_types::ID::TY_INVALID)
