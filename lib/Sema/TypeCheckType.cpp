@@ -430,7 +430,7 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
     selfType = foundDC->getSelfInterfaceType();
 
     if (selfType->is<GenericTypeParamType>()) {
-      if (typeDecl->getDeclContext()->getSelfProtocolDecl()) {
+      if (isa<ProtocolDecl>(typeDecl->getDeclContext())) {
         if (isa<AssociatedTypeDecl>(typeDecl) ||
             (isa<TypeAliasDecl>(typeDecl) &&
              !cast<TypeAliasDecl>(typeDecl)->isGeneric() &&
@@ -1434,6 +1434,23 @@ static Type resolveTopLevelIdentTypeComponent(TypeResolution resolution,
   auto globals = TypeChecker::lookupUnqualifiedType(DC, id, comp->getLoc(),
                                                     lookupOptions);
 
+  // If we're doing structural resolution and one of the results is an
+  // associated type, ignore any other results found from the same
+  // DeclContext; they are going to be protocol typealiases, possibly
+  // from constrained extensions, and trying to compute their type in
+  // resolveTypeInContext() might hit request cycles since structural
+  // resolution is performed while computing the requirement signature
+  // of the protocol.
+  DeclContext *assocTypeDC = nullptr;
+  if (resolution.getStage() == TypeResolutionStage::Structural) {
+    for (const auto &entry : globals) {
+      if (isa<AssociatedTypeDecl>(entry.getValueDecl())) {
+        assocTypeDC = entry.getDeclContext();
+        break;
+      }
+    }
+  }
+
   // Process the names we found.
   Type current;
   TypeDecl *currentDecl = nullptr;
@@ -1443,6 +1460,13 @@ static Type resolveTopLevelIdentTypeComponent(TypeResolution resolution,
     auto *foundDC = entry.getDeclContext();
     auto *typeDecl = cast<TypeDecl>(entry.getValueDecl());
 
+    // See the comment above.
+    if (assocTypeDC != nullptr &&
+        foundDC == assocTypeDC && !isa<AssociatedTypeDecl>(typeDecl))
+      continue;
+
+    // Compute the type of the found declaration when referenced from this
+    // location.
     Type type = resolveTypeDecl(typeDecl, foundDC, resolution, silParams, comp);
     if (type->is<ErrorType>())
       return type;
