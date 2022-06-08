@@ -1653,13 +1653,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
 #include "swift/AST/MagicIdentifierKinds.def"
   {
     auto Kind = getMagicIdentifierLiteralKind(Tok.getKind(), Context.LangOpts);
-    SyntaxKind SKind = getMagicIdentifierSyntaxKind(Kind);
-
-    ExprContext.setCreateSyntax(SKind);
-    SourceLoc Loc = consumeToken();
-
-    return makeParserResult(new (Context) MagicIdentifierLiteralExpr(
-        Kind, Loc, /*implicit=*/false));
+    return parseMagicIdentifierLiteral(Kind);
   }
       
   case tok::identifier:  // foo
@@ -2357,6 +2351,38 @@ DeclNameRef Parser::parseDeclNameRef(DeclNameLoc &loc,
     return DeclNameRef(baseName);
 
   return DeclNameRef({ Context, baseName, argumentLabels });
+}
+
+ParserResult<Expr>
+Parser::parseMagicIdentifierLiteral(MagicIdentifierLiteralExpr::Kind Kind) {
+  SyntaxKind SKind = getMagicIdentifierSyntaxKind(Kind);
+
+  SyntaxParsingContext ExprContext(SyntaxContext, SyntaxContextKind::Expr);
+  ExprContext.setCreateSyntax(SKind);
+  SourceLoc Loc = consumeToken();
+
+  // If the magic identifier takes an argument list, capture it too.
+  ArgumentList *argList = nullptr; {
+    bool parseArgList = false;
+#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND)
+#define MAGIC_IDENTIFIER_TAKES_ARGUMENT(NAME) \
+  if (Kind == MagicIdentifierLiteralExpr::NAME) { parseArgList = true; }
+#include "swift/AST/MagicIdentifierKinds.def"
+    if (parseArgList) {
+      auto args = parseArgumentList(tok::l_paren, tok::r_paren,
+                                    /*isExprBasic=*/false);
+      if (args.isParseError()) {
+        // TODO: @Transcribed -- diagnostics
+        // diagnose(Tok, ...);
+        return makeParserError();
+      } else {
+        argList = args.getPtrOrNull();
+      }
+    }
+  }
+
+  return makeParserResult(new (Context) MagicIdentifierLiteralExpr(
+    Kind, Loc, argList, /*defaultExpr=*/nullptr, /*implicit=*/false));
 }
 
 ///   expr-identifier:

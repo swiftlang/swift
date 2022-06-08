@@ -1659,6 +1659,9 @@ public:
   DeclNameRef parseDeclNameRef(DeclNameLoc &loc, const Diagnostic &diag,
                                DeclNameOptions flags);
 
+  ParserResult<Expr>
+  parseMagicIdentifierLiteral(MagicIdentifierLiteralExpr::Kind Kind);
+
   ParserResult<Expr> parseExprIdentifier();
   Expr *parseExprEditorPlaceholder(Token PlaceholderTok,
                                    Identifier PlaceholderId);

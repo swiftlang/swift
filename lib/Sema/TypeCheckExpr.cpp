@@ -694,15 +694,31 @@ Expr *TypeChecker::foldSequence(SequenceExpr *expr, DeclContext *dc) {
   return Result;
 }
 
+static MagicIdentifierLiteralExpr *
+synthesizeMagicIdentifierLiteral(ASTContext &ctx, const ParamDecl *param,
+                                 SourceLoc loc, DefaultArgumentExpr *defaultExpr,
+                                 MagicIdentifierLiteralExpr::Kind kind) {
+
+  ArgumentList *argList = nullptr;
+  if (auto structuralExpr = param->getStructuralDefaultExpr()) {
+    if (auto original = dyn_cast<MagicIdentifierLiteralExpr>(structuralExpr)) {
+      argList = original->getArgs();
+    }
+  }
+
+  return new (ctx) MagicIdentifierLiteralExpr(kind, loc, argList, defaultExpr,
+                                              /*implicit=*/true);
+}
+
 static Expr *synthesizeCallerSideDefault(const ParamDecl *param,
-                                         SourceLoc loc) {
+                                         DefaultArgumentExpr *defaultExpr) {
   auto &ctx = param->getASTContext();
+  auto loc = defaultExpr->getLoc();
   switch (param->getDefaultArgumentKind()) {
 #define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
   case DefaultArgumentKind::NAME: \
-    return new (ctx) \
-        MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::NAME, loc, \
-                                   /*implicit=*/true);
+    return synthesizeMagicIdentifierLiteral(ctx, param, loc, defaultExpr, \
+      MagicIdentifierLiteralExpr::NAME);
 #include "swift/AST/MagicIdentifierKinds.def"
 
   case DefaultArgumentKind::NilLiteral:
@@ -735,7 +751,7 @@ Expr *CallerSideDefaultArgExprRequest::evaluate(
 
   // Re-create the default argument using the location info of the call site.
   auto *initExpr =
-      synthesizeCallerSideDefault(param, defaultExpr->getLoc());
+      synthesizeCallerSideDefault(param, defaultExpr);
   auto *dc = defaultExpr->ContextOrCallerSideExpr.get<DeclContext *>();
   assert(dc && "Expected a DeclContext before type-checking caller-side arg");
 

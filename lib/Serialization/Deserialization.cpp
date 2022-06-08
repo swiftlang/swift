@@ -208,6 +208,7 @@ getActualDefaultArgKind(uint8_t raw) {
   CASE(EmptyArray)
   CASE(EmptyDictionary)
   CASE(StoredProperty)
+  CASE(Transcription)
 #undef CASE
   }
   return None;

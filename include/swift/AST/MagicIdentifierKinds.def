@@ -46,6 +46,11 @@
 #define MAGIC_IDENTIFIER_DEPRECATED_TOKEN(NAME, TOKEN) MAGIC_IDENTIFIER_TOKEN(NAME, TOKEN)
 #endif
 
+// Used when a magic identifier takes an argument.
+#ifndef MAGIC_IDENTIFIER_TAKES_ARGUMENT
+#define MAGIC_IDENTIFIER_TAKES_ARGUMENT(NAME)
+#endif
+
 
 
 //
@@ -77,6 +82,11 @@ MAGIC_STRING_IDENTIFIER(FilePathSpelledAsFile, "#file", PoundFileExpr)
 MAGIC_STRING_IDENTIFIER(Function, "#function", PoundFunctionExpr)
   MAGIC_IDENTIFIER_TOKEN(Function, pound_function)
   MAGIC_IDENTIFIER_DEPRECATED_TOKEN(Function, kw___FUNCTION__)
+
+/// The \c #function magic identifier literal.
+MAGIC_STRING_IDENTIFIER(Transcription, "#transcription", PoundTranscriptionExpr)
+  MAGIC_IDENTIFIER_TOKEN(Transcription, pound_transcription)
+  MAGIC_IDENTIFIER_TAKES_ARGUMENT(Transcription)
 
 
 
@@ -114,3 +124,4 @@ MAGIC_POINTER_IDENTIFIER(DSOHandle, "#dsohandle", PoundDsohandleExpr)
 #undef MAGIC_POINTER_IDENTIFIER
 #undef MAGIC_IDENTIFIER_TOKEN
 #undef MAGIC_IDENTIFIER_DEPRECATED_TOKEN
+#undef MAGIC_IDENTIFIER_TAKES_ARGUMENT

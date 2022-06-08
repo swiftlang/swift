@@ -48,6 +48,7 @@ namespace swift {
   class ValueDecl;
   class Decl;
   class DeclRefExpr;
+  class DefaultArgumentExpr;
   class OpenedArchetypeType;
   class ParamDecl;
   class Pattern;
@@ -1041,11 +1042,15 @@ public:
 
 private:
   SourceLoc Loc;
+  ArgumentList *ArgList;
+  DefaultArgumentExpr *DefaultArgument;
 
 public:
-  MagicIdentifierLiteralExpr(Kind kind, SourceLoc loc, bool implicit = false)
+  MagicIdentifierLiteralExpr(Kind kind, SourceLoc loc, ArgumentList *argList,
+                             DefaultArgumentExpr *defaultArgument,
+                             bool implicit = false)
       : BuiltinLiteralExpr(ExprKind::MagicIdentifierLiteral, implicit),
-        Loc(loc) {
+        Loc(loc), ArgList(argList), DefaultArgument(defaultArgument) {
     Bits.MagicIdentifierLiteralExpr.Kind = static_cast<unsigned>(kind);
     Bits.MagicIdentifierLiteralExpr.StringEncoding
       = static_cast<unsigned>(StringLiteralExpr::UTF8);
@@ -1084,6 +1089,18 @@ public:
     assert(isString() && "Magic identifier literal has non-string encoding");
     Bits.MagicIdentifierLiteralExpr.StringEncoding
       = static_cast<unsigned>(encoding);
+  }
+
+  ArgumentList *getArgs() const { return ArgList; }
+  void setArgs(ArgumentList *newArgs) { ArgList = newArgs; }
+
+  /// Get the default argument corresponding to this magic identifier literal,
+  /// if any.
+  ///
+  /// If a magic identifier literal does not correspond to a default argument,
+  /// the result of this function is \c nullptr.
+  DefaultArgumentExpr *getDefaultArgumentExpr() const {
+    return DefaultArgument;
   }
 
   static bool classof(const Expr *E) {
@@ -4404,13 +4421,16 @@ class DefaultArgumentExpr final : public Expr {
   /// default expression.
   PointerUnion<DeclContext *, Expr *> ContextOrCallerSideExpr;
 
+  /// The argument list of which this default argument is a member.
+  ArgumentList *CallerArgList;
+
 public:
   explicit DefaultArgumentExpr(ConcreteDeclRef defaultArgsOwner,
                                unsigned paramIndex, SourceLoc loc, Type Ty,
                                DeclContext *dc)
     : Expr(ExprKind::DefaultArgument, /*Implicit=*/true, Ty),
       DefaultArgsOwner(defaultArgsOwner), ParamIndex(paramIndex), Loc(loc),
-      ContextOrCallerSideExpr(dc) { }
+      ContextOrCallerSideExpr(dc), CallerArgList(nullptr) { }
 
   SourceRange getSourceRange() const { return Loc; }
 
@@ -4432,6 +4452,12 @@ public:
   /// For a caller-side default argument, retrieves the fully type-checked
   /// expression within the context of the call site.
   Expr *getCallerSideDefaultExpr() const;
+
+  /// Gets the argument list of which this default argument is a member.
+  ArgumentList *getCallerArgs() const { return CallerArgList; }
+
+  /// Sets the argument list of which this default argument is a member.
+  void setCallerArgs(ArgumentList *argList) { CallerArgList = argList; }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::DefaultArgument;

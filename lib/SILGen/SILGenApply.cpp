@@ -39,6 +39,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Unicode.h"
+#include "swift/Parse/Lexer.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "clang/AST/DeclCXX.h"
@@ -1983,6 +1984,37 @@ buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
   return args;
 }
 
+static StringRef transcribe(ASTContext& ctx, SourceRange exprRange) {
+  // Find the rance of source characters corresponding to the input expression.
+  // If no such range can be found, assume the expression was compiler-generated.
+  auto sourceRange = Lexer::getCharSourceRangeFromSourceRange(ctx.SourceMgr,
+                                                              exprRange);
+  if (sourceRange.isValid()) {
+    return ctx.SourceMgr.extractText(sourceRange);
+  }
+
+  // TODO: @Transcribed -- diagnostic?
+
+  return "<compiler-generated>";
+}
+
+static Expr *findArgumentExprWithLabel(DefaultArgumentExpr *defaultArgExpr,
+                                       StringRef expectedLabel) {
+  if (auto argList = defaultArgExpr->getCallerArgs()) {
+    for (auto arg : *argList) {
+      auto label = arg.getLabel().str(); // FIXME: @Transcribed -- internal label
+      if (label.empty()) {
+        label = arg.getLabel().str();
+      }
+      if (label.str() == expectedLabel) {
+        return arg.getExpr();
+      }
+    }
+  }
+
+  return nullptr;
+}
+
 static inline PreparedArguments
 buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
                         MagicIdentifierLiteralExpr *magicLiteral) {
@@ -2028,6 +2060,47 @@ buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
     builtinLiteralArgs.emplace(AnyFunctionType::Param(ty));
     builtinLiteralArgs.add(magicLiteral, RValue(SGF, {integerManaged}, ty));
     return builtinLiteralArgs;
+  }
+  case MagicIdentifierLiteralExpr::Transcription: {
+    // If we have a corresponding default argument expression, do the math
+    // and find the right argument in its argument list. Otherwise, just use the
+    // parameter expression captured during parsing (warn?)
+    // TODO: @Transcribed -- diagnostics, not assertions
+    auto argList = magicLiteral->getArgs();
+    assert(argList && "Magic identifier literal missing a parameter expression");
+    assert(argList->size() == 1 && "Magic identifier literal takes one argument");
+    Argument arg = argList->get(0);
+
+    // Get us some source code!
+    StringRef sourceCode;
+    if (auto defaultExpr = magicLiteral->getDefaultArgumentExpr()) {
+      // Look for an argument in the argument list with an internal label that
+      // matches the one specified by the developer.
+      auto declRefExpr = dyn_cast<UnresolvedDeclRefExpr>(arg.getExpr());
+      if (arg.getLabel().str() == "of" && declRefExpr) {
+        // TODO: @Transcribed -- diagnostics, not assertions
+        assert(declRefExpr->getName().isSimpleName() && "Magic identifier literal just needs an argument label");
+        auto argLabel = declRefExpr->getName().getBaseIdentifier().str();
+
+        if (auto expr = findArgumentExprWithLabel(defaultExpr, argLabel)) {
+          sourceCode = transcribe(ctx, expr->getSourceRange());
+        } else {
+          // TODO: @Transcribed -- diagnostics, not assertions
+          assert("Argument with that name not found" && false);
+        }
+      } else {
+        // TODO: @Transcribed -- diagnostics, not assertions
+        assert("Invalid argument to #transcription" && false);
+      }
+
+    } else {
+      // No argument list. Resolve the source code of the magic identifier's
+      // argument list itself.
+      sourceCode = transcribe(ctx, arg.getSourceRange());
+    }
+
+    return emitStringLiteralArgs(SGF, magicLiteral, sourceCode, C,
+                                 magicLiteral->getStringEncoding());
   }
   case MagicIdentifierLiteralExpr::DSOHandle:
     llvm_unreachable("handled elsewhere");

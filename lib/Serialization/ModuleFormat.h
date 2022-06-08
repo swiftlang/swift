@@ -500,6 +500,7 @@ enum class DefaultArgumentKind : uint8_t {
   EmptyArray,
   EmptyDictionary,
   StoredProperty,
+  Transcription,
 };
 using DefaultArgumentField = BCFixed<4>;
 

@@ -552,6 +552,8 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
                     "Swift 5 #file < #function");
       static_assert(Kind::FilePathSpelledAsFile < Kind::DSOHandle,
                     "Swift 5 #file < #dsohandle");
+      static_assert(Kind::FilePathSpelledAsFile < Kind::Transcription,
+                    "Swift 5 #file < #transcription");
 
       // The rules are all commutative, so we will take the greater of the two
       // kinds.

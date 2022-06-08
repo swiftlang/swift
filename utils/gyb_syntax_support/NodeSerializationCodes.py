@@ -261,6 +261,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'BackDeployAttributeSpecList' : 257,
     'BackDeployVersionList' : 258,
     'BackDeployVersionArgument' : 259,
+    'PoundTranscriptionExpr': 260,
 }
 
 

@@ -806,6 +806,8 @@ ArgumentList *Expr::getArgs() const {
     return DSE->getArgs();
   if (auto *OLE = dyn_cast<ObjectLiteralExpr>(this))
     return OLE->getArgs();
+  if (auto *MILE = dyn_cast<MagicIdentifierLiteralExpr>(this))
+    return MILE->getArgs();
   return nullptr;
 }
 

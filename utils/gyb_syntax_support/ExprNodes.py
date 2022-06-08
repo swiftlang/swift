@@ -164,6 +164,19 @@ EXPR_NODES = [
              Child('PoundDsohandle', kind='PoundDsohandleToken'),
          ]),
 
+    # A #transcription expression.
+    Node('PoundTranscriptionExpr', kind='Expr',
+         traits=['Parenthesized'],
+         children=[
+             Child('PoundTranscription', kind='PoundTranscriptionToken'),
+             Child('LeftParen', kind='LeftParenToken'),
+             Child('Kind', kind='ContextualKeywordToken',
+                   text_choices=['of']),
+             Child('Colon', kind='ColonToken'),
+             Child('ParameterName', kind='Expr'),
+             Child('RightParen', kind='RightParenToken'),
+         ]),
+
     # symbolic-reference-expression -> identifier generic-argument-clause?
     Node('SymbolicReferenceExpr', kind='Expr',
          children=[

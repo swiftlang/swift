@@ -5651,6 +5651,7 @@ ArgumentList *ExprRewriter::coerceCallArguments(
   auto parameterBindings = solution.argumentMatchingChoices.find(locatorPtr)
                                ->second.parameterBindings;
 
+  SmallVector<DefaultArgumentExpr *, 4> defaultArgs;
   SmallVector<Argument, 4> newArgs;
   for (unsigned paramIdx = 0, numParams = parameterBindings.size();
        paramIdx != numParams; ++paramIdx) {
@@ -5770,6 +5771,7 @@ ArgumentList *ExprRewriter::coerceCallArguments(
       auto *defArg = new (ctx) DefaultArgumentExpr(
           owner, paramIdx, args->getStartLoc(), paramTy, dc);
       cs.cacheType(defArg);
+      defaultArgs.push_back(defArg);
       newArgs.emplace_back(SourceLoc(), param.getLabel(), defArg);
       continue;
     }
@@ -5931,7 +5933,14 @@ ArgumentList *ExprRewriter::coerceCallArguments(
     arg.setExpr(convertedArg);
     newArgs.push_back(arg);
   }
-  return ArgumentList::createTypeChecked(ctx, args, newArgs);
+  auto finalArgList = ArgumentList::createTypeChecked(ctx, args, newArgs);
+
+  // Capture a reference to the final argument list in every default argument.
+  for (auto defaultArgExpr : defaultArgs) {
+    defaultArgExpr->setCallerArgs(finalArgList);
+  }
+
+  return finalArgList;
 }
 
 static bool isClosureLiteralExpr(Expr *expr) {

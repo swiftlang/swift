@@ -388,22 +388,22 @@ synthesizeStubBody(AbstractFunctionDecl *fn, void *) {
   className->setType(staticStringType);
 
   auto *initName = new (ctx) MagicIdentifierLiteralExpr(
-    MagicIdentifierLiteralExpr::Function, loc, /*Implicit=*/true);
+    MagicIdentifierLiteralExpr::Function, loc, nullptr, nullptr, /*Implicit=*/true);
   initName->setType(staticStringType);
   initName->setBuiltinInitializer(staticStringInit);
 
   auto *file = new (ctx) MagicIdentifierLiteralExpr(
-    MagicIdentifierLiteralExpr::FileID, loc, /*Implicit=*/true);
+    MagicIdentifierLiteralExpr::FileID, loc, nullptr, nullptr, /*Implicit=*/true);
   file->setType(staticStringType);
   file->setBuiltinInitializer(staticStringInit);
 
   auto *line = new (ctx) MagicIdentifierLiteralExpr(
-    MagicIdentifierLiteralExpr::Line, loc, /*Implicit=*/true);
+    MagicIdentifierLiteralExpr::Line, loc, nullptr, nullptr, /*Implicit=*/true);
   line->setType(uintType);
   line->setBuiltinInitializer(uintInit);
 
   auto *column = new (ctx) MagicIdentifierLiteralExpr(
-    MagicIdentifierLiteralExpr::Column, loc, /*Implicit=*/true);
+    MagicIdentifierLiteralExpr::Column, loc, nullptr, nullptr, /*Implicit=*/true);
   column->setType(uintType);
   column->setBuiltinInitializer(uintInit);
 
