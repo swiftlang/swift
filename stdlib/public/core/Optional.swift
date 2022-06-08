@@ -396,7 +396,7 @@ extension Optional: Equatable where Wrapped: Equatable {
   /// - Parameters:
   ///   - lhs: An optional value to compare.
   ///   - rhs: Another optional value to compare.
-  @inlinable
+  @inlinable @inline(__always)
   public static func ==(lhs: Wrapped?, rhs: Wrapped?) -> Bool {
     switch (lhs, rhs) {
     case let (l?, r?):
@@ -502,7 +502,7 @@ extension Optional {
   /// - Parameters:
   ///   - lhs: A value to compare to `nil`.
   ///   - rhs: A `nil` literal.
-  @_transparent
+  @inlinable @inline(__always)
   public static func ==(lhs: Wrapped?, rhs: _OptionalNilComparisonType) -> Bool {
     switch lhs {
     case .some:
@@ -564,7 +564,7 @@ extension Optional {
   /// - Parameters:
   ///   - lhs: A `nil` literal.
   ///   - rhs: A value to compare to `nil`.
-  @_transparent
+  @inlinable @inline(__always)
   public static func ==(lhs: _OptionalNilComparisonType, rhs: Wrapped?) -> Bool {
     switch rhs {
     case .some:
