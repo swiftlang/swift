@@ -3583,8 +3583,9 @@ void PrintAST::printPrimaryAssociatedTypes(ProtocolDecl *decl) {
       [&](AssociatedTypeDecl *assocType) {
         Printer.callPrintStructurePre(PrintStructureKind::GenericParameter,
                                       assocType);
-        Printer.printName(assocType->getName(),
-                          PrintNameContext::GenericParameter);
+        Printer.printTypeRef(assocType->getDeclaredInterfaceType(), assocType,
+                             assocType->getName(),
+                             PrintNameContext::GenericParameter);
         Printer.printStructurePost(PrintStructureKind::GenericParameter,
                                    assocType);
       },
