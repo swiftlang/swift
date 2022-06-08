@@ -25,7 +25,8 @@ final public class BasicBlock : ListNode, CustomStringConvertible, HasShortDescr
   public var function: Function { SILBasicBlock_getFunction(bridged).function }
 
   public var description: String {
-    String(_cxxString: SILBasicBlock_debugDescription(bridged))
+    var s = SILBasicBlock_debugDescription(bridged)
+    return String(cString: s.c_str())
   }
   public var shortDescription: String { name }
 

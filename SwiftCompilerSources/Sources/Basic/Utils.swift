@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 @_exported import BasicBridging
-import std
 
 //===----------------------------------------------------------------------===//
 //                              StringRef
@@ -60,13 +59,6 @@ extension String {
     return str.withUTF8 { buffer in
       return c(BridgedStringRef(data: buffer.baseAddress, length: buffer.count))
     }
-  }
-
-  /// Underscored to avoid name collision with the std overlay.
-  /// To be replaced with an overlay call once the CI uses SDKs built with Swift 5.8.
-  public init(_cxxString s: std.string) {
-    self.init(cString: s.c_str())
-    withExtendedLifetime(s) {}
   }
 }
 
