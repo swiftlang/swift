@@ -504,3 +504,11 @@ func `escapedName`(`x`: Int) {}
 // CHECK: [[@LINE-1]]:1 | function/Swift | escapedName(x:) | {{.*}} | Ref,Call | rel: 0
 `escapedName`(`x`:)
 // CHECK: [[@LINE-1]]:1 | function/Swift | escapedName(x:) | {{.*}} | Ref | rel: 0
+
+protocol WithPrimary<Assoc> {
+// CHECK: [[@LINE-1]]:22 | type-alias/associated-type/Swift | Assoc | {{.*}} | Ref | rel: 0
+// CHECK: [[@LINE-2]]:10 | protocol/Swift | WithPrimary | {{.*}} | Def | rel: 0
+  associatedtype Assoc
+// CHECK: [[@LINE-1]]:18 | type-alias/associated-type/Swift | Assoc | {{.*}} | Def,RelChild | rel: 1
+// CHECK-NEXT: RelChild | protocol/Swift | WithPrimary | {{.*}}
+}

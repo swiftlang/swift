@@ -54,7 +54,7 @@ class SwiftGizmo : Gizmo {
   }
 
   // Objective-C deallocation deinit thunk (i.e., -dealloc).
-  // CHECK-LABEL: sil hidden [thunk] [ossa] @$s12objc_dealloc10SwiftGizmoCfDTo : $@convention(objc_method) (SwiftGizmo) -> ()
+  // CHECK-LABEL: sil private [thunk] [ossa] @$s12objc_dealloc10SwiftGizmoCfDTo : $@convention(objc_method) (SwiftGizmo) -> ()
   // CHECK: bb0([[SELF:%[0-9]+]] : @unowned $SwiftGizmo):
   // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
 
@@ -89,6 +89,6 @@ class SwiftGizmo : Gizmo {
   // CHECK-NEXT: return [[RESULT]] : $()
 }
 
-// CHECK-NOT: sil hidden [thunk] [ossa] @$sSo11SwiftGizmo2CfETo : $@convention(objc_method) (SwiftGizmo2) -> ()
+// CHECK-NOT: sil private [thunk] [ossa] @$sSo11SwiftGizmo2CfETo : $@convention(objc_method) (SwiftGizmo2) -> ()
 class SwiftGizmo2 : Gizmo {
 }
