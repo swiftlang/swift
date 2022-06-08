@@ -86,6 +86,8 @@ enum class SILValueCategory : uint8_t {
   Address,
 };
 
+class SILPrinter;
+
 /// SILType - A Swift type that has been lowered to a SIL representation type.
 /// In addition to the Swift type system, SIL adds "address" types that can
 /// reference any Swift type (but cannot take the address of an address). *T
@@ -113,6 +115,8 @@ private:
 
   friend class Lowering::TypeConverter;
   friend struct llvm::DenseMapInfo<SILType>;
+  friend class SILPrinter;
+
 public:
   SILType() = default;
 
@@ -184,8 +188,11 @@ public:
   ///    type. This is done under the assumption that in all cases where we are
   ///    performing these AST queries on SILType, we are not interested in the
   ///    move only-ness of the value (which we can query separately anyways).
-  CanType getASTType() const { return withoutMoveOnly().getRawASTType(); }
+  CanType getASTType() const {
+    return removingMoveOnlyWrapper().getRawASTType();
+  }
 
+private:
   /// Returns the canonical AST type references by this SIL type without looking
   /// through move only. Should only be used by internal utilities of SILType.
   CanType getRawASTType() const { return CanType(value.getPointer()); }
@@ -596,33 +603,34 @@ public:
   ///
   /// Canonical way to check if a SILType is move only. Using is/getAs/castTo
   /// will look through moveonly-ness.
-  bool isMoveOnly() const { return getRawASTType()->is<SILMoveOnlyType>(); }
+  bool isMoveOnlyWrapped() const {
+    return getRawASTType()->is<SILMoveOnlyType>();
+  }
 
-  /// Return *this if already move only... otherwise, wrap the current type
-  /// within a move only type wrapper and return that. Idempotent!
-  SILType asMoveOnly() const {
-    if (isMoveOnly())
+  /// If this is already a move only wrapped type, return *this. Otherwise, wrap
+  /// the copyable type in the mov eonly wrapper.
+  SILType addingMoveOnlyWrapper() const {
+    if (isMoveOnlyWrapped())
       return *this;
     auto newType = SILMoveOnlyType::get(getRawASTType());
     return SILType::getPrimitiveType(newType, getCategory());
   }
 
-  /// Return this SILType, removing moveonly-ness.
-  ///
-  /// Is idempotent.
-  SILType withoutMoveOnly() const {
-    if (!isMoveOnly())
+  /// If this is already a copyable type, just return *this. Otherwise, if this
+  /// is a move only wrapped copyable type, return the inner type.
+  SILType removingMoveOnlyWrapper() const {
+    if (!isMoveOnlyWrapped())
       return *this;
     auto moveOnly = getRawASTType()->castTo<SILMoveOnlyType>();
     return SILType::getPrimitiveType(moveOnly->getInnerType(), getCategory());
   }
 
-  /// If \p otherType is move only, return this type that is move only as
-  /// well. Otherwise, returns self. Useful for propagating "move only"-ness
+  /// If \p otherType is move only wrapped, return this type that is move only
+  /// as well. Otherwise, returns self. Useful for propagating "move only"-ness
   /// from a parent type to a subtype.
-  SILType copyMoveOnly(SILType otherType) const {
-    if (otherType.isMoveOnly()) {
-      return asMoveOnly();
+  SILType copyingMoveOnlyWrapper(SILType otherType) const {
+    if (otherType.isMoveOnlyWrapped()) {
+      return addingMoveOnlyWrapper();
     }
     return *this;
   }
