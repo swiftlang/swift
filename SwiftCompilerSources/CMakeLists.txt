@@ -204,6 +204,19 @@ else()
       message(FATAL_ERROR "Need a swift toolchain building swift compiler sources")
     endif()
 
+    if(${BOOTSTRAPPING_MODE} STREQUAL "HOSTTOOLS")
+      if(NOT SWIFT_EXEC_FOR_SWIFT_MODULES STREQUAL CMAKE_Swift_COMPILER)
+        message(FATAL_ERROR "The Swift compiler (${CMAKE_Swift_COMPILER}) differs from the Swift compiler in SWIFT_NATIVE_SWIFT_TOOLS_PATH (${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc).")
+      endif()
+
+      set(min_supported_swift_version 5.5)
+      if(CMAKE_Swift_COMPILER_VERSION VERSION_LESS "${min_supported_swift_version}")
+        message(FATAL_ERROR
+            "Outdated Swift compiler: building with host tools requires Swift ${min_supported_swift_version} or newer. "
+            "Please update your Swift toolchain or switch BOOTSTRAPPING_MODE to BOOTSTRAPPING(-WITH-HOSTLIBS)? or OFF.")
+      endif()
+    endif()
+
     add_swift_compiler_modules_library(swiftCompilerModules
       SWIFT_EXEC "${SWIFT_EXEC_FOR_SWIFT_MODULES}")
 

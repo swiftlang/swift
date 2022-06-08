@@ -81,8 +81,7 @@ public enum Ownership {
 
 extension Value {
   public var description: String {
-    var s = SILNode_debugDescription(bridgedNode)
-    return String(cString: s.c_str())
+    String(_cxxString: SILNode_debugDescription(bridgedNode))
   }
 
   public var uses: UseList {
