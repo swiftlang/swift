@@ -2545,6 +2545,7 @@ RValue RValueEmitter::visitAbstractClosureExpr(AbstractClosureExpr *e,
   if (auto contextOrigType = C.getAbstractionPattern()) {
     SGF.SGM.Types.setAbstractionPattern(e, *contextOrigType);
   }
+  SGF.SGM.Types.setCaptureTypeExpansionContext(SILDeclRef(e), SGF.SGM.M);
   
   // Emit the closure body.
   SGF.SGM.emitClosure(e);
