@@ -8895,6 +8895,9 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
   } else if (auto patternBinding = target.getAsPatternBinding()) {
     ConstraintSystem &cs = solution.getConstraintSystem();
     for (unsigned index : range(patternBinding->getNumPatternEntries())) {
+      if (patternBinding->isInitializerChecked(index))
+        continue;
+
       // Find the solution application target for this.
       auto knownTarget = *cs.getSolutionApplicationTarget(
           {patternBinding, index});

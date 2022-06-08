@@ -427,6 +427,9 @@ private:
         locator, LocatorPathElt::SyntacticElement(patternBinding));
 
     for (unsigned index : range(patternBinding->getNumPatternEntries())) {
+      if (patternBinding->isInitializerChecked(index))
+        continue;
+
       auto *pattern = TypeChecker::resolvePattern(
           patternBinding->getPattern(index), patternBinding->getDeclContext(),
           /*isStmtCondition=*/true);
@@ -501,6 +504,9 @@ private:
     auto index =
         locator->castLastElementTo<LocatorPathElt::PatternBindingElement>()
             .getIndex();
+
+    if (patternBinding->isInitializerChecked(index))
+      return;
 
     auto contextualPattern =
         ContextualPattern::forPatternBindingDecl(patternBinding, index);
