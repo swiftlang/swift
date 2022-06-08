@@ -1,7 +1,7 @@
 // RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-cxx-interop)
 //
 // REQUIRES: executable_test
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: OS=macosx
 
 import StdlibUnittest
 import std
