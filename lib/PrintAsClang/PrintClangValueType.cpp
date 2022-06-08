@@ -171,9 +171,6 @@ printCStructStubForDirectPassing(raw_ostream &os, const NominalTypeDecl *SD,
         os << " _" << (fields.size() + 1) << ";\n";
         fields.push_back(std::make_pair(offset, end));
       });
-
-  // cPrologueOS << "  _Alignas(" << typeSizeAlign->alignment << ") ";
-  // cPrologueOS << "char _storage[" << typeSizeAlign->size << "];\n";
   os << "};\n\n";
 
   // Emit a stub that returns a value directly from swiftcc function.
