@@ -318,7 +318,7 @@ class Foo {
   // arm64-tvos-fixme:     ret i1 [[R2]]
 
   // i386-watchos:  define hidden swiftcc i1 @"$s8abitypes3FooC6negate{{[_0-9a-zA-Z]*}}F"(i1 %0, %T8abitypes3FooC* swiftself %1)
-  // i386-watchos:  define private zeroext i1 @"$s8abitypes3FooC6negate{{[_0-9a-zA-Z]*}}FTo"
+  // i386-watchos:  define internal zeroext i1 @"$s8abitypes3FooC6negate{{[_0-9a-zA-Z]*}}FTo"
   // i386-watchos:  [[R1:%[0-9]+]] = call swiftcc i1 @"$s10ObjectiveC22_convertObjCBoolToBoolySbAA0cD0VF"(i1 %2)
   // i386-watchos:  [[R2:%[0-9]+]] = call swiftcc i1 @"$s8abitypes3FooC6negate{{[_0-9a-zA-Z]*}}F"(i1 [[R1]]
   // i386-watchos:  [[R3:%[0-9]+]] = call swiftcc i1 @"$s10ObjectiveC22_convertBoolToObjCBoolyAA0eF0VSbF"(i1 [[R2]])
