@@ -66,10 +66,6 @@ func multipleAttrsFunc() -> deprecatedType {
     return deprecatedType()
 }
 
-@ignoreDeprecationWarnings
-@available(iOS 15.0, *)
-var multipleAttrsVar = 3
-
 struct aNormalType {
     var someNumber: Int   
 }
