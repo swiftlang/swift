@@ -11,7 +11,7 @@ import gizmo
 
 @objc class Foo : NSObject {
   // Bridging set parameters
-  // CHECK-LABEL: sil private [thunk] [ossa] @$s17objc_set_bridging3FooC16bridge_Set_param{{[_0-9a-zA-Z]*}}FTo : $@convention(objc_method) (NSSet, Foo) -> ()
+  // CHECK-LABEL: sil hidden [thunk] [ossa] @$s17objc_set_bridging3FooC16bridge_Set_param{{[_0-9a-zA-Z]*}}FTo : $@convention(objc_method) (NSSet, Foo) -> ()
   @objc func bridge_Set_param(_ s: Set<Foo>) {
     // CHECK: bb0([[NSSET:%[0-9]+]] : @unowned $NSSet, [[SELF:%[0-9]+]] : @unowned $Foo):
     // CHECK:   [[NSSET_COPY:%.*]] = copy_value [[NSSET]] : $NSSet
@@ -31,7 +31,7 @@ import gizmo
   // CHECK: // end sil function '$s17objc_set_bridging3FooC16bridge_Set_param{{[_0-9a-zA-Z]*}}FTo'
 
   // Bridging set results
-  // CHECK-LABEL: sil private [thunk] [ossa] @$s17objc_set_bridging3FooC17bridge_Set_result{{[_0-9a-zA-Z]*}}FTo : $@convention(objc_method) (Foo) -> @autoreleased NSSet {
+  // CHECK-LABEL: sil hidden [thunk] [ossa] @$s17objc_set_bridging3FooC17bridge_Set_result{{[_0-9a-zA-Z]*}}FTo : $@convention(objc_method) (Foo) -> @autoreleased NSSet {
   @objc func bridge_Set_result() -> Set<Foo> { 
     // CHECK: bb0([[SELF:%[0-9]+]] : @unowned $Foo):
     // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]] : $Foo
@@ -52,7 +52,7 @@ import gizmo
   @objc var property: Set<Foo> = Set()
 
   // Property getter
-  // CHECK-LABEL: sil private [thunk] [ossa] @$s17objc_set_bridging3FooC8property{{[_0-9a-zA-Z]*}}vgTo : $@convention(objc_method) (Foo) -> @autoreleased NSSet
+  // CHECK-LABEL: sil hidden [thunk] [ossa] @$s17objc_set_bridging3FooC8property{{[_0-9a-zA-Z]*}}vgTo : $@convention(objc_method) (Foo) -> @autoreleased NSSet
   // CHECK: bb0([[SELF:%[0-9]+]] : @unowned $Foo):
   // CHECK:   [[SELF_COPY]] = copy_value [[SELF]] : $Foo
   // CHECK:   [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
@@ -69,7 +69,7 @@ import gizmo
   // CHECK: } // end sil function '$s17objc_set_bridging3FooC8property{{[_0-9a-zA-Z]*}}vgTo'
   
   // Property setter
-  // CHECK-LABEL: sil private [thunk] [ossa] @$s17objc_set_bridging3FooC8property{{[_0-9a-zA-Z]*}}vsTo : $@convention(objc_method) (NSSet, Foo) -> () {
+  // CHECK-LABEL: sil hidden [thunk] [ossa] @$s17objc_set_bridging3FooC8property{{[_0-9a-zA-Z]*}}vsTo : $@convention(objc_method) (NSSet, Foo) -> () {
   // CHECK: bb0([[NSSET:%[0-9]+]] : @unowned $NSSet, [[SELF:%[0-9]+]] : @unowned $Foo):
   // CHECK:   [[NSSET_COPY:%.*]] = copy_value [[NSSET]] : $NSSet
   // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]] : $Foo
@@ -84,8 +84,8 @@ import gizmo
   // CHECK:   destroy_value [[SELF_COPY]] : $Foo
   // CHECK:   return [[RESULT]] : $()
   
-  // CHECK-LABEL: sil private [thunk] [ossa] @$s17objc_set_bridging3FooC19nonVerbatimProperty{{[_0-9a-zA-Z]*}}vgTo : $@convention(objc_method) (Foo) -> @autoreleased NSSet
-  // CHECK-LABEL: sil private [thunk] [ossa] @$s17objc_set_bridging3FooC19nonVerbatimProperty{{[_0-9a-zA-Z]*}}vsTo : $@convention(objc_method) (NSSet, Foo) -> () {
+  // CHECK-LABEL: sil hidden [thunk] [ossa] @$s17objc_set_bridging3FooC19nonVerbatimProperty{{[_0-9a-zA-Z]*}}vgTo : $@convention(objc_method) (Foo) -> @autoreleased NSSet
+  // CHECK-LABEL: sil hidden [thunk] [ossa] @$s17objc_set_bridging3FooC19nonVerbatimProperty{{[_0-9a-zA-Z]*}}vsTo : $@convention(objc_method) (NSSet, Foo) -> () {
   @objc var nonVerbatimProperty: Set<String> = Set()
 }
 

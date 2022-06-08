@@ -34,7 +34,7 @@ class testCFString {
 class HasBlockImpl: HasBlock {
   @objc func block(_: (Int) -> Int) {}
 }
-// CHECK-LABEL: sil private [thunk] [ossa] @$s25access_marker_verify_objc12HasBlockImplC5blockyyS2iXEFTo : $@convention(objc_method) (@convention(block) @noescape (Int) -> Int, HasBlockImpl) -> () {
+// CHECK-LABEL: sil hidden [thunk] [ossa] @$s25access_marker_verify_objc12HasBlockImplC5blockyyS2iXEFTo : $@convention(objc_method) (@convention(block) @noescape (Int) -> Int, HasBlockImpl) -> () {
 // CHECK: bb0(%0 : @unowned $@convention(block) @noescape (Int) -> Int, %1 : @unowned $HasBlockImpl):
 // CHECK:   [[CP:%.*]] = copy_block %0 : $@convention(block) @noescape (Int) -> Int
             // function_ref thunk for @callee_unowned @convention(block) (@unowned Int) -> (@unowned Int)
