@@ -944,6 +944,7 @@ static llvm::Constant *findSwiftAsObjCThunk(IRGenModule &IGM, SILDeclRef ref,
   SILFn = IGM.getSILModule().lookUpFunction(ref);
   assert(SILFn && "no IR function for swift-as-objc thunk");
   auto fn = IGM.getAddrOfSILFunction(SILFn, NotForDefinition);
+  ApplyIRLinkage(IRLinkage::Internal).to(fn);
   // Don't add the unnamed_addr attribute: in some places Foundation is
   // comparing ObjC method pointers. Therefore LLVM's function merging pass must
   // not create aliases for identical functions, but create thunks.

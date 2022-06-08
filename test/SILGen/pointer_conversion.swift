@@ -259,7 +259,7 @@ func classInoutToPointer() {
 
 // Check that pointer types don't bridge anymore.
 @objc class ObjCMethodBridging : NSObject {
-  // CHECK-LABEL: sil private [thunk] [ossa] @$s18pointer_conversion18ObjCMethodBridgingC0A4Args{{[_0-9a-zA-Z]*}}FTo : $@convention(objc_method) (UnsafeMutablePointer<Int>, UnsafePointer<Int>, AutoreleasingUnsafeMutablePointer<ObjCMethodBridging>, ObjCMethodBridging)
+  // CHECK-LABEL: sil hidden [thunk] [ossa] @$s18pointer_conversion18ObjCMethodBridgingC0A4Args{{[_0-9a-zA-Z]*}}FTo : $@convention(objc_method) (UnsafeMutablePointer<Int>, UnsafePointer<Int>, AutoreleasingUnsafeMutablePointer<ObjCMethodBridging>, ObjCMethodBridging)
   @objc func pointerArgs(_ x: UnsafeMutablePointer<Int>,
                          y: UnsafePointer<Int>,
                          z: AutoreleasingUnsafeMutablePointer<ObjCMethodBridging>) {}

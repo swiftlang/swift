@@ -83,7 +83,7 @@ class Cat : FakeNSObject {
   // CHECK: bb3([[RESULT:%.*]] : $Optional<Cat>):
     // CHECK-NEXT: return [[RESULT]] : $Optional<Cat>
 
-  // CHECK-LABEL: sil private [thunk] @$s40definite_init_failable_initializers_objc3CatC1n5afterACSgSi_SbtcfcTo
+  // CHECK-LABEL: sil hidden [thunk] @$s40definite_init_failable_initializers_objc3CatC1n5afterACSgSi_SbtcfcTo
   // CHECK: function_ref @$s40definite_init_failable_initializers_objc3CatC1n5afterACSgSi_Sbtcfc :
   // CHECK: end sil function '$s40definite_init_failable_initializers_objc3CatC1n5afterACSgSi_SbtcfcTo'
 
@@ -155,7 +155,7 @@ class Cat : FakeNSObject {
 
   // CHECK: end sil function '$s40definite_init_failable_initializers_objc3CatC4fail5afterACSgSb_Sbtcfc'
 
-  // CHECK-LABEL: sil private [thunk] @$s40definite_init_failable_initializers_objc3CatC4fail5afterACSgSb_SbtcfcTo
+  // CHECK-LABEL: sil hidden [thunk] @$s40definite_init_failable_initializers_objc3CatC4fail5afterACSgSb_SbtcfcTo
   // CHECK: function_ref @$s40definite_init_failable_initializers_objc3CatC4fail5afterACSgSb_Sbtcfc :
   // CHECK: end sil function '$s40definite_init_failable_initializers_objc3CatC4fail5afterACSgSb_SbtcfcTo'
   @objc convenience init?(fail: Bool, after: Bool) {

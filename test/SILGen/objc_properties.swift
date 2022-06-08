@@ -136,20 +136,20 @@ class TestComputedOutlet : NSObject {
 
 class Singleton : NSObject {
   // CHECK-DAG: sil hidden [ossa] @$s15objc_properties9SingletonC14sharedInstanceACvgZ : $@convention(method) (@thick Singleton.Type) -> @owned Singleton
-  // CHECK-DAG: sil private [thunk] [ossa] @$s15objc_properties9SingletonC14sharedInstanceACvgZTo : $@convention(objc_method) (@objc_metatype Singleton.Type) -> @autoreleased Singleton {
+  // CHECK-DAG: sil hidden [thunk] [ossa] @$s15objc_properties9SingletonC14sharedInstanceACvgZTo : $@convention(objc_method) (@objc_metatype Singleton.Type) -> @autoreleased Singleton {
   @objc static let sharedInstance = Singleton()
 
   // CHECK-DAG: sil hidden [ossa] @$s15objc_properties9SingletonC1iSivgZ : $@convention(method) (@thick Singleton.Type) -> Int
-  // CHECK-DAG: sil private [thunk] [ossa] @$s15objc_properties9SingletonC1iSivgZTo : $@convention(objc_method) (@objc_metatype Singleton.Type) -> Int
+  // CHECK-DAG: sil hidden [thunk] [ossa] @$s15objc_properties9SingletonC1iSivgZTo : $@convention(objc_method) (@objc_metatype Singleton.Type) -> Int
   @objc static let i = 2
 
   // CHECK-DAG: sil hidden [ossa] @$s15objc_properties9SingletonC1jSSvgZ : $@convention(method) (@thick Singleton.Type) -> @owned String
-  // CHECK-DAG: sil private [thunk] [ossa] @$s15objc_properties9SingletonC1jSSvgZTo : $@convention(objc_method) (@objc_metatype Singleton.Type) -> @autoreleased NSString
+  // CHECK-DAG: sil hidden [thunk] [ossa] @$s15objc_properties9SingletonC1jSSvgZTo : $@convention(objc_method) (@objc_metatype Singleton.Type) -> @autoreleased NSString
   // CHECK-DAG: sil hidden [ossa] @$s15objc_properties9SingletonC1jSSvsZ : $@convention(method) (@owned String, @thick Singleton.Type) -> ()
-  // CHECK-DAG: sil private [thunk] [ossa] @$s15objc_properties9SingletonC1jSSvsZTo : $@convention(objc_method) (NSString, @objc_metatype Singleton.Type) -> ()
+  // CHECK-DAG: sil hidden [thunk] [ossa] @$s15objc_properties9SingletonC1jSSvsZTo : $@convention(objc_method) (NSString, @objc_metatype Singleton.Type) -> ()
   @objc static var j = "Hello"
 
-  // CHECK-DAG: sil private [thunk] [ossa] @$s15objc_properties9SingletonC1kSdvgZTo : $@convention(objc_method) (@objc_metatype Singleton.Type) -> Double
+  // CHECK-DAG: sil hidden [thunk] [ossa] @$s15objc_properties9SingletonC1kSdvgZTo : $@convention(objc_method) (@objc_metatype Singleton.Type) -> Double
   // CHECK-DAG: sil hidden [ossa] @$s15objc_properties9SingletonC1kSdvgZ : $@convention(method) (@thick Singleton.Type) -> Double
   @objc static var k: Double {
     return 7.7
@@ -157,7 +157,7 @@ class Singleton : NSObject {
 }
 
 class HasUnmanaged : NSObject {
-  // CHECK-LABEL: sil private [thunk] [ossa] @$s15objc_properties12HasUnmanagedC3refs0D0VyyXlGSgvgTo
+  // CHECK-LABEL: sil hidden [thunk] [ossa] @$s15objc_properties12HasUnmanagedC3refs0D0VyyXlGSgvgTo
   // CHECK: bb0([[CLS:%.*]] : @unowned $HasUnmanaged):
   // CHECK:     [[CLS_COPY:%.*]] = copy_value [[CLS]]
   // CHECK:     [[BORROWED_CLS_COPY:%.*]] = begin_borrow [[CLS_COPY]]
@@ -170,7 +170,7 @@ class HasUnmanaged : NSObject {
   // CHECK:     return [[RESULT]] : $Optional<Unmanaged<AnyObject>>
   // CHECK: } // end sil function '$s15objc_properties12HasUnmanagedC3refs0D0VyyXlGSgvgTo'
 
-  // CHECK-LABEL: sil private [thunk] [ossa] @$s15objc_properties12HasUnmanagedC3refs0D0VyyXlGSgvsTo
+  // CHECK-LABEL: sil hidden [thunk] [ossa] @$s15objc_properties12HasUnmanagedC3refs0D0VyyXlGSgvsTo
   // CHECK: bb0([[NEW_VALUE:%.*]] : $Optional<Unmanaged<AnyObject>>, [[SELF:%.*]] : @unowned $HasUnmanaged):
   // CHECK-NEXT: [[SELF_COPY:%.*]] = copy_value [[SELF]] : $HasUnmanaged
   // CHECK-NEXT: [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
@@ -222,8 +222,8 @@ class NonObjCBaseClass : NSObject {
   }
 }
 
-// CHECK-LABEL: sil private [thunk] [ossa] @$s15objc_properties12ObjCSubclassC8propertySivgTo
-// CHECK-LABEL: sil private [thunk] [ossa] @$s15objc_properties12ObjCSubclassC8propertySivsTo
+// CHECK-LABEL: sil hidden [thunk] [ossa] @$s15objc_properties12ObjCSubclassC8propertySivgTo
+// CHECK-LABEL: sil hidden [thunk] [ossa] @$s15objc_properties12ObjCSubclassC8propertySivsTo
 
 // Make sure lazy properties that witness @objc protocol requirements are
 // correctly formed

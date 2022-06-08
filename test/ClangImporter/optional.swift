@@ -12,7 +12,7 @@ class A {
   @objc func foo() -> String? {
     return ""
   }
-// CHECK-LABEL:    sil private [thunk] [ossa] @$s8optional1AC3fooSSSgyFTo : $@convention(objc_method) (A) -> @autoreleased Optional<NSString>
+// CHECK-LABEL:    sil hidden [thunk] [ossa] @$s8optional1AC3fooSSSgyFTo : $@convention(objc_method) (A) -> @autoreleased Optional<NSString>
 // CHECK:    bb0([[SELF:%.*]] : @unowned $A):
 // CHECK:      [[SELF_COPY:%.*]] = copy_value [[SELF]]
 // CHECK:      [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
@@ -41,7 +41,7 @@ class A {
 // CHECK-NEXT: return [[T0]]
 
   @objc func bar(x x : String?) {}
-// CHECK-LABEL:    sil private [thunk] [ossa] @$s8optional1AC3bar1xySSSg_tFTo : $@convention(objc_method) (Optional<NSString>, A) -> ()
+// CHECK-LABEL:    sil hidden [thunk] [ossa] @$s8optional1AC3bar1xySSSg_tFTo : $@convention(objc_method) (Optional<NSString>, A) -> ()
 // CHECK:    bb0([[ARG:%.*]] : @unowned $Optional<NSString>, [[SELF:%.*]] : @unowned $A):
 // CHECK:      [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK:      [[SELF_COPY:%.*]] = copy_value [[SELF]]
