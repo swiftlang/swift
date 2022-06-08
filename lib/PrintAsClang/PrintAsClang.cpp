@@ -89,12 +89,14 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
       [&] {
         out << "#include <cstdint>\n"
                "#include <cstddef>\n"
-               "#include <cstdbool>\n";
+               "#include <cstdbool>\n"
+               "#include <cstring>\n";
       },
       [&] {
         out << "#include <stdint.h>\n"
                "#include <stddef.h>\n"
-               "#include <stdbool.h>\n";
+               "#include <stdbool.h>\n"
+               "#include <string.h>\n";
       });
   out << "\n"
          "#if !defined(SWIFT_TYPEDEFS)\n"
@@ -301,6 +303,7 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
     out << "#endif\n";
   };
   emitMacro("SWIFT_CALL", "__attribute__((swiftcall))");
+  emitMacro("SWIFT_INDIRECT_RESULT", "__attribute__((swift_indirect_result))");
   // SWIFT_NOEXCEPT applies 'noexcept' in C++ mode only.
   emitCxxConditional(
       out, [&] { emitMacro("SWIFT_NOEXCEPT", "noexcept"); },
