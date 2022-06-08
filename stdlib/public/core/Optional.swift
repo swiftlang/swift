@@ -396,7 +396,7 @@ extension Optional: Equatable where Wrapped: Equatable {
   /// - Parameters:
   ///   - lhs: An optional value to compare.
   ///   - rhs: Another optional value to compare.
-  @inlinable
+  @_transparent
   public static func ==(lhs: Wrapped?, rhs: Wrapped?) -> Bool {
     switch (lhs, rhs) {
     case let (l?, r?):
