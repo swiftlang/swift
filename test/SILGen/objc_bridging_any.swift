@@ -425,7 +425,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK: unreachable
   // CHECK: } // end sil function '$s17objc_bridging_any12SwiftIdLoverC18methodReturningAnyypyF'
 
-  // CHECK-LABEL: sil private [thunk] [ossa] @$s17objc_bridging_any12SwiftIdLoverC18methodReturningAnyypyFTo : $@convention(objc_method) (SwiftIdLover) -> @autoreleased AnyObject {
+  // CHECK-LABEL: sil hidden [thunk] [ossa] @$s17objc_bridging_any12SwiftIdLoverC18methodReturningAnyypyFTo : $@convention(objc_method) (SwiftIdLover) -> @autoreleased AnyObject {
   // CHECK: bb0([[SELF:%[0-9]+]] : @unowned $SwiftIdLover):
   // CHECK:   [[NATIVE_RESULT:%.*]] = alloc_stack $Any
   // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]] : $SwiftIdLover
@@ -444,11 +444,11 @@ class SwiftIdLover : NSObject, Anyable {
 
   @objc func methodReturningOptionalAny() -> Any? { fatalError() }
   // CHECK-LABEL: sil hidden [ossa] @$s17objc_bridging_any12SwiftIdLoverC26methodReturningOptionalAnyypSgyF
-  // CHECK-LABEL: sil private [thunk] [ossa] @$s17objc_bridging_any12SwiftIdLoverC26methodReturningOptionalAnyypSgyFTo
+  // CHECK-LABEL: sil hidden [thunk] [ossa] @$s17objc_bridging_any12SwiftIdLoverC26methodReturningOptionalAnyypSgyFTo
   // CHECK:       function_ref @$ss27_bridgeAnythingToObjectiveC{{.*}}F
 
   @objc func methodTakingAny(a: Any) { fatalError() }
-  // CHECK-LABEL: sil private [thunk] [ossa] @$s17objc_bridging_any12SwiftIdLoverC15methodTakingAny1ayyp_tFTo : $@convention(objc_method) (AnyObject, SwiftIdLover) -> ()
+  // CHECK-LABEL: sil hidden [thunk] [ossa] @$s17objc_bridging_any12SwiftIdLoverC15methodTakingAny1ayyp_tFTo : $@convention(objc_method) (AnyObject, SwiftIdLover) -> ()
   // CHECK:     bb0([[ARG:%.*]] : @unowned $AnyObject, [[SELF:%.*]] : @unowned $SwiftIdLover):
   // CHECK:   function_ref [[BRIDGE_ANYOBJECT_TO_ANY:@\$ss018_bridgeAnyObjectToB0yypyXlSgF]] : $@convention(thin) (@guaranteed Optional<AnyObject>) -> @out Any
   // CHECK:  [[METHOD:%.*]] = function_ref @$s17objc_bridging_any12SwiftIdLoverC15methodTakingAny1ayyp_tF
@@ -457,11 +457,11 @@ class SwiftIdLover : NSObject, Anyable {
   @objc func methodTakingOptionalAny(a: Any?) { fatalError() }
   // CHECK-LABEL: sil hidden [ossa] @$s17objc_bridging_any12SwiftIdLoverC23methodTakingOptionalAny1ayypSg_tF
 
-  // CHECK-LABEL: sil private [thunk] [ossa] @$s17objc_bridging_any12SwiftIdLoverC23methodTakingOptionalAny1ayypSg_tFTo
+  // CHECK-LABEL: sil hidden [thunk] [ossa] @$s17objc_bridging_any12SwiftIdLoverC23methodTakingOptionalAny1ayypSg_tFTo
 
   // CHECK-LABEL: sil hidden [ossa] @$s17objc_bridging_any12SwiftIdLoverC017methodTakingBlockH3AnyyyyypXEF : $@convention(method) (@noescape @callee_guaranteed (@in_guaranteed Any) -> (), @guaranteed SwiftIdLover) -> ()
 
-  // CHECK-LABEL: sil private [thunk] [ossa] @$s17objc_bridging_any12SwiftIdLoverC017methodTakingBlockH3AnyyyyypXEFTo : $@convention(objc_method) (@convention(block) @noescape (AnyObject) -> (), SwiftIdLover) -> ()
+  // CHECK-LABEL: sil hidden [thunk] [ossa] @$s17objc_bridging_any12SwiftIdLoverC017methodTakingBlockH3AnyyyyypXEFTo : $@convention(objc_method) (@convention(block) @noescape (AnyObject) -> (), SwiftIdLover) -> ()
   // CHECK:    bb0([[BLOCK:%.*]] : @unowned $@convention(block) @noescape (AnyObject) -> (), [[SELF:%.*]] : @unowned $SwiftIdLover):
   // CHECK-NEXT:  [[BLOCK_COPY:%.*]] = copy_block [[BLOCK]]
   // CHECK-NEXT:  [[SELF_COPY:%.*]] = copy_value [[SELF]]
@@ -496,7 +496,7 @@ class SwiftIdLover : NSObject, Anyable {
 
   // CHECK-LABEL: sil hidden [ossa] @$s17objc_bridging_any12SwiftIdLoverC29methodReturningBlockTakingAnyyypcyF : $@convention(method) (@guaranteed SwiftIdLover) -> @owned @callee_guaranteed (@in_guaranteed Any) -> ()
 
-  // CHECK-LABEL: sil private [thunk] [ossa] @$s17objc_bridging_any12SwiftIdLoverC29methodReturningBlockTakingAnyyypcyFTo : $@convention(objc_method) (SwiftIdLover) -> @autoreleased @convention(block) (AnyObject) -> ()
+  // CHECK-LABEL: sil hidden [thunk] [ossa] @$s17objc_bridging_any12SwiftIdLoverC29methodReturningBlockTakingAnyyypcyFTo : $@convention(objc_method) (SwiftIdLover) -> @autoreleased @convention(block) (AnyObject) -> ()
   // CHECK:     bb0([[SELF:%.*]] : @unowned $SwiftIdLover):
   // CHECK-NEXT:  [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK-NEXT:  [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
@@ -539,7 +539,7 @@ class SwiftIdLover : NSObject, Anyable {
 
   // CHECK-LABEL: sil hidden [ossa] @$s17objc_bridging_any12SwiftIdLoverC29methodTakingBlockReturningAnyyyypyXEF : $@convention(method) (@noescape @callee_guaranteed () -> @out Any, @guaranteed SwiftIdLover) -> () {
 
-  // CHECK-LABEL: sil private [thunk] [ossa] @$s17objc_bridging_any12SwiftIdLoverC29methodTakingBlockReturningAnyyyypyXEFTo : $@convention(objc_method) (@convention(block) @noescape () -> @autoreleased AnyObject, SwiftIdLover) -> ()
+  // CHECK-LABEL: sil hidden [thunk] [ossa] @$s17objc_bridging_any12SwiftIdLoverC29methodTakingBlockReturningAnyyyypyXEFTo : $@convention(objc_method) (@convention(block) @noescape () -> @autoreleased AnyObject, SwiftIdLover) -> ()
   // CHECK:     bb0([[BLOCK:%.*]] : @unowned $@convention(block) @noescape () -> @autoreleased AnyObject, [[ANY:%.*]] : @unowned $SwiftIdLover):
   // CHECK-NEXT:  [[BLOCK_COPY:%.*]] = copy_block [[BLOCK]]
   // CHECK-NEXT:  [[ANY_COPY:%.*]] = copy_value [[ANY]]
@@ -573,7 +573,7 @@ class SwiftIdLover : NSObject, Anyable {
 
   // CHECK-LABEL: sil hidden [ossa] @$s17objc_bridging_any12SwiftIdLoverC020methodReturningBlockH3AnyypycyF : $@convention(method) (@guaranteed SwiftIdLover) -> @owned @callee_guaranteed () -> @out Any
 
-  // CHECK-LABEL: sil private [thunk] [ossa] @$s17objc_bridging_any12SwiftIdLoverC020methodReturningBlockH3AnyypycyFTo : $@convention(objc_method) (SwiftIdLover) -> @autoreleased @convention(block) () -> @autoreleased AnyObject
+  // CHECK-LABEL: sil hidden [thunk] [ossa] @$s17objc_bridging_any12SwiftIdLoverC020methodReturningBlockH3AnyypycyFTo : $@convention(objc_method) (SwiftIdLover) -> @autoreleased @convention(block) () -> @autoreleased AnyObject
   // CHECK:     bb0([[SELF:%.*]] : @unowned $SwiftIdLover):
   // CHECK-NEXT:  [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK-NEXT:  [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
@@ -684,11 +684,11 @@ func bridgeIncomingAnyValue(_ receiver: NSIdLover) -> Any {
 }
 
 class SwiftAnyEnjoyer: NSIdLover, NSIdLoving {
-  // CHECK-LABEL: sil private [thunk] [ossa] @$s17objc_bridging_any15SwiftAnyEnjoyerC7takesIdyyypFTo
+  // CHECK-LABEL: sil hidden [thunk] [ossa] @$s17objc_bridging_any15SwiftAnyEnjoyerC7takesIdyyypFTo
   // CHECK: function_ref [[BRIDGE_ANYOBJECT_TO_ANY]]
   override func takesId(_ x: Any) { }
 
-  // CHECK-LABEL: sil private [thunk] [ossa] @$s17objc_bridging_any15SwiftAnyEnjoyerC7takesId11viaProtocolyyp_tFTo 
+  // CHECK-LABEL: sil hidden [thunk] [ossa] @$s17objc_bridging_any15SwiftAnyEnjoyerC7takesId11viaProtocolyyp_tFTo 
   // CHECK: function_ref [[BRIDGE_ANYOBJECT_TO_ANY]]
   func takesId(viaProtocol x: Any) { }
 }
