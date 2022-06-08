@@ -9,7 +9,7 @@
 import Foundation
 
 @objc class Foo {
-// CHECK-LABEL: sil private [thunk] [ossa] @$s20objc_blocks_bridging3FooC3foo_1xS3iXE_SitFTo :
+// CHECK-LABEL: sil hidden [thunk] [ossa] @$s20objc_blocks_bridging3FooC3foo_1xS3iXE_SitFTo :
   // CHECK: bb0([[ARG1:%.*]] : @unowned $@convention(block) @noescape (Int) -> Int, {{.*}}, [[SELF:%.*]] : @unowned $Foo):
   // CHECK:         [[ARG1_COPY:%.*]] = copy_block [[ARG1]]
   // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
@@ -25,7 +25,7 @@ import Foundation
     return f(x)
   }
 
-  // CHECK-LABEL: sil private [thunk] [ossa] @$s20objc_blocks_bridging3FooC3bar_1xS3SXE_SStFTo : $@convention(objc_method) (@convention(block) @noescape (NSString) -> @autoreleased NSString, NSString, Foo) -> @autoreleased NSString {
+  // CHECK-LABEL: sil hidden [thunk] [ossa] @$s20objc_blocks_bridging3FooC3bar_1xS3SXE_SStFTo : $@convention(objc_method) (@convention(block) @noescape (NSString) -> @autoreleased NSString, NSString, Foo) -> @autoreleased NSString {
   // CHECK:       bb0([[BLOCK:%.*]] : @unowned $@convention(block) @noescape (NSString) -> @autoreleased NSString, [[NSSTRING:%.*]] : @unowned $NSString, [[SELF:%.*]] : @unowned $Foo):
   // CHECK:         [[BLOCK_COPY:%.*]] = copy_block [[BLOCK]]
   // CHECK:         [[NSSTRING_COPY:%.*]] = copy_value [[NSSTRING]]
@@ -49,7 +49,7 @@ import Foundation
   // GUARANTEED:   apply [[BLOCK]]([[NSSTR]]) : $@convention(block) @noescape (NSString) -> @autoreleased NSString
   // GUARANTEED: } // end sil function '$sSo8NSStringCABIyBya_S2SIeggo_TR'
 
-  // CHECK-LABEL: sil private [thunk] [ossa] @$s20objc_blocks_bridging3FooC3bas_1xSSSgA2FXE_AFtFTo : $@convention(objc_method) (@convention(block) @noescape (Optional<NSString>) -> @autoreleased Optional<NSString>, Optional<NSString>, Foo) -> @autoreleased Optional<NSString> {
+  // CHECK-LABEL: sil hidden [thunk] [ossa] @$s20objc_blocks_bridging3FooC3bas_1xSSSgA2FXE_AFtFTo : $@convention(objc_method) (@convention(block) @noescape (Optional<NSString>) -> @autoreleased Optional<NSString>, Optional<NSString>, Foo) -> @autoreleased Optional<NSString> {
   // CHECK:       bb0([[BLOCK:%.*]] : @unowned $@convention(block) @noescape (Optional<NSString>) -> @autoreleased Optional<NSString>, [[OPT_STRING:%.*]] : @unowned $Optional<NSString>, [[SELF:%.*]] : @unowned $Foo):
   // CHECK:         [[BLOCK_COPY:%.*]] = copy_block [[BLOCK]]
   // CHECK:         [[OPT_STRING_COPY:%.*]] = copy_value [[OPT_STRING]]
@@ -65,7 +65,7 @@ import Foundation
     return f(x)
   }
 
-  // CHECK-LABEL: sil private [thunk] [ossa] @$s20objc_blocks_bridging3FooC16cFunctionPointer{{[_0-9a-zA-Z]*}}FTo
+  // CHECK-LABEL: sil hidden [thunk] [ossa] @$s20objc_blocks_bridging3FooC16cFunctionPointer{{[_0-9a-zA-Z]*}}FTo
   // CHECK:       bb0([[F:%.*]] : $@convention(c) (Int) -> Int, [[X:%.*]] : $Int, [[SELF:%.*]] : @unowned $Foo):
   // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:         [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
@@ -78,7 +78,7 @@ import Foundation
   }
 
   // Blocks and C function pointers must not be reabstracted when placed in optionals.
-  // CHECK-LABEL: sil private [thunk] [ossa] @$s20objc_blocks_bridging3FooC7optFunc{{[_0-9a-zA-Z]*}}FTo
+  // CHECK-LABEL: sil hidden [thunk] [ossa] @$s20objc_blocks_bridging3FooC7optFunc{{[_0-9a-zA-Z]*}}FTo
   // CHECK: bb0([[ARG0:%.*]] : @unowned $Optional<@convention(block) (NSString) -> @autoreleased NSString>,
   // CHECK:         [[COPY:%.*]] = copy_block [[ARG0]]
   // CHECK:         switch_enum [[COPY]] : $Optional<@convention(block) (NSString) -> @autoreleased NSString>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]

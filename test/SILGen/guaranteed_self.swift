@@ -260,7 +260,7 @@ class C: Fooable, Barrable {
   // CHECK:       } // end sil function '$s15guaranteed_self1CC{{[_0-9a-zA-Z]*}}fc'
 
   // @objc thunk for initializing constructor
-  // CHECK-LABEL: sil private [thunk] [ossa] @$s15guaranteed_self1CC{{[_0-9a-zA-Z]*}}fcTo : $@convention(objc_method) (@owned C) -> @owned C
+  // CHECK-LABEL: sil hidden [thunk] [ossa] @$s15guaranteed_self1CC{{[_0-9a-zA-Z]*}}fcTo : $@convention(objc_method) (@owned C) -> @owned C
   // CHECK:       bb0([[SELF:%.*]] : @owned $C):
   // CHECK-NOT:     copy_value [[SELF]]
   // CHECK:         [[SELF2:%.*]] = apply {{%.*}}([[SELF]])
@@ -277,7 +277,7 @@ class C: Fooable, Barrable {
   // CHECK-NOT:     destroy_value
   // CHECK:       } // end sil function '$s15guaranteed_self1CC3foo{{[_0-9a-zA-Z]*}}F'
 
-  // CHECK-LABEL: sil private [thunk] [ossa] @$s15guaranteed_self1CC3foo{{[_0-9a-zA-Z]*}}FTo : $@convention(objc_method) (Int, C) -> () {
+  // CHECK-LABEL: sil hidden [thunk] [ossa] @$s15guaranteed_self1CC3foo{{[_0-9a-zA-Z]*}}FTo : $@convention(objc_method) (Int, C) -> () {
   // CHECK:       bb0({{.*}} [[SELF:%.*]] : @unowned $C):
   // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:         [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
@@ -297,7 +297,7 @@ class C: Fooable, Barrable {
     self.bas()
   }
 
-  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s15guaranteed_self1CC5prop1SivgTo : $@convention(objc_method) (C) -> Int
+  // CHECK-LABEL: sil hidden [transparent] [thunk] [ossa] @$s15guaranteed_self1CC5prop1SivgTo : $@convention(objc_method) (C) -> Int
   // CHECK:       bb0([[SELF:%.*]] : @unowned $C):
   // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:         [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
@@ -307,7 +307,7 @@ class C: Fooable, Barrable {
   // CHECK-NOT:     destroy_value [[SELF]]
   // CHECK-NOT:     destroy_value [[SELF_COPY]]
 
-  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s15guaranteed_self1CC5prop1SivsTo : $@convention(objc_method) (Int, C) -> ()
+  // CHECK-LABEL: sil hidden [transparent] [thunk] [ossa] @$s15guaranteed_self1CC5prop1SivsTo : $@convention(objc_method) (Int, C) -> ()
   // CHECK:       bb0({{.*}} [[SELF:%.*]] : @unowned $C):
   // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:         [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]

@@ -17,7 +17,7 @@ class Generic<T>: NSObject {
   // CHECK-LABEL: sil hidden [ossa] @$s18objc_generic_class7GenericCfD : $@convention(method) <T> (@owned Generic<T>) -> () {
   // CHECK:       bb0({{%.*}} : @owned $Generic<T>):
   // CHECK: } // end sil function '$s18objc_generic_class7GenericCfD'
-  // CHECK-LABEL: sil private [thunk] [ossa] @$s18objc_generic_class7GenericCfDTo : $@convention(objc_method) <T> (Generic<T>) -> () {
+  // CHECK-LABEL: sil hidden [thunk] [ossa] @$s18objc_generic_class7GenericCfDTo : $@convention(objc_method) <T> (Generic<T>) -> () {
   // CHECK:       bb0([[SELF:%.*]] : @unowned $Generic<T>):
   // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:         [[NATIVE:%.*]] = function_ref @$s18objc_generic_class7GenericCfD
