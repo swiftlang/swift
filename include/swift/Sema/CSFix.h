@@ -103,7 +103,7 @@ enum class FixKind : uint8_t {
   GenericArgumentsMismatch,
 
   /// Fix up @autoclosure argument to the @autoclosure parameter,
-  /// to for a call to be able to foward it properly, since
+  /// to for a call to be able to forward it properly, since
   /// @autoclosure conversions are unsupported starting from
   /// Swift version 5.
   AutoClosureForwarding,
@@ -251,7 +251,7 @@ enum class FixKind : uint8_t {
   /// inferred in current context e.g. because it's a multi-statement closure.
   SpecifyClosureReturnType,
 
-  /// Object literal type coudn't be inferred because the module where
+  /// Object literal type couldn't be inferred because the module where
   /// the default type that implements the associated literal protocol
   /// is declared was not imported.
   SpecifyObjectLiteralTypeImport,
@@ -274,7 +274,7 @@ enum class FixKind : uint8_t {
   /// Allow key path to be bound to a function type with more than 1 argument
   AllowMultiArgFuncKeyPathMismatch,
 
-  /// Specify key path root type when it cannot be infered from context.
+  /// Specify key path root type when it cannot be inferred from context.
   SpecifyKeyPathRootType,
 
   /// Unwrap optional base on key path application.
@@ -316,10 +316,18 @@ enum class FixKind : uint8_t {
   /// succeed.
   AllowNoopCheckedCast,
 
+  /// Warn about special runtime case where statically known
+  /// checked cast from existentials to CFType always succeed.
+  AllowNoopExistentialToCFTypeCheckedCast,
+
   /// Allow a runtime checked cast where at compile time the from is
-  /// convertible, but runtime does not support such convertions. e.g.
+  /// convertible, but runtime does not support such conversions. e.g.
   /// function type casts.
   AllowUnsupportedRuntimeCheckedCast,
+
+  /// Allow a runtime checked cast where it is known at compile time
+  /// always fails.
+  AllowCheckedCastToUnrelated,
 
   /// Allow reference to a static member on a protocol metatype
   /// even though result type of the reference doesn't conform
@@ -382,6 +390,14 @@ enum class FixKind : uint8_t {
 
   /// Produce an error for not getting a compile-time constant
   NotCompileTimeConst,
+
+  /// Ignore a type mismatch while trying to infer generic parameter type
+  /// from default expression.
+  IgnoreDefaultExprTypeMismatch,
+
+  /// Coerce a result type of a call to a particular existential type
+  /// by adding `as any <#Type#>`.
+  AddExplicitExistentialCoercion,
 };
 
 class ConstraintFix {
@@ -438,7 +454,7 @@ public:
 
   /// Retrieve anchor expression associated with this fix.
   /// NOTE: such anchor comes directly from locator without
-  /// any simplication attempts.
+  /// any simplification attempts.
   ASTNode getAnchor() const;
   ConstraintLocator *getLocator() const { return Locator; }
 
@@ -523,6 +539,8 @@ public:
   }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
 
   static RelabelArguments *create(ConstraintSystem &cs,
                                   llvm::ArrayRef<Identifier> correctLabels,
@@ -690,10 +708,13 @@ public:
   }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
 
-  static TreatArrayLiteralAsDictionary *create(ConstraintSystem &cs,
-                                               Type dictionaryTy, Type arrayTy,
-                                               ConstraintLocator *loc);
+  static TreatArrayLiteralAsDictionary *attempt(ConstraintSystem &cs,
+                                                Type dictionaryTy, Type arrayTy,
+                                                ConstraintLocator *loc);
 
   static bool classof(ConstraintFix *fix) {
     return fix->getKind() == FixKind::TreatArrayLiteralAsDictionary;
@@ -2335,6 +2356,10 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
   static SpecifyClosureReturnType *create(ConstraintSystem &cs,
                                           ConstraintLocator *locator);
 
@@ -2781,6 +2806,31 @@ public:
   }
 };
 
+class AllowNoopExistentialToCFTypeCheckedCast final
+    : public CheckedCastContextualMismatchWarning {
+  AllowNoopExistentialToCFTypeCheckedCast(ConstraintSystem &cs, Type fromType,
+                                          Type toType, CheckedCastKind kind,
+                                          ConstraintLocator *locator)
+      : CheckedCastContextualMismatchWarning(
+            cs, FixKind::AllowNoopExistentialToCFTypeCheckedCast, fromType,
+            toType, kind, locator) {}
+
+public:
+  std::string getName() const override {
+    return "checked cast from existential to CFType always succeeds";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static AllowNoopExistentialToCFTypeCheckedCast *
+  attempt(ConstraintSystem &cs, Type fromType, Type toType,
+          CheckedCastKind kind, ConstraintLocator *locator);
+
+  static bool classof(ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AllowNoopExistentialToCFTypeCheckedCast;
+  }
+};
+
 class AllowUnsupportedRuntimeCheckedCast final
     : public CheckedCastContextualMismatchWarning {
   AllowUnsupportedRuntimeCheckedCast(ConstraintSystem &cs, Type fromType,
@@ -2805,6 +2855,29 @@ public:
 
   static bool classof(ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowUnsupportedRuntimeCheckedCast;
+  }
+};
+
+class AllowCheckedCastToUnrelated final
+    : public CheckedCastContextualMismatchWarning {
+  AllowCheckedCastToUnrelated(ConstraintSystem &cs, Type fromType, Type toType,
+                              CheckedCastKind kind, ConstraintLocator *locator)
+      : CheckedCastContextualMismatchWarning(
+            cs, FixKind::AllowCheckedCastToUnrelated, fromType, toType, kind,
+            locator) {}
+
+public:
+  std::string getName() const override { return "checked cast always fails"; }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static AllowCheckedCastToUnrelated *attempt(ConstraintSystem &cs,
+                                              Type fromType, Type toType,
+                                              CheckedCastKind kind,
+                                              ConstraintLocator *locator);
+
+  static bool classof(ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AllowCheckedCastToUnrelated;
   }
 };
 
@@ -2889,6 +2962,60 @@ public:
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
   static AllowSwiftToCPointerConversion *create(ConstraintSystem &cs,
+                                                ConstraintLocator *locator);
+};
+
+class IgnoreDefaultExprTypeMismatch : public AllowArgumentMismatch {
+protected:
+  IgnoreDefaultExprTypeMismatch(ConstraintSystem &cs, Type argType,
+                                Type paramType, ConstraintLocator *locator)
+      : AllowArgumentMismatch(cs, FixKind::IgnoreDefaultExprTypeMismatch,
+                              argType, paramType, locator) {}
+
+public:
+  std::string getName() const override {
+    return "allow default expression conversion mismatch";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static IgnoreDefaultExprTypeMismatch *create(ConstraintSystem &cs,
+                                               Type argType, Type paramType,
+                                               ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::IgnoreDefaultExprTypeMismatch;
+  }
+};
+
+class AddExplicitExistentialCoercion final : public ConstraintFix {
+  Type ErasedResultType;
+
+  AddExplicitExistentialCoercion(ConstraintSystem &cs, Type erasedResultTy,
+                                 ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AddExplicitExistentialCoercion, locator),
+        ErasedResultType(erasedResultTy) {}
+
+public:
+  std::string getName() const override {
+    return "add explicit existential type coercion";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static bool
+  isRequired(ConstraintSystem &cs, Type resultTy,
+             ArrayRef<std::pair<TypeVariableType *, OpenedArchetypeType *>>
+                 openedExistentials,
+             ConstraintLocatorBuilder locator);
+
+  static bool isRequired(ConstraintSystem &cs, Type resultTy,
+                         llvm::function_ref<Optional<Type>(TypeVariableType *)>
+                             findExistentialType,
+                         ConstraintLocatorBuilder locator);
+
+  static AddExplicitExistentialCoercion *create(ConstraintSystem &cs,
+                                                Type resultTy,
                                                 ConstraintLocator *locator);
 };
 

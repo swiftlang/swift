@@ -18,40 +18,6 @@
 
 namespace swift {
 
-SILArgument *findFirstDistributedActorSystemArg(SILFunction &F) {
-  auto *module = F.getModule().getSwiftModule();
-  auto &C = F.getASTContext();
-
-  auto *transportProto = C.getProtocol(KnownProtocolKind::DistributedActorSystem);
-  Type transportTy = transportProto->getDeclaredInterfaceType();
-
-  for (auto arg : F.getArguments()) {
-    // TODO(distributed): also be able to locate a generic transport
-    Type argTy = arg->getType().getASTType();
-    auto argDecl = arg->getDecl();
-
-    auto conformsToTransport =
-        module->lookupConformance(argDecl->getInterfaceType(), transportProto);
-
-    // Is it a protocol that conforms to DistributedActorSystem?
-    if (argTy->isEqual(transportTy) || conformsToTransport) {
-      return arg;
-    }
-
-    // Is it some specific DistributedActorSystem?
-    auto result = module->lookupConformance(argTy, transportProto);
-    if (!result.isInvalid()) {
-      return arg;
-    }
-  }
-
-#ifndef NDEBUG
-  llvm_unreachable("Missing required DistributedActorSystem argument!");
-#endif
-
-  return nullptr;
-}
-
 void emitDistributedActorSystemWitnessCall(
     SILBuilder &B, SILLocation loc, DeclName methodName,
     SILValue base,
@@ -65,8 +31,8 @@ void emitDistributedActorSystemWitnessCall(
   auto &C = F.getASTContext();
 
   // Dig out the conformance to DistributedActorSystem.
-  ProtocolDecl *systemProto = C.getProtocol(KnownProtocolKind::DistributedActorSystem);
-  assert(systemProto);
+  ProtocolDecl *DAS = C.getDistributedActorSystemDecl();
+  assert(DAS);
   auto systemASTType = base->getType().getASTType();
   auto *module = M.getSwiftModule();
   ProtocolConformanceRef systemConfRef;
@@ -74,24 +40,25 @@ void emitDistributedActorSystemWitnessCall(
   // If the base is an existential open it.
   if (systemASTType->isAnyExistentialType()) {
     OpenedArchetypeType *opened;
-    systemASTType =
-        systemASTType->openAnyExistentialType(opened)->getCanonicalType();
+    systemASTType = systemASTType->openAnyExistentialType(opened,
+                                                          F.getGenericSignature())
+                        ->getCanonicalType();
     base = B.createOpenExistentialAddr(
         loc, base, F.getLoweredType(systemASTType),
         OpenedExistentialAccess::Immutable);
   }
 
   if (systemASTType->isTypeParameter() || systemASTType->is<ArchetypeType>()) {
-    systemConfRef = ProtocolConformanceRef(systemProto);
+    systemConfRef = ProtocolConformanceRef(DAS);
   } else {
-    systemConfRef = module->lookupConformance(systemASTType, systemProto);
+    systemConfRef = module->lookupConformance(systemASTType, DAS);
   }
 
   assert(!systemConfRef.isInvalid() &&
          "Missing conformance to `DistributedActorSystem`");
 
   // Dig out the method.
-  auto method = cast<FuncDecl>(systemProto->getSingleRequirement(methodName));
+  auto method = cast<FuncDecl>(DAS->getSingleRequirement(methodName));
   auto methodRef = SILDeclRef(method, SILDeclRef::Kind::Func);
   auto methodSILTy =
       M.Types.getConstantInfo(B.getTypeExpansionContext(), methodRef)
@@ -146,7 +113,6 @@ void emitDistributedActorSystemWitnessCall(
   auto params = methodSILFnTy->getParameters();
   for (size_t i = 0; i < args.size(); ++i) {
     auto arg = args[i];
-    // FIXME(distributed): handle multiple ones (!!!!)
     if (params[i].isFormalIndirect() &&
         !arg->getType().isAddress() &&
         !dyn_cast<AnyMetatypeType>(arg->getType().getASTType())) {
@@ -217,7 +183,39 @@ void emitActorReadyCall(SILBuilder &B, SILLocation loc, SILValue actor,
   auto &C = F.getASTContext();
   emitDistributedActorSystemWitnessCall(
       B, loc, C.Id_actorReady, actorSystem,
-      F.mapTypeIntoContext(actor->getType()), { actor });
+      actor->getType(), { actor });
+}
+
+void emitResignIdentityCall(SILBuilder &B, SILLocation loc,
+                            ClassDecl* actorDecl,
+                            SILValue actor, SILValue idRef) {
+  auto &F = B.getFunction();
+  auto &C = F.getASTContext();
+
+  SILValue systemRef = refDistributedActorSystem(B, loc, actorDecl, actor);
+
+  emitDistributedActorSystemWitnessCall(
+      B, loc, C.Id_resignID,
+      systemRef,
+      SILType(),
+      { idRef });
+}
+
+/// Creates a reference to the distributed actor's \p actorSystem
+/// stored property.
+SILValue refDistributedActorSystem(SILBuilder &b,
+                                   SILLocation loc,
+                                   ClassDecl *actDecl,
+                                   SILValue actorInstance) {
+  assert(actDecl);
+  assert(actDecl->isDistributedActor());
+
+  // get the VarDecl corresponding to the actorSystem.
+  auto refs = actDecl->lookupDirect(actDecl->getASTContext().Id_actorSystem);
+  assert(refs.size() == 1);
+  VarDecl *actorSystemVar = dyn_cast<VarDecl>(refs.front());
+
+  return b.createRefElementAddr(loc, actorInstance, actorSystemVar);
 }
 
 } // namespace swift

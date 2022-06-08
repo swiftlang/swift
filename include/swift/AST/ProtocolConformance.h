@@ -67,7 +67,7 @@ enum class ProtocolConformanceKind {
   /// Conformance of a generic class type projected through one of its
   /// superclass's conformances.
   Inherited,
-  /// Builtin conformances are special conformaces that the runtime handles
+  /// Builtin conformances are special conformances that the runtime handles
   /// and isn't implemented directly in Swift.
   Builtin
 };

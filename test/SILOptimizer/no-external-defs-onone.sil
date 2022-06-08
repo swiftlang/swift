@@ -3,26 +3,25 @@
 // CHECK-DAG: define linkonce_odr hidden swiftcc void @shared_external_test()
 // CHECK-DAG: declare {{(dllimport )?}}swiftcc void @public_external_test()
 // Non-public external symbols are emitted into clients.
-// CHECK-DAG: define available_externally hidden swiftcc void @hidden_external_test()
+// CHECK-DAG: declare swiftcc void @hidden_external_test()
 // CHECK-NOT: public_external_unused_test
 
+// TODO: update check line for the hidden_external_test for Windows.
+// UNSUPPORTED: OS=windows-msvc
 
-sil public_external @public_external_test : $@convention(thin)  () -> () {
+sil public_external [serialized] @public_external_test : $@convention(thin)  () -> () {
   %0 = tuple()
   return %0 : $()
 }
 
-sil hidden_external @hidden_external_test : $@convention(thin)  () -> () {
+sil hidden_external @hidden_external_test : $@convention(thin)  () -> ()
+
+sil shared @shared_external_test : $@convention(thin)  () -> () {
   %0 = tuple()
   return %0 : $()
 }
 
-sil shared_external @shared_external_test : $@convention(thin)  () -> () {
-  %0 = tuple()
-  return %0 : $()
-}
-
-sil public_external @public_external_unused_test : $@convention(thin)  () -> () {
+sil public_external [serialized] @public_external_unused_test : $@convention(thin)  () -> () {
   %0 = tuple()
   return %0 : $()
 }

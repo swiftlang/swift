@@ -584,6 +584,7 @@ actor EscapeArtist {
 actor Ahmad {
   nonisolated func f() {}
   var prop: Int = 0
+  var computedProp: Int { 10 } // expected-note {{property declared here}}
 
   init(v1: Void) {
     Task.detached { self.f() } // expected-note {{after making a copy of 'self', only non-isolated properties of 'self' can be accessed from this init}}
@@ -595,6 +596,26 @@ actor Ahmad {
     Task.detached { self.f() } // expected-note {{after making a copy of 'self', only non-isolated properties of 'self' can be accessed from this init}}
     f()
     prop += 1 // expected-warning {{cannot access property 'prop' here in non-isolated initializer; this is an error in Swift 6}}
+  }
+
+  nonisolated init(v3: Void) async {
+    prop = 10
+    f()       // expected-note {{after calling instance method 'f()', only non-isolated properties of 'self' can be accessed from this init}}
+    prop += 1 // expected-warning {{cannot access property 'prop' here in non-isolated initializer; this is an error in Swift 6}}
+  }
+
+  @MainActor init(v4: Void) async {
+    prop = 10
+    f()       // expected-note {{after calling instance method 'f()', only non-isolated properties of 'self' can be accessed from this init}}
+    prop += 1 // expected-warning {{cannot access property 'prop' here in non-isolated initializer; this is an error in Swift 6}}
+  }
+
+  deinit {
+    // expected-warning@+2 {{actor-isolated property 'computedProp' can not be referenced from a non-isolated context; this is an error in Swift 6}}
+    // expected-note@+1 {{after accessing property 'computedProp', only non-isolated properties of 'self' can be accessed from a deinit}}
+    let x = computedProp
+
+    prop = x // expected-warning {{cannot access property 'prop' here in deinitializer; this is an error in Swift 6}}
   }
 }
 
@@ -621,5 +642,61 @@ actor Rain {
     defer { Task { self.f() } }
 
     defer { _ = hollerBack(self) }
+  }
+
+  deinit {
+    x = 1
+  }
+}
+
+@available(SwiftStdlib 5.5, *)
+actor DeinitExceptionForSwift5 {
+  var x: Int = 0
+
+  func cleanup() { // expected-note {{calls to instance method 'cleanup()' from outside of its actor context are implicitly asynchronous}}
+    x = 0
+  }
+
+  deinit {
+    // expected-warning@+2 {{actor-isolated instance method 'cleanup()' can not be referenced from a non-isolated context; this is an error in Swift 6}}
+    // expected-note@+1 {{after calling instance method 'cleanup()', only non-isolated properties of 'self' can be accessed from a deinit}}
+    cleanup()
+
+    x = 1 // expected-warning {{cannot access property 'x' here in deinitializer; this is an error in Swift 6}}
+  }
+}
+
+@available(SwiftStdlib 5.5, *)
+actor OhBrother {
+  private var giver: (OhBrother) -> Int
+  private var whatever: Int = 0
+
+  static var DefaultResult: Int { 10 }
+
+  init() {
+    // expected-note@+2 {{after this closure involving 'self', only non-isolated properties of 'self' can be accessed from this init}}
+    // expected-warning@+1 {{cannot access property 'giver' here in non-isolated initializer; this is an error in Swift 6}}
+    self.giver = { (x: OhBrother) -> Int in Self.DefaultResult }
+  }
+
+  init(v2: Void) {
+    giver = { (x: OhBrother) -> Int in 0 }
+
+    // make sure we don't call this a closure, which is the more common situation.
+
+    _ = giver(self) // expected-note {{after a call involving 'self', only non-isolated properties of 'self' can be accessed from this init}}
+
+    whatever = 1 // expected-warning {{cannot access property 'whatever' here in non-isolated initializer; this is an error in Swift 6}}
+  }
+
+  init(v3: Void) {
+    let blah = { (x: OhBrother) -> Int in 0 }
+    giver = blah
+
+    // TODO: would be nice if we didn't say "after this closure" since it's not a capture, but a call.
+
+    _ = blah(self) // expected-note {{after this closure involving 'self', only non-isolated properties of 'self' can be accessed from this init}}
+
+    whatever = 2 // expected-warning {{cannot access property 'whatever' here in non-isolated initializer; this is an error in Swift 6}}
   }
 }

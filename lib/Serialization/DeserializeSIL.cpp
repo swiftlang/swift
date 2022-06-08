@@ -69,7 +69,6 @@ fromStableSILLinkage(unsigned value) {
   case SIL_LINKAGE_PRIVATE: return SILLinkage::Private;
   case SIL_LINKAGE_PUBLIC_EXTERNAL: return SILLinkage::PublicExternal;
   case SIL_LINKAGE_HIDDEN_EXTERNAL: return SILLinkage::HiddenExternal;
-  case SIL_LINKAGE_SHARED_EXTERNAL: return SILLinkage::SharedExternal;
   default: return None;
   }
 }
@@ -522,9 +521,10 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   DeclID clangNodeOwnerID;
   TypeID funcTyID;
   IdentifierID replacedFunctionID;
+  IdentifierID usedAdHocWitnessFunctionID;
   GenericSignatureID genericSigID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
-      isWithoutactuallyEscapingThunk, specialPurpose, inlineStrategy,
+      isWithoutActuallyEscapingThunk, specialPurpose, inlineStrategy,
       optimizationMode, perfConstr,
       subclassScope, hasCReferences, effect, numAttrs,
       hasQualifiedOwnership, isWeakImported, LIST_VER_TUPLE_PIECES(available),
@@ -532,11 +532,12 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
-      isWithoutactuallyEscapingThunk, specialPurpose, inlineStrategy,
+      isWithoutActuallyEscapingThunk, specialPurpose, inlineStrategy,
       optimizationMode, perfConstr,
       subclassScope, hasCReferences, effect, numAttrs,
       hasQualifiedOwnership, isWeakImported, LIST_VER_TUPLE_PIECES(available),
-      isDynamic, isExactSelfClass, isDistributed, funcTyID, replacedFunctionID,
+      isDynamic, isExactSelfClass, isDistributed, funcTyID,
+      replacedFunctionID, usedAdHocWitnessFunctionID,
       genericSigID, clangNodeOwnerID, SemanticsIDs);
 
   if (funcTyID == 0) {
@@ -565,6 +566,13 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
         getFuncForReference(MF->getIdentifier(replacedFunctionID).str());
   } else if (replacedFunctionID) {
     replacedObjectiveCFunc = MF->getIdentifier(replacedFunctionID);
+  }
+
+  SILFunction *usedAdHocWitnessFunction = nullptr;
+  if (usedAdHocWitnessFunctionID) {
+    auto usedAdHocWitnessFunctionStr =
+        MF->getIdentifier(usedAdHocWitnessFunctionID).str();
+    usedAdHocWitnessFunction = getFuncForReference(usedAdHocWitnessFunctionStr);
   }
 
   auto linkageOpt = fromStableSILLinkage(rawLinkage);
@@ -608,7 +616,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     fn->setSerialized(IsSerialized_t(isSerialized));
 
     // If the serialized function comes from the same module, we're merging
-    // modules, and can update the the linkage directly. This is needed to
+    // modules, and can update the linkage directly. This is needed to
     // correctly update the linkage for forward declarations to entities defined
     // in another file of the same module – we want to ensure the linkage
     // reflects the fact that the entity isn't really external and shouldn't be
@@ -623,11 +631,11 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     // Don't override the transparency or linkage of a function with
     // an existing declaration, except if we deserialized a
     // PublicNonABI function, which has HiddenExternal when
-    // referenced as a declaration, and SharedExternal when it has
+    // referenced as a declaration, and Shared when it has
     // a deserialized body.
     if (isAvailableExternally(fn->getLinkage())) {
-      if (linkage == SILLinkage::PublicNonABI) {
-        fn->setLinkage(SILLinkage::SharedExternal);
+      if (linkage == SILLinkage::PublicNonABI || linkage == SILLinkage::Shared) {
+        fn->setLinkage(SILLinkage::Shared);
       } else if (hasPublicVisibility(linkage)) {
         // Cross-module-optimization can change the linkage to public. In this
         // case we need to update the linkage of the function (which is
@@ -647,7 +655,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     fn->setTransparent(IsTransparent_t(isTransparent == 1));
     fn->setSerialized(IsSerialized_t(isSerialized));
     fn->setThunk(IsThunk_t(isThunk));
-    fn->setWithoutActuallyEscapingThunk(bool(isWithoutactuallyEscapingThunk));
+    fn->setWithoutActuallyEscapingThunk(bool(isWithoutActuallyEscapingThunk));
     fn->setInlineStrategy(Inline_t(inlineStrategy));
     fn->setSpecialPurpose(SILFunction::Purpose(specialPurpose));
     fn->setEffectsKind(EffectsKind(effect));
@@ -671,6 +679,8 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
       fn->setDynamicallyReplacedFunction(replacedFunction);
     if (!replacedObjectiveCFunc.empty())
       fn->setObjCReplacement(replacedObjectiveCFunc);
+    if (usedAdHocWitnessFunction)
+      fn->setReferencedAdHocRequirementWitnessFunction(usedAdHocWitnessFunction);
     if (clangNodeOwner)
       fn->setClangNodeOwner(clangNodeOwner);
     for (auto ID : SemanticsIDs) {
@@ -687,7 +697,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   builder.setHasOwnership(fn, hasQualifiedOwnership);
 
   // Mark this function as deserialized. This avoids rerunning diagnostic
-  // passes. Certain passes in the madatory pipeline may not work as expected
+  // passes. Certain passes in the mandatory pipeline may not work as expected
   // after arbitrary optimization and lowering.
   if (!MF->isSIB())
     fn->setWasDeserializedCanonical();
@@ -700,7 +710,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   }
 
   // Read and instantiate the specialize attributes.
-  bool shouldAddSpecAtttrs = fn->getSpecializeAttrs().empty();
+  bool shouldAddSpecAttrs = fn->getSpecializeAttrs().empty();
   bool shouldAddEffectAttrs = !fn->hasArgumentEffects();
   for (unsigned attrIdx = 0; attrIdx < numAttrs; ++attrIdx) {
     llvm::Expected<llvm::BitstreamEntry> maybeNext =
@@ -767,7 +777,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
     auto specializedSig = MF->getGenericSignature(specializedSigID);
     // Only add the specialize attributes once.
-    if (shouldAddSpecAtttrs) {
+    if (shouldAddSpecAttrs) {
       // Read the substitution list and construct a SILSpecializeAttr.
       fn->addSpecializeAttr(SILSpecializeAttr::create(
           SILMod, specializedSig, exported != 0, specializationKind, target,
@@ -884,6 +894,10 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   if (Callback)
     Callback->didDeserializeFunctionBody(MF->getAssociatedModule(), fn);
 
+  if (!MF->isSIB() && !SILMod.isSerialized()) {
+    assert((fn->isSerialized() || fn->empty()) &&
+           "deserialized function must have the IsSerialized flag set");
+  }
   return fn;
 }
 
@@ -1017,7 +1031,7 @@ SILDeserializer::readKeyPathComponent(ArrayRef<uint64_t> ListOfValues,
       auto formalType = MF->getType(ListOfValues[nextValue++]);
       auto loweredType = MF->getType(ListOfValues[nextValue++]);
       auto loweredCategory = (SILValueCategory)ListOfValues[nextValue++];
-      auto conformance = MF->readConformance(SILCursor);
+      auto conformance = MF->getConformance(ListOfValues[nextValue++]);
       indicesBuf.push_back({
         operand, formalType->getCanonicalType(),
         SILType::getPrimitiveType(loweredType->getCanonicalType(),
@@ -1086,11 +1100,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   if (Fn)
     Builder.setCurrentDebugScope(Fn->getDebugScope());
   unsigned RawOpCode = 0, TyCategory = 0, TyCategory2 = 0, TyCategory3 = 0,
-           Attr = 0, Attr2 = 0, Attr3 = 0, Attr4 = 0, NumSubs = 0,
-           NumConformances = 0;
+           Attr = 0, Attr2 = 0, Attr3 = 0, Attr4 = 0, NumSubs = 0;
   ValueID ValID, ValID2, ValID3;
   TypeID TyID, TyID2, TyID3;
   TypeID ConcreteTyID;
+  ProtocolConformanceID ConformanceID;
   SourceLoc SLoc;
   ApplyOptions ApplyOpts;
   ArrayRef<uint64_t> ListOfValues;
@@ -1138,7 +1152,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                                          TyID2, TyCategory2,
                                          ValID,
                                          ConcreteTyID,
-                                         NumConformances);
+                                         ListOfValues);
     break;
   case SIL_ONE_TYPE_VALUES:
     SILOneTypeValuesLayout::readRecord(scratch, RawOpCode, TyID, TyCategory,
@@ -1202,7 +1216,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   case SIL_INST_WITNESS_METHOD:
     SILInstWitnessMethodLayout::readRecord(
         scratch, TyID, TyCategory, Attr, TyID2, TyCategory2, TyID3,
-        TyCategory3, ValID3, ListOfValues);
+        TyCategory3, ValID3, ConformanceID, ListOfValues);
     RawOpCode = (unsigned)SILInstructionKind::WitnessMethodInst;
     break;
   case SIL_INST_DIFFERENTIABLE_FUNCTION:
@@ -1243,15 +1257,17 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
     ResultInst = Builder.createAllocBox(
         Loc, cast<SILBoxType>(MF->getType(TyID)->getCanonicalType()), None,
-        /*bool hasDynamicLifetime*/ Attr != 0);
+        /*bool hasDynamicLifetime*/ Attr & 1,
+        /*bool reflection*/ Attr & 2);
     break;
   case SILInstructionKind::AllocStackInst: {
     assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
     bool hasDynamicLifetime = Attr & 0x1;
     bool isLexical = (Attr >> 1) & 0x1;
+    bool wasMoved = (Attr >> 2) & 0x1;
     ResultInst = Builder.createAllocStack(
         Loc, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn),
-        None, hasDynamicLifetime, isLexical);
+        None, hasDynamicLifetime, isLexical, wasMoved);
     break;
   }
   case SILInstructionKind::MetatypeInst:
@@ -1330,7 +1346,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   ONEOPERAND_ONETYPE_INST(RefTo##Name) \
   ONEOPERAND_ONETYPE_INST(Name##ToRef)
 #include "swift/AST/ReferenceStorage.def"
-  ONEOPERAND_ONETYPE_INST(UncheckedRefCast)
   ONEOPERAND_ONETYPE_INST(UncheckedAddrCast)
   ONEOPERAND_ONETYPE_INST(UncheckedTrivialBitCast)
   ONEOPERAND_ONETYPE_INST(UncheckedBitwiseCast)
@@ -1346,8 +1361,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   ONEOPERAND_ONETYPE_INST(ObjCToThickMetatype)
   ONEOPERAND_ONETYPE_INST(ObjCMetatypeToObject)
   ONEOPERAND_ONETYPE_INST(ObjCExistentialMetatypeToObject)
-  ONEOPERAND_ONETYPE_INST(ThinFunctionToPointer)
-  ONEOPERAND_ONETYPE_INST(PointerToThinFunction)
   ONEOPERAND_ONETYPE_INST(ProjectBlockStorage)
 #undef ONEOPERAND_ONETYPE_INST
 
@@ -1446,8 +1459,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
           ValID, getSILType(Ty2, (SILValueCategory)TyCategory2, Fn));
 
     SmallVector<ProtocolConformanceRef, 2> conformances;
-    while (NumConformances--) {
-      auto conformance = MF->readConformance(SILCursor);
+    for (auto conformanceID: ListOfValues) {
+      auto conformance = MF->getConformance(conformanceID);
       conformances.push_back(conformance);
     }
 
@@ -1503,12 +1516,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     }
     if (OpCode == SILInstructionKind::AllocRefDynamicInst) {
       assert(i + 2 == NumVals);
-      assert(!canAllocOnStack);
       SILType MetadataType = getSILType(MF->getType(ListOfValues[i+1]),
                                         SILValueCategory::Object, Fn);
       SILValue MetadataOp = getLocalValue(ListOfValues[i], MetadataType);
       ResultInst = Builder.createAllocRefDynamic(Loc, MetadataOp, ClassTy,
-                                                 isObjC, TailTypes, Counts);
+                                                 isObjC, canAllocOnStack,
+                                                 TailTypes, Counts);
     } else {
       assert(i == NumVals);
       ResultInst = Builder.createAllocRef(Loc, ClassTy, isObjC, canAllocOnStack,
@@ -2570,7 +2583,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     SILType OperandTy =
         getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2, Fn);
 
-    auto Conformance = MF->readConformance(SILCursor);
+    auto Conformance = MF->getConformance(ConformanceID);
     // Read the optional opened existential.
     SILValue ExistentialOperand;
     if (TyID3) {
@@ -2619,36 +2632,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                                         forwardingOwnership);
     break;
   }
-  case SILInstructionKind::CheckedCastValueBranchInst: {
-    CanType srcFormalType = MF->getType(ListOfValues[0])->getCanonicalType();
-    SILType srcLoweredType = getSILType(MF->getType(ListOfValues[2]),
-                                        (SILValueCategory)ListOfValues[3], Fn);
-    SILValue op = getLocalValue(ListOfValues[1], srcLoweredType);
-    SILType targetLoweredType =
-        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn);
-    CanType targetFormalType =
-        MF->getType(ListOfValues[4])->getCanonicalType();
-    auto *successBB = getBBForReference(Fn, ListOfValues[5]);
-    auto *failureBB = getBBForReference(Fn, ListOfValues[6]);
-
-    ResultInst = Builder.createCheckedCastValueBranch(
-        Loc, op, srcFormalType, targetLoweredType, targetFormalType, successBB,
-        failureBB);
-    break;
-  }
-  case SILInstructionKind::UnconditionalCheckedCastValueInst: {
-    CanType srcFormalType = MF->getType(ListOfValues[0])->getCanonicalType();
-    SILType srcLoweredType = getSILType(MF->getType(ListOfValues[2]),
-                                      (SILValueCategory)ListOfValues[3], Fn);
-    SILValue src = getLocalValue(ListOfValues[1], srcLoweredType);
-
-    SILType targetLoweredType =
-        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn);
-    CanType targetFormalType = MF->getType(ListOfValues[4])->getCanonicalType();
-    ResultInst = Builder.createUnconditionalCheckedCastValue(
-        Loc, src, srcFormalType, targetLoweredType, targetFormalType);
-    break;
-  }
   case SILInstructionKind::UnconditionalCheckedCastAddrInst: {
     // ignore attr.
     CanType srcFormalType = MF->getType(ListOfValues[0])->getCanonicalType();
@@ -2684,6 +2667,17 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     ResultInst = Builder.createCheckedCastAddrBranch(
         Loc, consumption, src, srcFormalType, dest, targetFormalType, successBB,
         failureBB);
+    break;
+  }
+  case SILInstructionKind::UncheckedRefCastInst: {
+    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
+           "Layout should be OneTypeOneOperand.");
+    auto *urc = Builder.createUncheckedRefCast(Loc,
+        getLocalValue(ValID, getSILType(MF->getType(TyID2),
+                                        (SILValueCategory)TyCategory2, Fn)),
+        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
+    urc->setForwardingOwnershipKind(decodeValueOwnership(Attr));
+    ResultInst = urc;
     break;
   }
   case SILInstructionKind::UncheckedRefCastAddrInst: {
@@ -2760,12 +2754,16 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     auto numOperands = ListOfValues[nextValue++];
     auto subMap = MF->getSubstitutionMap(ListOfValues[nextValue++]);
     auto objcString = MF->getIdentifierText(ListOfValues[nextValue++]);
-    auto numGenericParams = ListOfValues[nextValue++];
-    
+
     SmallVector<GenericTypeParamType *, 4> genericParams;
-    while (numGenericParams-- > 0) {
+    SmallVector<Requirement, 4> requirements;
+    auto numGenericParams = ListOfValues[nextValue++];
+    for (unsigned i = 0; i != numGenericParams; ++i) {
       genericParams.push_back(MF->getType(ListOfValues[nextValue++])
                                 ->castTo<GenericTypeParamType>());
+    }
+    if (numGenericParams != 0) {
+      MF->deserializeGenericRequirements(ListOfValues, nextValue, requirements);
     }
     
     SmallVector<KeyPathPatternComponent, 4> components;
@@ -2773,9 +2771,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     while (numComponents-- > 0) {
       components.push_back(*readKeyPathComponent(ListOfValues, nextValue));
     }
-    
-    SmallVector<Requirement, 4> requirements;
-    MF->readGenericRequirements(requirements, SILCursor);
     
     CanGenericSignature sig = CanGenericSignature();
     if (!genericParams.empty() || !requirements.empty())
@@ -2981,9 +2976,10 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   DeclID clangOwnerID;
   TypeID funcTyID;
   IdentifierID replacedFunctionID;
+  IdentifierID usedAdHocWitnessFunctionID;
   GenericSignatureID genericSigID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
-      isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
+      isWithoutActuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, perfConstr,
       subclassScope, hasCReferences, effect, numSpecAttrs,
       hasQualifiedOwnership, isWeakImported, LIST_VER_TUPLE_PIECES(available),
@@ -2991,11 +2987,12 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
-      isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
+      isWithoutActuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, perfConstr,
       subclassScope, hasCReferences, effect, numSpecAttrs,
       hasQualifiedOwnership, isWeakImported, LIST_VER_TUPLE_PIECES(available),
-      isDynamic, isExactSelfClass, isDistributed, funcTyID, replacedFunctionID,
+      isDynamic, isExactSelfClass, isDistributed, funcTyID,
+      replacedFunctionID, usedAdHocWitnessFunctionID,
       genericSigID, clangOwnerID, SemanticsIDs);
   auto linkage = fromStableSILLinkage(rawLinkage);
   if (!linkage) {
@@ -3399,19 +3396,22 @@ void SILDeserializer::readWitnessTableEntries(
       witnessEntries.push_back(SILDefaultWitnessTable::Entry());
     } else if (kind == SIL_WITNESS_BASE_ENTRY) {
       DeclID protoId;
-      WitnessBaseEntryLayout::readRecord(scratch, protoId);
+      ProtocolConformanceID conformanceId;
+      WitnessBaseEntryLayout::readRecord(scratch, protoId, conformanceId);
       ProtocolDecl *proto = cast<ProtocolDecl>(MF->getDecl(protoId));
-      auto conformance = MF->readConformance(SILCursor);
+      auto conformance = MF->getConformance(conformanceId);
       witnessEntries.push_back(SILWitnessTable::BaseProtocolWitness{
         proto, conformance.getConcrete()
       });
     } else if (kind == SIL_WITNESS_ASSOC_PROTOCOL) {
       TypeID assocId;
       DeclID protoId;
-      WitnessAssocProtocolLayout::readRecord(scratch, assocId, protoId);
+      ProtocolConformanceID conformanceId;
+      WitnessAssocProtocolLayout::readRecord(scratch, assocId, protoId,
+                                             conformanceId);
       CanType type = MF->getType(assocId)->getCanonicalType();
       ProtocolDecl *proto = cast<ProtocolDecl>(MF->getDecl(protoId));
-      auto conformance = MF->readConformance(SILCursor);
+      auto conformance = MF->getConformance(conformanceId);
       witnessEntries.push_back(SILWitnessTable::AssociatedTypeProtocolWitness{
         type, proto, conformance
       });
@@ -3442,9 +3442,11 @@ void SILDeserializer::readWitnessTableEntries(
              "Content of WitnessTable should be in "
              "SIL_WITNESS_CONDITIONAL_CONFORMANCE.");
       TypeID assocId;
-      WitnessConditionalConformanceLayout::readRecord(scratch, assocId);
+      ProtocolConformanceID conformanceId;
+      WitnessConditionalConformanceLayout::readRecord(scratch, assocId,
+                                                      conformanceId);
       CanType type = MF->getType(assocId)->getCanonicalType();
-      auto conformance = MF->readConformance(SILCursor);
+      auto conformance = MF->getConformance(conformanceId);
       conditionalConformances.push_back(
           SILWitnessTable::ConditionalConformance{type, conformance});
     }
@@ -3513,8 +3515,9 @@ llvm::Expected<SILWitnessTable *>
   unsigned RawLinkage;
   unsigned IsDeclaration;
   unsigned Serialized;
-  WitnessTableLayout::readRecord(scratch, RawLinkage,
-                                 IsDeclaration, Serialized);
+  ProtocolConformanceID conformance;
+  WitnessTableLayout::readRecord(scratch, RawLinkage, IsDeclaration,
+                                 Serialized, conformance);
 
   auto Linkage = fromStableSILLinkage(RawLinkage);
   if (!Linkage) {
@@ -3524,7 +3527,7 @@ llvm::Expected<SILWitnessTable *>
   }
 
   // Deserialize Conformance.
-  auto maybeConformance = MF->readConformanceChecked(SILCursor);
+  auto maybeConformance = MF->getConformanceChecked(conformance);
   if (!maybeConformance)
     return maybeConformance.takeError();
 
@@ -3535,7 +3538,7 @@ llvm::Expected<SILWitnessTable *>
                                     theConformance);
 
   if (!existingWt)
-    existingWt = SILMod.lookUpWitnessTable(theConformance, false);
+    existingWt = SILMod.lookUpWitnessTable(theConformance);
   auto wT = existingWt;
 
   // If we have an existing witness table, verify that the conformance matches

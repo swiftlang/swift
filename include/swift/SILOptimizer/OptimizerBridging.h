@@ -96,8 +96,9 @@ BridgedCalleeAnalysis PassContext_getCalleeAnalysis(BridgedPassContext context);
 
 BridgedCalleeList CalleeAnalysis_getCallees(BridgedCalleeAnalysis calleeAnalysis,
                                             BridgedValue callee);
-BridgedCalleeList CalleeAnalysis_getInstCallees(BridgedCalleeAnalysis calleeAnalysis,
-                                                BridgedInstruction inst);
+BridgedCalleeList CalleeAnalysis_getDestructors(BridgedCalleeAnalysis calleeAnalysis,
+                                                BridgedType type,
+                                                SwiftInt isExactType);
 SwiftInt BridgedFunctionArray_size(BridgedCalleeList callees);
 BridgedFunction BridgedFunctionArray_get(BridgedCalleeList callees,
                                          SwiftInt index);
@@ -140,12 +141,12 @@ BridgedFunction BasicBlockSet_getFunction(BridgedBasicBlockSet set);
 
 void AllocRefInstBase_setIsStackAllocatable(BridgedInstruction arb);
 
-OptionalBridgedFunction PassContext_getDestructor(BridgedPassContext context,
-                                                  BridgedType type);
-
 BridgedSubstitutionMap
 PassContext_getContextSubstitutionMap(BridgedPassContext context,
                                       BridgedType bridgedType);
+
+OptionalBridgedFunction
+PassContext_loadFunction(BridgedPassContext context, BridgedStringRef name);
 
 #ifdef __cplusplus
 } // extern "C"

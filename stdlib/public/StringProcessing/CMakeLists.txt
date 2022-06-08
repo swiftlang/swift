@@ -12,10 +12,12 @@
 
 set(swift_string_processing_link_libraries
   swiftCore
-  swift_MatchingEngine)
+  swift_RegexParser)
 
 file(GLOB_RECURSE _STRING_PROCESSING_SOURCES
-  "${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}/Sources/_StringProcessing/*.swift")
+  "${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}/Sources/_StringProcessing/*.swift"
+  "${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}/Sources/_CUnicode/*.h"
+  "${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}/Sources/_CUnicode/*.c")
 set(STRING_PROCESSING_SOURCES)
 foreach(source ${_STRING_PROCESSING_SOURCES})
   file(TO_CMAKE_PATH "${source}" source)
@@ -41,6 +43,6 @@ add_swift_target_library(swift_StringProcessing ${SWIFT_STDLIB_LIBRARY_BUILD_TYP
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
 
-  SWIFT_MODULE_DEPENDS _MatchingEngine
+  SWIFT_MODULE_DEPENDS _RegexParser
   INSTALL_IN_COMPONENT stdlib
 )

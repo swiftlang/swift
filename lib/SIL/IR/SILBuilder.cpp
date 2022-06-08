@@ -154,6 +154,18 @@ SILBuilder::createUncheckedReinterpretCast(SILLocation Loc, SILValue Op,
   if (SILType::canRefCast(Op->getType(), Ty, getModule()))
     return createUncheckedRefCast(Loc, Op, Ty);
 
+  // If the source and destination types are functions with the same
+  // kind of representation, then do a function conversion.
+  if (Op->getType().isObject() && Ty.isObject()) {
+    if (auto OpFnTy = Op->getType().getAs<SILFunctionType>()) {
+      if (auto DestFnTy = Ty.getAs<SILFunctionType>()) {
+        if (OpFnTy->getRepresentation() == DestFnTy->getRepresentation()) {
+          return createConvertFunction(Loc, Op, Ty, /*withoutActuallyEscaping*/ false);
+        }
+      }
+    }
+  }
+  
   // The destination type is nontrivial, and may be smaller than the source
   // type, so RC identity cannot be assumed.
   return insert(UncheckedBitwiseCastInst::create(
@@ -175,6 +187,18 @@ SILBuilder::createUncheckedBitCast(SILLocation Loc, SILValue Op, SILType Ty) {
   if (SILType::canRefCast(Op->getType(), Ty, getModule()))
     return createUncheckedRefCast(Loc, Op, Ty);
 
+  // If the source and destination types are functions with the same
+  // kind of representation, then do a function conversion.
+  if (Op->getType().isObject() && Ty.isObject()) {
+    if (auto OpFnTy = Op->getType().getAs<SILFunctionType>()) {
+      if (auto DestFnTy = Ty.getAs<SILFunctionType>()) {
+        if (OpFnTy->getRepresentation() == DestFnTy->getRepresentation()) {
+          return createConvertFunction(Loc, Op, Ty, /*withoutActuallyEscaping*/ false);
+        }
+      }
+    }
+  }
+  
   // The destination type is nontrivial, and may be smaller than the source
   // type, so RC identity cannot be assumed.
   return createUncheckedValueCast(Loc, Op, Ty);
@@ -572,24 +596,25 @@ void SILBuilder::emitDestructureValueOperation(
 
 DebugValueInst *SILBuilder::createDebugValue(SILLocation Loc, SILValue src,
                                              SILDebugVariable Var,
-                                             bool poisonRefs) {
+                                             bool poisonRefs,
+                                             bool operandWasMoved) {
   llvm::SmallString<4> Name;
   // Debug location overrides cannot apply to debug value instructions.
   DebugLocOverrideRAII LocOverride{*this, None};
   return insert(DebugValueInst::create(
       getSILDebugLocation(Loc), src, getModule(),
-      *substituteAnonymousArgs(Name, Var, Loc), poisonRefs));
+      *substituteAnonymousArgs(Name, Var, Loc), poisonRefs, operandWasMoved));
 }
 
-DebugValueInst *SILBuilder::createDebugValueAddr(SILLocation Loc,
-                                                 SILValue src,
-                                                 SILDebugVariable Var) {
+DebugValueInst *SILBuilder::createDebugValueAddr(SILLocation Loc, SILValue src,
+                                                 SILDebugVariable Var,
+                                                 bool wasMoved) {
   llvm::SmallString<4> Name;
   // Debug location overrides cannot apply to debug addr instructions.
   DebugLocOverrideRAII LocOverride{*this, None};
-  return insert(
-      DebugValueInst::createAddr(getSILDebugLocation(Loc), src, getModule(),
-                                 *substituteAnonymousArgs(Name, Var, Loc)));
+  return insert(DebugValueInst::createAddr(
+      getSILDebugLocation(Loc), src, getModule(),
+      *substituteAnonymousArgs(Name, Var, Loc), wasMoved));
 }
 
 void SILBuilder::emitScopedBorrowOperation(SILLocation loc, SILValue original,
@@ -637,7 +662,7 @@ void SILBuilder::emitScopedBorrowOperation(SILLocation loc, SILValue original,
 /// copy. This does require the client code to handle ending the lifetime of an
 /// owned result even if the input was passed as guaranteed.
 ///
-/// Note: For simplicitly, ownership None is not propagated for any statically
+/// Note: For simplicity, ownership None is not propagated for any statically
 /// nontrivial result, even if \p targetType may also be dynamically
 /// trivial. For example, the operand of a switch_enum could be a nested enum
 /// such that all switch cases may be dynamically trivial. Or a checked_cast_br

@@ -77,7 +77,7 @@ void TBDGenVisitor::addSymbolInternal(StringRef name, SymbolKind kind,
     return;
 
 #ifndef NDEBUG
-  if (kind == SymbolKind::GlobalSymbol && !source.isFromCrossModuleOptimization()) {
+  if (kind == SymbolKind::GlobalSymbol) {
     if (!DuplicateSymbolChecker.insert(name).second) {
       llvm::dbgs() << "TBDGen duplicate symbol: " << name << '\n';
       assert(false && "TBDGen symbol appears twice");
@@ -269,7 +269,7 @@ getLinkerPlatformName(OriginallyDefinedInAttr::ActiveVersion Ver) {
   return getLinkerPlatformName((uint8_t)getLinkerPlatformId(Ver));
 }
 
-/// Find the most relevant introducing version of the decl stack we have visted
+/// Find the most relevant introducing version of the decl stack we have visited
 /// so far.
 static Optional<llvm::VersionTuple>
 getInnermostIntroVersion(ArrayRef<Decl*> DeclStack, PlatformKind Platform) {
@@ -559,7 +559,7 @@ void TBDGenVisitor::addAutoDiffLinearMapFunction(AbstractFunctionDecl *original,
 
   // Differential functions are emitted only when forward-mode is enabled.
   if (kind == AutoDiffLinearMapKind::Differential &&
-      !ctx.LangOpts.EnableExperimentalForwardModeDifferentiation)
+      !ctx.LangOpts.hasFeature(Feature::ForwardModeDifferentiation))
     return;
   auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
       config.parameterIndices,
@@ -718,9 +718,10 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
     addSymbol(SILDeclRef(AFD).asForeign());
   }
 
-  if (AFD->isDistributed()) {
-    addSymbol(SILDeclRef(AFD).asDistributed());
-    addAsyncFunctionPointerSymbol(SILDeclRef(AFD).asDistributed());
+  if (auto distributedThunk = AFD->getDistributedThunk()) {
+    auto thunk = SILDeclRef(distributedThunk).asDistributed();
+    addSymbol(thunk);
+    addAsyncFunctionPointerSymbol(thunk);
   }
 
   // Add derivative function symbols.
@@ -846,6 +847,11 @@ void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
   }
 
   visitAbstractStorageDecl(VD);
+}
+
+void TBDGenVisitor::visitSubscriptDecl(SubscriptDecl *SD) {
+  visitDefaultArguments(SD, SD->getIndices());
+  visitAbstractStorageDecl(SD);
 }
 
 void TBDGenVisitor::visitNominalTypeDecl(NominalTypeDecl *NTD) {
@@ -1196,13 +1202,7 @@ void TBDGenVisitor::visitFile(FileUnit *file) {
 void TBDGenVisitor::visit(const TBDGenDescriptor &desc) {
   // Add any autolinking force_load symbols.
   addFirstFileSymbols();
-
-  if (desc.getPublicCMOSymbols()) {
-    for (const std::string &sym : *desc.getPublicCMOSymbols()) {
-      addSymbol(sym, SymbolSource::forCrossModuleOptimization());
-    }
-  }
-
+  
   if (auto *singleFile = desc.getSingleFile()) {
     assert(SwiftModule == singleFile->getParentModule() &&
            "mismatched file and module");
@@ -1346,9 +1346,9 @@ std::vector<std::string> swift::getPublicSymbols(TBDGenDescriptor desc) {
   return llvm::cantFail(evaluator(PublicSymbolsRequest{desc}));
 }
 void swift::writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
-                const TBDGenOptions &opts, TBDSymbolSetPtr publicCMOSymbols) {
+                         const TBDGenOptions &opts) {
   auto &evaluator = M->getASTContext().evaluator;
-  auto desc = TBDGenDescriptor::forModule(M, opts, publicCMOSymbols);
+  auto desc = TBDGenDescriptor::forModule(M, opts);
   auto file = llvm::cantFail(evaluator(GenerateTBDRequest{desc}));
   llvm::cantFail(llvm::MachO::TextAPIWriter::writeToStream(os, file),
                  "YAML writing should be error-free");
@@ -1491,10 +1491,10 @@ apigen::API APIGenRequest::evaluate(Evaluator &evaluator,
 }
 
 void swift::writeAPIJSONFile(ModuleDecl *M, llvm::raw_ostream &os,
-                             bool PrettyPrint, TBDSymbolSetPtr publicCMOSymbols) {
+                             bool PrettyPrint) {
   TBDGenOptions opts;
   auto &evaluator = M->getASTContext().evaluator;
-  auto desc = TBDGenDescriptor::forModule(M, opts, publicCMOSymbols);
+  auto desc = TBDGenDescriptor::forModule(M, opts);
   auto api = llvm::cantFail(evaluator(APIGenRequest{desc}));
   api.writeAPIJSONFile(os, PrettyPrint);
 }

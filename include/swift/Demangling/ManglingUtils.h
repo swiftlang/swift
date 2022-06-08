@@ -13,6 +13,7 @@
 #ifndef SWIFT_DEMANGLING_MANGLINGUTILS_H
 #define SWIFT_DEMANGLING_MANGLINGUTILS_H
 
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
 #include "swift/Demangling/NamespaceMacros.h"
 #include "swift/Demangling/Punycode.h"

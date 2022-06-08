@@ -417,7 +417,7 @@ struct _Deque<Element> {
 internal func _internalInvariant(
   _ condition: @autoclosure () -> Bool,
   _ message: @autoclosure () -> String = String(),
-  file: StaticString = #file, line: UInt = #line
+  file: StaticString = #fileID, line: UInt = #line
 ) {
   #if INTERNAL_CHECKS_ENABLED
   assert(condition(), message(), file: file, line: line)

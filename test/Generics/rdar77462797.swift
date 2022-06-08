@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift
-// RUN: %target-swift-frontend -typecheck -debug-generic-signatures %s 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
 protocol P {}
 
@@ -21,18 +21,15 @@ struct G<X, Y> where X : Q {
 
   // 'X : Q' is redundant
   func foo3() where X : Q, X == S<Y>, Y : P {}
-  // expected-warning@-1 {{redundant conformance constraint 'X' : 'Q'}}
-  // expected-note@-2 {{conformance constraint 'X' : 'Q' implied here}}
+  // expected-warning@-1 {{redundant conformance constraint 'S<Y>' : 'Q'}}
   // CHECK: Generic signature: <X, Y where X == S<Y>, Y : P>
 
   // 'T.T : P' is redundant
   func foo4<T : Q>(_: T) where X == S<Y>, T.T : P {}
   // expected-warning@-1 {{redundant conformance constraint 'T.T' : 'P'}}
-  // expected-note@-2 {{conformance constraint 'T.T' : 'P' implied here}}
   // CHECK: Generic signature: <X, Y, T where X == S<Y>, Y : P, T : Q>
 }
 
 func foo<X, Y>(_: X, _: Y) where X : Q, X : S<Y>, Y : P {}
-// expected-warning@-1 {{redundant conformance constraint 'X' : 'Q'}}
-// expected-note@-2 {{conformance constraint 'X' : 'Q' implied here}}
+// expected-warning@-1 {{redundant conformance constraint 'S<Y>' : 'Q'}}
 // CHECK: Generic signature: <X, Y where X : S<Y>, Y : P>

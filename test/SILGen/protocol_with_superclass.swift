@@ -1,9 +1,6 @@
 // RUN: %target-swift-emit-silgen %s | %FileCheck %s
 // RUN: %target-swift-frontend -emit-ir %s
 
-// RUN: %target-swift-emit-silgen -enable-explicit-existential-types %s | %FileCheck %s
-// RUN: %target-swift-frontend -emit-ir -enable-explicit-existential-types %s
-
 // Protocols with superclass-constrained Self.
 
 class Concrete {
@@ -281,7 +278,7 @@ func passesFuncTakingBaseClass() {
 
 // CHECK-LABEL: sil hidden [ossa] @$s24protocol_with_superclass25passesFuncTakingBaseClassyyF : $@convention(thin) () -> ()
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$s24protocol_with_superclass9BaseClassCIegg_AA12RefinedProto_pIegg_TR : $@convention(thin) (@guaranteed RefinedProto, @guaranteed @callee_guaranteed (@guaranteed BaseClass) -> ()) -> ()
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$s24protocol_with_superclass9BaseClassCIegg_AA12RefinedProto_pIegg_TR : $@convention(thin) (@guaranteed RefinedProto, @guaranteed @callee_guaranteed (@guaranteed BaseClass) -> ()) -> ()
 // CHECK: [[PAYLOAD:%.*]] = open_existential_ref %0 : $RefinedProto to $@opened("{{.*}}") RefinedProto
 // CHECK: [[COPY:%.*]] = copy_value [[PAYLOAD]]
 // CHECK: [[UPCAST:%.*]] = upcast [[COPY]] : $@opened("{{.*}}") RefinedProto to $BaseClass

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # touch.py - /bin/touch that writes the LLVM epoch -*- python -*-
 #
 # This source file is part of the Swift.org open source project

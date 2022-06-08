@@ -89,14 +89,17 @@ class SILLayout final : public llvm::FoldingSetNode,
 
   enum : unsigned {
     IsMutable = 0x1,
+    CapturesGenericEnvironment = 0x2,
   };
   
-  static constexpr const unsigned NumFlags = 1;
+  static constexpr const unsigned NumFlags = 2;
   
-  static unsigned getFlagsValue(bool Mutable) {
+  static unsigned getFlagsValue(bool Mutable, bool CapturesGenerics) {
     unsigned flags = 0;
     if (Mutable)
       flags |= IsMutable;
+    if (CapturesGenerics)
+      flags |= CapturesGenericEnvironment;
     
     assert(flags >> NumFlags == 0
            && "more flags than flag bits?!");
@@ -109,7 +112,8 @@ class SILLayout final : public llvm::FoldingSetNode,
   unsigned NumFields;
   
   SILLayout(CanGenericSignature Signature,
-            ArrayRef<SILField> Fields);
+            ArrayRef<SILField> Fields,
+            bool CapturesGenericEnvironment);
   
   SILLayout(const SILLayout &) = delete;
   SILLayout &operator=(const SILLayout &) = delete;
@@ -117,7 +121,8 @@ public:
   /// Get or create a layout.
   static SILLayout *get(ASTContext &C,
                         CanGenericSignature Generics,
-                        ArrayRef<SILField> Fields);
+                        ArrayRef<SILField> Fields,
+                        bool CapturesGenericEnvironment);
   
   /// Get the generic signature in which this layout exists.
   CanGenericSignature getGenericSignature() const {
@@ -129,6 +134,12 @@ public:
     return GenericSigAndFlags.getInt() & IsMutable;
   }
   
+  /// True if the layout captures the generic arguments it is substituted with
+  /// and can provide generic bindings when passed as a closure argument.
+  bool capturesGenericEnvironment() const {
+    return GenericSigAndFlags.getInt() & CapturesGenericEnvironment;
+  }
+  
   /// Get the fields inside the layout.
   ArrayRef<SILField> getFields() const {
     return llvm::makeArrayRef(getTrailingObjects<SILField>(), NumFields);
@@ -137,11 +148,13 @@ public:
   /// Produce a profile of this layout, for use in a folding set.
   static void Profile(llvm::FoldingSetNodeID &id,
                       CanGenericSignature Generics,
-                      ArrayRef<SILField> Fields);
+                      ArrayRef<SILField> Fields,
+                      bool CapturesGenericEnvironment);
   
   /// Produce a profile of this locator, for use in a folding set.
   void Profile(llvm::FoldingSetNodeID &id) {
-    Profile(id, getGenericSignature(), getFields());
+    Profile(id, getGenericSignature(), getFields(),
+            capturesGenericEnvironment());
   }
 };
 

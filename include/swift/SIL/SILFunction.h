@@ -21,7 +21,7 @@
 #include "swift/AST/Availability.h"
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/Basic/ProfileCounter.h"
-#include "swift/SIL/SwiftObjectHeader.h"
+#include "swift/Basic/SwiftObjectHeader.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILDeclRef.h"
@@ -212,6 +212,17 @@ private:
   /// @_dynamicReplacement(for:) function.
   SILFunction *ReplacedFunction = nullptr;
 
+  /// This SILFunction REFerences an ad-hoc protocol requirement witness in
+  /// order to keep it alive, such that it main be obtained in IRGen. Without
+  /// this explicit reference, the witness would seem not-used, and not be
+  /// accessible for IRGen.
+  ///
+  /// Specifically, one such case is the DistributedTargetInvocationDecoder's
+  /// 'decodeNextArgument' which must be retained, as it is only used from IRGen
+  /// and such, appears as-if unused in SIL and would get optimized away.
+  // TODO: Consider making this a general "references adhoc functions" and make it an array?
+  SILFunction *RefAdHocRequirementFunction = nullptr;
+
   Identifier ObjCReplacementFor;
 
   /// The head of a single-linked list of currently alive BasicBlockBitfield.
@@ -223,6 +234,10 @@ private:
   /// sufficient.
   /// For details see BasicBlockBitfield::bitfieldID;
   unsigned currentBitfieldID = 1;
+
+  /// Unique identifier for vector indexing and deterministic sorting.
+  /// May be reused when zombie functions are recovered.
+  unsigned index;
 
   /// The function's set of semantics attributes.
   ///
@@ -262,7 +277,7 @@ private:
   unsigned Transparent : 1;
 
   /// The function's serialized attribute.
-  unsigned Serialized : 2;
+  bool Serialized : 1;
 
   /// Specifies if this function is a thunk or a reabstraction thunk.
   ///
@@ -294,7 +309,7 @@ private:
 
   /// Whether the implementation can be dynamically replaced.
   unsigned IsDynamicReplaceable : 1;
-    
+
   /// If true, this indicates that a class method implementation will always be
   /// invoked with a `self` argument of the exact base class type.
   unsigned ExactSelfClass : 1;
@@ -446,6 +461,8 @@ public:
     return SILFunctionConventions(fnType, getModule());
   }
 
+  unsigned getIndex() const { return index; }
+
   SILProfiler *getProfiler() const { return Profiler; }
 
   SILFunction *getDynamicallyReplacedFunction() const {
@@ -460,22 +477,33 @@ public:
     ReplacedFunction = f;
     ReplacedFunction->incrementRefCount();
   }
-
-  SILFunction *getDistributedRecordArgumentFunction() const {
-    return ReplacedFunction;
-  }
-  void setDistributedRecordArgumentFunction(SILFunction *f) {
-    if (f == nullptr)
-      return;
-    f->incrementRefCount();
-  }
-
   /// This function should only be called when SILFunctions are bulk deleted.
   void dropDynamicallyReplacedFunction() {
     if (!ReplacedFunction)
       return;
     ReplacedFunction->decrementRefCount();
     ReplacedFunction = nullptr;
+  }
+
+  SILFunction *getReferencedAdHocRequirementWitnessFunction() const {
+    return RefAdHocRequirementFunction;
+  }
+  // Marks that this `SILFunction` uses the passed in ad-hoc protocol
+  // requirement witness `f` and therefore must retain it explicitly,
+  // otherwise we might not be able to get a reference to it.
+  void setReferencedAdHocRequirementWitnessFunction(SILFunction *f) {
+    assert(RefAdHocRequirementFunction == nullptr && "already set");
+
+    if (f == nullptr)
+      return;
+    RefAdHocRequirementFunction = f;
+    RefAdHocRequirementFunction->incrementRefCount();
+  }
+  void dropReferencedAdHocRequirementWitnessFunction() {
+    if (!RefAdHocRequirementFunction)
+      return;
+    RefAdHocRequirementFunction->decrementRefCount();
+    RefAdHocRequirementFunction = nullptr;
   }
 
   bool hasObjCReplacement() const {
@@ -689,10 +717,7 @@ public:
 
   /// Returns true if this function can be inlined into a fragile function
   /// body.
-  bool hasValidLinkageForFragileInline() const {
-    return (isSerialized() == IsSerialized ||
-            isSerialized() == IsSerializable);
-  }
+  bool hasValidLinkageForFragileInline() const { return isSerialized(); }
 
   /// Returns true if this function can be referenced from a fragile function
   /// body.
@@ -755,7 +780,7 @@ public:
     IsDynamicReplaceable = value;
     assert(!Transparent || !IsDynamicReplaceable);
   }
-    
+
   IsExactSelfClass_t isExactSelfClass() const {
     return IsExactSelfClass_t(ExactSelfClass);
   }
@@ -914,7 +939,11 @@ public:
 
   /// Get this function's serialized attribute.
   IsSerialized_t isSerialized() const { return IsSerialized_t(Serialized); }
-  void setSerialized(IsSerialized_t isSerialized) { Serialized = isSerialized; }
+  void setSerialized(IsSerialized_t isSerialized) {
+    Serialized = isSerialized;
+    assert(this->isSerialized() == isSerialized &&
+           "too few bits for Serialized storage");
+  }
 
   /// Get this function's thunk attribute.
   IsThunk_t isThunk() const { return IsThunk_t(Thunk); }
@@ -1048,6 +1077,10 @@ public:
   void setGenericEnvironment(GenericEnvironment *env) {
     GenericEnv = env;
   }
+
+  /// Retrieve the generic signature from the generic environment of this
+  /// function, if any. Else returns the null \c GenericSignature.
+  GenericSignature getGenericSignature() const;
 
   /// Map the given type, which is based on an interface SILFunctionType and may
   /// therefore be dependent, to a type based on the context archetypes of this

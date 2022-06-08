@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-cxx-interop)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
 
 // REQUIRES: executable_test
 
@@ -30,6 +30,13 @@ OperatorsTestSuite.test("LoadableIntWrapper.call (inline)") {
   expectEqual(57, resultTwoArgs)
 }
 
+OperatorsTestSuite.test("LoadableBoolWrapper.exclaim (inline)") {
+  var wrapper = LoadableBoolWrapper(value: true)
+
+  let resultExclaim = !wrapper
+  expectEqual(false, resultExclaim.value)
+}
+
 OperatorsTestSuite.test("AddressOnlyIntWrapper.call (inline)") {
   var wrapper = AddressOnlyIntWrapper(42)
 
@@ -42,8 +49,32 @@ OperatorsTestSuite.test("AddressOnlyIntWrapper.call (inline)") {
   expectEqual(57, resultTwoArgs)
 }
 
+OperatorsTestSuite.test("DerivedFromAddressOnlyIntWrapper.call (inline, base class)") {
+  var wrapper = DerivedFromAddressOnlyIntWrapper(42)
+
+  let resultNoArgs = wrapper()
+  let resultOneArg = wrapper(23)
+  let resultTwoArgs = wrapper(3, 5)
+
+  expectEqual(42, resultNoArgs)
+  expectEqual(65, resultOneArg)
+  expectEqual(57, resultTwoArgs)
+}
+
 OperatorsTestSuite.test("ReadWriteIntArray.subscript (inline)") {
   var arr = ReadWriteIntArray()
+
+  let resultBefore = arr[1]
+  expectEqual(2, resultBefore)
+
+  arr[1] = 234
+
+  let resultAfter = arr[1]
+  expectEqual(234, resultAfter)
+}
+
+OperatorsTestSuite.test("DerivedFromReadWriteIntArray.subscript (inline, base class)") {
+  var arr = DerivedFromReadWriteIntArray()
 
   let resultBefore = arr[1]
   expectEqual(2, resultBefore)
@@ -134,6 +165,20 @@ OperatorsTestSuite.test("DifferentTypesArrayByVal.subscript (inline)") {
 #if !os(Windows)    // SR-13129
 OperatorsTestSuite.test("NonTrivialArrayByVal.subscript (inline)") {
   var arr = NonTrivialArrayByVal()
+  let NonTrivialByVal = arr[0];
+  let cStr = NonTrivialByVal.Str!
+  expectEqual("Non-Trivial", String(cString: cStr))
+
+  expectEqual(1, NonTrivialByVal.a)
+  expectEqual(2, NonTrivialByVal.b)
+  expectEqual(3, NonTrivialByVal.c)
+  expectEqual(4, NonTrivialByVal.d)
+  expectEqual(5, NonTrivialByVal.e)
+  expectEqual(6, NonTrivialByVal.f)
+}
+
+OperatorsTestSuite.test("DerivedFromNonTrivialArrayByVal.subscript (inline, base class)") {
+  var arr = DerivedFromNonTrivialArrayByVal()
   let NonTrivialByVal = arr[0];
   let cStr = NonTrivialByVal.Str!
   expectEqual("Non-Trivial", String(cString: cStr))

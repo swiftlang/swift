@@ -17,6 +17,7 @@
 
 #include "swift/Runtime/Casting.h"
 #include "../SwiftShims/RuntimeShims.h"
+#include "../SwiftShims/GlobalObjects.h"
 #include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "ErrorObject.h"
 #include "ExistentialMetadataImpl.h"
@@ -145,12 +146,18 @@ using TypeNameCacheKey = llvm::PointerIntPair<const Metadata *, 2, TypeNameKind>
 
 #if SWIFT_CASTING_SUPPORTS_MUTEX
 static StaticReadWriteLock TypeNameCacheLock;
+static StaticReadWriteLock MangledToPrettyFunctionNameCacheLock;
 #endif
 
 /// Cache containing rendered names for Metadata.
 /// Access MUST be protected using `TypeNameCacheLock`.
 static Lazy<llvm::DenseMap<TypeNameCacheKey, std::pair<const char *, size_t>>>
   TypeNameCache;
+
+/// Cache containing rendered human-readable names for incoming mangled names.
+static Lazy<llvm::DenseMap<llvm::StringRef, std::pair<const char *, size_t>>>
+/// Access MUST be protected using `MangledToPrettyFunctionNameCache`.
+  MangledToPrettyFunctionNameCache;
 
 TypeNamePair
 swift::swift_getTypeName(const Metadata *type, bool qualified) {
@@ -250,6 +257,141 @@ swift::swift_getMangledTypeName(const Metadata *type) {
 
     cache.insert({key, {result, size}});
 
+    return TypeNamePair{result, size};
+  }
+}
+
+
+TypeNamePair
+swift::swift_getFunctionFullNameFromMangledName(
+    const char *mangledNameStart, uintptr_t mangledNameLength) {
+  llvm::StringRef mangledName(mangledNameStart, mangledNameLength);
+
+  auto &cache = MangledToPrettyFunctionNameCache.get();
+  // Attempt read-only lookup of cache entry.
+  {
+    #if SWIFT_CASTING_SUPPORTS_MUTEX
+    StaticScopedReadLock guard(MangledToPrettyFunctionNameCacheLock);
+    #endif
+
+    auto found = cache.find(mangledName);
+    if (found != cache.end()) {
+      auto result = found->second;
+      return TypeNamePair{result.first, result.second};
+    }
+  }
+
+  for (char c : mangledName) {
+    if (c >= '\x01' && c <= '\x1F')
+      return TypeNamePair{nullptr, 0};
+  }
+
+  // Read-only lookup failed, we may need to demangle and cache the entry.
+  // We have to copy the string to be able to refer to it "forever":
+  auto copy = (char *)malloc(mangledNameLength);
+  memcpy(copy, mangledNameStart, mangledNameLength);
+  mangledName = StringRef(copy, mangledNameLength);
+
+  std::string demangled;
+  StackAllocatedDemangler<1024> Dem;
+  NodePointer node = Dem.demangleSymbol(mangledName);
+  if (!node) {
+    return TypeNamePair{nullptr, 0};
+  }
+
+  // Form the demangled string from the node tree.
+  node = node->findByKind(Demangle::Node::Kind::Function, /*maxDepth=*/3);
+  if (!node || node->getNumChildren() < 3) {
+    // we normally expect Class/Identifier/Type, but don't need `Type`
+    return TypeNamePair{nullptr, 0};
+  }
+
+  // Class identifier:
+  auto clazz = node->findByKind(Demangle::Node::Kind::Class, 1);
+  if (clazz) {
+    if (auto module = clazz->findByKind(Demangle::Node::Kind::Module, 1)) {
+      demangled += module->getText();
+      demangled += ".";
+    }
+    if (auto clazzIdent = clazz->findByKind(Demangle::Node::Kind::Identifier, 1)) {
+      demangled += clazzIdent->getText();
+      demangled += ".";
+    }
+  }
+
+  // Function identifier:
+  NodePointer funcIdent = nullptr; // node == Function
+  for (size_t i = 0; i < node->getNumChildren(); ++i) {
+    if (node->getChild(i)->getKind() == Demangle::Node::Kind::Identifier) {
+      funcIdent = node->getChild(i);
+    }
+  }
+
+  // We always expect to work with functions here and they must have idents
+  if (!funcIdent) {
+    return TypeNamePair{nullptr, 0};
+  }
+  assert(funcIdent->getKind() == Demangle::Node::Kind::Identifier);
+  demangled += funcIdent->getText();
+  demangled += "(";
+
+  if (auto labelList = node->findByKind(Demangle::Node::Kind::LabelList, /*maxDepth=*/1)) {
+    if (labelList->getNumChildren()) {
+      size_t paramIdx = 0;
+      while (paramIdx < labelList->getNumChildren()) {
+        auto labelIdentifier = labelList->getChild(paramIdx++);
+        if (labelIdentifier) {
+          if (labelIdentifier->getKind() == Demangle::Node::Kind::Identifier) {
+            demangled += labelIdentifier->getText();
+            demangled += ":";
+          } else if (labelIdentifier->getKind() ==
+                     Demangle::Node::Kind::FirstElementMarker) {
+            demangled += "_:";
+          }
+        }
+      }
+    } else if (auto argumentTuple = node->findByKind(
+                   Demangle::Node::Kind::ArgumentTuple, /*maxDepth=*/5)) {
+      // LabelList was empty.
+        //
+        // The function has no labels at all, but could have some parameters...
+        // we need to check for their count, and render it as e.g. (::) for two
+        // anonymous parameters.
+        auto params = argumentTuple->getFirstChild();
+        if (auto paramsType = params->getFirstChild()) {
+          if (paramsType->getKind() != Demangle::Node::Kind::Tuple) {
+            // was a single, unnamed, parameter
+            demangled += "_:";
+          } else {
+            // there are a few parameters; find out how many
+            while (params && params->getFirstChild() &&
+                   params->getFirstChild()->getKind() !=
+                       Demangle::Node::Kind::TupleElement) {
+              params = params->getFirstChild();
+            }
+            if (params) {
+              for (size_t i = 0; i < params->getNumChildren(); ++i) {
+                demangled += "_:";
+              }
+            }
+          }
+        }
+    }
+  }
+  demangled += ")";
+
+  // We have to copy the string to be able to refer to it;
+  auto size = demangled.size();
+  auto result = (char *)malloc(size + 1);
+  memcpy(result, demangled.data(), size);
+  result[size] = 0; // 0-terminated string
+
+  {
+    #if SWIFT_CASTING_SUPPORTS_MUTEX
+    StaticScopedWriteLock guard(MangledToPrettyFunctionNameCacheLock);
+    #endif
+
+    cache.insert({mangledName, {result, size}});
     return TypeNamePair{result, size};
   }
 }
@@ -1106,7 +1248,7 @@ static id bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
         return objc_retain(protocolObj);
       }
     }
-  // Handle bridgable types.
+  // Handle bridgeable types.
   } else if (auto srcBridgeWitness = findBridgeWitness(srcType)) {
     // Bridge the source value to an object.
     auto srcBridgedObject =
@@ -1409,6 +1551,14 @@ SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 bool _swift_isClassOrObjCExistentialType(const Metadata *value,
                                                     const Metadata *T) {
   return swift_isClassOrObjCExistentialTypeImpl(T);
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
+void _swift_setClassMetadata(const HeapMetadata *newClassMetadata,
+                             HeapObject* onObject,
+                             const Metadata *T) {
+  assert(T == newClassMetadata);
+  onObject->metadata = newClassMetadata;
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL

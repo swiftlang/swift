@@ -243,8 +243,8 @@ public:
   std::vector<ObjCUnsatisfiedOptReq> ObjCUnsatisfiedOptReqs;
 
   /// A selector that is used by two different declarations in the same class.
-  /// Fields: classDecl, selector, isInstanceMethod.
-  using ObjCMethodConflict = std::tuple<ClassDecl *, ObjCSelector, bool>;
+  /// Fields: typeDecl, selector, isInstanceMethod.
+  using ObjCMethodConflict = std::tuple<NominalTypeDecl *, ObjCSelector, bool>;
 
   /// List of Objective-C member conflicts we have found during type checking.
   std::vector<ObjCMethodConflict> ObjCMethodConflicts;
@@ -335,7 +335,7 @@ public:
                 const ModuleDecl *importedModule,
                 llvm::SmallSetVector<Identifier, 4> &spiGroups) const override;
 
-  // Is \p targetDecl accessible as an explictly imported SPI from this file?
+  // Is \p targetDecl accessible as an explicitly imported SPI from this file?
   bool isImportedAsSPI(const ValueDecl *targetDecl) const;
 
   bool shouldCrossImport() const;

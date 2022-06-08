@@ -12,7 +12,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-import _Distributed
+import Distributed
 
 // ==== Fake Address -----------------------------------------------------------
 
@@ -36,11 +36,13 @@ public struct ActorAddress: Hashable, Sendable, Codable {
 
 // ==== Noop Transport ---------------------------------------------------------
 
-public struct FakeActorSystem: DistributedActorSystem {
+@available(SwiftStdlib 5.7, *)
+public struct FakeActorSystem: DistributedActorSystem, CustomStringConvertible {
   public typealias ActorID = ActorAddress
   public typealias InvocationDecoder = FakeInvocationDecoder
   public typealias InvocationEncoder = FakeInvocationEncoder
   public typealias SerializationRequirement = Codable
+  public typealias ResultHandler = FakeRoundtripResultHandler
 
   // just so that the struct does not become "trivial"
   let someValue: String = ""
@@ -48,7 +50,7 @@ public struct FakeActorSystem: DistributedActorSystem {
   let someValue3: String = ""
   let someValue4: String = ""
 
-  init() {
+  public init() {
     print("Initialized new FakeActorSystem")
   }
 
@@ -87,10 +89,10 @@ public struct FakeActorSystem: DistributedActorSystem {
           Act.ID == ActorID,
           Err: Error,
           Res: SerializationRequirement {
-    throw ExecuteDistributedTargetError(message: "Not implemented.")
+    throw ExecuteDistributedTargetError(message: "\(#function) not implemented.")
   }
 
-  func remoteCallVoid<Act, Err>(
+  public func remoteCallVoid<Act, Err>(
     on actor: Act,
     target: RemoteCallTarget,
     invocation invocationEncoder: inout InvocationEncoder,
@@ -99,18 +101,24 @@ public struct FakeActorSystem: DistributedActorSystem {
     where Act: DistributedActor,
           Act.ID == ActorID,
           Err: Error {
-    throw ExecuteDistributedTargetError(message: "Not implemented.")
+    throw ExecuteDistributedTargetError(message: "\(#function) not implemented.")
+  }
+
+  public nonisolated var description: Swift.String {
+    "\(Self.self)()"
   }
 }
 
 // ==== Fake Roundtrip Transport -----------------------------------------------
 
-// TODO: not thread safe...
+// TODO(distributed): not thread safe...
+@available(SwiftStdlib 5.7, *)
 public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked Sendable {
   public typealias ActorID = ActorAddress
   public typealias InvocationEncoder = FakeInvocationEncoder
   public typealias InvocationDecoder = FakeInvocationDecoder
   public typealias SerializationRequirement = Codable
+  public typealias ResultHandler = FakeRoundtripResultHandler
 
   var activeActors: [ActorID: any DistributedActor] = [:]
 
@@ -175,10 +183,13 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
         self.remoteCallResult = nil
         self.remoteCallError = error
       }
+
+      var decoder = invocation.makeDecoder()
+
       try await executeDistributedTarget(
         on: active,
-        mangledTargetName: target.mangledName,
-        invocationDecoder: invocation.makeDecoder(),
+        target: target,
+        invocationDecoder: &decoder,
         handler: resultHandler
       )
 
@@ -222,10 +233,13 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
         self.remoteCallResult = nil
         self.remoteCallError = error
       }
+
+      var decoder = invocation.makeDecoder()
+
       try await executeDistributedTarget(
         on: active,
-        mangledTargetName: target.mangledName,
-        invocationDecoder: invocation.makeDecoder(),
+        target: target,
+        invocationDecoder: &decoder,
         handler: resultHandler
       )
 
@@ -244,6 +258,7 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
 
 }
 
+@available(SwiftStdlib 5.7, *)
 public struct FakeInvocationEncoder : DistributedTargetInvocationEncoder {
   public typealias SerializationRequirement = Codable
 
@@ -257,18 +272,22 @@ public struct FakeInvocationEncoder : DistributedTargetInvocationEncoder {
     genericSubs.append(type)
   }
 
-  public mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {
-    print(" > encode argument: \(argument)")
-    arguments.append(argument)
+  public mutating func recordArgument<Value: SerializationRequirement>(
+    _ argument: RemoteCallArgument<Value>) throws {
+    print(" > encode argument name:\(argument.label ?? "_"), value: \(argument.value)")
+    arguments.append(argument.value)
   }
+
   public mutating func recordErrorType<E: Error>(_ type: E.Type) throws {
     print(" > encode error type: \(String(reflecting: type))")
     self.errorType = type
   }
+
   public mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {
     print(" > encode return type: \(String(reflecting: type))")
     self.returnType = type
   }
+
   public mutating func doneRecording() throws {
     print(" > done recording")
   }
@@ -284,8 +303,13 @@ public struct FakeInvocationEncoder : DistributedTargetInvocationEncoder {
 }
 
 // === decoding --------------------------------------------------------------
-public class FakeInvocationDecoder : DistributedTargetInvocationDecoder {
-    public typealias SerializationRequirement = Codable
+
+// !!! WARNING !!!
+// This is a 'final class' on purpose, to see that we retain the ad-hoc witness
+// for 'decodeNextArgument'; Do not change it to just a class!
+@available(SwiftStdlib 5.7, *)
+public final class FakeInvocationDecoder: DistributedTargetInvocationDecoder {
+  public typealias SerializationRequirement = Codable
 
   var genericSubs: [Any.Type] = []
   var arguments: [Any] = []
@@ -337,7 +361,7 @@ public class FakeInvocationDecoder : DistributedTargetInvocationDecoder {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.7, *)
 public struct FakeRoundtripResultHandler: DistributedTargetInvocationResultHandler {
   public typealias SerializationRequirement = Codable
 
@@ -348,10 +372,14 @@ public struct FakeRoundtripResultHandler: DistributedTargetInvocationResultHandl
     self.storeError = storeError
   }
 
-  // FIXME(distributed): can we return void here?
-  public func onReturn<Res>(value: Res) async throws {
+  public func onReturn<Success: SerializationRequirement>(value: Success) async throws {
     print(" << onReturn: \(value)")
     storeReturn(value)
+  }
+
+  public func onReturnVoid() async throws {
+    print(" << onReturnVoid: ()")
+    storeReturn(())
   }
 
   public func onThrow<Err: Error>(error: Err) async throws {
@@ -362,5 +390,11 @@ public struct FakeRoundtripResultHandler: DistributedTargetInvocationResultHandl
 
 // ==== Helpers ----------------------------------------------------------------
 
+@available(SwiftStdlib 5.7, *)
 @_silgen_name("swift_distributed_actor_is_remote")
 func __isRemoteActor(_ actor: AnyObject) -> Bool
+
+@available(SwiftStdlib 5.7, *)
+func __isLocalActor(_ actor: AnyObject) -> Bool {
+  return !__isRemoteActor(actor)
+}

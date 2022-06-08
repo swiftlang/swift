@@ -477,8 +477,8 @@ func ff_implicitTupleShuffle(_ input: (one: Int, two: Int)) -> (two: Int, one: I
     input // expected-warning {{expression shuffles the elements of this tuple; this behavior is deprecated}}
 }
 
-func ff_implicitCollectionUpcast(_ deriveds: [Derived]) -> [Base] {
-    deriveds
+func ff_implicitCollectionUpcast(_ derived: [Derived]) -> [Base] {
+    derived
 }
 
 func ff_implicitErasureExpr(_ conformer: SomeProtoConformer) -> SomeProto {
@@ -1700,7 +1700,7 @@ class D_optionalTryUnusedImplicit {
 
 
 
-// Miscellanceous
+// Miscellaneous
 
 class CSuperExpr_Base { init() {} }
 class CSuperExpr_Derived : CSuperExpr_Base { override init() { super.init() } }

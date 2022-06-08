@@ -157,6 +157,7 @@ set(SWIFTLIB_ESSENTIAL
   StringProtocol.swift
   StringIndex.swift
   StringIndexConversions.swift
+  StringIndexValidation.swift
   StringInterpolation.swift
   StringLegacy.swift
   StringNormalization.swift
@@ -182,6 +183,7 @@ set(SWIFTLIB_ESSENTIAL
   UnicodeParser.swift
   UnicodeScalarProperties.swift
   CharacterProperties.swift # ORDER DEPENDENCY: UnicodeScalarProperties.swift
+  UnicodeSPI.swift
   Unmanaged.swift
   UnmanagedOpaqueString.swift
   UnmanagedString.swift
@@ -215,7 +217,10 @@ set(SWIFTLIB_SOURCES
   CollectionDifference.swift
   CollectionOfOne.swift
   Diffing.swift
+  Duration.swift
+  DurationProtocol.swift
   FloatingPointRandom.swift
+  Instant.swift
   Mirror.swift
   PlaygroundDisplay.swift
   CommandLine.swift
@@ -228,6 +233,7 @@ set(SWIFTLIB_SOURCES
 
 set(SWIFTLIB_GYB_SOURCES
   ${SWIFTLIB_ESSENTIAL_GYB_SOURCES}
+  Int128.swift.gyb
   Tuple.swift.gyb
   )
 
@@ -267,6 +273,9 @@ if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "MinSizeRel")
 endif()
 if(SWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING)
   list(APPEND swift_stdlib_compile_flags "-enforce-exclusivity=checked")
+endif()
+if(SWIFT_STDLIB_ENABLE_DEBUG_PRECONDITIONS_IN_RELEASE)
+  list(APPEND swift_stdlib_compile_flags "-DSWIFT_STDLIB_ENABLE_DEBUG_PRECONDITIONS_IN_RELEASE")
 endif()
 set(compile_flags_for_final_build)
 if(SWIFT_ENABLE_ARRAY_COW_CHECKS)

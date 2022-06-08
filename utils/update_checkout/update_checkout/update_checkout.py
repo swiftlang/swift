@@ -70,7 +70,7 @@ def check_parallel_results(results, op):
             print("%s failed (ret=%d): %s" % (r.repo_path, r.ret, r))
             fail_count += 1
             if r.stderr:
-                print(r.stderr.decode('utf-8'))
+                print(r.stderr)
     return fail_count
 
 
@@ -125,7 +125,9 @@ def update_single_repository(pool_args):
         return
 
     try:
-        print("Updating '" + repo_path + "'")
+        prefix = "[{0}] ".format(os.path.basename(repo_path)).ljust(40)
+        print(prefix + "Updating '" + repo_path + "'")
+
         with shell.pushd(repo_path, dry_run=False, echo=False):
             cross_repo = False
             checkout_target = None
@@ -141,15 +143,20 @@ def update_single_repository(pool_args):
 
             # The clean option restores a repository to pristine condition.
             if should_clean:
-                shell.run(['git', 'clean', '-fdx'], echo=True)
-                shell.run(['git', 'submodule', 'foreach', '--recursive', 'git',
-                           'clean', '-fdx'], echo=True)
-                shell.run(['git', 'submodule', 'foreach', '--recursive', 'git',
-                           'reset', '--hard', 'HEAD'], echo=True)
-                shell.run(['git', 'reset', '--hard', 'HEAD'], echo=True)
+                shell.run(['git', 'clean', '-fdx'],
+                          echo=True, prefix=prefix)
+                shell.run(['git', 'submodule', 'foreach', '--recursive',
+                           'git', 'clean', '-fdx'],
+                          echo=True, prefix=prefix)
+                shell.run(['git', 'submodule', 'foreach', '--recursive',
+                           'git', 'reset', '--hard', 'HEAD'],
+                          echo=True, prefix=prefix)
+                shell.run(['git', 'reset', '--hard', 'HEAD'],
+                          echo=True, prefix=prefix)
                 # It is possible to reset --hard and still be mid-rebase.
                 try:
-                    shell.run(['git', 'rebase', '--abort'], echo=True)
+                    shell.run(['git', 'rebase', '--abort'],
+                              echo=True, prefix=prefix)
                 except Exception:
                     pass
 
@@ -166,15 +173,17 @@ def update_single_repository(pool_args):
                 except Exception:
                     shell.run(["git", "fetch", "--recurse-submodules=yes",
                                "--tags"],
-                              echo=True)
+                              echo=True, prefix=prefix)
 
                 try:
-                    shell.run(['git', 'checkout', checkout_target], echo=True)
+                    shell.run(['git', 'checkout', checkout_target],
+                              echo=True, prefix=prefix)
                 except Exception as originalException:
                     try:
                         result = shell.run(['git', 'rev-parse', checkout_target])
                         revision = result[0].strip()
-                        shell.run(['git', 'checkout', revision], echo=True)
+                        shell.run(['git', 'checkout', revision],
+                                  echo=True, prefix=prefix)
                     except Exception:
                         raise originalException
 
@@ -182,13 +191,14 @@ def update_single_repository(pool_args):
             # .git/FETCH_HEAD updates the not-for-merge attributes based on
             # which branch was checked out during the fetch.
             shell.run(["git", "fetch", "--recurse-submodules=yes", "--tags"],
-                      echo=True)
+                      echo=True, prefix=prefix)
 
             # If we were asked to reset to the specified branch, do the hard
             # reset and return.
             if checkout_target and reset_to_remote and not cross_repo:
                 full_target = full_target_name('origin', checkout_target)
-                shell.run(['git', 'reset', '--hard', full_target], echo=True)
+                shell.run(['git', 'reset', '--hard', full_target],
+                          echo=True, prefix=prefix)
                 return
 
             # Query whether we have a "detached HEAD", which will mean that
@@ -215,13 +225,15 @@ def update_single_repository(pool_args):
             # --rebase" that respects rebase.autostash.  See
             # http://stackoverflow.com/a/30209750/125349
             if not cross_repo and not detached_head:
-                shell.run(["git", "rebase", "FETCH_HEAD"], echo=True)
+                shell.run(["git", "rebase", "FETCH_HEAD"],
+                          echo=True, prefix=prefix)
             elif detached_head:
-                print(repo_path,
-                      "\nDetached HEAD; probably checked out a tag. No need "
-                      "to rebase.\n")
+                print(prefix +
+                      "Detached HEAD; probably checked out a tag. No need "
+                      "to rebase.")
 
-            shell.run(["git", "submodule", "update", "--recursive"], echo=True)
+            shell.run(["git", "submodule", "update", "--recursive"],
+                      echo=True, prefix=prefix)
     except Exception:
         (type, value, tb) = sys.exc_info()
         print('Error on repo "%s": %s' % (repo_path, traceback.format_exc()))
@@ -273,7 +285,7 @@ def obtain_additional_swift_sources(pool_args):
      skip_history, skip_tags, skip_repository_list) = pool_args
 
     env = dict(os.environ)
-    env.update({'GIT_TERMINAL_PROMPT': 0})
+    env.update({'GIT_TERMINAL_PROMPT': '0'})
 
     with shell.pushd(args.source_root, dry_run=False, echo=False):
 
@@ -431,12 +443,12 @@ def validate_config(config):
 
 
 def full_target_name(repository, target):
-    tag = shell.capture(["git", "tag", "-l", target], echo=True).strip()
+    tag = shell.capture(["git", "tag", "-l", target], echo=False).strip()
     if tag == target:
         return tag
 
     branch = shell.capture(["git", "branch", "--list", target],
-                           echo=True).strip().replace("* ", "")
+                           echo=False).strip().replace("* ", "")
     if branch == target:
         name = "%s/%s" % (repository, target)
         return name

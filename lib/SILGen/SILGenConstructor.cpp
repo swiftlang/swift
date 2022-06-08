@@ -343,7 +343,6 @@ static bool ctorHopsInjectedByDefiniteInit(ConstructorDecl *ctor,
   // must be instance isolated
   switch (isolation) {
     case ActorIsolation::ActorInstance:
-    case ActorIsolation::DistributedActorInstance:
       return true;
 
     case ActorIsolation::Unspecified:
@@ -666,7 +665,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
     }
 
     selfValue = B.createAllocRefDynamic(Loc, allocArg, selfTy,
-                                        useObjCAllocation, {}, {});
+                                        useObjCAllocation, false, {}, {});
   } else {
     assert(ctor->isDesignatedInit());
     // For a designated initializer, we know that the static type being
@@ -836,9 +835,10 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     }
   }
 
-  // Distributed actor initializers implicitly initialize their transport and id
-  if (isDesignatedDistActorInit)
-    emitDistActorImplicitPropertyInits(ctor, selfArg);
+  // Some distributed actor initializers need to init the actorSystem & id now
+  if (isDesignatedDistActorInit) {
+    emitDistributedActorImplicitPropertyInits(ctor, selfArg);
+  }
 
   // Prepare the end of initializer location.
   SILLocation endOfInitLoc = RegularLocation(ctor);
@@ -1257,4 +1257,3 @@ void SILGenFunction::emitIVarInitializer(SILDeclRef ivarInitializer) {
 
   emitEpilog(loc);
 }
-

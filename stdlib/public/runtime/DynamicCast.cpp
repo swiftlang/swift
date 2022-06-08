@@ -673,7 +673,7 @@ bool _swift_dictionaryDownCastConditionalIndirect(OpaqueValue *destination,
 #if SWIFT_OBJC_INTEROP
 // Helper to memoize bridging conformance data for a particular
 // Swift struct type.  This is used to speed up the most common
-// ObjC->Swift bridging conversions by eliminating repeeated
+// ObjC->Swift bridging conversions by eliminating repeated
 // protocol conformance lookups.
 
 // Currently used only for String, which may be the only
@@ -1234,6 +1234,7 @@ tryCastToTuple(
   for (unsigned i = 0; typesMatch && i != numElements; ++i) {
     if (srcTupleType->getElement(i).Type != destTupleType->getElement(i).Type) {
       typesMatch = false;
+      break;
     }
   }
 
@@ -2079,7 +2080,7 @@ tryCast(
       || srcKind == MetadataKind::ObjCClassWrapper
       || srcKind == MetadataKind::ForeignClass) {
     auto srcObject = getNonNullSrcObject(srcValue, srcType, destType);
-    // If srcObject is null, we're in compability mode.
+    // If srcObject is null, we're in compatibility mode.
     // But we can't lookup dynamic type for a null class reference, so
     // just skip this in that case.
     if (srcObject != nullptr) {

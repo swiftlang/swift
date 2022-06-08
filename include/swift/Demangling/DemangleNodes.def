@@ -170,6 +170,7 @@ NODE(EscapingObjCBlock)
 CONTEXT_NODE(OtherNominalType)
 CONTEXT_NODE(OwningAddressor)
 CONTEXT_NODE(OwningMutableAddressor)
+NODE(ParameterizedProtocol)
 NODE(PartialApplyForwarder)
 NODE(PartialApplyObjCForwarder)
 NODE(PostfixOperator)
@@ -332,6 +333,10 @@ NODE(CompileTimeConst)
 
 // Added in Swift 5.7
 NODE(OpaqueReturnTypeIndexed)
+NODE(BackDeploymentThunk)
+NODE(BackDeploymentFallback)
+NODE(ExtendedExistentialTypeShape)
+NODE(Uniquable)
 
 #undef CONTEXT_NODE
 #undef NODE

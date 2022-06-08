@@ -152,6 +152,7 @@ import RangeAssignment
 import RangeIteration
 import RangeOverlaps
 import RangeReplaceableCollectionPlusDefault
+//import ReadAccessor
 import RecursiveOwnedParameter
 import ReduceInto
 import RemoveWhere
@@ -332,6 +333,8 @@ register(RangeAssignment.benchmarks)
 register(RangeIteration.benchmarks)
 register(RangeOverlaps.benchmarks)
 register(RangeReplaceableCollectionPlusDefault.benchmarks)
+// TODO: rdar://92120528
+//register(ReadAccessor.benchmarks)
 register(RecursiveOwnedParameter.benchmarks)
 register(ReduceInto.benchmarks)
 register(RemoveWhere.benchmarks)

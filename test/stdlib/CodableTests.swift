@@ -434,7 +434,7 @@ class TestCodable : TestCodableSuper {
 
     // MARK: - DateInterval
     @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
-    lazy var dateIntervalValues: [Int : DateInterval] = [
+    static let dateIntervalValues: [Int : DateInterval] = [
         #line : DateInterval(),
         #line : DateInterval(start: Date.distantPast, end: Date()),
         #line : DateInterval(start: Date(), end: Date.distantFuture),
@@ -443,14 +443,14 @@ class TestCodable : TestCodableSuper {
 
     @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
     func test_DateInterval_JSON() {
-        for (testLine, interval) in dateIntervalValues {
+        for (testLine, interval) in Self.dateIntervalValues {
             expectRoundTripEqualityThroughJSON(for: interval, lineNumber: testLine)
         }
     }
 
     @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
     func test_DateInterval_Plist() {
-        for (testLine, interval) in dateIntervalValues {
+        for (testLine, interval) in Self.dateIntervalValues {
             expectRoundTripEqualityThroughPlist(for: interval, lineNumber: testLine)
         }
     }
@@ -641,7 +641,7 @@ class TestCodable : TestCodableSuper {
 
     // MARK: - Measurement
     @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
-    lazy var unitValues: [Int : Dimension] = [
+    static let unitValues: [Int : Dimension] = [
         #line : UnitAcceleration.metersPerSecondSquared,
         #line : UnitMass.kilograms,
         #line : UnitLength.miles
@@ -649,7 +649,7 @@ class TestCodable : TestCodableSuper {
 
     @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
     func test_Measurement_JSON() {
-        for (testLine, unit) in unitValues {
+        for (testLine, unit) in Self.unitValues {
             // FIXME: <rdar://problem/49026133>
             // Terminating due to uncaught exception NSInvalidArgumentException:
             // *** You must override baseUnit in your class NSDimension to define its base unit.
@@ -660,7 +660,7 @@ class TestCodable : TestCodableSuper {
 
     @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
     func test_Measurement_Plist() {
-        for (testLine, unit) in unitValues {
+        for (testLine, unit) in Self.unitValues {
             // FIXME: <rdar://problem/49026133>
             // Terminating due to uncaught exception NSInvalidArgumentException:
             // *** You must override baseUnit in your class NSDimension to define its base unit.
@@ -741,7 +741,7 @@ class TestCodable : TestCodableSuper {
 
     // MARK: - PersonNameComponents
     @available(macOS 10.11, iOS 9.0, watchOS 2.0, tvOS 9.0, *)
-    lazy var personNameComponentsValues: [Int : PersonNameComponents] = [
+    static let personNameComponentsValues: [Int : PersonNameComponents] = [
         #line : makePersonNameComponents(givenName: "John", familyName: "Appleseed"),
         #line : makePersonNameComponents(givenName: "John", familyName: "Appleseed", nickname: "Johnny"),
         #line : makePersonNameComponents(namePrefix: "Dr.", givenName: "Jane", middleName: "A.", familyName: "Appleseed", nameSuffix: "Esq.", nickname: "Janie")
@@ -749,14 +749,14 @@ class TestCodable : TestCodableSuper {
 
     @available(macOS 10.11, iOS 9.0, watchOS 2.0, tvOS 9.0, *)
     func test_PersonNameComponents_JSON() {
-        for (testLine, components) in personNameComponentsValues {
+        for (testLine, components) in Self.personNameComponentsValues {
             expectRoundTripEqualityThroughJSON(for: components, lineNumber: testLine)
         }
     }
 
     @available(macOS 10.11, iOS 9.0, watchOS 2.0, tvOS 9.0, *)
     func test_PersonNameComponents_Plist() {
-        for (testLine, components) in personNameComponentsValues {
+        for (testLine, components) in Self.personNameComponentsValues {
             expectRoundTripEqualityThroughPlist(for: components, lineNumber: testLine)
         }
     }

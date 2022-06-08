@@ -33,18 +33,18 @@ findDistributedAccessor(const char *targetNameStart, size_t targetNameLength) {
 }
 
 SWIFT_CC(swift)
-SWIFT_EXPORT_FROM(swift_Distributed)
+SWIFT_EXPORT_FROM(swiftDistributed)
 void *swift_distributed_getGenericEnvironment(const char *targetNameStart,
                                               size_t targetNameLength) {
   auto *accessor = findDistributedAccessor(targetNameStart, targetNameLength);
   return accessor ? accessor->GenericEnvironment.get() : nullptr;
 }
 
-/// func _executeDistributedTarget(
+/// func _executeDistributedTarget<D: DistributedTargetInvocationDecoder>(
 ///    on: AnyObject,
 ///    _ targetName: UnsafePointer<UInt8>,
 ///    _ targetNameLength: UInt,
-///    argumentDecoder: AnyObject,
+///    argumentDecoder: inout D,
 ///    argumentTypes: UnsafeBufferPointer<Any.Type>,
 ///    resultBuffer: Builtin.RawPointer,
 ///    substitutions: UnsafeRawPointer?,
@@ -60,12 +60,12 @@ using TargetExecutorSignature =
                         /*substitutions=*/void *,
                         /*witnessTables=*/void **,
                         /*numWitnessTables=*/size_t,
-                        /*resumeFunc=*/TaskContinuationFunction *,
-                        /*callContext=*/AsyncContext *),
+                        /*decoderType=*/Metadata *,
+                        /*decoderWitnessTable=*/void **),
                    /*throws=*/true>;
 
 SWIFT_CC(swiftasync)
-SWIFT_EXPORT_FROM(swift_Distributed)
+SWIFT_EXPORT_FROM(swiftDistributed)
 TargetExecutorSignature::FunctionType swift_distributed_execute_target;
 
 /// Accessor takes:
@@ -77,6 +77,8 @@ TargetExecutorSignature::FunctionType swift_distributed_execute_target;
 ///   - a list of witness tables
 ///   - a number of witness tables in the buffer
 ///   - a reference to an actor to execute method on.
+///   - a type of the argument decoder
+///   - a witness table associated with argument decoder value
 using DistributedAccessorSignature =
     AsyncSignature<void(/*argumentDecoder=*/HeapObject *,
                         /*argumentTypes=*/const Metadata *const *,
@@ -84,7 +86,9 @@ using DistributedAccessorSignature =
                         /*substitutions=*/void *,
                         /*witnessTables=*/void **,
                         /*numWitnessTables=*/size_t,
-                        /*actor=*/HeapObject *),
+                        /*actor=*/HeapObject *,
+                        /*decoderType=*/Metadata *,
+                        /*decoderWitnessTable=*/void **),
                    /*throws=*/true>;
 
 SWIFT_CC(swiftasync)
@@ -92,7 +96,7 @@ static DistributedAccessorSignature::ContinuationType
     swift_distributed_execute_target_resume;
 
 SWIFT_CC(swiftasync)
-static void ::swift_distributed_execute_target_resume(
+static void swift_distributed_execute_target_resume(
     SWIFT_ASYNC_CONTEXT AsyncContext *context,
     SWIFT_CONTEXT SwiftError *error) {
   auto parentCtx = context->Parent;
@@ -102,11 +106,11 @@ static void ::swift_distributed_execute_target_resume(
   swift_task_dealloc(context);
   // See `swift_distributed_execute_target` - `parentCtx` in this case
   // is `callContext` which should be completely transparent on resume.
-  return resumeInParent(parentCtx->Parent, error);
+  return resumeInParent(parentCtx, error);
 }
 
 SWIFT_CC(swiftasync)
-void ::swift_distributed_execute_target(
+void swift_distributed_execute_target(
     SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
     DefaultActor *actor,
     const char *targetNameStart, size_t targetNameLength,
@@ -116,8 +120,8 @@ void ::swift_distributed_execute_target(
     void *substitutions,
     void **witnessTables,
     size_t numWitnessTables,
-    TaskContinuationFunction *resumeFunc,
-    AsyncContext *callContext) {
+    Metadata *decoderType,
+    void **decoderWitnessTable) {
   auto *accessor = findDistributedAccessor(targetNameStart, targetNameLength);
   if (!accessor) {
     assert(false && "no distributed accessor");
@@ -135,25 +139,18 @@ void ::swift_distributed_execute_target(
   AsyncContext *calleeContext = reinterpret_cast<AsyncContext *>(
       swift_task_alloc(asyncFnPtr->ExpectedContextSize));
 
-  // TODO(concurrency): Special functions like this one are currently set-up
-  // to pass "caller" context and resume function as extra parameters due to
-  // how they are declared in C. But this particular function behaves exactly
-  // like a regular `async throws`, which means that we need to initialize
-  // intermediate `callContext` using parent `callerContext`. A better fix for
-  // this situation would be to adjust IRGen and handle function like this
-  // like regular `async` functions even though they are classified as special.
-  callContext->Parent = callerContext;
-  callContext->ResumeParent = resumeFunc;
-
-  calleeContext->Parent = callContext;
+  calleeContext->Parent = callerContext;
   calleeContext->ResumeParent = reinterpret_cast<TaskContinuationFunction *>(
       swift_distributed_execute_target_resume);
 
   accessorEntry(calleeContext,
-                argumentDecoder, argumentTypes,
+                argumentDecoder,
+                argumentTypes,
                 resultBuffer,
                 substitutions,
                 witnessTables,
                 numWitnessTables,
-                actor);
+                actor,
+                decoderType,
+                decoderWitnessTable);
 }

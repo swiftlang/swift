@@ -33,18 +33,17 @@ typealias A1 = P1.Type & P2 // expected-error {{non-protocol, non-class type 'P1
 
 // BEGIN swift4.swift
 
-func foo(x: P1 & Any & P2.Type?) { // expected-error {{non-protocol, non-class type 'P2.Type?' cannot be used within a protocol-constrained type}}
-  let _: (P1 & P2).Type? = x // expected-error {{cannot convert value of type 'P1' to specified type '(P1 & P2).Type?'}}
-  let _: (P1 & P2).Type = x! // expected-error {{cannot force unwrap value of non-optional type 'P1'}}
-  // expected-error@-1 {{cannot convert value of type 'P1' to specified type '(P1 & P2).Type'}}
-  let _: Int = x!.p1() // expected-error {{cannot force unwrap value of non-optional type 'P1'}} expected-error {{static member 'p1' cannot be used on instance of type 'P1'}}
-  let _: Int? = x?.p2 // expected-error {{cannot use optional chaining on non-optional value of type 'P1'}}
-                      // expected-error@-1 {{value of type 'P1' has no member 'p2'}}
+func foo(x: P1 & Any & P2.Type?) { // expected-error {{non-protocol, non-class type '(any P2.Type)?' cannot be used within a protocol-constrained type}}
+  let _: (P1 & P2).Type? = x
+  let _: (P1 & P2).Type = x!
+
+  let _: Int = x!.p1()
+  let _: Int? = x?.p2
 }
 
 func bar() -> ((P1 & P2)?).Type {
-  let x = (P1 & P2?).self // expected-error {{non-protocol, non-class type 'P2?' cannot be used within a protocol-constrained type}}
-  return x // expected-error {{cannot convert return expression}}
+  let x = (P1 & P2?).self // expected-error {{non-protocol, non-class type '(any P2)?' cannot be used within a protocol-constrained type}}
+  return x
 }
 
-typealias A1 = P1.Type & P2 // expected-error {{non-protocol, non-class type 'P1.Type' cannot be used within a protocol-constrained type}}
+typealias A1 = P1.Type & P2 // expected-error {{non-protocol, non-class type 'any P1.Type' cannot be used within a protocol-constrained type}}

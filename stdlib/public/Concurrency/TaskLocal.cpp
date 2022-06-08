@@ -24,9 +24,10 @@
 #include "swift/ABI/Metadata.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "TaskPrivate.h"
+#include <new>
 #include <set>
 
-#if defined(__APPLE__)
+#if SWIFT_STDLIB_HAS_ASL
 #include <asl.h>
 #elif defined(__ANDROID__)
 #include <android/log.h>
@@ -207,7 +208,7 @@ TaskLocal::Item::createLink(AsyncTask *task,
   size_t amountToAllocate = Item::itemSize(valueType);
   void *allocation = task ? _swift_task_alloc_specific(task, amountToAllocate)
                           : malloc(amountToAllocate);
-  Item *item = new (allocation) Item(key, valueType);
+  Item *item = ::new (allocation) Item(key, valueType);
 
   auto next = task ? task->_private().Local.head
                    : FallbackTaskLocalStorage::get()->head;
@@ -299,9 +300,10 @@ static void swift_task_reportIllegalTaskLocalBindingWithinWithTaskGroupImpl(
   #define STDERR_FILENO 2
   _write(STDERR_FILENO, message, strlen(message));
 #else
-  write(STDERR_FILENO, message, strlen(message));
+  fputs(message, stderr);
+  fflush(stderr);
 #endif
-#if defined(__APPLE__)
+#if SWIFT_STDLIB_HAS_ASL
   asl_log(nullptr, nullptr, ASL_LEVEL_ERR, "%s", message);
 #elif defined(__ANDROID__)
   __android_log_print(ANDROID_LOG_FATAL, "SwiftRuntime", "%s", message);

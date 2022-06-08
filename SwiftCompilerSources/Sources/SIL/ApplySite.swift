@@ -10,14 +10,20 @@
 //
 //===----------------------------------------------------------------------===//
 
+import SILBridging
+
 public struct ApplyOperands {
   public static let calleeOperandIndex: Int = 0
   public static let firstArgumentIndex = 1
 }
 
-public protocol ApplySite : AnyObject {
+public protocol ApplySite : Instruction {
   var operands: OperandArray { get }
   var numArguments: Int { get }
+  var substitutionMap: SubstitutionMap { get }
+  func calleeArgIndex(callerArgIndex: Int) -> Int
+  func callerArgIndex(calleeArgIndex: Int) -> Int?
+  func getArgumentConvention(calleeArgIndex: Int) -> ArgumentConvention
 }
 
 extension ApplySite {
@@ -25,6 +31,10 @@ extension ApplySite {
 
   public var arguments: LazyMapSequence<OperandArray, Value> {
     operands[1..<operands.count].lazy.map { $0.value }
+  }
+
+  public var substitutionMap: SubstitutionMap {
+    SubstitutionMap(ApplySite_getSubstitutionMap(bridged))
   }
 
   public func argumentIndex(of operand: Operand) -> Int? {
@@ -36,6 +46,10 @@ extension ApplySite {
     return nil
   }
 
+  public func getArgumentConvention(calleeArgIndex: Int) -> ArgumentConvention {
+    return ApplySite_getArgumentConvention(bridged, calleeArgIndex).convention
+  }
+  
   public var referencedFunction: Function? {
     if let fri = callee as? FunctionRefInst {
       return fri.referencedFunction
@@ -46,4 +60,9 @@ extension ApplySite {
 
 public protocol FullApplySite : ApplySite {
   var singleDirectResult: Value? { get }
+}
+
+extension FullApplySite {
+  public func calleeArgIndex(callerArgIndex: Int) -> Int { callerArgIndex }
+  public func callerArgIndex(calleeArgIndex: Int) -> Int? { calleeArgIndex }
 }

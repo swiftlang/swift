@@ -8,7 +8,7 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
-// This benchmark is derived from user code that encoutered a major
+// This benchmark is derived from user code that encountered a major
 // performance problem in normal usage. Contributed by Saleem
 // Abdulrasool (compnerd).
 //

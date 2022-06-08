@@ -214,16 +214,6 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
         succBB->getArgument(0)->getOwnershipKind()));
     return;
   }
-  case SILInstructionKind::CheckedCastValueBranchInst: {
-    auto CBI = cast<CheckedCastValueBranchInst>(T);
-    auto succBB = edgeIdx == 0 ? CBI->getSuccessBB() : CBI->getFailureBB();
-    if (!succBB->getNumArguments())
-      return;
-    args.push_back(newEdgeBB->createPhiArgument(
-        succBB->getArgument(0)->getType(),
-        succBB->getArgument(0)->getOwnershipKind()));
-    return;
-  }
 
   case SILInstructionKind::TryApplyInst: {
     auto *TAI = cast<TryApplyInst>(T);

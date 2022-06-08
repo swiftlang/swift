@@ -23,6 +23,7 @@
 #include "SourceKit/Core/LLVM.h"
 #include "SourceKit/Support/UIdent.h"
 #include "swift/Basic/ThreadSafeRefCounted.h"
+#include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
@@ -405,7 +406,7 @@ public:
     OS << '\"';
     // Avoid raw_ostream's write_escaped, we don't want to escape unicode
     // characters because it will be invalid JSON.
-    writeEscaped(Str, OS);
+    swift::writeEscaped(Str, OS);
     OS << '\"';
   }
   

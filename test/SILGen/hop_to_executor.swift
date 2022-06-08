@@ -438,3 +438,33 @@ func asyncWithIsolatedParam(i: Int, actor: isolated MyActor, d: Double) async {
   // CHECK-NEXT: hop_to_executor [[BORROWED]] : $MyActor
   // CHECK-NEXT: end_borrow [[BORROWED]] : $MyActor
 }
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test26asyncWithUnsafeInheritanceyyYaF
+@_unsafeInheritExecutor
+func asyncWithUnsafeInheritance() async {
+  // CHECK-NEXT: bb0:
+  // CHECK-NEXT:   // function_ref
+  // CHECK-NEXT:   [[FN:%.*]] = function_ref
+  // CHECK-NEXT:   apply [[FN]]()
+  // CHECK-NEXT:   tuple ()
+  // CHECK-NEXT:   return
+  await unspecifiedAsync()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test34asyncWithUnsafeInheritance_hopbackyyYaF
+@_unsafeInheritExecutor
+func asyncWithUnsafeInheritance_hopback() async {
+  // CHECK:      [[FN:%.*]] = function_ref @$s4test5redFnyySiF
+  // CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thin RedActor.Type
+  // CHECK-NEXT: // function_ref
+  // CHECK-NEXT: [[ACTOR_GETTER:%.*]] = function_ref @$s4test8RedActorV6sharedAA0bC4ImplCvgZ
+  // CHECK-NEXT: [[ACTOR:%.*]] = apply [[ACTOR_GETTER]]([[METATYPE]])
+  // CHECK-NEXT: [[BORROWED_ACTOR:%.*]] = begin_borrow [[ACTOR]]
+  // CHECK-NEXT: hop_to_executor [[BORROWED_ACTOR]]
+  // CHECK-NEXT: apply [[FN]]({{%.*}})
+  // CHECK-NEXT: end_borrow [[BORROWED_ACTOR]]
+  // CHECK-NEXT: destroy_value [[ACTOR]]
+  // CHECK-NEXT: tuple
+  // CHECK-NEXT: return
+  await redFn(0)
+}

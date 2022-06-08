@@ -33,6 +33,44 @@
 using namespace swift;
 
 namespace {
+static void transferSpecializeAttributeTargets(SILModule &M,
+                                               SILOptFunctionBuilder &builder,
+                                               Decl *d) {
+  auto *vd = cast<AbstractFunctionDecl>(d);
+  for (auto *A : vd->getAttrs().getAttributes<SpecializeAttr>()) {
+    auto *SA = cast<SpecializeAttr>(A);
+    // Filter _spi.
+    auto spiGroups = SA->getSPIGroups();
+    auto hasSPIGroup = !spiGroups.empty();
+    if (hasSPIGroup) {
+      if (vd->getModuleContext() != M.getSwiftModule() &&
+          !M.getSwiftModule()->isImportedAsSPI(SA, vd)) {
+        continue;
+      }
+    }
+    if (auto *targetFunctionDecl = SA->getTargetFunctionDecl(vd)) {
+      auto target = SILDeclRef(targetFunctionDecl);
+      auto targetSILFunction = builder.getOrCreateFunction(
+          SILLocation(vd), target, NotForDefinition,
+          [&builder](SILLocation loc, SILDeclRef constant) -> SILFunction * {
+            return builder.getOrCreateFunction(loc, constant, NotForDefinition);
+          });
+      auto kind = SA->getSpecializationKind() ==
+                          SpecializeAttr::SpecializationKind::Full
+                      ? SILSpecializeAttr::SpecializationKind::Full
+                      : SILSpecializeAttr::SpecializationKind::Partial;
+      Identifier spiGroupIdent;
+      if (hasSPIGroup) {
+        spiGroupIdent = spiGroups[0];
+      }
+      auto availability = AvailabilityInference::annotatedAvailableRangeForAttr(
+          SA, M.getSwiftModule()->getASTContext());
+      targetSILFunction->addSpecializeAttr(SILSpecializeAttr::create(
+          M, SA->getSpecializedSignature(), SA->isExported(), kind, nullptr,
+          spiGroupIdent, vd->getModuleContext(), availability));
+    }
+  }
+}
 
 static bool specializeAppliesInFunction(SILFunction &F,
                                         SILTransform *transform,
@@ -60,6 +98,13 @@ static bool specializeAppliesInFunction(SILFunction &F,
       auto *Callee = Apply.getReferencedFunctionOrNull();
       if (!Callee)
         continue;
+
+      FunctionBuilder.getModule().performOnceForPrespecializedImportedExtensions(
+        [&FunctionBuilder](AbstractFunctionDecl *pre) {
+        transferSpecializeAttributeTargets(FunctionBuilder.getModule(), FunctionBuilder,
+                                           pre);
+        });
+
       if (!Callee->isDefinition() && !Callee->hasPrespecialization()) {
         ORE.emit([&]() {
           using namespace OptRemark;
@@ -254,7 +299,7 @@ optimizeInst(SILInstruction *inst, SILOptFunctionBuilder &funcBuilder,
       return true;
 
     if (callee->isExternalDeclaration())
-      getModule()->loadFunction(callee);
+      getModule()->loadFunction(callee, SILModule::LinkingMode::LinkAll);
 
     if (callee->isExternalDeclaration())
       return true;

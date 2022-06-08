@@ -1,4 +1,4 @@
-//===--- PassRegistration.swift - Register optimzation passes -------------===//
+//===--- PassRegistration.swift - Register optimization passes -------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -12,19 +12,13 @@
 
 import SIL
 import OptimizerBridging
-
-#if canImport(ExperimentalRegex)
-import ExperimentalRegex
-#endif
+import Parse
 
 @_cdecl("initializeSwiftModules")
 public func initializeSwiftModules() {
   registerSILClasses()
   registerSwiftPasses()
-
-  #if canImport(ExperimentalRegex)
-  registerRegexParser()
-  #endif
+  initializeSwiftParseModules()
 }
 
 private func registerPass(
@@ -46,11 +40,16 @@ private func registerPass<InstType: Instruction>(
 private func registerSwiftPasses() {
   registerPass(silPrinterPass, { silPrinterPass.run($0) })
   registerPass(mergeCondFailsPass, { mergeCondFailsPass.run($0) })
+  registerPass(escapeInfoDumper, { escapeInfoDumper.run($0) })
+  registerPass(addressEscapeInfoDumper, { addressEscapeInfoDumper.run($0) })
+  registerPass(computeEffects, { computeEffects.run($0) })
+  registerPass(stackPromotion, { stackPromotion.run($0) })
   registerPass(simplifyBeginCOWMutationPass, { simplifyBeginCOWMutationPass.run($0) })
   registerPass(simplifyGlobalValuePass, { simplifyGlobalValuePass.run($0) })
   registerPass(simplifyStrongRetainPass, { simplifyStrongRetainPass.run($0) })
   registerPass(simplifyStrongReleasePass, { simplifyStrongReleasePass.run($0) })
   registerPass(assumeSingleThreadedPass, { assumeSingleThreadedPass.run($0) })
+  registerPass(rangeDumper, { rangeDumper.run($0) })
   registerPass(runUnitTests, { runUnitTests.run($0) })
   registerPass(releaseDevirtualizerPass, { releaseDevirtualizerPass.run($0) })
 }

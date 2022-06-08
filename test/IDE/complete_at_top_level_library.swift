@@ -56,7 +56,6 @@ protocol MyProtocol {}
 // LIBRARY-DAG: Keyword[repeat]/None/Flair[ExprAtFileScope]: repeat; name=repeat
 // LIBRARY-DAG: Keyword[else]/None/Flair[ExprAtFileScope]: else; name=else
 // LIBRARY-DAG: Keyword[for]/None/Flair[ExprAtFileScope]: for; name=for
-// LIBRARY-DAG: Keyword[in]/None/Flair[ExprAtFileScope]: in; name=in
 // LIBRARY-DAG: Keyword[while]/None/Flair[ExprAtFileScope]: while; name=while
 // LIBRARY-DAG: Keyword[break]/None/Flair[ExprAtFileScope]: break; name=break
 // LIBRARY-DAG: Keyword[continue]/None/Flair[ExprAtFileScope]: continue; name=continue
@@ -133,7 +132,6 @@ protocol MyProtocol {}
 // SCRIPT-DAG: Keyword[repeat]/None:               repeat; name=repeat
 // SCRIPT-DAG: Keyword[else]/None:                 else; name=else
 // SCRIPT-DAG: Keyword[for]/None:                  for; name=for
-// SCRIPT-DAG: Keyword[in]/None:                   in; name=in
 // SCRIPT-DAG: Keyword[while]/None:                while; name=while
 // SCRIPT-DAG: Keyword[break]/None:                break; name=break
 // SCRIPT-DAG: Keyword[continue]/None:             continue; name=continue

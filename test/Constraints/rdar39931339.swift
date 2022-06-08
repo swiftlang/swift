@@ -1,4 +1,5 @@
 // RUN: %target-typecheck-verify-swift
+// RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
 protocol P {}
 
@@ -17,10 +18,14 @@ extension S where T == Float { // expected-note {{requirement specified as 'T' =
 
 class A<T, U> {}
 
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=A
+// CHECK-NEXT: Generic signature: <T, U where T == [U], U : P>
 extension A where T == [U], U: P {
   typealias S1 = Int
 }
 
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=A
+// CHECK-NEXT: Generic signature: <T, U where T == [Int], U == Int>
 extension A where T == [U], U == Int {
 // expected-note@-1 {{requirement specified as 'T' == '[Int]' [with T = [String]]}}
   typealias S2 = Int

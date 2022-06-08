@@ -378,7 +378,7 @@ unsigned SymbolicValue::getIntegerValueBitWidth() const {
 // Returns a SymbolicValue representing a UTF-8 encoded string.
 SymbolicValue SymbolicValue::getString(StringRef string,
                                        SymbolicValueAllocator &allocator) {
-  // TODO: Could have an inline representation for strings if thre was demand,
+  // TODO: Could have an inline representation for strings if there was demand,
   // just store a char[8] as the storage.
 
   auto *resultPtr = allocator.allocate<char>(string.size());

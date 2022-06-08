@@ -5,6 +5,9 @@
 
 #include "visibility.h"
 
+template <class From, class To>
+To __swift_interopStaticCast(From from) { return from; }
+
 inline void *operator new(size_t, void *p) { return p; }
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
@@ -116,6 +119,25 @@ void mutateIt(BigType &x) {
   x.b = 4;
 }
 BigType passThroughByValue(BigType x) { return x; }
+
+struct __attribute__((swift_attr("import_as_ref"))) BaseRef {
+  int a = 1;
+  int b = 2;
+
+  int test() const { return b - a; }
+  int test() { return b - a; }
+
+  static BaseRef *create() { return new (malloc(sizeof(BaseRef))) BaseRef(); }
+};
+
+struct __attribute__((swift_attr("import_as_ref"))) DerivedRef : BaseRef {
+  int c = 1;
+
+  int testDerived() const { return test() + c; }
+  int testDerived() { return test() + c; }
+
+  static DerivedRef *create() { return new (malloc(sizeof(DerivedRef))) DerivedRef(); }
+};
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
 

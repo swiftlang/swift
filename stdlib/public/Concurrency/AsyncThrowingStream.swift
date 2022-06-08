@@ -51,7 +51,7 @@ import Swift
 /// `Quake` instances every time it detects an earthquake. To receive callbacks,
 /// callers set a custom closure as the value of the monitor's
 /// `quakeHandler` property, which the monitor calls back as necessary. Callers
-/// can also set an `errorHandler` to receive asychronous error notifications,
+/// can also set an `errorHandler` to receive asynchronous error notifications,
 /// such as the monitor service suddenly becoming unavailable.
 ///
 ///     class QuakeMonitor {
@@ -80,24 +80,26 @@ import Swift
 /// calls `stopMonitoring()` on the monitor.
 /// 5. Calls `startMonitoring` on the `QuakeMonitor`.
 ///
-///     extension QuakeMonitor {
+/// ```
+/// extension QuakeMonitor {
 ///
-///         static var throwingQuakes: AsyncThrowingStream<Quake, Error> {
-///             AsyncThrowingStream { continuation in
-///                 let monitor = QuakeMonitor()
-///                 monitor.quakeHandler = { quake in
-///                     continuation.yield(quake)
-///                 }
-///                 monitor.errorHandler = { error in
-///                     continuation.finish(throwing: error)
-///                 }
-///                 continuation.onTermination = { @Sendable _ in
-///                     monitor.stopMonitoring()
-///                 }
-///                 monitor.startMonitoring()
+///     static var throwingQuakes: AsyncThrowingStream<Quake, Error> {
+///         AsyncThrowingStream { continuation in
+///             let monitor = QuakeMonitor()
+///             monitor.quakeHandler = { quake in
+///                  continuation.yield(quake)
 ///             }
+///             monitor.errorHandler = { error in
+///                 continuation.finish(throwing: error)
+///             }
+///             continuation.onTermination = { @Sendable _ in
+///                 monitor.stopMonitoring()
+///             }
+///             monitor.startMonitoring()
 ///         }
 ///     }
+/// }
+/// ```
 ///
 ///
 /// Because the stream is an `AsyncSequence`, the call point uses the
@@ -105,11 +107,11 @@ import Swift
 ///
 ///     do {
 ///         for try await quake in quakeStream {
-///             print ("Quake: \(quake.date)")
+///             print("Quake: \(quake.date)")
 ///         }
-///         print ("Stream done.")
+///         print("Stream done.")
 ///     } catch {
-///         print ("Error: \(error)")
+///         print("Error: \(error)")
 ///     }
 ///
 @available(SwiftStdlib 5.1, *)
@@ -199,7 +201,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
     let storage: _Storage
 
     /// Resume the task awaiting the next iteration point by having it return
-    /// nomally from its suspension point with a given element.
+    /// normally from its suspension point with a given element.
     ///
     /// - Parameter value: The value to yield from the continuation.
     /// - Returns: A `YieldResult` that indicates the success or failure of the
@@ -281,7 +283,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   ///   elements to the stream and terminate the stream when finished.
   ///
   /// The `AsyncStream.Continuation` received by the `build` closure is
-  /// appopriate for use in concurrent contexts. It is thread safe to send and
+  /// appropriate for use in concurrent contexts. It is thread safe to send and
   /// finish; all calls are to the continuation are serialized. However, calling
   /// this from multiple concurrent contexts could result in out-of-order
   /// delivery.
@@ -289,34 +291,34 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   /// The following example shows an `AsyncStream` created with this
   /// initializer that produces 100 random numbers on a one-second interval,
   /// calling `yield(_:)` to deliver each element to the awaiting call point.
-  /// When the `for` loop exits and the stream finishes by calling the
-  /// continuation's `finish()` method. If the random number is divisble by 5
+  /// When the `for` loop exits, the stream finishes by calling the
+  /// continuation's `finish()` method. If the random number is divisible by 5
   /// with no remainder, the stream throws a `MyRandomNumberError`.
   ///
   ///     let stream = AsyncThrowingStream<Int, Error>(Int.self,
   ///                                                  bufferingPolicy: .bufferingNewest(5)) { continuation in
-  ///             Task.detached {
-  ///                 for _ in 0..<100 {
-  ///                     await Task.sleep(1 * 1_000_000_000)
-  ///                     let random = Int.random(in: 1...10)
-  ///                     if (random % 5 == 0) {
-  ///                         continuation.finish(throwing: MyRandomNumberError())
-  ///                         return
-  ///                     } else {
-  ///                         continuation.yield(random)
-  ///                     }
+  ///         Task.detached {
+  ///             for _ in 0..<100 {
+  ///                 await Task.sleep(1 * 1_000_000_000)
+  ///                 let random = Int.random(in: 1...10)
+  ///                 if random % 5 == 0 {
+  ///                     continuation.finish(throwing: MyRandomNumberError())
+  ///                     return
+  ///                 } else {
+  ///                     continuation.yield(random)
   ///                 }
-  ///                 continuation.finish()
   ///             }
+  ///             continuation.finish()
   ///         }
+  ///     }
   ///
   ///     // Call point:
   ///     do {
   ///         for try await random in stream {
-  ///             print ("\(random)")
+  ///             print(random)
   ///         }
   ///     } catch {
-  ///         print ("\(error)")
+  ///         print(error)
   ///     }
   ///
   public init(
@@ -336,7 +338,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   ///   - produce: A closure that asynchronously produces elements for the
   ///    stream.
   ///
-  /// Use this convenience initializer when you have an asychronous function
+  /// Use this convenience initializer when you have an asynchronous function
   /// that can produce elements for the stream, and don't want to invoke
   /// a continuation manually. This initializer "unfolds" your closure into
   /// a full-blown asynchronous stream. The created stream handles adherence to
@@ -345,25 +347,25 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   ///
   /// The following example shows an `AsyncThrowingStream` created with this
   /// initializer that produces random numbers on a one-second interval. If the
-  /// random number is divisble by 5 with no remainder, the stream throws a
+  /// random number is divisible by 5 with no remainder, the stream throws a
   /// `MyRandomNumberError`.
   ///
   ///     let stream = AsyncThrowingStream<Int, Error> {
-  ///             await Task.sleep(1 * 1_000_000_000)
-  ///             let random = Int.random(in: 1...10)
-  ///             if (random % 5 == 0) {
-  ///                 throw MyRandomNumberError()
-  ///             }
-  ///             return random
+  ///         await Task.sleep(1 * 1_000_000_000)
+  ///         let random = Int.random(in: 1...10)
+  ///         if random % 5 == 0 {
+  ///             throw MyRandomNumberError()
   ///         }
+  ///         return random
+  ///     }
   ///
   ///     // Call point:
   ///     do {
   ///         for try await random in stream {
-  ///             print ("\(random)")
+  ///             print(random)
   ///         }
   ///     } catch {
-  ///         print ("\(error)")
+  ///         print(error)
   ///     }
   ///
   public init(
@@ -453,7 +455,7 @@ extension AsyncThrowingStream.Continuation {
   }
 
   /// Resume the task awaiting the next iteration point by having it return
-  /// nomally from its suspension point.
+  /// normally from its suspension point.
   ///
   /// - Returns: A `YieldResult` that indicates the success or failure of the
   ///   yield operation.
@@ -469,3 +471,6 @@ extension AsyncThrowingStream.Continuation {
     storage.yield(())
   }
 }
+
+@available(SwiftStdlib 5.1, *)
+extension AsyncThrowingStream: @unchecked Sendable where Element: Sendable { }

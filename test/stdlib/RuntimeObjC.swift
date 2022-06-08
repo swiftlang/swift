@@ -793,8 +793,8 @@ RuntimeClassNamesTestSuite.test("private class nested in same-type-constrained e
   let base: NSData? = nil
   let util = base.asInner
 
-  let clas = unsafeBitCast(type(of: util), to: NSObject.self)
-  let desc = clas.description
+  let clazz = unsafeBitCast(type(of: util), to: NSObject.self)
+  let desc = clazz.description
   expectEqual("_TtCE1a", desc.prefix(7))
   expectEqual("Inner", desc.suffix(5))
 }

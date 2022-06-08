@@ -99,10 +99,10 @@ mapTypeOutOfOpenedExistentialContext(CanType t) {
         /*type sequence*/ false, /*depth*/ 0, /*index*/ i, ctx);
     params.push_back(param);
 
-    const auto constraintTy = openedTypes[i]
-                                  ->getOpenedExistentialType()
-                                  ->castTo<ExistentialType>()
-                                  ->getConstraintType();
+    Type constraintTy = openedTypes[i]->getExistentialType();
+    if (auto existentialTy = constraintTy->getAs<ExistentialType>())
+      constraintTy = existentialTy->getConstraintType();
+
     requirements.emplace_back(RequirementKind::Conformance, param,
                               constraintTy);
   }
@@ -179,7 +179,8 @@ public:
         layoutSubs.getGenericSignature().getCanonicalSignature();
     auto boxLayout =
         SILLayout::get(SGF.getASTContext(), layoutSig,
-                       SILField(layoutTy->getCanonicalType(layoutSig), true));
+                       SILField(layoutTy->getCanonicalType(layoutSig), true),
+                       /*captures generics*/ false);
 
     resultBox = SGF.B.createAllocBox(loc,
       SILBoxType::get(SGF.getASTContext(),
@@ -498,6 +499,7 @@ class ForeignAsyncInitializationPlan final : public ResultPlan {
   SILType opaqueResumeType;
   SILValue resumeBuf;
   SILValue continuation;
+  ExecutorBreadcrumb breadcrumb;
   
 public:
   ForeignAsyncInitializationPlan(SILGenFunction &SGF, SILLocation loc,
@@ -506,9 +508,8 @@ public:
   {
     // Allocate space to receive the resume value when the continuation is
     // resumed.
-    opaqueResumeType =
-        SGF.getLoweredType(AbstractionPattern(calleeTypeInfo.substResultType),
-                           calleeTypeInfo.substResultType);
+    opaqueResumeType = SGF.getLoweredType(AbstractionPattern::getOpaque(),
+                                          calleeTypeInfo.substResultType);
     resumeBuf = SGF.emitTemporaryAllocation(loc, opaqueResumeType);
   }
   
@@ -595,6 +596,11 @@ public:
     // know we won't escape it locally so the callee can be responsible for
     // _Block_copy-ing it.
     return ManagedValue::forUnmanaged(block);
+  }
+
+  void deferExecutorBreadcrumb(ExecutorBreadcrumb &&crumb) override {
+    assert(!breadcrumb.needsEmit() && "overwriting an existing breadcrumb?");
+    breadcrumb = std::move(crumb);
   }
 
   RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
@@ -692,6 +698,7 @@ public:
     // Propagate an error if we have one.
     if (errorBlock) {
       SGF.B.emitBlock(errorBlock);
+      breadcrumb.emit(SGF, loc);
       
       Scope errorScope(SGF, loc);
 
@@ -703,18 +710,17 @@ public:
     }
     
     SGF.B.emitBlock(resumeBlock);
+    breadcrumb.emit(SGF, loc);
     
     // The incoming value is the maximally-abstracted result type of the
     // continuation. Move it out of the resume buffer and reabstract it if
     // necessary.
-    auto resumeResult = SGF.emitLoad(loc, resumeBuf,
-      calleeTypeInfo.origResultType
-         ? *calleeTypeInfo.origResultType
-         : AbstractionPattern(calleeTypeInfo.substResultType),
-                 calleeTypeInfo.substResultType,
-                 SGF.getTypeLowering(calleeTypeInfo.substResultType),
-                 SGFContext(), IsTake);
-    
+    auto resumeResult =
+        SGF.emitLoad(loc, resumeBuf, AbstractionPattern::getOpaque(),
+                     calleeTypeInfo.substResultType,
+                     SGF.getTypeLowering(calleeTypeInfo.substResultType),
+                     SGFContext(), IsTake);
+
     return RValue(SGF, loc, calleeTypeInfo.substResultType, resumeResult);
   }
 };
@@ -772,6 +778,10 @@ public:
                                 ManagedValue::forLValue(errorTemp),
                                 /*TODO: enforcement*/ None,
                                 AbstractionPattern(errorType), errorType);
+  }
+
+  void deferExecutorBreadcrumb(ExecutorBreadcrumb &&breadcrumb) override {
+    subPlan->deferExecutorBreadcrumb(std::move(breadcrumb));
   }
 
   RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,

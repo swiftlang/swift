@@ -302,7 +302,8 @@ static ValueDecl *deriveAdditiveArithmetic_zero(DerivedConformance &derived) {
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
   std::tie(propDecl, pbDecl) = derived.declareDerivedProperty(
-      C.Id_zero, returnInterfaceTy, returnTy, /*isStatic*/ true,
+      DerivedConformance::SynthesizedIntroducer::Var, C.Id_zero,
+      returnInterfaceTy, returnTy, /*isStatic*/ true,
       /*isFinal*/ true);
 
   // Create property getter.

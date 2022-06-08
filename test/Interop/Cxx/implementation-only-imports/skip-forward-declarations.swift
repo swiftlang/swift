@@ -12,4 +12,4 @@ public func createAWrapper() {
   let _ = MagicWrapper()
 }
 
-// CHECK: struct 'MagicWrapper' cannot be used in an '@inlinable' function because 'UserA' was imported implementation-only
+// CHECK: struct 'MagicWrapper' cannot be used in an '@inlinable' function because 'Helper' was imported implementation-only

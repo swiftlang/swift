@@ -20,8 +20,9 @@
 using namespace swift;
 
 /// Return true if all OperandOwnership invariants hold.
-bool swift::checkOperandOwnershipInvariants(const Operand *operand) {
-  OperandOwnership opOwnership = operand->getOperandOwnership();
+bool swift::checkOperandOwnershipInvariants(const Operand *operand,
+                                            SILModuleConventions *silConv) {
+  OperandOwnership opOwnership = operand->getOperandOwnership(silConv);
   if (opOwnership == OperandOwnership::Borrow) {
     // Must be a valid BorrowingOperand.
     return bool(BorrowingOperand(const_cast<Operand *>(operand)));
@@ -38,6 +39,9 @@ namespace {
 class OperandOwnershipClassifier
   : public SILInstructionVisitor<OperandOwnershipClassifier, OperandOwnership> {
   LLVM_ATTRIBUTE_UNUSED SILModule &mod;
+  // Allow module conventions to be overridden while lowering between canonical
+  // and lowered SIL stages.
+  SILModuleConventions silConv;
 
   const Operand &op;
 
@@ -49,8 +53,8 @@ public:
   /// should be the subobject and Value should be the parent object. An example
   /// of where one would want to do this is in the case of value projections
   /// like struct_extract.
-  OperandOwnershipClassifier(SILModule &mod, const Operand &op)
-      : mod(mod), op(op) {}
+  OperandOwnershipClassifier(SILModuleConventions silConv, const Operand &op)
+      : mod(silConv.getModule()), silConv(silConv), op(op) {}
 
   SILValue getValue() const { return op.get(); }
 
@@ -167,7 +171,6 @@ OPERAND_OWNERSHIP(TrivialUse, ObjCToThickMetatype)
 OPERAND_OWNERSHIP(TrivialUse, OpenExistentialAddr)
 OPERAND_OWNERSHIP(TrivialUse, OpenExistentialMetatype)
 OPERAND_OWNERSHIP(TrivialUse, PointerToAddress)
-OPERAND_OWNERSHIP(TrivialUse, PointerToThinFunction)
 OPERAND_OWNERSHIP(TrivialUse, ProjectBlockStorage)
 OPERAND_OWNERSHIP(TrivialUse, RawPointerToRef)
 OPERAND_OWNERSHIP(TrivialUse, SelectEnumAddr)
@@ -176,7 +179,6 @@ OPERAND_OWNERSHIP(TrivialUse, SwitchEnumAddr)
 OPERAND_OWNERSHIP(TrivialUse, SwitchValue)
 OPERAND_OWNERSHIP(TrivialUse, TailAddr)
 OPERAND_OWNERSHIP(TrivialUse, ThickToObjCMetatype)
-OPERAND_OWNERSHIP(TrivialUse, ThinFunctionToPointer)
 OPERAND_OWNERSHIP(TrivialUse, ThinToThickFunction)
 OPERAND_OWNERSHIP(TrivialUse, TupleElementAddr)
 OPERAND_OWNERSHIP(TrivialUse, UncheckedAddrCast)
@@ -256,8 +258,6 @@ OPERAND_OWNERSHIP(DestroyingConsume, EndCOWMutation)
 OPERAND_OWNERSHIP(DestroyingConsume, MoveValue)
 
 // Instructions that move an owned value.
-OPERAND_OWNERSHIP(ForwardingConsume, CheckedCastValueBranch)
-OPERAND_OWNERSHIP(ForwardingConsume, UnconditionalCheckedCastValue)
 OPERAND_OWNERSHIP(ForwardingConsume, InitExistentialValue)
 OPERAND_OWNERSHIP(ForwardingConsume, DeinitExistentialValue)
 OPERAND_OWNERSHIP(ForwardingConsume, MarkUninitialized)
@@ -271,7 +271,7 @@ OPERAND_OWNERSHIP(InteriorPointer, OpenExistentialBox)
 OPERAND_OWNERSHIP(InteriorPointer, HopToExecutor)
 OPERAND_OWNERSHIP(InteriorPointer, ExtractExecutor)
 
-// Instructions that propagate a value value within a borrow scope.
+// Instructions that propagate a value within a borrow scope.
 OPERAND_OWNERSHIP(ForwardingBorrow, TupleExtract)
 OPERAND_OWNERSHIP(ForwardingBorrow, StructExtract)
 OPERAND_OWNERSHIP(ForwardingBorrow, DifferentiableFunctionExtract)
@@ -430,7 +430,7 @@ OperandOwnershipClassifier::visitStoreBorrowInst(StoreBorrowInst *i) {
   return OperandOwnership::TrivialUse;
 }
 
-// Get the OperandOwnership for instaneous apply, yield, and return uses.
+// Get the OperandOwnership for instantaneous apply, yield, and return uses.
 // This does not apply to uses that begin an explicit borrow scope in the
 // caller, such as begin_apply.
 static OperandOwnership getFunctionArgOwnership(SILArgumentConvention argConv,
@@ -474,9 +474,17 @@ OperandOwnershipClassifier::visitFullApply(FullApplySite apply) {
   if (getValue()->getType().isAddress()) {
     return OperandOwnership::TrivialUse;
   }
-  SILArgumentConvention argConv = apply.isCalleeOperand(op)
-    ? SILArgumentConvention(apply.getSubstCalleeType()->getCalleeConvention())
-    : apply.getArgumentConvention(op);
+  auto calleeTy = apply.getSubstCalleeType();
+  SILArgumentConvention argConv = [&]() {
+    if (apply.isCalleeOperand(op)) {
+      return SILArgumentConvention(calleeTy->getCalleeConvention());
+    } else {
+      unsigned calleeArgIdx = apply.getCalleeArgIndexOfFirstAppliedArg()
+                              + apply.getAppliedArgIndex(op);
+      return silConv.getFunctionConventions(calleeTy).getSILArgumentConvention(
+          calleeArgIdx);
+    }
+  }();
 
   auto argOwnership = getFunctionArgOwnership(
     argConv, /*hasScopeInCaller*/ apply.beginsCoroutineEvaluation());
@@ -904,8 +912,9 @@ OperandOwnership OperandOwnershipClassifier::visitBuiltinInst(BuiltinInst *bi) {
 //                            Top Level Entrypoint
 //===----------------------------------------------------------------------===//
 
-OperandOwnership Operand::getOperandOwnership() const {
-  // A type-dependent operant is a NonUse (as opposed to say an
+OperandOwnership
+Operand::getOperandOwnership(SILModuleConventions *silConv) const {
+  // A type-dependent operand is a NonUse (as opposed to say an
   // InstantaneousUse) because it does not require liveness.
   if (isTypeDependent())
     return OperandOwnership::NonUse;
@@ -925,7 +934,8 @@ OperandOwnership Operand::getOperandOwnership() const {
       return OperandOwnership(OperandOwnership::InstantaneousUse);
     }
   }
-
-  OperandOwnershipClassifier classifier(getUser()->getModule(), *this);
+  SILModuleConventions overrideConv =
+      silConv ? *silConv : SILModuleConventions(getUser()->getModule());
+  OperandOwnershipClassifier classifier(overrideConv, *this);
   return classifier.visit(const_cast<SILInstruction *>(getUser()));
 }

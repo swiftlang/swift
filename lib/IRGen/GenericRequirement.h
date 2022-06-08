@@ -60,7 +60,6 @@ void enumerateGenericSignatureRequirements(CanGenericSignature signature,
 llvm::Value *
 emitGenericRequirementFromSubstitutions(IRGenFunction &IGF,
                                         CanGenericSignature signature,
-                                        ModuleDecl &module,
                                         GenericRequirement requirement,
                                         SubstitutionMap subs);
 
@@ -99,11 +98,12 @@ void bindFromGenericRequirementsBuffer(IRGenFunction &IGF,
 /// root conformances of the context established by the type, again minus
 /// anything fulfillable from its parent type metadata).
 class GenericTypeRequirements {
-  NominalTypeDecl *TheDecl;
   llvm::SmallVector<GenericRequirement, 4> Requirements;
+  CanGenericSignature Generics;
 
 public:
   GenericTypeRequirements(IRGenModule &IGM, NominalTypeDecl *decl);
+  GenericTypeRequirements(IRGenModule &IGM, GenericSignature sig);
 
   /// Return the layout chunks.
   ArrayRef<GenericRequirement> getRequirements() const {

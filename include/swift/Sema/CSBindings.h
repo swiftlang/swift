@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the \c PotentialBindings class and its auxilary types
-// such as \c PotentialBinding, that are used to descibe bindings which
+// This file defines the \c PotentialBindings class and its auxiliary types
+// such as \c PotentialBinding, that are used to describe bindings which
 // a particular type variable could be bound to.
 //
 //===----------------------------------------------------------------------===//
@@ -422,7 +422,7 @@ public:
   /// Determine whether this set has any "viable" (or non-hole) bindings.
   ///
   /// A viable binding could be - a direct or transitive binding
-  /// inferred from a constraint, literal binding, or defaltable
+  /// inferred from a constraint, literal binding, or defaultable
   /// binding.
   ///
   /// A hole is not considered a viable binding since it doesn't

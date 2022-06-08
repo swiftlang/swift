@@ -1,6 +1,8 @@
 {
-  "kind": "Root",
-  "name": "TopLevel",
-  "printedName": "TopLevel",
-  "json_format_version": 6
+  "ABIRoot": {
+    "kind": "Root",
+    "name": "TopLevel",
+    "printedName": "TopLevel",
+    "json_format_version": 8
+  }
 }

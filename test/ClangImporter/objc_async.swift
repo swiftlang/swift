@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules %s -verify -verify-additional-file %swift_src_root/test/Inputs/clang-importer-sdk/usr/include/ObjCConcurrency.h -warn-concurrency
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules %s -verify -verify-additional-file %swift_src_root/test/Inputs/clang-importer-sdk/usr/include/ObjCConcurrency.h -strict-concurrency=targeted -parse-as-library
 
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
@@ -6,10 +6,10 @@ import Foundation
 import ObjCConcurrency
 // expected-remark@-1{{add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'ObjCConcurrency'}}
 
-if #available(SwiftStdlib 5.5, *) {
-
+@available(SwiftStdlib 5.5, *)
 @MainActor func onlyOnMainActor() { }
 
+@available(SwiftStdlib 5.5, *)
 func testSlowServer(slowServer: SlowServer) async throws {
   let _: Int = await slowServer.doSomethingSlow("mail")
   let _: Bool = await slowServer.checkAvailability()
@@ -62,6 +62,7 @@ func testSlowServer(slowServer: SlowServer) async throws {
   _ = await slowServer.runOnMainThread()
 }
 
+@available(SwiftStdlib 5.5, *)
 func testSlowServerSynchronous(slowServer: SlowServer) {
   // synchronous version
   let _: Int = slowServer.doSomethingConflicted("thinking")
@@ -88,6 +89,7 @@ func testSlowServerSynchronous(slowServer: SlowServer) {
   let _: Int = slowServer.overridableButRunsOnMainThread // expected-error{{cannot convert value of type '(((String) -> Void)?) -> Void' to specified type 'Int'}}
 }
 
+@available(SwiftStdlib 5.5, *)
 func testSlowServerOldSchool(slowServer: SlowServer) {
   slowServer.doSomethingSlow("mail") { i in
     _ = i
@@ -96,6 +98,7 @@ func testSlowServerOldSchool(slowServer: SlowServer) {
   _ = slowServer.allOperations
 }
 
+@available(SwiftStdlib 5.5, *)
 func testSendable(fn: () -> Void) {
   doSomethingConcurrently(fn) // okay, due to implicit @preconcurrency
   doSomethingConcurrentlyButUnsafe(fn) // okay, @Sendable not part of the type
@@ -107,6 +110,7 @@ func testSendable(fn: () -> Void) {
   }
 }
 
+@available(SwiftStdlib 5.5, *)
 func testSendableInAsync() async {
   var x = 17
   doSomethingConcurrentlyButUnsafe {
@@ -115,6 +119,7 @@ func testSendableInAsync() async {
   print(x)
 }
 
+@available(SwiftStdlib 5.5, *)
 func testSendableAttrs(
   sendableClass: SendableClass, nonSendableClass: NonSendableClass,
   sendableEnum: SendableEnum, nonSendableEnum: NonSendableEnum,
@@ -150,8 +155,10 @@ func testSendableAttrs(
 }
 
 // Check import of attributes
+@available(SwiftStdlib 5.5, *)
 func globalAsync() async { }
 
+@available(SwiftStdlib 5.5, *)
 actor MySubclassCheckingSwiftAttributes : ProtocolWithSwiftAttributes {
   func syncMethod() { } // expected-note 2{{calls to instance method 'syncMethod()' from outside of its actor context are implicitly asynchronous}}
 
@@ -171,19 +178,30 @@ actor MySubclassCheckingSwiftAttributes : ProtocolWithSwiftAttributes {
 
 // Sendable conformance inference for imported types.
 func acceptCV<T: Sendable>(_: T) { }
-func testCV(r: NSRange) {
+
+struct MyStruct: Sendable {
+  var range: NSRange
+  var inner: SendableStructWithNonSendable
+}
+
+@available(SwiftStdlib 5.5, *)
+func testCV(r: NSRange, someStruct: SendableStructWithNonSendable) async {
   acceptCV(r)
+  acceptCV(someStruct)
 }
 
 // Global actor (unsafe) isolation.
 
+@available(SwiftStdlib 5.5, *)
 actor SomeActor { }
 
+@available(SwiftStdlib 5.5, *)
 @globalActor
 struct SomeGlobalActor {
   static let shared = SomeActor()
 }
 
+@available(SwiftStdlib 5.5, *)
 class MyButton : NXButton {
   @MainActor func testMain() {
     onButtonPress() // okay
@@ -198,17 +216,19 @@ class MyButton : NXButton {
   }
 }
 
+@available(SwiftStdlib 5.5, *)
 func testButtons(mb: MyButton) {
   mb.onButtonPress()
 }
 
-
+@available(SwiftStdlib 5.5, *)
 func testMirrored(instance: ClassWithAsync) async {
   await instance.instanceAsync()
   await instance.protocolMethod()
   await instance.customAsyncName()
 }
 
+@available(SwiftStdlib 5.5, *)
 @MainActor class MyToolbarButton : NXButton {
   var count = 5
 
@@ -220,6 +240,7 @@ func testMirrored(instance: ClassWithAsync) async {
   }
 }
 
+@available(SwiftStdlib 5.5, *)
 @MainActor class MyView: NXView {
   func f() {
     Task {
@@ -230,4 +251,133 @@ func testMirrored(instance: ClassWithAsync) async {
   func g() async { }
 }
 
-} // SwiftStdlib 5.5
+
+
+@available(SwiftStdlib 5.5, *)
+@MainActor func mainActorFn() {}
+@available(SwiftStdlib 5.5, *)
+@SomeGlobalActor func sgActorFn() {}
+
+// Check inferred isolation for overridden decls from ObjC.
+// Note that even if the override is not present, it
+// can have an affect. -- rdar://87217618 / SR-15694
+@MainActor
+@available(SwiftStdlib 5.5, *)
+class FooFrame: PictureFrame {
+  init() {
+    super.init(size: 0)
+  }
+
+  override init(size n: Int) {
+    super.init(size: n)
+  }
+
+  override func rotate() {
+    mainActorFn()
+  }
+}
+
+@available(SwiftStdlib 5.5, *)
+class BarFrame: PictureFrame {
+  init() {
+    super.init(size: 0)
+  }
+
+  override init(size n: Int) {
+    super.init(size: n)
+  }
+
+  override func rotate() {
+    mainActorFn()
+  }
+}
+
+@available(SwiftStdlib 5.5, *)
+@SomeGlobalActor
+class BazFrame: NotIsolatedPictureFrame {
+  init() {
+    super.init(size: 0)
+  }
+
+  override init(size n: Int) {
+    super.init(size: n)
+  }
+
+  override func rotate() {
+    sgActorFn()
+  }
+}
+
+@SomeGlobalActor
+class BazFrameIso: PictureFrame { // expected-error {{global actor 'SomeGlobalActor'-isolated class 'BazFrameIso' has different actor isolation from main actor-isolated superclass 'PictureFrame'}}
+}
+
+@available(SwiftStdlib 5.5, *)
+func check() async {
+  _ = await BarFrame()
+  _ = await FooFrame()
+  _ = await BazFrame()
+
+  _ = await BarFrame(size: 0)
+  _ = await FooFrame(size: 0)
+  _ = await BazFrame(size: 0)
+}
+
+@available(SwiftStdlib 5.5, *)
+func testSender(
+  sender: NXSender,
+  sendableObject: SendableClass,
+  nonSendableObject: NonSendableClass,
+  sendableSubclassOfNonSendableObject: NonSendableClass & Sendable,
+  sendableProtos: LabellyProtocol & ObjCClub & Sendable,
+  nonSendableProtos: LabellyProtocol & ObjCClub,
+  sendableGeneric: GenericObject<SendableClass> & Sendable,
+  nonSendableGeneric: GenericObject<SendableClass>,
+  ptr: UnsafeMutableRawPointer,
+  stringArray: [String]
+) async {
+  sender.sendAny(sendableObject)
+  sender.sendAny(nonSendableObject)
+  // expected-warning@-1 {{conformance of 'NonSendableClass' to 'Sendable' is unavailable}}
+
+  sender.sendOptionalAny(sendableObject)
+  sender.sendOptionalAny(nonSendableObject)
+  // expected-warning@-1 {{conformance of 'NonSendableClass' to 'Sendable' is unavailable}}
+
+  sender.sendSendable(sendableObject)
+
+  sender.sendSendableSubclasses(nonSendableObject)
+  // expected-warning@-1 {{conformance of 'NonSendableClass' to 'Sendable' is unavailable}}
+  sender.sendSendableSubclasses(sendableSubclassOfNonSendableObject)
+  // expected-warning@-1 {{conformance of 'NonSendableClass' to 'Sendable' is unavailable}}
+  // FIXME(rdar://89992569): Should allow for the possibility that NonSendableClass will have a Sendable subclass
+
+  sender.sendProto(sendableProtos)
+  sender.sendProto(nonSendableProtos)
+  // expected-warning@-1 {{type 'any LabellyProtocol & ObjCClub' does not conform to the 'Sendable' protocol}}
+
+  sender.sendProtos(sendableProtos)
+  sender.sendProtos(nonSendableProtos)
+  // expected-warning@-1 {{type 'any LabellyProtocol & ObjCClub' does not conform to the 'Sendable' protocol}}
+
+  sender.sendAnyArray([sendableObject])
+  sender.sendAnyArray([nonSendableObject])
+  // expected-warning@-1 {{conformance of 'NonSendableClass' to 'Sendable' is unavailable; this is an error in Swift 6}}
+
+  sender.sendGeneric(sendableGeneric)
+  // expected-warning@-1{{type 'GenericObject<SendableClass>' does not conform to the 'Sendable' protocol}}
+  // FIXME: Shouldn't warn
+
+  sender.sendGeneric(nonSendableGeneric)
+  // expected-warning@-1 {{type 'GenericObject<SendableClass>' does not conform to the 'Sendable' protocol}}
+
+  sender.sendPtr(ptr)
+  sender.sendStringArray(stringArray)
+}
+
+// Sendable checking
+public struct SomeWrapper<T: AuditedNonSendable> {
+  public let unit: T
+}
+
+extension SomeWrapper: Sendable where T: Sendable {}

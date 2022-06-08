@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/../Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-build-swift -module-name main -Xfrontend -enable-experimental-distributed -Xfrontend -disable-availability-checking -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
+// RUN: %target-build-swift -module-name main -Xfrontend -disable-availability-checking -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s --enable-var-scope --color
 
-// X: %target-run-simple-swift( -Xfrontend -module-name=main -Xfrontend -disable-availability-checking -Xfrontend -enable-experimental-distributed -parse-as-library -Xfrontend -I -Xfrontend %t ) | %FileCheck %s --dump-input=always
+// X: %target-run-simple-swift( -Xfrontend -module-name=main -Xfrontend -disable-availability-checking  -parse-as-library -Xfrontend -I -Xfrontend %t ) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -14,15 +14,9 @@
 // UNSUPPORTED: back_deployment_runtime
 
 // FIXME(distributed): Distributed actors currently have some issues on windows, isRemote always returns false. rdar://82593574
-// UNSUPPORTED: windows
+// UNSUPPORTED: OS=windows-msvc
 
-// FIXME(distributed): remote calls seem to hang on linux - rdar://87240034
-// UNSUPPORTED: linux
-
-// rdar://88228867 - remoteCall_* tests have been disabled due to random failures
-// OK: rdar88228867
-
-import _Distributed
+import Distributed
 import FakeDistributedActorSystems
 
 typealias DefaultDistributedActorSystem = FakeRoundtripActorSystem
@@ -48,11 +42,11 @@ struct SomeError: Error {}
 func test() async throws {
   let system = DefaultDistributedActorSystem()
 
-  let local = Greeter(system: system)
+  let local = Greeter(actorSystem: system)
   let ref = try Greeter.resolve(id: local.id, using: system)
 
   let reply = try await ref.echo(name: "Caplin")
-  // CHECK: > encode argument: Caplin
+  // CHECK: > encode argument name:name, value: Caplin
   // CHECK-NOT: > encode error type
   // CHECK: > encode return type: Swift.String
   // CHECK: > done recording

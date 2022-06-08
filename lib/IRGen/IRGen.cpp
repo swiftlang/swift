@@ -146,6 +146,11 @@ static void addThreadSanitizerPass(const PassManagerBuilder &Builder,
   PM.add(createThreadSanitizerLegacyPassPass());
 }
 
+static void addSwiftDbgAddrBlockSplitterPass(const PassManagerBuilder &Builder,
+                                             legacy::PassManagerBase &PM) {
+  PM.add(createSwiftDbgAddrBlockSplitter());
+}
+
 static void addSanitizerCoveragePass(const PassManagerBuilder &Builder,
                                      legacy::PassManagerBase &PM) {
   const PassManagerBuilderWrapper &BuilderWrapper =
@@ -289,6 +294,13 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
       });
   }
 
+  if (RunSwiftSpecificLLVMOptzns) {
+    PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
+                           addSwiftDbgAddrBlockSplitterPass);
+    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
+                           addSwiftDbgAddrBlockSplitterPass);
+  }
+
   // Configure the function passes.
   legacy::FunctionPassManager FunctionPasses(Module);
   FunctionPasses.add(createTargetTransformInfoWrapperPass(
@@ -352,7 +364,8 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
   // rely on any other LLVM ARC transformations, but we do need ARC
   // contraction to add the objc_retainAutoreleasedReturnValue
   // assembly markers and remove clang.arc.used.
-  if (Opts.shouldOptimize() && !DisableObjCARCContract)
+  if (Opts.shouldOptimize() && !DisableObjCARCContract &&
+      !Opts.DisableLLVMOptzns)
     ModulePasses.add(createObjCARCContractPass());
 
   // Do it.
@@ -747,6 +760,18 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
   opts.AsyncContextExtendedFrameEntry = PointerAuthSchema(
       dataKey, /*address*/ true, Discrimination::Constant,
       SpecialPointerAuthDiscriminators::SwiftAsyncContextExtendedFrameEntry);
+
+  opts.ExtendedExistentialTypeShape =
+      PointerAuthSchema(dataKey, /*address*/ false,
+                        Discrimination::Constant,
+                        SpecialPointerAuthDiscriminators
+                          ::ExtendedExistentialTypeShape);
+
+  opts.NonUniqueExtendedExistentialTypeShape =
+      PointerAuthSchema(dataKey, /*address*/ false,
+                        Discrimination::Constant,
+                        SpecialPointerAuthDiscriminators
+                          ::NonUniqueExtendedExistentialTypeShape);
 }
 
 std::unique_ptr<llvm::TargetMachine>
@@ -937,9 +962,8 @@ static void initLLVMModule(const IRGenModule &IGM, SILModule &SIL) {
 std::pair<IRGenerator *, IRGenModule *>
 swift::irgen::createIRGenModule(SILModule *SILMod, StringRef OutputFilename,
                                 StringRef MainInputFilenameForDebugInfo,
-                                StringRef PrivateDiscriminator) {
-
-  IRGenOptions Opts;
+                                StringRef PrivateDiscriminator,
+                                IRGenOptions &Opts) {
   IRGenerator *irgen = new IRGenerator(Opts, *SILMod);
   auto targetMachine = irgen->createTargetMachine();
   if (!targetMachine)
@@ -1008,7 +1032,6 @@ getSymbolSourcesToEmit(const IRGenDescriptor &desc) {
       irEntitiesToEmit.push_back(source->getIRLinkEntity());
       break;
     case SymbolSource::Kind::LinkerDirective:
-    case SymbolSource::Kind::CrossModuleOptimization:
     case SymbolSource::Kind::Unknown:
       llvm_unreachable("Not supported");
     }

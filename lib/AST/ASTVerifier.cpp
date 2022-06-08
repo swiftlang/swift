@@ -1469,6 +1469,25 @@ public:
       verifyCheckedBase(E);
     }
 
+    bool shouldVerify(ErasureExpr *expr) {
+      if (!shouldVerify(cast<Expr>(expr)))
+        return false;
+
+      for (auto &elt : expr->getArgumentConversions()) {
+        assert(!OpaqueValues.count(elt.OrigValue));
+        OpaqueValues[elt.OrigValue] = 0;
+      }
+
+      return true;
+    }
+
+    void cleanup(ErasureExpr *expr) {
+      for (auto &elt : expr->getArgumentConversions()) {
+        assert(OpaqueValues.count(elt.OrigValue));
+        OpaqueValues.erase(elt.OrigValue);
+      }
+    }
+
     void verifyChecked(ErasureExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying ErasureExpr", E);
 
@@ -2289,7 +2308,7 @@ public:
 
       auto *subExpr = E->getSubExpr();
       if (isa<ParenExpr>(subExpr) || isa<ForceValueExpr>(subExpr)) {
-        Out << "Immediate ParenExpr/ForceValueExpr should preceed a LoadExpr\n";
+        Out << "Immediate ParenExpr/ForceValueExpr should precede a LoadExpr\n";
         E->dump(Out);
         Out << "\n";
         abort();
@@ -2314,7 +2333,7 @@ public:
 
       if (VD->hasAccess()) {
         if (VD->getFormalAccess() == AccessLevel::Open) {
-          if (!isa<ClassDecl>(VD) && !VD->isPotentiallyOverridable()) {
+          if (!isa<ClassDecl>(VD) && !VD->isSyntacticallyOverridable()) {
             Out << "decl cannot be 'open'\n";
             VD->dump(Out);
             abort();
@@ -2720,7 +2739,8 @@ public:
       if (!normal->isInvalid()){
         auto conformances = normal->getSignatureConformances();
         unsigned idx = 0;
-        for (const auto &req : proto->getRequirementSignature()) {
+        auto reqs = proto->getRequirementSignature().getRequirements();
+        for (const auto &req : reqs) {
           if (req.getKind() != RequirementKind::Conformance)
             continue;
 

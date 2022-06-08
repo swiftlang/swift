@@ -29,6 +29,11 @@ func runSILPrinter(function: Function, context: PassContext) {
       for use in arg.uses {
         print("      user: \(use.instruction)")
       }
+      if let blockArg = arg as? BlockArgument, blockArg.isPhiArgument {
+        for incoming in blockArg.incomingPhiValues {
+          print("      incoming: \(incoming)")
+        }
+      }
     }
 
     print("  instructions:")

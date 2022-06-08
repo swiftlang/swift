@@ -33,6 +33,7 @@ namespace swift {
     const char *DocOutputPath = nullptr;
     const char *SourceInfoOutputPath = nullptr;
     std::string ABIDescriptorPath;
+    bool emptyABIDescriptor = false;
     llvm::VersionTuple UserModuleVersion;
     std::string SDKName;
 

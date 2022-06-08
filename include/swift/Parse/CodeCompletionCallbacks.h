@@ -118,6 +118,11 @@ public:
   /// Set target decl for attribute if the CC token is in attribute of the decl.
   virtual void setAttrTargetDeclKind(Optional<DeclKind> DK) {}
 
+  /// Set that the code completion token occurred in a custom attribute. This
+  /// allows us to type check the custom attribute even if it is not attached to
+  /// the AST, e.g. because there is no var declaration following it.
+  virtual void setCompletingInAttribute(CustomAttr *Attr){};
+
   /// Complete expr-dot after we have consumed the dot.
   virtual void completeDotExpr(CodeCompletionExpr *E, SourceLoc DotLoc) {};
 
@@ -128,7 +133,7 @@ public:
   /// by user.
   virtual void completePostfixExprBeginning(CodeCompletionExpr *E) {};
 
-  /// Complete the beginning of expr-postfix in a for-each loop sequqence
+  /// Complete the beginning of expr-postfix in a for-each loop sequence
   /// -- no tokens provided by user.
   virtual void completeForEachSequenceBeginning(CodeCompletionExpr *E) {};
 
@@ -212,7 +217,7 @@ public:
 
   /// Complete a yield statement.  A missing yield index means that the
   /// completion immediately follows the 'yield' keyword; it may be either
-  /// an expresion or a parenthesized expression list.  A present yield
+  /// an expression or a parenthesized expression list.  A present yield
   /// index means that the completion is within the parentheses and is
   /// for a specific yield value.
   virtual void completeYieldStmt(CodeCompletionExpr *E,
@@ -225,7 +230,7 @@ public:
 
   virtual void completePlatformCondition() {};
 
-  virtual void completeAfterIfStmt(bool hasElse) {};
+  virtual void completeAfterIfStmtElse() {};
 
   virtual void completeGenericRequirement() {};
 
@@ -235,6 +240,8 @@ public:
   void completeForEachPatternBeginning(bool hasTry, bool hasAwait) {};
 
   virtual void completeTypeAttrBeginning() {};
+
+  virtual void completeOptionalBinding(){};
 
   /// Signals that the AST for the all the delayed-parsed code was
   /// constructed.  No \c complete*() callbacks will be done after this.

@@ -218,9 +218,7 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
 
     // Find a protocol that is not @objc.
     bool sawErrorProtocol = false;
-    for (auto P : layout.getProtocols()) {
-      auto *PD = P->getDecl();
-
+    for (auto PD : layout.getProtocols()) {
       if (PD->isSpecificProtocol(KnownProtocolKind::Error)) {
         sawErrorProtocol = true;
         break;
@@ -401,11 +399,11 @@ static bool checkObjCInForeignClassContext(const ValueDecl *VD,
   if (!type)
     return false;
 
-  auto clas = type->getClassOrBoundGenericClass();
-  if (!clas)
+  auto clazz = type->getClassOrBoundGenericClass();
+  if (!clazz)
     return false;
 
-  switch (clas->getForeignClassKind()) {
+  switch (clazz->getForeignClassKind()) {
   case ClassDecl::ForeignKind::Normal:
     return false;
 
@@ -419,7 +417,7 @@ static bool checkObjCInForeignClassContext(const ValueDecl *VD,
   case ClassDecl::ForeignKind::RuntimeOnly:
     VD->diagnose(diag::objc_in_objc_runtime_visible,
                  VD->getDescriptiveKind(), getObjCDiagnosticAttrKind(Reason),
-                 clas->getName())
+                 clazz->getName())
         .limitBehavior(behavior);
     Reason.describe(VD);
     break;
@@ -428,35 +426,52 @@ static bool checkObjCInForeignClassContext(const ValueDecl *VD,
   return true;
 }
 
+/// Whether the given declaration can be exposed as Objective-C.
+static bool canExposeActorIsolatedAsObjC(
+    const ValueDecl *value, const ActorIsolation &isolation) {
+  if (isAccessibleAcrossActors(
+          const_cast<ValueDecl *>(value), isolation, value->getDeclContext()))
+    return true;
+
+  // An async function can be exposed as Objective-C.
+  if (auto func = dyn_cast<AbstractFunctionDecl>( value))
+    return func->hasAsync();
+
+  return false;
+}
+
 /// Actor-isolated declarations cannot be @objc.
-static bool checkObjCActorIsolation(const ValueDecl *VD,
-                                    ObjCReason Reason) {
+static bool checkObjCActorIsolation(const ValueDecl *VD, ObjCReason Reason) {
   // Check actor isolation.
-  switch (auto restriction = ActorIsolationRestriction::forDeclaration(
-              const_cast<ValueDecl *>(VD), VD->getDeclContext(),
-              /*fromExpression=*/false)) {
-  case ActorIsolationRestriction::CrossActorSelf:
+  switch (auto isolation = getActorIsolation(const_cast<ValueDecl *>(VD))) {
+  case ActorIsolation::ActorInstance:
+    if (!canExposeActorIsolatedAsObjC(VD, isolation)) {
+      // Actor-isolated functions cannot be @objc.
+      VD->diagnose(diag::actor_isolated_objc, VD->getDescriptiveKind(),
+                   VD->getName());
+      Reason.describe(VD);
+      if (auto FD = dyn_cast<FuncDecl>(VD)) {
+        addAsyncNotes(const_cast<FuncDecl *>(FD));
+      }
+
+      return true;
+    }
+
     // FIXME: Substitution map?
     diagnoseNonSendableTypesInReference(
         const_cast<ValueDecl *>(VD), VD->getDeclContext(),
         VD->getLoc(), SendableCheckReason::ObjC);
     return false;
-  case ActorIsolationRestriction::ActorSelf:
-    // Actor-isolated functions cannot be @objc.
-    VD->diagnose(diag::actor_isolated_objc, VD->getDescriptiveKind(),
-                 VD->getName());
-    Reason.describe(VD);
-    if (auto FD = dyn_cast<FuncDecl>(VD)) {
-      addAsyncNotes(const_cast<FuncDecl *>(FD));
-    }
-    return true;
 
-  case ActorIsolationRestriction::GlobalActorUnsafe:
-  case ActorIsolationRestriction::GlobalActor:
+  case ActorIsolation::GlobalActor:
+  case ActorIsolation::GlobalActorUnsafe:
     // FIXME: Consider whether to limit @objc on global-actor-qualified
-    // declarations.
-  case ActorIsolationRestriction::Unrestricted:
-  case ActorIsolationRestriction::Unsafe:
+    // declarations. Perhaps only allow main actor, which we can reflect
+    // in the generated header.
+    return false;
+
+  case ActorIsolation::Independent:
+  case ActorIsolation::Unspecified:
     return false;
   }
 }
@@ -769,7 +784,7 @@ bool swift::isRepresentableInObjC(
 
       completionHandlerParams.push_back(AnyFunctionType::Param(type));
 
-      // Make sure that the paraneter type is representable in Objective-C.
+      // Make sure that the parameter type is representable in Objective-C.
       if (!type->isRepresentableIn(
               ForeignLanguage::ObjectiveC, const_cast<FuncDecl *>(FD))) {
         softenIfAccessNote(AFD, Reason.getAttr(),
@@ -1614,10 +1629,11 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
     if (auto attr = proto->getAttrs().getAttribute<ObjCAttr>()) {
       isObjC = objCReasonForObjCAttr(attr);
 
-      // If the protocol is @objc, it may only refine other @objc protocols.
+      // If the protocol is @objc, it may only refine other @objc protocols and
+      // marker protocols.
       // FIXME: Revisit this restriction.
       for (auto inherited : proto->getInheritedProtocols()) {
-        if (!inherited->isObjC()) {
+        if (!inherited->isObjC() && !inherited->isMarkerProtocol()) {
           proto->diagnose(diag::objc_protocol_inherits_non_objc_protocol,
                           proto->getDeclaredInterfaceType(),
                           inherited->getDeclaredInterfaceType());
@@ -2008,9 +2024,9 @@ void markAsObjC(ValueDecl *D, ObjCReason reason,
       }
     }
 
-    // Record the method in the class, if it's a member of one.
-    if (auto classDecl = D->getDeclContext()->getSelfClassDecl()) {
-      classDecl->recordObjCMethod(method, selector);
+    // Record the method in the type, if it's a member of one.
+    if (auto tyDecl = D->getDeclContext()->getSelfNominalTypeDecl()) {
+      tyDecl->recordObjCMethod(method, selector);
     }
 
     // Record the method in the source file.
@@ -2276,7 +2292,7 @@ namespace {
 /// given class or any of its superclasses. We intentionally don't respect
 /// access control, since everything is visible to the Objective-C runtime.
 static AbstractFunctionDecl *
-lookupOverridenObjCMethod(ClassDecl *classDecl, AbstractFunctionDecl *method,
+lookupOverriddenObjCMethod(ClassDecl *classDecl, AbstractFunctionDecl *method,
                           bool inheritingInits = true) {
   assert(classDecl);
 
@@ -2297,7 +2313,7 @@ lookupOverridenObjCMethod(ClassDecl *classDecl, AbstractFunctionDecl *method,
                              OrderDeclarations());
   }
 
-  // If we've reached the bottom of the inheritance heirarchy, we're done.
+  // If we've reached the bottom of the inheritance hierarchy, we're done.
   if (!classDecl->hasSuperclass())
     return nullptr;
 
@@ -2308,7 +2324,7 @@ lookupOverridenObjCMethod(ClassDecl *classDecl, AbstractFunctionDecl *method,
   if (isa<ConstructorDecl>(method) && !inheritingInits)
     return nullptr;
 
-  return lookupOverridenObjCMethod(classDecl->getSuperclassDecl(), method,
+  return lookupOverriddenObjCMethod(classDecl->getSuperclassDecl(), method,
                                    inheritingInits);
 }
 
@@ -2364,7 +2380,7 @@ bool swift::diagnoseUnintendedObjCMethodOverrides(SourceFile &sf) {
     // purposes, but a subclass already depends on its superclasses and any
     // extensions for many other reasons.
     auto *overriddenMethod =
-        lookupOverridenObjCMethod(classDecl->getSuperclassDecl(), method);
+        lookupOverriddenObjCMethod(classDecl->getSuperclassDecl(), method);
     if (!overriddenMethod)
       continue;
 
@@ -2406,11 +2422,11 @@ bool swift::diagnoseUnintendedObjCMethodOverrides(SourceFile &sf) {
 /// Retrieve the source file for the given Objective-C member conflict.
 static TinyPtrVector<AbstractFunctionDecl *>
 getObjCMethodConflictDecls(const SourceFile::ObjCMethodConflict &conflict) {
-  ClassDecl *classDecl = std::get<0>(conflict);
+  NominalTypeDecl *typeDecl = std::get<0>(conflict);
   ObjCSelector selector = std::get<1>(conflict);
   bool isInstanceMethod = std::get<2>(conflict);
 
-  return classDecl->lookupDirect(selector, isInstanceMethod);
+  return typeDecl->lookupDirect(selector, isInstanceMethod);
 }
 
 static ObjCAttr *getObjCAttrIfFromAccessNote(ValueDecl *VD) {
@@ -2447,6 +2463,7 @@ bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
   // Diagnose each conflict.
   bool anyConflicts = false;
   for (const auto &conflict : localConflicts) {
+    NominalTypeDecl *tyDecl = std::get<0>(conflict);
     ObjCSelector selector = std::get<1>(conflict);
 
     auto methods = getObjCMethodConflictDecls(conflict);
@@ -2529,6 +2546,9 @@ bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
                                      diagInfo.first, diagInfo.second,
                                      origDiagInfo.first, origDiagInfo.second,
                                      selector);
+
+      // Protocols weren't checked for selector conflicts in 5.0.
+      diag.warnUntilSwiftVersionIf(!isa<ClassDecl>(tyDecl), 6);
 
       auto objcAttr = getObjCAttrIfFromAccessNote(conflictingDecl);
       swift::softenIfAccessNote(conflictingDecl, objcAttr, diag);

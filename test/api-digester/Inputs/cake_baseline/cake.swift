@@ -97,14 +97,14 @@ public class RemoveSetters {
   }
 }
 
-public protocol RequiementChanges {
+public protocol RequirementChanges {
   func removedFunc()
   associatedtype removedType
   var removedVar: Int {get}
 }
 
 /// This protocol shouldn't be complained because its requirements are all derived.
-public protocol DerivedProtocolRequiementChanges: RequiementChanges {}
+public protocol DerivedProtocolRequirementChanges: RequirementChanges {}
 
 public class SuperClassRemoval: C3 {}
 

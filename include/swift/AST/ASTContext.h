@@ -130,7 +130,6 @@ namespace swift {
   class IndexSubset;
   struct SILAutoDiffDerivativeFunctionKey;
   struct InterfaceSubContextDelegate;
-  class TypeCheckCompletionCallback;
 
   enum class KnownProtocolKind : uint8_t;
 
@@ -144,6 +143,10 @@ namespace rewriting {
 
 namespace syntax {
   class SyntaxArena;
+}
+
+namespace ide {
+  class TypeCheckCompletionCallback;
 }
 
 /// Lists the set of "known" Foundation entities that are used in the
@@ -220,7 +223,7 @@ class ASTContext final {
   ASTContext(const ASTContext&) = delete;
   void operator=(const ASTContext&) = delete;
 
-  ASTContext(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
+  ASTContext(LangOptions &langOpts, TypeCheckerOptions &typecheckOpts,
              SILOptions &silOpts, SearchPathOptions &SearchPathOpts,
              ClangImporterOptions &ClangImporterOpts,
              symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
@@ -235,7 +238,7 @@ public:
 
   void operator delete(void *Data) throw();
 
-  static ASTContext *get(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
+  static ASTContext *get(LangOptions &langOpts, TypeCheckerOptions &typecheckOpts,
                          SILOptions &silOpts, SearchPathOptions &SearchPathOpts,
                          ClangImporterOptions &ClangImporterOpts,
                          symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
@@ -281,7 +284,7 @@ public:
   /// the cancellation might return with any result.
   std::shared_ptr<std::atomic<bool>> CancellationFlag = nullptr;
 
-  TypeCheckCompletionCallback *CompletionCallback = nullptr;
+  ide::TypeCheckCompletionCallback *CompletionCallback = nullptr;
 
   /// The request-evaluator that is used to process various requests.
   Evaluator evaluator;
@@ -366,12 +369,6 @@ private:
   /// The boolean in the value indicates whether or not the entry is keyed by an alias vs real name,
   /// i.e. true if the entry is [key: alias_name, value: (real_name, true)].
   mutable llvm::DenseMap<Identifier, std::pair<Identifier, bool>> ModuleAliasMap;
-
-  /// The maximum arity of `_StringProcessing.Tuple{n}`.
-  static constexpr unsigned StringProcessingTupleDeclMaxArity = 8;
-  /// Cached `_StringProcessing.Tuple{n}` declarations.
-  mutable SmallVector<StructDecl *, StringProcessingTupleDeclMaxArity - 2>
-      StringProcessingTupleDecls;
 
   /// Retrieve the allocator for the given arena.
   llvm::BumpPtrAllocator &
@@ -486,7 +483,7 @@ public:
                               setVector.size());
   }
 
-  /// Retrive the syntax node memory manager for this context.
+  /// Retrieve the syntax node memory manager for this context.
   llvm::IntrusiveRefCntPtr<syntax::SyntaxArena> getSyntaxArena() const;
 
   /// Set a new stats reporter.
@@ -629,14 +626,6 @@ public:
   /// Retrieve _StringProcessing.Regex.init(_regexString: String, version: Int).
   ConcreteDeclRef getRegexInitDecl(Type regexType) const;
 
-  /// Retrieve the max arity that `_StringProcessing.Tuple{arity}` was
-  /// instantiated for.
-  unsigned getStringProcessingTupleDeclMaxArity() const;
-
-  /// Retrieve the `_StringProcessing.Tuple{arity}` declaration for the given
-  /// arity.
-  StructDecl *getStringProcessingTupleDecl(unsigned arity) const;
-
   /// Retrieve the declaration of Swift.<(Int, Int) -> Bool.
   FuncDecl *getLessThanIntDecl() const;
 
@@ -672,12 +661,11 @@ public:
 
   /// Retrieve the declaration of DistributedActorSystem.make().
   ///
-  /// \param actorOrSystem distributed actor or actor system to get the
-  /// remoteCall function for. Since the method we're looking for is an ad-hoc
-  /// requirement, a specific type MUST be passed here as it is not possible
-  /// to obtain the decl from just the `DistributedActorSystem` protocol type.
+  /// \param thunk the function from which we'll be invoking things on the obtained
+  /// actor system; This way we'll always get the right type, taking care of any
+  /// where clauses etc.
   FuncDecl *getMakeInvocationEncoderOnDistributedActorSystem(
-      NominalTypeDecl *actorOrSystem) const;
+      AbstractFunctionDecl *thunk) const;
 
   // Retrieve the declaration of
   // DistributedInvocationEncoder.recordGenericSubstitution(_:).
@@ -688,20 +676,30 @@ public:
   FuncDecl *getRecordGenericSubstitutionOnDistributedInvocationEncoder(
       NominalTypeDecl *nominal) const;
 
-  // Retrieve the declaration of DistributedInvocationEncoder.recordArgument(_:).
+  // Retrieve the declaration of DistributedTargetInvocationEncoder.recordArgument(_:).
   //
   // \param nominal optionally provide a 'NominalTypeDecl' from which the
   // function decl shall be extracted. This is useful to avoid witness calls
   // through the protocol which is looked up when nominal is null.
-  FuncDecl *getRecordArgumentOnDistributedInvocationEncoder(
+  AbstractFunctionDecl *getRecordArgumentOnDistributedInvocationEncoder(
       NominalTypeDecl *nominal) const;
 
-  // Retrieve the declaration of DistributedInvocationEncoder.recordErrorType(_:).
-  FuncDecl *getRecordErrorTypeOnDistributedInvocationEncoder(
+  // Retrieve the declaration of DistributedTargetInvocationEncoder.recordReturnType(_:).
+  AbstractFunctionDecl *getRecordReturnTypeOnDistributedInvocationEncoder(
       NominalTypeDecl *nominal) const;
 
-  // Retrieve the declaration of DistributedInvocationEncoder.recordReturnType(_:).
-  FuncDecl *getRecordReturnTypeOnDistributedInvocationEncoder(
+  // Retrieve the declaration of DistributedTargetInvocationEncoder.recordErrorType(_:).
+  AbstractFunctionDecl *getRecordErrorTypeOnDistributedInvocationEncoder(
+      NominalTypeDecl *nominal) const;
+
+  // Retrieve the declaration of
+  // DistributedTargetInvocationDecoder.getDecodeNextArgumentOnDistributedInvocationDecoder(_:).
+  AbstractFunctionDecl *getDecodeNextArgumentOnDistributedInvocationDecoder(
+      NominalTypeDecl *nominal) const;
+
+  // Retrieve the declaration of
+  // getOnReturnOnDistributedTargetInvocationResultHandler.onReturn(_:).
+  AbstractFunctionDecl *getOnReturnOnDistributedTargetInvocationResultHandler(
       NominalTypeDecl *nominal) const;
 
   // Retrieve the declaration of DistributedInvocationEncoder.doneRecording().
@@ -772,7 +770,7 @@ public:
   /// \p templateArgs must be empty. \p templateParams and \p genericArgs must
   /// be equal in size.
   ///
-  /// \returns nullptr if successful. If an error occors, returns a list of
+  /// \returns nullptr if successful. If an error occurs, returns a list of
   /// types that couldn't be converted.
   std::unique_ptr<TemplateInstantiationError> getClangTemplateArguments(
       const clang::TemplateParameterList *templateParams,
@@ -870,6 +868,10 @@ public:
   /// swift_isUniquelyReferenced functions.
   AvailabilityContext getObjCIsUniquelyReferencedAvailability();
 
+  /// Get the runtime availability of metadata manipulation runtime functions
+  /// for extended existential types.
+  AvailabilityContext getParameterizedExistentialRuntimeAvailability();
+
   /// Get the runtime availability of features introduced in the Swift 5.2
   /// compiler for the target platform.
   AvailabilityContext getSwift52Availability();
@@ -889,6 +891,10 @@ public:
   /// Get the runtime availability of features introduced in the Swift 5.6
   /// compiler for the target platform.
   AvailabilityContext getSwift56Availability();
+
+  /// Get the runtime availability of features introduced in the Swift 5.7
+  /// compiler for the target platform.
+  AvailabilityContext getSwift57Availability();
 
   // Note: Update this function if you add a new getSwiftXYAvailability above.
   /// Get the runtime availability for a particular version of Swift (5.0+).
@@ -989,11 +995,11 @@ public:
   /// one.
   void loadExtensions(NominalTypeDecl *nominal, unsigned previousGeneration);
 
-  /// Load the methods within the given class that produce
+  /// Load the methods within the given type that produce
   /// Objective-C class or instance methods with the given selector.
   ///
-  /// \param classDecl The class in which we are searching for @objc methods.
-  /// The search only considers this class and its extensions; not any
+  /// \param tyDecl The type in which we are searching for @objc methods.
+  /// The search only considers this type and its extensions; not any
   /// superclasses.
   ///
   /// \param selector The selector to search for.
@@ -1011,7 +1017,11 @@ public:
   ///
   /// \param swiftOnly If true, only loads methods from imported Swift modules,
   /// skipping the Clang importer.
-  void loadObjCMethods(ClassDecl *classDecl, ObjCSelector selector,
+  ///
+  /// \note Passing a protocol is supported, but currently a no-op, because
+  /// Objective-C protocols cannot be extended in ways that make the ObjC method
+  /// lookup table relevant.
+  void loadObjCMethods(NominalTypeDecl *tyDecl, ObjCSelector selector,
                        bool isInstanceMethod, unsigned previousGeneration,
                        llvm::TinyPtrVector<AbstractFunctionDecl *> &methods,
                        bool swiftOnly = false);
@@ -1167,7 +1177,7 @@ public:
   /// conformance itself, along with a bit indicating whether this diagnostic
   /// produces an error.
   struct DelayedConformanceDiag {
-    ValueDecl *Requirement;
+    const ValueDecl *Requirement;
     std::function<void()> Callback;
     bool IsError;
   };
@@ -1298,17 +1308,26 @@ public:
   CanGenericSignature getSingleGenericParameterSignature() const;
 
   /// Retrieve a generic signature with a single type parameter conforming
-  /// to the given protocol or composition type, like <T: type>.
-  CanGenericSignature getOpenedArchetypeSignature(Type type);
+  /// to the given protocol or composition type, like <T: P>.
+  ///
+  /// The opened archetype may have a different set of conformances from the
+  /// corresponding existential. The opened archetype conformances are dictated
+  /// by the ABI for generic arguments, while the existential value conformances
+  /// are dictated by their layout (see \c Type::getExistentialLayout()). In
+  /// particular, the opened archetype signature does not have requirements for
+  /// conformances inherited from superclass constraints while existential
+  /// values do.
+  CanGenericSignature getOpenedArchetypeSignature(Type type,
+                                                  GenericSignature parentSig);
 
   GenericSignature getOverrideGenericSignature(const ValueDecl *base,
                                                const ValueDecl *derived);
 
   enum class OverrideGenericSignatureReqCheck {
-    /// Base method's generic requirements are satisifed by derived method
+    /// Base method's generic requirements are satisfied by derived method
     BaseReqSatisfiedByDerived,
 
-    /// Derived method's generic requirements are satisifed by base method
+    /// Derived method's generic requirements are satisfied by base method
     DerivedReqSatisfiedByBase
   };
 
@@ -1351,11 +1370,8 @@ public:
   /// alternative specified via the -entry-point-function-name frontend flag.
   std::string getEntryPointFunctionName() const;
 
-  /// Find the type of SerializationRequirement on the passed nominal.
-  ///
-  /// This type exists as a typealias/associatedtype on all distributed actors,
-  /// actor systems, and related serialization types.
-  Type getDistributedSerializationRequirementType(NominalTypeDecl *);
+  Type getAssociatedTypeOfDistributedSystemOfActor(NominalTypeDecl *actor,
+                                            Identifier member);
 
   /// Find the concrete invocation decoder associated with the given actor.
   NominalTypeDecl *

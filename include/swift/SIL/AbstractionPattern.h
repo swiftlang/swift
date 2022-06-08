@@ -679,7 +679,7 @@ public:
   /// imported as a method.
   ///
   /// For example, if the original function is:
-  ///   void CCRefrigatorSetTemperature(CCRefrigeratorRef fridge,
+  ///   void CCRefrigeratorSetTemperature(CCRefrigeratorRef fridge,
   ///                                   CCRefrigeratorCompartment compartment,
   ///                                   CCTemperature temperature);
   /// then the uncurried type is:
@@ -699,7 +699,7 @@ public:
   /// C function imported as a method.
   ///
   /// For example, if the original function is:
-  ///   void CCRefrigatorSetTemperature(CCRefrigeratorRef fridge,
+  ///   void CCRefrigeratorSetTemperature(CCRefrigeratorRef fridge,
   ///                                   CCRefrigeratorCompartment compartment,
   ///                                   CCTemperature temperature);
   /// then the curried type is:
@@ -840,7 +840,7 @@ private:
   /// type of a C function imported as a method.
   ///
   /// For example, if the original function is:
-  ///   CCRefrigatorSetTemperature(CCRefrigeratorRef, CCTemperature)
+  ///   CCRefrigeratorSetTemperature(CCRefrigeratorRef, CCTemperature)
   /// then the curried type is:
   ///   (CCRefrigerator) -> (CCTemperature) -> ()
   /// and the partially-applied curried type is:
@@ -1336,6 +1336,14 @@ public:
     }
     llvm_unreachable("bad kind");
   }
+
+  /// Given that the value being abstracted is a move only type, return the
+  /// abstraction pattern with the move only bit removed.
+  AbstractionPattern withoutMoveOnly() const;
+
+  /// Given that the value being abstracted is not a move only type, return the
+  /// abstraction pattern with the move only bit added.
+  AbstractionPattern withMoveOnly() const;
 
   /// Given that the value being abstracted is a tuple type, return
   /// the abstraction pattern for its object type.

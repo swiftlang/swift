@@ -111,8 +111,7 @@
               key.name: "-(_:_:)",
               key.usr: "s:15index_operators7StructBV1soiyA2C_ACtFZ",
               key.line: 17,
-              key.column: 19,
-              key.receiver_usr: "s:15index_operators7StructBV"
+              key.column: 19
             }
           ],
           key.effective_access: source.decl.effective_access.internal

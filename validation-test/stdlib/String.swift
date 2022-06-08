@@ -1132,7 +1132,7 @@ StringTests.test("toInt") {
 
   // Make a String from an Int, mangle the String's characters,
   // then print if the new String is or is not still an Int.
-  func testConvertabilityOfStringWithModification(
+  func testConvertibilityOfStringWithModification(
     _ initialValue: Int,
     modification: (_ chars: inout [UTF8.CodeUnit]) -> Void
   ) {
@@ -1142,11 +1142,11 @@ StringTests.test("toInt") {
     expectNil(Int(str))
   }
 
-  testConvertabilityOfStringWithModification(Int.min) {
+  testConvertibilityOfStringWithModification(Int.min) {
     $0[2] += 1; ()  // underflow by lots
   }
 
-  testConvertabilityOfStringWithModification(Int.max) {
+  testConvertibilityOfStringWithModification(Int.max) {
     $0[1] += 1; ()  // overflow by lots
   }
 
@@ -1859,7 +1859,7 @@ struct COWStringTest {
 }
 
 var testCases: [COWStringTest] {
-  return [ COWStringTest(test: "abcdefghijklmnopqrxtuvwxyz", name: "ASCII"),
+  return [ COWStringTest(test: "abcdefghijklmnopqrstuvwxyz", name: "ASCII"),
            COWStringTest(test: "🐮🐄🤠👢🐴", name: "Unicode")
          ]
 }
@@ -2333,6 +2333,17 @@ if #available(SwiftStdlib 5.6, *) {
     let test10 = "\u{003F}\u{094D}\u{0924}" // 2
     expectEqual(2, test10.count)
     expectBidirectionalCount(2, test10)
+
+#if _runtime(_ObjC)
+    let test11Foreign = NSString(string: "\u{930}\u{93e}\u{91c}\u{94d}") // 2
+    let test11 = test11Foreign as String
+    expectEqual(2, test11.count)
+    expectBidirectionalCount(2, test11)
+#endif
+
+    let test12 = "a\u{0915}\u{093C}\u{200D}\u{094D}\u{0924}a" // 3
+    expectEqual(3, test12.count)
+    expectBidirectionalCount(3, test12)
   }
 }
 

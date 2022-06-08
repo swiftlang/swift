@@ -27,6 +27,12 @@ static StringRef getRuntimeLibPath() {
   return sys::path::parent_path(SWIFTLIB_DIR);
 }
 
+static SmallString<128> getSwiftExecutablePath() {
+  SmallString<128> path = sys::path::parent_path(getRuntimeLibPath());
+  sys::path::append(path, "bin", "swift-frontend");
+  return path;
+}
+
 static void *createCancallationToken() {
   static std::atomic<size_t> handle(1000);
   return reinterpret_cast<void *>(
@@ -125,7 +131,8 @@ public:
   }
 
   CursorInfoTest()
-      : Ctx(*new SourceKit::Context(getRuntimeLibPath(),
+      : Ctx(*new SourceKit::Context(getSwiftExecutablePath(),
+                                    getRuntimeLibPath(),
                                     /*diagnosticDocumentationPath*/ "",
                                     SourceKit::createSwiftLangSupport,
                                     /*dispatchOnMain=*/false)) {
@@ -417,7 +424,8 @@ TEST_F(CursorInfoTest, CursorInfoMustWaitDueTokenRace) {
   EXPECT_EQ(strlen("fog"), Info.Length);
 }
 
-TEST_F(CursorInfoTest, CursorInfoCancelsPreviousRequest) {
+// Disabled until we re-enable cancellation (rdar://91251055)
+TEST_F(CursorInfoTest, DISABLED_CursorInfoCancelsPreviousRequest) {
   // TODO: This test case relies on the following snippet being slow to type 
   // check so that the first cursor info request takes longer to execute than it 
   // takes time to schedule the second request. If that is fixed, we need to 
@@ -467,7 +475,8 @@ TEST_F(CursorInfoTest, CursorInfoCancelsPreviousRequest) {
     llvm::report_fatal_error("Did not receive a resonse for the first request");
 }
 
-TEST_F(CursorInfoTest, CursorInfoCancellation) {
+// Disabled until we re-enable cancellation (rdar://91251055)
+TEST_F(CursorInfoTest, DISABLED_CursorInfoCancellation) {
   // TODO: This test case relies on the following snippet being slow to type
   // check so that the first cursor info request takes longer to execute than it
   // takes time to schedule the second request. If that is fixed, we need to

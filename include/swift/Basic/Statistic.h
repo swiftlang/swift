@@ -13,6 +13,7 @@
 #ifndef SWIFT_BASIC_STATISTIC_H
 #define SWIFT_BASIC_STATISTIC_H
 
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Timer.h"

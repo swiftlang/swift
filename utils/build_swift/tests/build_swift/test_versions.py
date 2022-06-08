@@ -7,13 +7,9 @@
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 
-from __future__ import absolute_import, unicode_literals
-
 import unittest
 
 from build_swift.versions import Version
-
-import six
 
 
 class TestVersion(unittest.TestCase):
@@ -59,7 +55,7 @@ class TestVersion(unittest.TestCase):
     # -------------------------------------------------------------------------
 
     def test_parse(self):
-        for string, components in six.iteritems(self.VERSION_COMPONENTS):
+        for string, components in self.VERSION_COMPONENTS.items():
             # Version parses
             version = Version(string)
 
@@ -90,7 +86,7 @@ class TestVersion(unittest.TestCase):
         self.assertVersionLess('a0b', 'a1')
 
     def test_str(self):
-        for string in six.iterkeys(self.VERSION_COMPONENTS):
+        for string in self.VERSION_COMPONENTS.keys():
             version = Version(string)
 
-            self.assertEqual(six.text_type(version), string)
+            self.assertEqual(str(version), string)

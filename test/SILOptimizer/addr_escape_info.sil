@@ -1,0 +1,520 @@
+// RUN: %target-sil-opt %s -dump-addr-escape-info -o /dev/null | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+// rdar92963081
+// UNSUPPORTED: OS=linux-gnu
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+struct Str {
+  @_hasStorage var a: Int
+  @_hasStorage var b: Int
+}
+
+class X {
+  @_hasStorage var s: Str
+}
+
+struct Container {
+  @_hasStorage var x: X
+}
+
+struct XandInt {
+  @_hasStorage var x: X
+  @_hasStorage var i: Int
+}
+
+class XandIntClass {
+  @_hasStorage var x: X
+  @_hasStorage var i: Int
+}
+
+sil @no_arguments : $@convention(thin) () -> ()
+sil @indirect_argument : $@convention(thin) (@in Int) -> ()
+sil @indirect_struct_argument : $@convention(thin) (@in Str) -> ()
+sil @direct_argument : $@convention(thin) (Int) -> ()
+sil @class_argument : $@convention(thin) (@guaranteed X) -> ()
+sil [escapes !%0] @non_escaping_class_argument : $@convention(thin) (@guaranteed X) -> ()
+sil [escapes !%0.**] @inout_class_argument : $@convention(thin) (@inout X) -> ()
+sil @container_argument : $@convention(thin) (@guaranteed Container) -> ()
+sil @take_closure_as_addr : $@convention(thin) (@in @callee_guaranteed () -> ()) -> ()
+sil [escapes !%0.**] @closure_with_inout : $@convention(thin) (@inout Str) -> ()
+sil [escapes %0 => %r, %0.c*.v** => %r.c*.v**] @initX : $@convention(method) (@owned X) -> @owned X
+sil @modifyStr : $@convention(method) (@inout Str) -> ()
+
+// CHECK-LABEL: Address escape information for test_simple:
+// CHECK:       value:  %1 = struct_element_addr %0 : $*Str, #Str.a
+// CHECK-NEXT:    ==>   %7 = apply %6(%5) : $@convention(thin) (@in Int) -> ()
+// CHECK-NEXT:    -     %10 = apply %8(%9) : $@convention(thin) (Int) -> ()
+// CHECK:       value:  %3 = struct_element_addr %0 : $*Str, #Str.b
+// CHECK-NEXT:    -     %7 = apply %6(%5) : $@convention(thin) (@in Int) -> ()
+// CHECK-NEXT:    -     %10 = apply %8(%9) : $@convention(thin) (Int) -> ()
+// CHECK:       pair 0 - 1
+// CHECK-NEXT:    %1 = struct_element_addr %0 : $*Str, #Str.a
+// CHECK-NEXT:    %3 = struct_element_addr %0 : $*Str, #Str.b
+// CHECK-NEXT: no alias
+// CHECK:       End function test_simple
+sil @test_simple : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Str
+  %1 = struct_element_addr %0 : $*Str, #Str.a
+  fix_lifetime %1 : $*Int
+  %3 = struct_element_addr %0 : $*Str, #Str.b
+  fix_lifetime %3 : $*Int
+  %5 = struct_element_addr %0 : $*Str, #Str.a
+  %6 = function_ref @indirect_argument : $@convention(thin) (@in Int) -> ()
+  %7 = apply %6(%5) : $@convention(thin) (@in Int) -> ()
+  %8 = function_ref @direct_argument : $@convention(thin) (Int) -> ()
+  %9 = load %3 : $*Int
+  %10 = apply %8(%9) : $@convention(thin) (Int) -> ()
+  dealloc_stack %0 : $*Str
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// CHECK-LABEL: Address escape information for test_class:
+// CHECK:       value:  %0 = alloc_ref $X
+// CHECK-NEXT:    ==>   %11 = apply %10(%0) : $@convention(thin) (@guaranteed X) -> ()
+// CHECK:       value:  %2 = struct_element_addr %1 : $*Str, #Str.a
+// CHECK-NEXT:    ==>   %11 = apply %10(%0) : $@convention(thin) (@guaranteed X) -> ()
+// CHECK:       value:  %5 = alloc_ref $X
+// CHECK-NEXT:    -     %11 = apply %10(%0) : $@convention(thin) (@guaranteed X) -> ()
+// CHECK:       value:  %7 = struct_element_addr %6 : $*Str, #Str.a
+// CHECK-NEXT:    -     %11 = apply %10(%0) : $@convention(thin) (@guaranteed X) -> ()
+// CHECK:      pair 0 - 1
+// CHECK-NEXT:   %0 = alloc_ref $X
+// CHECK-NEXT:   %2 = struct_element_addr %1 : $*Str, #Str.a
+// CHECK-NEXT: may alias
+// CHECK:      pair 0 - 2
+// CHECK-NEXT:   %0 = alloc_ref $X
+// CHECK-NEXT:   %5 = alloc_ref $X
+// CHECK-NEXT: no alias
+// CHECK:      pair 0 - 3
+// CHECK-NEXT:   %0 = alloc_ref $X
+// CHECK-NEXT:   %7 = struct_element_addr %6 : $*Str, #Str.a
+// CHECK-NEXT: no alias
+// CHECK:      pair 1 - 2
+// CHECK-NEXT:   %2 = struct_element_addr %1 : $*Str, #Str.a
+// CHECK-NEXT:   %5 = alloc_ref $X
+// CHECK-NEXT: no alias
+// CHECK:      pair 1 - 3
+// CHECK-NEXT:   %2 = struct_element_addr %1 : $*Str, #Str.a
+// CHECK-NEXT:   %7 = struct_element_addr %6 : $*Str, #Str.a
+// CHECK-NEXT: no alias
+// CHECK:      pair 2 - 3
+// CHECK-NEXT:   %5 = alloc_ref $X
+// CHECK-NEXT:   %7 = struct_element_addr %6 : $*Str, #Str.a
+// CHECK-NEXT: may alias
+// CHECK:      End function test_class
+sil @test_class : $@convention(thin) () -> X {
+bb0:
+  %0 = alloc_ref $X
+  %1 = ref_element_addr %0 : $X, #X.s
+  %2 = struct_element_addr %1 : $*Str, #Str.a
+  fix_lifetime %0 : $X
+  fix_lifetime %2 : $*Int
+  %5 = alloc_ref $X
+  %6 = ref_element_addr %5 : $X, #X.s
+  %7 = struct_element_addr %6 : $*Str, #Str.a
+  fix_lifetime %5 : $X
+  fix_lifetime %7 : $*Int
+  %10 = function_ref @class_argument : $@convention(thin) (@guaranteed X) -> ()
+  %11 = apply %10(%0) : $@convention(thin) (@guaranteed X) -> ()
+  return %5 : $X
+}
+
+// CHECK-LABEL: Address escape information for test_struct_with_class:
+// CHECK:       value:  %1 = struct $Container (%0 : $X)
+// CHECK-NEXT:    ==>   %7 = apply %6(%1) : $@convention(thin) (@guaranteed Container) -> ()
+// CHECK:       value:  %4 = struct $Container (%3 : $X)
+// CHECK-NEXT:    -     %7 = apply %6(%1) : $@convention(thin) (@guaranteed Container) -> ()
+// CHECK:       End function test_struct_with_class
+sil @test_struct_with_class : $@convention(thin) () -> Container {
+bb0:
+  %0 = alloc_ref $X
+  %1 = struct $Container (%0 : $X)
+  fix_lifetime %1 : $Container
+  %3 = alloc_ref $X
+  %4 = struct $Container (%3 : $X)
+  fix_lifetime %4 : $Container
+  %6 = function_ref @container_argument : $@convention(thin) (@guaranteed Container) -> ()
+  %10 = apply %6(%1) : $@convention(thin) (@guaranteed Container) -> ()
+  return %4 : $Container
+}
+
+// CHECK-LABEL: Address escape information for ignore_indirect_arg_of_other_call:
+// CHECK:       value:  %1 = ref_element_addr %0 : $X, #X.s
+// CHECK-NEXT:    ==>   %5 = apply %4(%3) : $@convention(thin) (@in Int) -> ()
+// CHECK-NEXT:    -     %7 = apply %6() : $@convention(thin) () -> ()
+// CHECK:       End function ignore_indirect_arg_of_other_call
+sil @ignore_indirect_arg_of_other_call : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $X
+  %1 = ref_element_addr %0 : $X, #X.s
+  fix_lifetime %1 : $*Str
+  %3 = struct_element_addr %1 : $*Str, #Str.a
+  %4 = function_ref @indirect_argument : $@convention(thin) (@in Int) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@in Int) -> ()
+  %6 = function_ref @no_arguments : $@convention(thin) () -> ()
+  %7 = apply %6() : $@convention(thin) () -> ()
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL: Address escape information for dont_ignore_direct_arg_of_other_call:
+// CHECK:       value:  %1 = ref_element_addr %0 : $X, #X.s
+// CHECK-NEXT:    ==>   %4 = apply %3(%0) : $@convention(thin) (@guaranteed X) -> ()
+// CHECK-NEXT:    ==>   %6 = apply %5() : $@convention(thin) () -> ()
+// CHECK:       End function dont_ignore_direct_arg_of_other_call
+sil @dont_ignore_direct_arg_of_other_call : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $X
+  %1 = ref_element_addr %0 : $X, #X.s
+  fix_lifetime %1 : $*Str
+  %3 = function_ref @class_argument : $@convention(thin) (@guaranteed X) -> ()
+  %4 = apply %3(%0) : $@convention(thin) (@guaranteed X) -> ()
+  %5 = function_ref @no_arguments : $@convention(thin) () -> ()
+  %6 = apply %5() : $@convention(thin) () -> ()
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: Address escape information for ignore_non_escaping_arg_of_other_call:
+// CHECK:       value:  %1 = ref_element_addr %0 : $X, #X.s
+// CHECK-NEXT:    ==>   %4 = apply %3(%0) : $@convention(thin) (@guaranteed X) -> ()
+// CHECK-NEXT:    -     %6 = apply %5() : $@convention(thin) () -> ()
+// CHECK:       End function ignore_non_escaping_arg_of_other_call
+sil @ignore_non_escaping_arg_of_other_call : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $X
+  %1 = ref_element_addr %0 : $X, #X.s
+  fix_lifetime %1 : $*Str
+  %3 = function_ref @non_escaping_class_argument : $@convention(thin) (@guaranteed X) -> ()
+  %4 = apply %3(%0) : $@convention(thin) (@guaranteed X) -> ()
+  %5 = function_ref @no_arguments : $@convention(thin) () -> ()
+  %6 = apply %5() : $@convention(thin) () -> ()
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: Address escape information for dont_ignore_non_escaping_arg_of_other_call_if_followstores:
+// CHECK:       value:  %7 = ref_element_addr %6 : $X, #X.s
+// CHECK-NEXT:    ==>   %5 = apply %4(%1) : $@convention(thin) (@inout X) -> ()
+// CHECK-NEXT:    ==>   %10 = apply %9() : $@convention(thin) () -> ()
+// CHECK:       End function dont_ignore_non_escaping_arg_of_other_call_if_followstores
+sil @dont_ignore_non_escaping_arg_of_other_call_if_followstores : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $X
+  %1 = alloc_stack $X
+  store %0 to %1 : $*X
+  %3 = alloc_ref $X
+  %4 = function_ref @inout_class_argument : $@convention(thin) (@inout X) -> ()
+  %5 = apply %4(%1) : $@convention(thin) (@inout X) -> ()
+  %6 = load %1 : $*X
+  %7 = ref_element_addr %6 : $X, #X.s
+  fix_lifetime %7 : $*Str
+  %9 = function_ref @no_arguments : $@convention(thin) () -> ()
+  %10 = apply %9() : $@convention(thin) () -> ()
+  dealloc_stack %1 : $*X
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// CHECK-LABEL: Address escape information for ignore_copy_addr_and_release:
+// CHECK:       value:  %1 = ref_element_addr %0 : $X, #X.s
+// CHECK-NEXT:    -     %6 = apply %5(%3) : $@convention(thin) (@in Str) -> ()
+// CHECK:       End function ignore_copy_addr_and_release
+sil @ignore_copy_addr_and_release : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $X
+  %1 = ref_element_addr %0 : $X, #X.s
+  fix_lifetime %1 : $*Str
+  %3 = alloc_stack $Str
+  copy_addr %1 to [initialization] %3 : $*Str
+  %5 = function_ref @indirect_struct_argument : $@convention(thin) (@in Str) -> ()
+  %6 = apply %5(%3) : $@convention(thin) (@in Str) -> ()
+  strong_release %0 : $X
+  dealloc_stack %3 : $*Str
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// CHECK-LABEL: Address escape information for non_aliased_addr_arg:
+// CHECK:       value:%0 = argument of bb0 : $*Int
+// CHECK-NEXT:    -     %3 = apply %2() : $@convention(thin) () -> ()
+// CHECK:       End function non_aliased_addr_arg
+sil @non_aliased_addr_arg : $@convention(thin) (@inout Int) -> () {
+bb0(%0 : $*Int):
+  fix_lifetime %0 : $*Int
+  %2 = function_ref @no_arguments : $@convention(thin) () -> ()
+  %3 = apply %2() : $@convention(thin) () -> ()
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// CHECK-LABEL: Address escape information for aliased_addr_arg:
+// CHECK:       value:%0 = argument of bb0 : $*Int
+// CHECK-NEXT:    ==>   %3 = apply %2() : $@convention(thin) () -> ()
+// CHECK:       End function aliased_addr_arg
+sil @aliased_addr_arg : $@convention(thin) (@inout_aliasable Int) -> () {
+bb0(%0 : $*Int):
+  fix_lifetime %0 : $*Int
+  %2 = function_ref @no_arguments : $@convention(thin) () -> ()
+  %3 = apply %2() : $@convention(thin) () -> ()
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// CHECK-LABEL: Address escape information for adddr_arg_with_aliased_content:
+// CHECK:       value:  %2 = ref_element_addr %1 : $X, #X.s
+// CHECK-NEXT:    ==>   %5 = apply %4() : $@convention(thin) () -> ()
+// CHECK:       End function adddr_arg_with_aliased_content
+sil @adddr_arg_with_aliased_content : $@convention(thin) (@inout X) -> () {
+bb0(%0 : $*X):
+  %1 = load %0 : $*X
+  %2 = ref_element_addr %1 : $X, #X.s
+  fix_lifetime %2 : $*Str
+  %4 = function_ref @no_arguments : $@convention(thin) () -> ()
+  %5 = apply %4() : $@convention(thin) () -> ()
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: Address escape information for pointer_arg:
+// CHECK:       value:  %1 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*Str
+// CHECK-NEXT:    ==>   %4 = apply %3() : $@convention(thin) () -> ()
+// CHECK:       End function pointer_arg
+sil @pointer_arg : $@convention(thin) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*Str
+  fix_lifetime %1 : $*Str
+  %3 = function_ref @no_arguments : $@convention(thin) () -> ()
+  %4 = apply %3() : $@convention(thin) () -> ()
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK-LABEL: Address escape information for follow_stores_to_arg:
+// CHECK:       value:  %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Str
+// CHECK-NEXT:    ==>   %5 = apply %4() : $@convention(thin) () -> ()
+// CHECK:       End function follow_stores_to_arg
+sil @follow_stores_to_arg : $@convention(thin) (@inout Builtin.RawPointer) -> () {
+bb0(%0 : $*Builtin.RawPointer):
+  %1 = load %0 : $*Builtin.RawPointer
+  %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Str
+  fix_lifetime %2 : $*Str
+  %4 = function_ref @no_arguments : $@convention(thin) () -> ()
+  %5 = apply %4() : $@convention(thin) () -> ()
+  %6 = tuple ()
+  return %6 : $()
+}
+
+
+// CHECK-LABEL: Address escape information for partial_apply:
+// CHECK:       value:  %0 = alloc_stack $Str
+// CHECK-NEXT:    -     %5 = apply %4() : $@convention(thin) () -> ()
+// CHECK:       End function partial_apply
+sil @partial_apply : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Str
+  fix_lifetime %0 : $*Str
+  %2 = function_ref @closure_with_inout : $@convention(thin) (@inout Str) -> ()
+  %3 = partial_apply [callee_guaranteed] [on_stack] %2(%0) : $@convention(thin) (@inout Str) -> ()
+  %8 = function_ref @no_arguments : $@convention(thin) () -> ()
+  %9 = apply %8() : $@convention(thin) () -> ()
+  dealloc_stack %3 : $@callee_guaranteed @noescape () -> ()
+  dealloc_stack %0 : $*Str
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// CHECK-LABEL: Address escape information for partial_apply_with_inout:
+// CHECK:       value:  %0 = alloc_stack $Str
+// CHECK-NEXT:    ==>   %7 = apply %6(%4) : $@convention(thin) (@in @callee_guaranteed () -> ()) -> ()
+// CHECK-NEXT:    -     %9 = apply %8() : $@convention(thin) () -> ()
+// CHECK:       End function partial_apply_with_inout
+sil @partial_apply_with_inout : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Str
+  fix_lifetime %0 : $*Str
+  %2 = function_ref @closure_with_inout : $@convention(thin) (@inout Str) -> ()
+  %3 = partial_apply [callee_guaranteed] %2(%0) : $@convention(thin) (@inout Str) -> ()
+  %4 = alloc_stack $@callee_guaranteed () -> ()
+  store %3 to %4 : $*@callee_guaranteed () -> ()
+  %6 = function_ref @take_closure_as_addr : $@convention(thin) (@in @callee_guaranteed () -> ()) -> ()
+  %7 = apply %6(%4) : $@convention(thin) (@in @callee_guaranteed () -> ()) -> ()
+  %8 = function_ref @no_arguments : $@convention(thin) () -> ()
+  %9 = apply %8() : $@convention(thin) () -> ()
+  dealloc_stack %4 : $*@callee_guaranteed () -> ()
+  dealloc_stack %0 : $*Str
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// CHECK-LABEL: Address escape information for non_escaping_trivial_member:
+// CHECK:       value:  %2 = struct $XandInt (%1 : $X, %0 : $Int)
+// CHECK-NEXT:    -     %8 = apply %7(%6) : $@convention(thin) (@in Int) -> ()
+// CHECK:       End function non_escaping_trivial_member
+sil @non_escaping_trivial_member : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = alloc_ref $X
+  %2 = struct $XandInt(%1 : $X, %0 : $Int)
+  %3 = alloc_stack $XandInt
+  store %2 to %3 : $*XandInt
+  fix_lifetime %2 : $XandInt
+  %6 = struct_element_addr %3 : $*XandInt, #XandInt.i
+  %7 = function_ref @indirect_argument : $@convention(thin) (@in Int) -> ()
+  %8 = apply %7(%6) : $@convention(thin) (@in Int) -> ()
+  dealloc_stack %3 : $*XandInt
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// CHECK-LABEL: Address escape information for escaping_nontrivial_member:
+// CHECK:       value:  %2 = struct $XandInt (%1 : $X, %0 : $Int)
+// CHECK-NEXT:    ==>   %8 = apply %7(%6) : $@convention(thin) (@inout X) -> ()
+// CHECK:       End function escaping_nontrivial_member
+sil @escaping_nontrivial_member : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = alloc_ref $X
+  %2 = struct $XandInt(%1 : $X, %0 : $Int)
+  %3 = alloc_stack $XandInt
+  store %2 to %3 : $*XandInt
+  fix_lifetime %2 : $XandInt
+  %6 = struct_element_addr %3 : $*XandInt, #XandInt.x
+  %7 = function_ref @inout_class_argument : $@convention(thin) (@inout X) -> ()
+  %8 = apply %7(%6) : $@convention(thin) (@inout X) -> ()
+  dealloc_stack %3 : $*XandInt
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// CHECK-LABEL: Address escape information for escaping_address_in_nontrivial_member:
+// CHECK:       value:  %2 = struct $XandInt (%1 : $X, %0 : $Int)
+// CHECK-NEXT:    ==>   %11 = apply %10(%9) : $@convention(thin) (@in Int) -> ()
+// CHECK:       End function escaping_address_in_nontrivial_member
+sil @escaping_address_in_nontrivial_member : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = alloc_ref $X
+  %2 = struct $XandInt(%1 : $X, %0 : $Int)
+  %3 = alloc_stack $XandInt
+  store %2 to %3 : $*XandInt
+  fix_lifetime %2 : $XandInt
+  %6 = struct_element_addr %3 : $*XandInt, #XandInt.x
+  %7 = load %6 : $*X
+  %8 = ref_element_addr %7 : $X, #X.s
+  %9 = struct_element_addr %8 : $*Str, #Str.a
+  %10 = function_ref @indirect_argument : $@convention(thin) (@in Int) -> ()
+  %11 = apply %10(%9) : $@convention(thin) (@in Int) -> ()
+  dealloc_stack %3 : $*XandInt
+  %13 = tuple ()
+  return %13 : $()
+}
+
+// CHECK-LABEL: Address escape information for bidirectly_forward_property_addr:
+// CHECK:       value:  %3 = ref_element_addr %2 : $X, #X.s
+// CHECK-NEXT:    ==>   %2 = apply %1(%0) : $@convention(method) (@owned X) -> @owned X
+// CHECK-NEXT:    ==>   %6 = apply %5(%3) : $@convention(method) (@inout Str) -> ()
+// CHECK:      End function bidirectly_forward_property_addr
+sil @bidirectly_forward_property_addr : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $X
+  %1 = function_ref @initX : $@convention(method) (@owned X) -> @owned X
+  %2 = apply %1(%0) : $@convention(method) (@owned X) -> @owned X
+  %3 = ref_element_addr %2 : $X, #X.s
+  fix_lifetime %3 : $*Str
+  %5 = function_ref @modifyStr : $@convention(method) (@inout Str) -> ()
+  %6 = apply %5(%3) : $@convention(method) (@inout Str) -> ()
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: Address escape information for test_addr_alias1:
+// CHECK:      pair 0 - 1
+// CHECK-NEXT:   %2 = ref_element_addr %0 : $XandIntClass, #XandIntClass.x
+// CHECK-NEXT:   %4 = ref_element_addr %0 : $XandIntClass, #XandIntClass.i
+// CHECK-NEXT: no alias
+// CHECK:      pair 0 - 2
+// CHECK-NEXT:   %2 = ref_element_addr %0 : $XandIntClass, #XandIntClass.x
+// CHECK-NEXT:   %5 = ref_element_addr %1 : $X, #X.s
+// CHECK-NEXT: no alias
+// CHECK:      pair 0 - 3
+// CHECK-NEXT:   %2 = ref_element_addr %0 : $XandIntClass, #XandIntClass.x
+// CHECK-NEXT:   %6 = struct_element_addr %5 : $*Str, #Str.a
+// CHECK-NEXT: no alias
+// CHECK:      pair 1 - 2
+// CHECK-NEXT:   %4 = ref_element_addr %0 : $XandIntClass, #XandIntClass.i
+// CHECK-NEXT:   %5 = ref_element_addr %1 : $X, #X.s
+// CHECK-NEXT: no alias
+// CHECK:      pair 1 - 3
+// CHECK-NEXT:   %4 = ref_element_addr %0 : $XandIntClass, #XandIntClass.i
+// CHECK-NEXT:   %6 = struct_element_addr %5 : $*Str, #Str.a
+// CHECK-NEXT: no alias
+// CHECK:      pair 2 - 3
+// CHECK-NEXT:   %5 = ref_element_addr %1 : $X, #X.s
+// CHECK-NEXT:   %6 = struct_element_addr %5 : $*Str, #Str.a
+// CHECK-NEXT: may alias
+// CHECK:      End function test_addr_alias1
+sil @test_addr_alias1 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $XandIntClass
+  %1 = alloc_ref $X
+  %2 = ref_element_addr %0 : $XandIntClass, #XandIntClass.x
+  store %1 to %2 : $*X
+  %4 = ref_element_addr %0 : $XandIntClass, #XandIntClass.i
+  %5 = ref_element_addr %1 : $X, #X.s
+  %6 = struct_element_addr %5 : $*Str, #Str.a
+  fix_lifetime %2 : $*X
+  fix_lifetime %4 : $*Int
+  fix_lifetime %5 : $*Str
+  fix_lifetime %6 : $*Int
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// CHECK-LABEL: Address escape information for test_addr_alias2:
+// CHECK:      pair 0 - 1
+// CHECK-NEXT:   %1 = ref_element_addr %0 : $X, #X.s
+// CHECK-NEXT:   %2 = struct_element_addr %1 : $*Str, #Str.a
+// CHECK-NEXT: may alias
+// CHECK:      pair 0 - 2
+// CHECK-NEXT:   %1 = ref_element_addr %0 : $X, #X.s
+// CHECK-NEXT:   %3 = struct_element_addr %1 : $*Str, #Str.b
+// CHECK-NEXT: may alias
+// CHECK:      pair 0 - 3
+// CHECK-NEXT:   %1 = ref_element_addr %0 : $X, #X.s
+// CHECK-NEXT:   %5 = struct_element_addr %4 : $*Str, #Str.a
+// CHECK-NEXT: may alias
+// CHECK:      pair 1 - 2
+// CHECK-NEXT:   %2 = struct_element_addr %1 : $*Str, #Str.a
+// CHECK-NEXT:   %3 = struct_element_addr %1 : $*Str, #Str.b
+// CHECK-NEXT: no alias
+// CHECK:      pair 1 - 3
+// CHECK-NEXT:   %2 = struct_element_addr %1 : $*Str, #Str.a
+// CHECK-NEXT:   %5 = struct_element_addr %4 : $*Str, #Str.a
+// CHECK-NEXT: may alias
+// CHECK:      pair 2 - 3
+// CHECK-NEXT:   %3 = struct_element_addr %1 : $*Str, #Str.b
+// CHECK-NEXT:   %5 = struct_element_addr %4 : $*Str, #Str.a
+// CHECK-NEXT: no alias
+// CHECK:      End function test_addr_alias2
+sil @test_addr_alias2 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $X
+  %1 = ref_element_addr %0 : $X, #X.s
+  %2 = struct_element_addr %1 : $*Str, #Str.a
+  %3 = struct_element_addr %1 : $*Str, #Str.b
+  %4 = ref_element_addr %0 : $X, #X.s
+  %5 = struct_element_addr %4 : $*Str, #Str.a
+  fix_lifetime %1 : $*Str
+  fix_lifetime %2 : $*Int
+  fix_lifetime %3 : $*Int
+  fix_lifetime %5 : $*Int
+  %11 = tuple ()
+  return %11 : $()
+}

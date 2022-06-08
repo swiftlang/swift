@@ -99,6 +99,9 @@ public:
   /// Emit index data for imported serialized swift system modules.
   bool IndexSystemModules = false;
 
+  /// Avoid emitting index data for imported clang modules (pcms).
+  bool IndexIgnoreClangModules = false;
+
   /// If indexing system modules, don't index the stdlib.
   bool IndexIgnoreStdlib = false;
 
@@ -378,6 +381,10 @@ public:
   /// '.../lib/swift', otherwise '.../lib/swift_static'.
   bool UseSharedResourceFolder = true;
 
+  /// Indicates whether to expose all public declarations in the generated clang
+  /// header.
+  bool ExposePublicDeclsInClangHeader = false;
+
   /// \return true if the given action only parses without doing other compilation steps.
   static bool shouldActionOnlyParse(ActionType);
 
@@ -440,12 +447,17 @@ public:
   bool IncludeSPISymbolsInSymbolGraph = false;
 
   /// Whether to reuse a frontend (i.e. compiler instance) for multiple
-  /// compiletions. This prevents ASTContext being freed.
-  bool ReuseFrontendForMutipleCompilations = false;
+  /// compilations. This prevents ASTContext being freed.
+  bool ReuseFrontendForMultipleCompilations = false;
 
   /// This is used to obfuscate the serialized search paths so we don't have
   /// to encode the actual paths into the .swiftmodule file.
   PathObfuscator serializedPathObfuscator;
+
+  /// Avoid printing actual module content into the ABI descriptor file.
+  /// This should only be used as a workaround when emitting ABI descriptor files
+  /// crashes the compiler.
+  bool emptyABIDescriptor = false;
 
 private:
   static bool canActionEmitDependencies(ActionType);

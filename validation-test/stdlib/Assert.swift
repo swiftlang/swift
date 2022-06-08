@@ -174,10 +174,32 @@ Assert.test("preconditionFailure")
   preconditionFailure("this should fail")
 }
 
+Assert.test("_precondition")
+  .xfail(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "preconditions are disabled in Unchecked mode"))
+  .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
+  .code {
+  var x = 2
+  _precondition(x * 21 == 42, "should not fail")
+  expectCrashLater()
+  _precondition(x == 42, "this should fail")
+}
+
+Assert.test("_preconditionFailure")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "optimizer assumes that the code path is unreachable"))
+  .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
+  .code {
+  expectCrashLater()
+  _preconditionFailure("this should fail")
+}
+
 Assert.test("_debugPrecondition")
   .xfail(.custom(
-    { !_isDebugAssertConfiguration() },
-    reason: "debug preconditions are disabled in Release and Unchecked mode"))
+    { !_isStdlibDebugChecksEnabled() },
+    reason: "debug preconditions are disabled"))
   .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
   .code {
   var x = 2
@@ -188,9 +210,9 @@ Assert.test("_debugPrecondition")
 
 Assert.test("_debugPreconditionFailure")
   .skip(.custom(
-    { !_isDebugAssertConfiguration() },
+    { !_isStdlibDebugChecksEnabled() },
     reason: "optimizer assumes that the code path is unreachable"))
-  .crashOutputMatches("this should fail")
+  .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
   .code {
   expectCrashLater()
   _debugPreconditionFailure("this should fail")

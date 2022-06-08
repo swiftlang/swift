@@ -51,6 +51,18 @@ void DerivedConformance::addMembersToConformanceContext(
     IDC->addMember(child);
 }
 
+void DerivedConformance::addMemberToConformanceContext(
+    Decl *member, Decl *hint) {
+  auto IDC = cast<IterableDeclContext>(ConformanceDecl);
+  IDC->addMember(member, hint, /*insertAtHead=*/false);
+}
+
+void DerivedConformance::addMemberToConformanceContext(
+    Decl *member, bool insertAtHead) {
+  auto IDC = cast<IterableDeclContext>(ConformanceDecl);
+  IDC->addMember(member, /*hint=*/nullptr, insertAtHead);
+}
+
 Type DerivedConformance::getProtocolType() const {
   return Protocol->getDeclaredInterfaceType();
 }
@@ -77,8 +89,13 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
 
   if (*derivableKind == KnownDerivableProtocolKind::Actor)
     return canDeriveActor(DC, Nominal);
+
+  if (*derivableKind == KnownDerivableProtocolKind::Identifiable)
+    return canDeriveIdentifiable(Nominal, DC);
   if (*derivableKind == KnownDerivableProtocolKind::DistributedActor)
     return canDeriveDistributedActor(Nominal, DC);
+  if (*derivableKind == KnownDerivableProtocolKind::DistributedActorSystem)
+    return canDeriveDistributedActorSystem(Nominal, DC);
 
   if (*derivableKind == KnownDerivableProtocolKind::AdditiveArithmetic)
     return canDeriveAdditiveArithmetic(Nominal, DC);
@@ -196,6 +213,10 @@ void DerivedConformance::tryDiagnoseFailedDerivation(DeclContext *DC,
 
   if (*knownProtocol == KnownProtocolKind::DistributedActor) {
     tryDiagnoseFailedDistributedActorDerivation(DC, nominal);
+  }
+
+  if (*knownProtocol == KnownProtocolKind::DistributedActorSystem) {
+    tryDiagnoseFailedDistributedActorSystemDerivation(DC, nominal);
   }
 }
 
@@ -374,6 +395,11 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
       }
     }
 
+    // DistributedActor.actorSystem
+    if (name.isCompoundName() &&
+        name.getBaseName() == ctx.Id_invokeHandlerOnReturn)
+      return getRequirement(KnownProtocolKind::DistributedActorSystem);
+
     return nullptr;
   }
 
@@ -491,23 +517,33 @@ DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
     property->getInterfaceType(), parentDC);
   getterDecl->setImplicit();
   getterDecl->setIsTransparent(false);
-
   getterDecl->copyFormalAccessFrom(property);
 
 
   return getterDecl;
 }
 
+static VarDecl::Introducer
+mapIntroducer(DerivedConformance::SynthesizedIntroducer intro) {
+  switch (intro) {
+  case DerivedConformance::SynthesizedIntroducer::Let:
+    return VarDecl::Introducer::Let;
+  case DerivedConformance::SynthesizedIntroducer::Var:
+    return VarDecl::Introducer::Var;
+  }
+  llvm_unreachable("Invalid synthesized introducer!");
+}
+
 std::pair<VarDecl *, PatternBindingDecl *>
-DerivedConformance::declareDerivedProperty(Identifier name,
+DerivedConformance::declareDerivedProperty(SynthesizedIntroducer intro,
+                                           Identifier name,
                                            Type propertyInterfaceType,
                                            Type propertyContextType,
                                            bool isStatic, bool isFinal) {
   auto parentDC = getConformanceContext();
 
-  VarDecl *propDecl = new (Context)
-      VarDecl(/*IsStatic*/ isStatic, VarDecl::Introducer::Var,
-              SourceLoc(), name, parentDC);
+  VarDecl *propDecl = new (Context) VarDecl(
+      /*IsStatic*/ isStatic, mapIntroducer(intro), SourceLoc(), name, parentDC);
   propDecl->setImplicit();
   propDecl->setSynthesized();
   propDecl->copyFormalAccessFrom(Nominal, /*sourceIsParentContext*/ true);
@@ -864,4 +900,19 @@ VarDecl *DerivedConformance::indexedVarDecl(char prefixChar, int index, Type typ
                                  varContext);
   varDecl->setInterfaceType(type);
   return varDecl;
+}
+
+bool swift::memberwiseAccessorsRequireActorIsolation(NominalTypeDecl *nominal) {
+  if (!getActorIsolation(nominal).isActorIsolated())
+    return false;
+
+  for (auto property : nominal->getStoredProperties()) {
+    if (!property->isUserAccessible())
+      continue;
+
+    if (!property->isLet())
+      return true;
+  }
+
+  return false;
 }

@@ -699,7 +699,7 @@ BUILTIN_MISC_OPERATION(IntToFPWithOverflow, "itofp_with_overflow", "n", Special)
 /// zeroInitializer has type <T> () -> T
 BUILTIN_MISC_OPERATION(ZeroInitializer, "zeroInitializer", "n", Special)
 
-/// once has type (Builtin.RawPointer, () -> ())
+/// once has type (Builtin.RawPointer, (Builtin.RawPointer) -> ())
 BUILTIN_MISC_OPERATION(Once, "once", "", Special)
 /// onceWithContext has type (Builtin.RawPointer, (Builtin.RawPointer) -> (), Builtin.RawPointer)
 BUILTIN_MISC_OPERATION(OnceWithContext, "onceWithContext", "", Special)

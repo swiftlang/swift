@@ -117,6 +117,23 @@ func opt_to_class(_ obj: AnyObject) {
   // CHECK:   return [[RESULT]] : $()
 }
 
+// CHECK-LABEL: sil hidden [ossa] @$s14dynamic_lookup20opt_to_class_unboundyyF : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK:   metatype $@thin AnyObject.Protocol
+// CHECK:   function_ref @$[[THUNK_NAME:[_a-zA-Z0-9]+]]
+// CHECK: } // end sil function '$s14dynamic_lookup20opt_to_class_unboundyyF'
+//
+// CHECK: sil private [ossa] @$[[THUNK_NAME]] : $@convention(thin) (@guaranteed AnyObject) -> @owned Optional<@callee_guaranteed () -> ()> {
+// CHECK: bb0(%0 : @guaranteed $AnyObject):
+// CHECK:   [[OPENED:%[0-9]+]] = open_existential_ref %0 : $AnyObject to $[[OPENED_TY:@opened\("[-A-F0-9]+"\) AnyObject]]
+// CHECK:   [[OPENED_COPY:%[0-9]+]] = copy_value [[OPENED]]
+// CHECK:   alloc_stack $Optional<@callee_guaranteed () -> ()>
+// CHECK:   dynamic_method_br [[OPENED_COPY]] : $[[OPENED_TY]], #X.f!foreign, bb1, bb2
+// CHECK: } // end sil function '$[[THUNK_NAME]]'
+func opt_to_class_unbound() {
+  let f = AnyObject.f
+}
+
 // CHECK-LABEL: sil hidden [ossa] @$s14dynamic_lookup20forced_without_outer{{[_0-9a-zA-Z]*}}F
 func forced_without_outer(_ obj: AnyObject) {
   // CHECK: dynamic_method_br

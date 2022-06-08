@@ -189,6 +189,12 @@ struct PointerAuthOptions : clang::PointerAuthOptions {
 
   /// The swift async context entry in the extended frame info.
   PointerAuthSchema AsyncContextExtendedFrameEntry;
+
+  /// Extended existential type shapes in flight.
+  PointerAuthSchema ExtendedExistentialTypeShape;
+
+  /// Non-unique extended existential type shapes in flight.
+  PointerAuthSchema NonUniqueExtendedExistentialTypeShape;
 };
 
 enum class JITDebugArtifact : unsigned {
@@ -247,6 +253,11 @@ public:
 
   /// Path prefixes that should be rewritten in coverage info.
   PathRemapper CoveragePrefixMap;
+
+  /// Path prefixes that should be rewritten in info besides debug and coverage
+  /// (use DebugPrefixMap and CoveragePrefixMap for those) - currently just
+  /// indexing info.
+  PathRemapper FilePrefixMap;
 
   /// What level of debug info to generate.
   IRGenDebugInfoLevel DebugInfoLevel : 2;
@@ -320,6 +331,11 @@ public:
   unsigned LazyInitializeProtocolConformances : 1;
   unsigned IndirectAsyncFunctionPointer : 1;
 
+  /// Use absolute function references instead of relative ones.
+  /// Mainly used on WebAssembly, that doesn't support relative references
+  /// to code from data.
+  unsigned CompactAbsoluteFunctionPointer : 1;
+
   /// Normally if the -read-legacy-type-info flag is not specified, we look for
   /// a file named "legacy-<arch>.yaml" in SearchPathOpts.RuntimeLibraryPath.
   /// Passing this flag completely disables this behavior.
@@ -377,8 +393,11 @@ public:
 
   unsigned InternalizeAtLink : 1;
 
+  /// Internalize symbols (static library) - do not export any public symbols.
+  unsigned InternalizeSymbols : 1;
+
   /// Whether to avoid emitting zerofill globals as preallocated type metadata
-  /// and prototol conformance caches.
+  /// and protocol conformance caches.
   unsigned NoPreallocatedInstantiationCaches : 1;
 
   /// The number of threads for multi-threaded code generation.
@@ -413,6 +432,10 @@ public:
 
   JITDebugArtifact DumpJIT = JITDebugArtifact::None;
 
+  /// If not an empty string, trap intrinsics are lowered to calls to this
+  /// function instead of to trap instructions.
+  std::string TrapFuncName = "";
+
   IRGenOptions()
       : DWARFVersion(2),
         OutputKind(IRGenOutputKind::LLVMAssemblyAfterOptimization),
@@ -434,20 +457,27 @@ public:
         EnableReflectionNames(true), EnableAnonymousContextMangledNames(false),
         ForcePublicLinkage(false), LazyInitializeClassMetadata(false),
         LazyInitializeProtocolConformances(false),
-        IndirectAsyncFunctionPointer(false), DisableLegacyTypeInfo(false),
+        IndirectAsyncFunctionPointer(false),
+        CompactAbsoluteFunctionPointer(false), DisableLegacyTypeInfo(false),
         PrespecializeGenericMetadata(false), UseIncrementalLLVMCodeGen(true),
         UseTypeLayoutValueHandling(true), ForceStructTypeLayouts(false),
         GenerateProfile(false), EnableDynamicReplacementChaining(false),
-        DisableRoundTripDebugTypes(false), DisableDebuggerShadowCopies(false),
+        DisableDebuggerShadowCopies(false),
         DisableConcreteTypeMetadataMangledNameAccessors(false),
         DisableStandardSubstitutionsInReflectionMangling(false),
         EnableGlobalISel(false), VirtualFunctionElimination(false),
         WitnessMethodElimination(false), ConditionalRuntimeRecords(false),
-        InternalizeAtLink(false),
+        InternalizeAtLink(false), InternalizeSymbols(false),
         NoPreallocatedInstantiationCaches(false),
         CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
-        TypeInfoFilter(TypeInfoDumpFilter::All) {}
+        TypeInfoFilter(TypeInfoDumpFilter::All) {
+#ifndef NDEBUG
+    DisableRoundTripDebugTypes = false;
+#else
+    DisableRoundTripDebugTypes = true;
+#endif
+  }
 
   /// Appends to \p os an arbitrary string representing all options which
   /// influence the llvm compilation but are not reflected in the llvm module

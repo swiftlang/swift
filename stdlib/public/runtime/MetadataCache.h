@@ -18,6 +18,7 @@
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/AtomicWaitQueue.h"
+#include "../SwiftShims/Visibility.h"
 #include <condition_variable>
 #include <thread>
 
@@ -39,7 +40,8 @@ public:
 
   void Reset() {}
 
-  LLVM_ATTRIBUTE_RETURNS_NONNULL void *Allocate(size_t size, size_t alignment);
+  SWIFT_RETURNS_NONNULL SWIFT_NODISCARD
+  void *Allocate(size_t size, size_t alignment);
   using AllocatorBase<MetadataAllocator>::Allocate;
 
   void Deallocate(const void *Ptr, size_t size, size_t Alignment);
@@ -59,11 +61,12 @@ public:
 class MetadataAllocator {
 public:
   MetadataAllocator(uint16_t tag) {}
+  SWIFT_RETURNS_NONNULL SWIFT_NODISCARD
   void *Allocate(size_t size, size_t alignment) {
     if (alignment < sizeof(void*)) alignment = sizeof(void*);
     void *ptr = nullptr;
-    if (posix_memalign(&ptr, alignment, size) != 0) {
-      return nullptr;
+    if (SWIFT_UNLIKELY(posix_memalign(&ptr, alignment, size) != 0 || !ptr)) {
+      swift::crash("Could not allocate memory for type metadata.");
     }
     return ptr;
   }
@@ -398,11 +401,44 @@ public:
   }
 };
 
+/// A summary of the information from a generic signature that's
+/// sufficient to compare arguments.
+template<typename Runtime>
+struct GenericSignatureLayout {
+  uint16_t NumKeyParameters = 0;
+  uint16_t NumWitnessTables = 0;
+
+  GenericSignatureLayout(const RuntimeGenericSignature<Runtime> &sig) {
+    for (const auto &gp : sig.getParams()) {
+      if (gp.hasKeyArgument())
+        ++NumKeyParameters;
+    }
+    for (const auto &reqt : sig.getRequirements()) {
+      if (reqt.Flags.hasKeyArgument() &&
+          reqt.getKind() == GenericRequirementKind::Protocol)
+        ++NumWitnessTables;
+    }
+  }
+
+  size_t sizeInWords() const {
+    return NumKeyParameters + NumWitnessTables;
+  }
+
+  friend bool operator==(const GenericSignatureLayout<Runtime> &lhs,
+                         const GenericSignatureLayout<Runtime> &rhs) {
+    return lhs.NumKeyParameters == rhs.NumKeyParameters &&
+           lhs.NumWitnessTables == rhs.NumWitnessTables;
+  }
+  friend bool operator!=(const GenericSignatureLayout<Runtime> &lhs,
+                         const GenericSignatureLayout<Runtime> &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
 /// A key value as provided to the concurrent map.
 class MetadataCacheKey {
   const void * const *Data;
-  uint16_t NumKeyParameters;
-  uint16_t NumWitnessTables;
+  GenericSignatureLayout<InProcess> Layout;
   uint32_t Hash;
 
   /// Compare two witness tables, which may involving checking the
@@ -443,18 +479,16 @@ public:
 
 private:
   /// Compare the content from two keys.
-  static int compareContent(const void * const *adata,
-                            const void * const *bdata,
-                            unsigned numKeyParameters,
-                            unsigned numWitnessTables) {
+  static int compareContent(const void *const *adata, const void *const *bdata,
+                            const GenericSignatureLayout<InProcess> &layout) {
     // Compare generic arguments for key parameters.
-    for (unsigned i = 0; i != numKeyParameters; ++i) {
+    for (unsigned i = 0; i != layout.NumKeyParameters; ++i) {
       if (auto result = comparePointers(*adata++, *bdata++))
         return result;
     }
 
     // Compare witness tables.
-    for (unsigned i = 0; i != numWitnessTables; ++i) {
+    for (unsigned i = 0; i != layout.NumWitnessTables; ++i) {
       if (auto result =
               compareWitnessTables((const WitnessTable *)*adata++,
                                    (const WitnessTable *)*bdata++))
@@ -465,30 +499,23 @@ private:
   }
 
 public:
-  MetadataCacheKey(uint16_t numKeyParams,
-                   uint16_t numWitnessTables,
-                   const void * const *data)
-      : Data(data), NumKeyParameters(numKeyParams),
-        NumWitnessTables(numWitnessTables), Hash(computeHash()) { }
+  MetadataCacheKey(const GenericSignatureLayout<InProcess> &layout,
+                   const void *const *data)
+      : Data(data), Layout(layout), Hash(computeHash()) {}
 
-  MetadataCacheKey(uint16_t numKeyParams,
-                   uint16_t numWitnessTables,
-                   const void * const *data,
-                   uint32_t hash)
-    : Data(data), NumKeyParameters(numKeyParams),
-      NumWitnessTables(numWitnessTables), Hash(hash) {}
+  MetadataCacheKey(const GenericSignatureLayout<InProcess> &layout,
+                   const void *const *data, uint32_t hash)
+      : Data(data), Layout(layout), Hash(hash) {}
 
   bool operator==(MetadataCacheKey rhs) const {
     // Compare the hashes.
     if (hash() != rhs.hash()) return false;
 
     // Compare the sizes.
-    if (NumKeyParameters != rhs.NumKeyParameters) return false;
-    if (NumWitnessTables != rhs.NumWitnessTables) return false;
+    if (Layout != rhs.Layout) return false;
 
     // Compare the content.
-    return compareContent(begin(), rhs.begin(), NumKeyParameters,
-                          NumWitnessTables) == 0;
+    return compareContent(begin(), rhs.begin(), Layout) == 0;
   }
 
   int compare(const MetadataCacheKey &rhs) const {
@@ -499,27 +526,27 @@ public:
 
     // Compare the # of key parameters.
     if (auto keyParamsComparison =
-            compareIntegers(NumKeyParameters, rhs.NumKeyParameters)) {
+            compareIntegers(Layout.NumKeyParameters,
+                            rhs.Layout.NumKeyParameters)) {
       return keyParamsComparison;
     }
 
     // Compare the # of witness tables.
     if (auto witnessTablesComparison =
-            compareIntegers(NumWitnessTables, rhs.NumWitnessTables)) {
+            compareIntegers(Layout.NumWitnessTables,
+                            rhs.Layout.NumWitnessTables)) {
       return witnessTablesComparison;
     }
 
     // Compare the content.
-    return compareContent(begin(), rhs.begin(), NumKeyParameters,
-                          NumWitnessTables);
+    return compareContent(begin(), rhs.begin(), Layout);
   }
-
-  uint16_t numKeyParameters() const { return NumKeyParameters; }
-  uint16_t numWitnessTables() const { return NumWitnessTables; }
 
   uint32_t hash() const {
     return Hash;
   }
+
+  const GenericSignatureLayout<InProcess> &layout() const { return Layout; }
 
   friend llvm::hash_code hash_value(const MetadataCacheKey &key) {
     return key.Hash;
@@ -527,12 +554,17 @@ public:
 
   const void * const *begin() const { return Data; }
   const void * const *end() const { return Data + size(); }
-  unsigned size() const { return NumKeyParameters + NumWitnessTables; }
+  unsigned size() const { return Layout.sizeInWords(); }
+
+  void installInto(const void **buffer) const {
+    // FIXME: variadic-parameter-packs
+    memcpy(buffer, Data, size() * sizeof(const void *));
+  }
 
 private:
   uint32_t computeHash() const {
-    size_t H = 0x56ba80d1u * NumKeyParameters;
-    for (unsigned index = 0; index != NumKeyParameters; ++index) {
+    size_t H = 0x56ba80d1u * Layout.NumKeyParameters;
+    for (unsigned index = 0; index != Layout.NumKeyParameters; ++index) {
       H = (H >> 10) | (H << ((sizeof(size_t) * 8) - 10));
       H ^= (reinterpret_cast<size_t>(Data[index])
             ^ (reinterpret_cast<size_t>(Data[index]) >> 19));
@@ -1331,7 +1363,7 @@ protected:
   using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
 
   size_t numTrailingObjects(OverloadToken<const void *>) const {
-    return NumKeyParameters + NumWitnessTables;
+    return Layout.sizeInWords();
   }
 
   template <class... Args>
@@ -1343,8 +1375,7 @@ protected:
 
 private:
   /// These are set during construction and never changed.
-  const uint16_t NumKeyParameters;
-  const uint16_t NumWitnessTables;
+  const GenericSignatureLayout<InProcess> Layout;
   const uint32_t Hash;
 
   /// Valid if TrackingInfo.getState() >= PrivateMetadataState::Abstract.
@@ -1364,18 +1395,16 @@ public:
                                  PrivateMetadataState initialState,
                                  ValueType value)
       : super(worker, initialState),
-        NumKeyParameters(key.numKeyParameters()),
-        NumWitnessTables(key.numWitnessTables()),
+        Layout(key.layout()),
         Hash(key.hash()),
         Value(value) {
     assert((value != nullptr) ==
            (initialState != PrivateMetadataState::Allocating));
-    memcpy(this->template getTrailingObjects<const void *>(),
-           key.begin(), key.size() * sizeof(const void *));
+    key.installInto(this->template getTrailingObjects<const void *>());
   }
 
   MetadataCacheKey getKey() const {
-    return MetadataCacheKey(NumKeyParameters, NumWitnessTables,
+    return MetadataCacheKey(Layout,
                             this->template getTrailingObjects<const void*>(),
                             Hash);
   }

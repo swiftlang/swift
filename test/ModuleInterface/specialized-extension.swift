@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -module-name Test -typecheck -emit-module-interface-path - -enable-experimental-bound-generic-extensions %s | %FileCheck %s
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name Test -enable-experimental-bound-generic-extensions
+// RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name Test
+// RUN: %FileCheck %s < %t.swiftinterface
 
 public struct Tree<T> {
   public struct Branch<B> {
@@ -23,7 +25,7 @@ extension Tree<Int>.Branch.Nest.Egg { public static func twoot() {} }
 // CHECK: }
 extension Tree<Int>.Branch<String>.Nest.Egg { public static func twote() {} }
 
-// CHECK: extension Test.Tree.Branch.Nest.Egg where T == Swift.Int, B == Swift.String, N == Swift.Void {
+// CHECK: extension Test.Tree.Branch.Nest.Egg where T == Swift.Int, B == Swift.String, N == () {
 // CHECK:   public static func twite()
 // CHECK: }
 extension Tree<Int>.Branch<String>.Nest<Void>.Egg { public static func twite() {} }

@@ -23,7 +23,7 @@ using namespace swift;
 
 llvm::cl::opt<bool> DontAbortOnMemoryLifetimeErrors(
     "dont-abort-on-memory-lifetime-errors",
-    llvm::cl::desc("Don't abort compliation if the memory lifetime checker "
+    llvm::cl::desc("Don't abort compilation if the memory lifetime checker "
                    "detects an error."));
 
 namespace {
@@ -185,12 +185,6 @@ static bool injectsNoPayloadCase(InjectEnumAddrInst *IEAI) {
   return elemType.isEmpty(*function);
 }
 
-static bool isOrHasEnum(SILType type) {
-  return type.getASTType().findIf([](Type ty) {
-    return ty->getEnumOrBoundGenericEnum() != nullptr;
-  });
-}
-
 bool MemoryLifetimeVerifier::storesTrivialEnum(int locIdx,
                         SILBasicBlock::reverse_iterator start,
                         SILBasicBlock::reverse_iterator end) {
@@ -204,7 +198,7 @@ bool MemoryLifetimeVerifier::storesTrivialEnum(int locIdx,
     if (auto *SI = dyn_cast<StoreInst>(&inst)) {
       const Location *loc = locations.getLocation(SI->getDest());
       if (loc && loc->isSubLocation(locIdx) &&
-          isOrHasEnum(SI->getSrc()->getType())) {
+          SI->getSrc()->getType().isOrHasEnum()) {
         return SI->getOwnershipQualifier() == StoreOwnershipQualifier::Trivial;
       }
     }
@@ -264,7 +258,7 @@ void MemoryLifetimeVerifier::require(const Bits &wrongBits,
 void MemoryLifetimeVerifier::requireBitsClear(const Bits &bits, SILValue addr,
                                              SILInstruction *where) {
   if (auto *loc = locations.getLocation(addr)) {
-    require(bits & loc->subLocations, "memory is initialized, but shouldn't",
+    require(bits & loc->subLocations, "memory is initialized, but shouldn't be",
             where, /*excludeTrivialEnums*/ true);
   }
 }
@@ -273,7 +267,7 @@ void MemoryLifetimeVerifier::requireBitsSet(const Bits &bits, SILValue addr,
                                            SILInstruction *where) {
   if (auto *loc = locations.getLocation(addr)) {
     require(~bits & loc->subLocations,
-            "memory is not initialized, but should", where);
+            "memory is not initialized, but should be", where);
   }
 }
 
@@ -310,7 +304,7 @@ void MemoryLifetimeVerifier::initDataflow(BitDataflow &dataFlow) {
     }
     bs.data.exitSet.set();
 
-    // Anything weired can happen in unreachable blocks. So just ignore them.
+    // Anything weird can happen in unreachable blocks. So just ignore them.
     // Note: while solving the dataflow, unreachable blocks are implicitly
     // ignored, because their entry/exit sets are all-ones and their gen/kill
     // sets are all-zeroes.
@@ -635,7 +629,7 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
         // We don't want to check `debug_value` instructions that
         // are used to mark variable declarations (e.g. its SSA value is
         // an alloc_stack), which don't have any `op_deref` in its
-        // di-expression, because that memory does't need to be initialized
+        // di-expression, because that memory doesn't need to be initialized
         // when `debug_value` is referencing it.
         if (cast<DebugValueInst>(&I)->hasAddrVal() &&
             cast<DebugValueInst>(&I)->exprStartsWithDeref())

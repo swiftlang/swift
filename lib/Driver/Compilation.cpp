@@ -902,7 +902,7 @@ namespace driver {
         }
 
         const Optional<std::pair<bool, bool>> shouldSchedAndIsCascading =
-            computeShouldInitiallyScheduleJobAndDependendents(cmd);
+            computeShouldInitiallyScheduleJobAndDependents(cmd);
         if (!shouldSchedAndIsCascading)
           return getEveryCompileJob(); // Load error, just run them all
         const bool &shouldSchedule = shouldSchedAndIsCascading->first;
@@ -934,7 +934,7 @@ namespace driver {
     /// the job is cascading. Or if there was a dependency-read error, return
     /// \c None to indicate don't-know.
     Optional<std::pair<bool, bool>>
-    computeShouldInitiallyScheduleJobAndDependendents(const Job *Cmd) {
+    computeShouldInitiallyScheduleJobAndDependents(const Job *Cmd) {
       auto CondAndHasDepsIfNoError =
           loadDependenciesAndComputeCondition(Cmd);
       if (!CondAndHasDepsIfNoError)
@@ -1148,7 +1148,7 @@ namespace driver {
 
     /// Create \c NumberOfParallelCommands batches and assign each job to a
     /// batch either filling each partition in order or, if seeded with a
-    /// nonzero value, pseudo-randomly (but determinstically and nearly-evenly).
+    /// nonzero value, pseudo-randomly (but deterministically and nearly-evenly).
     void partitionIntoBatches(std::vector<const Job *> Batchable,
                               BatchPartition &Partition) {
       if (Comp.getShowJobLifecycle()) {
@@ -1447,7 +1447,7 @@ namespace driver {
     /// \c loadDependenciesAndComputeCondition .
     /// Then, the cascading predicate is returned from
     /// \c isCompileJobInitiallyNeededForDependencyBasedIncrementalCompilation.
-    /// Then, in \c computeShouldInitiallyScheduleJobAndDependendents
+    /// Then, in \c computeShouldInitiallyScheduleJobAndDependents
     /// if the job needs a cascading build, it's dependents will be scheduled
     /// immediately. After the job finishes, it's dependencies will be processed
     /// again. If a non-cascading job failed, the driver will schedule all of
@@ -1705,8 +1705,8 @@ static void writeIndexUnitOutputPathsToFilelist(llvm::raw_fd_ostream &out,
   for (auto &output : outputInfo.getIndexUnitOutputFilenames())
     out << output << "\n";
 }
-static void writeSupplementarOutputToFilelist(llvm::raw_fd_ostream &out,
-                                              const Job *job) {
+static void writeSupplementaryOutputToFilelist(llvm::raw_fd_ostream &out,
+                                               const Job *job) {
   job->getOutput().writeOutputFileMap(out);
 }
 
@@ -1745,7 +1745,7 @@ static bool writeFilelistIfNecessary(const Job *job, const ArgList &args,
       writeIndexUnitOutputPathsToFilelist(out, job);
       break;
     case FilelistInfo::WhichFiles::SupplementaryOutput:
-      writeSupplementarOutputToFilelist(out, job);
+      writeSupplementaryOutputToFilelist(out, job);
       break;
     }
   }

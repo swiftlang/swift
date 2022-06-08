@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=BoolEnums -I %S/Inputs -source-filename=x -enable-cxx-interop | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=BoolEnums -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
 
 // TODO: these should be enums eventually (especially the enum class).
 

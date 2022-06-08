@@ -1,8 +1,8 @@
-// RUN: %target-typecheck-verify-swift -warn-concurrency -enable-experimental-distributed -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -warn-concurrency -disable-availability-checking
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
-import _Distributed
+import Distributed
 
 actor Charlie {
     // should not cause sendable warnings, Worker is Sendable as implied by DA

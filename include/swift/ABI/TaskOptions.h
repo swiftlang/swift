@@ -78,7 +78,7 @@ class TaskGroupTaskOptionRecord : public TaskOptionRecord {
 
 /// Task option to specify on what executor the task should be executed.
 ///
-/// Not passing this option implies that that a "best guess" or good default
+/// Not passing this option implies that a "best guess" or good default
 /// executor should be used instead, most often this may mean the global
 /// concurrent executor, or the enclosing actor's executor.
 class ExecutorTaskOptionRecord : public TaskOptionRecord {

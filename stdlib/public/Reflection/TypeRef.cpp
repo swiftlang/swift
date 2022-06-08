@@ -237,6 +237,15 @@ public:
     stream << ")";
   }
 
+  void
+  visitParameterizedProtocolTypeRef(const ParameterizedProtocolTypeRef *PPT) {
+    printHeader("parameterized_protocol");
+    printRec(PPT->getBase());
+    for (auto param : PPT->getArgs())
+      printRec(param);
+    stream << ")";
+  }
+
   void visitMetatypeTypeRef(const MetatypeTypeRef *M) {
     printHeader("metatype");
     if (M->wasAbstract())
@@ -419,6 +428,11 @@ struct TypeRefIsConcrete
       if (!visit(Superclass))
         return false;
     return true;
+  }
+
+  bool
+  visitParameterizedProtocolTypeRef(const ParameterizedProtocolTypeRef *PPT) {
+    return visit(PPT->getBase());
   }
 
   bool visitMetatypeTypeRef(const MetatypeTypeRef *M) {
@@ -762,6 +776,17 @@ public:
     return node;
   }
 
+  Demangle::NodePointer
+  visitParameterizedProtocolTypeRef(const ParameterizedProtocolTypeRef *PPT) {
+    auto node = Dem.createNode(Node::Kind::ParameterizedProtocol);
+    node->addChild(visit(PPT->getBase()), Dem);
+    auto genericArgsList = Dem.createNode(Node::Kind::TypeList);
+    for (auto param : PPT->getArgs())
+      genericArgsList->addChild(visit(param), Dem);
+    node->addChild(genericArgsList, Dem);
+    return node;
+  }
+
   Demangle::NodePointer visitMetatypeTypeRef(const MetatypeTypeRef *M) {
     auto node = Dem.createNode(Node::Kind::Metatype);
     // FIXME: This is lossy. @objc_metatype is also abstract.
@@ -1036,8 +1061,12 @@ public:
     std::vector<const TypeRef *> GenericParams;
     for (auto Param : BG->getGenericParams())
       GenericParams.push_back(visit(Param));
+    auto parent = BG->getParent();
+    if (parent) {
+      parent = ThickenMetatype(Builder).visit(parent);
+    }
     return BoundGenericTypeRef::create(Builder, BG->getMangledName(),
-                                       GenericParams);
+                                       GenericParams, parent);
   }
 
   const TypeRef *visitTupleTypeRef(const TupleTypeRef *T) {
@@ -1070,6 +1099,15 @@ public:
   const TypeRef *
   visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC) {
     return PC;
+  }
+
+  const TypeRef *
+  visitParameterizedProtocolTypeRef(const ParameterizedProtocolTypeRef *PPT) {
+    std::vector<const TypeRef *> ThickArgs;
+    for (auto Param : PPT->getArgs())
+      ThickArgs.push_back(visit(Param));
+    return ParameterizedProtocolTypeRef::create(Builder, PPT->getBase(),
+                                                ThickArgs);
   }
 
   const TypeRef *visitMetatypeTypeRef(const MetatypeTypeRef *M) {
@@ -1217,6 +1255,15 @@ public:
     // Existential metatypes do not contain type parameters.
     assert(EM->getInstanceType()->isConcrete());
     return EM;
+  }
+
+  const TypeRef *
+  visitParameterizedProtocolTypeRef(const ParameterizedProtocolTypeRef *PPT) {
+    std::vector<const TypeRef *> substArg;
+    for (auto Param : PPT->getArgs())
+      substArg.push_back(visit(Param));
+    return ParameterizedProtocolTypeRef::create(Builder, PPT->getBase(),
+                                                substArg);
   }
 
   const TypeRef *

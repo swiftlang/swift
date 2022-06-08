@@ -92,7 +92,7 @@ KNOWN_SETTINGS=(
     android-ndk                                   ""                "An absolute path to the NDK that will be used as a libc implementation for Android builds"
 
     ## Darwin Options
-    darwin-crash-reporter-client                  ""                "whether to enable CrashReporter integration"
+    darwin-crash-reporter-client                  ""                "whether to enable CrashReporter integration, default is 1 on Darwin platforms, 0 otherwise"
     darwin-deployment-version-ios                 "7.0"             "minimum deployment target version for iOS"
     darwin-deployment-version-osx                 "10.9"            "minimum deployment target version for OS X"
     darwin-deployment-version-tvos                "9.0"             "minimum deployment target version for tvOS"
@@ -168,7 +168,6 @@ KNOWN_SETTINGS=(
     ## LLDB Options
     lldb-assertions                               "1"               "build lldb with assertions enabled"
     lldb-extra-cmake-args                         ""                "extra command line args to pass to lldb cmake"
-    lldb-no-debugserver                           ""                "delete debugserver after building it, and don't try to codesign it"
     lldb-test-cc                                  ""                "CC to use for building LLDB testsuite test inferiors.  Defaults to just-built, in-tree clang.  If set to 'host-toolchain', sets it to same as host-cc."
     lldb-test-swift-compatibility                 ""                "specify additional Swift compilers to test lldb with"
     lldb-test-swift-only                          "0"               "when running lldb tests, only include Swift-specific tests"
@@ -192,10 +191,12 @@ KNOWN_SETTINGS=(
     swift-primary-variant-sdk                     ""                "default SDK for target binaries"
     swift-runtime-enable-leak-checker             "0"               "Enable leaks checking routines in the runtime"
     swift-stdlib-enable-assertions                "1"               "enable assertions in Swift"
+    swift-stdlib-enable-debug-preconditions-in-release "0"          "Enable _debugPrecondition checks in the stdlib in Release configurations"
     swift-tools-enable-lto                        ""                "enable LTO compilation of Swift tools. *NOTE* This does not include the swift standard library and runtime. Must be set to one of 'thin' or 'full'"
     extra-swift-args                              ""                "Extra arguments to pass to swift modules which match regex. Assumed to be a flattened cmake list consisting of [module_regexp, args, module_regexp, args, ...]"
     report-statistics                             "0"               "set to 1 to generate compilation statistics files for swift libraries"
     sil-verify-all                                "0"               "If enabled, run the SIL verifier after each transform when building Swift files during this build process"
+    sil-verify-all-macos-only                     "0"               "If enabled, run the SIL verifier after each transform when building Swift files during this build process when building a macos stdlib"
     stdlib-deployment-targets                     ""                "space-separated list of targets to configure the Swift standard library to be compiled or cross-compiled for"
     swift-objc-interop                            ""                "whether to enable interoperability with Objective-C, default is 1 on Darwin platforms, 0 otherwise"
     swift-enable-dispatch                         "1"               "whether to enable use of libdispatch"
@@ -206,6 +207,7 @@ KNOWN_SETTINGS=(
     swift-stdlib-supports-backtrace-reporting     ""                "whether to build stdlib assuming the runtime environment provides the backtrace(3) API, if not set defaults to true on all platforms except for Cygwin, Haiku and wasm"
     swift-runtime-static-image-inspection         "0"               "whether to build stdlib assuming the runtime environment only supports a single runtime image with Swift code"
     swift-stdlib-single-threaded-runtime          "0"               "whether to build stdlib as a single-threaded runtime only"
+    swift-stdlib-concurrency-tracing              ""                "whether to enable tracing signposts for concurrency; default is 1 on Darwin platforms, 0 otherwise"
     swift-stdlib-os-versioning                    "1"               "whether to build stdlib with availability based on OS versions (Darwin only)"
     swift-stdlib-has-commandline                  "1"               "whether to build stdlib with the CommandLine enum and support for argv/argc"
     swift-stdlib-stable-abi                       ""                "should stdlib be built with stable ABI, if not set defaults to true on Darwin, false otherwise"
@@ -218,9 +220,11 @@ KNOWN_SETTINGS=(
     swift-stdlib-enable-prespecialization         ""                "whether stdlib should be built with generic metadata prespecialization enabled, defaults to true on Darwin and Linux, false otherwise"
     swift-stdlib-passthrough-metadata-allocator   "0"               "whether stdlib should be built without a custom implementation of MetadataAllocator, relying on malloc+free instead"
     swift-stdlib-short-mangling-lookups           "1"               "whether to build stdlib with fast-path context descriptor lookups based on well-known short manglings"
+    swift-stdlib-enable-vector-types              "1"               "whether to build stdlib with support for SIMD and vector types"
     swift-stdlib-experimental-hermetic-seal-at-link     "0"         "whether stdlib should be built with -experimental-hermetic-seal-at-link"
     swift-stdlib-disable-instantiation-caches     "0"               "whether to build stdlib with -disable-preallocated-instantiation-caches"
     swift-stdlib-has-type-printing                "1"               "whether stdlib should support printing user-friendly type name as strings at runtime"
+    swift-stdlib-trap-function                    ""                "Name of function to call instead of emitting a trap instruction"
     swift-disable-dead-stripping                  "0"               "turns off Darwin-specific dead stripping for Swift host tools"
     common-swift-flags                            ""                "Flags used for Swift targets other than the stdlib, like the corelibs"
     swift-enable-experimental-string-processing   "1"               "whether to build experimental string processing feature"
@@ -263,6 +267,9 @@ components=(
   libcxx
   libdispatch
   libicu
+  libxml2
+  zlib
+  curl
   llbuild
   lldb
   llvm
@@ -324,7 +331,7 @@ function with_pushd() {
 }
 
 function quoted_print() {
-    python -c 'import pipes; import sys; print(" ".join(pipes.quote(arg) for arg in sys.argv[1:]))' "$@"
+    python3 -c 'import pipes; import sys; print(" ".join(pipes.quote(arg) for arg in sys.argv[1:]))' "$@"
 }
 
 function toupper() {
@@ -446,9 +453,11 @@ function verify_host_is_supported() {
       | haiku-x86_64            \
       | linux-x86_64            \
       | linux-i686              \
+      | linux-armv5             \
       | linux-armv6             \
       | linux-armv7             \
       | linux-aarch64           \
+      | linux-powerpc           \
       | linux-powerpc64         \
       | linux-powerpc64le       \
       | linux-s390x             \
@@ -539,6 +548,10 @@ function set_build_options_for_host() {
                     ;;
             esac
             ;;
+        linux-armv5)
+            SWIFT_HOST_TRIPLE="armv5-unknown-linux-gnueabi"
+            llvm_target_arch="ARM"
+            ;;
         linux-armv6)
             SWIFT_HOST_TRIPLE="armv6-unknown-linux-gnueabihf"
             llvm_target_arch="ARM"
@@ -555,7 +568,6 @@ function set_build_options_for_host() {
         watchos-*           | \
         watchsimulator-*)
             swift_cmake_options+=(
-              -DPython2_EXECUTABLE="$(xcrun -f python2.7)"
               -DPython3_EXECUTABLE="$(xcrun -f python3)"
             )
             case ${host} in
@@ -1093,7 +1105,7 @@ function false_true() {
 CROSS_COMPILE_HOSTS=($CROSS_COMPILE_HOSTS)
 for t in "${CROSS_COMPILE_HOSTS[@]}"; do
     case ${t} in
-        macosx* | iphone* | appletv* | watch* | linux-armv6 | linux-armv7 | android-* )
+        macosx* | iphone* | appletv* | watch* | linux-armv5 | linux-armv6 | linux-armv7 | android-* )
             ;;
         *)
             echo "Unknown host to cross-compile for: ${t}"
@@ -1244,6 +1256,7 @@ LIBDISPATCH_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 LIBICU_SOURCE_DIR="${WORKSPACE}/icu"
 LIBCXX_SOURCE_DIR="${WORKSPACE}/llvm-project/libcxx"
 EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR="${WORKSPACE}/swift-experimental-string-processing"
+LIBXML2_SOURCE_DIR="${WORKSPACE}/libxml2"
 
 # We cannot currently apply the normal rules of skipping here for LLVM. Even if
 # we are skipping building LLVM, we still need to at least build a few tools
@@ -1651,7 +1664,7 @@ for host in "${ALL_HOSTS[@]}"; do
     if [[ "${DARWIN_CRASH_REPORTER_CLIENT}" ]] ; then
         swift_cmake_options=(
             "${swift_cmake_options[@]}"
-            -DSWIFT_RUNTIME_CRASH_REPORTER_CLIENT:BOOL=TRUE
+            -DSWIFT_RUNTIME_CRASH_REPORTER_CLIENT:BOOL=$(true_false "${DARWIN_CRASH_REPORTER_CLIENT}")
         )
     fi
 
@@ -1678,6 +1691,7 @@ for host in "${ALL_HOSTS[@]}"; do
         "${swift_cmake_options[@]}"
         -DSWIFT_AST_VERIFIER:BOOL=$(true_false "${SWIFT_ENABLE_AST_VERIFIER}")
         -DSWIFT_SIL_VERIFY_ALL:BOOL=$(true_false "${SIL_VERIFY_ALL}")
+        -DSWIFT_SIL_VERIFY_ALL_MACOS_ONLY:BOOL=$(true_false "${SIL_VERIFY_ALL_MACOS_ONLY}")
         -DSWIFT_RUNTIME_ENABLE_LEAK_CHECKER:BOOL=$(true_false "${SWIFT_RUNTIME_ENABLE_LEAK_CHECKER}")
     )
 
@@ -1814,16 +1828,8 @@ for host in "${ALL_HOSTS[@]}"; do
                     llvm_enable_projects+=("clang-tools-extra")
                 fi
 
-                # On non-Darwin platforms, build lld so we can always have a
-                # linker that is compatible with the swift we are using to
-                # compile the stdlib.
-                #
-                # This makes it easier to build target stdlibs on systems that
-                # have old toolchains without more modern linker features.
-                if [[ "$(uname -s)" != "Darwin" ]] ; then
-                    if [[ ! "${SKIP_BUILD_LLD}" ]]; then
-                        llvm_enable_projects+=("lld")
-                    fi
+                if [[ ! "${SKIP_BUILD_LLD}" ]]; then
+                    llvm_enable_projects+=("lld")
                 fi
 
                 cmake_options+=(
@@ -1983,6 +1989,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_ANALYZE_CODE_COVERAGE:STRING=$(toupper "${SWIFT_ANALYZE_CODE_COVERAGE}")
                     -DSWIFT_STDLIB_BUILD_TYPE:STRING="${SWIFT_STDLIB_BUILD_TYPE}"
                     -DSWIFT_STDLIB_ASSERTIONS:BOOL=$(true_false "${SWIFT_STDLIB_ENABLE_ASSERTIONS}")
+                    -DSWIFT_STDLIB_ENABLE_DEBUG_PRECONDITIONS_IN_RELEASE=$(true_false "${SWIFT_STDLIB_ENABLE_DEBUG_PRECONDITIONS_IN_RELEASE}")
                     -DSWIFT_ENABLE_DISPATCH:BOOL=$(true_false "${SWIFT_ENABLE_DISPATCH}")
                     -DSWIFT_IMPLICIT_CONCURRENCY_IMPORT:BOOL=$(true_false "${SWIFT_IMPLICIT_CONCURRENCY_IMPORT}")
                     -DSWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT:BOOL=$(true_false "${SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT}")
@@ -1998,7 +2005,9 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_STDLIB_ENABLE_LTO:STRING="${SWIFT_STDLIB_LTO}"
                     -DSWIFT_STDLIB_PASSTHROUGH_METADATA_ALLOCATOR:BOOL=$(true_false "${SWIFT_STDLIB_PASSTHROUGH_METADATA_ALLOCATOR}")
                     -DSWIFT_STDLIB_SHORT_MANGLING_LOOKUPS:BOOL=$(true_false "${SWIFT_STDLIB_SHORT_MANGLING_LOOKUPS}")
+                    -DSWIFT_STDLIB_ENABLE_VECTOR_TYPES:BOOL=$(true_false "${SWIFT_STDLIB_ENABLE_VECTOR_TYPES}")
                     -DSWIFT_STDLIB_HAS_TYPE_PRINTING:BOOL=$(true_false "${SWIFT_STDLIB_HAS_TYPE_PRINTING}")
+                    -DSWIFT_STDLIB_TRAP_FUNCTION:STRING="${SWIFT_STDLIB_TRAP_FUNCTION}"
                     -DSWIFT_STDLIB_EXPERIMENTAL_HERMETIC_SEAL_AT_LINK:BOOL=$(true_false "${SWIFT_STDLIB_EXPERIMENTAL_HERMETIC_SEAL_AT_LINK}")
                     -DSWIFT_STDLIB_DISABLE_INSTANTIATION_CACHES:BOOL=$(true_false "${SWIFT_STDLIB_DISABLE_INSTANTIATION_CACHES}")
                     -DSWIFT_NATIVE_LLVM_TOOLS_PATH:STRING="${native_llvm_tools_path}"
@@ -2180,13 +2189,29 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
-                if [[ $(true_false "${SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING}") == "TRUE" && \
-                      -d "${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}" && \
+                if [[ -d "${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}" && \
                       -n "$(ls -A "${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}")" ]] ; then
                     cmake_options=(
                         "${cmake_options[@]}"
-                        -DSWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING:BOOL=TRUE
                         -DEXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR="${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}"
+                    )
+                    if [[ $(true_false "${SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING}") == "TRUE" ]] ; then
+                        cmake_options=(
+                            "${cmake_options[@]}"
+                            -DSWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING:BOOL=TRUE
+                        )
+                    fi
+                else
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_BUILD_REGEX_PARSER_IN_COMPILER:BOOL=FALSE
+                    )
+                fi
+
+                if [[ "${SWIFT_STDLIB_CONCURRENCY_TRACING}" ]] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_STDLIB_CONCURRENCY_TRACING:BOOL=$(true_false "${SWIFT_STDLIB_CONCURRENCY_TRACING}")
                     )
                 fi
 
@@ -2488,6 +2513,61 @@ for host in "${ALL_HOSTS[@]}"; do
                     LIBICU_BUILD_ARGS=()
                 fi
 
+                if [[ ! "${SKIP_BUILD_LIBXML2}" ]]; then
+                    BASE_INSTALL_DIR="$(get_host_install_destdir ${host})"
+                    LIBXML2_HEADERS="${BASE_INSTALL_DIR}/usr/include/libxml2"
+                    LIBXML2_LIBRARY="${BASE_INSTALL_DIR}/usr/lib/libxml2.a"
+
+                    if [[ -z "${DRY_RUN}" && ! -d "${LIBXML2_HEADERS}" ]]; then
+                        echo "Error: '${LIBXML2_HEADERS}' does not exist" 1>&2
+                        exit 1
+                    fi
+
+                    if [[ -z "${DRY_RUN}" && ! -e "${LIBXML2_LIBRARY}" ]]; then
+                        echo "Error: '${LIBXML2_LIBRARY}' does not exist" 1>&2
+                        exit 1
+                    fi
+
+                    LIBXML2_BUILD_ARGS=(
+                        -DLIBXML2_INCLUDE_DIR:PATH="${LIBXML2_HEADERS}"
+                        -DLIBXML2_LIBRARY:PATH="${LIBXML2_LIBRARY}"
+                        -DLIBXML2_DEFINITIONS="-DLIBXML_STATIC"
+                    )
+                else
+                    LIBXML2_BUILD_ARGS=()
+                fi
+
+                if [[ ! "${SKIP_BUILD_ZLIB}" ]]; then
+                    BASE_INSTALL_DIR="$(get_host_install_destdir ${host})"
+                    ZLIB_HEADERS="${BASE_INSTALL_DIR}/usr/include"
+                    # Note: On Windows, the spelling is 'zlibstatic.lib',
+                    #       so if this is ported to python, that case will need
+                    #       to be handled.
+                    ZLIB_LIBRARY="${BASE_INSTALL_DIR}/usr/lib/libz.a"
+
+                    if [[ -z "${DRY_RUN}" && ! -d "${ZLIB_HEADERS}" ]]; then
+                        echo "Error: '${ZLIB_HEADERS}' does not exist" 1>&2
+                        exit 1
+                    fi
+
+                    if [[ -z "${DRY_RUN}" && ! -e "${ZLIB_LIBRARY}" ]]; then
+                        echo "Error: '${ZLIB_LIBRARY}' does not exist" 1>&2
+                        exit 1
+                    fi
+
+                    ZLIB_BUILD_ARGS=(
+                        -DZLIB_INCLUDE_DIR:PATH="${ZLIB_HEADERS}"
+                        -DZLIB_LIBRARY:PATH="${ZLIB_LIBRARY}"
+                    )
+                fi
+
+                if [[ ! "${SKIP_BUILD_CURL}" ]]; then
+                    BASE_INSTALL_DIR="$(get_host_install_destdir ${host})"
+                    CURL_BUILD_ARGS=(
+                        -DCURL_DIR="${BASE_INSTALL_DIR}/usr/lib/cmake/CURL"
+                    )
+                fi
+
                 if [[ "${SKIP_CLEAN_FOUNDATION}" == "0" ]]
                 then
                   # The Swift project might have been changed, but CMake might
@@ -2513,6 +2593,12 @@ for host in "${ALL_HOSTS[@]}"; do
                   -DCMAKE_INSTALL_PREFIX:PATH=$(get_host_install_prefix ${host})
 
                   ${LIBICU_BUILD_ARGS[@]}
+
+                  ${LIBXML2_BUILD_ARGS[@]}
+
+                  ${ZLIB_BUILD_ARGS[@]}
+
+                  ${CURL_BUILD_ARGS[@]}
 
                   -DFOUNDATION_PATH_TO_LIBDISPATCH_SOURCE=${LIBDISPATCH_SOURCE_DIR}
                   -DFOUNDATION_PATH_TO_LIBDISPATCH_BUILD=$(build_directory ${host} libdispatch)

@@ -1823,14 +1823,6 @@ ConstantFolder::processWorkList() {
     }
 
     // Go through all users of the constant and try to fold them.
-    //
-    // FIXME: remove this temporary deleter. It is dangerous because any use of
-    // the original deleter will invalidate its iterators. It is currently used
-    // to work around bugs that are exposed in the -Onone stdlib build when the
-    // same deleter is used for both the dead code elimination above and the
-    // dead use elimination below.
-    auto tempCallbacks = deleter.getCallbacks();
-    InstructionDeleter tempDeleter(std::move(tempCallbacks));
 
     for (auto Result : I->getResults()) {
       for (auto *Use : Result->getUses()) {
@@ -1855,7 +1847,7 @@ ConstantFolder::processWorkList() {
         // this as part of the constant folding logic, because there is no value
         // they can produce (other than empty tuple, which is wasteful).
         if (isa<CondFailInst>(User))
-          tempDeleter.trackIfDead(User);
+          deleter.trackIfDead(User);
 
         // See if we have an instruction that is read none and has a stateless
         // inverse. If we do, add it to the worklist so we can check its users
@@ -1961,7 +1953,7 @@ ConstantFolder::processWorkList() {
           // it, we exit the worklist as expected.
           SILValue r = User->getResult(Index);
           if (r->use_empty()) {
-            tempDeleter.trackIfDead(User);
+            deleter.trackIfDead(User);
             continue;
           }
 
@@ -1969,7 +1961,7 @@ ConstantFolder::processWorkList() {
           User->getResult(Index)->replaceAllUsesWith(C);
           // Record the user if it is dead to perform the necessary cleanups
           // later.
-          tempDeleter.trackIfDead(User);
+          deleter.trackIfDead(User);
 
           // The new constant could be further folded now, add it to the
           // worklist.
@@ -1981,7 +1973,7 @@ ConstantFolder::processWorkList() {
 
     // Eagerly DCE. We do this after visiting all users to ensure we don't
     // invalidate the uses iterator.
-    tempDeleter.cleanupDeadInstructions();
+    deleter.cleanupDeadInstructions();
   }
 
   // TODO: refactor this code outside of the method. Passes should not merge

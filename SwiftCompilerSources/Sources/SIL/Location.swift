@@ -13,5 +13,5 @@
 import SILBridging
 
 public struct Location {
-  let bridgedLocation: BridgedLocation
+  let bridged: BridgedLocation
 }

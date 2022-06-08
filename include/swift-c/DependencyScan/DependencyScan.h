@@ -15,15 +15,21 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "DependencyScanMacros.h"
-#include "CommonString.h"
-
 #ifndef SWIFT_C_DEPENDENCY_SCAN_H
 #define SWIFT_C_DEPENDENCY_SCAN_H
 
+#include "DependencyScanMacros.h"
+#include "swift-c/CommonString/CommonString.h"
+
+/// The version constants for the SwiftDependencyScan C API.
+/// SWIFTSCAN_VERSION_MINOR should increase when there are API additions.
+/// SWIFTSCAN_VERSION_MAJOR is intended for "major" source/ABI breaking changes.
+#define SWIFTSCAN_VERSION_MAJOR 0
+#define SWIFTSCAN_VERSION_MINOR 2
+
 SWIFTSCAN_BEGIN_DECLS
 
-//=== Public Dependency Scanner Data Types -------------------------------===//
+//=== Public Scanner Data Types -------------------------------------------===//
 
 typedef enum {
   // This dependency info encodes two ModuleDependencyKind types:
@@ -344,8 +350,6 @@ swiftscan_scanner_cache_load(swiftscan_scanner_t scanner,
 /// scanning queries are done "from-scratch".
 SWIFTSCAN_PUBLIC void
 swiftscan_scanner_cache_reset(swiftscan_scanner_t scanner);
-
-//=== Experimental compiler invocation operations -------------------------===//
 
 /// An entry point to invoke the compiler via a library call.
 SWIFTSCAN_PUBLIC int invoke_swift_compiler(int argc, const char **argv);

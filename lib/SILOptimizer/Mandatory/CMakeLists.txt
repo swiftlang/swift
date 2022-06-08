@@ -4,7 +4,9 @@ target_sources(swiftSILOptimizer PRIVATE
   AddressLowering.cpp
   CapturePromotion.cpp
   ClosureLifetimeFixup.cpp
+  PhiStorageOptimizer.cpp
   ConstantPropagation.cpp
+  DebugInfoCanonicalizer.cpp
   DefiniteInitialization.cpp
   DIMemoryUseCollector.cpp
   DataflowDiagnostics.cpp
@@ -19,6 +21,7 @@ target_sources(swiftSILOptimizer PRIVATE
   LexicalLifetimeEliminator.cpp
   LowerHopToActor.cpp
   MandatoryInlining.cpp
+  MovedAsyncVarDebugInfoPropagator.cpp
   MoveFunctionCanonicalization.cpp
   MoveKillsCopyableAddressesChecker.cpp
   MoveKillsCopyableValuesChecker.cpp

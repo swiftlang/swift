@@ -277,7 +277,7 @@ bool CompileInstance::setupCI(
   invocation.getFrontendOptions().LLVMArgs.clear();
 
   /// Declare the frontend to be used for multiple compilations.
-  invocation.getFrontendOptions().ReuseFrontendForMutipleCompilations = true;
+  invocation.getFrontendOptions().ReuseFrontendForMultipleCompilations = true;
 
   // Enable dependency trakcing (excluding system modules) to invalidate the
   // compiler instance if any dependent files are modified.

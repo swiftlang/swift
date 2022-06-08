@@ -29,7 +29,7 @@ namespace swift {
 /// Unfortunately it's not possible to use `llvm::SetVector` directly because
 /// the BasicBlockSet and StackList constructors needs a `SILFunction` argument.
 ///
-/// Note: This class does not provide a `remove` method intentinally, because
+/// Note: This class does not provide a `remove` method intentionally, because
 /// it would have a O(n) complexity.
 class BasicBlockSetVector {
   StackList<SILBasicBlock *> vector;

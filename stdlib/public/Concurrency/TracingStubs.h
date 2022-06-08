@@ -34,25 +34,41 @@ inline void actor_enqueue(HeapObject *actor, Job *job) {}
 inline void actor_dequeue(HeapObject *actor, Job *job) {}
 
 inline void actor_state_changed(HeapObject *actor, Job *firstJob,
-                                bool needsPreprocessing, uintptr_t flags) {}
+                                bool needsPreprocessing, uint8_t state,
+                                bool isDistributedRemote,
+                                bool isPriorityEscalated, uint8_t maxPriority) {
+}
 
 inline void actor_note_job_queue(HeapObject *actor, Job *first,
                                  Job *(*getNext)(Job *)) {}
 
 inline void task_create(AsyncTask *task, AsyncTask *parent, TaskGroup *group,
-                        AsyncLet *asyncLet) {}
+                        AsyncLet *asyncLet, uint8_t jobPriority,
+                        bool isChildTask, bool isFuture, bool isGroupChildTask,
+                        bool isAsyncLetTask) {}
 
 inline void task_destroy(AsyncTask *task) {}
-
-inline void task_status_changed(AsyncTask *task, TaskStatusRecord *record,
-                                uintptr_t flags) {}
 
 inline void task_wait(AsyncTask *task, AsyncTask *waitingOn, uintptr_t status) {
 }
 
-inline void task_status_changed(AsyncTask *task, uintptr_t flags) {}
+inline void task_resume(AsyncTask *task) {}
 
-inline void task_flags_changed(AsyncTask *task, uint32_t flags) {}
+inline void task_status_changed(AsyncTask *task, uint8_t maxPriority,
+                                bool isCancelled, bool isEscalated,
+                                bool isRunning, bool isEnqueued) {}
+
+inline void task_flags_changed(AsyncTask *task, uint8_t jobPriority,
+                               bool isChildTask, bool isFuture,
+                               bool isGroupChildTask, bool isAsyncLetTask) {}
+
+inline void task_continuation_init(AsyncTask *task,
+                                   ContinuationAsyncContext *context) {}
+
+inline void task_continuation_await(ContinuationAsyncContext *context) {}
+
+inline void task_continuation_resume(ContinuationAsyncContext *context,
+                                     bool error) {}
 
 inline void job_enqueue_global(Job *job) {}
 
@@ -60,10 +76,9 @@ inline void job_enqueue_global_with_delay(unsigned long long delay, Job *job) {}
 
 inline void job_enqueue_main_executor(Job *job) {}
 
-inline uint64_t job_run_begin(Job *job, ExecutorRef *executor) { return 0; }
+inline job_run_info job_run_begin(Job *job) { return {}; }
 
-inline void job_run_end(Job *job, ExecutorRef *executor, uint64_t beginHandle) {
-}
+inline void job_run_end(job_run_info info) {}
 
 } // namespace trace
 } // namespace concurrency

@@ -7,7 +7,7 @@ func ~= (x: (Int,Int), y: (Int,Int)) -> Bool {
 }
 
 func parseError1(x: Int) {
-  switch func {} // expected-error {{expected expression in 'switch' statement}} expected-error {{expected identifier in function declaration}} expected-error {{closure expression is unused}} expected-note{{did you mean to use a 'do' statement?}} {{15-15=do }}
+  switch func {} // expected-error {{expected expression in 'switch' statement}} expected-error {{expected identifier in function declaration}}
 }
 
 func parseError2(x: Int) {
@@ -246,7 +246,7 @@ case (1, _):
 func patternVarUsedInAnotherPattern(x: Int) {
   switch x {
   case let a, // expected-error {{'a' must be bound in every pattern}}
-       a: // expected-error {{cannot find 'a' in scope}}
+       value: // expected-error {{cannot find 'value' in scope}}
     break
   }
 }

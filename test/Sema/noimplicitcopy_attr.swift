@@ -93,7 +93,7 @@ enum MyEnum {
     case none
     case noImplicitCopyCase(Klass)
 
-    // We suport doing it on computed properties though.
+    // We support doing it on computed properties though.
     @_noImplicitCopy var myMoveOnly: Builtin.NativeObject { // expected-error {{'@_noImplicitCopy' attribute can only be applied to local lets}}
         return getKlass()
     }
@@ -105,12 +105,12 @@ enum MyGenericEnum<T> {
     case none
     case noImplicitCopyCase(Klass)
 
-    // We suport doing it on computed properties though.
+    // We support doing it on computed properties though.
     @_noImplicitCopy var myMoveOnly: Builtin.NativeObject { // expected-error {{'@_noImplicitCopy' attribute can only be applied to local lets}}
         return getKlass()
     }
 
-    // We suport doing it on computed properties though.
+    // We support doing it on computed properties though.
     @_noImplicitCopy var myMoveOnly2: T? { // expected-error {{'@_noImplicitCopy' attribute can only be applied to local lets}}
         return nil
     }

@@ -33,9 +33,11 @@ TEST_F(SemaTest, TestLookupAlwaysLooksThroughOptionalBase) {
   auto *UMCRE = new (Context) UnresolvedMemberChainResultExpr(UME, UME);
 
   ConstraintSystem cs(DC, ConstraintSystemOptions());
-  cs.generateConstraints(UMCRE, DC);
+  auto *expr = cs.generateConstraints(UMCRE, DC);
+  ASSERT_TRUE(expr);
+
   cs.addConstraint(
-      ConstraintKind::Conversion, cs.getType(UMCRE), intOptType,
+      ConstraintKind::Conversion, cs.getType(expr), intOptType,
       cs.getConstraintLocator(UMCRE, ConstraintLocator::ContextualType));
   SmallVector<Solution, 2> solutions;
   cs.solve(solutions);
@@ -67,10 +69,12 @@ TEST_F(SemaTest, TestLookupPrefersResultsOnOptionalRatherThanBase) {
   auto *UMCRE = new (Context) UnresolvedMemberChainResultExpr(UME, UME);
 
   ConstraintSystem cs(DC, ConstraintSystemOptions());
-  cs.generateConstraints(UMCRE, DC);
+  auto *expr = cs.generateConstraints(UMCRE, DC);
+  ASSERT_TRUE(expr);
+
   cs.addConstraint(
-      ConstraintKind::Conversion, cs.getType(UMCRE), intOptType,
-      cs.getConstraintLocator(UMCRE, ConstraintLocator::ContextualType));
+      ConstraintKind::Conversion, cs.getType(expr), intOptType,
+      cs.getConstraintLocator(expr, ConstraintLocator::ContextualType));
   SmallVector<Solution, 2> solutions;
   cs.solve(solutions);
 

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
 // RUN: %target-swift-frontend -typecheck -debug-generic-signatures %s 2>&1 | %FileCheck %s
 // RUN: %target-swift-frontend -emit-ir %s
 
@@ -27,7 +27,6 @@ public func caller11<Child: P3>(_: Child)
 // CHECK: rdar83687967.(file).caller12@
 // CHECK: Generic signature: <Child where Child : P3, Child.[P3]B == G<Child.[P3]A>>
 public func caller12<Child: P3>(_: Child)
-    // expected-note@-1 {{conformance constraint 'Child.A' : 'P1' implied here}}
     where Child.B == G<Child.A>, Child.A : P1 {
     // expected-warning@-1 {{redundant conformance constraint 'Child.A' : 'P1'}}
 
@@ -48,7 +47,6 @@ public protocol X1 {
 
 public protocol X2 {
   associatedtype Child: P3
-    // expected-note@-1 {{conformance constraint 'Self.Child.A' : 'P1' implied here}}
     where Child.B == G<Child.A>, Child.A : P1
     // expected-warning@-1 {{redundant conformance constraint 'Self.Child.A' : 'P1'}}
 }

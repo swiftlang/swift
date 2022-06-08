@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-swift-frontend -typecheck -verify -enable-experimental-distributed -disable-availability-checking -I %t 2>&1 %s
+// RUN: %target-swift-frontend -typecheck -verify -disable-availability-checking -I %t 2>&1 %s
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
-import _Distributed
+import Distributed
 import FakeDistributedActorSystems
 
 typealias DefaultDistributedActorSystem = FakeActorSystem
@@ -22,14 +22,16 @@ class C: Actor, UnsafeSendable {
 }
 
 struct S: Actor {
-  // expected-error@-1{{non-class type 'S' cannot conform to class protocol 'Actor'}}
+  // expected-error@-1{{non-class type 'S' cannot conform to class protocol 'AnyActor'}}
+  // expected-error@-2{{non-class type 'S' cannot conform to class protocol 'Actor'}}
   nonisolated var unownedExecutor: UnownedSerialExecutor {
     fatalError()
   }
 }
 
 struct E: Actor {
-  // expected-error@-1{{non-class type 'E' cannot conform to class protocol 'Actor'}}
+  // expected-error@-1{{non-class type 'E' cannot conform to class protocol 'AnyActor'}}
+  // expected-error@-2{{non-class type 'E' cannot conform to class protocol 'Actor'}}
   nonisolated var unownedExecutor: UnownedSerialExecutor {
     fatalError()
   }
@@ -41,10 +43,10 @@ distributed actor DA: DistributedActor {
   typealias ActorSystem = FakeActorSystem
 }
 
+// FIXME(distributed): error reporting is a bit whacky here; needs cleanup
+// expected-error@+2{{actor type 'A2' cannot conform to the 'DistributedActor' protocol. Isolation rules of these actor types are not interchangeable.}}
+// expected-error@+1{{actor type 'A2' cannot conform to the 'DistributedActor' protocol. Isolation rules of these actor types are not interchangeable.}}
 actor A2: DistributedActor {
-  // expected-error@-1{{non-distributed actor type 'A2' cannot conform to the 'DistributedActor' protocol}} {{1-1=distributed }}
-  // expected-error@-2{{'DistributedActor' requires the types 'ObjectIdentifier' and 'FakeActorSystem.ActorID' (aka 'ActorAddress') be equivalent}}
-  // expected-note@-3{{requirement specified as 'Self.ID' == 'Self.ActorSystem.ActorID' [with Self = A2]}}
   nonisolated var id: ID {
     fatalError()
   }
@@ -61,10 +63,8 @@ actor A2: DistributedActor {
   }
 }
 
+// expected-error@+1{{non-distributed actor type 'C2' cannot conform to the 'DistributedActor' protocol}}
 final class C2: DistributedActor {
-  // expected-error@-1{{non-actor type 'C2' cannot conform to the 'Actor' protocol}}
-  // expected-error@-2{{'DistributedActor' requires the types 'ObjectIdentifier' and 'FakeActorSystem.ActorID' (aka 'ActorAddress') be equivalent}}
-  // expected-note@-3{{requirement specified as 'Self.ID' == 'Self.ActorSystem.ActorID' [with Self = C2]}}
   nonisolated var id: ID {
     fatalError()
   }

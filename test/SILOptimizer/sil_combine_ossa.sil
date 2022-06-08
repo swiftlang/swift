@@ -83,6 +83,7 @@ sil [global_init] @global_init_fun : $@convention(thin) () -> Builtin.RawPointer
 sil [ossa] @user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
 sil [ossa] @use_nativeobject_owned : $@convention(thin) (@owned Builtin.NativeObject) -> ()
 sil [ossa] @use_nativeobject_guaranteed : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+sil [ossa] @get_owned_klass : $@convention(thin) () -> (@owned Klass)
 sil @use_anyobject_guaranteed : $@convention(thin) (@guaranteed AnyObject) -> ()
 sil @use_generic_obj_guaranteed : $@convention(thin) <τ_0_0> (@guaranteed τ_0_0) -> ()
 sil [ossa] @unknown : $@convention(thin) () -> ()
@@ -1687,7 +1688,7 @@ class AnotherClass : MyNSObj { }
 
 sil [ossa] @MyNSObj_self : $@convention(method) (@guaranteed MyNSObj) -> @owned MyNSObj
 
-sil shared [ossa] [transparent] [serializable] [reabstraction_thunk] @reabstraction_thunk1 : $@convention(thin) (@in (), @owned @callee_owned () -> @owned AnotherClass) -> @out AnotherClass {
+sil shared [ossa] [transparent] [serialized] [reabstraction_thunk] @reabstraction_thunk1 : $@convention(thin) (@in (), @owned @callee_owned () -> @owned AnotherClass) -> @out AnotherClass {
 bb0(%0 : $*AnotherClass, %1 : $*(), %2 : @owned $@callee_owned () -> @owned AnotherClass):
   %3 = apply %2() : $@callee_owned () -> @owned AnotherClass
   store %3 to [init] %0 : $*AnotherClass
@@ -1696,7 +1697,7 @@ bb0(%0 : $*AnotherClass, %1 : $*(), %2 : @owned $@callee_owned () -> @owned Anot
 }
 
 // @nonobjc curry thunk of MyNSObj.self()
-sil shared [ossa] [serializable] [thunk] @curry_thunk_for_MyNSObj_self : $@convention(thin) (@owned MyNSObj) -> @owned @callee_owned () -> @owned MyNSObj {
+sil shared [ossa] [serialized] [thunk] @curry_thunk_for_MyNSObj_self : $@convention(thin) (@owned MyNSObj) -> @owned @callee_owned () -> @owned MyNSObj {
 bb0(%0 : @owned $MyNSObj):
   // function_ref @nonobjc MyNSObj.self()
   %1 = function_ref @MyNSObj_self : $@convention(method) (@guaranteed MyNSObj) -> @owned MyNSObj
@@ -1704,14 +1705,15 @@ bb0(%0 : @owned $MyNSObj):
   return %2 : $@callee_owned () -> @owned MyNSObj
 }
 
-// Check that convert_function is not eliminated if the result type of the converted function is different from the apply result type.
-// CHECK-LABEL: sil {{.*}} @do_not_peephole_convert_function : $@convention(thin) (@in AnotherClass) -> @out @callee_owned (@in ()) -> @out AnotherClass {
-// CHECK: [[CF:%[0-9]+]] = convert_function
-// CHECK: [[APPLY:%[0-9]+]] = apply
-// CHECK: [[FUN:%[0-9]+]] = function_ref
-// CHECK: [[CF:%[0-9]+]] = partial_apply [[FUN]]([[APPLY]])
-// CHECK: // end sil function 'do_not_peephole_convert_function'
-sil shared [ossa] [transparent] [reabstraction_thunk] @do_not_peephole_convert_function : $@convention(thin) (@in AnotherClass) -> @out @callee_owned (@in ()) -> @out AnotherClass {
+// Check that convert_function is eliminated if the result type of the converted function is different from the apply result type.
+// CHECK-LABEL: sil {{.*}} @peephole_convert_function_result_change : $@convention(thin) (@in AnotherClass) -> @out @callee_owned (@in ()) -> @out AnotherClass {
+// CHECK: [[F1:%[0-9]+]] = function_ref @curry_thunk_for_MyNSObj_self
+// CHECK: [[APPLY:%[0-9]+]] = apply [[F1]]
+// CHECK: [[CONV_RESULT:%[0-9]+]] = convert_function [[APPLY]]
+// CHECK: [[FUN:%[0-9]+]] = function_ref @reabstraction_thunk1
+// CHECK: [[CF:%[0-9]+]] = partial_apply [[FUN]]([[CONV_RESULT]])
+// CHECK: // end sil function 'peephole_convert_function_result_change'
+sil shared [ossa] [transparent] [reabstraction_thunk] @peephole_convert_function_result_change : $@convention(thin) (@in AnotherClass) -> @out @callee_owned (@in ()) -> @out AnotherClass {
 bb0(%0 : $*@callee_owned (@in ()) -> @out AnotherClass, %1 : $*AnotherClass):
   // function_ref @nonobjc curry thunk of MyNSObj.self()
   %2 = function_ref @curry_thunk_for_MyNSObj_self : $@convention(thin) (@owned MyNSObj) -> @owned @callee_owned () -> @owned MyNSObj
@@ -1724,7 +1726,65 @@ bb0(%0 : $*@callee_owned (@in ()) -> @out AnotherClass, %1 : $*AnotherClass):
   store %8 to [init] %0 : $*@callee_owned (@in ()) -> @out AnotherClass
   %10 = tuple ()
   return %10 : $()
-} // end sil function 'do_not_peephole_convert_function'
+} // end sil function 'peephole_convert_function_result_change'
+
+sil @convertible_result_with_error : $@convention(thin) () -> (@owned AnotherClass, @error Error)
+
+// TODO
+sil [ossa] @peephole_convert_function_result_change_with_error : $@convention(thin) () -> () {
+entry:
+  %f = function_ref @convertible_result_with_error : $@convention(thin) () -> (@owned AnotherClass, @error Error)
+  %c = convert_function %f : $@convention(thin) () -> (@owned AnotherClass, @error Error) to $@convention(thin) () -> (@owned MyNSObj, @error Error)
+  try_apply %c() : $@convention(thin) () -> (@owned MyNSObj, @error Error), normal success, error failure
+
+success(%r : $MyNSObj):
+  destroy_value %r : $MyNSObj
+  br exit
+
+failure(%e : $Error):
+  destroy_value %e : $Error
+  br exit
+
+exit:
+  return undef : $()
+}
+
+sil @convertible_indirect_result : $@convention(thin) (@guaranteed MyNSObj) -> @out AnotherClass
+
+// CHECK-LABEL: sil [ossa] @peephole_convert_function_indirect_result :
+// CHECK:       bb0([[A:%.*]] : @guaranteed $AnotherClass):
+// CHECK:         [[F:%.*]] = function_ref @convertible_indirect_result :
+// CHECK:         [[B:%.*]] = alloc_stack $MyNSObj
+// CHECK:         [[B_CONV:%.*]] = unchecked_addr_cast [[B]]
+// CHECK:         [[A_CONV:%.*]] = upcast [[A]]
+// CHECK:         apply [[F]]([[B_CONV]], [[A_CONV]])
+sil [ossa] @peephole_convert_function_indirect_result : $@convention(thin) (@guaranteed AnotherClass) -> @owned MyNSObj {
+entry(%a : @guaranteed $AnotherClass):
+  %f = function_ref @convertible_indirect_result : $@convention(thin) (@guaranteed MyNSObj) -> @out AnotherClass
+  %c = convert_function %f : $@convention(thin) (@guaranteed MyNSObj) -> @out AnotherClass to $@convention(thin) (@guaranteed AnotherClass) -> @out MyNSObj
+  %b = alloc_stack $*MyNSObj
+  apply %c(%b, %a) : $@convention(thin) (@guaranteed AnotherClass) -> @out MyNSObj
+  %r = load [take] %b : $*MyNSObj
+  dealloc_stack %b : $*MyNSObj
+  return %r : $MyNSObj
+}
+
+sil @convertible_owned_aggregate_input : $@convention(thin) (@owned (MyNSObj, MyNSObj)) -> @owned (AnotherClass, AnotherClass)
+
+// CHECK-LABEL: sil [ossa] @peephole_convert_owned_aggregate_input_result :
+// CHECK:       bb0([[A:%.*]] : @owned $(AnotherClass, AnotherClass)):
+// CHECK:         [[F:%.*]] = function_ref @convertible_owned_aggregate_input :
+// CHECK:         [[A_CONV:%.*]] = unchecked_value_cast [[A]]
+// CHECK:         [[R:%.*]] = apply [[F]]([[A_CONV]])
+// CHECK:         [[R_CONV:%.*]] = unchecked_value_cast [[R]]
+// CHECK:         return [[R_CONV]]
+sil [ossa] @peephole_convert_owned_aggregate_input_result : $@convention(thin) (@owned (AnotherClass, AnotherClass)) -> @owned (MyNSObj, MyNSObj) {
+entry(%a : @owned $(AnotherClass, AnotherClass)):
+  %f = function_ref @convertible_owned_aggregate_input : $@convention(thin) (@owned (MyNSObj, MyNSObj)) -> @owned (AnotherClass, AnotherClass)
+  %c = convert_function %f : $@convention(thin) (@owned (MyNSObj, MyNSObj)) -> @owned (AnotherClass, AnotherClass) to $@convention(thin) (@owned (AnotherClass, AnotherClass)) -> @owned (MyNSObj, MyNSObj)
+  %r = apply %c(%a) : $@convention(thin) (@owned (AnotherClass, AnotherClass)) -> @owned (MyNSObj, MyNSObj)
+  return %r : $(MyNSObj, MyNSObj)
+}
 
 // CHECK-LABEL: sil [ossa] @upcast_formation : $@convention(thin) (@inout E, @owned E, @inout B) -> @owned B {
 // CHECK: bb0
@@ -5218,21 +5278,40 @@ bb0(%0 : $UnsafePointer<AnyObject>):
 // CHECK:   destroy_value [[CP1]] : $Klass
 // CHECK:   fix_lifetime %0 : $Klass
 // CHECK-LABEL: } // end sil function 'test_pointer_to_address'
-//
-// CHECK_COPYPROP-LABEL: sil [ossa] @test_pointer_to_address : $@convention(thin) (@owned Klass, Builtin.Word) -> @owned AnyObject {
-// CHECK_COPYPROP: bb0(%0 : @owned $Klass, %1 : $Builtin.Word):
-// CHECK_COPYPROP-NOT: copy_value
-// CHECK_COPYPROP:   [[BORROW:%.*]] = begin_borrow %0 : $Klass
-// CHECK_COPYPROP:   ref_tail_addr [[BORROW]] : $Klass, $AnyObject
-// CHECK_COPYPROP:   index_addr %{{.*}} : $*AnyObject, %1 : $Builtin.Word
-// CHECK_COPYPROP:   index_addr %{{.*}} : $*AnyObject, %1 : $Builtin.Word
-// CHECK_COPYPROP:   load [copy] %{{.*}} : $*AnyObject
-// CHECK_COPYPROP:   end_borrow [[BORROW]] : $Klass
-// CHECK_COPYPROP:   fix_lifetime %0 : $Klass
-// CHECK_COPYPROP:   destroy_value %0 : $Klass
-// CHECK_COPYPROP-LABEL: } // end sil function 'test_pointer_to_address'
 sil [ossa] @test_pointer_to_address : $@convention(thin) (@owned Klass, Builtin.Word) -> @owned AnyObject {
 bb0(%0 : @owned $Klass, %1 : $Builtin.Word):
+  %2 = begin_borrow %0 : $Klass
+  %3 = ref_tail_addr %2 : $Klass, $AnyObject
+  %4 = index_addr %3 : $*AnyObject, %1 : $Builtin.Word
+  %5 = address_to_pointer %4 : $*AnyObject to $Builtin.RawPointer
+  end_borrow %2 : $Klass
+  %7 = pointer_to_address %5 : $Builtin.RawPointer to [strict] $*AnyObject
+  %8 = index_addr %7 : $*AnyObject, %1 : $Builtin.Word
+  %9 = address_to_pointer %8 : $*AnyObject to $Builtin.RawPointer
+  %10 = pointer_to_address %9 : $Builtin.RawPointer to [strict] $*AnyObject
+  %11 = load [copy] %10 : $*AnyObject
+  fix_lifetime %0 : $Klass
+  destroy_value %0 : $Klass
+  return %11 : $AnyObject
+}
+
+// CHECK_COPYPROP-LABEL: sil [ossa] @test_pointer_to_address_copyprop : {{.*}} {
+// CHECK_COPYPROP: bb0([[WORD:%[^,]+]] :
+// CHECK_COPYPROP: [[INSTANCE:%[^,]+]] = apply
+// CHECK_COPYPROP-NOT: copy_value
+// CHECK_COPYPROP:   [[BORROW:%.*]] = begin_borrow [[INSTANCE]] : $Klass
+// CHECK_COPYPROP:   ref_tail_addr [[BORROW]] : $Klass, $AnyObject
+// CHECK_COPYPROP:   index_addr %{{.*}} : $*AnyObject, [[WORD]] : $Builtin.Word
+// CHECK_COPYPROP:   index_addr %{{.*}} : $*AnyObject, [[WORD]] : $Builtin.Word
+// CHECK_COPYPROP:   load [copy] %{{.*}} : $*AnyObject
+// CHECK_COPYPROP:   end_borrow [[BORROW]] : $Klass
+// CHECK_COPYPROP:   fix_lifetime [[INSTANCE]] : $Klass
+// CHECK_COPYPROP:   destroy_value [[INSTANCE]] : $Klass
+// CHECK_COPYPROP-LABEL: } // end sil function 'test_pointer_to_address_copyprop'
+sil [ossa] @test_pointer_to_address_copyprop : $@convention(thin) (Builtin.Word) -> @owned AnyObject {
+bb0(%1 : $Builtin.Word):
+  %f = function_ref @get_owned_klass : $@convention(thin) () -> (@owned Klass)
+  %0 = apply %f() : $@convention(thin) () -> (@owned Klass)
   %2 = begin_borrow %0 : $Klass
   %3 = ref_tail_addr %2 : $Klass, $AnyObject
   %4 = index_addr %3 : $*AnyObject, %1 : $Builtin.Word

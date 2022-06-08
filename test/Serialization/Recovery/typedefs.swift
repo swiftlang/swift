@@ -126,7 +126,7 @@ open class User {
   // CHECK-RECOVERY: /* placeholder for returnsWrappedMethod() (vtable entries: 1) */
   public func returnsWrappedMethod() -> WrappedInt { fatalError() }
 
-  // CHECK: func constrainedUnwrapped<T>(_: T) where T : HasAssoc, T.Assoc == UnwrappedInt
+  // CHECK: func constrainedUnwrapped<T>(_: T) where T : HasAssoc, T.Assoc == Int32
   // CHECK-RECOVERY: func constrainedUnwrapped<T>(_: T) where T : HasAssoc, T.Assoc == Int32
   public func constrainedUnwrapped<T: HasAssoc>(_: T) where T.Assoc == UnwrappedInt { fatalError() }
   // CHECK: func constrainedWrapped<T>(_: T) where T : HasAssoc, T.Assoc == WrappedInt

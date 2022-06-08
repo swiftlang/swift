@@ -163,7 +163,10 @@ public:
     /// type sequence
     HasTypeSequence = 0x1000,
 
-    Last_Property = HasTypeSequence
+    /// This type contains a parameterized existential type \c any P<T>.
+    HasParameterizedExistential = 0x2000,
+
+    Last_Property = HasParameterizedExistential
   };
   enum { BitWidth = countBitsUsed(Property::Last_Property) };
 
@@ -222,6 +225,12 @@ public:
   bool hasPlaceholder() const { return Bits & HasPlaceholder; }
 
   bool hasTypeSequence() const { return Bits & HasTypeSequence; }
+
+  /// Does a type with these properties structurally contain a
+  /// parameterized existential type?
+  bool hasParameterizedExistential() const {
+    return Bits & HasParameterizedExistential;
+  }
 
   /// Returns the set of properties present in either set.
   friend RecursiveTypeProperties operator|(Property lhs, Property rhs) {
@@ -291,11 +300,13 @@ enum class TypeMatchFlags {
   AllowABICompatible = 1 << 3,
   /// Allow escaping function parameters to override optional non-escaping ones.
   ///
-  /// This is necessary because Objective-C allows optional function paramaters
+  /// This is necessary because Objective-C allows optional function parameters
   /// to be non-escaping, but Swift currently does not.
   IgnoreNonEscapingForOptionalFunctionParam = 1 << 4,
   /// Allow compatible opaque archetypes.
-  AllowCompatibleOpaqueTypeArchetypes = 1 << 5
+  AllowCompatibleOpaqueTypeArchetypes = 1 << 5,
+  /// Ignore the @Sendable attributes on functions when matching types.
+  IgnoreFunctionSendability = 1 << 6,
 };
 using TypeMatchOptions = OptionSet<TypeMatchFlags>;
 
@@ -413,6 +424,11 @@ protected:
     Count : 32
   );
 
+  SWIFT_INLINE_BITFIELD_FULL(ParameterizedProtocolType, TypeBase, 32,
+    /// The number of type arguments.
+    ArgCount : 32
+  );
+
   SWIFT_INLINE_BITFIELD_FULL(TupleType, TypeBase, 1+32,
     /// Whether an element of the tuple is inout, __shared or __owned.
     /// Values cannot have such tuple types in the language.
@@ -502,7 +518,7 @@ public:
   /// Canonical protocol composition types are minimized only to a certain
   /// degree to preserve ABI compatibility. This routine enables performing
   /// slower, but stricter minimization at need (e.g. redeclaration checking).
-  CanType getMinimalCanonicalType() const;
+  CanType getMinimalCanonicalType(const DeclContext *useDC) const;
 
   /// Reconstitute type sugar, e.g., for array types, dictionary
   /// types, optionals, etc.
@@ -619,6 +635,11 @@ public:
     return getRecursiveProperties().hasTypeSequence();
   }
 
+  /// Determine whether the type involves a parameterized existential type.
+  bool hasParameterizedExistential() const {
+    return getRecursiveProperties().hasParameterizedExistential();
+  }
+
   /// Determine whether the type involves the given opened existential
   /// archetype.
   bool hasOpenedExistentialWithRoot(const OpenedArchetypeType *root) const;
@@ -643,7 +664,8 @@ public:
 
   /// Replace opened archetypes with the given root with their most
   /// specific non-dependent upper bounds throughout this type.
-  Type typeEraseOpenedArchetypesWithRoot(const OpenedArchetypeType *root) const;
+  Type typeEraseOpenedArchetypesWithRoot(const OpenedArchetypeType *root,
+                                         const DeclContext *useDC) const;
 
   /// Given a declaration context, returns a function type with the 'self'
   /// type curried as the input if the declaration context describes a type.
@@ -683,7 +705,7 @@ public:
   bool canDynamicallyBeOptionalType(bool includeExistential);
 
   /// Determine whether this type contains a type parameter somewhere in it.
-  bool hasTypeParameter() {
+  bool hasTypeParameter() const {
     return getRecursiveProperties().hasTypeParameter();
   }
 
@@ -691,7 +713,7 @@ public:
   ///
   /// "Unresolved" dependent member types have no known associated type,
   /// and are only used transiently in the type checker.
-  const DependentMemberType *findUnresolvedDependentMemberType();
+  DependentMemberType *findUnresolvedDependentMemberType();
 
   /// Return the root generic parameter of this type parameter type.
   GenericTypeParamType *getRootGenericParam();
@@ -758,13 +780,18 @@ public:
   bool isClassExistentialType();
 
   /// Opens an existential instance or meta-type and returns the opened type.
-  Type openAnyExistentialType(OpenedArchetypeType *&opened);
+  Type openAnyExistentialType(OpenedArchetypeType *&opened,
+                              GenericSignature parentSig);
 
   /// Break an existential down into a set of constraints.
   ExistentialLayout getExistentialLayout();
 
   /// Determines whether this type is an actor type.
   bool isActorType();
+
+  /// Determines whether this type conforms or inherits (if it's a protocol
+  /// type) from `DistributedActor`.
+  bool isDistributedActor();
 
   /// Determines the element type of a known
   /// [Autoreleasing]Unsafe[Mutable][Raw]Pointer variant, or returns null if the
@@ -1234,6 +1261,10 @@ public:
 
   /// Whether this is the AnyObject type.
   bool isAnyObject();
+
+  /// Return true if this type is potentially an AnyObject existential after
+  /// substitution.
+  bool isPotentiallyAnyObject();
 
   /// Whether this is an existential composition containing
   /// Error.
@@ -2077,7 +2108,7 @@ public:
     return value.toRaw() != other.value.toRaw();
   }
 
-  uint8_t toRaw() const { return value.toRaw(); }
+  uint16_t toRaw() const { return value.toRaw(); }
 };
 
 class YieldTypeFlags {
@@ -2755,6 +2786,7 @@ BEGIN_CAN_TYPE_WRAPPER(ExistentialMetatypeType, AnyMetatypeType)
                                         MetatypeRepresentation repr) {
     return CanExistentialMetatypeType(ExistentialMetatypeType::get(type, repr));
   }
+  PROXY_CAN_TYPE_SIMPLE_GETTER(getExistentialInstanceType)
 END_CAN_TYPE_WRAPPER(ExistentialMetatypeType, AnyMetatypeType)
   
 /// ModuleType - This is the type given to a module value, e.g. the "Builtin" in
@@ -4428,6 +4460,32 @@ public:
   SILType getDirectFormalResultsType(SILModule &M,
                                      TypeExpansionContext expansion);
 
+  unsigned getNumIndirectFormalYields() const {
+    return isCoroutine() ? NumAnyIndirectFormalResults : 0;
+  }
+  /// Does this function have any formally indirect yields?
+  bool hasIndirectFormalYields() const {
+    return getNumIndirectFormalYields() != 0;
+  }
+  unsigned getNumDirectFormalYields() const {
+    return isCoroutine() ? NumAnyResults - NumAnyIndirectFormalResults : 0;
+  }
+
+  struct IndirectFormalYieldFilter {
+    bool operator()(SILYieldInfo yield) const {
+      return !yield.isFormalIndirect();
+    }
+  };
+
+  using IndirectFormalYieldIter =
+      llvm::filter_iterator<const SILYieldInfo *, IndirectFormalYieldFilter>;
+  using IndirectFormalYieldRange = iterator_range<IndirectFormalYieldIter>;
+
+  /// A range of SILYieldInfo for all formally Indirect Yields.
+  IndirectFormalYieldRange getIndirectFormalYields() const {
+    return llvm::make_filter_range(getYields(), IndirectFormalYieldFilter());
+  }
+
   /// Get a single non-address SILType for all SIL results regardless of whether
   /// they are formally indirect. The actual SIL result type of an apply
   /// instruction that calls this function depends on the current SIL stage and
@@ -4937,6 +4995,33 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(SILBoxType, Type)
 
+class SILMoveOnlyType;
+class SILModule; // From SIL
+typedef CanTypeWrapper<SILMoveOnlyType> CanMoveOnlyType;
+
+/// A wrapper type that marks an inner type as being a move only value. Can not
+/// be written directly at the Swift level, instead it is triggered by adding
+/// the type attribute @_moveOnly to a different type. We transform these in
+/// TypeLowering into a moveOnly SILType on the inner type.
+class SILMoveOnlyType final : public TypeBase, public llvm::FoldingSetNode {
+  CanType innerType;
+
+  SILMoveOnlyType(CanType innerType)
+      : TypeBase(TypeKind::SILMoveOnly, &innerType->getASTContext(),
+                 innerType->getRecursiveProperties()),
+        innerType(innerType) {}
+
+public:
+  CanType getInnerType() const { return innerType; }
+
+  static CanMoveOnlyType get(CanType innerType);
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::SILMoveOnly;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(SILMoveOnlyType, Type)
+
 class SILBlockStorageType;
 typedef CanTypeWrapper<SILBlockStorageType> CanSILBlockStorageType;
   
@@ -5184,7 +5269,7 @@ public:
   /// Canonical protocol composition types are minimized only to a certain
   /// degree to preserve ABI compatibility. This routine enables performing
   /// slower, but stricter minimization at need (e.g. redeclaration checking).
-  CanType getMinimalCanonicalType() const;
+  CanType getMinimalCanonicalType(const DeclContext *useDC) const;
 
   /// Retrieve the set of members composed to create this type.
   ///
@@ -5241,10 +5326,13 @@ private:
   }
 };
 BEGIN_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
+  CanTypeArrayRef getMembers() const {
+    return CanTypeArrayRef(getPointer()->getMembers());
+  }
 END_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
 
-/// ParameterizedProtocolType - A type that constrains the primary associated
-/// type of a protocol to an argument type.
+/// ParameterizedProtocolType - A type that constrains one or more primary
+/// associated type of a protocol to a list of argument types.
 ///
 /// Written like a bound generic type, eg Sequence<Int>.
 ///
@@ -5252,6 +5340,7 @@ END_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
 /// - Inheritance clauses of protocols, generic parameters, associated types
 /// - Conformance requirements in where clauses
 /// - Extensions
+/// - Opaque result types
 ///
 /// Assuming that the primary associated type of Sequence is Element, the
 /// desugaring is that T : Sequence<Int> is equivalent to
@@ -5260,52 +5349,86 @@ END_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
 /// T : Sequence where T.Element == Int.
 /// \endcode
 class ParameterizedProtocolType final : public TypeBase,
-    public llvm::FoldingSetNode {
+    public llvm::FoldingSetNode,
+    private llvm::TrailingObjects<ParameterizedProtocolType, Type> {
   friend struct ExistentialLayout;
+  friend TrailingObjects;
 
   ProtocolType *Base;
-  AssociatedTypeDecl *AssocType;
-  Type Arg;
 
 public:
   /// Retrieve an instance of a protocol composition type with the
   /// given set of members.
   static Type get(const ASTContext &C, ProtocolType *base,
-                  Type arg);
+                  ArrayRef<Type> args);
 
   ProtocolType *getBaseType() const {
     return Base;
   }
 
-  AssociatedTypeDecl *getAssocType() const {
-    return AssocType;
+  ProtocolDecl *getProtocol() const {
+    return Base->getDecl();
   }
 
-  Type getArgumentType() const {
-    return Arg;
+  ArrayRef<Type> getArgs() const {
+    return {getTrailingObjects<Type>(),
+            Bits.ParameterizedProtocolType.ArgCount};
   }
+
+  bool requiresClass() const {
+    return getBaseType()->requiresClass();
+  }
+
+  void getRequirements(Type baseType, SmallVectorImpl<Requirement> &reqs) const;
 
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, Base, Arg);
+    Profile(ID, Base, getArgs());
   }
   static void Profile(llvm::FoldingSetNodeID &ID,
                       ProtocolType *base,
-                      Type arg);
+                      ArrayRef<Type> args);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::ParameterizedProtocol;
   }
-  
+
 private:
   ParameterizedProtocolType(const ASTContext *ctx,
-                            ProtocolType *base, Type arg,
+                            ProtocolType *base,
+                            ArrayRef<Type> args,
                             RecursiveTypeProperties properties);
 };
 BEGIN_CAN_TYPE_WRAPPER(ParameterizedProtocolType, Type)
-  PROXY_CAN_TYPE_SIMPLE_GETTER(getBaseType)
-  PROXY_CAN_TYPE_SIMPLE_GETTER(getArgumentType)
+  CanProtocolType getBaseType() const {
+    return CanProtocolType(getPointer()->getBaseType());
+  }
+  CanTypeArrayRef getArgs() const {
+    return CanTypeArrayRef(getPointer()->getArgs());
+  }
 END_CAN_TYPE_WRAPPER(ParameterizedProtocolType, Type)
+
+/// The generalized shape of an existential type.
+struct ExistentialTypeGeneralization {
+  /// The generalized existential type.  May refer to type parameters
+  /// from the generalization signature.
+  Type Shape;
+
+  /// The generalization signature and substitutions.
+  SubstitutionMap Generalization;
+
+  /// Retrieve the generalization for the given existential type.
+  ///
+  /// Substituting the generalization substitutions into the shape
+  /// should produce the original existential type.
+  ///
+  /// If there is a generic type substitution which can turn existential
+  /// type A into existential type B, then:
+  /// - the generalized shape types of A and B must be equal and
+  /// - the generic signatures of the generalization substitutions of
+  ///   A and B must be equal.
+  static ExistentialTypeGeneralization get(Type existentialType);
+};
 
 /// An existential type, spelled with \c any .
 ///
@@ -5321,7 +5444,7 @@ class ExistentialType final : public TypeBase {
         ConstraintType(constraintType) {}
 
 public:
-  static Type get(Type constraint);
+  static Type get(Type constraint, bool forceExistential = false);
 
   Type getConstraintType() const { return ConstraintType; }
 
@@ -5331,6 +5454,9 @@ public:
 
     if (auto composition = ConstraintType->getAs<ProtocolCompositionType>())
       return composition->requiresClass();
+
+    if (auto paramProtocol = ConstraintType->getAs<ParameterizedProtocolType>())
+      return paramProtocol->requiresClass();
 
     return false;
   }
@@ -5663,7 +5789,7 @@ enum class OpaqueSubstitutionKind {
   // Can be done if the underlying type is accessible from the context we
   // substitute into. Private types cannot be accessed from a different TU.
   SubstituteSameModuleMaximalResilience,
-  // Substitute in a different module from the opaque definining decl. Can only
+  // Substitute in a different module from the opaque defining decl. Can only
   // be done if the underlying type is public.
   SubstituteNonResilientModule
 };
@@ -5673,9 +5799,12 @@ enum class OpaqueSubstitutionKind {
 /// archetypes with underlying types visible at a given resilience expansion
 /// to their underlying types.
 class ReplaceOpaqueTypesWithUnderlyingTypes {
+public:
+  using SeenDecl = std::pair<OpaqueTypeDecl *, SubstitutionMap>;
+private:
   ResilienceExpansion contextExpansion;
   llvm::PointerIntPair<const DeclContext *, 1, bool> inContextAndIsWholeModule;
-  llvm::SmallPtrSetImpl<OpaqueTypeDecl *> *seenDecls;
+  llvm::DenseSet<SeenDecl> *seenDecls;
 
 public:
   ReplaceOpaqueTypesWithUnderlyingTypes(const DeclContext *inContext,
@@ -5687,7 +5816,7 @@ public:
 
   ReplaceOpaqueTypesWithUnderlyingTypes(
       const DeclContext *inContext, ResilienceExpansion contextExpansion,
-      bool isWholeModuleContext, llvm::SmallPtrSetImpl<OpaqueTypeDecl *> &seen);
+      bool isWholeModuleContext, llvm::DenseSet<SeenDecl> &seen);
 
   /// TypeSubstitutionFn
   Type operator()(SubstitutableType *maybeOpaqueType) const;
@@ -5720,7 +5849,6 @@ class OpenedArchetypeType final : public ArchetypeType,
   friend ArchetypeType;
   friend GenericEnvironment;
 
-  TypeBase *Opened;
   UUID ID;
 
   /// Create a new opened archetype in the given environment representing
@@ -5734,45 +5862,71 @@ class OpenedArchetypeType final : public ArchetypeType,
          LayoutConstraint layout);
 
 public:
+  /// Compute the parameter that serves as the \c Self type for an opened
+  /// archetype from the given outer generic signature.
+  ///
+  /// This type is a generic parameter one level deeper
+  /// than the deepest generic context depth.
+  static Type getSelfInterfaceTypeFromContext(GenericSignature parentSig,
+                                              ASTContext &ctx);
+
+public:
   /// Get or create an archetype that represents the opened type
   /// of an existential value.
   ///
   /// \param existential The existential type to open.
+  /// \param parentSig The generic signature of the context opening
+  /// this existential.
   ///
   /// \param knownID When non-empty, the known ID of the archetype. When empty,
   /// a fresh archetype with a unique ID will be opened.
-  static CanTypeWrapper<OpenedArchetypeType> get(
-      CanType existential, Optional<UUID> knownID = None);
+  static CanTypeWrapper<OpenedArchetypeType> get(CanType existential,
+                                                 GenericSignature parentSig,
+                                                 Optional<UUID> knownID = None);
 
   /// Get or create an archetype that represents the opened type
   /// of an existential value.
   ///
   /// \param existential The existential type to open.
   /// \param interfaceType The interface type represented by this archetype.
+  /// \param parentSig The generic signature of the context opening
+  /// this existential.
   ///
   /// \param knownID When non-empty, the known ID of the archetype. When empty,
   /// a fresh archetype with a unique ID will be opened.
-  static CanTypeWrapper<OpenedArchetypeType> get(
-      CanType existential, Type interfaceType, Optional<UUID> knownID = None);
+  static CanTypeWrapper<OpenedArchetypeType> get(CanType existential,
+                                                 Type interfaceType,
+                                                 GenericSignature parentSig,
+                                                 Optional<UUID> knownID = None);
 
   /// Create a new archetype that represents the opened type
   /// of an existential value.
+  ///
+  /// Use this function when you are unsure of whether the
+  /// \c existential type is a metatype or an instance type. This function
+  /// will unwrap any existential metatype containers.
   ///
   /// \param existential The existential type or existential metatype to open.
   /// \param interfaceType The interface type represented by this archetype.
-  static CanType getAny(CanType existential, Type interfaceType);
+  /// \param parentSig The generic signature of the context opening
+  /// this existential.
+  static CanType getAny(CanType existential, Type interfaceType,
+                        GenericSignature parentSig);
 
   /// Create a new archetype that represents the opened type
   /// of an existential value.
   ///
+  /// Use this function when you are unsure of whether the
+  /// \c existential type is a metatype or an instance type. This function
+  /// will unwrap any existential metatype containers.
+  ///
   /// \param existential The existential type or existential metatype to open.
-  static CanType getAny(CanType existential);
+  /// \param parentSig The generic signature of the context opening
+  /// this existential.
+  static CanType getAny(CanType existential, GenericSignature parentSig);
 
   /// Retrieve the ID number of this opened existential.
   UUID getOpenedExistentialID() const;
-  
-  /// Retrieve the opened existential type
-  Type getOpenedExistentialType() const;
 
   /// Return the archetype that represents the root generic parameter of its
   /// interface type.
@@ -5790,6 +5944,9 @@ private:
                       LayoutConstraint layout);
 };
 BEGIN_CAN_TYPE_WRAPPER(OpenedArchetypeType, ArchetypeType)
+  CanOpenedArchetypeType getRoot() const {
+    return CanOpenedArchetypeType(getPointer()->getRoot());
+  }
 END_CAN_TYPE_WRAPPER(OpenedArchetypeType, ArchetypeType)
 
 /// An archetype that represents an opaque element of a type sequence in context.
@@ -6378,9 +6535,10 @@ inline bool TypeBase::isAnyExistentialType() {
 }
 
 inline bool CanType::isExistentialTypeImpl(CanType type) {
-  return (isa<ProtocolType>(type) ||
-          isa<ProtocolCompositionType>(type) ||
-          isa<ExistentialType>(type));
+  return isa<ProtocolType>(type) ||
+         isa<ProtocolCompositionType>(type) ||
+         isa<ExistentialType>(type) ||
+         isa<ParameterizedProtocolType>(type);
 }
 
 inline bool CanType::isAnyExistentialTypeImpl(CanType type) {
@@ -6412,8 +6570,7 @@ inline bool TypeBase::isOpenedExistentialWithError() {
 
   CanType T = getCanonicalType();
   if (auto archetype = dyn_cast<OpenedArchetypeType>(T)) {
-    auto openedExistentialType = archetype->getOpenedExistentialType();
-    return openedExistentialType->isExistentialWithError();
+    return archetype->getExistentialType()->isExistentialWithError();
   }
   return false;
 }
@@ -6477,6 +6634,8 @@ inline NominalTypeDecl *CanType::getNominalOrBoundGenericNominal() const {
     return Ty->getDecl();
   if (auto Ty = dyn_cast<ExistentialType>(*this))
     return Ty->getConstraintType()->getNominalOrBoundGenericNominal();
+  if (auto Ty = dyn_cast<ParameterizedProtocolType>(*this))
+    return Ty->getBaseType()->getNominalOrBoundGenericNominal();
   return nullptr;
 }
 
@@ -6487,7 +6646,8 @@ inline NominalTypeDecl *TypeBase::getAnyNominal() {
 inline Type TypeBase::getNominalParent() {
   if (auto existential = getAs<ExistentialType>())
     return existential->getConstraintType()->getNominalParent();
-
+  if (auto ppt = getAs<ParameterizedProtocolType>())
+    return ppt->getBaseType()->getNominalParent();
   return castTo<AnyGenericType>()->getParent();
 }
 
@@ -6645,38 +6805,6 @@ inline TypeBase *TypeBase::getDesugaredType() {
   if (!isa<SugarType>(this))
     return this;
   return cast<SugarType>(this)->getSinglyDesugaredType()->getDesugaredType();
-}
-
-inline bool TypeBase::hasSimpleTypeRepr() const {
-  // NOTE: Please keep this logic in sync with TypeRepr::isSimple().
-  switch (getKind()) {
-  case TypeKind::Function:
-  case TypeKind::GenericFunction:
-    return false;
-
-  case TypeKind::Metatype:
-  case TypeKind::ExistentialMetatype:
-    return !cast<const AnyMetatypeType>(this)->hasRepresentation();
-
-  case TypeKind::Existential:
-    return false;
-
-  case TypeKind::OpaqueTypeArchetype:
-  case TypeKind::OpenedArchetype:
-    return false;
-
-  case TypeKind::ProtocolComposition: {
-    // 'Any', 'AnyObject' and single protocol compositions are simple
-    auto composition = cast<const ProtocolCompositionType>(this);
-    auto memberCount = composition->getMembers().size();
-    if (composition->hasExplicitAnyObject())
-      return memberCount == 0;
-    return memberCount <= 1;
-  }
-
-  default:
-    return true;
-  }
 }
 
 } // end namespace swift

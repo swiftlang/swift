@@ -202,6 +202,7 @@ normalize_boolean_spelling(SWIFT_OPTIMIZED)
 normalize_boolean_spelling(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
 normalize_boolean_spelling(SWIFT_ENABLE_REFLECTION)
 normalize_boolean_spelling(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS)
+normalize_boolean_spelling(SWIFT_STDLIB_ENABLE_DEBUG_PRECONDITIONS_IN_RELEASE)
 normalize_boolean_spelling(SWIFT_HAVE_LIBXML2)
 normalize_boolean_spelling(SWIFT_INCLUDE_TOOLS)
 normalize_boolean_spelling(SWIFT_STDLIB_STATIC_PRINT)
@@ -218,6 +219,7 @@ set(TEST_MODES
     optimize_none_with_implicit_dynamic
     optimize_with_implicit_dynamic
     only_executable only_non_executable
+    with_cxx_interop
 )
 set(TEST_SUBSETS
     primary
@@ -238,8 +240,8 @@ endif()
 foreach(SDK ${SWIFT_SDKS})
   foreach(ARCH ${SWIFT_SDK_${SDK}_ARCHITECTURES})
     # macCatalyst needs to run two sets of tests: one with the normal macosx target triple
-    # and one with the the macCatalyst ios-macabi triple.  The build_flavors list will
-    # have have only the "default" flavor for all SDKs and architectures except
+    # and one with the macCatalyst ios-macabi triple.  The build_flavors list will
+    # have only the "default" flavor for all SDKs and architectures except
     # OSX when macCatalyst support is enabled.
     get_swift_test_build_flavors(build_flavors "${SDK}")
 
@@ -295,7 +297,7 @@ foreach(SDK ${SWIFT_SDKS})
             "swift-test-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
 
         if(BUILD_FLAVOR STREQUAL "ios-like")
-          # When testing the iOS-like build flavor, use the the normal macOS
+          # When testing the iOS-like build flavor, use the normal macOS
           # swift-reflection-test-tool. That tool runs out of process so it
           # doesn't need to be build for macCatalyst.
           list(APPEND test_dependencies
@@ -310,9 +312,11 @@ foreach(SDK ${SWIFT_SDKS})
         list(APPEND test_dependencies "touch-covering-tests")
       endif()
 
-      set(validation_test_dependencies
-          "swiftStdlibCollectionUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}"
-          "swiftStdlibUnicodeUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
+      list(APPEND test_dependencies
+        "swiftStdlibCollectionUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}"
+        "swiftStdlibUnicodeUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
+
+      set(validation_test_dependencies)
 
       set(command_upload_stdlib)
       set(command_upload_swift_reflection_test)

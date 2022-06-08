@@ -1415,7 +1415,7 @@ extension SIMDMask {
     return a .| SIMDMask(repeating: b)
   }
   
-  /// Replaces `a` with the pointwise logical conjuction of `a` and `b`.
+  /// Replaces `a` with the pointwise logical conjunction of `a` and `b`.
   ///
   /// Equivalent to:
   /// ```
@@ -1454,7 +1454,7 @@ extension SIMDMask {
     a = a .| b
   }
   
-  /// Replaces `a` with the pointwise logical conjuction of `a` and `b`.
+  /// Replaces `a` with the pointwise logical conjunction of `a` and `b`.
   ///
   /// Equivalent to:
   /// ```

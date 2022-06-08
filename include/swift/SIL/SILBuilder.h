@@ -46,7 +46,7 @@ class SILBuilderContext {
 
   SILModule &Module;
 
-  /// Allow the SIL module conventions to be overriden within the builder.
+  /// Allow the SIL module conventions to be overridden within the builder.
   /// This supports passes that lower SIL to a new stage.
   SILModuleConventions silConv = SILModuleConventions(Module);
 
@@ -123,11 +123,23 @@ public:
     setInsertionPoint(I);
   }
 
-  // Used by swift bridging.
   explicit SILBuilder(SILInstruction *I, const SILDebugScope *debugScope)
       : TempContext(I->getFunction()->getModule()),
         C(TempContext), F(I->getFunction()), CurDebugScope(debugScope) {
     setInsertionPoint(I);
+  }
+
+  // Used by swift bridging.
+  explicit SILBuilder(SILInstruction *I, SILBasicBlock *BB,
+                      const SILDebugScope *debugScope)
+      : TempContext((BB ? BB->getParent() : I->getFunction())->getModule()),
+        C(TempContext), F(BB ? BB->getParent() : I->getFunction()),
+        CurDebugScope(debugScope) {
+    if (I) {
+      setInsertionPoint(I);
+    } else {
+      setInsertionPoint(BB);
+    }
   }
 
   explicit SILBuilder(SILBasicBlock::iterator I,
@@ -266,11 +278,10 @@ public:
   void clearInsertionPoint() { BB = nullptr; }
 
   /// setInsertionPoint - Set the insertion point.
-  void setInsertionPoint(SILBasicBlock *BB, SILBasicBlock::iterator InsertPt) {
+  void setInsertionPoint(SILBasicBlock *BB, SILBasicBlock::iterator insertPt) {
     this->BB = BB;
-    this->InsertPt = InsertPt;
-    if (InsertPt == BB->end())
-      return;
+    this->InsertPt = insertPt;
+    assert(insertPt == BB->end() || insertPt->getParent() == BB);
   }
 
   /// setInsertionPoint - Set the insertion point to insert before the specified
@@ -382,15 +393,16 @@ public:
   AllocStackInst *createAllocStack(SILLocation Loc, SILType elementType,
                                    Optional<SILDebugVariable> Var = None,
                                    bool hasDynamicLifetime = false,
-                                   bool isLexical = false) {
+                                   bool isLexical = false,
+                                   bool wasMoved = false) {
     llvm::SmallString<4> Name;
     Loc.markAsPrologue();
     assert((!dyn_cast_or_null<VarDecl>(Loc.getAsASTNode<Decl>()) || Var) &&
            "location is a VarDecl, but SILDebugVariable is empty");
     return insert(AllocStackInst::create(
         getSILDebugLocation(Loc), elementType, getFunction(),
-        substituteAnonymousArgs(Name, Var, Loc), hasDynamicLifetime,
-        isLexical));
+        substituteAnonymousArgs(Name, Var, Loc), hasDynamicLifetime, isLexical,
+        wasMoved));
   }
 
   AllocRefInst *createAllocRef(SILLocation Loc, SILType ObjectType,
@@ -407,26 +419,28 @@ public:
 
   AllocRefDynamicInst *createAllocRefDynamic(SILLocation Loc, SILValue operand,
                                              SILType type, bool objc,
+                                             bool canAllocOnStack,
                                     ArrayRef<SILType> ElementTypes,
                                     ArrayRef<SILValue> ElementCountOperands) {
     // AllocRefDynamicInsts expand to function calls and can therefore
     // not be counted towards the function prologue.
     assert(!Loc.isInPrologue());
     return insert(AllocRefDynamicInst::create(
-        getSILDebugLocation(Loc), *F, operand, type, objc, ElementTypes,
-        ElementCountOperands));
+        getSILDebugLocation(Loc), *F, operand, type, objc, canAllocOnStack,
+        ElementTypes, ElementCountOperands));
   }
 
   AllocBoxInst *createAllocBox(SILLocation Loc, CanSILBoxType BoxType,
                                Optional<SILDebugVariable> Var = None,
-                               bool hasDynamicLifetime = false) {
+                               bool hasDynamicLifetime = false,
+                               bool reflection = false) {
     llvm::SmallString<4> Name;
     Loc.markAsPrologue();
     assert((!dyn_cast_or_null<VarDecl>(Loc.getAsASTNode<Decl>()) || Var) &&
            "location is a VarDecl, but SILDebugVariable is empty");
     return insert(AllocBoxInst::create(getSILDebugLocation(Loc), BoxType, *F,
                                        substituteAnonymousArgs(Name, Var, Loc),
-                                       hasDynamicLifetime));
+                                       hasDynamicLifetime, reflection));
   }
 
   AllocExistentialBoxInst *
@@ -895,19 +909,18 @@ public:
   ///   [trivial].
   ///
   /// * Otherwise, emit an actual store_borrow.
-  void emitStoreBorrowOperation(SILLocation loc, SILValue src,
-                                SILValue destAddr) {
+  SILInstruction *emitStoreBorrowOperation(SILLocation loc, SILValue src,
+                                           SILValue destAddr) {
     if (!hasOwnership()) {
-      return emitStoreValueOperation(loc, src, destAddr,
-                                     StoreOwnershipQualifier::Unqualified);
+      emitStoreValueOperation(loc, src, destAddr,
+                              StoreOwnershipQualifier::Unqualified);
+    } else if (src->getType().isTrivial(getFunction())) {
+      emitStoreValueOperation(loc, src, destAddr,
+                              StoreOwnershipQualifier::Trivial);
+    } else {
+      createStoreBorrow(loc, src, destAddr);
     }
-
-    if (src->getType().isTrivial(getFunction())) {
-      return emitStoreValueOperation(loc, src, destAddr,
-                                     StoreOwnershipQualifier::Trivial);
-    }
-
-    createStoreBorrow(loc, src, destAddr);
+    return &*std::prev(getInsertionPoint());
   }
 
   MarkUninitializedInst *
@@ -941,9 +954,11 @@ public:
 
   DebugValueInst *createDebugValue(SILLocation Loc, SILValue src,
                                    SILDebugVariable Var,
-                                   bool poisonRefs = false);
+                                   bool poisonRefs = false,
+                                   bool wasMoved = false);
   DebugValueInst *createDebugValueAddr(SILLocation Loc, SILValue src,
-                                       SILDebugVariable Var);
+                                       SILDebugVariable Var,
+                                       bool wasMoved = false);
 
   /// Create a debug_value according to the type of \p src
   SILInstruction *emitDebugDescription(SILLocation Loc, SILValue src,
@@ -1056,18 +1071,6 @@ public:
     return insert(ConvertEscapeToNoEscapeInst::create(
         getSILDebugLocation(Loc), Op, Ty, getFunction(),
         lifetimeGuaranteed));
-  }
-
-  ThinFunctionToPointerInst *
-  createThinFunctionToPointer(SILLocation Loc, SILValue Op, SILType Ty) {
-    return insert(new (getModule()) ThinFunctionToPointerInst(
-        getSILDebugLocation(Loc), Op, Ty));
-  }
-
-  PointerToThinFunctionInst *
-  createPointerToThinFunction(SILLocation Loc, SILValue Op, SILType Ty) {
-    return insert(PointerToThinFunctionInst::create(
-        getSILDebugLocation(Loc), Op, Ty, getFunction()));
   }
 
   UpcastInst *createUpcast(SILLocation Loc, SILValue Op, SILType Ty) {
@@ -1310,16 +1313,6 @@ public:
     return insert(UnconditionalCheckedCastAddrInst::create(
         getSILDebugLocation(Loc), src, sourceFormalType,
         dest, targetFormalType, getFunction()));
-  }
-
-  UnconditionalCheckedCastValueInst *
-  createUnconditionalCheckedCastValue(SILLocation Loc,
-                                      SILValue op, CanType srcFormalTy,
-                                      SILType destLoweredTy,
-                                      CanType destFormalTy) {
-    return insert(UnconditionalCheckedCastValueInst::create(
-        getSILDebugLocation(Loc), op, srcFormalTy,
-        destLoweredTy, destFormalTy, getFunction()));
   }
 
   RetainValueInst *createRetainValue(SILLocation Loc, SILValue operand,
@@ -2322,18 +2315,6 @@ public:
                           ProfileCounter Target1Count = ProfileCounter(),
                           ProfileCounter Target2Count = ProfileCounter());
 
-  CheckedCastValueBranchInst *
-  createCheckedCastValueBranch(SILLocation Loc,
-                               SILValue op, CanType srcFormalTy,
-                               SILType destLoweredTy,
-                               CanType destFormalTy,
-                               SILBasicBlock *successBB,
-                               SILBasicBlock *failureBB) {
-    return insertTerminator(CheckedCastValueBranchInst::create(
-        getSILDebugLocation(Loc), op, srcFormalTy,
-        destLoweredTy, destFormalTy, successBB, failureBB, getFunction()));
-  }
-
   CheckedCastAddrBranchInst *
   createCheckedCastAddrBranch(SILLocation Loc, CastConsumptionKind consumption,
                               SILValue src, CanType sourceFormalType,
@@ -2688,7 +2669,7 @@ private:
     // sync. We don't care if an instruction is used in global_addr.
     if (F)
       TheInst->verifyDebugInfo();
-    TheInst->verifyOperandOwnership();
+    TheInst->verifyOperandOwnership(&C.silConv);
 #endif
   }
 

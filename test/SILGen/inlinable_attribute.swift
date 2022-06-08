@@ -136,15 +136,15 @@ private class PrivateDerivedFromUFI : UFIBase {}
 // CHECK-LABEL: sil [serialized] [ossa] @$s19inlinable_attribute3basyyF
 @inlinable
 public func bas() {
-  // CHECK-LABEL: sil shared [serializable] [ossa] @$s19inlinable_attribute3basyyF3zimL_yyF
+  // CHECK-LABEL: sil shared [serialized] [ossa] @$s19inlinable_attribute3basyyF3zimL_yyF
   func zim() {
-    // CHECK-LABEL: sil shared [serializable] [ossa] @$s19inlinable_attribute3basyyF3zimL_yyF4zangL_yyF
+    // CHECK-LABEL: sil shared [serialized] [ossa] @$s19inlinable_attribute3basyyF3zimL_yyF4zangL_yyF
     func zang() { }
   }
 
   // CHECK-LABEL: sil shared [serialized] [ossa] @$s19inlinable_attribute3bas{{[_0-9a-zA-Z]*}}U_
   let _ = {
-    // CHECK-LABEL: sil shared [serializable] [ossa] @$s19inlinable_attribute3basyyFyycfU_7zippityL_yyF
+    // CHECK-LABEL: sil shared [serialized] [ossa] @$s19inlinable_attribute3basyyFyycfU_7zippityL_yyF
     func zippity() { }
   }
 }
@@ -168,18 +168,18 @@ public func global(_ x: Int) -> Int { return x }
   let _: @convention(c) (Int) -> Int = local
 }
 
-// CHECK-LABEL: sil shared [serializable] [thunk] [ossa] @$s19inlinable_attribute6globalyS2iFTo : $@convention(c) (Int) -> Int
+// CHECK-LABEL: sil shared [serialized] [thunk] [ossa] @$s19inlinable_attribute6globalyS2iFTo : $@convention(c) (Int) -> Int
 // CHECK: function_ref @$s19inlinable_attribute6globalyS2iF
 // CHECK: return
 
 // CHECK-LABEL: sil shared [serialized] [ossa] @$s19inlinable_attribute16cFunctionPointeryyFS2icfU_ : $@convention(thin) (Int) -> Int {
 
-// CHECK-LABEL: sil shared [serializable] [thunk] [ossa] @$s19inlinable_attribute16cFunctionPointeryyFS2icfU_To : $@convention(c) (Int) -> Int {
+// CHECK-LABEL: sil shared [serialized] [thunk] [ossa] @$s19inlinable_attribute16cFunctionPointeryyFS2icfU_To : $@convention(c) (Int) -> Int {
 // CHECK: function_ref @$s19inlinable_attribute16cFunctionPointeryyFS2icfU_
 // CHECK: return
 
-// CHECK-LABEL: sil shared [serializable] [ossa] @$s19inlinable_attribute16cFunctionPointeryyF5localL_yS2iF : $@convention(thin) (Int) -> Int {
+// CHECK-LABEL: sil shared [serialized] [ossa] @$s19inlinable_attribute16cFunctionPointeryyF5localL_yS2iF : $@convention(thin) (Int) -> Int {
 
-// CHECK-LABEL: sil shared [serializable] [thunk] [ossa] @$s19inlinable_attribute16cFunctionPointeryyF5localL_yS2iFTo : $@convention(c) (Int) -> Int {
+// CHECK-LABEL: sil shared [serialized] [thunk] [ossa] @$s19inlinable_attribute16cFunctionPointeryyF5localL_yS2iFTo : $@convention(c) (Int) -> Int {
 // CHECK: function_ref @$s19inlinable_attribute16cFunctionPointeryyF5localL_yS2iF
 // CHECK: return

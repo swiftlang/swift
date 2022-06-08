@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -dump-requirement-machine -disable-requirement-machine-merged-associated-types 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -dump-requirement-machine 2>&1 | %FileCheck %s
 
 protocol P1 {
   associatedtype A : P1
@@ -40,7 +40,7 @@ struct G<T : P1 & P2> {}
 // T.B.A => T.B
 // ...
 
-// CHECK-LABEL: Requirement machine for <τ_0_0 where τ_0_0 : P1, τ_0_0 : P2>
+// CHECK-LABEL: Requirement machine for fresh signature < T >
 // CHECK-LABEL: Rewrite system: {
 // CHECK: - τ_0_0.[P1:A].[concrete: S1 : P1] => τ_0_0.[P1:A]
 // CHECK: - τ_0_0.[P1:A].[P1:A] => τ_0_0.[P1:A]
@@ -60,5 +60,4 @@ struct G<T : P1 & P2> {}
 // CHECK: τ_0_0.[P1:B] => { conforms_to: [P1] concrete_type: [concrete: S2] }
 // CHECK: τ_0_0.[P1:A].[P1:B] => { conforms_to: [P1] concrete_type: [concrete: S2] }
 // CHECK: τ_0_0.[P1:B].[P1:B] => { conforms_to: [P1] concrete_type: [concrete: S1] }
-// CHECK: }
 // CHECK: }

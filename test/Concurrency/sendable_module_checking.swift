@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/StrictModule.swiftmodule -module-name StrictModule -warn-concurrency %S/Inputs/StrictModule.swift
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/NonStrictModule.swiftmodule -module-name NonStrictModule %S/Inputs/NonStrictModule.swift
-// RUN: %target-swift-frontend -typecheck -disable-availability-checking -I %t 2>&1 %s | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck -strict-concurrency=targeted -disable-availability-checking -I %t 2>&1 %s | %FileCheck %s
 
 // REQUIRES: concurrency
 

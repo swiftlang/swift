@@ -1073,7 +1073,7 @@ static bool canDevirtualizeWitnessMethod(ApplySite applySite) {
   auto *wmi = cast<WitnessMethodInst>(applySite.getCallee());
 
   std::tie(f, wt) = applySite.getModule().lookUpFunctionInWitnessTable(
-      wmi->getConformance(), wmi->getMember());
+      wmi->getConformance(), wmi->getMember(), SILModule::LinkingMode::LinkAll);
 
   if (!f)
     return false;
@@ -1094,9 +1094,10 @@ static bool canDevirtualizeWitnessMethod(ApplySite applySite) {
     return false;
   }
 
-  // FIXME: devirtualizeWitnessMethod below does not support cases with
-  // covariant 'Self' nested inside a collection type,
-  // like '[Self]' or '[* : Self]'.
+  // FIXME: devirtualizeWitnessMethod does not support cases with covariant
+  // 'Self'-rooted type parameters nested inside a collection type, like
+  // '[Self]' or '[* : Self.A]', because it doesn't know how to deal with
+  // associated collection upcasts.
   const Type interfaceTy = wmi->getMember()
                                .getDecl()
                                ->getInterfaceType()
@@ -1107,35 +1108,35 @@ static bool canDevirtualizeWitnessMethod(ApplySite applySite) {
   if (!interfaceTy->hasTypeParameter())
     return true;
 
-  class HasSelfNestedInsideCollection final : public TypeWalker {
-    unsigned CollectionDepth;
+  auto *const selfGP = wmi->getLookupProtocol()->getProtocolSelfType();
+  auto isSelfRootedTypeParameter = [selfGP](Type T) -> bool {
+    if (!T->hasTypeParameter())
+      return false;
 
-  public:
-    Action walkToTypePre(Type T) override {
-      if (!T->hasTypeParameter())
-        return Action::SkipChildren;
-
-      if (auto *GP = T->getAs<GenericTypeParamType>()) {
-        // Only 'Self' will have zero depth in the type of a requirement.
-        if (GP->getDepth() == 0 && CollectionDepth)
-          return Action::Stop;
-      }
-
-      if (T->isArray() || T->isDictionary())
-        ++CollectionDepth;
-
-      return Action::Continue;
+    if (T->isTypeParameter()) {
+      return T->getRootGenericParam()->isEqual(selfGP);
     }
 
-    Action walkToTypePost(Type T) override {
-      if (T->isArray() || T->isDictionary())
-        --CollectionDepth;
-
-      return Action::Continue;
-    }
+    return false;
   };
 
-  return !interfaceTy.walk(HasSelfNestedInsideCollection());
+  return !interfaceTy.findIf([&](Type T) -> bool {
+    if (!T->hasTypeParameter())
+      return false;
+
+    if (T->isArray() || T->isDictionary()) {
+      return T.findIf(isSelfRootedTypeParameter);
+    }
+
+    if (auto *FT = T->getAs<FunctionType>()) {
+      for (const auto &Param : FT->getParams()) {
+        if (Param.isVariadic() && T.findIf(isSelfRootedTypeParameter))
+          return true;
+      }
+    }
+
+    return false;
+  });
 }
 
 /// In the cases where we can statically determine the function that
@@ -1153,7 +1154,7 @@ swift::tryDevirtualizeWitnessMethod(ApplySite applySite,
   auto *wmi = cast<WitnessMethodInst>(applySite.getCallee());
 
   std::tie(f, wt) = applySite.getModule().lookUpFunctionInWitnessTable(
-      wmi->getConformance(), wmi->getMember());
+      wmi->getConformance(), wmi->getMember(), SILModule::LinkingMode::LinkAll);
 
   return devirtualizeWitnessMethod(applySite, f, wmi->getConformance(), ore);
 }

@@ -257,7 +257,7 @@ bool CopyOfBorrowedProjectionChecker::check(SILValue markedValue) {
         if (auto op = ForwardingOperand(use)) {
           // If our user is not directly forwarding, we cannot convert its
           // ownership to be guaranteed, so we treat it as a true consuming use.
-          if (!op.isDirectlyForwarding()) {
+          if (!op.preservesOwnership()) {
             foundConsumesOfBorrowedSubValues.push_back(user);
             liveness.updateForUse(user, /*lifetimeEnding*/ true);
             break;

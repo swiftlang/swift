@@ -15,35 +15,128 @@ func testNoneMarkerCheck() {
 func test0Fixits() {
   undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}}
 
+  // CHECK: [[@LINE+1]]:80: error: expected fix-it verification within braces; example: '1-2=text' or 'none'
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{}}
+
+  // CHECK: [[@LINE+1]]:81: error: expected line offset after leading '+' or '-' in fix-it verification
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{+}}
+
+  // CHECK: [[@LINE+1]]:81: error: expected line offset after leading '+' or '-' in fix-it verification
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{-}}
+
+  // CHECK: [[@LINE+1]]:81: error: expected '-' range separator in fix-it verification
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1}}
+
+  // CHECK: [[@LINE+1]]:82: error: expected colon-separated column number after line offset in fix-it verification
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{-1}}
+
+  // CHECK: [[@LINE+1]]:82: error: expected colon-separated column number after line offset in fix-it verification
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{+1}}
+
+  // CHECK: [[@LINE+1]]:82: error: expected column number after ':' in fix-it verification
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1:}}
+
+  // CHECK: [[@LINE+1]]:83: error: expected column number after ':' in fix-it verification
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{+1:}}
+
+  // CHECK: [[@LINE+1]]:83: error: expected '-' range separator in fix-it verification
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1:1}}
+
+  // CHECK: [[@LINE+1]]:84: error: expected '-' range separator in fix-it verification
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{-1:1}}
+
+  // CHECK: [[@LINE+1]]:83: error: expected column number after ':' in fix-it verification
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{+1:-1}}
+
+  // CHECK: [[@LINE+1]]:82: error: expected line or column number in fix-it verification
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1-}}
+
+  // CHECK: [[@LINE+1]]:84: error: expected line or column number in fix-it verification
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1:1-}}
+
+  // CHECK: [[@LINE+1]]:85: error: expected line or column number in fix-it verification
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{-1:1-}}
+
+  // CHECK: [[@LINE+1]]:83: error: expected line offset after leading '+' or '-' in fix-it verification
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1--}}
+
+  // CHECK: [[@LINE+1]]:83: error: expected '=' after range in fix-it verification
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1-1}}
+
+  // CHECK: [[@LINE+1]]:85: error: expected '=' after range in fix-it verification
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1:1-1}}
+
+  // CHECK: [[@LINE+1]]:86: error: expected '=' after range in fix-it verification
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{+1:1-1}}
+
+  // CHECK: [[@LINE+1]]:83: error: expected line offset after leading '+' or '-' in fix-it verification
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1--:}}
+
+  // CHECK: [[@LINE+1]]:84: error: expected column number after ':' in fix-it verification
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1-1:}}
+
+  // CHECK: [[@LINE+1]]:86: error: expected column number after ':' in fix-it verification
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1:1-1:}}
+
+  // CHECK: [[@LINE+1]]:87: error: expected column number after ':' in fix-it verification
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{+1:1-1:}}
+
+  // CHECK: [[@LINE+1]]:85: error: expected '=' after range in fix-it verification
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1-1:1}}
+
+  // CHECK: [[@LINE+1]]:86: error: expected '=' after range in fix-it verification
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1-+1:1}}
+
+  // CHECK: [[@LINE+1]]:87: error: expected '=' after range in fix-it verification
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1:1-1:1}}
+
+  // CHECK: [[@LINE+1]]:89: error: expected '=' after range in fix-it verification
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{+1:1--1:1}}
+
+  // CHECK: [[@LINE+1]]:78: error: expected fix-it not seen
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1-1=}}
+
   // CHECK: [[@LINE+1]]:78: error: expected fix-it not seen
   undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1-1=a}}
 
-  // CHECK: [[@LINE+1]]:80: error: invalid column number in fix-it verification
+  // CHECK: [[@LINE+1]]:80: error: expected line or column number in fix-it verification
   undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{x-1=a}}
 
-  // CHECK: [[@LINE+1]]:82: error: invalid column number in fix-it verification
+  // CHECK: [[@LINE+1]]:82: error: expected line or column number in fix-it verification
   undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1-x=a}}
 
-  // CHECK: [[@LINE+1]]:82: error: invalid column number in fix-it verification
+  // CHECK: [[@LINE+1]]:82: error: expected column number after ':' in fix-it verification
   undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1:x-1=a}}
 
-  // CHECK: [[@LINE+1]]:80: error: invalid line number in fix-it verification
+  // CHECK: [[@LINE+1]]:80: error: expected line or column number in fix-it verification
   undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{x:1-1=a}}
 
-  // CHECK: [[@LINE+1]]:84: error: invalid column number in fix-it verification
+  // CHECK: [[@LINE+1]]:81: error: expected line offset after leading '+' or '-' in fix-it verification
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{+x:1-1=a}}
+
+  // CHECK: [[@LINE+1]]:84: error: expected column number after ':' in fix-it verification
   undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1-1:x=a}}
 
-  // CHECK: [[@LINE+1]]:82: error: invalid line number in fix-it verification
+  // CHECK: [[@LINE+1]]:82: error: expected line or column number in fix-it verification
   undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1-x:1=a}}
 
-  // CHECK: [[@LINE+1]]:82: error: invalid column number in fix-it verification
+  // CHECK: [[@LINE+1]]:83: error: expected line offset after leading '+' or '-' in fix-it verification
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1-+x:1=a}}
+
+  // CHECK: [[@LINE+1]]:82: error: expected column number after ':' in fix-it verification
   undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1:x-1:x=a}}
 
-  // CHECK: [[@LINE+1]]:80: error: invalid line number in fix-it verification
+  // CHECK: [[@LINE+1]]:80: error: expected line or column number in fix-it verification
   undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{x:1-1:x=a}}
 
-  // CHECK: [[@LINE+1]]:82: error: invalid column number in fix-it verification
+  // CHECK: [[@LINE+1]]:81: error: expected line offset after leading '+' or '-' in fix-it verification
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{+x:1-1:x=a}}
+
+  // CHECK: [[@LINE+1]]:82: error: expected column number after ':' in fix-it verification
   undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1:x-x:1=a}}
+
+  // CHECK: [[@LINE+1]]:82: error: expected column number after ':' in fix-it verification
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1:x--x:1=a}}
 
   // CHECK: [[@LINE+1]]:78: error: expected fix-it not seen
   undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1:1-1:1=a}}
@@ -53,6 +146,15 @@ func test0Fixits() {
 
   // CHECK: [[@LINE+1]]:78: error: expected fix-it not seen
   undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1:1-1=a}}
+
+  // CHECK: [[@LINE+1]]:78: error: expected fix-it not seen
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{-1:1-1=a}}
+
+  // CHECK: [[@LINE+1]]:78: error: expected fix-it not seen
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1-+1:1=a}}
+
+  // CHECK: [[@LINE+1]]:78: error: expected fix-it not seen
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{+1:1-+1:1=a}}
 
   // CHECK: [[@LINE+1]]:78: error: expected fix-it not seen
   undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1-1=a}} {{2-2=b}}
@@ -95,13 +197,32 @@ func test1Fixits() {
   labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{15-18=xx}} {{15-18=aa}} {{none}}
 
   // CHECK-NOT: [[@LINE+1]]:{{[0-9]+}}: error:
-  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{98:15-98:18=aa}}
+  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{200:15-200:18=aa}}
   // CHECK-NOT: [[@LINE+1]]:{{[0-9]+}}: error:
-  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{100:15-18=aa}}
+  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{202:15-18=aa}}
   // CHECK-NOT: [[@LINE+1]]:{{[0-9]+}}: error:
-  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{15-102:18=aa}}
+  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{15-204:18=aa}}
+  // CHECK-NOT: [[@LINE+1]]:{{[0-9]+}}: error:
+  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{-0:15-+0:18=aa}}
+  // CHECK-NOT: [[@LINE+1]]:{{[0-9]+}}: error:
+  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{15--0:18=aa}}
+  // CHECK-NOT: [[@LINE+1]]:{{[0-9]+}}: error:
+  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {+0:15-210:18=aa}}
+  // CHECK-NOT: [[@LINE+1]]:{{[0-9]+}}: error:
+  labeledFunc(aa: 0, // expected-error {{incorrect argument label in call (have 'aa:bbx:', expected 'aa:bb:')}} {{+1:15-+1:18=bb}}
+              bbx: 1)
+  // CHECK-NOT: [[@LINE+1]]:{{[0-9]+}}: error:
+  labeledFunc(aa: 0, // expected-error {{incorrect argument label in call (have 'aa:bbx:', expected 'aa:bb:')}} {{216:15-+1:18=bb}}
+              bbx: 1)
+
   // CHECK: [[@LINE+1]]:121: error: expected fix-it not seen; actual fix-it seen: {{{{}}15-18=aa}}
   labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{61:15-18=aa}}
+  // CHECK: [[@LINE+1]]:121: error: expected fix-it not seen; actual fix-it seen: {{{{}}15-18=aa}}
+  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{-1:15-18=aa}}
+  // CHECK: [[@LINE+1]]:121: error: expected fix-it not seen; actual fix-it seen: {{{{}}15-18=aa}}
+  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{+0:15--1:18=aa}}
+  // CHECK: [[@LINE+1]]:121: error: expected fix-it not seen; actual fix-it seen: {{{{}}15-18=aa}}
+  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{61:15-+1:18=aa}}
 }
 
 func test2Fixits() {

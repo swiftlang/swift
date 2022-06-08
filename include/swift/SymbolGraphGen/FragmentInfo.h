@@ -25,7 +25,7 @@ namespace symbolgraphgen {
 struct FragmentInfo {
   /// The swift decl of the referenced symbol.
   const ValueDecl *VD;
-  /// The path components of the refereced symbol.
+  /// The path components of the referenced symbol.
   SmallVector<PathComponent, 4> ParentContexts;
 };
 

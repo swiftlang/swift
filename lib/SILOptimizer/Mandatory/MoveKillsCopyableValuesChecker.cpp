@@ -20,11 +20,16 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILUndef.h"
+#include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/ClosureScope.h"
+#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/CanonicalOSSALifetime.h"
 
 using namespace swift;
@@ -128,10 +133,22 @@ bool CheckerLivenessInfo::compute() {
         break;
       case OperandOwnership::Borrow: {
         if (auto *bbi = dyn_cast<BeginBorrowInst>(user)) {
-          // Only add borrows to liveness if the borrow isn't lexical. If it is
-          // a lexical borrow, we have created an entirely new source level
-          // binding that should be tracked separately.
-          if (!bbi->isLexical()) {
+          // If we have a lexical begin_borrow, we are going to check its uses
+          // separately and emit diagnostics for it. So we just need to add the
+          // liveness of the begin_borrow.
+          //
+          // NOTE: We know that semantically the use lexical lifetime must have
+          // a separate lifetime from the base lexical lifetime that we are
+          // processing. We do not want to include those uses as transitive uses
+          // of our base lexical lifetime. We just want to treat the formation
+          // of the new variable as a use. Thus we only include the begin_borrow
+          // itself as the use.
+          if (bbi->isLexical()) {
+            liveness.updateForUse(bbi, false /*lifetime ending*/);
+          } else {
+            // Otherwise, try to update liveness for a borrowing operand
+            // use. This will make it so that we add the end_borrows of the
+            // liveness use. If we have a reborrow here, we will bail.
             bool failed = !liveness.updateForBorrowingOperand(use);
             if (failed)
               return false;
@@ -191,8 +208,19 @@ namespace {
 struct MoveKillsCopyableValuesChecker {
   SILFunction *fn;
   CheckerLivenessInfo livenessInfo;
+  DominanceInfo *dominanceToUpdate;
+  SILLoopInfo *loopInfoToUpdate;
 
-  MoveKillsCopyableValuesChecker(SILFunction *fn) : fn(fn) {}
+  MoveKillsCopyableValuesChecker(SILFunction *fn)
+      : fn(fn), livenessInfo(), dominanceToUpdate(nullptr),
+        loopInfoToUpdate(nullptr) {}
+
+  void setDominanceToUpdate(DominanceInfo *newDFI) {
+    dominanceToUpdate = newDFI;
+  }
+
+  void setLoopInfoToUpdate(SILLoopInfo *newLFI) { loopInfoToUpdate = newLFI; }
+
   bool check();
 
   void emitDiagnosticForMove(SILValue borrowedValue,
@@ -335,35 +363,47 @@ bool MoveKillsCopyableValuesChecker::check() {
   SmallSetVector<SILValue, 32> valuesToCheck;
 
   for (auto *arg : fn->getEntryBlock()->getSILFunctionArguments()) {
-    if (arg->getOwnershipKind() == OwnershipKind::Owned)
+    if (arg->getOwnershipKind() == OwnershipKind::Owned) {
+      LLVM_DEBUG(llvm::dbgs() << "Found owned arg to check: " << *arg);
       valuesToCheck.insert(arg);
+    }
   }
 
   for (auto &block : *fn) {
     for (auto &ii : block) {
       if (auto *bbi = dyn_cast<BeginBorrowInst>(&ii)) {
-        if (bbi->isLexical())
+        if (bbi->isLexical()) {
+          LLVM_DEBUG(llvm::dbgs()
+                     << "Found lexical lifetime to check: " << *bbi);
           valuesToCheck.insert(bbi);
+        }
         continue;
       }
     }
   }
 
-  if (valuesToCheck.empty())
+  if (valuesToCheck.empty()) {
+    LLVM_DEBUG(llvm::dbgs() << "No values to check! Exiting early!\n");
     return false;
+  }
 
-  LLVM_DEBUG(llvm::dbgs() << "Visiting Function: " << fn->getName() << "\n");
+  LLVM_DEBUG(llvm::dbgs()
+             << "Found at least one value to check, performing checking.\n");
   auto valuesToProcess =
       llvm::makeArrayRef(valuesToCheck.begin(), valuesToCheck.end());
+  auto &mod = fn->getModule();
 
+  // If we do not emit any diagnostics, we need to put in a break after each dbg
+  // info carrying inst for a lexical value that we find a move on. This ensures
+  // that we avoid a behavior today in SelectionDAG that causes dbg info addr to
+  // be always sunk to the end of a block.
+  //
+  // TODO: We should add llvm.dbg.addr support for fastisel and also teach
+  // CodeGen how to handle llvm.dbg.addr better.
   while (!valuesToProcess.empty()) {
     auto lexicalValue = valuesToProcess.front();
     valuesToProcess = valuesToProcess.drop_front(1);
     LLVM_DEBUG(llvm::dbgs() << "Visiting: " << *lexicalValue);
-
-    // Before we do anything, see if we can find a name for our value. We do
-    // this early since we need this for all of our diagnostics below.
-    StringRef varName = getDebugVarName(lexicalValue);
 
     // Then compute liveness.
     SWIFT_DEFER { livenessInfo.clear(); };
@@ -377,6 +417,9 @@ bool MoveKillsCopyableValuesChecker::check() {
 
     // Then look at all of our found consuming uses. See if any of these are
     // _move that are within the boundary.
+    bool foundMove = false;
+    auto dbgVarInst = DebugVarCarryingInst::getFromValue(lexicalValue);
+    StringRef varName = DebugVarCarryingInst::getName(dbgVarInst);
     for (auto *use : livenessInfo.consumingUse) {
       if (auto *mvi = dyn_cast<MoveValueInst>(use->getUser())) {
         // Only emit diagnostics if our move value allows us to.
@@ -394,8 +437,27 @@ bool MoveKillsCopyableValuesChecker::check() {
           emitDiagnosticForMove(lexicalValue, varName, mvi);
         } else {
           LLVM_DEBUG(llvm::dbgs() << "    WithinBoundary: No!\n");
+          if (auto varInfo = dbgVarInst.getVarInfo()) {
+            auto *next = mvi->getNextInstruction();
+            SILBuilderWithScope builder(next);
+            // We need to make sure any undefs we put in are the same loc/debug
+            // scope as our original so that the backend treats them as
+            // referring to the same "debug entity".
+            builder.setCurrentDebugScope(dbgVarInst->getDebugScope());
+            builder.createDebugValue(
+                dbgVarInst->getLoc(),
+                SILUndef::get(mvi->getOperand()->getType(), mod), *varInfo,
+                false /*poison*/, true /*moved*/);
+          }
         }
+        foundMove = true;
       }
+    }
+
+    // If we found a move, mark our debug var inst as having a moved value. This
+    // ensures we emit llvm.dbg.addr instead of llvm.dbg.declare in IRGen.
+    if (foundMove) {
+      dbgVarInst.markAsMoved();
     }
   }
 
@@ -431,10 +493,25 @@ class MoveKillsCopyableValuesCheckerPass : public SILFunctionTransform {
     assert(fn->getModule().getStage() == SILStage::Raw &&
            "Should only run on Raw SIL");
 
+    LLVM_DEBUG(llvm::dbgs() << "*** Checking moved values in fn: "
+                            << getFunction()->getName() << '\n');
+
     MoveKillsCopyableValuesChecker checker(getFunction());
 
-    if (MoveKillsCopyableValuesChecker(getFunction()).check()) {
-      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+    // If we already had dominance or loop info generated, update them when
+    // splitting blocks.
+    auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();
+    if (dominanceAnalysis->hasFunctionInfo(fn))
+      checker.setDominanceToUpdate(dominanceAnalysis->get(fn));
+    auto *loopAnalysis = getAnalysis<SILLoopAnalysis>();
+    if (loopAnalysis->hasFunctionInfo(fn))
+      checker.setLoopInfoToUpdate(loopAnalysis->get(fn));
+
+    if (checker.check()) {
+      AnalysisPreserver preserveDominance(dominanceAnalysis);
+      AnalysisPreserver preserveLoop(loopAnalysis);
+      invalidateAnalysis(
+          SILAnalysis::InvalidationKind::BranchesAndInstructions);
     }
 
     // Now search through our function one last time and any move_value

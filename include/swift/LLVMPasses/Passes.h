@@ -102,7 +102,6 @@ namespace swift {
     static char ID;
     InlineTreePrinter() : llvm::ModulePass(ID) {}
   };
-
 } // end namespace swift
 
 #endif

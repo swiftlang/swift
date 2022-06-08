@@ -136,7 +136,7 @@ static SILFunction *getStringMakeUTF8Init(SILInstruction *inst) {
 }
 
 // A cache of string-related, SIL information that is needed to create and
-// initalize strings from raw string literals. This information is
+// initialize strings from raw string literals. This information is
 // extracted from instructions while they are constant evaluated. Though the
 // information contained here can be constructed from scratch, extracting it
 // from existing instructions is more efficient.
@@ -496,7 +496,8 @@ static SILValue emitCodeForConstantArray(ArrayRef<SILValue> elements,
   std::string allocatorMangledName =
       SILDeclRef(arrayAllocateDecl, SILDeclRef::Kind::Func).mangle();
   SILFunction *arrayAllocateFun =
-      module.findFunction(allocatorMangledName, SILLinkage::PublicExternal);
+      module.loadFunction(allocatorMangledName,
+                          SILModule::LinkingMode::LinkNormal);
   assert(arrayAllocateFun);
 
   SILFunction *arrayFinalizeFun = nullptr;
@@ -505,9 +506,9 @@ static SILValue emitCodeForConstantArray(ArrayRef<SILValue> elements,
       std::string finalizeMangledName =
           SILDeclRef(arrayFinalizeDecl, SILDeclRef::Kind::Func).mangle();
       arrayFinalizeFun =
-          module.findFunction(finalizeMangledName, SILLinkage::SharedExternal);
+          module.loadFunction(finalizeMangledName,
+                              SILModule::LinkingMode::LinkNormal);
       assert(arrayFinalizeFun);
-      module.linkFunction(arrayFinalizeFun);
     }
   }
 

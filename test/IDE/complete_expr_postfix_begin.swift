@@ -34,7 +34,7 @@ typealias FooTypealias = Int
 // COMMON-DAG: Decl[Enum]/CurrModule:       FooEnum[#FooEnum#]{{; name=.+$}}
 // COMMON-DAG: Decl[Class]/CurrModule:      FooClass[#FooClass#]{{; name=.+$}}
 // COMMON-DAG: Decl[Protocol]/CurrModule/Flair[RareType]: FooProtocol[#FooProtocol#]{{; name=.+$}}
-// COMMON-DAG: Decl[TypeAlias]/CurrModule{{(/TypeRelation\[Identical\])?}}:  FooTypealias[#Int#]{{; name=.+$}}
+// COMMON-DAG: Decl[TypeAlias]/CurrModule{{(/TypeRelation\[Convertible\])?}}:  FooTypealias[#Int#]{{; name=.+$}}
 // COMMON-DAG: Decl[GlobalVar]/CurrModule:  fooObject[#FooStruct#]{{; name=.+$}}
 // COMMON-DAG: Keyword[try]/None: try{{; name=.+$}}
 // COMMON-DAG: Literal[Boolean]/None: true[#Bool#]{{; name=.+$}}
@@ -45,10 +45,10 @@ typealias FooTypealias = Int
 // COMMON-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem:    Int32[#Int32#]{{; name=.+$}}
 // COMMON-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem:    Int64[#Int64#]{{; name=.+$}}
 // COMMON-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem:    Bool[#Bool#]{{; name=.+$}}
-// COMMON-DAG: Keyword[#function]/None{{(/TypeRelation\[Identical\])?}}: #function[#String#]{{; name=.+$}}
-// COMMON-DAG: Keyword[#file]/None{{(/TypeRelation\[Identical\])?}}: #file[#String#]{{; name=.+$}}
-// COMMON-DAG: Keyword[#line]/None{{(/TypeRelation\[Identical\])?}}: #line[#Int#]{{; name=.+$}}
-// COMMON-DAG: Keyword[#column]/None{{(/TypeRelation\[Identical\])?}}: #column[#Int#]{{; name=.+$}}
+// COMMON-DAG: Keyword[#function]/None{{(/TypeRelation\[Convertible\])?}}: #function[#String#]{{; name=.+$}}
+// COMMON-DAG: Keyword[#file]/None{{(/TypeRelation\[Convertible\])?}}: #file[#String#]{{; name=.+$}}
+// COMMON-DAG: Keyword[#line]/None{{(/TypeRelation\[Convertible\])?}}: #line[#Int#]{{; name=.+$}}
+// COMMON-DAG: Keyword[#column]/None{{(/TypeRelation\[Convertible\])?}}: #column[#Int#]{{; name=.+$}}
 // COMMON: End completions
 
 // NO_SELF-NOT: {{[[:<:]][Ss]elf[[:>:]]}}
@@ -334,8 +334,8 @@ func foo() -> Undeclared {
 }
 // MY_ALIAS_1: Begin completions
 // MY_ALIAS_1-DAG: Decl[TypeAlias]/Local:                        MyAlias[#(T, T)#];
-// MY_ALIAS_1-DAG: Decl[LocalVar]/Local/TypeRelation[Identical]: x[#MyAlias<Int>#]; name=x
-// MY_ALIAS_1-DAG: Decl[LocalVar]/Local/TypeRelation[Identical]: y[#(Int, Int)#]; name=y
+// MY_ALIAS_1-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: x[#MyAlias<Int>#]; name=x
+// MY_ALIAS_1-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: y[#(Int, Int)#]; name=y
 // MY_ALIAS_1: End completions
 
 func testGenericTypealias1() {
@@ -346,8 +346,8 @@ func testGenericTypealias1() {
 }
 // MY_ALIAS_2: Begin completions
 // MY_ALIAS_2-DAG: Decl[TypeAlias]/Local:                        MyAlias[#(T, T)#];
-// MY_ALIAS_2-DAG: Decl[LocalVar]/Local/TypeRelation[Identical]: x[#(Int, Int)#]; name=x
-// MY_ALIAS_2-DAG: Decl[LocalVar]/Local/TypeRelation[Identical]: y[#MyAlias<Int>#]; name=y
+// MY_ALIAS_2-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: x[#(Int, Int)#]; name=x
+// MY_ALIAS_2-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: y[#MyAlias<Int>#]; name=y
 // MY_ALIAS_2: End completions
 func testGenericTypealias2() {
   typealias MyAlias<T> = (T, T)
@@ -375,9 +375,9 @@ func testInForEach2(arg: Int) {
   }
   let after = 4
 // IN_FOR_EACH_2-NOT: Decl[LocalVar]
-// IN_FOR_EACH_2: Decl[LocalVar]/Local/TypeRelation[Identical]: local[#Int#];
+// IN_FOR_EACH_2: Decl[LocalVar]/Local/TypeRelation[Convertible]: local[#Int#];
 // IN_FOR_EACH_2-NOT: after
-// IN_FOR_EACH_2: Decl[LocalVar]/Local/TypeRelation[Identical]: arg[#Int#];
+// IN_FOR_EACH_2: Decl[LocalVar]/Local/TypeRelation[Convertible]: arg[#Int#];
 // IN_FOR_EACH_2-NOT: Decl[LocalVar]
 }
 func testInForEach3(arg: Int) {
@@ -435,9 +435,14 @@ func testInForEach9(arg: Int) {
 }
 func testInForEach10(arg: Int) {
   let local = 2
-  for index in [1:2, #^IN_FOR_EACH_10?check=IN_FOR_EACH_1^#] {}
+  for index in [1:2, #^IN_FOR_EACH_10^#] {}
   let after = 4
 }
+// IN_FOR_EACH_10-NOT: Decl[LocalVar]
+// IN_FOR_EACH_10: Decl[LocalVar]/Local/TypeRelation[Convertible]:               local[#Int#];
+// IN_FOR_EACH_10-NOT: after
+// IN_FOR_EACH_10: Decl[LocalVar]/Local/TypeRelation[Convertible]:               arg[#Int#];
+// IN_FOR_EACH_10-NOT: Decl[LocalVar]
 func testInForEach11(arg: Int) {
   let local = 2
   for index in [1:2, #^IN_FOR_EACH_11?check=IN_FOR_EACH_2^#:] {}
@@ -472,13 +477,13 @@ func testTuple(localInt: Int) {
   let _: (Int, String) = (#^IN_TUPLE_2^#, "foo")
 }
 // IN_TUPLE_1: Begin completions
-// IN_TUPLE_1-DAG: Decl[LocalVar]/Local/TypeRelation[Identical]: localStr[#String#]; name=localStr
+// IN_TUPLE_1-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: localStr[#String#]; name=localStr
 // IN_TUPLE_1-DAG: Decl[LocalVar]/Local:               localInt[#Int#]; name=localInt
 // IN_TUPLE_1: End completions
 
 // IN_TUPLE_2: Begin completions
 // IN_TUPLE_2-DAG: Decl[LocalVar]/Local:               localStr[#String#]; name=localStr
-// IN_TUPLE_2-DAG: Decl[LocalVar]/Local/TypeRelation[Identical]: localInt[#Int#]; name=localInt
+// IN_TUPLE_2-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: localInt[#Int#]; name=localInt
 // IN_TUPLE_2: End completions
 
 var ownInit1: Int = #^OWN_INIT_1^#
@@ -524,13 +529,13 @@ func ownInitTestingParamInterp(ownInit12: String = "\(#^OWN_INIT_12^#)") {
 func ownInitTestingShadow(ownInit7: Int) {
   var ownInit7: Int = #^OWN_INIT_7^#
   // OWN_INIT_7: Begin completions
-  // OWN_INIT_7: Decl[LocalVar]/Local/TypeRelation[Identical]: ownInit7[#Int#];
+  // OWN_INIT_7: Decl[LocalVar]/Local/TypeRelation[Convertible]: ownInit7[#Int#];
 }
 
 var inAccessor1: Int {
   get { #^OWN_ACCESSOR_1^# }
 // OWN_ACCESSOR_1: Begin completions
-// OWN_ACCESSOR_1: Decl[GlobalVar]/CurrModule/NotRecommended/TypeRelation[Identical]: inAccessor1[#Int#];
+// OWN_ACCESSOR_1: Decl[GlobalVar]/CurrModule/NotRecommended/TypeRelation[Convertible]: inAccessor1[#Int#];
   set { #^OWN_ACCESSOR_2^# }
 // OWN_ACCESSOR_2: Begin completions
 // OWN_ACCESSOR_2: Decl[GlobalVar]/CurrModule: inAccessor1[#Int#];
@@ -545,7 +550,7 @@ class InAccessorTest {
   var inAccessor3: Int {
     get { #^OWN_ACCESSOR_5^# }
 // OWN_ACCESSOR_5: Begin completions
-// OWN_ACCESSOR_5: Decl[InstanceVar]/CurrNominal/NotRecommended/TypeRelation[Identical]: inAccessor3[#Int#];
+// OWN_ACCESSOR_5: Decl[InstanceVar]/CurrNominal/NotRecommended/TypeRelation[Convertible]: inAccessor3[#Int#];
     set { #^OWN_ACCESSOR_6^# }
 // OWN_ACCESSOR_6: Begin completions
 // OWN_ACCESSOR_6: Decl[InstanceVar]/CurrNominal: inAccessor3[#Int#];
@@ -561,7 +566,7 @@ func inAccessorTest() {
   var inAccessor5: Int {
     get { #^OWN_ACCESSOR_9^# }
 // OWN_ACCESSOR_9: Begin completions
-// OWN_ACCESSOR_9: Decl[LocalVar]/Local/NotRecommended/TypeRelation[Identical]: inAccessor5[#Int#];
+// OWN_ACCESSOR_9: Decl[LocalVar]/Local/NotRecommended/TypeRelation[Convertible]: inAccessor5[#Int#];
     set { #^OWN_ACCESSOR_10^# }
 // OWN_ACCESSOR_10: Begin completions
 // OWN_ACCESSOR_10: Decl[LocalVar]/Local: inAccessor5[#Int#];

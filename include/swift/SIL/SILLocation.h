@@ -72,8 +72,10 @@ public:
       return line == rhs.line && column == rhs.column &&
              filename.equals(rhs.filename);
     }
+
     void dump() const;
     void print(raw_ostream &OS) const;
+    friend llvm::hash_code hash_value(const FilenameAndLocation &);
   };
 
 protected:
@@ -431,7 +433,18 @@ public:
   }
 
   inline bool operator!=(const SILLocation &R) const { return !(*this == R); }
+
+  friend llvm::hash_code hash_value(const SILLocation &);
 };
+
+inline llvm::hash_code hash_value(const SILLocation &R) {
+  return llvm::hash_combine(R.kindAndFlags.packedKindAndFlags,
+                            *R.storage.filePositionLoc);
+}
+
+inline llvm::hash_code hash_value(const SILLocation::FilenameAndLocation &R) {
+  return llvm::hash_combine(R.line, R.column, R.filename);
+}
 
 /// Allowed on any instruction.
 class RegularLocation : public SILLocation {

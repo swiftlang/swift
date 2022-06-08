@@ -1,6 +1,8 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -typecheck %s -swift-version 5 -enable-library-evolution -emit-module-interface-path %t/Bakery.swiftinterface -DBAKERY -module-name Bakery
-// RUN: %target-swift-frontend -typecheck %s -swift-version 5 -enable-library-evolution -emit-module-interface-path %t/Home.swiftinterface -DHOME -module-name Home -I %t
+// RUN: %target-swift-emit-module-interface(%t/Bakery.swiftinterface) %s -DBAKERY -module-name Bakery
+// RUN: %target-swift-typecheck-module-from-interface(%t/Bakery.swiftinterface) -module-name Bakery
+// RUN: %target-swift-emit-module-interface(%t/Home.swiftinterface) %s -DHOME -module-name Home -I %t
+// RUN: %target-swift-typecheck-module-from-interface(%t/Home.swiftinterface) -module-name Home -I %t
 // RUN: %FileCheck %s < %t/Home.swiftinterface
 
 #if BAKERY

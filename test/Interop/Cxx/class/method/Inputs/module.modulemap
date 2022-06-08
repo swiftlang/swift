@@ -2,3 +2,8 @@ module Methods {
   header "methods.h"
   requires cplusplus
 }
+
+module AmbiguousMethods {
+  header "ambiguous_methods.h"
+  requires cplusplus
+}

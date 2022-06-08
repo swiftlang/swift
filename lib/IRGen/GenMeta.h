@@ -29,6 +29,7 @@ namespace llvm {
 
 namespace swift {
   class AbstractFunctionDecl;
+  struct ExistentialTypeGeneralization;
   class FileUnit;
   class FuncDecl;
   enum class ResilienceExpansion : unsigned;
@@ -196,6 +197,13 @@ namespace irgen {
   /// witness table.
   ProtocolDecl *opaqueTypeRequiresWitnessTable(
       OpaqueTypeDecl *opaque, const Requirement &req);
+
+  /// Emit the extended existential type shape for the given existential
+  /// type generalization.
+  std::pair<llvm::Constant *, /*unique*/ bool>
+  emitExtendedExistentialTypeShape(IRGenModule &IGM,
+                                   const ExistentialTypeGeneralization &shape,
+                                   unsigned metatypeDepth);
 
 } // end namespace irgen
 } // end namespace swift

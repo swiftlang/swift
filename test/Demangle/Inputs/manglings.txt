@@ -420,9 +420,16 @@ $sSIxip6foobarP ---> foobar in Swift.DefaultIndices.subscript : A
 $s13__lldb_expr_110$10016c2d8yXZ1B10$10016c2e0LLC ---> __lldb_expr_1.(unknown context at $10016c2d8).(B in $10016c2e0)
 $s__TJO ---> $s__TJO
 $s6Foobar7Vector2VAASdRszlE10simdMatrix5scale6rotate9translateSo0C10_double3x3aACySdG_SdAJtFZ0D4TypeL_aySd__GD ---> MatrixType #1 in static (extension in Foobar):Foobar.Vector2<Swift.Double><A where A == Swift.Double>.simdMatrix(scale: Foobar.Vector2<Swift.Double>, rotate: Swift.Double, translate: Foobar.Vector2<Swift.Double>) -> __C.simd_double3x3
-$s17distributed_thunk2DAC1fyyFTE ---> distributed thunk for distributed_thunk.DA.f() -> ()
+$s17distributed_thunk2DAC1fyyFTE ---> distributed thunk distributed_thunk.DA.f() -> ()
 $s16distributed_test1XC7computeyS2iFTF ---> distributed accessor for distributed_test.X.compute(Swift.Int) -> Swift.Int
-$s27distributed_actor_accessors7MyActorC7simple2ySSSiFTETFHF ---> accessible function runtime record for distributed accessor for distributed thunk for distributed_actor_accessors.MyActor.simple2(Swift.Int) -> Swift.String
+$s27distributed_actor_accessors7MyActorC7simple2ySSSiFTETFHF ---> accessible function runtime record for distributed accessor for distributed thunk distributed_actor_accessors.MyActor.simple2(Swift.Int) -> Swift.String
 $s1A3bar1aySSYt_tF ---> A.bar(a: _const Swift.String) -> ()
 $s1t1fyyFSiAA3StrVcs7KeyPathCyADSiGcfu_SiADcfu0_33_556644b740b1b333fecb81e55a7cce98ADSiTf3npk_n ---> function signature specialization <Arg[1] = [Constant Propagated KeyPath : _556644b740b1b333fecb81e55a7cce98<t.Str,Swift.Int>]> of implicit closure #2 (t.Str) -> Swift.Int in implicit closure #1 (Swift.KeyPath<t.Str, Swift.Int>) -> (t.Str) -> Swift.Int in t.f() -> ()
-
+$s21back_deploy_attribute0A12DeployedFuncyyFTwb ---> back deployment thunk for back_deploy_attribute.backDeployedFunc() -> ()
+$s21back_deploy_attribute0A12DeployedFuncyyFTwB ---> back deployment fallback for back_deploy_attribute.backDeployedFunc() -> ()
+$s4test3FooVAAyyAA1P_pyxqd__XPlF ---> test.Foo.test<A>(test.P<A, A1>) -> ()
+$s4test3FooVAAyyAA1P_pyxXPF ---> test.Foo.test(test.P<A>) -> ()
+$s4test3FooVAAyyAA1P_pF ---> test.Foo.test(test.P) -> ()
+$s4test3FooVAAyyAA1P_pyqd__XPAaDRd__lF ---> test.Foo.test<A where A1: test.P>(test.P<A1>) -> ()
+$sxxxIxzCXxxxesy -> $sxxxIxzCXxxxesy
+$Sxxx_x_xxIxzCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC$x -> $Sxxx_x_xxIxzCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC$x

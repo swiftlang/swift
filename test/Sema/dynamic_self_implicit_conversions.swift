@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -typecheck -dump-ast %s | %FileCheck %s
 
+// FIXME: Make this a SILGen test instead.
 // Even though redundant conversions are eventually optimized away, test from
 // the get-go that we build these implicit conversions only when necessary.
 protocol P {}
@@ -35,9 +36,9 @@ class B: A {
     _ = super.staticMethod()
     // CHECK: covariant_function_conversion_expr implicit type='() -> Self' location={{.*}}.swift:[[@LINE+1]]
     _ = super.staticMethod
-    // FIXME: This could be a single conversion.
-    // CHECK: function_conversion_expr implicit type='(Self) -> () -> Self' location={{.*}}.swift:[[@LINE+2]]
-    // CHECK: covariant_function_conversion_expr implicit type='(A) -> () -> Self' location={{.*}}.swift:[[@LINE+1]]
+    // CHECK-NOT: function_conversion_expr {{.*}} location={{.*}}.swift:[[@LINE+3]]
+    // CHECK-NOT: covariant_function_conversion_expr {{.*}} location={{.*}}.swift:[[@LINE+2]]
+    // CHECK: covariant_return_conversion_expr implicit type='Self' location={{.*}}.swift:[[@LINE+1]]
     _ = self.method
     // CHECK: covariant_function_conversion_expr implicit type='() -> Self' location={{.*}}.swift:[[@LINE+1]]
     _ = self.init

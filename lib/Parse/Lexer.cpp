@@ -14,27 +14,27 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Parse/Confusables.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/AST/BridgingUtils.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/Parse/ExperimentalRegexBridging.h"
+#include "swift/Parse/Confusables.h"
+#include "swift/Parse/RegexParserBridging.h"
 #include "swift/Syntax/Trivia.h"
-#include "llvm/Support/Compiler.h"
-#include "llvm/Support/MathExtras.h"
-#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/Support/Compiler.h"
+#include "llvm/Support/MathExtras.h"
+#include "llvm/Support/MemoryBuffer.h"
 // FIXME: Figure out if this can be migrated to LLVM.
 #include "clang/Basic/CharInfo.h"
 
 #include <limits>
 
 // Regex lexing delivered via libSwift.
-#include "swift/Parse/ExperimentalRegexBridging.h"
 static RegexLiteralLexingFn regexLiteralLexingFn = nullptr;
 void Parser_registerRegexLiteralLexingFn(RegexLiteralLexingFn fn) {
   regexLiteralLexingFn = fn;
@@ -183,9 +183,12 @@ Lexer::Lexer(const PrincipalTag &, const LangOptions &LangOpts,
              HashbangMode HashbangAllowed, CommentRetentionMode RetainComments,
              TriviaRetentionMode TriviaRetention)
     : LangOpts(LangOpts), SourceMgr(SourceMgr), BufferID(BufferID),
-      Diags(Diags), LexMode(LexMode),
+      LexMode(LexMode),
       IsHashbangAllowed(HashbangAllowed == HashbangMode::Allowed),
-      RetainComments(RetainComments), TriviaRetention(TriviaRetention) {}
+      RetainComments(RetainComments), TriviaRetention(TriviaRetention) {
+  if (Diags)
+    DiagQueue.emplace(*Diags, /*emitOnDestruction*/ false);
+}
 
 void Lexer::initialize(unsigned Offset, unsigned EndOffset) {
   assert(Offset <= EndOffset);
@@ -202,7 +205,7 @@ void Lexer::initialize(unsigned Offset, unsigned EndOffset) {
   // Check for Unicode BOM at start of file (Only UTF-8 BOM supported now).
   size_t BOMLength = contents.startswith("\xEF\xBB\xBF") ? 3 : 0;
 
-  // Keep information about existance of UTF-8 BOM for transparency source code
+  // Keep information about existence of UTF-8 BOM for transparency source code
   // editing with libSyntax.
   ContentStart = BufferStart + BOMLength;
 
@@ -245,7 +248,7 @@ Lexer::Lexer(const LangOptions &Options, const SourceManager &SourceMgr,
 
 Lexer::Lexer(Lexer &Parent, State BeginState, State EndState)
     : Lexer(PrincipalTag(), Parent.LangOpts, Parent.SourceMgr, Parent.BufferID,
-            Parent.Diags, Parent.LexMode,
+            Parent.getUnderlyingDiags(), Parent.LexMode,
             Parent.IsHashbangAllowed
                 ? HashbangMode::Allowed
                 : HashbangMode::Disallowed,
@@ -261,7 +264,7 @@ Lexer::Lexer(Lexer &Parent, State BeginState, State EndState)
 }
 
 InFlightDiagnostic Lexer::diagnose(const char *Loc, Diagnostic Diag) {
-  if (Diags)
+  if (auto *Diags = getTokenDiags())
     return Diags->diagnose(getSourceLoc(Loc), Diag);
   
   return InFlightDiagnostic();
@@ -272,7 +275,7 @@ Token Lexer::getTokenAt(SourceLoc Loc) {
                          SourceMgr.findBufferContainingLoc(Loc)) &&
          "location from the wrong buffer");
 
-  Lexer L(LangOpts, SourceMgr, BufferID, Diags, LexMode,
+  Lexer L(LangOpts, SourceMgr, BufferID, getUnderlyingDiags(), LexMode,
           HashbangMode::Allowed, CommentRetentionMode::None,
           TriviaRetentionMode::WithoutTrivia);
   L.restoreState(State(Loc));
@@ -330,6 +333,7 @@ void Lexer::formStringLiteralToken(const char *TokStart,
     return;
   NextToken.setStringLiteral(IsMultilineString, CustomDelimiterLen);
 
+  auto *Diags = getTokenDiags();
   if (IsMultilineString && Diags)
     validateMultilineIndents(NextToken, Diags);
 }
@@ -416,7 +420,8 @@ static bool advanceToEndOfLine(const char *&CurPtr, const char *BufferEnd,
 }
 
 void Lexer::skipToEndOfLine(bool EatNewline) {
-  bool isEOL = advanceToEndOfLine(CurPtr, BufferEnd, CodeCompletionPtr, Diags);
+  bool isEOL =
+      advanceToEndOfLine(CurPtr, BufferEnd, CodeCompletionPtr, getTokenDiags());
   if (EatNewline && isEOL) {
     ++CurPtr;
     NextToken.setAtStartOfLine(true);
@@ -514,8 +519,8 @@ static bool skipToEndOfSlashStarComment(const char *&CurPtr,
 /// skipSlashStarComment - /**/ comments are skipped (treated as whitespace).
 /// Note that (unlike in C) block comments can be nested.
 void Lexer::skipSlashStarComment() {
-  bool isMultiline =
-      skipToEndOfSlashStarComment(CurPtr, BufferEnd, CodeCompletionPtr, Diags);
+  bool isMultiline = skipToEndOfSlashStarComment(
+      CurPtr, BufferEnd, CodeCompletionPtr, getTokenDiags());
   if (isMultiline)
     NextToken.setAtStartOfLine(true);
 }
@@ -808,6 +813,13 @@ void Lexer::lexOperatorIdentifier() {
       break;
     if (Identifier::isEditorPlaceholder(StringRef(CurPtr, BufferEnd-CurPtr)) &&
         rangeContainsPlaceholderEnd(CurPtr + 2, BufferEnd)) {
+      break;
+    }
+
+    // If we are lexing a `/.../` regex literal, we don't consider `/` to be an
+    // operator character.
+    if (ForwardSlashRegexMode != LexerForwardSlashRegexMode::None &&
+        *CurPtr == '/') {
       break;
     }
   } while (advanceIfValidContinuationOfOperator(CurPtr, BufferEnd));
@@ -1354,13 +1366,13 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
   case '"':
   case '\'':
     if (CurPtr[-1] == StopQuote) {
-      // Mutliline and custom escaping are only enabled for " quote.
+      // Multiline and custom escaping are only enabled for " quote.
       if (LLVM_UNLIKELY(StopQuote != '"'))
         return ~0U;
       if (!IsMultilineString && !CustomDelimiterLen)
         return ~0U;
 
-      DiagnosticEngine *D = EmitDiagnostics ? Diags : nullptr;
+      DiagnosticEngine *D = EmitDiagnostics ? getTokenDiags() : nullptr;
       auto TmpPtr = CurPtr;
       if (IsMultilineString &&
           !advanceIfMultilineDelimiter(CustomDelimiterLen, TmpPtr, D))
@@ -1385,7 +1397,7 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
     return CurPtr[-1];
   case '\\':  // Escapes.
     if (!delimiterMatches(CustomDelimiterLen, CurPtr,
-                          EmitDiagnostics ? Diags : nullptr))
+                          EmitDiagnostics ? getTokenDiags() : nullptr))
       return '\\';
     break;
   }
@@ -1799,7 +1811,7 @@ static void validateMultilineIndents(const Token &Str,
 void Lexer::diagnoseSingleQuoteStringLiteral(const char *TokStart,
                                              const char *TokEnd) {
   assert(*TokStart == '\'' && TokEnd[-1] == '\'');
-  if (!Diags) // or assert?
+  if (!getTokenDiags()) // or assert?
     return;
 
   auto startLoc = Lexer::getSourceLoc(TokStart);
@@ -1836,7 +1848,7 @@ void Lexer::diagnoseSingleQuoteStringLiteral(const char *TokStart,
   replacement.append(OutputPtr, Ptr - 1);
   replacement.push_back('"');
 
-  Diags->diagnose(startLoc, diag::lex_single_quote_string)
+  getTokenDiags()->diagnose(startLoc, diag::lex_single_quote_string)
       .fixItReplaceChars(startLoc, endLoc, replacement);
 }
 
@@ -1852,8 +1864,8 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
   // diagnostics about changing them to double quotes.
   assert((QuoteChar == '"' || QuoteChar == '\'') && "Unexpected start");
 
-  bool IsMultilineString = advanceIfMultilineDelimiter(CustomDelimiterLen,
-                                                       CurPtr, Diags, true);
+  bool IsMultilineString = advanceIfMultilineDelimiter(
+      CustomDelimiterLen, CurPtr, getTokenDiags(), true);
   if (IsMultilineString && *CurPtr != '\n' && *CurPtr != '\r')
     diagnose(CurPtr, diag::lex_illegal_multiline_string_start)
         .fixItInsert(Lexer::getSourceLoc(CurPtr), "\n");
@@ -1872,13 +1884,21 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
         // Successfully scanned the body of the expression literal.
         ++CurPtr;
         continue;
-      } else if ((*CurPtr == '\r' || *CurPtr == '\n') && IsMultilineString) {
-        // The only case we reach here is unterminated single line string in the
-        // interpolation. For better recovery, go on after emitting an error.
-        diagnose(CurPtr, diag::lex_unterminated_string);
-        wasErroneous = true;
-        continue;
       } else {
+        if ((*CurPtr == '\r' || *CurPtr == '\n') && IsMultilineString) {
+          diagnose(--TmpPtr, diag::string_interpolation_unclosed);
+
+          // The only case we reach here is unterminated single line string in
+          // the interpolation. For better recovery, go on after emitting
+          // an error.
+          diagnose(CurPtr, diag::lex_unterminated_string);
+          wasErroneous = true;
+          continue;
+        } else if (!IsMultilineString || CurPtr == BufferEnd) {
+          diagnose(--TmpPtr, diag::string_interpolation_unclosed);
+        }
+
+        // As a fallback, just emit an unterminated string error.
         diagnose(TokStart, diag::lex_unterminated_string);
         return formToken(tok::unknown, TokStart);
       }
@@ -1903,7 +1923,7 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
 
   if (QuoteChar == '\'') {
     assert(!IsMultilineString && CustomDelimiterLen == 0 &&
-           "Single quoted string cannot have custom delimitor, nor multiline");
+           "Single quoted string cannot have custom delimiter, nor multiline");
     diagnoseSingleQuoteStringLiteral(TokStart, CurPtr);
   }
 
@@ -1959,28 +1979,136 @@ const char *Lexer::findEndOfCurlyQuoteStringLiteral(const char *Body,
 }
 
 bool Lexer::tryLexRegexLiteral(const char *TokStart) {
-  assert(*TokStart == '\'');
-
   // We need to have experimental string processing enabled, and have the
   // parsing logic for regex literals available.
   if (!LangOpts.EnableExperimentalStringProcessing || !regexLiteralLexingFn)
     return false;
 
-  // Ask libswift to try and lex a regex literal.
+  bool MustBeRegex = true;
+  bool IsForwardSlash = (*TokStart == '/');
+
+  // Check if we're able to lex a `/.../` regex.
+  if (IsForwardSlash) {
+    switch (ForwardSlashRegexMode) {
+    case LexerForwardSlashRegexMode::None:
+      return false;
+    case LexerForwardSlashRegexMode::Tentative:
+      MustBeRegex = false;
+      break;
+    case LexerForwardSlashRegexMode::Always:
+      break;
+    }
+
+    // For `/.../` regex literals, we need to ban space and tab at the start of
+    // a regex to avoid ambiguity with operator chains, e.g:
+    //
+    // Builder {
+    //   0
+    //   / 1 /
+    //   2
+    // }
+    //
+    // This takes advantage of the consistent operator spacing rule.
+    // TODO: This heuristic should be sunk into the Swift library once we have a
+    // way of doing fix-its from there.
+    auto *RegexContentStart = TokStart + 1;
+    switch (*RegexContentStart) {
+    case ' ':
+    case '\t': {
+      if (!MustBeRegex)
+        return false;
+
+      // We must have a regex, so emit an error for space and tab.
+      StringRef DiagChar;
+      switch (*RegexContentStart) {
+      case ' ':
+        DiagChar = "space";
+        break;
+      case '\t':
+        DiagChar = "tab";
+        break;
+      default:
+        llvm_unreachable("Unhandled case");
+      }
+      diagnose(RegexContentStart, diag::lex_regex_literal_invalid_starting_char,
+               DiagChar)
+          .fixItInsert(getSourceLoc(RegexContentStart), "\\");
+      break;
+    }
+    default:
+      break;
+    }
+  }
+
+  // Ask the Swift library to try and lex a regex literal.
   // - Ptr will not be advanced if this is not for a regex literal.
-  // - ErrStr will be set if there is any error to emit.
   // - CompletelyErroneous will be set if there was an error that cannot be
   //   recovered from.
   auto *Ptr = TokStart;
-  const char *ErrStr = nullptr;
-  bool CompletelyErroneous = regexLiteralLexingFn(&Ptr, BufferEnd, &ErrStr);
-  if (ErrStr)
-    diagnose(TokStart, diag::regex_literal_parsing_error, ErrStr);
+  bool CompletelyErroneous = regexLiteralLexingFn(
+      &Ptr, BufferEnd, MustBeRegex,
+      getBridgedOptionalDiagnosticEngine(getTokenDiags()));
 
   // If we didn't make any lexing progress, this isn't a regex literal and we
   // should fallback to lexing as something else.
   if (Ptr == TokStart)
     return false;
+
+  // If we're lexing `/.../`, error if we ended on the opening of a comment.
+  // We prefer to lex the comment as it's more likely than not that is what
+  // the user is expecting.
+  // TODO: This should be sunk into the Swift library.
+  if (IsForwardSlash && Ptr[-1] == '/' && (*Ptr == '*' || *Ptr == '/')) {
+    if (!MustBeRegex)
+      return false;
+
+    diagnose(TokStart, diag::lex_regex_literal_unterminated);
+
+    // Move the pointer back to the '/' of the comment.
+    Ptr--;
+  }
+
+  // If we're tentatively lexing `/.../`, scan to make sure we don't have any
+  // unbalanced ')'s. This helps avoid ambiguity with unapplied operator
+  // references e.g `reduce(1, /)` and `foo(/, 0) / 2`. This would be invalid
+  // regex syntax anyways. This ensures users can surround their operator ref
+  // in parens `(/)` to fix the issue. This also applies to prefix operators
+  // that can be disambiguated as e.g `(/S.foo)`. Note we need to track whether
+  // or not we're in a custom character class `[...]`, as parens are literal
+  // there.
+  // TODO: This should be sunk into the Swift library.
+  if (IsForwardSlash && !MustBeRegex) {
+    unsigned CharClassDepth = 0;
+    unsigned GroupDepth = 0;
+    for (auto *Cursor = TokStart + 1; Cursor < Ptr - 1; Cursor++) {
+      switch (*Cursor) {
+      case '\\':
+        // Skip over the next character of an escape.
+        Cursor++;
+        break;
+      case '(':
+        if (CharClassDepth == 0)
+          GroupDepth += 1;
+        break;
+      case ')':
+        if (CharClassDepth != 0)
+          break;
+
+        // Invalid, so bail.
+        if (GroupDepth == 0)
+          return false;
+
+        GroupDepth -= 1;
+        break;
+      case '[':
+        CharClassDepth += 1;
+        break;
+      case ']':
+        if (CharClassDepth != 0)
+          CharClassDepth -= 1;
+      }
+    }
+  }
 
   // Update to point to where we ended regex lexing.
   assert(Ptr > TokStart && Ptr <= BufferEnd);
@@ -1988,14 +2116,11 @@ bool Lexer::tryLexRegexLiteral(const char *TokStart) {
 
   // If the lexing was completely erroneous, form an unknown token.
   if (CompletelyErroneous) {
-    assert(ErrStr);
     formToken(tok::unknown, TokStart);
     return true;
   }
 
-  // Otherwise, we either had a successful lex, or something that was
-  // recoverable.
-  assert(ErrStr || CurPtr[-1] == '\'');
+  // We either had a successful lex, or something that was recoverable.
   formToken(tok::regex_literal, TokStart);
   return true;
 }
@@ -2383,6 +2508,11 @@ void Lexer::lexImpl() {
   assert(CurPtr >= BufferStart &&
          CurPtr <= BufferEnd && "Current pointer out of range!");
 
+  // If we're re-lexing, clear out any previous diagnostics that weren't
+  // emitted.
+  if (DiagQueue)
+    DiagQueue->clear();
+
   const char *LeadingTriviaStart = CurPtr;
   if (CurPtr == BufferStart) {
     if (BufferStart < ContentStart) {
@@ -2470,12 +2600,20 @@ void Lexer::lexImpl() {
   case ':': return formToken(tok::colon, TokStart);
   case '\\': return formToken(tok::backslash, TokStart);
 
-  case '#':
+  case '#': {
+    // Try lex a raw string literal.
+    auto *Diags = getTokenDiags();
     if (unsigned CustomDelimiterLen = advanceIfCustomDelimiter(CurPtr, Diags))
       return lexStringLiteral(CustomDelimiterLen);
-    return lexHash();
 
-      // Operator characters.
+    // Try lex a regex literal.
+    if (tryLexRegexLiteral(TokStart))
+      return;
+
+    // Otherwise try lex a magic pound literal.
+    return lexHash();
+  }
+  // Operator characters.
   case '/':
     if (CurPtr[0] == '/') {  // "//"
       skipSlashSlashComment(/*EatNewline=*/true);
@@ -2489,6 +2627,10 @@ void Lexer::lexImpl() {
              "Non token comment should be eaten by lexTrivia as LeadingTrivia");
       return formToken(tok::comment, TokStart);
     }
+    // Try lex a regex literal.
+    if (tryLexRegexLiteral(TokStart))
+      return;
+
     return lexOperatorIdentifier();
   case '%':
     // Lex %[0-9a-zA-Z_]+ as a local SIL value
@@ -2544,14 +2686,6 @@ void Lexer::lexImpl() {
     return lexNumber();
 
   case '\'':
-    // If we have experimental string processing enabled, and have the parsing
-    // logic for regex literals, try to lex a single quoted string as a regex
-    // literal.
-    if (tryLexRegexLiteral(TokStart))
-      return;
-
-    // Otherwise lex as a string literal and emit a diagnostic.
-    LLVM_FALLTHROUGH;
   case '"':
     return lexStringLiteral();
       
@@ -2581,6 +2715,16 @@ Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc,
   // we need to lex just the comment token.
   Lexer L(FakeLangOpts, SM, BufferID, nullptr, LexerMode::Swift,
           HashbangMode::Allowed, CRM);
+
+  if (SM.isRegexLiteralStart(Loc)) {
+    // HACK: If this was previously lexed as a regex literal, make sure we
+    // re-lex with forward slash regex literals enabled to make sure we get an
+    // accurate length. We can force EnableExperimentalStringProcessing on, as
+    // we know it must have been enabled to parse the regex in the first place.
+    FakeLangOpts.EnableExperimentalStringProcessing = true;
+    L.ForwardSlashRegexMode = LexerForwardSlashRegexMode::Always;
+  }
+
   L.restoreState(State(Loc));
   return L.peekNextToken();
 }
@@ -2613,7 +2757,7 @@ Restart:
     goto Restart;
   case '/':
     if (IsForTrailingTrivia || isKeepingComments()) {
-      // Don't lex comments as trailing trivias (for now).
+      // Don't lex comments as trailing trivia (for now).
       // Don't try to lex comments here if we are lexing comments as Tokens.
       break;
     } else if (*CurPtr == '/') {
@@ -2652,7 +2796,7 @@ Restart:
   case 0:
     switch (getNulCharacterKind(CurPtr - 1)) {
     case NulCharacterKind::Embedded: {
-      diagnoseEmbeddedNul(Diags, CurPtr - 1);
+      diagnoseEmbeddedNul(getTokenDiags(), CurPtr - 1);
       goto Restart;
     }
     case NulCharacterKind::CodeCompletion:

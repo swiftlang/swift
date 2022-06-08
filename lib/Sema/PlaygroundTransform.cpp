@@ -576,12 +576,14 @@ public:
       } else if (auto *D = Element.dyn_cast<Decl *>()) {
         D->walk(CF);
         if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
-          if (VarDecl *VD = PBD->getSingleVar()) {
-            if (VD->getParentInitializer()) {
-              Added<Stmt *> Log = logVarDecl(VD);
-              if (*Log) {
-                Elements.insert(Elements.begin() + (EI + 1), *Log);
-                ++EI;
+          if (!PBD->isAsyncLet()) {
+            if (VarDecl *VD = PBD->getSingleVar()) {
+              if (VD->getParentInitializer()) {
+                Added<Stmt *> Log = logVarDecl(VD);
+                if (*Log) {
+                  Elements.insert(Elements.begin() + (EI + 1), *Log);
+                  ++EI;
+                }
               }
             }
           }

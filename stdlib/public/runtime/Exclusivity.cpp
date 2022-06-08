@@ -42,6 +42,9 @@
 #elif _MSC_VER
 #include <intrin.h>
 #define get_return_address() _ReturnAddress()
+#elif defined(__wasm__)
+// Wasm can't access call frame for security purposes
+#define get_return_address() ((void*) 0)
 #else
 #error missing implementation for get_return_address
 #define get_return_address() ((void*) 0)

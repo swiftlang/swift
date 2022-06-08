@@ -22,17 +22,21 @@
 #include <Windows.h>
 #include <Bcrypt.h>
 #pragma comment(lib, "bcrypt.lib")
-#else
+#elif !defined(__APPLE__)
+
 #include <errno.h>
 #include <fcntl.h>
-#endif
 
 #if __has_include(<sys/random.h>)
 #include <sys/random.h>
 #endif
+#if __has_include(<sys/stat.h>)
 #include <sys/stat.h>
+#endif
 #if __has_include(<sys/syscall.h>)
 #include <sys/syscall.h>
+#endif
+
 #endif
 
 #include <stdlib.h>
@@ -66,7 +70,7 @@ void swift_stdlib_random(void *buf, __swift_size_t nbytes) {
                                     static_cast<ULONG>(nbytes),
                                     BCRYPT_USE_SYSTEM_PREFERRED_RNG);
   if (!BCRYPT_SUCCESS(status)) {
-    fatalError(0, "Fatal error: 0x%.8X in '%s'\n", status, __func__);
+    fatalError(0, "Fatal error: 0x%lX in '%s'\n", status, __func__);
   }
 }
 

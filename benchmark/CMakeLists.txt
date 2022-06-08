@@ -196,6 +196,7 @@ set(SWIFT_BENCH_MODULES
     single-source/WordCount
     single-source/XorLoop
     cxx-source/CreateObjects
+    cxx-source/ReadAccessor
 )
 
 set(SWIFT_MULTISOURCE_SWIFT_BENCHES
@@ -240,7 +241,7 @@ set(SWIFT_BENCHMARK_EXTRA_FLAGS "" CACHE STRING
     "Extra options to pass to swiftc when building the benchmarks")
 
 set(SWIFT_BENCHMARK_UNOPTIMIZED_DRIVER NO CACHE BOOL
-    "Build the benchmark driver utilites without optimization (default: no)")
+    "Build the benchmark driver utilities without optimization (default: no)")
 
 if (SWIFT_BENCHMARK_BUILT_STANDALONE)
   # This option's value must match the value of the same option used when

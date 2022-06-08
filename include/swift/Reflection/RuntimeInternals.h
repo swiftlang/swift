@@ -49,8 +49,8 @@ template <typename Runtime> struct MetadataCacheNode {
 };
 
 template <typename Runtime> struct ConcurrentHashMap {
-  typename Runtime::StoredSize ReaderCount;
-  typename Runtime::StoredSize ElementCount;
+  uint32_t ReaderCount;
+  uint32_t ElementCount;
   typename Runtime::StoredPointer Elements;
   typename Runtime::StoredPointer Indices;
   // We'll ignore the remaining fields for now....
@@ -94,28 +94,45 @@ struct StackAllocator {
 };
 
 template <typename Runtime>
-struct ActiveTaskStatus {
+struct ActiveTaskStatusWithEscalation {
+  uint32_t Flags[1];
+  uint32_t ExecutionLock[(sizeof(typename Runtime::StoredPointer) == 8) ? 1 : 2];
   typename Runtime::StoredPointer Record;
-  typename Runtime::StoredSize Flags;
 };
 
 template <typename Runtime>
+struct ActiveTaskStatusWithoutEscalation {
+  uint32_t Flags[sizeof(typename Runtime::StoredPointer) == 8 ? 2 : 1];
+  typename Runtime::StoredPointer Record;
+};
+
+struct ActiveTaskStatusFlags {
+  static const uint32_t PriorityMask = 0xFF;
+  static const uint32_t IsCancelled = 0x100;
+  static const uint32_t IsStatusRecordLocked = 0x200;
+  static const uint32_t IsEscalated = 0x400;
+  static const uint32_t IsRunning = 0x800;
+  static const uint32_t IsEnqueued = 0x1000;
+  static const uint32_t IsComplete = 0x2000;
+};
+
+template <typename Runtime, typename ActiveTaskStatus>
 struct AsyncTaskPrivateStorage {
-  ActiveTaskStatus<Runtime> Status;
+  typename Runtime::StoredPointer ExclusivityAccessSet[2];
+  ActiveTaskStatus Status;
   StackAllocator<Runtime> Allocator;
   typename Runtime::StoredPointer Local;
-  typename Runtime::StoredPointer ExclusivityAccessSet[2];
   uint32_t Id;
+  uint32_t BasePriority;
 };
 
-template <typename Runtime>
+template <typename Runtime, typename ActiveTaskStatus>
 struct AsyncTask: Job<Runtime> {
-  // On 64-bit, there's a Reserved64 after ResumeContext.  
+  // On 64-bit, there's a Reserved64 after ResumeContext.
   typename Runtime::StoredPointer ResumeContextAndReserved[
     sizeof(typename Runtime::StoredPointer) == 8 ? 2 : 1];
-
   union {
-    AsyncTaskPrivateStorage<Runtime> PrivateStorage;
+    AsyncTaskPrivateStorage<Runtime, ActiveTaskStatus> PrivateStorage;
     typename Runtime::StoredPointer PrivateStorageRaw[14];
   };
 };
@@ -124,7 +141,6 @@ template <typename Runtime>
 struct AsyncContext {
   typename Runtime::StoredSignedPointer Parent;
   typename Runtime::StoredSignedPointer ResumeParent;
-  uint32_t Flags;
 };
 
 template <typename Runtime>
@@ -143,10 +159,23 @@ struct FutureAsyncContextPrefix {
 };
 
 template <typename Runtime>
+struct ActiveActorStatusWithEscalation {
+  uint32_t Flags[1];
+  uint32_t DrainLock[(sizeof(typename Runtime::StoredPointer) == 8) ? 1 : 2];
+  typename Runtime::StoredPointer FirstJob;
+};
+
+template <typename Runtime>
+struct ActiveActorStatusWithoutEscalation {
+  uint32_t Flags[sizeof(typename Runtime::StoredPointer) == 8 ? 2 : 1];
+  typename Runtime::StoredPointer FirstJob;
+};
+
+template <typename Runtime, typename ActiveActorStatus>
 struct DefaultActorImpl {
   HeapObject<Runtime> HeapObject;
-  typename Runtime::StoredPointer FirstJob;
-  typename Runtime::StoredSize Flags;
+  Job<Runtime> JobStorage;
+  ActiveActorStatus Status;
 };
 
 template <typename Runtime>

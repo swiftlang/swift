@@ -20,6 +20,7 @@
 
 #include "swift/Remote/RemoteAddress.h"
 #include "swift/SwiftRemoteMirror/MemoryReaderInterface.h"
+#include "llvm/ADT/Optional.h"
 
 #include <cstring>
 #include <functional>
@@ -148,19 +149,32 @@ public:
     return RemoteAbsolutePointer("", readValue);
   }
 
-  /// Atempt to resolve the pointer to a symbol for the given remote address.
   virtual llvm::Optional<RemoteAbsolutePointer>
   resolvePointerAsSymbol(RemoteAddress address) {
     return llvm::None;
   }
 
+  /// Lookup a symbol for the given remote address.
+  virtual RemoteAbsolutePointer getSymbol(RemoteAddress address) {
+    if (auto symbol = resolvePointerAsSymbol(address))
+      return *symbol;
+    return RemoteAbsolutePointer("", address.getAddressData());
+  }
+
+  /// Lookup a dynamic symbol name (ie dynamic loader binding) for the given
+  /// remote address. Note: An address can be referenced by both dynamic and
+  /// regular symbols, this function must return a dynamic symbol only.
+  virtual RemoteAbsolutePointer getDynamicSymbol(RemoteAddress address) {
+    return nullptr;
+  }
+
   /// Attempt to read and resolve a pointer value at the given remote address.
   llvm::Optional<RemoteAbsolutePointer> readPointer(RemoteAddress address,
                                                     unsigned pointerSize) {
-    // Try to resolve the pointer as a symbol first, as reading memory
-    // may potentially be expensive.
-    if (auto symbolPointer = resolvePointerAsSymbol(address))
-      return symbolPointer;
+    // First, try to lookup the pointer as a dynamic symbol (binding), as
+    // reading memory may potentially be expensive.
+    if (auto dynamicSymbol = getDynamicSymbol(address))
+      return dynamicSymbol;
 
     auto result = readBytes(address, pointerSize);
     if (!result)

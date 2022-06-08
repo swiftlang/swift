@@ -1638,8 +1638,8 @@ emitCastOperand(SILGenFunction &SGF, SILLocation loc,
   // temporary if necessary.
 
   // Figure out if we need the value to be in a temporary.
-  bool requiresAddress = !canUseScalarCheckedCastInstructions(SGF.SGM.M,
-                                                        sourceType, targetType);
+  bool requiresAddress =
+    !canSILUseScalarCheckedCastInstructions(SGF.SGM.M, sourceType, targetType);
 
   AbstractionPattern abstraction = SGF.SGM.M.Types.getMostGeneralAbstraction();
   auto &srcAbstractTL = SGF.getTypeLowering(abstraction, sourceType);
@@ -2850,7 +2850,11 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
     }
 
     // If then we have an object, return it at +0.
+    // For opaque values, return at +1
     if (subjectMV.getType().isObject()) {
+      if (subjectMV.getType().isAddressOnly(F)) {
+        return {subjectMV.copy(*this, S), CastConsumptionKind::TakeAlways};
+      }
       return {subjectMV, CastConsumptionKind::BorrowAlways};
     }
 

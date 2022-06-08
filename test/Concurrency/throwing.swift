@@ -46,7 +46,7 @@ extension MP {
     var tests = TestSuite("Async Throw")
 
     if #available(SwiftStdlib 5.1, *) {
-      tests.test("throwing of naturally direct but indirect reabstration") {
+      tests.test("throwing of naturally direct but indirect reabstraction") {
         let task2 = detach {
           let m = M()
           await verifyCancelled {

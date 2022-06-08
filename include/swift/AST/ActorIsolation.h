@@ -47,7 +47,7 @@ bool isLetAccessibleAnywhere(const ModuleDecl *fromModule, VarDecl *let);
 /// the actors with which it can interact.
 class ActorIsolation {
 public:
-  enum Kind {
+  enum Kind : uint8_t {
     /// The actor isolation has not been specified. It is assumed to be
     /// unsafe to interact with this declaration from any actor.
     Unspecified = 0,
@@ -55,10 +55,6 @@ public:
     /// For example, a mutable stored property or synchronous function within
     /// the actor is isolated to the instance of that actor.
     ActorInstance,
-    /// The declaration is isolated to a (potentially) distributed actor.
-    /// Distributed actors may access _their_ state (same as 'ActorInstance')
-    /// however others may not access any properties on other distributed actors.
-    DistributedActorInstance,
     /// The declaration is explicitly specified to be independent of any actor,
     /// meaning that it can be used from any actor but is also unable to
     /// refer to the isolated state of any given actor.
@@ -73,18 +69,19 @@ public:
   };
 
 private:
-  Kind kind;
   union {
     NominalTypeDecl *actor;
     Type globalActor;
     void *pointer;
   };
+  uint8_t kind : 3;
+  uint8_t isolatedByPreconcurrency : 1;
 
   ActorIsolation(Kind kind, NominalTypeDecl *actor)
-      : kind(kind), actor(actor) { }
+      : actor(actor), kind(kind), isolatedByPreconcurrency(false) { }
 
   ActorIsolation(Kind kind, Type globalActor)
-      : kind(kind), globalActor(globalActor) { }
+      : globalActor(globalActor), kind(kind), isolatedByPreconcurrency(false) { }
 
 public:
   static ActorIsolation forUnspecified() {
@@ -99,16 +96,12 @@ public:
     return ActorIsolation(ActorInstance, actor);
   }
 
-  static ActorIsolation forDistributedActorInstance(NominalTypeDecl *actor) {
-    return ActorIsolation(DistributedActorInstance, actor);
-  }
-
   static ActorIsolation forGlobalActor(Type globalActor, bool unsafe) {
     return ActorIsolation(
         unsafe ? GlobalActorUnsafe : GlobalActor, globalActor);
   }
 
-  Kind getKind() const { return kind; }
+  Kind getKind() const { return (Kind)kind; }
 
   operator Kind() const { return getKind(); }
 
@@ -116,8 +109,21 @@ public:
   
   bool isIndependent() const { return kind == Independent; }
 
+  bool isActorIsolated() const {
+    switch (getKind()) {
+    case ActorInstance:
+    case GlobalActor:
+    case GlobalActorUnsafe:
+      return true;
+
+    case Unspecified:
+    case Independent:
+      return false;
+    }
+  }
+
   NominalTypeDecl *getActor() const {
-    assert(getKind() == ActorInstance || getKind() == DistributedActorInstance);
+    assert(getKind() == ActorInstance);
     return actor;
   }
 
@@ -125,9 +131,21 @@ public:
     return getKind() == GlobalActor || getKind() == GlobalActorUnsafe;
   }
 
+  bool isDistributedActor() const;
+
   Type getGlobalActor() const {
     assert(isGlobalActor());
     return globalActor;
+  }
+
+  bool preconcurrency() const {
+    return isolatedByPreconcurrency;
+  }
+
+  ActorIsolation withPreconcurrency(bool value) const {
+    auto copy = *this;
+    copy.isolatedByPreconcurrency = value;
+    return copy;
   }
 
   /// Determine whether this isolation will require substitution to be
@@ -142,16 +160,15 @@ public:
     if (lhs.isGlobalActor() && rhs.isGlobalActor())
       return areTypesEqual(lhs.globalActor, rhs.globalActor);
 
-    if (lhs.kind != rhs.kind)
+    if (lhs.getKind() != rhs.getKind())
       return false;
 
-    switch (lhs.kind) {
+    switch (lhs.getKind()) {
     case Independent:
     case Unspecified:
       return true;
 
     case ActorInstance:
-    case DistributedActorInstance:
       return lhs.actor == rhs.actor;
 
     case GlobalActor:

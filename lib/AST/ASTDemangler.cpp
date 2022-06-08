@@ -595,6 +595,10 @@ Type ASTBuilder::createProtocolCompositionType(
   return ExistentialType::get(composition);
 }
 
+Type ASTBuilder::createProtocolTypeFromDecl(ProtocolDecl *protocol) {
+  return protocol->getDeclaredInterfaceType();
+}
+
 static MetatypeRepresentation
 getMetatypeRepresentation(ImplMetatypeRepresentation repr) {
   switch (repr) {
@@ -619,6 +623,14 @@ Type ASTBuilder::createExistentialMetatypeType(Type instance,
 
   return ExistentialMetatypeType::get(instance,
                                       getMetatypeRepresentation(*repr));
+}
+
+Type ASTBuilder::createParameterizedProtocolType(Type base,
+                                                 ArrayRef<Type> args) {
+  if (!base->getAs<ProtocolType>())
+    return Type();
+  return ParameterizedProtocolType::get(base->getASTContext(),
+                                        base->castTo<ProtocolType>(), args);
 }
 
 Type ASTBuilder::createMetatypeType(Type instance,
@@ -698,7 +710,8 @@ Type ASTBuilder::createSILBoxTypeWithLayout(
     silFields.emplace_back(field.getPointer()->getCanonicalType(),
                            field.getInt());
   SILLayout *layout =
-      SILLayout::get(Ctx, signature.getCanonicalSignature(), silFields);
+      SILLayout::get(Ctx, signature.getCanonicalSignature(), silFields,
+                     /*captures generics*/ false);
 
   SubstitutionMap substs;
   if (signature)
@@ -784,6 +797,29 @@ Type ASTBuilder::createDictionaryType(Type key, Type value) {
 
 Type ASTBuilder::createParenType(Type base) {
   return ParenType::get(Ctx, base);
+}
+
+GenericSignature
+ASTBuilder::createGenericSignature(ArrayRef<BuiltType> builtParams,
+                                   ArrayRef<BuiltRequirement> requirements) {
+  std::vector<BuiltGenericTypeParam> params;
+  for (auto &param : builtParams) {
+    auto paramTy = param->getAs<GenericTypeParamType>();
+    if (!paramTy)
+      return GenericSignature();
+    params.push_back(paramTy);
+  }
+  return GenericSignature::get(params, requirements);
+}
+
+SubstitutionMap
+ASTBuilder::createSubstitutionMap(BuiltGenericSignature sig,
+                                  ArrayRef<BuiltType> replacements) {
+  return SubstitutionMap::get(sig, replacements, {});
+}
+
+Type ASTBuilder::subst(Type subject, const BuiltSubstitutionMap &Subs) const {
+  return subject.subst(Subs);
 }
 
 bool ASTBuilder::validateParentType(TypeDecl *decl, Type parent) {

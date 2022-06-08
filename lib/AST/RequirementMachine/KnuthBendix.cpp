@@ -23,9 +23,9 @@
 // pair to the other. This can introduce more overlaps with existing rules, and
 // the process iterates until fixed point.
 //
-// This implementation also extends Knuth-Bendix to introduce new _generators_,
-// in addition to new relations as in the standard algorithm. See the comment at
-// the top of RewriteSystem::processMergedAssociatedTypes() for a description.
+// When completion records a new rewrite rule, it also constructs a rewrite loop
+// describing how this rule is derived from existing rules. See RewriteLoop.cpp
+// for a discussion of rewrite loops.
 //
 //===----------------------------------------------------------------------===//
 
@@ -68,269 +68,6 @@ Symbol Symbol::prependPrefixToConcreteSubstitutions(
 
       return Term::get(mutTerm, ctx);
     }, ctx);
-}
-
-/// If we have two symbols [P:T] and [Q:T], produce a merged symbol:
-///
-/// - If P inherits from Q, this is just [P:T].
-/// - If Q inherits from P, this is just [Q:T].
-/// - If P and Q are unrelated, this is [P&Q:T].
-Symbol RewriteContext::mergeAssociatedTypes(Symbol lhs, Symbol rhs) {
-  auto key = std::make_pair(lhs, rhs);
-
-  auto found = MergedAssocTypes.find(key);
-  if (found != MergedAssocTypes.end())
-    return found->second;
-
-  // Check preconditions that were established by RewriteSystem::addRule().
-  assert(lhs.getKind() == Symbol::Kind::AssociatedType);
-  assert(rhs.getKind() == Symbol::Kind::AssociatedType);
-  assert(lhs.getName() == rhs.getName());
-  assert(lhs.compare(rhs, *this) > 0);
-
-  auto protos = lhs.getProtocols();
-  auto otherProtos = rhs.getProtocols();
-
-  // This must follow from lhs > rhs.
-  assert(getProtocolSupport(protos) <= getProtocolSupport(otherProtos));
-
-  // Compute sorted and merged list of protocols, with duplicates.
-  llvm::TinyPtrVector<const ProtocolDecl *> newProtos;
-  std::merge(protos.begin(), protos.end(),
-             otherProtos.begin(), otherProtos.end(),
-             std::back_inserter(newProtos),
-             [&](const ProtocolDecl *lhs,
-                 const ProtocolDecl *rhs) -> int {
-               return compareProtocols(lhs, rhs) < 0;
-             });
-
-  // Prune duplicates and protocols that are inherited by other
-  // protocols.
-  llvm::TinyPtrVector<const ProtocolDecl *> minimalProtos;
-  for (const auto *newProto : newProtos) {
-    auto inheritsFrom = [&](const ProtocolDecl *thisProto) {
-      if (thisProto == newProto)
-        return true;
-
-      const auto &inherited = getInheritedProtocols(thisProto);
-      return std::find(inherited.begin(),
-                       inherited.end(),
-                       newProto) != inherited.end();
-    };
-
-    if (std::find_if(minimalProtos.begin(), minimalProtos.end(),
-                     inheritsFrom)
-        == minimalProtos.end()) {
-      minimalProtos.push_back(newProto);
-    }
-  }
-
-  // The two input sets are minimal already, so the merged set
-  // should have at least as many elements as the smallest
-  // input set.
-  assert(minimalProtos.size() >= std::min(protos.size(), otherProtos.size()));
-
-  // The merged set cannot contain more elements than the union
-  // of the two sets.
-  assert(minimalProtos.size() <= protos.size() + otherProtos.size());
-
-  auto result = Symbol::forAssociatedType(minimalProtos, lhs.getName(), *this);
-  auto inserted = MergedAssocTypes.insert(std::make_pair(key, result));
-  assert(inserted.second);
-  (void) inserted;
-
-  return result;
-}
-
-/// Consider the following example:
-///
-///   protocol P1 { associatedtype T : P1 }
-///   protocol P2 { associatedtype T : P2 }
-///   struct G<T : P1 & P2> {}
-///
-/// We start with these rewrite rules:
-///
-///   [P1].T => [P1:T]
-///   [P2].T => [P2:T]
-///   [P1:T].[P1] => [P1:T]
-///   [P2:T].[P1] => [P2:T]
-///   τ_0_0.[P1] => τ_0_0
-///   τ_0_0.[P2] => τ_0_0
-///   τ_0_0.T => τ_0_0.[P1:T]
-///   τ_0_0.[P2:T] => τ_0_0.[P1:T]
-///
-/// The completion procedure ends up adding an infinite series of rules of the
-/// form
-///
-///   τ_0_0.[P1:T].[P2]                 => τ_0_0.[P1:T]
-///   τ_0_0.[P1:T].[P2:T]               => τ_0_0.[P1:T].[P1:T]
-///
-///   τ_0_0.[P1:T].[P1:T].[P2]          => τ_0_0.[P1:T].[P1:T]
-///   τ_0_0.[P1:T].[P1:T].[P2:T]        => τ_0_0.[P1:T].[P1:T].[P1:T]
-///
-///   τ_0_0.[P1:T].[P1:T].[P1:T].[P2]   => τ_0_0.[P1:T].[P1:T].[P1.T]
-///   τ_0_0.[P1:T].[P1:T].[P1:T].[P2:T] => τ_0_0.[P1:T].[P1:T].[P1:T].[P1.T]
-///
-/// The difficulty here stems from the fact that an arbitrary sequence of
-/// [P1:T] following a τ_0_0 is known to conform to P2, but P1:T itself
-/// does not conform to P2.
-///
-/// We use a heuristic to compute a completion in this case by using
-/// merged associated type terms.
-///
-/// The key is the following rewrite rule:
-///
-///   τ_0_0.[P2:T] => τ_0_0.[P1:T]
-///
-/// When we add this rule, we introduce a new merged symbol [P1&P2:T] and
-/// a new rule:
-///
-///   τ_0_0.[P1:T] => τ_0_0.[P1&P2:T]
-///
-/// We also look for any existing rules of the form [P1:T].[Q] => [P1:T]
-/// or [P2:T].[Q] => [P2:T], and introduce a new rule:
-///
-///   [P1&P2:T].[Q] => [P1&P2:T]
-///
-/// In the above example, we have such a rule for Q == P1 and Q == P2, so
-/// in total we end up adding the following four rules:
-///
-///   τ_0_0.[P1:T] => τ_0_0.[P1&P2:T]
-///   [P1&P2:T].[P1] => [P1&P2:T]
-///   [P1&P2:T].[P2] => [P1&P2:T]
-///
-/// Intuitively, since the conformance requirements on the merged term
-/// are not prefixed by the root τ_0_0, they apply at any level; we've
-/// "tied off" the recursion, and the rewrite system is now convergent.
-void RewriteSystem::processMergedAssociatedTypes() {
-  if (MergedAssociatedTypes.empty())
-    return;
-
-  unsigned i = 0;
-
-  // Chase the end of the vector, since addRule() might add new elements below.
-  while (i < MergedAssociatedTypes.size()) {
-    // Copy the entry out, since addRule() might add new elements below.
-    auto entry = MergedAssociatedTypes[i++];
-
-    if (Debug.contains(DebugFlags::Merge)) {
-      llvm::dbgs() << "## Processing associated type merge with ";
-      llvm::dbgs() << entry.rhs << ", ";
-      llvm::dbgs() << entry.lhsSymbol << ", ";
-      llvm::dbgs() << entry.mergedSymbol << "\n";
-    }
-
-    // If we have X.[P2:T] => Y.[P1:T], add a new rule:
-    // X.[P1:T] => X.[P1&P2:T]
-    MutableTerm lhs(entry.rhs);
-
-    // Build the term X.[P1&P2:T].
-    MutableTerm rhs(entry.rhs);
-    rhs.back() = entry.mergedSymbol;
-
-    // Add the rule X.[P1:T] => X.[P1&P2:T].
-    addRule(lhs, rhs);
-
-    // Collect new rules here so that we're not adding rules while traversing
-    // the trie.
-    SmallVector<std::pair<MutableTerm, MutableTerm>, 2> inducedRules;
-
-    // Look for conformance requirements on [P1:T] and [P2:T].
-    auto visitRule = [&](unsigned ruleID) {
-      const auto &otherRule = getRule(ruleID);
-      const auto &otherLHS = otherRule.getLHS();
-      if (otherLHS.size() == 2 &&
-          otherLHS[1].getKind() == Symbol::Kind::Protocol) {
-        if (otherLHS[0] == entry.lhsSymbol ||
-            otherLHS[0] == entry.rhs.back()) {
-          // We have a rule of the form
-          //
-          //   [P1:T].[Q] => [P1:T]
-          //
-          // or
-          //
-          //   [P2:T].[Q] => [P2:T]
-          if (Debug.contains(DebugFlags::Merge)) {
-            llvm::dbgs() << "### Lifting conformance rule " << otherRule << "\n";
-          }
-
-          // We know that [P1:T] or [P2:T] conforms to Q, therefore the
-          // merged type [P1&P2:T] must conform to Q as well. Add a new rule
-          // of the form:
-          //
-          //   [P1&P2:T].[Q] => [P1&P2:T]
-          //
-          MutableTerm newLHS;
-          newLHS.add(entry.mergedSymbol);
-          newLHS.add(otherLHS[1]);
-
-          MutableTerm newRHS;
-          newRHS.add(entry.mergedSymbol);
-
-          inducedRules.emplace_back(newLHS, newRHS);
-        }
-      }
-    };
-
-    // Visit rhs first to preserve the ordering of protocol requirements in the
-    // the property map. This is just for aesthetic purposes in the debug dump,
-    // it doesn't change behavior.
-    Trie.findAll(entry.rhs.back(), visitRule);
-    Trie.findAll(entry.lhsSymbol, visitRule);
-
-    // Now add the new rules.
-    for (const auto &pair : inducedRules)
-      addRule(pair.first, pair.second);
-  }
-
-  MergedAssociatedTypes.clear();
-}
-
-/// Check if we have a rule of the form
-///
-///   X.[P1:T] => X.[P2:T]
-///
-/// If so, record this rule for later. We'll try to merge the associated
-/// types in RewriteSystem::processMergedAssociatedTypes().
-void RewriteSystem::checkMergedAssociatedType(Term lhs, Term rhs) {
-  // FIXME: Figure out 3-cell representation for merged associated types
-  if (RecordLoops ||
-      !Context.getASTContext().LangOpts.RequirementMachineMergedAssociatedTypes)
-    return;
-
-  if (lhs.size() == rhs.size() &&
-      std::equal(lhs.begin(), lhs.end() - 1, rhs.begin()) &&
-      lhs.back().getKind() == Symbol::Kind::AssociatedType &&
-      rhs.back().getKind() == Symbol::Kind::AssociatedType &&
-      lhs.back().getName() == rhs.back().getName()) {
-    if (Debug.contains(DebugFlags::Merge)) {
-      llvm::dbgs() << "## Associated type merge candidate ";
-      llvm::dbgs() << lhs << " => " << rhs << "\n\n";
-    }
-
-    auto mergedSymbol = Context.mergeAssociatedTypes(lhs.back(), rhs.back());
-    if (Debug.contains(DebugFlags::Merge)) {
-      llvm::dbgs() << "### Merged symbol " << mergedSymbol << "\n";
-    }
-
-    // We must have mergedSymbol <= rhs < lhs, therefore mergedSymbol != lhs.
-    assert(lhs.back() != mergedSymbol &&
-           "Left hand side should not already end with merged symbol?");
-    assert(mergedSymbol.compare(rhs.back(), Context) <= 0);
-    assert(rhs.back().compare(lhs.back(), Context) < 0);
-
-    // If the merge didn't actually produce a new symbol, there is nothing else
-    // to do.
-    if (rhs.back() == mergedSymbol) {
-      if (Debug.contains(DebugFlags::Merge)) {
-        llvm::dbgs() << "### Skipping\n";
-      }
-
-      return;
-    }
-
-    MergedAssociatedTypes.push_back({rhs, lhs.back(), mergedSymbol});
-  }
 }
 
 /// Compute a critical pair from the left hand sides of two rewrite rules,
@@ -420,8 +157,66 @@ RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
       return false;
     }
 
-    // Add the pair (X, TYV).
-    pairs.emplace_back(x, tyv, path);
+    // If X == TUW for some W, then the critical pair is (TUW, TYV),
+    // and we have
+    // - lhs == (TUV => TUW)
+    // - rhs == (U => Y).
+    //
+    // We explicitly apply the rewrite step (Y => U) to the beginning of the
+    // rewrite path, transforming the critical pair to (TYW, TYV).
+    //
+    // In particular, if V == W.[P] for some protocol P, then we in fact have
+    // a property rule and a same-type rule:
+    //
+    // - lhs == (TUW.[P] => TUW)
+    // - rhs == (U => Y)
+    //
+    // Without this hack, the critical pair would be:
+    //
+    // (TUW => TYW.[P])
+    //
+    // With this hack, the critical pair becomes:
+    //
+    // (TYW.[P] => TYW)
+    //
+    // This ensures that the newly-added rule is itself a property rule;
+    // otherwise, this would only be the case if addRule() reduced TUW
+    // into TYW without immediately reducing some subterm of TUW first.
+    //
+    // While completion will eventually simplify all such rules down into
+    // property rules, their existence in the first place breaks subtle
+    // invariants in the minimal conformances algorithm, which expects
+    // homotopy generators describing redundant protocol conformance rules
+    // to have a certain structure.
+    if (t.size() + rhs.getLHS().size() <= x.size() &&
+        std::equal(rhs.getLHS().begin(),
+                   rhs.getLHS().end(),
+                   x.begin() + t.size())) {
+      // We have a path from TUW to TYV. Invert to get a path from TYV to
+      // TUW.
+      path.invert();
+
+      // Compute the term W.
+      MutableTerm w(x.begin() + t.size() + rhs.getLHS().size(), x.end());
+
+      // Now add a rewrite step T.(U => Y).W to get a path from TYV to
+      // TYW.
+      path.add(RewriteStep::forRewriteRule(/*startOffset=*/t.size(),
+                                           /*endOffset=*/w.size(),
+                                           getRuleID(rhs),
+                                           /*inverse=*/false));
+
+      // Compute the term TYW.
+      MutableTerm tyw(t);
+      tyw.append(rhs.getRHS());
+      tyw.append(w);
+
+      // Add the pair (TYV, TYW).
+      pairs.emplace_back(tyv, tyw, path);
+    } else {
+      // Add the pair (X, TYV).
+      pairs.emplace_back(x, tyv, path);
+    }
   } else {
     // lhs == TU -> X, rhs == UV -> Y.
 
@@ -448,15 +243,15 @@ RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
                                          getRuleID(lhs),
                                          /*inverse=*/true));
 
-    // (2) Next, if the right hand side rule ends with a concrete type symbol,
-    // perform the concrete type adjustment:
+    // (2) Next, if the right hand side rule ends with a superclass or concrete
+    // type symbol, remove the prefix 'T' from each substitution in the symbol.
     //
     //     (σ - T)
     if (xv.back().hasSubstitutions() &&
         !xv.back().getSubstitutions().empty() &&
         t.size() > 0) {
-      path.add(RewriteStep::forAdjustment(t.size(), /*endOffset=*/0,
-                                          /*inverse=*/true));
+      path.add(RewriteStep::forPrefixSubstitutions(t.size(), /*endOffset=*/0,
+                                                   /*inverse=*/true));
 
       xv.back() = xv.back().prependPrefixToConcreteSubstitutions(
           t, Context);
@@ -475,44 +270,97 @@ RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
       return false;
     }
 
-    // Add the pair (XV, TY).
-    pairs.emplace_back(xv, ty, path);
+    // If Y == UW for some W, then the critical pair is (XV, TUW),
+    // and we have
+    // - lhs == (TU -> X)
+    // - rhs == (UV -> UW).
+    //
+    // We explicitly apply the rewrite step (TU => X) to the rewrite path,
+    // transforming the critical pair to (XV, XW).
+    //
+    // In particular, if T == X, U == [P] for some protocol P, and
+    // V == W.[p] for some property symbol p, then we in fact have a pair
+    // of property rules:
+    //
+    // - lhs == (T.[P] => T)
+    // - rhs == ([P].W.[p] => [P].W)
+    //
+    // Without this hack, the critical pair would be:
+    //
+    // (T.W.[p] => T.[P].W)
+    //
+    // With this hack, the critical pair becomes:
+    //
+    // (T.W.[p] => T.W)
+    //
+    // This ensures that the newly-added rule is itself a property rule;
+    // otherwise, this would only be the case if addRule() reduced T.[P].W
+    // into T.W without immediately reducing some subterm of T first.
+    //
+    // While completion will eventually simplify all such rules down into
+    // property rules, their existence in the first place breaks subtle
+    // invariants in the minimal conformances algorithm, which expects
+    // homotopy generators describing redundant protocol conformance rules
+    // to have a certain structure.
+    if (lhs.getLHS().size() <= ty.size() &&
+        std::equal(lhs.getLHS().begin(),
+                   lhs.getLHS().end(),
+                   ty.begin())) {
+      unsigned endOffset = ty.size() - lhs.getLHS().size();
+      path.add(RewriteStep::forRewriteRule(/*startOffset=*/0,
+                                           endOffset,
+                                           getRuleID(lhs),
+                                           /*inverse=*/false));
+
+      // Compute the term XW.
+      MutableTerm xw(lhs.getRHS());
+      xw.append(ty.end() - endOffset, ty.end());
+
+      pairs.emplace_back(xv, xw, path);
+    } else {
+      pairs.emplace_back(xv, ty, path);
+    }
   }
 
   return true;
 }
 
-/// Computes the confluent completion using the Knuth-Bendix algorithm.
+/// Computes the confluent completion using the Knuth-Bendix algorithm and
+/// returns a status code.
 ///
-/// Returns a pair consisting of a status and number of iterations executed.
+/// The first element of the pair is a status.
 ///
-/// The status is CompletionResult::MaxIterations if we exceed \p maxIterations
-/// iterations.
+/// The status is CompletionResult::MaxRuleCount if we add more than
+/// \p maxRuleCount rules.
 ///
-/// The status is CompletionResult::MaxDepth if we produce a rewrite rule whose
-/// left hand side has a length exceeding \p maxDepth.
+/// The status is CompletionResult::MaxRuleLength if we produce a rewrite rule
+/// whose left hand side has a length exceeding \p maxRuleLength.
 ///
-/// Otherwise, the status is CompletionResult::Success.
+/// In the above two cases, the second element of the pair is a rule ID.
+///
+/// Otherwise, the status is CompletionResult::Success and the second element
+/// is zero.
 std::pair<CompletionResult, unsigned>
-RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
-                                          unsigned maxDepth) {
+RewriteSystem::computeConfluentCompletion(unsigned maxRuleCount,
+                                          unsigned maxRuleLength) {
   assert(Initialized);
   assert(!Minimized);
+  assert(!Frozen);
 
   // Complete might already be set, if we're re-running completion after
   // adding new rules in the property map's concrete type unification procedure.
   Complete = 1;
 
-  unsigned steps = 0;
-
-  bool again = false;
+  unsigned ruleCount;
 
   std::vector<CriticalPair> resolvedCriticalPairs;
   std::vector<RewriteLoop> resolvedLoops;
 
   do {
+    ruleCount = Rules.size();
+
     // For every rule, looking for other rules that overlap with this rule.
-    for (unsigned i = 0, e = Rules.size(); i < e; ++i) {
+    for (unsigned i = FirstLocalRule, e = Rules.size(); i < e; ++i) {
       const auto &lhs = getRule(i);
       if (lhs.isLHSSimplified() ||
           lhs.isRHSSimplified() ||
@@ -596,24 +444,21 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
       }
     }
 
+    assert(ruleCount == Rules.size());
+
     simplifyLeftHandSides();
 
-    again = false;
     for (const auto &pair : resolvedCriticalPairs) {
       // Check if we've already done too much work.
-      if (Rules.size() > maxIterations)
-        return std::make_pair(CompletionResult::MaxIterations, steps);
+      if (getLocalRules().size() > maxRuleCount)
+        return std::make_pair(CompletionResult::MaxRuleCount, Rules.size() - 1);
 
       if (!addRule(pair.LHS, pair.RHS, &pair.Path))
         continue;
 
       // Check if the new rule is too long.
-      if (Rules.back().getDepth() > maxDepth)
-        return std::make_pair(CompletionResult::MaxDepth, steps);
-
-      // Only count a 'step' once we add a new rule.
-      ++steps;
-      again = true;
+      if (Rules.back().getDepth() > maxRuleLength + getLongestInitialRule())
+        return std::make_pair(CompletionResult::MaxRuleLength, Rules.size() - 1);
     }
 
     for (const auto &loop : resolvedLoops) {
@@ -624,17 +469,8 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
     resolvedLoops.clear();
 
     simplifyRightHandSides();
-    simplifyLeftHandSideSubstitutions();
+    simplifyLeftHandSideSubstitutions(/*map=*/nullptr);
+  } while (Rules.size() > ruleCount);
 
-    // If the added rules merged any associated types, process the merges now
-    // before we continue with the completion procedure. This is important
-    // to perform incrementally since merging is required to repair confluence
-    // violations.
-    processMergedAssociatedTypes();
-  } while (again);
-
-  assert(MergedAssociatedTypes.empty() &&
-         "Should have processed all merge candidates");
-
-  return std::make_pair(CompletionResult::Success, steps);
+  return std::make_pair(CompletionResult::Success, 0);
 }

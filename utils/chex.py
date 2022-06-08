@@ -1,10 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Check HEX -- a stupid filter that allows hexadecimal literals to be checked
 # for in LLVM IR FileCheck tests. It works by replacing occurrences of
 # strings matching the regex /< (i[0-9]+) \s+ (0x[0-9A-Fa-f]+) >/x with the
 # decimal literal equivalent that would really appear in printed LLVM IR.
-
-from __future__ import print_function
 
 import re
 import sys

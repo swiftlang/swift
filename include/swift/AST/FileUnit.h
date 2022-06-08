@@ -55,6 +55,12 @@ public:
   /// Returns the synthesized file for this source file, if it exists.
   SynthesizedFileUnit *getSynthesizedFile() const;
 
+  /// Returns the synthesized file for this source file, creating one and
+  /// inserting it into the module if it does not exist.
+  ///
+  /// \warning Because this function mutates the parent module's list of files,
+  ///          it will invalidate the iterators of any upstream callers of
+  ///          \c ModuleDecl::getFiles().
   SynthesizedFileUnit &getOrCreateSynthesizedFile();
 
   /// Look up a (possibly overloaded) value set at top-level scope
@@ -246,7 +252,7 @@ public:
   ///
   /// This can differ from \c getTopLevelDecls, e.g. it returns decls from a
   /// shadowed clang module.
-  virtual void getDisplayDecls(SmallVectorImpl<Decl*> &results) const {
+  virtual void getDisplayDecls(SmallVectorImpl<Decl*> &results, bool recursive = false) const {
     getTopLevelDecls(results);
   }
 

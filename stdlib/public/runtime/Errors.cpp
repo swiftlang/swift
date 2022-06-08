@@ -57,6 +57,13 @@
 
 #include <inttypes.h>
 
+#ifdef SWIFT_HAVE_CRASHREPORTERCLIENT
+#include <atomic>
+#include <malloc/malloc.h>
+
+#include "swift/Runtime/Atomic.h"
+#endif // SWIFT_HAVE_CRASHREPORTERCLIENT
+
 namespace FatalErrorFlags {
 enum: uint32_t {
   ReportBacktrace = 1 << 0
@@ -254,56 +261,38 @@ void swift::printCurrentBacktrace(unsigned framesToSkip) {
     fprintf(stderr, "<backtrace unavailable>\n");
 }
 
-#ifdef SWIFT_HAVE_CRASHREPORTERCLIENT
-#include <malloc/malloc.h>
-
-// Instead of linking to CrashReporterClient.a (because it complicates the
-// build system), define the only symbol from that static archive ourselves.
-//
-// The layout of this struct is CrashReporter ABI, so there are no ABI concerns
-// here.
-extern "C" {
-SWIFT_LIBRARY_VISIBILITY
-struct crashreporter_annotations_t gCRAnnotations
-__attribute__((__section__("__DATA," CRASHREPORTER_ANNOTATIONS_SECTION))) = {
-    CRASHREPORTER_ANNOTATIONS_VERSION, 0, 0, 0, 0, 0, 0, 0};
-}
-
 // Report a message to any forthcoming crash log.
 static void
 reportOnCrash(uint32_t flags, const char *message)
 {
-  // We must use an "unsafe" mutex in this pathway since the normal "safe"
-  // mutex calls fatalError when an error is detected and fatalError ends up
-  // calling us. In other words we could get infinite recursion if the
-  // mutex errors.
-  static swift::StaticUnsafeMutex crashlogLock;
+#ifdef SWIFT_HAVE_CRASHREPORTERCLIENT
+  char *oldMessage = nullptr;
+  char *newMessage = nullptr;
 
-  crashlogLock.lock();
+  oldMessage = std::atomic_load_explicit(
+    (volatile std::atomic<char *> *)&gCRAnnotations.message,
+    SWIFT_MEMORY_ORDER_CONSUME);
 
-  char *oldMessage = (char *)CRGetCrashLogMessage();
-  char *newMessage;
-  if (oldMessage) {
-    swift_asprintf(&newMessage, "%s%s", oldMessage, message);
-    if (malloc_size(oldMessage)) free(oldMessage);
-  } else {
-    newMessage = strdup(message);
-  }
-  
-  CRSetCrashLogMessage(newMessage);
+  do {
+    if (newMessage) {
+      free(newMessage);
+      newMessage = nullptr;
+    }
 
-  crashlogLock.unlock();
-}
-
+    if (oldMessage) {
+      swift_asprintf(&newMessage, "%s%s", oldMessage, message);
+    } else {
+      newMessage = strdup(message);
+    }
+  } while (!std::atomic_compare_exchange_strong_explicit(
+             (volatile std::atomic<char *> *)&gCRAnnotations.message,
+             &oldMessage, newMessage,
+             std::memory_order_release,
+             SWIFT_MEMORY_ORDER_CONSUME));
 #else
-
-static void
-reportOnCrash(uint32_t flags, const char *message)
-{
   // empty
+#endif // SWIFT_HAVE_CRASHREPORTERCLIENT
 }
-
-#endif
 
 // Report a message to system console and stderr.
 static void
@@ -365,10 +354,8 @@ void swift::swift_reportError(uint32_t flags,
 }
 
 // Report a fatal error to system console, stderr, and crash logs, then abort.
-SWIFT_NORETURN void swift::fatalError(uint32_t flags, const char *format, ...) {
-  va_list args;
-  va_start(args, format);
-
+SWIFT_NORETURN void swift::fatalErrorv(uint32_t flags, const char *format,
+                                       va_list args) {
   char *log;
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wuninitialized"
@@ -377,6 +364,14 @@ SWIFT_NORETURN void swift::fatalError(uint32_t flags, const char *format, ...) {
 
   swift_reportError(flags, log);
   abort();
+}
+
+// Report a fatal error to system console, stderr, and crash logs, then abort.
+SWIFT_NORETURN void swift::fatalError(uint32_t flags, const char *format, ...) {
+  va_list args;
+  va_start(args, format);
+
+  fatalErrorv(flags, format, args);
 }
 
 // Report a warning to system console and stderr.

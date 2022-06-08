@@ -93,7 +93,7 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
 #      DistributedActor.cpp
 #      )
     list(APPEND PLATFORM_TARGET_LINK_LIBRARIES
-      swift_Distributed${SWIFT_PRIMARY_VARIANT_SUFFIX}
+      swiftDistributed${SWIFT_PRIMARY_VARIANT_SUFFIX}
       )
   endif()
 
@@ -112,6 +112,7 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     Concurrent.cpp
     Metadata.cpp
     Enum.cpp
+    ExtendedExistential.cpp
     Refcounting.cpp
     Stdlib.cpp
     StackAllocator.cpp
@@ -126,7 +127,7 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     )
 
   # The local stdlib implementation provides definitions of the swiftCore
-  # interfaes to avoid pulling in swiftCore itself.  Build the SwiftRuntimeTests
+  # interfaces to avoid pulling in swiftCore itself.  Build the SwiftRuntimeTests
   # with swiftCore_EXPORTS to permit exporting the stdlib interfaces.
   target_compile_definitions(SwiftRuntimeTests
                              PRIVATE

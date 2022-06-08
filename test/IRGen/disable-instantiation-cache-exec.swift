@@ -5,6 +5,10 @@
 
 // REQUIRES: executable_test
 
+// The -disable-preallocated-instantiation-caches flag does not support back-deployment.
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
 public class Generic<T> {
   public func m1(t: T) -> T { return t }
   public func m2(t: T) -> T { return t }

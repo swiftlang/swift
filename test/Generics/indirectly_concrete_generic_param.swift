@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift
-// RUN: %target-swift-frontend -typecheck -debug-generic-signatures %s 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
 class S<T, U> where T : P, U == T.T {}
 
@@ -13,5 +13,5 @@ class C : P {
   typealias T = Int
 }
 
-// CHECK-LABEL: Generic signature: <X, T, U where X : S<T, C.T>, T : C, U == C.T>
+// CHECK-LABEL: Generic signature: <X, T, U where X : S<T, Int>, T : C, U == Int>
 extension G where X : S<T, U>, T : C {}

@@ -263,7 +263,7 @@ func test_lambda2() {
   { () -> protocol<Int> in
     // expected-error @-1 {{'protocol<...>' composition syntax has been removed and is not needed here}} {{11-24=Int}}
     // expected-error @-2 {{non-protocol, non-class type 'Int' cannot be used within a protocol-constrained type}}
-    // expected-warning @-3 {{result of call to closure returning 'Any' is unused}}
+    // expected-warning @-3 {{result of call to closure returning 'Int' is unused}}
     return 1
   }()
 }
@@ -475,9 +475,11 @@ func stringliterals(_ d: [String: Int]) {
   let x = 4
   "Hello \(x+1) world"  // expected-warning {{string literal is unused}}
   
-  "Error: \(x+1"; // expected-error {{unterminated string literal}}
-  
-  "Error: \(x+1   // expected-error {{unterminated string literal}}
+  // expected-error @+1 {{unterminated string literal}}
+  "Error: \(x+1"; // expected-error {{cannot find ')' to match opening '(' in string interpolation}}
+
+  // expected-error @+1 {{unterminated string literal}}
+  "Error: \(x+1   // expected-error {{cannot find ')' to match opening '(' in string interpolation}}
   ;    // expected-error {{';' statements are not allowed}}
 
   // rdar://14050788 [DF] String Interpolations can't contain quotes
@@ -488,15 +490,16 @@ func stringliterals(_ d: [String: Int]) {
   "test \("quoted-paren (")"
   "test \("\\")"
   "test \("\n")"
-  "test \("\")" // expected-error {{unterminated string literal}}
+  "test \("\")" // expected-error {{cannot find ')' to match opening '(' in string interpolation}} expected-error {{unterminated string literal}}
 
   "test \
   // expected-error @-1 {{unterminated string literal}} expected-error @-1 {{invalid escape sequence in literal}}
   "test \("\
-  // expected-error @-1 {{unterminated string literal}}
+  // expected-error @-1 {{cannot find ')' to match opening '(' in string interpolation}} expected-error @-1 {{unterminated string literal}}
   "test newline \("something" +
     "something else")"
-  // expected-error @-2 {{unterminated string literal}} expected-error @-1 {{unterminated string literal}}
+  // expected-error @-2 {{cannot find ')' to match opening '(' in string interpolation}}
+  // expected-error @-2 {{unterminated string literal}} expected-error @-3 {{unterminated string literal}}
 
   // expected-warning @+2 {{variable 'x2' was never used; consider replacing with '_' or removing it}}
   // expected-error @+1 {{unterminated string literal}}
@@ -542,8 +545,8 @@ func testInOut(_ arg: inout Int) {
   takesExplicitInt(x) // expected-error{{passing value of type 'Int' to an inout parameter requires explicit '&'}} {{20-20=&}}
   takesExplicitInt(&x)
   takesInt(&x) // expected-error{{'&' used with non-inout argument of type 'Int'}}
-  var y = &x //expected-error {{use of extraneous '&'}}
-  var z = &arg //expected-error {{use of extraneous '&'}}
+  var y = &x //expected-error {{'&' may only be used to pass an argument to inout parameter}}
+  var z = &arg //expected-error {{'&' may only be used to pass an argument to inout parameter}}
 
   takesExplicitInt(5) // expected-error {{cannot pass immutable value as inout argument: literals are not mutable}}
 }
@@ -701,8 +704,8 @@ func test() {
   let y = Foo()
 
   // rdar://15708430
-  (&x).method()  // expected-error {{use of extraneous '&'}}
-  (&x).mutatingMethod() // expected-error {{use of extraneous '&'}}
+  (&x).method()  // expected-error {{'&' may only be used to pass an argument to inout parameter}}
+  (&x).mutatingMethod() // expected-error {{'&' may only be used to pass an argument to inout parameter}}
 }
 
 
@@ -760,10 +763,10 @@ func invalidDictionaryLiteral() {
 //===----------------------------------------------------------------------===//
 // nil/metatype comparisons
 //===----------------------------------------------------------------------===//
-_ = Int.self == nil  // expected-warning {{comparing non-optional value of type 'Any.Type' to 'nil' always returns false}}
-_ = nil == Int.self  // expected-warning {{comparing non-optional value of type 'Any.Type' to 'nil' always returns false}}
-_ = Int.self != nil  // expected-warning {{comparing non-optional value of type 'Any.Type' to 'nil' always returns true}}
-_ = nil != Int.self  // expected-warning {{comparing non-optional value of type 'Any.Type' to 'nil' always returns true}}
+_ = Int.self == nil  // expected-warning {{comparing non-optional value of type 'any Any.Type' to 'nil' always returns false}}
+_ = nil == Int.self  // expected-warning {{comparing non-optional value of type 'any Any.Type' to 'nil' always returns false}}
+_ = Int.self != nil  // expected-warning {{comparing non-optional value of type 'any Any.Type' to 'nil' always returns true}}
+_ = nil != Int.self  // expected-warning {{comparing non-optional value of type 'any Any.Type' to 'nil' always returns true}}
 
 // <rdar://problem/19032294> Disallow postfix ? when not chaining
 func testOptionalChaining(_ a : Int?, b : Int!, c : Int??) {
@@ -832,20 +835,20 @@ public struct TestPropMethodOverloadGroup {
 // <rdar://problem/18496742> Passing ternary operator expression as inout crashes Swift compiler
 func inoutTests(_ arr: inout Int) {
   var x = 1, y = 2
-  (true ? &x : &y) // expected-error {{use of extraneous '&'}}
-  let a = (true ? &x : &y) // expected-error {{use of extraneous '&'}}
+  (true ? &x : &y) // expected-error {{'&' may only be used to pass an argument to inout parameter}}
+  let a = (true ? &x : &y) // expected-error {{'&' may only be used to pass an argument to inout parameter}}
 
-  inoutTests(true ? &x : &y) // expected-error {{use of extraneous '&'}}
+  inoutTests(true ? &x : &y) // expected-error {{'&' may only be used to pass an argument to inout parameter}}
 
-  &_ // expected-error {{use of extraneous '&'}}
+  &_ // expected-error {{'&' may only be used to pass an argument to inout parameter}}
 
-  inoutTests((&x, 24).0) // expected-error {{use of extraneous '&'}}
+  inoutTests((&x, 24).0) // expected-error {{'&' may only be used to pass an argument to inout parameter}}
 
-  inoutTests((&x)) // expected-error {{use of extraneous '&'}} {{15-16=(}} {{14-15=&}}
+  inoutTests((&x)) // expected-error {{'&' may only be used to pass an argument to inout parameter}} {{15-16=(}} {{14-15=&}}
   inoutTests(&x)
   
   // <rdar://problem/17489894> inout not rejected as operand to assignment operator
-  &x += y  // expected-error {{use of extraneous '&'}}
+  &x += y  // expected-error {{'&' may only be used to pass an argument to inout parameter}}
 
   // <rdar://problem/23249098>
   func takeAny(_ x: Any) {}
@@ -861,7 +864,7 @@ func inoutTests(_ arr: inout Int) {
 // <rdar://problem/20802757> Compiler crash in default argument & inout expr
 var g20802757 = 2
 func r20802757(_ z: inout Int = &g20802757) { // expected-error {{cannot provide default value to inout parameter 'z'}}
-  // expected-error@-1 {{use of extraneous '&'}}
+  // expected-error@-1 {{'&' may only be used to pass an argument to inout parameter}}
   print(z)
 }
 
@@ -909,7 +912,7 @@ do {
   x = (x,(3,y)).1.1
 }
 
-// SR-3439 subscript with pound exprssions.
+// SR-3439 subscript with pound expressions.
 Sr3439: do {
   class B {
     init() {}
@@ -939,10 +942,10 @@ let _ = 0xFFF_FFFF_FFFF_FFFF as Int64
 
 // rdar://problem/20289969 - string interpolation with comment containing ')' or '"'
 let _ = "foo \(42 /* ) " ) */)"
-let _ = "foo \(foo // )  " // expected-error {{unterminated string literal}}
+let _ = "foo \(foo // )  " // expected-error {{cannot find ')' to match opening '(' in string interpolation}} expected-error {{unterminated string literal}}
 let _ = "foo \(42 /*
                    * multiline comment
                    */)end"
-// expected-error @-3 {{unterminated string literal}}
+// expected-error @-3 {{cannot find ')' to match opening '(' in string interpolation}} expected-error @-3 {{unterminated string literal}}
 // expected-error @-2 {{expected expression}}
 // expected-error @-3 {{unterminated string literal}}

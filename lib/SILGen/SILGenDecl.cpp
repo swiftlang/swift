@@ -474,7 +474,7 @@ public:
 
     // Make sure that we have a non-address only type when binding a
     // @_noImplicitCopy let.
-    if (SGF.getASTContext().LangOpts.EnableExperimentalMoveOnly &&
+    if (SGF.getASTContext().LangOpts.hasFeature(Feature::MoveOnly) &&
         lowering.isAddressOnly() &&
         vd->getAttrs().hasAttribute<NoImplicitCopyAttr>()) {
       auto d = diag::noimplicitcopy_used_on_generic_or_existential;
@@ -556,7 +556,7 @@ public:
 
     if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule()) &&
         value->getOwnershipKind() != OwnershipKind::None) {
-      if (!SGF.getASTContext().LangOpts.EnableExperimentalMoveOnly) {
+      if (!SGF.getASTContext().LangOpts.hasFeature(Feature::MoveOnly)) {
         value = SILValue(
             SGF.B.createBeginBorrow(PrologueLoc, value, /*isLexical*/ true));
       } else {
@@ -1212,8 +1212,7 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
     if (auto tryExpr = dyn_cast<TryExpr>(init))
       init = tryExpr->getSubExpr();
     init = cast<CallExpr>(init)->getFn();
-    assert(isa<AutoClosureExpr>(init) &&
-           "Could not find async let autoclosure");
+    auto initClosure = cast<AutoClosureExpr>(init);
     bool isThrowing = init->getType()->castTo<AnyFunctionType>()->isThrowing();
 
     // Allocate space to receive the child task's result.
@@ -1240,8 +1239,7 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
       alet = emitAsyncLetStart(
           loc,
           options.forward(*this), // options is B.createManagedOptionalNone
-          init->getType(),
-          emitRValue(init).getScalarValue(),
+          initClosure,
           resultBufPtr
         ).forward(*this);
     }
@@ -1803,7 +1801,7 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
     return;
   }
 
-  if (getASTContext().LangOpts.EnableExperimentalMoveOnly) {
+  if (getASTContext().LangOpts.hasFeature(Feature::MoveOnly)) {
     if (auto *mvi = dyn_cast<MarkMustCheckInst>(Val.getDefiningInstruction())) {
       if (mvi->isNoImplicitCopy()) {
         if (auto *cvi = dyn_cast<CopyValueInst>(mvi->getOperand())) {

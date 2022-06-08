@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -warn-concurrency
+// RUN: %target-typecheck-verify-swift -warn-concurrency -parse-as-library
 // REQUIRES: concurrency
 
 class GlobalCounter {

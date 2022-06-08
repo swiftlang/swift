@@ -224,12 +224,20 @@ PASS(EmitDFDiagnostics, "dataflow-diagnostics",
      "Emit SIL Diagnostics")
 PASS(EscapeAnalysisDumper, "escapes-dump",
      "Dump Escape Analysis Results")
+SWIFT_FUNCTION_PASS(EscapeInfoDumper, "dump-escape-info",
+     "Dumps escape information")
+SWIFT_FUNCTION_PASS(AddressEscapeInfoDumper, "dump-addr-escape-info",
+     "Dumps address escape information")
+SWIFT_FUNCTION_PASS(ComputeEffects, "compute-effects",
+     "Computes function effects")
 PASS(FlowIsolation, "flow-isolation",
      "Enforces flow-sensitive actor isolation rules")
 PASS(FunctionOrderPrinter, "function-order-printer",
      "Print Function Order for Testing")
 PASS(FunctionSignatureOpts, "function-signature-opts",
      "Function Signature Optimization")
+SWIFT_FUNCTION_PASS(RangeDumper, "dump-ranges",
+     "Dumps block and instruction ranges")
 PASS(ARCSequenceOpts, "arc-sequence-opts",
      "ARC Sequence Optimization")
 PASS(ARCLoopOpts, "arc-loop-opts",
@@ -388,7 +396,7 @@ PASS(SplitAllCriticalEdges, "split-critical-edges",
      "Split all Critical Edges in the SIL CFG")
 PASS(SplitNonCondBrCriticalEdges, "split-non-cond_br-critical-edges",
      "Split all Critical Edges not from SIL cond_br")
-PASS(StackPromotion, "stack-promotion",
+SWIFT_FUNCTION_PASS(StackPromotion, "stack-promotion",
      "Stack Promotion of Class Objects")
 PASS(StripDebugInfo, "strip-debug-info",
      "Strip Debug Information")
@@ -436,6 +444,12 @@ PASS(MoveKillsCopyableAddressesChecker, "sil-move-kills-copyable-addresses-check
 PASS(MoveFunctionCanonicalization, "sil-move-function-canon",
      "Pass that canonicalizes certain parts of the IR before we perform move "
      "function checking.")
+PASS(DebugInfoCanonicalizer, "sil-onone-debuginfo-canonicalizer",
+     "Canonicalize debug info at -Onone by propagating debug info into coroutine funclets")
+PASS(PartialApplySimplification, "partial-apply-simplification",
+     "Transform partial_apply instructions into explicit closure box constructions")
+PASS(MovedAsyncVarDebugInfoPropagator, "sil-moved-async-var-dbginfo-propagator",
+     "Propagate debug info from moved async vars after coroutine funclet boundaries")
 PASS(PruneVTables, "prune-vtables",
      "Mark class methods that do not require vtable dispatch")
 PASS_RANGE(AllPasses, AADumper, PruneVTables)

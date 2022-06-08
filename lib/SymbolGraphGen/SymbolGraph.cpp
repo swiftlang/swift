@@ -583,6 +583,12 @@ bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
 
   // Don't record effectively internal declarations if specified
   if (D->hasUnderscoredNaming()) {
+    // Some implicit decls from Clang with underscored names sneak in, so throw those out
+    if (const auto *clangD = D->getClangDecl()) {
+      if (clangD->isImplicit())
+        return true;
+    }
+
     AccessLevel symLevel = AccessLevel::Public;
     if (const ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
       symLevel = VD->getFormalAccess();
@@ -661,16 +667,32 @@ bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
   return false;
 }
 
+bool SymbolGraph::isUnconditionallyUnavailableOnAllPlatforms(const Decl *D) const {
+  return llvm::any_of(D->getAttrs(), [](const auto *Attr) { 
+    if (const auto *AvAttr = dyn_cast<AvailableAttr>(Attr)) {
+      return !AvAttr->hasPlatform()
+        && AvAttr->isUnconditionallyUnavailable();
+    }
+
+    return false;
+  });
+}
+
 /// Returns `true` if the symbol should be included as a node in the graph.
 bool SymbolGraph::canIncludeDeclAsNode(const Decl *D) const {
-  // If this decl isn't in this module, don't record it,
+  // If this decl isn't in this module or module that this module imported with `@_exported`, don't record it,
   // as it will appear elsewhere in its module's symbol graph.
-  if (D->getModuleContext()->getName() != M.getName()) {
+  if (D->getModuleContext()->getName() != M.getName() && !Walker.isFromExportedImportedModule(D)) {
     return false;
   }
 
-  if (!isa<ValueDecl>(D)) {
+  if (const auto *VD = dyn_cast<ValueDecl>(D)) {
+    if (VD->getOverriddenDecl() && D->isImplicit()) {
+      return false;
+    }
+  } else {
     return false;
   }
-  return !isImplicitlyPrivate(cast<ValueDecl>(D));
+  return !isImplicitlyPrivate(cast<ValueDecl>(D)) 
+    && !isUnconditionallyUnavailableOnAllPlatforms(cast<ValueDecl>(D));
 }

@@ -197,8 +197,8 @@ STMT_NODES = [
              Child('Condition', kind='Syntax',
                    node_choices=[
                        Child('Expression', kind='Expr'),
-                       Child('Availablity', kind='AvailabilityCondition'),
-                       Child('Unavailablity', kind='UnavailabilityCondition'),
+                       Child('Availability', kind='AvailabilityCondition'),
+                       Child('Unavailability', kind='UnavailabilityCondition'),
                        Child('MatchingPattern',
                              kind='MatchingPatternCondition'),
                        Child('OptionalBinding',

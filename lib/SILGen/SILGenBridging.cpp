@@ -65,8 +65,8 @@ static bool shouldBridgeThroughError(SILGenModule &SGM, CanType type,
   if (type.isExistentialType()) {
     auto layout = type->getExistentialLayout();
     for (auto proto : layout.getProtocols()) {
-      if (proto->getDecl() == errorProtocol ||
-          proto->getDecl()->inheritsFrom(errorProtocol)) {
+      if (proto == errorProtocol ||
+          proto->inheritsFrom(errorProtocol)) {
         return true;
       }
     }
@@ -732,7 +732,8 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
   // If the input argument is known to be an existential, save the runtime
   // some work by opening it.
   if (nativeType->isExistentialType()) {
-    auto openedType = OpenedArchetypeType::get(nativeType);
+    auto openedType = OpenedArchetypeType::get(nativeType,
+                                               SGF.F.getGenericSignature());
 
     FormalEvaluationScope scope(SGF);
 
@@ -1593,13 +1594,17 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     }
   }
 
-  // If we are bridging a Swift method with an Any return value, create a
-  // stack allocation to hold the result, since Any is address-only.
+  // If we are bridging a Swift method with Any return value(s), create a
+  // stack allocation to hold the result(s), since Any is address-only.
   SmallVector<SILValue, 4> args;
-
   if (substConv.hasIndirectSILResults()) {
-    args.push_back(emitTemporaryAllocation(
-        loc, substConv.getSingleSILResultType(getTypeExpansionContext())));
+    for (auto result : substConv.getResults()) {
+      if (!substConv.isSILIndirect(result)) {
+        continue;
+      }
+      args.push_back(emitTemporaryAllocation(
+                loc, substConv.getSILType(result, getTypeExpansionContext())));
+    }
   }
 
   // If the '@objc' was inferred due to deprecated rules,
@@ -1792,13 +1797,29 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
           pushErrorFlag(/*has error*/ false, completionHandlerArgs);
           continue;
         }
-        pushArg(asyncResult,
-                nativeFormalResultType,
-                completionTy->getParameters()[i]);
+        
+        // Use the indirect return argument if the result is indirect.
+        if (substConv.hasIndirectSILResults()) {
+          pushArg(emitManagedRValueWithCleanup(args[0]),
+                  nativeFormalResultType,
+                  completionTy->getParameters()[i]);
+        } else {
+          pushArg(asyncResult,
+                  nativeFormalResultType,
+                  completionTy->getParameters()[i]);
+        }
       }
     } else {
       // A tuple return maps to multiple completion handler parameters.
       auto formalTuple = cast<TupleType>(nativeFormalResultType);
+      
+      unsigned indirectResultI = 0;
+      unsigned directResultI = 0;
+      
+      auto directResults = substConv.getDirectSILResults();
+      auto hasMultipleDirectResults
+        = !directResults.empty() &&
+          std::next(directResults.begin()) != directResults.end();
       
       for (unsigned paramI : indices(completionTy->getParameters())) {
         if (errorParamIndex && paramI == *errorParamIndex) {
@@ -1813,7 +1834,21 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
                                - (errorFlagIndex && paramI > *errorFlagIndex);
         auto param = completionTy->getParameters()[paramI];
         auto formalTy = formalTuple.getElementType(elementI);
-        auto argPiece = B.createTupleExtract(loc, asyncResult, elementI);
+        ManagedValue argPiece;
+        
+        auto result = substConv.getResults()[elementI];
+        if (substConv.isSILIndirect(result)) {
+          // Take the arg piece from the indirect return arguments.
+          argPiece = emitManagedRValueWithCleanup(args[indirectResultI++]);
+        } else if (hasMultipleDirectResults) {
+          // Take the arg piece from one of the tuple elements of the direct
+          // result tuple from the apply.
+          argPiece = B.createTupleExtract(loc, asyncResult, directResultI++);
+        } else {
+          // Take the entire direct result from the apply as the arg piece.
+          argPiece = asyncResult;
+        }
+        
         pushArg(argPiece, formalTy, param);
       }
     }
@@ -1829,16 +1864,11 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     // The immediate function result is an empty tuple.
     return SILUndef::get(SGM.Types.getEmptyTupleType(), F);
   };
-  
+    
   if (!substTy->hasErrorResult()) {
     // Create the apply.
     result = B.createApply(loc, nativeFn, subs, args);
-
-    if (substConv.hasIndirectSILResults()) {
-      assert(substTy->getNumResults() == 1);
-      result = args[0];
-    }
-
+  
     // Leave the argument cleanup scope immediately.  This isn't really
     // necessary; it just limits lifetimes a little bit more.
     argScope.pop();
@@ -1849,6 +1879,10 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     if (foreignAsync) {
       result = passResultToCompletionHandler(result);
     } else {
+      if (substConv.hasIndirectSILResults()) {
+        assert(substTy->getNumResults() == 1);
+        result = args[0];
+      }
       result = emitBridgeReturnValue(*this, loc, result, nativeFormalResultType,
                                      bridgedFormalResultType, objcResultTy);
     }
@@ -1864,17 +1898,16 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
       SILValue nativeResult =
           normalBB->createPhiArgument(swiftResultTy, OwnershipKind::Owned);
 
-      if (substConv.hasIndirectSILResults()) {
-        assert(substTy->getNumResults() == 1);
-        nativeResult = args[0];
-      }
-      
       if (foreignAsync) {
         // If the function is async, pass the results as the success argument(s)
         // to the completion handler, with a nil error.
         passResultToCompletionHandler(nativeResult);
         B.createBranch(loc, contBB);
       } else {
+        if (substConv.hasIndirectSILResults()) {
+          assert(substTy->getNumResults() == 1);
+          nativeResult = args[0];
+        }
         // In this branch, the eventual return value is mostly created
         // by bridging the native return value, but we may need to
         // adjust it slightly.

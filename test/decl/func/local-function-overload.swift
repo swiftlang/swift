@@ -40,11 +40,9 @@ func invalid2() {
   func inner(_: String) {}
   // expected-note@-1 {{candidate expects value of type 'String' for parameter #1}}
   // expected-note@-2 {{found this candidate}}
-  // expected-note@-3 {{did you mean 'inner'?}}
 
   func inner(label: Int) {}
   // expected-note@-1 {{found this candidate}}
-  // expected-note@-2 {{did you mean 'inner'?}}
 
   inner([])
   // expected-error@-1 {{no exact matches in call to local function 'inner'}}

@@ -846,7 +846,7 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
     status |= CurriedParameterClause;
   }
 
-  // If the decl uses currying syntax, complain that that syntax has gone away.
+  // If the decl uses currying syntax, complain that syntax has gone away.
   if (MultipleParameterLists) {
     diagnose(BodyParams->getStartLoc(),
              diag::parameter_curry_syntax_removed);
@@ -926,6 +926,7 @@ bool Parser::isEffectsSpecifier(const Token &T) {
   //       'parseEffectsSpecifiers()'.
 
   if (T.isContextualKeyword("async") ||
+      (T.isContextualKeyword("await") && !T.isAtStartOfLine()) ||
       T.isContextualKeyword("reasync"))
     return true;
 
@@ -977,10 +978,18 @@ ParserStatus Parser::parseEffectsSpecifiers(SourceLoc existingArrowLoc,
             .fixItInsert(throwsLoc, isReasync ? "reasync " : "async ");
       }
       if (asyncLoc.isInvalid()) {
+        Tok.setKind(tok::contextual_keyword);
         if (reasync)
           *reasync = isReasync;
         asyncLoc = Tok.getLoc();
       }
+      consumeToken();
+      continue;
+    }
+    // diagnose 'await'
+    if (Tok.isContextualKeyword("await") && !Tok.isAtStartOfLine()) {
+      diagnose(Tok, diag::await_in_function_type)
+        .fixItReplace(Tok.getLoc(), "async");
       consumeToken();
       continue;
     }
@@ -1111,8 +1120,8 @@ ParserResult<Pattern> Parser::parsePattern() {
   switch (Tok.getKind()) {
   case tok::l_paren:
     return parsePatternTuple();
-    
-  case tok::kw__:
+
+  case tok::kw__: {
     // Normally, '_' is invalid in type context for patterns, but they show up
     // in interface files as the name for type members that are non-public.
     // Treat them as an implicitly synthesized NamedPattern with a nameless
@@ -1126,8 +1135,12 @@ ParserResult<Pattern> Parser::parsePattern() {
       return makeParserResult(NamedPattern::createImplicit(Context, VD));
     }
     PatternCtx.setCreateSyntax(SyntaxKind::WildcardPattern);
-    return makeParserResult(new (Context) AnyPattern(consumeToken(tok::kw__)));
-    
+
+    const auto isAsyncLet =
+        InPatternWithAsyncAttribute && introducer == VarDecl::Introducer::Let;
+    return makeParserResult(
+        new (Context) AnyPattern(consumeToken(tok::kw__), isAsyncLet));
+  }
   case tok::identifier: {
     PatternCtx.setCreateSyntax(SyntaxKind::IdentifierPattern);
     Identifier name;
@@ -1166,7 +1179,10 @@ ParserResult<Pattern> Parser::parsePattern() {
     // In our recursive parse, remember that we're in a var/let pattern.
     llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
     T(InVarOrLetPattern, isLet ? IVOLP_InLet : IVOLP_InVar);
-    
+
+    // Reset async attribute in parser context.
+    llvm::SaveAndRestore<bool> AsyncAttr(InPatternWithAsyncAttribute, false);
+
     ParserResult<Pattern> subPattern = parsePattern();
     if (subPattern.hasCodeCompletion())
       return makeParserCodeCompletionResult<Pattern>();
@@ -1375,6 +1391,9 @@ ParserResult<Pattern> Parser::parseMatchingPatternAsLetOrVar(bool isLet,
   // In our recursive parse, remember that we're in a var/let pattern.
   llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
     T(InVarOrLetPattern, isLet ? IVOLP_InLet : IVOLP_InVar);
+
+  // Reset async attribute in parser context.
+  llvm::SaveAndRestore<bool> AsyncAttr(InPatternWithAsyncAttribute, false);
 
   ParserResult<Pattern> subPattern = parseMatchingPattern(isExprBasic);
   if (subPattern.isNull())

@@ -1,6 +1,6 @@
 // RUN: %target-swiftxx-frontend -I %S/Inputs %s -emit-ir | %FileCheck %s
 
-// Verify that non-trival/address-only C++ classes are constructed and accessed
+// Verify that non-trivial/address-only C++ classes are constructed and accessed
 // correctly. Make sure that we correctly IRGen functions that construct
 // non-trivial C++ classes, take those classes as a parameter, and access those
 // classes members.

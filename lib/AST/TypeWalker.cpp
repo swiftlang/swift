@@ -178,7 +178,11 @@ class Traversal : public TypeVisitor<Traversal, bool>
     if (doIt(ty->getBaseType()))
       return true;
 
-    return doIt(ty->getArgumentType());
+    for (auto arg : ty->getArgs())
+      if (doIt(arg))
+        return true;
+
+    return false;
   }
 
   bool visitExistentialType(ExistentialType *ty) {
@@ -228,6 +232,10 @@ class Traversal : public TypeVisitor<Traversal, bool>
   
   bool visitSILBlockStorageType(SILBlockStorageType *ty) {
     return doIt(ty->getCaptureType());
+  }
+
+  bool visitSILMoveOnlyType(SILMoveOnlyType *ty) {
+    return doIt(ty->getInnerType());
   }
 
   bool visitSILBoxType(SILBoxType *ty) {

@@ -56,7 +56,7 @@ func foo() {}
 
 //   helper function: __swift_instantiateConcreteTypeFromMangledName
 // CHECK-LABEL: define {{.*}} @__swift_instantiateConcreteTypeFromMangledName(
-// CHECK-SAME: [[ATTRS_NOINLINE_READNONE_NOUNWIND_NOFRAME:#[0-9]+]]
+// CHECK-SAME: [[ATTRS_NOINLINE_READONLY_NOUNWIND_NOFRAME:#[0-9]+]]
 
 func use_metadata() -> Any.Type {
   return ((C) -> Int).self
@@ -96,7 +96,7 @@ func test_class_existential_cast_3(value: AnyObject) -> C & CP0 {
 
 //   metadata accessor
 // CHECK-LABEL: define {{.*}} @"$s30default_function_ir_attributes1CCMa"(
-// CHECK-SAME: [[ATTRS_NOINLINE_READNONE_NOUNWIND_NOFRAME]]
+// CHECK-SAME: [[ATTRS_NOINLINE_READNONE_NOUNWIND_NOFRAME:#[0-9]+]]
 
 //   helper function: dynamic_cast_existential_1_superclass_conditional
 // CHECK-LABEL: define {{.*}} @dynamic_cast_existential_1_superclass_conditional(
@@ -164,7 +164,7 @@ func test_computed_key_path_generic_thunks<T: P0 & Hashable>(value: T) -> KeyPat
 
 //   helper function: __swift_instantiateGenericMetadata
 // CHECK-LABEL: define {{.*}} @__swift_instantiateGenericMetadata(
-// CHECK-SAME: [[ATTRS_NOINLINE_READNONE_NOUNWIND_NOFRAME]]
+// CHECK-SAME: [[ATTRS_NOINLINE_READONLY_NOUNWIND_NOFRAME]]
 
 //   Use the presence of a target-cpu attribute as a litmus for
 //   whether constructInitialAttributes was called, since it's very
@@ -172,4 +172,5 @@ func test_computed_key_path_generic_thunks<T: P0 & Hashable>(value: T) -> KeyPat
 // CHECK: attributes [[ATTRS_SIMPLE]] = { [[CUSTOM_ATTRS:.*target-cpu.*]] }{{$}}
 // CHECK-DAG: attributes [[ATTRS_NOINLINE_NOUNWIND]] = { noinline nounwind {{.*target-cpu.*}} }
 // CHECK-DAG: attributes [[ATTRS_NOINLINE_READNONE_NOUNWIND_NOFRAME]] = { noinline nounwind readnone {{.*}}"frame-pointer"="none"{{.*target-cpu.*}} }
+// CHECK-DAG: attributes [[ATTRS_NOINLINE_READONLY_NOUNWIND_NOFRAME]] = { noinline nounwind readonly willreturn {{.*}}"frame-pointer"="none"{{.*target-cpu.*}} }
 // CHECK-DAG: attributes [[ATTRS_NOUNWIND]] = { nounwind [[CUSTOM_ATTRS]] }{{$}}

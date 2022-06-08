@@ -23,6 +23,7 @@
 #include "swift/Demangling/TypeLookupError.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Metadata.h"
+#include "../SwiftShims/Visibility.h"
 
 #if defined(__APPLE__) && __has_include(<TargetConditionals.h>)
 #include <TargetConditionals.h>
@@ -515,6 +516,7 @@ public:
     }
   }
 
+  SWIFT_RETURNS_NONNULL SWIFT_NODISCARD
   void *allocateMetadata(size_t size, size_t align);
 
   /// Gather the set of generic arguments that would be written in the

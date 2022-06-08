@@ -59,7 +59,7 @@ amounts of language sugar it's given, vends initializers corresponding to
   }
 
 This pattern of boilerplate also occurs in third-party frameworks that make
-heavy use of enums. Some examples from Github:
+heavy use of enums. Some examples from GitHub:
 
 - https://github.com/antitypical/Manifold/blob/ae94eb96085c2c8195d457e06df485b1cca455cb/Manifold/Name.swift
 - https://github.com/antitypical/TesseractCore/blob/73099ae5fa772b90cefa49395f237290d8363f76/TesseractCore/Symbol.swift

@@ -215,9 +215,7 @@ function(_add_target_variant_c_compile_flags)
     list(APPEND result "-DLLVM_ON_WIN32")
     list(APPEND result "-D_CRT_SECURE_NO_WARNINGS")
     list(APPEND result "-D_CRT_NONSTDC_NO_WARNINGS")
-    if(NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
-      list(APPEND result "-D_CRT_USE_BUILTIN_OFFSETOF")
-    endif()
+    list(APPEND result "-D_CRT_USE_BUILTIN_OFFSETOF")
     # TODO(compnerd) permit building for different families
     list(APPEND result "-D_CRT_USE_WINAPI_FAMILY_DESKTOP_APP")
     if("${CFLAGS_ARCH}" MATCHES arm)
@@ -304,6 +302,10 @@ function(_add_target_variant_c_compile_flags)
     list(APPEND result "-DSWIFT_OBJC_INTEROP=0")
   endif()
 
+  if(SWIFT_STDLIB_COMPACT_ABSOLUTE_FUNCTION_POINTER)
+    list(APPEND result "-DSWIFT_COMPACT_ABSOLUTE_FUNCTION_POINTER=1")
+  endif()
+
   if(SWIFT_STDLIB_STABLE_ABI)
     list(APPEND result "-DSWIFT_LIBRARY_EVOLUTION=1")
   else()
@@ -375,9 +377,13 @@ function(_add_target_variant_c_compile_flags)
   if(SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING)
     list(APPEND result "-DSWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING")
   endif()
-  
+
   if(SWIFT_STDLIB_ENABLE_UNICODE_DATA)
     list(APPEND result "-D" "SWIFT_STDLIB_ENABLE_UNICODE_DATA")
+  endif()
+
+  if(SWIFT_STDLIB_CONCURRENCY_TRACING)
+    list(APPEND result "-DSWIFT_STDLIB_CONCURRENCY_TRACING")
   endif()
 
   list(APPEND result ${SWIFT_STDLIB_EXTRA_C_COMPILE_FLAGS})
@@ -420,7 +426,7 @@ function(_add_target_variant_link_flags)
     MACCATALYST_BUILD_FLAVOR  "${LFLAGS_MACCATALYST_BUILD_FLAVOR}")
   if("${LFLAGS_SDK}" STREQUAL "LINUX")
     list(APPEND link_libraries "pthread" "dl")
-    if("${LFLAGS_ARCH}" MATCHES "armv6|armv7|i686")
+    if("${LFLAGS_ARCH}" MATCHES "armv5|armv6|armv7|i686")
       list(APPEND link_libraries "atomic")
     endif()
   elseif("${LFLAGS_SDK}" STREQUAL "FREEBSD")
@@ -546,9 +552,20 @@ function(_add_swift_lipo_target)
     if(LIPO_CODESIGN)
       set(codesign_command COMMAND "codesign" "-f" "-s" "-" "${LIPO_OUTPUT}")
     endif()
+
+    set(lipo_lto_env)
+    # When lipo-ing LTO-based libraries with lipo on Darwin, the tool uses
+    # libLTO.dylib to inspect the bitcode files. However, by default the "host"
+    # libLTO.dylib is loaded, which might be too old and not understand the
+    # just-built bitcode format. Let's ask lipo to use the just-built
+    # libLTO.dylib from the toolchain that we're using to build.
+    if(APPLE AND SWIFT_NATIVE_CLANG_TOOLS_PATH)
+      set(lipo_lto_env "LIBLTO_PATH=${SWIFT_NATIVE_CLANG_TOOLS_PATH}/../lib/libLTO.dylib")
+    endif()
+
     # Use lipo to create the final binary.
     add_custom_command_target(unused_var
-        COMMAND "${SWIFT_LIPO}" "-create" "-output" "${LIPO_OUTPUT}" ${source_binaries}
+        COMMAND "${CMAKE_COMMAND}" "-E" "env" ${lipo_lto_env} "${SWIFT_LIPO}" "-create" "-output" "${LIPO_OUTPUT}" ${source_binaries}
         ${codesign_command}
         CUSTOM_TARGET_NAME "${LIPO_TARGET}"
         OUTPUT "${LIPO_OUTPUT}"
@@ -837,6 +854,9 @@ function(add_swift_target_library_single target name)
   foreach(def ${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS})
     list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS "-Xfrontend" "-define-availability" "-Xfrontend" "${def}") 
   endforeach()
+
+  # Enable -target-min-inlining-version
+  list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS "-Xfrontend" "-target-min-inlining-version" "-Xfrontend" "min")
 
   # Don't install the Swift module content for back-deployment libraries.
   if (SWIFTLIB_SINGLE_BACK_DEPLOYMENT_LIBRARY)
@@ -1198,7 +1218,7 @@ function(add_swift_target_library_single target name)
 
   set(library_search_subdir "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}")
   set(library_search_directories
-      "${lib_dir}/${SWIFTLIB_SINGLE_SUBDIR}"
+      "${lib_dir}/${output_sub_dir}"
       "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFTLIB_SINGLE_SUBDIR}"
       "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}")
 
@@ -1734,10 +1754,10 @@ function(add_swift_target_library name)
   # Turn off implicit import of _Concurrency when building libraries
   list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-disable-implicit-concurrency-module-import")
 
-  # Turn off implicit import of _Distributed when building libraries
-  if(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
+  # Turn off implicit import of _StringProcessing when building libraries
+  if(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
     list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS
-                      "-Xfrontend;-disable-implicit-distributed-module-import")
+                      "-Xfrontend;-disable-implicit-string-processing-module-import")
   endif()
 
   if(SWIFTLIB_IS_STDLIB AND SWIFT_STDLIB_ENABLE_PRESPECIALIZATION)
@@ -1847,7 +1867,7 @@ function(add_swift_target_library name)
            ${SWIFTLIB_FRAMEWORK_DEPENDS_IOS_TVOS})
     endif()
 
-    # Collect architecutre agnostic compiler flags
+    # Collect architecture agnostic compiler flags
     set(swiftlib_swift_compile_flags_all ${SWIFTLIB_SWIFT_COMPILE_FLAGS})
     if(${sdk} STREQUAL OSX)
       list(APPEND swiftlib_swift_compile_flags_all
@@ -2322,7 +2342,7 @@ function(add_swift_target_library name)
         endif()
       endforeach()
 
-      # Add the swiftmodule-only targets to the lipo target depdencies.
+      # Add the swiftmodule-only targets to the lipo target dependencies.
       foreach(arch ${SWIFT_SDK_${sdk}_MODULE_ARCHITECTURES})
         set(_variant_name "${name}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
         if(maccatalyst_build_flavor STREQUAL "ios-like")

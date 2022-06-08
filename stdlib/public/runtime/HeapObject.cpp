@@ -31,6 +31,7 @@
 #include <cstring>
 #include <cstdio>
 #include <cstdlib>
+#include <new>
 #include <thread>
 #include "../SwiftShims/GlobalObjects.h"
 #include "../SwiftShims/RuntimeShims.h"
@@ -50,8 +51,8 @@ using namespace swift;
 // Check to make sure the runtime is being built with a compiler that
 // supports the Swift calling convention.
 //
-// If the Swift calling convention is not in use, functions such as 
-// swift_allocBox and swift_makeBoxUnique that rely on their return value 
+// If the Swift calling convention is not in use, functions such as
+// swift_allocBox and swift_makeBoxUnique that rely on their return value
 // being passed in a register to be compatible with Swift may miscompile on
 // some platforms and silently fail.
 #if !__has_attribute(swiftcall)
@@ -66,6 +67,10 @@ static inline bool isValidPointerForNativeRetain(const void *p) {
   // arm64_32 is special since it has 32-bit pointers but __arm64__ is true.
   // Catch it early since __POINTER_WIDTH__ is generally non-portable.
   return p != nullptr;
+#elif defined(__ANDROID__) && defined(__aarch64__)
+  // Check the top of the second byte instead, since Android AArch64 reserves
+  // the top byte for its own pointer tagging since Android 11.
+  return (intptr_t)((uintptr_t)p << 8) > 0;
 #elif defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__s390x__) || (defined(__powerpc64__) && defined(__LITTLE_ENDIAN__))
   // On these platforms, except s390x, the upper half of address space is reserved for the
   // kernel, so we can assume that pointer values in this range are invalid.
@@ -88,6 +93,7 @@ static inline bool isValidPointerForNativeRetain(const void *p) {
 // not to emit a bunch of ptrauth instructions just to perform the comparison.
 // We only want to authenticate the function pointer if we actually call it. We
 // can revert to a straight comparison once rdar://problem/55267009 is fixed.
+SWIFT_RETURNS_NONNULL SWIFT_NODISCARD
 static HeapObject *_swift_allocObject_(HeapMetadata const *metadata,
                                        size_t requiredSize,
                                        size_t requiredAlignmentMask)
@@ -120,7 +126,7 @@ static HeapObject *_swift_allocObject_(HeapMetadata const *metadata,
   // NOTE: this relies on the C++17 guaranteed semantics of no null-pointer
   // check on the placement new allocator which we have observed on Windows,
   // Linux, and macOS.
-  new (object) HeapObject(metadata);
+  ::new (object) HeapObject(metadata);
 
   // If leak tracking is enabled, start tracking this object.
   SWIFT_LEAKS_START_TRACKING_OBJECT(object);
@@ -186,11 +192,11 @@ swift::swift_verifyEndOfLifetime(HeapObject *object) {
   if (object->refCounts.getCount() != 0)
     swift::fatalError(/* flags = */ 0,
                       "Fatal error: Stack object escaped\n");
-  
+
   if (object->refCounts.getUnownedCount() != 1)
     swift::fatalError(/* flags = */ 0,
                       "Fatal error: Unowned reference to stack object\n");
-  
+
   if (object->refCounts.getWeakCount() != 0)
     swift::fatalError(/* flags = */ 0,
                       "Fatal error: Weak reference to stack object\n");
@@ -477,10 +483,10 @@ void swift::swift_unownedRelease(HeapObject *object) {
   // Only class objects can be unowned-retained and unowned-released.
   assert(object->metadata->isClassObject());
   assert(static_cast<const ClassMetadata*>(object->metadata)->isTypeMetadata());
-  
+
   if (object->refCounts.decrementUnownedShouldFree(1)) {
     auto classMetadata = static_cast<const ClassMetadata*>(object->metadata);
-    
+
     swift_slowDealloc(object, classMetadata->getInstanceSize(),
                       classMetadata->getInstanceAlignMask());
   }
@@ -537,7 +543,7 @@ void swift::swift_unownedRelease_n(HeapObject *object, int n) {
   // Only class objects can be unowned-retained and unowned-released.
   assert(object->metadata->isClassObject());
   assert(static_cast<const ClassMetadata*>(object->metadata)->isTypeMetadata());
-  
+
   if (object->refCounts.decrementUnownedShouldFree(n)) {
     auto classMetadata = static_cast<const ClassMetadata*>(object->metadata);
     swift_slowDealloc(object, classMetadata->getInstanceSize(),

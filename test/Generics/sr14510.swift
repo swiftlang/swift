@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=off
-// RUN: %target-swift-frontend -debug-generic-signatures -typecheck %s -requirement-machine-protocol-signatures=on 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: %target-swift-frontend -debug-generic-signatures -typecheck %s 2>&1 | %FileCheck %s
 
 // CHECK-LABEL: Requirement signature: <Self where Self == Self.[Adjoint]Dual.[Adjoint]Dual, Self.[Adjoint]Dual : Adjoint>
 public protocol Adjoint {
@@ -26,7 +26,6 @@ where Self.Patch: Adjoint, Self.Dual: AdjointDiffable,
 protocol P {
   associatedtype A : P where A == B.C
   associatedtype B : P where B == A.C
-  // expected-note@-1 {{conformance constraint 'Self.C' : 'P' implied here}}
   associatedtype C : P where C == A.B
   // expected-warning@-1 {{redundant conformance constraint 'Self.C' : 'P'}}
 }

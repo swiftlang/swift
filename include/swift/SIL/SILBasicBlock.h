@@ -19,10 +19,10 @@
 
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/Range.h"
+#include "swift/Basic/SwiftObjectHeader.h"
 #include "swift/SIL/SILArgumentArrayRef.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILArgument.h"
-#include "swift/SIL/SwiftObjectHeader.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
 namespace swift {
@@ -48,7 +48,7 @@ private:
   /// A backreference to the containing SILFunction.
   SILFunction *Parent;
 
-  /// PrevList - This is a list of all of the terminator operands that are
+  /// PredList - This is a list of all of the terminator operands that are
   /// branching to this block, forming the predecessor list.  This is
   /// automatically managed by the SILSuccessor class.
   SILSuccessor *PredList = nullptr;
@@ -426,6 +426,12 @@ public:
   /// the debug scope for newly created instructions.
   const SILDebugScope *getScopeOfFirstNonMetaInstruction();
 
+  /// Whether the block has any phi arguments.
+  ///
+  /// Note that a block could have an argument and still return false.  The
+  /// argument must also satisfy SILPhiArgument::isPhiArgument.
+  bool hasPhi() const;
+
   //===--------------------------------------------------------------------===//
   // Debugging
   //===--------------------------------------------------------------------===//
@@ -575,7 +581,7 @@ struct PhiValue {
 
   PhiValue(SILValue value) {
     auto *blockArg = dyn_cast<SILPhiArgument>(value);
-    if (!blockArg || !blockArg->isPhiArgument())
+    if (!blockArg || !blockArg->isPhi())
       return;
 
     phiBlock = blockArg->getParent();
@@ -592,6 +598,11 @@ struct PhiValue {
 
   SILPhiArgument *getValue() const {
     return cast<SILPhiArgument>(phiBlock->getArgument(argIndex));
+  }
+
+  Operand *getOperand(SILBasicBlock *predecessor) {
+    auto *branch = cast<BranchInst>(predecessor->getTerminator());
+    return &branch->getAllOperands()[argIndex];
   }
 
   operator SILValue() const { return getValue(); }

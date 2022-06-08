@@ -16,7 +16,9 @@
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/PathRemapper.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/Support/Error.h"
 #include "llvm/Support/VirtualFileSystem.h"
 
 #include <string>
@@ -30,16 +32,15 @@ namespace swift {
 enum class ModuleSearchPathKind {
   Import,
   Framework,
-  DarwinImplictFramework,
+  DarwinImplicitFramework,
   RuntimeLibrary,
 };
 
 /// A single module search path that can come from different sources, e.g.
 /// framework search paths, import search path etc.
-struct ModuleSearchPath {
-  /// The actual path of the module search path. References a search path string
-  /// stored inside \c SearchPathOptions, which must outlive this reference.
-  StringRef Path;
+class ModuleSearchPath : public llvm::RefCountedBase<ModuleSearchPath> {
+  /// The actual path of the module search path.
+  std::string Path;
 
   /// The kind of the search path.
   ModuleSearchPathKind Kind;
@@ -52,6 +53,18 @@ struct ModuleSearchPath {
   /// different file names in \c searchPathsContainingFile.
   unsigned Index;
 
+public:
+  ModuleSearchPath(StringRef Path, ModuleSearchPathKind Kind, bool IsSystem,
+                   unsigned Index)
+      : Path(Path), Kind(Kind), IsSystem(IsSystem), Index(Index) {}
+
+  StringRef getPath() const { return Path; }
+  ModuleSearchPathKind getKind() const { return Kind; }
+
+  bool isSystem() const { return IsSystem; }
+
+  unsigned getIndex() const { return Index; }
+
   bool operator<(const ModuleSearchPath &Other) const {
     if (this->Kind == Other.Kind) {
       return this->Index < Other.Index;
@@ -60,6 +73,8 @@ struct ModuleSearchPath {
     }
   }
 };
+
+using ModuleSearchPathPtr = llvm::IntrusiveRefCntPtr<ModuleSearchPath>;
 
 class SearchPathOptions;
 
@@ -97,12 +112,12 @@ class ModuleSearchPathLookup {
     const SearchPathOptions *Opts;
   } State;
 
-  llvm::StringMap<SmallVector<ModuleSearchPath, 4>> LookupTable;
+  llvm::StringMap<SmallVector<ModuleSearchPathPtr, 4>> LookupTable;
 
   /// Scan the directory at \p SearchPath for files and add those files to the
   /// lookup table. \p Kind specifies the search path kind and \p Index the
   /// index of \p SearchPath within that search path kind. Search paths with
-  /// lower indicies are considered first.
+  /// lower indices are considered first.
   /// The \p SearchPath is stored by as a \c StringRef, so the string backing it
   /// must be alive as long as this lookup table is alive and not cleared.
   void addFilesInPathToLookupTable(llvm::vfs::FileSystem *FS,
@@ -312,14 +327,10 @@ public:
   /// would for a non-system header.
   bool DisableModulesValidateSystemDependencies = false;
 
-  /// Enforce loading only serialized modules built with the same SDK
-  /// as the context loading it.
-  bool EnableSameSDKCheck = true;
-
   /// A set of compiled modules that may be ready to use.
   std::vector<std::string> CandidateCompiledModules;
 
-  /// A map of explict Swift module information.
+  /// A map of explicit Swift module information.
   std::string ExplicitSwiftModuleMap;
 
   /// A map of placeholder Swift module dependency information.
@@ -343,6 +354,14 @@ public:
                                   llvm::vfs::FileSystem *FS, bool IsOSDarwin) {
     return Lookup.searchPathsContainingFile(this, Filenames, FS, IsOSDarwin);
   }
+
+  /// Creates a filesystem taking into account any overlays specified in
+  /// \c VFSOverlayFiles. Returns \p BaseFS if there were no overlays and
+  /// \c FileError(s) if any error occurred while attempting to parse the
+  /// overlay files.
+  llvm::Expected<llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>>
+  makeOverlayFileSystem(
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> BaseFS) const;
 
 private:
   static StringRef

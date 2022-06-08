@@ -232,7 +232,7 @@ _swift_setGlobalRuntimeFunctionCountersUpdateHandler(
   return oldHandler;
 }
 
-/// TODO: Provide an API to remove any counters releated to a specific object
+/// TODO: Provide an API to remove any counters related to a specific object
 /// or all objects.
 /// This is useful if you want to reset the stats for some/all objects.
 

@@ -230,18 +230,19 @@ class Top {}
 class Bottom<T : Bottom<Top>> {}
 // expected-error@-1 {{'Bottom' requires that 'Top' inherit from 'Bottom<Top>'}}
 // expected-note@-2 {{requirement specified as 'T' : 'Bottom<Top>' [with T = Top]}}
-// expected-error@-3 4{{generic class 'Bottom' has self-referential generic requirements}}
-// expected-note@-4 {{while resolving type 'Bottom<Top>'}}
-// expected-note@-5 {{through reference here}}
+// expected-error@-3 *{{generic class 'Bottom' has self-referential generic requirements}}
 
 // Invalid inheritance clause
 
 struct UnsolvableInheritance1<T : T.A> {}
 // expected-error@-1 {{'A' is not a member type of type 'T'}}
+// expected-error@-2 {{type 'T' constrained to non-protocol, non-class type 'T.A'}}
 
 struct UnsolvableInheritance2<T : U.A, U : T.A> {}
 // expected-error@-1 {{'A' is not a member type of type 'U'}}
 // expected-error@-2 {{'A' is not a member type of type 'T'}}
+// expected-error@-3 {{type 'T' constrained to non-protocol, non-class type 'U.A'}}
+// expected-error@-4 {{type 'U' constrained to non-protocol, non-class type 'T.A'}}
 
 enum X7<T> where X7.X : G { case X } // expected-error{{enum case 'X' is not a member type of 'X7<T>'}}
 // expected-error@-1{{cannot find type 'G' in scope}}

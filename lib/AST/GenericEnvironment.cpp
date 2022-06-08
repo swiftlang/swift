@@ -242,7 +242,11 @@ Type MapTypeOutOfContext::operator()(SubstitutableType *type) const {
   auto archetype = cast<ArchetypeType>(type);
   if (isa<OpaqueTypeArchetypeType>(archetype->getRoot()))
     return Type();
-  
+
+  // Leave opened archetypes alone; they're handled contextually.
+  if (isa<OpenedArchetypeType>(archetype))
+    return Type(type);
+
   return archetype->getInterfaceType();
 }
 
@@ -362,8 +366,8 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
       if (depType->is<GenericTypeParamType>()) {
         auto layout = getOpenedExistentialType()->getExistentialLayout();
         SmallVector<ProtocolDecl *, 2> protos;
-        for (auto protoType : layout.getProtocols())
-          protos.push_back(protoType->getDecl());
+        for (auto proto : layout.getProtocols())
+          protos.push_back(proto);
 
         result = OpenedArchetypeType::getNew(this, requirements.anchor, protos,
                                              superclass, requirements.layout);

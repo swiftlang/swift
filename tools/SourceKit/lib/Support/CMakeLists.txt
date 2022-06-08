@@ -7,7 +7,6 @@ add_sourcekit_library(SourceKitSupport
   UIDRegistry.cpp)
 target_link_libraries(SourceKitSupport PRIVATE
   swiftBasic
-  swiftSyntax
   clangBasic
   clangRewrite)
 if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
@@ -15,4 +14,3 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
     dispatch
     BlocksRuntime)
 endif()
-

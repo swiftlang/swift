@@ -89,13 +89,13 @@ func testImplicitMember() -> MyStruct {
   return .#^EXPR_IMPLICITMEMBER^#
 }
 // EXPR_IMPLICITMEMBER: Begin completions, 7 items
-// EXPR_IMPLICITMEMBER-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: <name>init</name>(<callarg><callarg.label>x</callarg.label>: <callarg.type><typeid.sys>Int</typeid.sys></callarg.type></callarg>); typename=<typeid.user>MyStruct</typeid.user>;
-// EXPR_IMPLICITMEMBER-DAG: Decl[StaticVar]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: <name>instance</name>; typename=<typeid.user>MyStruct</typeid.user>;
+// EXPR_IMPLICITMEMBER-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: <name>init</name>(<callarg><callarg.label>x</callarg.label>: <callarg.type><typeid.sys>Int</typeid.sys></callarg.type></callarg>); typename=<typeid.user>MyStruct</typeid.user>;
+// EXPR_IMPLICITMEMBER-DAG: Decl[StaticVar]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: <name>instance</name>; typename=<typeid.user>MyStruct</typeid.user>;
 // EXPR_IMPLICITMEMBER-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: <name>labelNameParamName</name>(<callarg><callarg.label>_</callarg.label> <callarg.param>self</callarg.param>: <callarg.type><typeid.user>MyStruct</typeid.user></callarg.type></callarg>); typename=(label: (<keyword>inout</keyword> <typeid.sys>Int</typeid.sys>) <keyword>throws</keyword> -&gt; <typeid.user>MyStruct</typeid.user>) -&gt; <typeid.sys>Void</typeid.sys>;
 // EXPR_IMPLICITMEMBER-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: <name>labelName</name>(<callarg><callarg.label>_</callarg.label> <callarg.param>self</callarg.param>: <callarg.type><typeid.user>MyStruct</typeid.user></callarg.type></callarg>); typename=(label: (<attribute>@autoclosure</attribute> () -&gt; <typeid.sys>Int</typeid.sys>) -&gt; <typeid.sys>Int</typeid.sys>) -&gt; <typeid.sys>Void</typeid.sys>;
 // EXPR_IMPLICITMEMBER-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: <name>sameName</name>(<callarg><callarg.label>_</callarg.label> <callarg.param>self</callarg.param>: <callarg.type><typeid.user>MyStruct</typeid.user></callarg.type></callarg>); typename=(label: <keyword>inout</keyword> <typeid.sys>Int</typeid.sys>) -&gt; <typeid.sys>Void</typeid.sys>;
 // EXPR_IMPLICITMEMBER-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: <name>paramName</name>(<callarg><callarg.label>_</callarg.label> <callarg.param>self</callarg.param>: <callarg.type><typeid.user>MyStruct</typeid.user></callarg.type></callarg>); typename=(<typeid.sys>Int</typeid.sys>) -&gt; <typeid.sys>Void</typeid.sys>;
-// EXPR_IMPLICITMEMBER-DAG: Decl[StaticMethod]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: <name>create</name>(<callarg><callarg.label>x</callarg.label>: <callarg.type><typeid.sys>Int</typeid.sys></callarg.type></callarg>); typename=<typeid.user>MyStruct</typeid.user>;
+// EXPR_IMPLICITMEMBER-DAG: Decl[StaticMethod]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: <name>create</name>(<callarg><callarg.label>x</callarg.label>: <callarg.type><typeid.sys>Int</typeid.sys></callarg.type></callarg>); typename=<typeid.user>MyStruct</typeid.user>;
 // EXPR_IMPLICITMEMBER: End completions
 
 func testArgument() -> MyStruct {
@@ -135,9 +135,15 @@ protocol BaseP {
   var value: MyStruct
 }
 class BaseC {
+  func baseMethod(x: Int) -> Int { }
+  func baseMethodWithName(x y: Int) -> Int { }
+  func baseMethodWithEmptyName(_ y: Int) -> Int { }
+
   func baseMethodAsync(x: Int) async -> Int { }
   func genericAsyncThrowsConstraint<T, U>(x: T) async throws -> U.Element where U: Collection, U.Element == Int {}
   subscript(index: Int) -> (Int) -> Int { }
+  subscript(withName index: Int) -> Float { }
+  subscript(_ index: String) -> String { }
 }
 class DerivedC: BaseC, BaseP {
   #^OVERRIDE^#
@@ -145,9 +151,14 @@ class DerivedC: BaseC, BaseP {
 // OVERRIDE-DAG: Keyword[func]/None:                 <keyword>func</keyword>; typename=; name=func; sourcetext=func
 // OVERRIDE-DAG: Decl[InstanceMethod]/Super:         <name>protoMethod</name>() -&gt; (<typeid.sys>UInt8</typeid.sys>) -&gt; <typeid.sys>Void</typeid.sys>; typename=; name=protoMethod(); sourcetext=func protoMethod() -> (UInt8) -> Void {\n<#code#>\n}
 // OVERRIDE-DAG: Decl[InstanceVar]/Super:            <name>value</name>: <typeid.user>MyStruct</typeid.user>; typename=; name=value; sourcetext=var value: MyStruct
+// OVERRIDE-DAG: Decl[InstanceMethod]/Super:         <name>baseMethod</name>(<param><param.label>x</param.label>: <param.type><typeid.sys>Int</typeid.sys></param.type></param>) -&gt; <typeid.sys>Int</typeid.sys>; typename=; name=baseMethod(x:); sourcetext=override func baseMethod(x: Int) -> Int {\n<#code#>\n}
+// OVERRIDE-DAG: Decl[InstanceMethod]/Super:         <name>baseMethodWithName</name>(<param><param.label>x</param.label> <param.param>y</param.param>: <param.type><typeid.sys>Int</typeid.sys></param.type></param>) -&gt; <typeid.sys>Int</typeid.sys>; typename=; name=baseMethodWithName(x:); sourcetext=override func baseMethodWithName(x y: Int) -> Int {\n<#code#>\n}
+// OVERRIDE-DAG: Decl[InstanceMethod]/Super:         <name>baseMethodWithEmptyName</name>(<param><param.label>_</param.label> <param.param>y</param.param>: <param.type><typeid.sys>Int</typeid.sys></param.type></param>) -&gt; <typeid.sys>Int</typeid.sys>; typename=; name=baseMethodWithEmptyName(:); sourcetext=override func baseMethodWithEmptyName(_ y: Int) -> Int {\n<#code#>\n}
 // OVERRIDE-DAG: Decl[InstanceMethod]/Super:         <name>baseMethodAsync</name>(<param><param.label>x</param.label>: <param.type><typeid.sys>Int</typeid.sys></param.type></param>) <keyword>async</keyword> -&gt; <typeid.sys>Int</typeid.sys>; typename=; name=baseMethodAsync(x:); sourcetext=override func baseMethodAsync(x: Int) async -> Int {\n<#code#>\n}
 // OVERRIDE-DAG: Decl[InstanceMethod]/Super:         <name>genericAsyncThrowsConstraint</name>&lt;T, U&gt;(<param><param.label>x</param.label>: <param.type><typeid.user>T</typeid.user></param.type></param>) <keyword>async</keyword> <keyword>throws</keyword> -&gt; <typeid.user>U</typeid.user>.<typeid.sys>Element</typeid.sys> <keyword>where</keyword> <typeid.user>U</typeid.user> : <typeid.sys>Collection</typeid.sys>, <typeid.user>U</typeid.user>.<typeid.sys>Element</typeid.sys> == <typeid.sys>Int</typeid.sys>; typename=; name=genericAsyncThrowsConstraint(x:); sourcetext=override func genericAsyncThrowsConstraint<T, U>(x: T) async throws -> U.Element where U : Collection, U.Element == Int {\n<#code#>\n}
 // OVERRIDE-DAG: Decl[Subscript]/Super:              <name>subscript</name>(<param><param.param>index</param.param>: <param.type><typeid.sys>Int</typeid.sys></param.type></param>) -&gt; (<typeid.sys>Int</typeid.sys>) -&gt; <typeid.sys>Int</typeid.sys>; typename=; name=subscript(:); sourcetext=override subscript(index: Int) -> (Int) -> Int {\n<#code#>\n}
+// OVERRIDE-DAG: Decl[Subscript]/Super:              <name>subscript</name>(<param><param.label>withName</param.label> <param.param>index</param.param>: <param.type><typeid.sys>Int</typeid.sys></param.type></param>) -&gt; <typeid.sys>Float</typeid.sys>; typename=; name=subscript(withName:); sourcetext=override subscript(withName index: Int) -> Float {\n<#code#>\n}
+// OVERRIDE-DAG: Decl[Subscript]/Super:              <name>subscript</name>(<param><param.param>index</param.param>: <param.type><typeid.sys>String</typeid.sys></param.type></param>) -&gt; <typeid.sys>String</typeid.sys>; typename=; name=subscript(:); sourcetext=override subscript(index: String) -> String {\n<#code#>\n}
 // OVERRIDE-DAG: Decl[Constructor]/Super:            <name>init</name>(); typename=; name=init(); sourcetext=override init() {\n<#code#>\n}
 // OVERRIDE: End completions
 }

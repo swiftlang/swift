@@ -32,9 +32,12 @@ class SILLocation;
 class SILType;
 class SILValue;
 
-/// Finds the first `DistributedActorSystem`-compatible parameter of the given function.
-/// \returns nullptr if the function does not have such a parameter.
-SILArgument *findFirstDistributedActorSystemArg(SILFunction &F);
+/// Creates a reference to the distributed actor's \p actorSystem
+/// stored property.
+SILValue refDistributedActorSystem(SILBuilder &B,
+                                   SILLocation loc,
+                                   ClassDecl *actorDecl,
+                                   SILValue actorInstance);
 
 /// Emit a call to a witness of the DistributedActorSystem protocol.
 ///
@@ -58,6 +61,11 @@ void emitDistributedActorSystemWitnessCall(
 /// being "ready" \param actorSystem a value representing the DistributedActorSystem
 void emitActorReadyCall(SILBuilder &B, SILLocation loc, SILValue actor,
                         SILValue actorSystem);
+
+/// Emits code to notify the \p actorSystem that the given identity is resigned.
+void emitResignIdentityCall(SILBuilder &B, SILLocation loc, ClassDecl* actDecl,
+                            SILValue actor, SILValue identityRef);
+
 
 } // namespace swift
 

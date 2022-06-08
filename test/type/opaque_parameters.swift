@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-opaque-parameters -enable-parameterized-protocol-types -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -warn-redundant-requirements
 
 protocol P { }
 
@@ -6,6 +6,7 @@ protocol Q {
   associatedtype A: P & Equatable
 
   func f() -> A
+  func takesA(_: A)
 }
 
 extension Int: P { }
@@ -16,17 +17,24 @@ extension Array: Q where Element: P, Element: Equatable {
   func f() -> Element {
     return first!
   }
+
+  func takesA(_: Element) {}
 }
 
-extension Set: Q where Element: P, Element: Equatable {
+extension Set: Q where Element: P, Element: Equatable { // expected-warning {{redundant conformance constraint 'Element' : 'Equatable'}}
   func f() -> Element {
     return first!
   }
+
+  func takesA(_: Element) {}
 }
 
 // expected-note@+2{{where 'some Q' = 'Int'}}
 // expected-note@+1{{in call to function 'takesQ'}}
 func takesQ(_ q: some Q) -> Bool {
+  // expected-error@+1 {{cannot convert value of type 'Int' to expected argument type '(some Q).A'}}
+  q.takesA(1)
+
   return q.f() == q.f()
 }
 
@@ -68,9 +76,7 @@ func testAnyDictionary(numberNames: [Int: String]) {
 }
 
 // Combine with parameterized protocol types
-protocol PrimaryCollection: Collection {
-  @_primaryAssociatedType associatedtype Element
-}
+protocol PrimaryCollection<Element>: Collection {}
 
 extension Array: PrimaryCollection { }
 extension Set: PrimaryCollection { }
@@ -102,3 +108,10 @@ func testPrimaries(
   _ = takeMatchedPrimaryCollections(arrayOfInts, setOfInts)
   _ = takeMatchedPrimaryCollections(arrayOfInts, setOfStrings) // expected-error{{type of expression is ambiguous without more context}}
 }
+
+
+// Prohibit use of opaque parameters in consuming positions.
+typealias FnType<T> = (T) -> Void
+
+func consumingA(fn: (some P) -> Void) { } // expected-error{{'some' cannot appear in parameter position in parameter type '(some P) -> Void'}}
+func consumingB(fn: FnType<some P>) { } // expected-error{{'some' cannot appear in parameter position in parameter type '(some P) -> Void'}}

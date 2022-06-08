@@ -21,19 +21,7 @@ public struct Operand : CustomStringConvertible, CustomReflectable {
   }
 
   public var value: Value {
-    let v = Operand_getValue(bridged).getAs(AnyObject.self)
-    switch v {
-      case let inst as SingleValueInstruction:
-        return inst
-      case let arg as Argument:
-        return arg
-      case let mvr as MultipleValueInstructionResult:
-        return mvr
-      case let undef as Undef:
-        return undef
-      default:
-        fatalError("unknown Value type")
-    }
+    Operand_getValue(bridged).value
   }
 
   public static func ==(lhs: Operand, rhs: Operand) -> Bool {
@@ -67,11 +55,11 @@ public struct OperandArray : RandomAccessCollection, CustomReflectable {
   
   public subscript(_ index: Int) -> Operand {
     precondition(index >= 0 && index < endIndex)
-    return Operand(BridgedOperand(op: opArray.data + index &* BridgedOperandSize))
+    return Operand(BridgedOperand(op: opArray.data! + index &* BridgedOperandSize))
   }
   
   public func getIndex(of operand: Operand) -> Int {
-    let idx = (operand.bridged.op - UnsafeRawPointer(opArray.data)) /
+    let idx = (operand.bridged.op - UnsafeRawPointer(opArray.data!)) /
                 BridgedOperandSize
     precondition(self[idx].bridged.op == operand.bridged.op)
     return idx
@@ -86,7 +74,7 @@ public struct OperandArray : RandomAccessCollection, CustomReflectable {
     precondition(bounds.lowerBound >= 0)
     precondition(bounds.upperBound <= endIndex)
     return OperandArray(opArray: BridgedArrayRef(
-      data: opArray.data + bounds.lowerBound &* BridgedOperandSize,
+      data: opArray.data! + bounds.lowerBound &* BridgedOperandSize,
       numElements: bounds.upperBound - bounds.lowerBound))
   }
 }
@@ -111,12 +99,15 @@ public struct UseList : CollectionLikeSequence {
     self.firstOpPtr = firstOpPtr.op
   }
 
-  public var isSingleUse: Bool {
+  public var singleUse: Operand? {
     if let opPtr = firstOpPtr {
-      return Operand_nextUse(BridgedOperand(op: opPtr)).op == nil
+      if Operand_nextUse(BridgedOperand(op: opPtr)).op != nil { return nil }
+      return Operand(BridgedOperand(op: opPtr))
     }
-    return false
+    return nil
   }
+
+  public var isSingleUse: Bool { singleUse != nil }
 
   public func makeIterator() -> Iterator {
     return Iterator(currentOpPtr: firstOpPtr)

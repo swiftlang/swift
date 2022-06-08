@@ -1,6 +1,9 @@
 #ifndef TEST_INTEROP_CXX_OPERATORS_INPUTS_MEMBER_INLINE_H
 #define TEST_INTEROP_CXX_OPERATORS_INPUTS_MEMBER_INLINE_H
 
+template <class From, class To>
+To __swift_interopStaticCast(From from) { return from; }
+
 struct LoadableIntWrapper {
   int value;
   LoadableIntWrapper operator-(LoadableIntWrapper rhs) {
@@ -15,6 +18,13 @@ struct LoadableIntWrapper {
   }
   int operator()(int x, int y) {
     return value + x * y;
+  }
+};
+
+struct LoadableBoolWrapper {
+  bool value;
+  LoadableBoolWrapper operator!() {
+    return LoadableBoolWrapper{.value = !value};
   }
 };
 
@@ -176,11 +186,24 @@ template<class T> struct TemplatedArrayByVal {
   T ts[];
   T operator[](int i) { return ts[i]; }
 };
+
 typedef TemplatedArrayByVal<double> TemplatedDoubleArrayByVal;
 
-struct TemplatedSubscriptArrayByVal {
+template <class T>
+struct TemplatedByVal {
+  T val;
+  TemplatedByVal<T> operator+(TemplatedByVal other) {
+    return TemplatedByVal{.val = val + other.val};
+  }
+};
+
+struct TemplatedOperatorArrayByVal {
   int *ptr;
   template<class T> T operator[](T i) { return ptr[i]; }
+  template <class T>
+  T *operator+(T i) {
+    return ptr + i;
+  }
 };
 
 struct NonTrivial {
@@ -242,5 +265,13 @@ struct ConstPtrByVal {
 private:
   int a = 64;
 };
+
+struct DerivedFromAddressOnlyIntWrapper : AddressOnlyIntWrapper {
+  DerivedFromAddressOnlyIntWrapper(int value) : AddressOnlyIntWrapper(value) { }
+};
+
+struct DerivedFromReadWriteIntArray : ReadWriteIntArray {};
+
+struct DerivedFromNonTrivialArrayByVal : NonTrivialArrayByVal {};
 
 #endif

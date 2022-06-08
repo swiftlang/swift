@@ -16,3 +16,7 @@ void setConstStaticIntRvalueRef(const int &&i) { staticInt = i; }
 
 auto getFuncRef() -> int (&)() { return getStaticInt; }
 auto getFuncRvalueRef() -> int (&&)() { return getStaticInt; }
+
+void takeConstRef(const int &value) {
+  staticInt = value;
+}

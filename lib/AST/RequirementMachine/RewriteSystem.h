@@ -13,14 +13,18 @@
 #ifndef SWIFT_REWRITESYSTEM_H
 #define SWIFT_REWRITESYSTEM_H
 
+#include "swift/AST/Requirement.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "llvm/ADT/DenseSet.h"
-#include "llvm/ADT/PointerUnion.h"
 
 #include "Debug.h"
+#include "Diagnostics.h"
 #include "RewriteLoop.h"
+#include "Rule.h"
 #include "Symbol.h"
 #include "Term.h"
 #include "Trie.h"
+#include "TypeDifference.h"
 
 namespace llvm {
   class raw_ostream;
@@ -34,175 +38,19 @@ class PropertyMap;
 class RewriteContext;
 class RewriteSystem;
 
-/// A rewrite rule that replaces occurrences of LHS with RHS.
-///
-/// LHS must be greater than RHS in the linear order over terms.
-///
-/// Out-of-line methods are documented in RewriteSystem.cpp.
-class Rule final {
-  Term LHS;
-  Term RHS;
-
-  /// A 'permanent' rule cannot be deleted by homotopy reduction. These
-  /// do not correspond to generic requirements and are re-added when the
-  /// rewrite system is built.
-  unsigned Permanent : 1;
-
-  /// An 'explicit' rule is a generic requirement written by the user.
-  unsigned Explicit : 1;
-
-  /// An 'LHS simplified' rule's left hand side was reduced via another rule.
-  /// Set by simplifyLeftHandSides().
-  unsigned LHSSimplified : 1;
-
-  /// An 'RHS simplified' rule's right hand side can be reduced via another rule.
-  /// Set by simplifyRightHandSides().
-  unsigned RHSSimplified : 1;
-
-  /// A 'substitution simplified' rule's left hand side contains substitutions
-  /// which can be reduced via another rule.
-  /// Set by simplifyLeftHandSideSubstitutions().
-  unsigned SubstitutionSimplified : 1;
-
-  /// A 'redundant' rule was eliminated by homotopy reduction. Redundant rules
-  /// still participate in term rewriting, but they are not part of the minimal
-  /// set of requirements in a generic signature.
-  unsigned Redundant : 1;
-
-  /// A 'conflicting' rule is a property rule which cannot be satisfied by any
-  /// concrete type because it is mutually exclusive with some other rule.
-  /// An example would be a pair of concrete type rules:
-  ///
-  ///    T.[concrete: Int] => T
-  ///    T.[concrete: String] => T
-  ///
-  /// Conflicting rules are detected in property map construction, and are
-  /// dropped from the minimal set of requirements.
-  unsigned Conflicting : 1;
-
-public:
-  Rule(Term lhs, Term rhs)
-      : LHS(lhs), RHS(rhs) {
-    Permanent = false;
-    Explicit = false;
-    LHSSimplified = false;
-    RHSSimplified = false;
-    SubstitutionSimplified = false;
-    Redundant = false;
-    Conflicting = false;
-  }
-
-  const Term &getLHS() const { return LHS; }
-  const Term &getRHS() const { return RHS; }
-
-  Optional<Symbol> isPropertyRule() const;
-
-  const ProtocolDecl *isProtocolConformanceRule() const;
-
-  const ProtocolDecl *isAnyConformanceRule() const;
-
-  bool isIdentityConformanceRule() const;
-
-  bool isProtocolRefinementRule() const;
-
-  /// See above for an explanation of these predicates.
-  bool isPermanent() const {
-    return Permanent;
-  }
-
-  bool isExplicit() const {
-    return Explicit;
-  }
-
-  bool isLHSSimplified() const {
-    return LHSSimplified;
-  }
-
-  bool isRHSSimplified() const {
-    return RHSSimplified;
-  }
-
-  bool isSubstitutionSimplified() const {
-    return SubstitutionSimplified;
-  }
-
-  bool isRedundant() const {
-    return Redundant;
-  }
-
-  bool isConflicting() const {
-    return Conflicting;
-  }
-
-  bool containsUnresolvedSymbols() const {
-    return (LHS.containsUnresolvedSymbols() ||
-            RHS.containsUnresolvedSymbols());
-  }
-
-  void markLHSSimplified() {
-    assert(!LHSSimplified);
-    LHSSimplified = true;
-  }
-
-  void markRHSSimplified() {
-    assert(!RHSSimplified);
-    RHSSimplified = true;
-  }
-
-  void markSubstitutionSimplified() {
-    assert(!SubstitutionSimplified);
-    SubstitutionSimplified = true;
-  }
-
-  void markPermanent() {
-    assert(!Explicit && !Permanent &&
-           "Permanent and explicit are mutually exclusive");
-    Permanent = true;
-  }
-
-  void markExplicit() {
-    assert(!Explicit && !Permanent &&
-           "Permanent and explicit are mutually exclusive");
-    Explicit = true;
-  }
-
-  void markRedundant() {
-    assert(!Redundant);
-    Redundant = true;
-  }
-
-  void markConflicting() {
-    // It's okay to mark a rule as conflicting multiple times, but it must not
-    // be a permanent rule.
-    assert(!Permanent && "Permanent rule should not conflict with anything");
-    Conflicting = true;
-  }
-
-  unsigned getDepth() const;
-
-  int compare(const Rule &other, RewriteContext &ctx) const;
-
-  void dump(llvm::raw_ostream &out) const;
-
-  friend llvm::raw_ostream &operator<<(llvm::raw_ostream &out,
-                                       const Rule &rule) {
-    rule.dump(out);
-    return out;
-  }
-};
-
-/// Result type for RewriteSystem::computeConfluentCompletion() and
-/// PropertyMap::buildPropertyMap().
+/// Result type for RequirementMachine::computeCompletion().
 enum class CompletionResult {
-  /// Confluent completion was computed successfully.
+  /// Completion was successful.
   Success,
 
-  /// Maximum number of iterations reached.
-  MaxIterations,
+  /// Maximum number of rules exceeded.
+  MaxRuleCount,
 
-  /// Completion produced a rewrite rule whose left hand side has a length
-  /// exceeding the limit.
-  MaxDepth
+  /// Maximum rule length exceeded.
+  MaxRuleLength,
+
+  /// Maximum concrete type nesting depth exceeded.
+  MaxConcreteNesting
 };
 
 /// A term rewrite system for working with types in a generic signature.
@@ -217,24 +65,28 @@ class RewriteSystem final {
   /// top-level generic signature and this array is empty.
   ArrayRef<const ProtocolDecl *> Protos;
 
+  /// The requirements written in source code.
+  std::vector<StructuralRequirement> WrittenRequirements;
+
   /// The rules added so far, including rules from our client, as well
   /// as rules introduced by the completion procedure.
   std::vector<Rule> Rules;
+
+  unsigned FirstLocalRule = 0;
 
   /// A prefix trie of rule left hand sides to optimize lookup. The value
   /// type is an index into the Rules array defined above.
   Trie<unsigned, MatchKind::Shortest> Trie;
 
-  /// The set of protocols known to this rewrite system. The boolean associated
-  /// with each key is true if the protocol is part of the 'Protos' set above,
-  /// otherwies it is false.
+  /// The set of protocols known to this rewrite system.
   ///
-  /// See RuleBuilder::ProtocolMap for a more complete explanation. For the most
-  /// part, this is only used while building the rewrite system, but conditional
-  /// requirement inference forces us to be able to add new protocols to the
-  /// rewrite system after the fact, so this little bit of RuleBuilder state
-  /// outlives the initialization phase.
-  llvm::DenseMap<const ProtocolDecl *, bool> ProtocolMap;
+  /// See RuleBuilder::ReferencedProtocols for a more complete explanation.
+  ///
+  /// For the most part, this is only used while building the rewrite system,
+  /// but conditional requirement inference forces us to be able to add new
+  /// protocols to the rewrite system after the fact, so this little bit of
+  /// RuleBuilder state outlives the initialization phase.
+  llvm::DenseSet<const ProtocolDecl *> ReferencedProtocols;
 
   DebugOptions Debug;
 
@@ -250,9 +102,17 @@ class RewriteSystem final {
   /// Whether we've minimized the rewrite system.
   unsigned Minimized : 1;
 
+  /// Whether the rewrite system is finalized, immutable, and ready for
+  /// generic signature queries.
+  unsigned Frozen : 1;
+
   /// If set, the completion procedure records rewrite loops describing the
   /// identities among rewrite rules discovered while resolving critical pairs.
   unsigned RecordLoops : 1;
+
+  /// The length of the longest initial rule, used for the MaxRuleLength
+  /// completion non-termination heuristic.
+  unsigned LongestInitialRule : 16;
 
 public:
   explicit RewriteSystem(RewriteContext &ctx);
@@ -266,22 +126,29 @@ public:
   /// Return the rewrite context used for allocating memory.
   RewriteContext &getRewriteContext() const { return Context; }
 
-  llvm::DenseMap<const ProtocolDecl *, bool> &getProtocolMap() {
-    return ProtocolMap;
+  llvm::DenseSet<const ProtocolDecl *> &getReferencedProtocols() {
+    return ReferencedProtocols;
   }
 
   DebugOptions getDebugOptions() const { return Debug; }
 
-  void initialize(bool recordLoops, ArrayRef<const ProtocolDecl *> protos,
+  void initialize(bool recordLoops,
+                  ArrayRef<const ProtocolDecl *> protos,
+                  std::vector<StructuralRequirement> &&writtenRequirements,
+                  std::vector<Rule> &&importedRules,
                   std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
-                  std::vector<std::pair<MutableTerm, MutableTerm>> &&requirementRules);
+                  std::vector<std::tuple<MutableTerm, MutableTerm, Optional<unsigned>>> &&requirementRules);
+
+  unsigned getLongestInitialRule() const {
+    return LongestInitialRule;
+  }
 
   ArrayRef<const ProtocolDecl *> getProtocols() const {
     return Protos;
   }
 
   bool isKnownProtocol(const ProtocolDecl *proto) const {
-    return ProtocolMap.find(proto) != ProtocolMap.end();
+    return ReferencedProtocols.count(proto) > 0;
   }
 
   unsigned getRuleID(const Rule &rule) const {
@@ -289,10 +156,19 @@ public:
     return (unsigned)(&rule - &*Rules.begin());
   }
 
+  /// Get an array of all rewrite rules.
   ArrayRef<Rule> getRules() const {
     return Rules;
   }
 
+  /// Get an array of rewrite rules, not including rewrite rules imported
+  /// from referenced protocols.
+  ArrayRef<Rule> getLocalRules() const {
+    return getRules().slice(FirstLocalRule);
+  }
+
+  /// Get the rewrite rule at the given index. Note that this is an index
+  /// into getRules(), *NOT* getLocalRules().
   Rule &getRule(unsigned ruleID) {
     return Rules[ruleID];
   }
@@ -306,11 +182,18 @@ public:
 
   bool addPermanentRule(MutableTerm lhs, MutableTerm rhs);
 
-  bool addExplicitRule(MutableTerm lhs, MutableTerm rhs);
+  bool addExplicitRule(MutableTerm lhs, MutableTerm rhs,
+                       Optional<unsigned> requirementID);
+
+  void addRules(std::vector<Rule> &&importedRules,
+                std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
+                std::vector<std::tuple<MutableTerm, MutableTerm, Optional<unsigned>>> &&requirementRules);
 
   bool simplify(MutableTerm &term, RewritePath *path=nullptr) const;
 
-  bool simplifySubstitutions(Symbol &symbol, RewritePath *path=nullptr) const;
+  Optional<unsigned>
+  simplifySubstitutions(Term baseTerm, Symbol symbol, const PropertyMap *map,
+                        RewritePath *path=nullptr);
 
   //////////////////////////////////////////////////////////////////////////////
   ///
@@ -322,14 +205,14 @@ public:
   llvm::DenseSet<std::pair<unsigned, unsigned>> CheckedOverlaps;
 
   std::pair<CompletionResult, unsigned>
-  computeConfluentCompletion(unsigned maxIterations,
-                             unsigned maxDepth);
+  computeConfluentCompletion(unsigned maxRuleCount,
+                             unsigned maxRuleLength);
 
   void simplifyLeftHandSides();
 
   void simplifyRightHandSides();
 
-  void simplifyLeftHandSideSubstitutions();
+  void simplifyLeftHandSideSubstitutions(const PropertyMap *map);
 
   enum ValidityPolicy {
     AllowInvalidRequirements,
@@ -337,6 +220,19 @@ public:
   };
 
   void verifyRewriteRules(ValidityPolicy policy) const;
+
+  //////////////////////////////////////////////////////////////////////////////
+  ///
+  /// Diagnostics
+  ///
+  //////////////////////////////////////////////////////////////////////////////
+
+  void computeRedundantRequirementDiagnostics(SmallVectorImpl<RequirementError> &errors);
+
+  void computeConflictDiagnostics(SmallVectorImpl<RequirementError> &errors,
+                                  SourceLoc signatureLoc,
+                                  const PropertyMap &map,
+                                  TypeArrayView<GenericTypeParamType> genericParams);
 
 private:
   struct CriticalPair {
@@ -355,29 +251,6 @@ private:
       std::vector<CriticalPair> &pairs,
       std::vector<RewriteLoop> &loops) const;
 
-  /// Constructed from a rule of the form X.[P2:T] => X.[P1:T] by
-  /// checkMergedAssociatedType().
-  struct MergedAssociatedType {
-    /// The *right* hand side of the original rule, X.[P1:T].
-    Term rhs;
-
-    /// The associated type symbol appearing at the end of the *left*
-    /// hand side of the original rule, [P2:T].
-    Symbol lhsSymbol;
-
-    /// The merged associated type symbol, [P1&P2:T].
-    Symbol mergedSymbol;
-  };
-
-  /// A list of pending terms for the associated type merging completion
-  /// heuristic. Entries are added by checkMergedAssociatedType(), and
-  /// consumed in processMergedAssociatedTypes().
-  std::vector<MergedAssociatedType> MergedAssociatedTypes;
-
-  void processMergedAssociatedTypes();
-
-  void checkMergedAssociatedType(Term lhs, Term rhs);
-
   //////////////////////////////////////////////////////////////////////////////
   ///
   /// Relations are "pseudo-rules" introduced by the property map
@@ -389,6 +262,9 @@ public:
   using Relation = std::pair<Term, Term>;
 
 private:
+  /// The map's values are indices into the vector. The map is used for
+  /// uniquing, then the index is returned and lookups are performed into
+  /// the vector.
   llvm::DenseMap<Relation, unsigned> RelationMap;
   std::vector<Relation> Relations;
 
@@ -410,6 +286,41 @@ public:
   unsigned recordSameTypeWitnessRelation(
       Symbol concreteConformanceSymbol,
       Symbol associatedTypeSymbol);
+
+private:
+  /// The map's values are indices into the vector. The map is used for
+  /// uniquing, then the index is returned and lookups are performed into
+  /// the vector.
+  llvm::DenseMap<std::tuple<Term, Symbol, Symbol>, unsigned> DifferenceMap;
+  std::vector<TypeDifference> Differences;
+
+  /// Avoid duplicate work when simplifying substitutions or rebuilding
+  /// the property map.
+  llvm::DenseSet<unsigned> CheckedDifferences;
+
+public:
+  unsigned recordTypeDifference(const TypeDifference &difference);
+
+  bool
+  computeTypeDifference(Term term, Symbol lhs, Symbol rhs,
+                        Optional<unsigned> &lhsDifferenceID,
+                        Optional<unsigned> &rhsDifferenceID);
+
+  const TypeDifference &getTypeDifference(unsigned index) const;
+
+  void processTypeDifference(const TypeDifference &difference,
+                             unsigned differenceID,
+                             unsigned lhsRuleID,
+                             const RewritePath &rhsPath);
+
+  void buildRewritePathForJoiningTerms(MutableTerm lhsTerm,
+                                       MutableTerm rhsTerm,
+                                       RewritePath *path) const;
+
+  void buildRewritePathForUnifier(Term key,
+                                  unsigned lhsRuleID,
+                                  const RewritePath &rhsPath,
+                                  RewritePath *path) const;
 
 private:
   //////////////////////////////////////////////////////////////////////////////
@@ -434,25 +345,42 @@ private:
   /// algorithms.
   std::vector<RewriteLoop> Loops;
 
-  void recordRewriteLoop(MutableTerm basepoint,
-                         RewritePath path);
+  /// A list of pairs where the first element is a rule number and the second
+  /// element is an equivalent rewrite path in terms of non-redundant rules.
+  std::vector<std::pair<unsigned, RewritePath>> RedundantRules;
+
+  /// Pairs of rules which together preclude a concrete type from satisfying the
+  /// requirements of the generic signature.
+  ///
+  /// Conflicts are detected in property map construction. Conflicts are
+  /// diagnosed and one of the rules in each pair is dropped during
+  /// minimization.
+  std::vector<std::pair<unsigned, unsigned>> ConflictingRules;
 
   void propagateExplicitBits();
 
-  Optional<unsigned>
-  findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn,
-                   RewritePath &replacementPath);
+  void propagateRedundantRequirementIDs();
+
+  using EliminationPredicate = llvm::function_ref<bool(unsigned loopID,
+                                                       unsigned ruleID)>;
+
+  Optional<std::pair<unsigned, unsigned>>
+  findRuleToDelete(EliminationPredicate isRedundantRuleFn);
 
   void deleteRule(unsigned ruleID, const RewritePath &replacementPath);
 
-  void performHomotopyReduction(
-      llvm::function_ref<bool(unsigned)> isRedundantRuleFn);
+  void performHomotopyReduction(EliminationPredicate isRedundantRuleFn);
 
   void computeMinimalConformances(
       llvm::DenseSet<unsigned> &redundantConformances);
 
 public:
-  bool isInMinimizationDomain(ArrayRef<const ProtocolDecl *> protos) const;
+  void recordRewriteLoop(MutableTerm basepoint,
+                         RewritePath path);
+
+  void recordConflict(unsigned existingRuleID, unsigned newRuleID);
+
+  bool isInMinimizationDomain(const ProtocolDecl *proto) const;
 
   ArrayRef<RewriteLoop> getLoops() const {
     return Loops;
@@ -460,9 +388,14 @@ public:
 
   void minimizeRewriteSystem();
 
-  bool hadError() const;
+  GenericSignatureErrors getErrors() const;
 
-  llvm::DenseMap<const ProtocolDecl *, std::vector<unsigned>>
+  struct MinimizedProtocolRules {
+    std::vector<unsigned> Requirements;
+    std::vector<unsigned> TypeAliases;
+  };
+
+  llvm::DenseMap<const ProtocolDecl *, MinimizedProtocolRules>
   getMinimizedProtocolRules() const;
 
   std::vector<unsigned> getMinimizedGenericSignatureRules() const;
@@ -477,6 +410,8 @@ private:
       const llvm::DenseSet<unsigned> &redundantConformances) const;
 
 public:
+  void freeze();
+
   void dump(llvm::raw_ostream &out) const;
 };
 

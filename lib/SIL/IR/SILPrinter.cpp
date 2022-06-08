@@ -461,9 +461,12 @@ static void printSILTypeColorAndSigil(raw_ostream &OS, SILType t) {
 
 void SILType::print(raw_ostream &OS, const PrintOptions &PO) const {
   printSILTypeColorAndSigil(OS, *this);
-  
+
   // Print other types as their Swift representation.
-  getASTType().print(OS, PO);
+  //
+  // NOTE: We always print the Raw AST type so we don't look through
+  // move-onlyness.
+  getRawASTType().print(OS, PO);
 }
 
 void SILType::dump() const {
@@ -529,8 +532,6 @@ static void printSILFunctionNameAndType(llvm::raw_ostream &OS,
 }
 
 namespace {
-  
-class SILPrinter;
 
 // 1. Accumulate opcode-specific comments in this stream.
 // 2. Start emitting comments: lineComments.start()
@@ -595,6 +596,10 @@ protected:
   }
 };
 
+} // namespace
+
+namespace swift {
+
 /// SILPrinter class - This holds the internal implementation details of
 /// printing SIL structures.
 class SILPrinter : public SILInstructionVisitor<SILPrinter> {
@@ -647,7 +652,7 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
   
   SILPrinter &operator<<(SILType t) {
     printSILTypeColorAndSigil(PrintState.OS, t);
-    t.getASTType().print(PrintState.OS, PrintState.ASTOptions);
+    t.getRawASTType().print(PrintState.OS, PrintState.ASTOptions);
     return *this;
   }
   
@@ -1321,6 +1326,8 @@ public:
       *this << "[dynamic_lifetime] ";
     if (AVI->isLexical())
       *this << "[lexical] ";
+    if (AVI->getWasMoved())
+      *this << "[moved] ";
     *this << AVI->getElementType();
     printDebugVar(AVI->getVarInfo(),
                   &AVI->getModule().getASTContext().SourceMgr);
@@ -1353,6 +1360,10 @@ public:
   void visitAllocBoxInst(AllocBoxInst *ABI) {
     if (ABI->hasDynamicLifetime())
       *this << "[dynamic_lifetime] ";
+    
+    if (ABI->emitReflectionMetadata()) {
+      *this << "[reflection] ";
+    }
     *this << ABI->getType();
     printDebugVar(ABI->getVarInfo(),
                   &ABI->getModule().getASTContext().SourceMgr);
@@ -1681,6 +1692,8 @@ public:
   void visitDebugValueInst(DebugValueInst *DVI) {
     if (DVI->poisonRefs())
       *this << "[poison] ";
+    if (DVI->getWasMoved())
+      *this << "[moved] ";
     *this << getIDAndType(DVI->getOperand());
     printDebugVar(DVI->getVarInfo(),
                   &DVI->getModule().getASTContext().SourceMgr);
@@ -1743,23 +1756,10 @@ public:
     printForwardingOwnershipKind(CI, CI->getOperand());
   }
 
-  void visitCheckedCastValueBranchInst(CheckedCastValueBranchInst *CI) {
-    *this << CI->getSourceFormalType() << " in "
-          << getIDAndType(CI->getOperand()) << " to " << CI->getTargetFormalType()
-          << ", " << Ctx.getID(CI->getSuccessBB()) << ", "
-          << Ctx.getID(CI->getFailureBB());
-  }
-
   void visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *CI) {
     *this << CI->getSourceFormalType() << " in " << getIDAndType(CI->getSrc())
           << " to " << CI->getTargetFormalType() << " in "
           << getIDAndType(CI->getDest());
-  }
-
-  void visitUnconditionalCheckedCastValueInst(
-      UnconditionalCheckedCastValueInst *CI) {
-    *this << CI->getSourceFormalType() << " in " << getIDAndType(CI->getOperand())
-          << " to " << CI->getTargetFormalType();
   }
 
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CI) {
@@ -1799,12 +1799,6 @@ public:
   void visitConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *CI) {
     *this << (CI->isLifetimeGuaranteed() ? "" : "[not_guaranteed] ")
           << getIDAndType(CI->getOperand()) << " to " << CI->getType();
-  }
-  void visitThinFunctionToPointerInst(ThinFunctionToPointerInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand());
-  }
-  void visitPointerToThinFunctionInst(PointerToThinFunctionInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand());
   }
   void visitUpcastInst(UpcastInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand());
@@ -2748,7 +2742,8 @@ public:
     }
   }
 };
-} // end anonymous namespace
+
+} // namespace swift
 
 static void printBlockID(raw_ostream &OS, SILBasicBlock *bb) {
   SILPrintContext Ctx(OS);
@@ -2783,6 +2778,10 @@ void SingleValueInstruction::dump() const {
 void SILInstruction::print(raw_ostream &OS) const {
   SILPrintContext Ctx(OS);
   SILPrinter(Ctx).print(this);
+}
+
+void NonSingleValueInstruction::dump() const {
+  SILNode::dump();
 }
 
 /// Pretty-print the SILBasicBlock to errs.
@@ -2834,7 +2833,6 @@ static StringRef getLinkageString(SILLinkage linkage) {
   case SILLinkage::Private: return "private ";
   case SILLinkage::PublicExternal: return "public_external ";
   case SILLinkage::HiddenExternal: return "hidden_external ";
-  case SILLinkage::SharedExternal: return "shared_external ";
   }
   llvm_unreachable("bad linkage");
 }
@@ -2890,7 +2888,6 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
 
   switch (isSerialized()) {
   case IsNotSerialized: break;
-  case IsSerializable: OS << "[serializable] "; break;
   case IsSerialized: OS << "[serialized] "; break;
   }
 
@@ -2997,6 +2994,12 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   if (auto *replacedFun = getDynamicallyReplacedFunction()) {
     OS << "[dynamic_replacement_for \"";
     OS << replacedFun->getName();
+    OS << "\"] ";
+  }
+
+  if (auto *usedFunc = getReferencedAdHocRequirementWitnessFunction()) {
+    OS << "[ref_adhoc_requirement_witness \"";
+    OS << usedFunc->getName();
     OS << "\"] ";
   }
 

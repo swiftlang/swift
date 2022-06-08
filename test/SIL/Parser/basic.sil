@@ -1232,7 +1232,7 @@ bb0:
 
 // CHECK-LABEL: sil @test_alloc_stack_flags
 sil @test_alloc_stack_flags : $() -> () {
-  // CHECK: alloc_stack $Builtin.NativeObjec
+  // CHECK: alloc_stack $Builtin.NativeObject
   %instance = alloc_stack $Builtin.NativeObject
   dealloc_stack %instance : $*Builtin.NativeObject
   // CHECK: alloc_stack [dynamic_lifetime]
@@ -1350,13 +1350,6 @@ entry(%x : $Class1, %w : $Builtin.Word):
 
 // CHECK-LABEL: sil [_semantics "foo"] @test_semantics : $@convention(thin) () -> () {
 sil [_semantics "foo"] @test_semantics : $@convention(thin) () -> () {
-bb0:
-  %0 = tuple ()
-  return %0 : $()
-}
-
-// CHECK-LABEL: sil shared_external @test_shared_external_definition : $@convention(thin) () -> () {
-sil shared_external @test_shared_external_definition : $@convention(thin) () -> () {
 bb0:
   %0 = tuple ()
   return %0 : $()

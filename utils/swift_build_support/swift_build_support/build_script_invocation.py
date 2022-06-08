@@ -20,8 +20,6 @@ from build_swift.build_swift.constants import SWIFT_BUILD_ROOT
 from build_swift.build_swift.constants import SWIFT_REPO_NAME
 from build_swift.build_swift.constants import SWIFT_SOURCE_ROOT
 
-import six
-
 from swift_build_support.swift_build_support import products
 from swift_build_support.swift_build_support import shell
 from swift_build_support.swift_build_support import targets
@@ -260,7 +258,10 @@ class BuildScriptInvocation(object):
             (args.build_llbuild, "llbuild"),
             (args.build_libcxx, "libcxx"),
             (args.build_libdispatch, "libdispatch"),
-            (args.build_libicu, "libicu")
+            (args.build_libicu, "libicu"),
+            (args.build_libxml2, 'libxml2'),
+            (args.build_zlib, 'zlib'),
+            (args.build_curl, 'curl')
         ]
         for (should_build, string_name) in conditional_subproject_configs:
             if not should_build and not self.args.infer_dependencies:
@@ -433,6 +434,20 @@ class BuildScriptInvocation(object):
                 "--llvm-install-components=%s" % args.llvm_install_components
             ]
 
+        # On non-Darwin platforms, build lld so we can always have a
+        # linker that is compatible with the swift we are using to
+        # compile the stdlib.
+        #
+        # This makes it easier to build target stdlibs on systems that
+        # have old toolchains without more modern linker features.
+        #
+        # On Darwin, only build lld if explicitly requested using --build-lld.
+        should_build_lld = (platform.system() != 'Darwin' or args.build_lld)
+        if not should_build_lld:
+            impl_args += [
+                "--skip-build-lld"
+            ]
+
         if not args.clean_libdispatch:
             impl_args += [
                 "--skip-clean-libdispatch"
@@ -499,7 +514,7 @@ class BuildScriptInvocation(object):
             try:
                 config = HostSpecificConfiguration(host_target, args)
             except argparse.ArgumentError as e:
-                exit_rejecting_arguments(six.text_type(e))
+                exit_rejecting_arguments(str(e))
 
             # Convert into `build-script-impl` style variables.
             options[host_target] = {
@@ -546,6 +561,15 @@ class BuildScriptInvocation(object):
 
         builder.add_product(products.CMark,
                             is_enabled=self.args.build_cmark)
+
+        builder.add_product(products.LibXML2,
+                            is_enabled=self.args.build_libxml2)
+
+        builder.add_product(products.zlib.Zlib,
+                            is_enabled=self.args.build_zlib)
+
+        builder.add_product(products.curl.LibCurl,
+                            is_enabled=self.args.build_curl)
 
         # Begin a build-script-impl pipeline for handling the compiler toolchain
         # and a subset of the tools that we build. We build these in this manner
@@ -700,7 +724,7 @@ class BuildScriptInvocation(object):
             try:
                 config = HostSpecificConfiguration(host_target.name, self.args)
             except argparse.ArgumentError as e:
-                exit_rejecting_arguments(six.text_type(e))
+                exit_rejecting_arguments(str(e))
             print("Building the standard library for: {}".format(
                 " ".join(config.swift_stdlib_build_targets)))
             if config.swift_test_run_targets and (

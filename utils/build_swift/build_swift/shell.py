@@ -12,8 +12,6 @@ Shell utilities wrapper module.
 """
 
 
-from __future__ import absolute_import, unicode_literals
-
 import abc
 import collections
 import functools
@@ -24,25 +22,10 @@ import shutil
 import subprocess
 import sys
 from copy import copy as _copy
+from pathlib import Path
+from pipes import quote as _quote
 from shlex import split
 from subprocess import CalledProcessError
-
-import six
-from six.moves import map
-
-
-try:
-    # Python 2
-    from pipes import quote as _quote
-except ImportError:
-    from shutil import quote as _quote
-
-
-try:
-    # Python 3.4
-    from pathlib import Path
-except ImportError:
-    Path = None
 
 
 __all__ = [
@@ -111,7 +94,7 @@ def _convert_pathlib_path(path):
         return path
 
     if isinstance(path, Path):
-        return six.text_type(path)
+        return str(path)
 
     return path
 
@@ -150,14 +133,14 @@ def _normalize_args(args):
     CommandWrapper instances into a one-dimensional list of strings.
     """
 
-    if isinstance(args, six.string_types):
+    if isinstance(args, (str,)):
         return shlex.split(args)
 
     def normalize_arg(arg):
         arg = _convert_pathlib_path(arg)
 
-        if isinstance(arg, six.string_types):
-            return [six.text_type(arg)]
+        if isinstance(arg, (str,)):
+            return [str(arg)]
         if isinstance(arg, AbstractWrapper):
             return list(map(_convert_pathlib_path, arg.command))
 
@@ -173,34 +156,6 @@ def _normalize_args(args):
 # -----------------------------------------------------------------------------
 # Decorators
 
-def _backport_devnull(func):
-    """Decorator used to backport the subprocess.DEVNULL functionality from
-    Python 3 to Python 2.
-    """
-
-    # DEVNULL was introduced in Python 3.3
-    if _PY_VERSION >= (3, 3):
-        return func
-
-    @functools.wraps(func)
-    def wrapper(command, **kwargs):
-        stdout = kwargs.get('stdout', sys.stdout)
-        stderr = kwargs.get('stderr', sys.stderr)
-
-        if stdout != DEVNULL and stderr != DEVNULL:
-            return func(command, **kwargs)
-
-        with open(os.devnull, 'w') as devnull:
-            if stdout == DEVNULL:
-                kwargs['stdout'] = devnull
-            if stderr == DEVNULL:
-                kwargs['stderr'] = devnull
-
-            return func(command, **kwargs)
-
-    return wrapper
-
-
 def _normalize_command(func):
     """Decorator used to uniformly normalize the input command of the
     subprocess wrappers.
@@ -208,7 +163,7 @@ def _normalize_command(func):
 
     @functools.wraps(func)
     def wrapper(command, **kwargs):
-        if not isinstance(command, six.string_types):
+        if not isinstance(command, (str,)):
             command = _normalize_args(command)
 
         return func(command, **kwargs)
@@ -237,10 +192,9 @@ def _add_echo_kwarg(func):
 # Public Functions
 
 def quote(command):
-    """Extension of the standard pipes.quote (Python 2) or shutil.quote
-    (Python 3) that handles both strings and lists of strings. This mirrors
-    how the subprocess package can handle commands as both a standalone string
-    or list of strings.
+    """Extension of the standard shutil.quote that handles both strings and
+    lists of strings. This mirrors how the subprocess package can handle
+    commands as both a standalone string or list of strings.
 
     >>> quote('/Applications/App Store.app')
     "'/Applications/App Store.app'"
@@ -249,10 +203,10 @@ def quote(command):
     "rm -rf '~/Documents/My Homework'"
     """
 
-    if isinstance(command, six.string_types):
+    if isinstance(command, (str,)):
         return _quote(command)
 
-    if isinstance(command, collections.Iterable):
+    if isinstance(command, collections.abc.Iterable):
         return ' '.join([_quote(arg) for arg in _normalize_args(command)])
 
     raise ValueError('Invalid command type: {}'.format(type(command).__name__))
@@ -288,7 +242,6 @@ class Popen(subprocess.Popen):
         solution to this problem in the form of their `method_decorator`.
         """
 
-        @_backport_devnull
         @_normalize_command
         @_add_echo_kwarg
         def closure(command, **kwargs):
@@ -305,7 +258,6 @@ class Popen(subprocess.Popen):
             self.wait()
 
 
-@_backport_devnull
 @_normalize_command
 @_add_echo_kwarg
 def call(command, **kwargs):
@@ -316,7 +268,6 @@ def call(command, **kwargs):
     return subprocess.call(command, **kwargs)
 
 
-@_backport_devnull
 @_normalize_command
 @_add_echo_kwarg
 def check_call(command, **kwargs):
@@ -327,7 +278,6 @@ def check_call(command, **kwargs):
     return subprocess.check_call(command, **kwargs)
 
 
-@_backport_devnull
 @_normalize_command
 @_add_echo_kwarg
 def check_output(command, **kwargs):
@@ -337,16 +287,11 @@ def check_output(command, **kwargs):
     Output is returned as a unicode string.
     """
 
-    if six.PY3:
-        kwargs['encoding'] = 'utf-8'
+    kwargs['encoding'] = 'utf-8'
 
     output = subprocess.check_output(command, **kwargs)
 
-    if six.PY3:
-        return output
-
-    # Return unicode string rather than bytes in Python 2.
-    return six.text_type(output, errors='ignore')
+    return output
 
 
 # -----------------------------------------------------------------------------
@@ -484,8 +429,7 @@ def wraps(command):
     return CommandWrapper(command)
 
 
-@six.add_metaclass(abc.ABCMeta)
-class AbstractWrapper(object):
+class AbstractWrapper(object, metaclass=abc.ABCMeta):
     """Abstract base class for implementing wrappers around command line
     utilities and executables. Subclasses must implement the `command` method
     which returns a command list suitable for use with executor instances.
@@ -555,7 +499,7 @@ class ExecutableWrapper(AbstractWrapper):
 
         self.EXECUTABLE = _convert_pathlib_path(self.EXECUTABLE)
 
-        if not isinstance(self.EXECUTABLE, six.string_types):
+        if not isinstance(self.EXECUTABLE, (str,)):
             raise AttributeError(
                 '{}.EXECUTABLE must be an executable name or path'.format(
                     type(self).__name__))

@@ -4,6 +4,9 @@
 // REQUIRES: optimized_stdlib
 // REQUIRES: objc_interop
 
+@_spi(_Unicode)
+import Swift
+
 import StdlibUnittest
 import StdlibUnicodeUnittest
 
@@ -189,6 +192,74 @@ if #available(SwiftStdlib 5.6, *) {
       }
 
       expectEqual(scalar.properties.name, names[scalar])
+    }
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Case Folded
+//===----------------------------------------------------------------------===//
+
+if #available(SwiftStdlib 5.7, *) {
+  UnicodeScalarPropertiesTest.test("Scalar Case Folding") {
+    for i in 0x0 ... 0x10FFFF {
+      guard let scalar = Unicode.Scalar(i) else {
+        continue
+      }
+
+      if let mapping = caseFolding[scalar] {
+        expectEqual(scalar.properties._caseFolded, mapping)
+      } else {
+        expectEqual(scalar.properties._caseFolded, String(scalar))
+      }
+    }
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Script/Script Extensions
+//===----------------------------------------------------------------------===//
+
+if #available(SwiftStdlib 5.7, *) {
+  UnicodeScalarPropertiesTest.test("Scalar Scripts") {
+    for i in 0x0 ... 0x10FFFF {
+      guard let scalar = Unicode.Scalar(i) else {
+        continue
+      }
+
+      let script = unsafeBitCast(
+        scalar.properties._script,
+        to: Unicode.Script.self
+      )
+
+      if let parsedScript = scripts[scalar] {
+        expectEqual(script, parsedScript)
+      } else {
+        expectEqual(script, .unknown)
+      }
+    }
+  }
+
+  UnicodeScalarPropertiesTest.test("Scalar Script Extensions") {
+    for i in 0x0 ... 0x10FFFF {
+      guard let scalar = Unicode.Scalar(i) else {
+        continue
+      }
+
+      let extensions = scalar.properties._scriptExtensions.map {
+        unsafeBitCast($0, to: Unicode.Script.self)
+      }
+
+      let script = unsafeBitCast(
+        scalar.properties._script,
+        to: Unicode.Script.self
+      )
+
+      if let parsedExtensions = scriptExtensions[scalar] {
+        expectEqual(extensions, parsedExtensions)
+      } else {
+        expectEqual(extensions, [script])
+      }
     }
   }
 }

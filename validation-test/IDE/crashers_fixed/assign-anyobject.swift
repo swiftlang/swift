@@ -2,4 +2,4 @@
 var bar: AnyObject
 var foo: AnyObject
 foo = #^A^#
-// CHECK: Decl[GlobalVar]/Local/TypeRelation[Identical]: foo[#AnyObject#];
+// CHECK: Decl[GlobalVar]/Local/TypeRelation[Convertible]: foo[#AnyObject#];

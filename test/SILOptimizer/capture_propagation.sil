@@ -487,8 +487,8 @@ bb0(%0 : $Builtin.Int32, %1 : $Builtin.FPIEEE32, %2 : $Builtin.RawPointer, %3 : 
 
 // CHECK: sil @test_capture_propagation2_caller_on_stack
 // CHECK:  [[F:%.*]] = function_ref @test_capture_propagation2_callee_on_stack : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
-// CHECK:  [[F2:%.*]] = function_ref @$s40test_capture_propagation2_thunk_on_stack4_12353globalinit_33_06E7F1D906492AE070936A9B58CBAE1C_token808_TFtest_b1_C8_closureTf3pi0pd0psbpgpf_n : $@convention(thin) @noescape () -> ()
-// CHECK:  [[CL:%.*]] = thin_to_thick_function [[F2]] : $@convention(thin) @noescape () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK:  [[F2:%.*]] = function_ref @$s40test_capture_propagation2_thunk_on_stack4_12353globalinit_33_06E7F1D906492AE070936A9B58CBAE1C_token808_TFtest_b1_C8_closureTf3pi0pd0psbpgpf_n : $@convention(thin) () -> ()
+// CHECK:  [[CL:%.*]] = thin_to_thick_function [[F2]] : $@convention(thin) () -> () to $@noescape @callee_guaranteed () -> ()
 // CHECK:  apply [[F]]([[CL]]) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
 // CHECK:  return
 

@@ -1,4 +1,4 @@
 module _InternalSwiftScan {
-  header "LibSwiftScan.h"
+  header "DependencyScan.h"
   link "_InternalSwiftScan"
 }

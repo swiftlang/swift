@@ -33,12 +33,13 @@
 #include "string"
 #include "queue" // TODO: remove and replace with usage of our mpsc queue
 #include <atomic>
+#include <new>
 #include <assert.h>
 #if SWIFT_CONCURRENCY_ENABLE_DISPATCH
 #include <dispatch/dispatch.h>
 #endif
 
-#if !defined(_WIN32) && !defined(__wasi__)
+#if !defined(_WIN32) && !defined(__wasi__) && __has_include(<dlfcn.h>)
 #include <dlfcn.h>
 #endif
 
@@ -469,7 +470,7 @@ SWIFT_CC(swift)
 static void swift_taskGroup_initializeImpl(TaskGroup *group, const Metadata *T) {
   SWIFT_TASK_DEBUG_LOG("creating task group = %p", group);
 
-  TaskGroupImpl *impl = new (group) TaskGroupImpl(T);
+  TaskGroupImpl *impl = ::new (group) TaskGroupImpl(T);
   auto record = impl->getTaskRecord();
   assert(impl == record && "the group IS the task record");
 
@@ -622,7 +623,7 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
         _swift_tsan_acquire(static_cast<Job *>(waitingTask));
 
         // TODO: allow the caller to suggest an executor
-        swift_task_enqueueGlobal(waitingTask);
+        waitingTask->flagAsAndEnqueueOnExecutor(ExecutorRef::generic());
         return;
       } // else, try again
     }

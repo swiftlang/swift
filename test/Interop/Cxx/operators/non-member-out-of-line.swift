@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-clangxx -c %S/Inputs/non-member-out-of-line.cpp -I %S/Inputs -o %t/non-member-out-of-line.o
-// RUN: %target-build-swift %s -I %S/Inputs -o %t/non-member-out-of-line %t/non-member-out-of-line.o -Xfrontend -enable-cxx-interop
+// RUN: %target-build-swift %s -I %S/Inputs -o %t/non-member-out-of-line %t/non-member-out-of-line.o -Xfrontend -enable-experimental-cxx-interop
 // RUN: %target-codesign %t/non-member-out-of-line
 // RUN: %target-run %t/non-member-out-of-line
 //

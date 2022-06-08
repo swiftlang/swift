@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck %s -requirement-machine-protocol-signatures=on -debug-generic-signatures 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
 // CHECK-LABEL: same_type_requirements_in_protocol.(file).P1@
 // CHECK-NEXT: Requirement signature: <Self where Self.[P1]X : P3, Self.[P1]X == Self.[P1]Y.[P1]X, Self.[P1]Y : P2>
@@ -20,22 +20,22 @@ public protocol P3 {
 // CHECK-LABEL: same_type_requirements_in_protocol.(file).Q1@
 // CHECK-NEXT: Requirement signature: <Self>
 public protocol Q1 {
-    associatedtype X
-    associatedtype Y
+  associatedtype X
+  associatedtype Y
 }
 
 // CHECK-LABEL: same_type_requirements_in_protocol.(file).Q2@
 // CHECK-NEXT: Requirement signature: <Self where Self == Self.[Q2]Z.[Q3]B, Self.[Q2]Z : Q3>
 public protocol Q2 {
-    associatedtype Y
-    associatedtype Z: Q3 where Z.B == Self
+  associatedtype Y
+  associatedtype Z: Q3 where Z.B == Self
 }
 
 // CHECK-LABEL: same_type_requirements_in_protocol.(file).Q3@
 // CHECK-NEXT: Requirement signature: <Self where Self.[Q3]A : Q2, Self.[Q3]B : Q1, Self.[Q3]A.[Q1]Y == Self.[Q3]B.[Q1]Y>
 public protocol Q3 {
-    associatedtype A: Q2
-    associatedtype B: Q1 where A.Y == B.Y
+  associatedtype A: Q2
+  associatedtype B: Q1 where A.Y == B.Y
 }
 
 // CHECK-LABEL: same_type_requirements_in_protocol.(file).R1@

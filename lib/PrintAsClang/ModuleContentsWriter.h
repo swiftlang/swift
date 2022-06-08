@@ -24,6 +24,7 @@ namespace clang {
 
 namespace swift {
 class ModuleDecl;
+class SwiftToClangInteropContext;
 
 using ImportModuleTy = PointerUnion<ModuleDecl*, const clang::Module*>;
 
@@ -31,13 +32,15 @@ using ImportModuleTy = PointerUnion<ModuleDecl*, const clang::Module*>;
 /// \p imports along the way.
 void printModuleContentsAsObjC(raw_ostream &os,
                                llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
-                               ModuleDecl &M);
+                               ModuleDecl &M,
+                               SwiftToClangInteropContext &interopContext);
 
 /// Prints the declarations of \p M to \p os in C++ language mode and collects
 /// imports in \p imports along the way.
 void printModuleContentsAsCxx(raw_ostream &os,
                               llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
-                              ModuleDecl &M);
+                              ModuleDecl &M,
+                              SwiftToClangInteropContext &interopContext);
 
 } // end namespace swift
 

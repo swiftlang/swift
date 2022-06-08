@@ -10,16 +10,20 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Basic
 import SILBridging
 
-final public class GlobalVariable : CustomStringConvertible, HasName {
-  public var name: String {
-    return SILGlobalVariable_getName(bridged).string
+final public class GlobalVariable : CustomStringConvertible, HasShortDescription {
+  public var name: StringRef {
+    return StringRef(bridged: SILGlobalVariable_getName(bridged))
   }
 
   public var description: String {
-    return SILGlobalVariable_debugDescription(bridged).takeString()
+    var s = SILGlobalVariable_debugDescription(bridged)
+    return String(cString: s.c_str())
   }
+
+  public var shortDescription: String { name.string }
 
   // TODO: initializer instructions
 

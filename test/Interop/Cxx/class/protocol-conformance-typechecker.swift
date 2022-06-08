@@ -1,6 +1,6 @@
 // Tests that a C++ class can conform to a Swift protocol.
 
-// RUN: %target-typecheck-verify-swift -I %S/Inputs -enable-cxx-interop
+// RUN: %target-typecheck-verify-swift -I %S/Inputs -enable-experimental-cxx-interop
 
 import ProtocolConformance
 

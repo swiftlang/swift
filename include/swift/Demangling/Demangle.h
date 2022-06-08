@@ -19,6 +19,7 @@
 #ifndef SWIFT_DEMANGLING_DEMANGLE_H
 #define SWIFT_DEMANGLING_DEMANGLE_H
 
+#include "swift/Demangling/Errors.h"
 #include "swift/Demangling/NamespaceMacros.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Compiler.h"
@@ -90,6 +91,7 @@ struct DemangleOptions {
     Opt.ShortenArchetype = true;
     Opt.ShowPrivateDiscriminators = false;
     Opt.ShowFunctionArgumentTypes = false;
+    Opt.ShowAsyncResumePartial = false;
     return Opt;
   };
 };

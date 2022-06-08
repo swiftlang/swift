@@ -211,6 +211,8 @@ ERROR(return_from_init_without_initing_stored_properties,none,
       "return from initializer without initializing all"
       " stored properties", ())
 
+ERROR(explicit_store_of_compilerinitialized,none,
+      "illegal assignment to '@_compilerInitialized' storage", ())
 ERROR(variable_function_use_uninit,none,
       "%select{variable|constant}1 '%0' used by function definition before"
       " being initialized",
@@ -320,7 +322,7 @@ ERROR(performance_objectivec,none,
 ERROR(performance_unknown_callees,none,
       "called function is not known at compile time and can have unpredictable performance", ())
 ERROR(performance_callee_unavailable,none,
-      "called function is not availbale in this module and can have unpredictable performance", ())
+      "called function is not available in this module and can have unpredictable performance", ())
 NOTE(performance_called_from,none,
       "called from here", ())
 

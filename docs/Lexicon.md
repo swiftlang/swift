@@ -239,7 +239,7 @@ Describes contributions which fix code that is not executed
 Provides context for interpreting a type that may have generic parameters
 in it. Generic parameter types are normally just represented as "first
 generic parameter in the outermost context" (or similar), so it's up to the
-generic environment to note that that type must be a Collection. (Another
+generic environment to note that type must be a Collection. (Another
 way of looking at it is that the generic environment connects
 [interface types](#interface-type) with
 [contextual types](#contextual-type)).
@@ -593,6 +593,16 @@ language syntax or a typealias. (For example, `Int?` is the sugared form
 of `Optional<Int>`.) Sugared types preserve information about the form
 and use of the type even though the behavior usually does not change
 (except for things like access control). Contrast with [canonical type](#canonical-type).
+
+## TBD
+
+Text-based dynamic library files (TBDs) are a textual representation of
+the information in a dynamic library / shared library that is required
+by the static linker.
+
+Apple’s SDKs originally used Mach-O Dynamic Library Stubs. Mach-O Dynamic
+Library Stubs are dynamic library files, but with all the text and data
+stripped out.
 
 ## thunk
 

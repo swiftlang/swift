@@ -36,6 +36,10 @@ ERROR(error_unsupported_target_os, none,
 ERROR(error_unsupported_target_arch, none,
       "unsupported target architecture: '%0'", (StringRef))
 
+ERROR(error_experimental_feature_not_available, none,
+      "experimental feature '%0' cannot be enabled in a production compiler",
+      (StringRef))
+
 ERROR(error_unknown_library_level, none,
       "unknown library level '%0', "
       "expected one of 'api', 'spi' or 'other'", (StringRef))
@@ -118,9 +122,7 @@ ERROR(error_mode_cannot_emit_dependencies,none,
 ERROR(error_mode_cannot_emit_reference_dependencies,none,
       "this mode does not support emitting reference dependency files", ())
 ERROR(error_mode_cannot_emit_header,none,
-      "this mode does not support emitting Objective-C headers", ())
-ERROR(error_mode_cannot_emit_cxx_header,none,
-      "this mode does not support emitting C++ headers", ())
+      "this mode does not support emitting Objective-C or C++ headers", ())
 ERROR(error_mode_cannot_emit_loaded_module_trace,none,
       "this mode does not support emitting the loaded module trace", ())
 ERROR(error_mode_cannot_emit_module,none,
@@ -151,8 +153,8 @@ WARNING(emit_reference_dependencies_without_primary_file,none,
 
 WARNING(warn_implicit_concurrency_import_failed,none,
         "unable to perform implicit import of \"_Concurrency\" module: no such module found", ())
-WARNING(warn_implicit_string_processing_import_failed,none,
-        "unable to perform implicit import of \"_StringProcessing\" module: no such module found", ())
+REMARK(warn_implicit_string_processing_import_failed,none,
+       "unable to perform implicit import of \"_StringProcessing\" module: no such module found", ())
 
 ERROR(error_module_name_required,none, "-module-name is required", ())
 ERROR(error_bad_module_name,none,
@@ -302,7 +304,7 @@ ERROR(batch_scan_input_file_corrupted,none,
       (StringRef))
 
 ERROR(unknown_platform_name, none,
-      "unkown platform name %0", (StringRef))
+      "unknown platform name %0", (StringRef))
 
 ERROR(unknown_swift_module_name, none,
       "cannot find Swift module with name %0", (StringRef))
@@ -340,12 +342,9 @@ WARNING(framework_search_path_includes_framework_extension,none,
 ERROR(error_optimization_remark_pattern, none, "%0 in '%1'",
       (StringRef, StringRef))
 
-ERROR(error_invalid_debug_prefix_map, none,
-      "values for '-debug-prefix-map' must be in the format 'original=remapped'"
-      ", but '%0' was provided", (StringRef))
-ERROR(error_invalid_coverage_prefix_map, none,
-      "values for '-coverage-prefix-map' must be in the format "
-      "'original=remapped', but '%0' was provided", (StringRef))
+ERROR(error_opt_invalid_mapping, none,
+      "values for '%0' must be in the format 'original=remapped', but '%1' was "
+      "provided", (StringRef, StringRef))
 
 ERROR(invalid_vfs_overlay_file,none,
       "invalid virtual overlay file '%0'", (StringRef))
@@ -419,6 +418,8 @@ ERROR(error_nonexistent_output_dir,none,
 
 REMARK(interface_file_backup_used,none,
       "building module from '%0' failed; retrying building module from '%1'", (StringRef, StringRef))
+
+WARNING(warn_flag_deprecated,none, "flag '%0' is deprecated", (StringRef))
 
 // Dependency Verifier Diagnostics
 ERROR(missing_member_dependency,none,

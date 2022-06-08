@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -I %S/Inputs -o %t/class_layout -Xfrontend -enable-cxx-interop
+// RUN: %target-build-swift %s -I %S/Inputs -o %t/class_layout -Xfrontend -enable-experimental-cxx-interop
 // RUN: %target-codesign %t/class_layout
 // RUN: %target-run %t/class_layout 2&>1
 //

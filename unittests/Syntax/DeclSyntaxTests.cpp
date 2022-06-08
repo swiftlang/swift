@@ -633,3 +633,44 @@ TEST(DeclSyntaxTests, FunctionDeclWithAPIs) {
 TEST(DeclSyntaxTests, FunctionDeclBuilderAPIs) {
 
 }
+
+#pragma mark - parameterized protocol-decl
+
+TEST(DeclSyntaxTests, ProtocolMakeAPIs) {
+  RC<SyntaxArena> Arena = SyntaxArena::make();
+  SyntaxFactory Factory(Arena);
+  {
+    SmallString<1> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    Factory.makeBlankProtocolDecl().print(OS);
+    ASSERT_EQ(OS.str().str(), "");
+  }
+  {
+    SmallString<64> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    auto Protocol = Factory.makeProtocolKeyword("", " ");
+    auto MyCollection = Factory.makeIdentifier("MyCollection", "", "");
+    auto ElementName = Factory.makeIdentifier("Element", "", "");
+    auto ElementParam =
+        Factory.makePrimaryAssociatedType(None, ElementName, None, None, None, None);
+    auto LeftAngle = Factory.makeLeftAngleToken("", "");
+    auto RightAngle = Factory.makeRightAngleToken("", " ");
+    auto PrimaryAssocs = PrimaryAssociatedTypeClauseSyntaxBuilder(Arena)
+                             .useLeftAngleBracket(LeftAngle)
+                             .useRightAngleBracket(RightAngle)
+                             .addPrimaryAssociatedType(ElementParam)
+                             .build();
+
+    auto LeftBrace = Factory.makeLeftBraceToken("", "");
+    auto RightBrace = Factory.makeRightBraceToken("", "");
+    auto Members = MemberDeclBlockSyntaxBuilder(Arena)
+                      .useLeftBrace(LeftBrace)
+                      .useRightBrace(RightBrace)
+                      .build();
+    Factory
+        .makeProtocolDecl(None, None, Protocol, MyCollection, PrimaryAssocs, None, None, Members)
+        .print(OS);
+    ASSERT_EQ(OS.str().str(),
+              "protocol MyCollection<Element> {}");
+  }
+}

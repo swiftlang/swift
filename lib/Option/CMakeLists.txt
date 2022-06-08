@@ -6,16 +6,20 @@ add_dependencies(swiftOption
 target_link_libraries(swiftOption PRIVATE
   swiftBasic)
 
-set(features_file_src "${CMAKE_CURRENT_SOURCE_DIR}/features.json")
+set(features_merger "${SWIFT_SOURCE_DIR}/utils/merge-features.py")
+set(features_file_swift_src "${CMAKE_CURRENT_SOURCE_DIR}/features.json")
+set(features_file_clang_src "${LLVM_MAIN_SRC_DIR}/../clang/tools/driver/features.json")
 set(features_file_dest "${CMAKE_BINARY_DIR}/share/swift/features.json")
 
 add_custom_command(
   OUTPUT
     ${features_file_dest}
   COMMAND
-    ${CMAKE_COMMAND} -E copy ${features_file_src} ${features_file_dest}
+    $<TARGET_FILE:Python3::Interpreter> ${features_merger} -f ${features_file_swift_src} -p \"\" -f ${features_file_clang_src} -p clang- > ${features_file_dest}
   DEPENDS
-    ${features_file_src}
+    ${features_merger}
+    ${features_file_swift_src}
+    ${features_file_clang_src}
 )
 
 add_custom_target(swift-features-file DEPENDS ${features_file_dest})

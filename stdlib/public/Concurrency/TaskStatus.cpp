@@ -57,7 +57,7 @@ namespace {
 /// record and clears the lock bit, then notifies the lock record that
 /// the locking operation is complete.
 ///
-/// When a task wants to change its active status record, but
+/// When a task wants to iterate task status records, but
 /// it sees that the locked bit is set in the `Status` field, it
 /// must acquire the global status-record lock, find this record
 /// (which should be the innermost record), and wait for an unlock.
@@ -83,7 +83,7 @@ public:
 /// Wait for a task's status record lock to be unlocked.
 ///
 /// When this function returns, `oldStatus` will have been updated
-/// to the last value read and `isLocked()` will be false.
+/// to the last value read and `isStatusRecordLocked()` will be false.
 /// Of course, another thread may still be concurrently trying
 /// to acquire the record lock.
 static void waitForStatusRecordUnlock(AsyncTask *task,
@@ -92,12 +92,12 @@ static void waitForStatusRecordUnlock(AsyncTask *task,
   StatusRecordLockRecord::Waiter waiter(StatusRecordLockLock);
 
   while (true) {
-    assert(oldStatus.isLocked());
+    assert(oldStatus.isStatusRecordLocked());
 
     bool waited = waiter.tryReloadAndWait([&]() -> StatusRecordLockRecord* {
       // Check that oldStatus is still correct.
-      oldStatus = task->_private().Status.load(std::memory_order_acquire);
-      if (!oldStatus.isLocked())
+      oldStatus = task->_private()._status().load(std::memory_order_acquire);
+      if (!oldStatus.isStatusRecordLocked())
         return nullptr;
 
       // The innermost entry should be a record lock record; wait
@@ -109,8 +109,8 @@ static void waitForStatusRecordUnlock(AsyncTask *task,
       return;
 
     // Reload the status before trying to relock.
-    oldStatus = task->_private().Status.load(std::memory_order_acquire);
-    if (!oldStatus.isLocked())
+    oldStatus = task->_private()._status().load(std::memory_order_acquire);
+    if (!oldStatus.isStatusRecordLocked())
       return;
   }
 }
@@ -118,10 +118,6 @@ static void waitForStatusRecordUnlock(AsyncTask *task,
 enum class LockContext {
   /// The lock is being acquired from within the running task.
   OnTask,
-
-  /// The lock is being acquired asynchronously in order to cancel the
-  /// task.
-  Cancellation,
 
   /// The lock is being acquired asynchronously in order to read the
   /// status records for some other reason.
@@ -140,13 +136,6 @@ static std::memory_order getLoadOrdering(LockContext lockContext) {
 /// (ignoring the `TaskStatusLockRecord`) before calling the function,
 /// and the value there will be written back into the task status after
 /// calling the function.
-///
-/// As a special case, if `lockContext` is `Cancellation` and the task
-/// is either already cancelled or can be cancelled without acquiring
-/// the lock, then cancellation is performed, the lock is not taken,
-/// and the function is not called.  `withStatusRecordLock` will return
-/// false in this case, and `status` will still contain the updated
-/// status value, for which `isCancelled()` will be true.
 template <class Fn>
 static bool withStatusRecordLock(AsyncTask *task,
                                  LockContext lockContext,
@@ -155,86 +144,56 @@ static bool withStatusRecordLock(AsyncTask *task,
   StatusRecordLockRecord::Worker worker(StatusRecordLockLock);
 
   auto loadOrdering = getLoadOrdering(lockContext);
-  bool forCancellation = lockContext == LockContext::Cancellation;
 
-  // Load the current state.  We can use relaxed loads if this isn't
-  // for cancellation because (1) this operation should be synchronous
-  // with the task, so the only thing that can modify it asynchronously
-  // is a cancelling thread, and (2) we'll reload with acquire ordering
-  // if a cancelling thread forces us to wait for an unlock.
+  TaskStatusRecord *oldRecord;
+  StatusRecordLockRecord *lockingRecord;
 
+  // Take the lock record
   while (true) {
-    // Cancellation should be idempotent: if the task has already
-    // been cancelled (or is being cancelled concurrently), there
-    // shouldn't be any need to do this work again.
-    if (status.isCancelled() && forCancellation)
-      return false;
-
     // If the old info says we're locked, wait for the lock to clear.
-    if (status.isLocked()) {
-      waitForStatusRecordUnlock(task, status);
-      continue;
-    }
-
-    // If we're cancelling and the task has no active status records,
-    // try to just set the cancelled bit and return.
-    auto oldRecord = status.getInnermostRecord();
-    if (!oldRecord && forCancellation) {
-      ActiveTaskStatus newStatus = status.withCancelled();
-      if (task->_private().Status.compare_exchange_weak(status, newStatus,
-            /*success*/ std::memory_order_relaxed,
-            /*failure*/ loadOrdering)) {
-        newStatus.traceStatusChanged(task);
-        status = newStatus;
-        return false;
-      }
-
-      // If that failed, just restart.
+    if (status.isStatusRecordLocked()) {
+      waitForStatusRecordUnlock(task, status); // Will update status
       continue;
     }
 
     // Make (or reconfigure) a lock record.
-    auto recordLockRecord = worker.createQueue(oldRecord);
+    oldRecord = status.getInnermostRecord();
+    lockingRecord = worker.createQueue(oldRecord);
 
     // Install the lock record as the top of the queue.
-    ActiveTaskStatus newStatus =
-      status.withLockingRecord(recordLockRecord);
-    if (forCancellation)
-      newStatus = newStatus.withCancelled();
-    if (task->_private().Status.compare_exchange_weak(status, newStatus,
-           /*success*/ std::memory_order_release,
-           /*failure*/ loadOrdering)) {
-      newStatus.traceStatusChanged(task);
+    ActiveTaskStatus newStatus = status.withLockingRecord(lockingRecord);
+    if (task->_private()._status().compare_exchange_weak(status, newStatus,
+            /*success*/ std::memory_order_release,
+            /*failure*/ loadOrdering)) {
+      status = newStatus;
 
-      // Update `status` for the purposes of the callback function.
-      // Note that we don't include the record lock, but do need to
-      // set the cancelled bit.
-      if (forCancellation)
-        status = status.withCancelled();
-
-      worker.flagQueueIsPublished(recordLockRecord);
+      status.traceStatusChanged(task);
+      worker.flagQueueIsPublished(lockingRecord);
       break;
     }
   }
 
+  // We've locked the status
   assert(worker.isWorkerThread());
 
   // Call the function.
   std::forward<Fn>(fn)();
 
-  // We can just unconditionally store because nobody can be modifying
-  // the state while we've locked it.
+  // Release lock record, restore the old record at the top
   //
-  // As a general matter, the task won't synchronize with anything we've
-  // done here through the task status; it may not even realize we ever
-  // acquired the lock.  If we need to change the state in a way that the
-  // task will see, we need to do so in some other way, probably via
-  // atomic objects in the task status records.  Because of this, we can
-  // actually unpublish the lock with a relaxed store.
-  assert(!status.isLocked());
-  status.traceStatusChanged(task);
-  task->_private().Status.store(status,
-                                /*success*/ std::memory_order_relaxed);
+  // We may need to reload the status since other flags could have changed on it
+  // while it is locked - namely cancelled bit, max priority, isEscalated.
+  while (true) {
+    assert(status.isStatusRecordLocked());
+    auto newStatus = status.withoutLockingRecord();
+
+    if (task->_private()._status().compare_exchange_weak(status, newStatus,
+            /*success*/ std::memory_order_relaxed,
+            /*failure*/ std::memory_order_relaxed)) {
+      status.traceStatusChanged(task);
+      break;
+    }
+  }
 
   // Unblock any waiters.
   worker.finishAndUnpublishQueue([]{});
@@ -249,7 +208,7 @@ static bool withStatusRecordLock(AsyncTask *task,
                                  LockContext lockContext,
                                  Fn &&fn) {
   ActiveTaskStatus status =
-    task->_private().Status.load(getLoadOrdering(lockContext));
+    task->_private()._status().load(getLoadOrdering(lockContext));
   return withStatusRecordLock(task, lockContext, status, [&] {
     fn(status);
   });
@@ -267,11 +226,11 @@ bool swift::addStatusRecord(
   auto task = swift_task_getCurrent();
   // Load the current state. We can use a relaxed load because we're
   // synchronous with the task.
-  auto oldStatus = task->_private().Status.load(std::memory_order_relaxed);
+  auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
 
   while (true) {
     // Wait for any active lock to be released.
-    if (oldStatus.isLocked())
+    if (oldStatus.isStatusRecordLocked())
       waitForStatusRecordUnlock(task, oldStatus);
 
     // Reset the parent of the new record.
@@ -282,9 +241,9 @@ bool swift::addStatusRecord(
 
     if (shouldAddRecord(newStatus)) {
       // We have to use a release on success to make the initialization of
-      // the new record visible to the cancelling thread.
-      if (task->_private().Status.compare_exchange_weak(
-              oldStatus, newStatus,
+      // the new record visible to an asynchronous thread trying to modify the
+      // status records
+      if (task->_private()._status().compare_exchange_weak(oldStatus, newStatus,
               /*success*/ std::memory_order_release,
               /*failure*/ std::memory_order_relaxed)) {
         return true;
@@ -304,12 +263,12 @@ bool swift::removeStatusRecord(TaskStatusRecord *record) {
                        record, task);
 
   // Load the current state.
-  auto &status = task->_private().Status;
+  auto &status = task->_private()._status();
   auto oldStatus = status.load(std::memory_order_relaxed);
 
   while (true) {
     // Wait for any active lock to be released.
-    if (oldStatus.isLocked())
+    if (oldStatus.isStatusRecordLocked())
       waitForStatusRecordUnlock(task, oldStatus);
 
     // If the record is the innermost record, try to just pop it off.
@@ -317,7 +276,7 @@ bool swift::removeStatusRecord(TaskStatusRecord *record) {
       ActiveTaskStatus newStatus =
         oldStatus.withInnermostRecord(record->getParent());
       if (status.compare_exchange_weak(oldStatus, newStatus,
-             /*success*/ std::memory_order_release,
+             /*success*/ std::memory_order_relaxed,
              /*failure*/ std::memory_order_relaxed)) {
         return !oldStatus.isCancelled();
       }
@@ -399,7 +358,7 @@ void swift::updateNewChildWithParentAndGroupState(AsyncTask *child,
   // cannot be accessed by anyone else since it hasn't been linked in yet.
   // Avoids the extra logic in `swift_task_cancel` and `swift_task_escalate`
   auto oldChildTaskStatus =
-      child->_private().Status.load(std::memory_order_relaxed);
+      child->_private()._status().load(std::memory_order_relaxed);
   assert(oldChildTaskStatus.getInnermostRecord() == NULL);
 
   auto newChildTaskStatus = oldChildTaskStatus;
@@ -408,14 +367,12 @@ void swift::updateNewChildWithParentAndGroupState(AsyncTask *child,
     newChildTaskStatus = newChildTaskStatus.withCancelled();
   }
 
-  // Propagate max priority of parent to child task's active status and the Job
-  // header
+  // Propagate max priority of parent to child task's active status
   JobPriority pri = parentStatus.getStoredPriority();
   newChildTaskStatus =
       newChildTaskStatus.withNewPriority(withUserInteractivePriorityDowngrade(pri));
-  child->Flags.setPriority(pri);
 
-  child->_private().Status.store(newChildTaskStatus, std::memory_order_relaxed);
+  child->_private()._status().store(newChildTaskStatus, std::memory_order_relaxed);
 }
 
 SWIFT_CC(swift)
@@ -494,16 +451,31 @@ SWIFT_CC(swift)
 static void swift_task_cancelImpl(AsyncTask *task) {
   SWIFT_TASK_DEBUG_LOG("cancel task = %p", task);
 
-  // withStatusRecordLock has some special behavior for
-  // LockContext::Cancellation; the function only gets called
-  // when they don't apply.
-  withStatusRecordLock(task, LockContext::Cancellation,
-                       [&](ActiveTaskStatus &status) {
-    assert(status.isCancelled());
+  auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
+  auto newStatus = oldStatus;
+  while (true) {
+    if (oldStatus.isCancelled()) {
+      return;
+    }
 
-    // Carry out the cancellation operations associated with all
-    // the active records.
-    for (auto cur: status.records()) {
+    // Set cancelled bit even if oldStatus.isStatusRecordLocked()
+    newStatus = oldStatus.withCancelled();
+
+    if (task->_private()._status().compare_exchange_weak(oldStatus, newStatus,
+            /*success*/ std::memory_order_relaxed,
+            /*failure*/ std::memory_order_relaxed)) {
+      break;
+    }
+  }
+
+  newStatus.traceStatusChanged(task);
+  if (newStatus.getInnermostRecord() == NULL) {
+     // No records, nothing to propagate
+     return;
+  }
+
+  withStatusRecordLock(task, LockContext::OtherAsynchronous, newStatus, [&] {
+    for (auto cur : newStatus.records()) {
       performCancellationAction(cur);
     }
   });
@@ -576,58 +548,77 @@ static void performEscalationAction(TaskStatusRecord *record,
 SWIFT_CC(swift)
 JobPriority
 static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
-  // Fast path: check that the stored priority is already at least
-  // as high as the desired priority.
-  auto status = task->_private().Status.load(std::memory_order_relaxed);
-  if (status.getStoredPriority() >= newPriority)
-    return status.getStoredPriority();
 
-  withStatusRecordLock(task, LockContext::OtherAsynchronous, status, [&] {
-    // Now that we have the task's status lock, check again that the
-    // priority is still too low.
-    if (status.getStoredPriority() >= newPriority)
-      return;
-    status = status.withEscalatedPriority(newPriority);
+  SWIFT_TASK_DEBUG_LOG("Escalating %p to %#zx priority", task, newPriority);
+  auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
+  auto newStatus = oldStatus;
 
-    // TODO: attempt to escalate the thread running the task, if it's
-    // currently running.  This probably requires the task to be enqueued
-    // on a standard executor.
+  while (true) {
+    // Fast path: check that the stored priority is already at least
+    // as high as the desired priority.
+    if (oldStatus.getStoredPriority() >= newPriority) {
+      SWIFT_TASK_DEBUG_LOG("Task is already at %#zx priority", oldStatus.getStoredPriority());
+      return oldStatus.getStoredPriority();
+    }
 
+    // Regardless of whether status record is locked or not, update the priority
+    // and RO bit on the task status
+    if (oldStatus.isRunning() || oldStatus.isEnqueued()) {
+      newStatus = oldStatus.withEscalatedPriority(newPriority);
+    } else {
+      newStatus = oldStatus.withNewPriority(newPriority);
+    }
+
+    if (task->_private()._status().compare_exchange_weak(oldStatus, newStatus,
+            /* success */ std::memory_order_relaxed,
+            /* failure */ std::memory_order_relaxed)) {
+      break;
+    }
+  }
+
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+  if (newStatus.isRunning()) {
+    // The task is running, escalate the thread that is running it.
+    ActiveTaskStatus *taskStatus;
+    dispatch_lock_t *executionLock;
+
+    taskStatus = (ActiveTaskStatus *) &task->_private()._status();
+    executionLock = (dispatch_lock_t *) ((char*)taskStatus + ActiveTaskStatus::executionLockOffset());
+
+    SWIFT_TASK_DEBUG_LOG("[Override] Escalating %p which is running on %#x to %#x", task, newStatus.currentExecutionLockOwner(), newPriority);
+    swift_dispatch_lock_override_start_with_debounce(executionLock, newStatus.currentExecutionLockOwner(), (qos_class_t) newPriority);
+  } else if (newStatus.isEnqueued()) {
+    //  Task is not running, it's enqueued somewhere waiting to be run
+    //
+    // TODO (rokhinip): Add a stealer to escalate the thread request for
+    // the task. Still mark the task has having been escalated so that the
+    // thread will self override when it starts draining the task
+    //
+    // TODO (rokhinip): Add a signpost to flag that this is a potential
+    // priority inversion
+    SWIFT_TASK_DEBUG_LOG("[Override] Escalating %p which is enqueued", task);
+  } else {
+    SWIFT_TASK_DEBUG_LOG("[Override] Escalating %p which is suspended to %#x", task, newPriority);
+  }
+#endif
+
+  if (newStatus.getInnermostRecord() == NULL) {
+    return newStatus.getStoredPriority();
+  }
+
+  withStatusRecordLock(task, LockContext::OnTask, newStatus, [&] {
     // Perform escalation operations for all the status records.
-    for (auto cur: status.records()) {
+    for (auto cur: newStatus.records()) {
       performEscalationAction(cur, newPriority);
     }
   });
+  // TODO (rokhinip): If the task is awaiting on another task that is not a
+  // child task, we need to escalate whoever we are already awaiting on
+  //
+  // rdar://88093007 (Task escalation does not propagate to a future that it is
+  // waiting on)
 
-  return status.getStoredPriority();
-}
-
-void AsyncTask::flagAsRunning_slow() {
-  withStatusRecordLock(this, LockContext::OnTask,
-                       [&](ActiveTaskStatus &status) {
-    assert(!status.isRunning());
-
-    status = status.withRunning(true);
-    if (status.isStoredPriorityEscalated()) {
-      status = status.withoutStoredPriorityEscalation();
-      Flags.setPriority(status.getStoredPriority());
-      concurrency::trace::task_flags_changed(this, Flags.getOpaqueValue());
-    }
-  });
-}
-
-void AsyncTask::flagAsSuspended_slow() {
-  withStatusRecordLock(this, LockContext::OnTask,
-                       [&](ActiveTaskStatus &status) {
-    assert(status.isRunning());
-
-    status = status.withRunning(false);
-    if (status.isStoredPriorityEscalated()) {
-      status = status.withoutStoredPriorityEscalation();
-      Flags.setPriority(status.getStoredPriority());
-      concurrency::trace::task_flags_changed(this, Flags.getOpaqueValue());
-    }
-  });
+  return newStatus.getStoredPriority();
 }
 
 /**************************************************************************/
@@ -640,7 +631,7 @@ static NearestTaskDeadline swift_task_getNearestDeadlineImpl(AsyncTask *task) {
   // ignoring the possibility of a concurrent cancelling task.
 
   // Load the current state.
-  auto &status = task->_private().Status;
+  auto &status = task->_private()._status();
   auto oldStatus = status.load(std::memory_order_relaxed);
 
   NearestTaskDeadline result;
@@ -653,9 +644,9 @@ static NearestTaskDeadline swift_task_getNearestDeadlineImpl(AsyncTask *task) {
 
   // If it's locked, wait for the lock; we can't safely step through
   // the RecordLockStatusRecord on a different thread.
-  if (oldStatus.isLocked()) {
+  if (oldStatus.isStatusRecordLocked()) {
     waitForStatusRecordUnlock(task, oldStatus);
-    assert(!oldStatus.isLocked());
+    assert(!oldStatus.isStatusRecordLocked());
   }
 
   // Walk all the records looking for deadlines.

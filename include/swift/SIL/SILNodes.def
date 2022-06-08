@@ -355,7 +355,7 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                       LiteralInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(FloatLiteralInst, float_literal,
                       LiteralInst, None, DoesNotRelease)
-    SINGLE_VALUE_INST(StringLiteralInst, string_literal,
+    BRIDGED_SINGLE_VALUE_INST(StringLiteralInst, string_literal,
                       LiteralInst, None, DoesNotRelease)
     SINGLE_VALUE_INST_RANGE(LiteralInst, FunctionRefInst, StringLiteralInst)
 
@@ -405,15 +405,11 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                       ConversionInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(ConvertEscapeToNoEscapeInst, convert_escape_to_noescape,
                       ConversionInst, None, DoesNotRelease)
-    SINGLE_VALUE_INST(ThinFunctionToPointerInst, thin_function_to_pointer,
-                      ConversionInst, None, DoesNotRelease)
-    SINGLE_VALUE_INST(PointerToThinFunctionInst, pointer_to_thin_function,
-                      ConversionInst, None, DoesNotRelease)
-    SINGLE_VALUE_INST(RefToBridgeObjectInst, ref_to_bridge_object,
+    BRIDGED_SINGLE_VALUE_INST(RefToBridgeObjectInst, ref_to_bridge_object,
                       ConversionInst, None, DoesNotRelease)
     BRIDGED_SINGLE_VALUE_INST(BridgeObjectToRefInst, bridge_object_to_ref,
-                              ConversionInst, None, DoesNotRelease)
-    SINGLE_VALUE_INST(BridgeObjectToWordInst, bridge_object_to_word,
+                      ConversionInst, None, DoesNotRelease)
+    BRIDGED_SINGLE_VALUE_INST(BridgeObjectToWordInst, bridge_object_to_word,
                       ConversionInst, None, DoesNotRelease)
     BRIDGED_SINGLE_VALUE_INST(ThinToThickFunctionInst, thin_to_thick_function,
                       ConversionInst, None, DoesNotRelease)
@@ -425,10 +421,6 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                       ConversionInst, None, DoesNotRelease)
     BRIDGED_SINGLE_VALUE_INST(ObjCExistentialMetatypeToObjectInst, objc_existential_metatype_to_object,
                       ConversionInst, None, DoesNotRelease)
-    // unconditional_checked_cast_value reads the source value and produces
-    // a new value with a potentially different representation.
-    DYNAMICCAST_SINGLE_VALUE_INST(UnconditionalCheckedCastValueInst, unconditional_checked_cast_value,
-                      ConversionInst, MayRead, MayRelease)
     // unconditional_checked_cast_inst is only MayRead to prevent a subsequent
     // release of the cast's source from being hoisted above the cast:
     // retain X
@@ -516,12 +508,12 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   BRIDGED_SINGLE_VALUE_INST(BeginAccessInst, begin_access,
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
-  SINGLE_VALUE_INST(Load##Name##Inst, load_##name, \
+  BRIDGED_SINGLE_VALUE_INST(Load##Name##Inst, load_##name, \
                     SingleValueInstruction, MayRead, DoesNotRelease)
 #include "swift/AST/ReferenceStorage.def"
   SINGLE_VALUE_INST(MarkUninitializedInst, mark_uninitialized,
                     SingleValueInstruction, None, DoesNotRelease)
-  SINGLE_VALUE_INST(ProjectBoxInst, project_box,
+  BRIDGED_SINGLE_VALUE_INST(ProjectBoxInst, project_box,
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(ProjectExistentialBoxInst, project_existential_box,
                     SingleValueInstruction, None, DoesNotRelease)
@@ -569,9 +561,9 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                     SingleValueInstruction, None, DoesNotRelease)
   BRIDGED_SINGLE_VALUE_INST(UncheckedEnumDataInst, unchecked_enum_data,
                     SingleValueInstruction, None, DoesNotRelease)
-  SINGLE_VALUE_INST(InitEnumDataAddrInst, init_enum_data_addr,
+  BRIDGED_SINGLE_VALUE_INST(InitEnumDataAddrInst, init_enum_data_addr,
                     SingleValueInstruction, None, DoesNotRelease)
-  SINGLE_VALUE_INST(UncheckedTakeEnumDataAddrInst, unchecked_take_enum_data_addr,
+  BRIDGED_SINGLE_VALUE_INST(UncheckedTakeEnumDataAddrInst, unchecked_take_enum_data_addr,
                     SingleValueInstruction, MayWrite, DoesNotRelease)
   SINGLE_VALUE_INST(SelectEnumInst, select_enum,
                     SingleValueInstruction, None, DoesNotRelease)
@@ -687,9 +679,7 @@ ABSTRACT_INST(TermInst, SILInstruction)
              TermInst, None, DoesNotRelease)
   DYNAMICCAST_TERMINATOR(CheckedCastAddrBranchInst, checked_cast_addr_br,
              TermInst, MayHaveSideEffects, MayRelease)
-  DYNAMICCAST_TERMINATOR(CheckedCastValueBranchInst, checked_cast_value_br,
-             TermInst, None, DoesNotRelease)
-  INST_RANGE(TermInst, UnreachableInst, CheckedCastValueBranchInst)
+  INST_RANGE(TermInst, UnreachableInst, CheckedCastAddrBranchInst)
 
 // Deallocation instructions.
 ABSTRACT_INST(DeallocationInst, SILInstruction)
@@ -775,7 +765,7 @@ NON_VALUE_INST(MarkFunctionEscapeInst, mark_function_escape,
 BRIDGED_NON_VALUE_INST(DebugValueInst, debug_value,
                SILInstruction, None, DoesNotRelease)
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
-  NON_VALUE_INST(Store##Name##Inst, store_##name, \
+  BRIDGED_NON_VALUE_INST(Store##Name##Inst, store_##name, \
                  SILInstruction, MayWrite, DoesNotRelease)
 #include "swift/AST/ReferenceStorage.def"
 BRIDGED_NON_VALUE_INST(CopyAddrInst, copy_addr,
@@ -784,7 +774,7 @@ BRIDGED_NON_VALUE_INST(DestroyAddrInst, destroy_addr,
                SILInstruction, MayHaveSideEffects, MayRelease)
 NON_VALUE_INST(EndLifetimeInst, end_lifetime,
                SILInstruction, MayHaveSideEffects, MayRelease)
-NON_VALUE_INST(InjectEnumAddrInst, inject_enum_addr,
+BRIDGED_NON_VALUE_INST(InjectEnumAddrInst, inject_enum_addr,
                SILInstruction, MayWrite, DoesNotRelease)
 NON_VALUE_INST(DeinitExistentialAddrInst, deinit_existential_addr,
                SILInstruction, MayHaveSideEffects, DoesNotRelease)

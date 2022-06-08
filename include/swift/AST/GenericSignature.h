@@ -122,6 +122,10 @@ public:
                               ArrayRef<Requirement> requirements,
                               bool isKnownCanonical = false);
 
+  /// Produce a new generic signature which drops all of the marker
+  /// protocol conformance requirements associated with this one.
+  GenericSignature withoutMarkerProtocols() const;
+
 public:
   static ASTContext &getASTContext(TypeArrayView<GenericTypeParamType> params,
                                    ArrayRef<Requirement> requirements);
@@ -528,6 +532,32 @@ GenericSignature buildGenericSignature(
     GenericSignature baseSignature,
     SmallVector<GenericTypeParamType *, 2> addedParameters,
     SmallVector<Requirement, 2> addedRequirements);
+
+/// Summary of error conditions detected by the Requirement Machine.
+enum class GenericSignatureErrorFlags {
+  /// The original requirements referenced a non-existent type parameter,
+  /// or the original requirements were in conflict with each other, meaning
+  /// there are no possible concrete substitutions which satisfy the
+  /// generic signature.
+  HasInvalidRequirements = (1<<0),
+
+  /// The generic signature had non-redundant concrete conformance
+  /// requirements, which means the rewrite system used for minimization
+  /// must be discarded and a new one built for queries.
+  HasConcreteConformances = (1<<1),
+
+  /// The Knuth-Bendix completion procedure failed to construct a confluent
+  /// rewrite system.
+  CompletionFailed = (1<<2)
+};
+
+using GenericSignatureErrors = OptionSet<GenericSignatureErrorFlags>;
+
+/// AbstractGenericSignatureRequest and InferredGenericSignatureRequest
+/// return this type, which stores a GenericSignature together with the
+/// above set of error flags.
+using GenericSignatureWithError = llvm::PointerIntPair<GenericSignature, 3,
+                                                       GenericSignatureErrors>;
 
 } // end namespace swift
 

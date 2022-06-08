@@ -631,11 +631,18 @@ public:
   /// might include "missing" conformances, which are synthesized for some
   /// protocols as an error recovery mechanism.
   ///
+  /// \param allowUnavailable When \c true, the resulting conformance reference
+  /// might include "unavailable" conformances, meaning that the conformance
+  /// cannot actually be used and will be diagnosed if used later. Pass
+  /// \c false here for queries that want to determine whether the conformance
+  /// is likely to be usable.
+  ///
   /// \returns The result of the conformance search, which will be
   /// None if the type does not conform to the protocol or contain a
   /// ProtocolConformanceRef if it does conform.
   ProtocolConformanceRef lookupConformance(Type type, ProtocolDecl *protocol,
-                                           bool allowMissing = false);
+                                           bool allowMissing = false,
+                                           bool allowUnavailable = true);
 
   /// Look for the conformance of the given existential type to the given
   /// protocol.
@@ -780,7 +787,7 @@ public:
   /// shadowed clang module. It does not force synthesized top-level decls that
   /// should be printed to be added; use \c swift::getTopLevelDeclsForDisplay()
   /// for that.
-  void getDisplayDecls(SmallVectorImpl<Decl*> &results) const;
+  void getDisplayDecls(SmallVectorImpl<Decl*> &results, bool recursive = false) const;
 
   using LinkLibraryCallback = llvm::function_ref<void(LinkLibrary)>;
 
@@ -938,6 +945,9 @@ inline bool DeclContext::isModuleScopeContext() const {
 inline SourceLoc extractNearestSourceLoc(const ModuleDecl *mod) {
   return extractNearestSourceLoc(static_cast<const Decl *>(mod));
 }
+
+/// Collects modules that this module imports via `@_exported import`.
+void collectParsedExportedImports(const ModuleDecl *M, SmallPtrSetImpl<ModuleDecl *> &Imports);
 
 } // end namespace swift
 

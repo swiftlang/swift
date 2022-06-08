@@ -159,6 +159,10 @@ OVERRIDE_TASK(task_suspend, AsyncTask *,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
               swift::, ,)
 
+OVERRIDE_TASK(task_enqueueTaskOnExecutor, void,
+              SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
+              (AsyncTask *task, ExecutorRef newExecutor), (task, newExecutor))
+
 OVERRIDE_TASK(continuation_init, AsyncTask *,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
               swift::, (ContinuationAsyncContext *context,

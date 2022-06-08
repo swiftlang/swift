@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if __has_include(<os/signpost.h>)
+#if SWIFT_STDLIB_CONCURRENCY_TRACING
 
 #include "TracingSignpost.h"
 #include <stdio.h>

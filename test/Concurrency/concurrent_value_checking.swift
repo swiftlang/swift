@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift  -disable-availability-checking -warn-concurrency
+// RUN: %target-typecheck-verify-swift  -disable-availability-checking -warn-concurrency -parse-as-library
 // REQUIRES: concurrency
 
 class NotConcurrent { } // expected-note 27{{class 'NotConcurrent' does not conform to the 'Sendable' protocol}}
@@ -174,7 +174,7 @@ func testConcurrency() {
 func testUnsafeSendableNothing() {
   var x = 5
   acceptUnsafeSendable {
-    x = 17
+    x = 17 // expected-error{{mutation of captured var 'x' in concurrently-executing code}}
   }
   print(x)
 }
@@ -223,7 +223,7 @@ protocol AsyncProto {
 }
 
 extension A1: AsyncProto {
-  func asyncMethod(_: NotConcurrent) async { } // expected-warning{{non-sendable type 'NotConcurrent' in parameter of actor-isolated instance method 'asyncMethod' satisfying non-isolated protocol requirement cannot cross actor boundary}}
+  func asyncMethod(_: NotConcurrent) async { } // expected-warning{{non-sendable type 'NotConcurrent' in parameter of actor-isolated instance method 'asyncMethod' satisfying protocol requirement cannot cross actor boundary}}
 }
 
 protocol MainActorProto {
@@ -232,7 +232,7 @@ protocol MainActorProto {
 
 class SomeClass: MainActorProto {
   @SomeGlobalActor
-  func asyncMainMethod(_: NotConcurrent) async { } // expected-warning{{non-sendable type 'NotConcurrent' in parameter of global actor 'SomeGlobalActor'-isolated instance method 'asyncMainMethod' satisfying non-isolated protocol requirement cannot cross actor boundary}}
+  func asyncMainMethod(_: NotConcurrent) async { } // expected-warning{{non-sendable type 'NotConcurrent' in parameter of global actor 'SomeGlobalActor'-isolated instance method 'asyncMainMethod' satisfying protocol requirement cannot cross actor boundary}}
 }
 
 // ----------------------------------------------------------------------
@@ -255,7 +255,7 @@ var concurrentFuncVar: (@Sendable (NotConcurrent) -> Void)? = nil
 // ----------------------------------------------------------------------
 func acceptConcurrentUnary<T>(_: @Sendable (T) -> T) { }
 
-func concurrentClosures<T>(_: T) {
+func concurrentClosures<T>(_: T) { // expected-note{{consider making generic parameter 'T' conform to the 'Sendable' protocol}} {{26-26=: Sendable}}
   acceptConcurrentUnary { (x: T) in
     _ = x // ok
     acceptConcurrentUnary { _ in x } // expected-warning{{capture of 'x' with non-sendable type 'T' in a `@Sendable` closure}}
@@ -269,7 +269,7 @@ struct S1: Sendable {
   var nc: NotConcurrent // expected-warning{{stored property 'nc' of 'Sendable'-conforming struct 'S1' has non-sendable type 'NotConcurrent'}}
 }
 
-struct S2<T>: Sendable {
+struct S2<T>: Sendable { // expected-note{{consider making generic parameter 'T' conform to the 'Sendable' protocol}} {{12-12=: Sendable}}
   var nc: T // expected-warning{{stored property 'nc' of 'Sendable'-conforming generic struct 'S2' has non-sendable type 'T'}}
 }
 

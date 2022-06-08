@@ -18,7 +18,7 @@ import Foundation
 public func fwdDeclaresBee() -> Bee { fatalError() }
 
 // CHECK: @class Hive;
-// CHECK-LABEL: void fwd_declares_hive(SWIFT_NOESCAPE Hive * _Nonnull (* _Nonnull bzzz)(Bee * _Nonnull));
+// CHECK-LABEL: void fwd_declares_hive(Hive * _Nonnull (* _Nonnull bzzz)(Bee * _Nonnull));
 
 @_cdecl("fwd_declares_hive")
 public func fwdDeclaresHive(bzzz: @convention(c) (Bee) -> Hive) { fatalError() }

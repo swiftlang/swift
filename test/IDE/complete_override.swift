@@ -277,13 +277,13 @@ class OuterNominal : ProtocolA {
 class OuterNominal2: ProtocolA {
   var f = { #^NESTED_CLOSURE_1?keywords=false^# }()
 }
-// NESTED_CLOSURE_1-NOT: Decl{{.*}}/Super
+// NESTED_CLOSURE_1-NOT: Decl{{.*}}/Super: func
 // NESTED_CLOSURE_1-NOT: {|}
 
 class OuterNominal3: ProtocolA {
   var f = { static #^NESTED_CLOSURE_2?keywords=false^# }()
 }
-// NESTED_CLOSURE_2-NOT: Decl{{.*}}/Super
+// NESTED_CLOSURE_2-NOT: Decl{{.*}}/Super: func
 // NESTED_CLOSURE_2-NOT: {|}
 
 class OmitKW1 : ProtocolA {
@@ -442,7 +442,7 @@ class Deprecated2 : Deprecated1 {
 // DEPRECATED_1: Decl[InstanceMethod]/Super/NotRecommended: deprecated() {|};
 
 class EscapingBase {
-  func method(_ x: @escaping (@escaping ()->()) -> (()->())) -> (@escaping (@escaping ()->() )->()) { }
+  func method(_ x: @escaping (@escaping ()->()) -> (()->())) -> ((@escaping ()->() )->()) { }
   func autoclosure(arg: @autoclosure () -> Bool) {}
 }
 class Escaping : EscapingBase {

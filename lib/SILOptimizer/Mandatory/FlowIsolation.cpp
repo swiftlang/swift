@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "flow-isolation"
 
+#include "swift/AST/Expr.h"
 #include "swift/AST/ActorIsolation.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/SIL/ApplySite.h"
@@ -335,31 +336,7 @@ SILInstruction *AnalysisInfo::findNonisolatedBlame(SILInstruction* startInst) {
   llvm_unreachable("failed to find nonisolated blame.");
 }
 
-ValueDecl *findCallee(ApplySite &apply) {
-  SILValue callee = apply.getCalleeOrigin();
-
-  auto check = [](ValueDecl *decl) -> ValueDecl* {
-    // if this is an accessor, then return the storage instead.
-    if (auto accessor = dyn_cast<AccessorDecl>(decl))
-      return accessor->getStorage();
-
-    return decl;
-  };
-
-  if (auto *methInst = dyn_cast<MethodInst>(callee))
-    return check(methInst->getMember().getDecl());
-
-  if (auto *funcInst = dyn_cast<FunctionRefBaseInst>(callee)) {
-    auto *refFunc = funcInst->getInitiallyReferencedFunction();
-    if (auto *declCxt = refFunc->getDeclContext())
-      if (auto *absFn = dyn_cast<AbstractFunctionDecl>(declCxt->getAsDecl()))
-        return check(absFn);
-  }
-
-  return nullptr;
-}
-
-StringRef verbForInvoking(ValueDecl *value) {
+static StringRef verbForInvoking(ValueDecl *value) {
   // Only computed properties need a different verb.
   if (isa<AbstractStorageDecl>(value))
     return "accessing ";
@@ -371,35 +348,66 @@ StringRef verbForInvoking(ValueDecl *value) {
 /// introducing non-isolation, this function produces the values needed
 /// to describe it to the user. Thus, the implementation of this function is
 /// closely tied to that diagnostic.
-std::tuple<StringRef, StringRef, DeclName>
+static std::tuple<StringRef, StringRef, DeclName>
 describe(SILInstruction *blame) {
   auto &ctx = blame->getModule().getASTContext();
 
   // check if it's a call-like thing.
   if (auto apply = ApplySite::isa(blame)) {
-    // NOTE: we can't use ApplySite::getCalleeFunction because it is overly
-    // precise in finding the specific corresponding SILFunction. We only care
-    // about describing the referenced AST decl, since that's all programmers
-    // know.
-    ValueDecl *callee = findCallee(apply);
+    /// First, look for a callee declaration.
+    ///
+    /// We can't use ApplySite::getCalleeFunction because it is overly
+    /// precise in finding the specific corresponding SILFunction. We only care
+    /// about describing the referenced AST decl, since that's all programmers
+    /// know.
+
+    ValueDecl *callee = nullptr;
+
+    auto inspect = [](ValueDecl *decl) -> ValueDecl* {
+      // if this is an accessor, then return the storage instead.
+      if (auto accessor = dyn_cast<AccessorDecl>(decl))
+        return accessor->getStorage();
+
+      return decl;
+    };
+
+    SILValue silCallee = apply.getCalleeOrigin();
+    if (auto *methInst = dyn_cast<MethodInst>(silCallee))
+      callee = inspect(methInst->getMember().getDecl());
+
+    if (auto *funcInst = dyn_cast<FunctionRefBaseInst>(silCallee)) {
+      auto *refFunc = funcInst->getInitiallyReferencedFunction();
+
+      if (auto *declCxt = refFunc->getDeclContext()) {
+        if (auto *absFn =
+            dyn_cast_or_null<AbstractFunctionDecl>(declCxt->getAsDecl())) {
+          callee = inspect(absFn);
+        } else if (isa<AbstractClosureExpr>(declCxt)) {
+          // TODO: determine if the closure captures self, or is applied to it,
+          // so we can be more specific in this message.
+          return std::make_tuple("this closure involving", "", ctx.Id_self);
+        }
+      }
+    }
 
     // if we have no callee info, all we know is it's a call involving self.
     if (!callee)
-      return {"a call involving", "", ctx.Id_self};
+      return std::make_tuple("a call involving", "", ctx.Id_self);
 
-    return {
+    // otherwise, form the tuple relative to the callee decl.
+    return std::make_tuple(
       verbForInvoking(callee),
       callee->getDescriptiveKindName(callee->getDescriptiveKind()),
       callee->getName()
-    };
+    );
   }
 
-  // handle non-call blames
+  // handle other non-call blames.
   switch (blame->getKind()) {
     case SILInstructionKind::CopyValueInst:
-      return {"making a copy of", "", ctx.Id_self};
+      return std::make_tuple("making a copy of", "", ctx.Id_self);
     default:
-      return {"this use of", "", ctx.Id_self};
+      return std::make_tuple("this use of", "", ctx.Id_self);
   }
 }
 

@@ -132,6 +132,9 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
     CGO.DwarfDebugFlags = Opts.getDebugFlags(PD);
     break;
   }
+  if (!Opts.TrapFuncName.empty()) {
+    CGO.TrapFuncName = Opts.TrapFuncName;
+  }
 
   auto &HSI = Importer->getClangPreprocessor()
                   .getHeaderSearchInfo()
@@ -574,10 +577,15 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     AtomicBoolSize = Size(ClangASTContext->getTypeSize(atomicBoolTy));
     AtomicBoolAlign = Alignment(ClangASTContext->getTypeSize(atomicBoolTy));
   }
-
-  IsSwiftErrorInRegister =
+  // On WebAssembly, tail optional arguments are not allowed because Wasm requires
+  // callee and caller signature to be the same. So LLVM adds dummy arguments for
+  // `swiftself` and `swifterror`. If there is `swiftself` but is no `swifterror` in
+  // a swiftcc function or invocation, then LLVM adds dummy `swifterror` parameter or
+  // argument. To count up how many dummy arguments should be added, we need to mark
+  // it as `swifterror` even though it's not in register.
+  ShouldUseSwiftError =
     clang::CodeGen::swiftcall::isSwiftErrorLoweredInRegister(
-      ClangCodeGen->CGM());
+      ClangCodeGen->CGM()) || TargetInfo.OutputObjectFormat == llvm::Triple::Wasm;
 
 #ifndef NDEBUG
   sanityCheckStdlib(*this);
@@ -659,9 +667,8 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   TaskContinuationFunctionPtrTy = TaskContinuationFunctionTy->getPointerTo();
 
   SwiftContextTy->setBody({
-    SwiftContextPtrTy,    // Parent
-    TaskContinuationFunctionPtrTy, // ResumeParent,
-    SizeTy,               // Flags
+    SwiftContextPtrTy,             // Parent
+    TaskContinuationFunctionPtrTy, // ResumeParent
   });
 
   AsyncTaskAndContextTy = createStructType(
@@ -671,6 +678,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   ContinuationAsyncContextTy = createStructType(
       *this, "swift.continuation_context",
       {SwiftContextTy,       // AsyncContext header
+       SizeTy,               // flags
        SizeTy,               // await synchronization
        ErrorPtrTy,           // error result pointer
        OpaquePtrTy,          // normal result address
@@ -878,7 +886,8 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
                       RuntimeAvailability availability,
                       llvm::ArrayRef<llvm::Type*> retTypes,
                       llvm::ArrayRef<llvm::Type*> argTypes,
-                      ArrayRef<Attribute::AttrKind> attrs) {
+                      ArrayRef<Attribute::AttrKind> attrs,
+                      IRGenModule *IGM) {
 
   if (cache)
     return cache;
@@ -951,6 +960,22 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
     fn->addFnAttrs(buildFnAttr);
     fn->addRetAttrs(buildRetAttr);
     fn->addParamAttrs(0, buildFirstParamAttr);
+
+    // Add swiftself and swifterror attributes only when swift_willThrow
+    // swift_willThrow is defined in RuntimeFunctions.def, but due to the
+    // DSL limitation, arguments attributes are not set.
+    // On the other hand, caller of `swift_willThrow` assumes that it's attributed
+    // with `swiftself` and `swifterror`.
+    // This mismatch of attributes would be issue when lowering to WebAssembly.
+    // While lowering, LLVM counts how many dummy params are necessary to match
+    // callee and caller signature. So we need to add them correctly.
+    if (functionName == "swift_willThrow") {
+      assert(IGM && "IGM is required for swift_willThrow.");
+      fn->addParamAttr(0, Attribute::AttrKind::SwiftSelf);
+      if (IGM->ShouldUseSwiftError) {
+        fn->addParamAttr(1, Attribute::AttrKind::SwiftError);
+      }
+    }
   }
 
   return cache;
@@ -994,7 +1019,7 @@ void IRGenModule::registerRuntimeEffect(ArrayRef<RuntimeEffect> effect,
     registerRuntimeEffect(EFFECT, #NAME);                                      \
     return getRuntimeFn(Module, ID##Fn, #NAME, CC,                             \
                         AVAILABILITY(this->Context),                           \
-                        RETURNS, ARGS, ATTRS);                                 \
+                        RETURNS, ARGS, ATTRS, this);                           \
   }
 
 #include "swift/Runtime/RuntimeFunctions.def"
@@ -1149,7 +1174,7 @@ bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
 }
 
 void IRGenerator::addLazyWitnessTable(const ProtocolConformance *Conf) {
-  if (auto *wt = SIL.lookUpWitnessTable(Conf, /*deserializeLazily=*/false)) {
+  if (auto *wt = SIL.lookUpWitnessTable(Conf)) {
     // Add it to the queue if it hasn't already been put there.
     if (canEmitWitnessTableLazily(wt) &&
         LazilyEmittedWitnessTables.insert(wt).second) {
@@ -1574,7 +1599,9 @@ static llvm::GlobalObject *createForceImportThunk(IRGenModule &IGM) {
                                llvm::GlobalValue::LinkOnceODRLinkage, buf,
                                &IGM.Module);
     ForceImportThunk->setAttributes(IGM.constructInitialAttributes());
-    ApplyIRLinkage(IRLinkage::ExternalExport).to(ForceImportThunk);
+    ApplyIRLinkage(IGM.IRGen.Opts.InternalizeSymbols
+                      ? IRLinkage::Internal
+                      : IRLinkage::ExternalExport).to(ForceImportThunk);
     if (IGM.Triple.supportsCOMDAT())
       if (auto *GO = cast<llvm::GlobalObject>(ForceImportThunk))
         GO->setComdat(IGM.Module.getOrInsertComdat(ForceImportThunk->getName()));
@@ -1740,7 +1767,7 @@ bool IRGenModule::useDllStorage() { return ::useDllStorage(Triple); }
 
 bool IRGenModule::shouldPrespecializeGenericMetadata() {
   auto canPrespecializeTarget =
-      (Triple.isOSDarwin() ||
+      (Triple.isOSDarwin() || Triple.isOSWindows() ||
        (Triple.isOSLinux() && !(Triple.isARM() && Triple.isArch32Bit())));
   if (canPrespecializeTarget && isStandardLibrary()) {
     return IRGen.Opts.PrespecializeGenericMetadata;

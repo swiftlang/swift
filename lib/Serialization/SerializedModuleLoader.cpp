@@ -104,7 +104,7 @@ Optional<bool> forEachModuleSearchPath(
   if (Ctx.LangOpts.Target.isOSDarwin()) {
     for (const auto &path : Ctx.getDarwinImplicitFrameworkSearchPaths())
       if (auto result =
-              callback(path, ModuleSearchPathKind::DarwinImplictFramework,
+              callback(path, ModuleSearchPathKind::DarwinImplicitFramework,
                        /*isSystem=*/true))
         return result;
   }
@@ -231,7 +231,7 @@ void SerializedModuleLoaderBase::collectVisibleTopLevelModuleNamesImpl(
       return None;
     }
     case ModuleSearchPathKind::Framework:
-    case ModuleSearchPathKind::DarwinImplictFramework: {
+    case ModuleSearchPathKind::DarwinImplicitFramework: {
       // Look for:
       // $PATH/{name}.framework/Modules/{name}.swiftmodule/{arch}.{extension}
       forEachDirectoryEntryPath(searchPath, [&](StringRef path) {
@@ -402,7 +402,7 @@ llvm::ErrorOr<ModuleDependencies> SerializedModuleLoaderBase::scanModuleFile(
   bool isFramework = false;
   serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
       modulePath.str(), std::move(moduleBuf.get()), nullptr, nullptr,
-      isFramework, isRequiredOSSAModules(),
+      isFramework, isRequiredOSSAModules(), Ctx.LangOpts.SDKName,
       Ctx.SearchPathOpts.DeserializedPathRecoverer,
       loadedModuleFile);
 
@@ -608,10 +608,10 @@ SerializedModuleLoaderBase::findModule(ImportPath::Element moduleID,
       InterestingFilenames, Ctx.SourceMgr.getFileSystem().get(),
       Ctx.LangOpts.Target.isOSDarwin());
   for (const auto &searchPath : searchPaths) {
-    currPath = searchPath->Path;
-    isSystemModule = searchPath->IsSystem;
+    currPath = searchPath->getPath();
+    isSystemModule = searchPath->isSystem();
 
-    switch (searchPath->Kind) {
+    switch (searchPath->getKind()) {
     case ModuleSearchPathKind::Import:
     case ModuleSearchPathKind::RuntimeLibrary: {
       isFramework = false;
@@ -621,7 +621,7 @@ SerializedModuleLoaderBase::findModule(ImportPath::Element moduleID,
       // This was not always true on non-Apple platforms, and in order to
       // ease the transition, check both layouts.
       bool checkTargetSpecificModule = true;
-      if (searchPath->Kind != ModuleSearchPathKind::RuntimeLibrary ||
+      if (searchPath->getKind() != ModuleSearchPathKind::RuntimeLibrary ||
           !Ctx.LangOpts.Target.isOSDarwin()) {
         auto modulePath = currPath;
         llvm::sys::path::append(modulePath, genericModuleFileName);
@@ -659,7 +659,7 @@ SerializedModuleLoaderBase::findModule(ImportPath::Element moduleID,
       }
     }
     case ModuleSearchPathKind::Framework:
-    case ModuleSearchPathKind::DarwinImplictFramework: {
+    case ModuleSearchPathKind::DarwinImplicitFramework: {
       isFramework = true;
       llvm::sys::path::append(currPath, moduleName + ".framework");
 
@@ -753,7 +753,7 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
   serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
       moduleInterfacePath, std::move(moduleInputBuffer),
       std::move(moduleDocInputBuffer), std::move(moduleSourceInfoInputBuffer),
-      isFramework, isRequiredOSSAModules(),
+      isFramework, isRequiredOSSAModules(), Ctx.LangOpts.SDKName,
       Ctx.SearchPathOpts.DeserializedPathRecoverer,
       loadedModuleFileCore);
   SerializedASTFile *fileUnit = nullptr;
@@ -1086,12 +1086,19 @@ bool swift::extractCompilerFlagsFromInterface(StringRef interfacePath,
     // options and input-like options.
     if (!parse->getOption().hasFlag(options::FrontendOption))
       continue;
-    // Push the supported option and its value to the list.
-    // We shouldn't need to worry about cases like -tbd-install_name=Foo because
-    // the parsing function should have droped alias options already.
-    SubArgs.push_back(ArgSaver.save(parse->getSpelling()).data());
-    for (auto value: parse->getValues())
-      SubArgs.push_back(value);
+    auto spelling = ArgSaver.save(parse->getSpelling());
+    auto &values = parse->getValues();
+    if (spelling.endswith("=")) {
+      // Handle the case like -tbd-install_name=Foo. This should be rare because
+      // most equal-separated arguments are alias to the separate form.
+      assert(values.size() == 1);
+      SubArgs.push_back(ArgSaver.save((llvm::Twine(spelling) + values[0]).str()).data());
+    } else {
+      // Push the supported option and its value to the list.
+      SubArgs.push_back(spelling.data());
+      for (auto value: values)
+        SubArgs.push_back(value);
+    }
   }
 
   return false;
@@ -1100,7 +1107,7 @@ bool swift::extractCompilerFlagsFromInterface(StringRef interfacePath,
 llvm::VersionTuple
 swift::extractUserModuleVersionFromInterface(StringRef moduleInterfacePath) {
   llvm::VersionTuple result;
-  // Read the inteface file and extract its compiler arguments line
+  // Read the interface file and extract its compiler arguments line
   if (auto file = llvm::MemoryBuffer::getFile(moduleInterfacePath)) {
     llvm::BumpPtrAllocator alloc;
     llvm::StringSaver argSaver(alloc);
@@ -1169,7 +1176,8 @@ bool SerializedModuleLoaderBase::canImportModule(ImportPath::Module path,
   // format, if present.
   if (currentVersion.empty() && *unusedModuleBuffer) {
     auto metaData = serialization::validateSerializedAST(
-        (*unusedModuleBuffer)->getBuffer(), Ctx.SILOpts.EnableOSSAModules);
+        (*unusedModuleBuffer)->getBuffer(), Ctx.SILOpts.EnableOSSAModules,
+        Ctx.LangOpts.SDKName);
     currentVersion = metaData.userModuleVersion;
   }
 
@@ -1554,8 +1562,8 @@ SerializedASTFile::getOpaqueReturnTypeDecls(
 }
 
 void
-SerializedASTFile::getDisplayDecls(SmallVectorImpl<Decl*> &results) const {
-  File.getDisplayDecls(results);
+SerializedASTFile::getDisplayDecls(SmallVectorImpl<Decl*> &results, bool recursive) const {
+  File.getDisplayDecls(results, recursive);
 }
 
 StringRef SerializedASTFile::getFilename() const {

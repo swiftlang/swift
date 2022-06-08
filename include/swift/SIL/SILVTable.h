@@ -144,7 +144,6 @@ public:
 
   /// Sets the serialized flag.
   void setSerialized(IsSerialized_t serialized) {
-    assert(serialized != IsSerializable);
     Serialized = (serialized ? 1 : 0);
   }
 

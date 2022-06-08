@@ -193,8 +193,7 @@ EXPR_NODES = [
     # NOTE: This appears only in SequenceExpr.
     Node('ArrowExpr', kind='Expr',
          children=[
-             Child('AsyncKeyword', kind='IdentifierToken',
-                   classification='Keyword',
+             Child('AsyncKeyword', kind='ContextualKeywordToken',
                    text_choices=['async'], is_optional=True),
              Child('ThrowsToken', kind='ThrowsToken',
                    is_optional=True),
@@ -394,8 +393,7 @@ EXPR_NODES = [
                        Child('SimpleInput', kind='ClosureParamList'),
                        Child('Input', kind='ParameterClause'),
                    ]),
-             Child('AsyncKeyword', kind='IdentifierToken',
-                   classification='Keyword',
+             Child('AsyncKeyword', kind='ContextualKeywordToken',
                    text_choices=['async'], is_optional=True),
              Child('ThrowsTok', kind='ThrowsToken', is_optional=True),
              Child('Output', kind='ReturnClause', is_optional=True),
@@ -601,7 +599,7 @@ EXPR_NODES = [
              Child('RightParen', kind='RightParenToken'),
          ]),
 
-    # postfix '#if' expession
+    # postfix '#if' expression
     Node('PostfixIfConfigExpr', kind='Expr',
          children=[
              Child('Base', kind='Expr', is_optional=True),

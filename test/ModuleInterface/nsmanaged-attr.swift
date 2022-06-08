@@ -3,13 +3,13 @@
 // This test ensures we can properly load modules that have @NSManaged properties.
 
 // 1. Emit this file to a module interface
-// RUN: %target-swift-frontend -typecheck -emit-module-interface-path %t/Module.swiftinterface %s -enable-library-evolution -module-name Module
+// RUN: %target-swift-emit-module-interface(%t/Module.swiftinterface) %s -module-name Module
 
 // 2. Check the interface against what we expect
 // RUN: %FileCheck %s < %t/Module.swiftinterface
 
 // 3. Ensure we can load this module from its interface
-// RUN: echo 'import Module' | %target-swift-frontend -typecheck - -I %t
+// RUN: %target-swift-typecheck-module-from-interface(%t/Module.swiftinterface) -module-name Module
 
 // REQUIRES: objc_interop
 

@@ -30,6 +30,7 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
+#include "clang/AST/ASTContext.h"
 using namespace swift;
 
 #define DEBUG_TYPE "Name lookup"
@@ -85,10 +86,11 @@ ProtocolDecl *DeclContext::getExtendedProtocolDecl() const {
 
 VarDecl *DeclContext::getNonLocalVarDecl() const {
   if (auto *init = dyn_cast<PatternBindingInitializer>(this)) {
-   if (auto *var =
-         init->getBinding()->getAnchoringVarDecl(init->getBindingIndex())) {
-      return var;
-     }
+    if (auto binding = init->getBinding()) {
+      if (auto *var = binding->getAnchoringVarDecl(init->getBindingIndex())) {
+        return var;
+      }
+    }
   }
   return nullptr;
 }
@@ -320,6 +322,7 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
   case FragileFunctionKind::AlwaysEmitIntoClient:
   case FragileFunctionKind::DefaultArgument:
   case FragileFunctionKind::PropertyInitializer:
+  case FragileFunctionKind::BackDeploy:
     return ResilienceExpansion::Minimal;
   case FragileFunctionKind::None:
     return ResilienceExpansion::Maximal;
@@ -418,8 +421,13 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
                 /*allowUsableFromInline=*/true};
       }
 
-      // If a property or subscript is @inlinable or @_alwaysEmitIntoClient,
-      // the accessors are @inlinable or @_alwaysEmitIntoClient also.
+      if (AFD->getAttrs().hasAttribute<BackDeployAttr>()) {
+        return {FragileFunctionKind::BackDeploy,
+                /*allowUsableFromInline=*/true};
+      }
+
+      // Property and subscript accessors inherit @_alwaysEmitIntoClient,
+      // @_backDeploy, and @inlinable from their storage declarations.
       if (auto accessor = dyn_cast<AccessorDecl>(AFD)) {
         auto *storage = accessor->getStorage();
         if (storage->getAttrs().getAttribute<InlinableAttr>()) {
@@ -428,6 +436,10 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
         }
         if (storage->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>()) {
           return {FragileFunctionKind::AlwaysEmitIntoClient,
+                  /*allowUsableFromInline=*/true};
+        }
+        if (storage->getAttrs().hasAttribute<BackDeployAttr>()) {
+          return {FragileFunctionKind::BackDeploy,
                   /*allowUsableFromInline=*/true};
         }
       }
@@ -722,6 +734,14 @@ unsigned DeclContext::printContext(raw_ostream &OS, const unsigned indent,
     }
   }
   }
+
+  if (auto decl = getAsDecl())
+    if (decl->getClangNode().getLocation().isValid()) {
+      auto &clangSM = getASTContext().getClangModuleLoader()
+                          ->getClangASTContext().getSourceManager();
+      OS << " clang_loc=";
+      decl->getClangNode().getLocation().print(OS, clangSM);
+    }
 
   if (!onlyAPartialLine)
     OS << "\n";
@@ -1229,12 +1249,10 @@ bool DeclContext::isAsyncContext() const {
     return false;
   case DeclContextKind::FileUnit:
     if (const SourceFile *sf = dyn_cast<SourceFile>(this))
-      return getASTContext().LangOpts.EnableExperimentalAsyncTopLevel &&
-             sf->isAsyncTopLevelSourceFile();
+      return sf->isAsyncTopLevelSourceFile();
     return false;
   case DeclContextKind::TopLevelCodeDecl:
-    return getASTContext().LangOpts.EnableExperimentalAsyncTopLevel &&
-           getParent()->isAsyncContext();
+    return getParent()->isAsyncContext();
   case DeclContextKind::AbstractClosureExpr:
     return cast<AbstractClosureExpr>(this)->isBodyAsync();
   case DeclContextKind::AbstractFunctionDecl: {
@@ -1276,7 +1294,7 @@ SourceLoc swift::extractNearestSourceLoc(const DeclContext *dc) {
   case DeclContextKind::SerializedLocal:
     return extractNearestSourceLoc(dc->getParent());
   }
-  llvm_unreachable("Unhandled DeclCopntextKindin switch");
+  llvm_unreachable("Unhandled DeclContextKindIn switch");
 }
 
 #define DECL(Id, Parent) \

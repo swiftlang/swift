@@ -27,6 +27,7 @@
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/IDE/CodeCompletion.h"
+#include "swift/IDE/CodeCompletionConsumer.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
@@ -176,6 +177,7 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
 bool CompletionInstance::performCachedOperationIfPossible(
     llvm::hash_code ArgsHash,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    const SearchPathOptions &SearchPathOpts,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
     DiagnosticConsumer *DiagC,
     std::shared_ptr<std::atomic<bool>> CancellationFlag,
@@ -209,6 +211,16 @@ bool CompletionInstance::performCachedOperationIfPossible(
     return false;
 
   if (shouldCheckDependencies()) {
+    // The passed in FileSystem does not have any overlays resolved. Make sure
+    // to do so before checking dependencies (otherwise we might decide we need
+    // to run the slow path due to a missing/different file).
+    auto ExpectedOverlay = SearchPathOpts.makeOverlayFileSystem(FileSystem);
+    if (ExpectedOverlay) {
+      FileSystem = std::move(ExpectedOverlay.get());
+    } else {
+      llvm::consumeError(ExpectedOverlay.takeError());
+    }
+
     if (areAnyDependentFilesInvalidated(
             CI, *FileSystem, *oldSF->getBufferID(),
             DependencyCheckedTimestamp, InMemoryDependencyHash))
@@ -542,9 +554,10 @@ void swift::ide::CompletionInstance::performOperation(
   // the cached completion instance.
   std::lock_guard<std::mutex> lock(mtx);
 
-  if (performCachedOperationIfPossible(ArgsHash, FileSystem, completionBuffer,
-                                       Offset, DiagC, CancellationFlag,
-                                       Callback)) {
+  if (performCachedOperationIfPossible(ArgsHash, FileSystem,
+                                       Invocation.getSearchPathOptions(),
+                                       completionBuffer, Offset, DiagC,
+                                       CancellationFlag, Callback)) {
     // We were able to reuse a cached AST. Callback has already been invoked
     // and we don't need to build a new AST. We are done.
     return;
@@ -577,14 +590,17 @@ void swift::ide::CompletionInstance::codeComplete(
   struct ConsumerToCallbackAdapter
       : public SimpleCachingCodeCompletionConsumer {
     SwiftCompletionInfo SwiftContext;
+    ImportDepth ImportDep;
     std::shared_ptr<std::atomic<bool>> CancellationFlag;
     llvm::function_ref<void(ResultType)> Callback;
     bool HandleResultsCalled = false;
 
     ConsumerToCallbackAdapter(
+        ImportDepth ImportDep,
         std::shared_ptr<std::atomic<bool>> CancellationFlag,
         llvm::function_ref<void(ResultType)> Callback)
-        : CancellationFlag(CancellationFlag), Callback(Callback) {}
+        : ImportDep(ImportDep), CancellationFlag(CancellationFlag),
+          Callback(Callback) {}
 
     void setContext(swift::ASTContext *context,
                     const swift::CompilerInvocation *invocation,
@@ -602,7 +618,7 @@ void swift::ide::CompletionInstance::codeComplete(
         Callback(ResultType::cancelled());
       } else {
         assert(SwiftContext.swiftASTContext);
-        Callback(ResultType::success({context.getResultSink(), SwiftContext}));
+        Callback(ResultType::success({context.getResultSink(), SwiftContext, ImportDep}));
       }
     }
   };
@@ -616,7 +632,9 @@ void swift::ide::CompletionInstance::codeComplete(
                                                     auto DeliverTransformed) {
               CompletionContext.ReusingASTContext = Result.DidReuseAST;
               CompilerInstance &CI = Result.CI;
-              ConsumerToCallbackAdapter Consumer(CancellationFlag,
+              ImportDepth ImportDep{CI.getASTContext(),
+                                    CI.getInvocation().getFrontendOptions()};
+              ConsumerToCallbackAdapter Consumer(ImportDep, CancellationFlag,
                                                  DeliverTransformed);
 
               std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
@@ -628,7 +646,7 @@ void swift::ide::CompletionInstance::codeComplete(
                                          &CI.getInvocation(),
                                          &CompletionContext};
                 CodeCompletionResultSink ResultSink;
-                DeliverTransformed(ResultType::success({ResultSink, Info}));
+                DeliverTransformed(ResultType::success({ResultSink, Info, ImportDep}));
                 return;
               }
 
@@ -646,7 +664,7 @@ void swift::ide::CompletionInstance::codeComplete(
                                          &CI.getInvocation(),
                                          &CompletionContext};
                 CodeCompletionResultSink ResultSink;
-                DeliverTransformed(ResultType::success({ResultSink, Info}));
+                DeliverTransformed(ResultType::success({ResultSink, Info, ImportDep}));
               }
             },
             Callback);

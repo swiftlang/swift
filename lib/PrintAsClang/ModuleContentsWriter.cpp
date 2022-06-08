@@ -1,4 +1,4 @@
-//===--- ModuleContentsWriter.cpp - Walk a module's decls to print ObjC ---===//
+//===--- ModuleContentsWriter.cpp - Walk module decls to print ObjC/C++ ---===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -12,7 +12,10 @@
 
 #include "ModuleContentsWriter.h"
 
+#include "ClangSyntaxPrinter.h"
 #include "DeclAndTypePrinter.h"
+#include "OutputLanguageMode.h"
+#include "PrimitiveTypeMapping.h"
 
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Module.h"
@@ -121,11 +124,19 @@ class ModuleWriter {
   llvm::DenseMap<const TypeDecl *, std::pair<EmissionState, bool>> seenTypes;
   std::vector<const Decl *> declsToWrite;
   DelayedMemberSet delayedMembers;
+  PrimitiveTypeMapping typeMapping;
   DeclAndTypePrinter printer;
+  OutputLanguageMode outputLangMode;
+
 public:
-  ModuleWriter(raw_ostream &os, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
-               ModuleDecl &mod, AccessLevel access)
-    : os(os), imports(imports), M(mod), printer(M, os, delayedMembers, access){}
+  ModuleWriter(raw_ostream &os, raw_ostream &prologueOS,
+               llvm::SmallPtrSetImpl<ImportModuleTy> &imports, ModuleDecl &mod,
+               SwiftToClangInteropContext &interopContext, AccessLevel access,
+               OutputLanguageMode outputLang)
+      : os(os), imports(imports), M(mod),
+        printer(M, os, prologueOS, delayedMembers, typeMapping, interopContext,
+                access, outputLang),
+        outputLangMode(outputLang) {}
 
   /// Returns true if we added the decl's module to the import set, false if
   /// the decl is a local decl.
@@ -399,6 +410,13 @@ public:
     return true;
   }
 
+  bool writeStruct(const StructDecl *SD) {
+    if (addImport(SD))
+      return true;
+    printer.print(SD);
+    return true;
+  }
+
   bool writeProtocol(const ProtocolDecl *PD) {
     if (addImport(PD))
       return true;
@@ -571,7 +589,13 @@ public:
       const Decl *D = declsToWrite.back();
       bool success = true;
 
-      if (isa<ValueDecl>(D)) {
+      if (outputLangMode == OutputLanguageMode::Cxx) {
+        if (auto FD = dyn_cast<FuncDecl>(D))
+          success = writeFunc(FD);
+        if (auto SD = dyn_cast<StructDecl>(D))
+          success = writeStruct(SD);
+        // FIXME: Warn on unsupported exported decl.
+      } else if (isa<ValueDecl>(D)) {
         if (auto CD = dyn_cast<ClassDecl>(D))
           success = writeClass(CD);
         else if (auto PD = dyn_cast<ProtocolDecl>(D))
@@ -611,23 +635,50 @@ public:
 };
 } // end anonymous namespace
 
-void
-swift::printModuleContentsAsObjC(raw_ostream &os,
-                                 llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
-                                 ModuleDecl &M) {
-  auto requiredAccess = M.isExternallyConsumed() ? AccessLevel::Public
-                                                 : AccessLevel::Internal;
-  ModuleWriter(os, imports, M, requiredAccess).write();
+static AccessLevel getRequiredAccess(const ModuleDecl &M) {
+  return M.isExternallyConsumed() ? AccessLevel::Public : AccessLevel::Internal;
+}
+
+void swift::printModuleContentsAsObjC(
+    raw_ostream &os, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
+    ModuleDecl &M, SwiftToClangInteropContext &interopContext) {
+  llvm::raw_null_ostream prologueOS;
+  ModuleWriter(os, prologueOS, imports, M, interopContext, getRequiredAccess(M),
+               OutputLanguageMode::ObjC)
+      .write();
 }
 
 void swift::printModuleContentsAsCxx(
     raw_ostream &os, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
-    ModuleDecl &M) {
-  os << "namespace ";
-  M.ValueDecl::getName().print(os);
-  os << " {\n\n";
-  // TODO (Alex): Emit module contents.
-  os << "\n} // namespace ";
-  M.ValueDecl::getName().print(os);
-  os << "\n\n";
+    ModuleDecl &M, SwiftToClangInteropContext &interopContext) {
+  std::string moduleContentsBuf;
+  llvm::raw_string_ostream moduleOS{moduleContentsBuf};
+  std::string modulePrologueBuf;
+  llvm::raw_string_ostream prologueOS{modulePrologueBuf};
+
+  ModuleWriter(moduleOS, prologueOS, imports, M, interopContext,
+               getRequiredAccess(M), OutputLanguageMode::Cxx)
+      .write();
+
+  // FIXME: refactor.
+  if (!prologueOS.str().empty()) {
+    os << "#endif\n";
+    os << "#ifdef __cplusplus\n";
+    os << "namespace ";
+    M.ValueDecl::getName().print(os);
+    os << " {\n";
+    os << "namespace " << cxx_synthesis::getCxxImplNamespaceName() << " {\n";
+    os << "#endif\n\n";
+
+    os << prologueOS.str();
+
+    os << "\n#ifdef __cplusplus\n";
+    os << "}\n";
+    os << "}\n";
+  }
+
+  // Construct a C++ namespace for the module.
+  ClangSyntaxPrinter(os).printNamespace(
+      [&](raw_ostream &os) { M.ValueDecl::getName().print(os); },
+      [&](raw_ostream &os) { os << moduleOS.str(); });
 }

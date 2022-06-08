@@ -5,6 +5,7 @@
 // 1. Build ../stored-properties.swift to a dylib and emit its interface in %t
 
 // RUN: %target-build-swift-dylib(%t/%target-library-name(StoredProperties)) -emit-module-interface-path %t/StoredProperties.swiftinterface %S/stored-properties.swift -module-name StoredProperties -swift-version 5
+// RUN: %target-swift-typecheck-module-from-interface(%t/StoredProperties.swiftinterface) -module-name StoredProperties
 
 // 2. Build this file and link with StoredProperties
 
