@@ -1,3 +1,7 @@
+#if defined(_WIN32) || defined(WIN32)
+#define SDK_STRING_H
+#endif
+
 #ifndef SDK_STRING_H
 #define SDK_STRING_H
 
