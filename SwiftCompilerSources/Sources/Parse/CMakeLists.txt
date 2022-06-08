@@ -14,5 +14,7 @@ endif()
 add_swift_compiler_module(Parse
   DEPENDS
     ${dependencies}
+  ADD_TO_SYNTAXPARSE
   SOURCES
+    Parse.swift
     Regex.swift)

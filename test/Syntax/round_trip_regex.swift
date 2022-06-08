@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %swift-syntax-test -input-source-filename %s -parse-gen -fail-on-parse-error > %t/afterRoundtrip.swift
 // RUN: diff -u %s %t/afterRoundtrip.swift
+// REQUIRES: swift_in_compiler
 
 _ = /abc/
 _ = #/abc/#

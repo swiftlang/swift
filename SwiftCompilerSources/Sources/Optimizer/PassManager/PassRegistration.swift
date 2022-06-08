@@ -18,7 +18,7 @@ import Parse
 public func initializeSwiftModules() {
   registerSILClasses()
   registerSwiftPasses()
-  registerRegexParser()
+  initializeSwiftParseModules()
 }
 
 private func registerPass(
