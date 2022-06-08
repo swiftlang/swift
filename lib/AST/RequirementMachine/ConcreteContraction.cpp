@@ -227,8 +227,8 @@ public:
 Optional<Type> ConcreteContraction::substTypeParameterRec(
     Type type, Position position) const {
 
-  // If the requirement is of the form 'T == C' or 'T : C', don't
-  // substitute T, since then we end up with 'C == C' or 'C : C',
+  // If we have a superclass (T : C) or same-type requirement (T == C),
+  // don't substitute T, since then we end up with 'C == C' or 'C : C',
   // losing the requirement.
   if (position == Position::BaseType ||
       position == Position::ConformanceRequirement) {
@@ -399,9 +399,10 @@ ConcreteContraction::substRequirement(const Requirement &req) const {
         !module->lookupConformance(substFirstType, proto,
                                    allowMissing, allowUnavailable)) {
       // Handle the case of <T where T : P, T : C> where C is a class and
-      // C does not conform to P by leaving the conformance requirement
-      // unsubstituted.
-      return req;
+      // C does not conform to P and only substitute the parent type of T
+      // by pretending we have a same-type requirement here.
+      substFirstType = substTypeParameter(
+          firstType, Position::SameTypeRequirement);
     }
 
     // Otherwise, replace the generic parameter in the conformance
@@ -418,9 +419,11 @@ ConcreteContraction::substRequirement(const Requirement &req) const {
     if (!substFirstType->isTypeParameter() &&
         !substFirstType->satisfiesClassConstraint() &&
         req.getLayoutConstraint()->isClass()) {
-      // If the concrete type doesn't satisfy the layout constraint,
-      // leave it unsubstituted so that we produce a better diagnostic.
-      return req;
+      // If the concrete type doesn't satisfy the layout constraint, produce
+      // a better diagnostic and only substitute the parent type by pretending
+      // we have a same-type requirement here.
+      substFirstType = substTypeParameter(
+          firstType, Position::SameTypeRequirement);
     }
 
     return Requirement(req.getKind(),
