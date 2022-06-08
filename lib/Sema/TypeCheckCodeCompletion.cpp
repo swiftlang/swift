@@ -575,6 +575,11 @@ bool TypeChecker::typeCheckForCodeCompletion(
   if (!node)
     return false;
 
+  if (auto *expr = getAsExpr(node)) {
+    node = expr->walk(SanitizeExpr(Context,
+                                   /*shouldReusePrecheckedType=*/false));
+  }
+
   CompletionContextFinder contextAnalyzer(node, DC);
 
   // If there was no completion expr (e.g. if the code completion location was
