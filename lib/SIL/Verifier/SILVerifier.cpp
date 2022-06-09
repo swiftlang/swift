@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-verifier"
+
 #include "VerifierPrivate.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AnyFunctionRef.h"
@@ -36,6 +37,7 @@
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILFunctionConventions.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/SILVTableVisitor.h"
@@ -2699,6 +2701,30 @@ public:
             "Source value should be an address value");
     require(!F.hasOwnership(),
             "retain_value is only in functions with unqualified ownership");
+  }
+
+  void checkBeginBorrowInst(BeginBorrowInst *I) {
+    // If we are in Raw SIL, we require that begin_borrow is always ended by an
+    // end_borrow instead of a different instruction (e.x.: br). This makes it
+    // easier for diagnostic passes to avoid needing to support guaranteed phis
+    // while allowing later performance passes like SILMem2Reg to insert
+    // guaranteed phis as needed.
+    //
+    // NOTE: SILGen maintains this invariant already.
+    //
+    // NOTE: If we need to eventually support guaranteed phis earlier in the Raw
+    // Pipeline, we will need to design a more complex solution where we
+    // maintain this invariant early in the pipeline.
+    auto &mod = I->getModule();
+    if (mod.getStage() == SILStage::Raw &&
+        !I->getFunction()->wasDeserializedCanonical()) {
+      SILModuleConventions modConventions(mod);
+      for (auto *use : I->getUses()) {
+        require(use->getOperandOwnership(&modConventions) !=
+                    OperandOwnership::Reborrow,
+                "In Raw SIL, begin_borrow can not be reborrowed?!");
+      }
+    }
   }
 
   void checkCopyValueInst(CopyValueInst *I) {

@@ -4,6 +4,7 @@
 // Copied from mem2reg_ossa.sil                                               {{
 // =============================================================================
 
+sil_stage canonical
 
 import Builtin
 import Swift
