@@ -3626,7 +3626,12 @@ if [[ ${#LIPO_SRC_DIRS[@]} -gt 0 ]]; then
         else
             LIPO_PATH="${HOST_LIPO}"
         fi
-        call "${SWIFT_SOURCE_DIR}"/utils/recursive-lipo --lipo=${LIPO_PATH} --copy-subdirs="$(get_host_install_prefix ${host})lib/swift $(get_host_install_prefix ${host})lib/swift_static" --explicit-src-files="$(get_host_install_prefix ${host})lib/swift/${host%%-*}/lib_InternalSwiftScan.dylib $(get_host_install_prefix ${host})lib/swift/${host%%-*}/lib_InternalSwiftSyntaxParser.dylib" --destination="$(get_host_install_destdir ${mergedHost})" ${LIPO_SRC_DIRS[@]}
+        call "${SWIFT_SOURCE_DIR}"/utils/recursive-lipo \
+        --lipo=${LIPO_PATH} \
+        --copy-subdirs="$(get_host_install_prefix ${host})lib/swift $(get_host_install_prefix ${host})lib/swift_static" \
+        --explicit-src-files="$(get_host_install_prefix ${host})lib/swift/${host%%-*}/lib_InternalSwiftScan.dylib $(get_host_install_prefix ${host})lib/swift/${host%%-*}/lib_InternalSwiftSyntaxParser.dylib $(get_host_install_prefix ${host})lib/swift/${host%%-*}/lib_InternalSwiftSyntaxParser.a" \
+        --destination="$(get_host_install_destdir ${mergedHost})" \
+        ${LIPO_SRC_DIRS[@]}
 
         if [[ $(should_execute_action "${mergedHost}-lipo") ]]; then
             # Build and test the lipo-ed package.
