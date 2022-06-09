@@ -71,6 +71,22 @@ ERROR(inout_argument_alias,none,
 NOTE(previous_inout_alias,none,
       "previous aliasing argument", ())
 
+ERROR(magic_identifier_missing_arg,none,
+      "missing argument for parameter %0 of literal expression %1",
+      (StringRef, StringRef))
+ERROR(magic_identifier_unexpected_arg,none,
+      "unexpected argument for parameter %0 of literal expression %1",
+      (StringRef, StringRef))
+ERROR(magic_identifier_invalid_arg_name,none,
+      "invalid argument name %0 passed to literal expression %1",
+      (StringRef, StringRef))
+ERROR(magic_identifier_unknown_arg_name,none,
+      "unknown argument name %0 passed to literal expression %1",
+      (StringRef, StringRef))
+WARNING(magic_identifier_poor_transcription,none,
+        "this expression's source representation cannot be found; a generic "
+        "string literal will be substituted", ())
+
 ERROR(unimplemented_generator_witnesses,none,
       "protocol conformance emission for generator coroutines is unimplemented",
       ())

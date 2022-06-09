@@ -1984,7 +1984,8 @@ buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
   return args;
 }
 
-static StringRef transcribe(ASTContext& ctx, SourceRange exprRange) {
+static StringRef transcribe(SILGenFunction &SGF, ASTContext& ctx,
+                            SourceRange exprRange) {
   // Find the rance of source characters corresponding to the input expression.
   // If no such range can be found, assume the expression was compiler-generated.
   auto sourceRange = Lexer::getCharSourceRangeFromSourceRange(ctx.SourceMgr,
@@ -1993,8 +1994,7 @@ static StringRef transcribe(ASTContext& ctx, SourceRange exprRange) {
     return ctx.SourceMgr.extractText(sourceRange);
   }
 
-  // TODO: @Transcribed -- diagnostic?
-
+  SGF.SGM.diagnose(exprRange.Start, diag::magic_identifier_poor_transcription);
   return "<compiler-generated>";
 }
 
@@ -2013,6 +2013,78 @@ static Expr *findArgumentExprWithLabel(DefaultArgumentExpr *defaultArgExpr,
   }
 
   return nullptr;
+}
+
+static inline PreparedArguments
+buildTranscriptionLiteral(SILGenFunction &SGF, SGFContext C,
+                          MagicIdentifierLiteralExpr *magicLiteral) {
+  ASTContext &ctx = SGF.getASTContext();
+  auto kindString = MagicIdentifierLiteralExpr::getKindString(
+    magicLiteral->getKind());
+
+  // Get the literal's argument list and verify it has exactly one element.
+  auto argList = magicLiteral->getArgs();
+  if (!argList || argList->size() == 0) {
+    SGF.SGM.diagnose(magicLiteral->getLoc(),
+                     diag::magic_identifier_missing_arg, "of", kindString);
+    return PreparedArguments();
+  }
+
+  // Get the argument to the literal and verify it is labelled correctly.
+  Argument arg = argList->get(0); {
+    auto argLabel = arg.getLabel().str();
+    if (argLabel != "of") {
+      SGF.SGM.diagnose(magicLiteral->getLoc(),
+                       diag::magic_identifier_unexpected_arg, argLabel,
+                       kindString);
+      return PreparedArguments();
+    }
+  }
+
+  // If we have a corresponding default argument expression, do the math
+  // and find the right argument in its argument list. Otherwise, just use the
+  // parameter expression captured during parsing.
+  StringRef transcription; {
+    auto defaultExpr = magicLiteral->getDefaultArgumentExpr();
+    auto declRefExpr = dyn_cast<UnresolvedDeclRefExpr>(arg.getExpr());
+    if (defaultExpr && declRefExpr) {
+      // Look for an argument in the argument list with an internal label that
+      // matches the one specified by the developer.
+        auto argLabel = declRefExpr->getName();
+        if (!argLabel.isSimpleName()) {
+          llvm::SmallVector<char, 16> scratch;
+          SGF.SGM.diagnose(magicLiteral->getLoc(),
+                           diag::magic_identifier_invalid_arg_name,
+                           argLabel.getString(scratch), kindString);
+          return PreparedArguments();
+        }
+
+        auto argExpr = findArgumentExprWithLabel(defaultExpr,
+          argLabel.getBaseIdentifier().str());
+        if (argExpr) {
+          transcription = transcribe(SGF, ctx, argExpr->getSourceRange());
+        } else {
+          llvm::SmallVector<char, 16> scratch;
+          SGF.SGM.diagnose(magicLiteral->getLoc(),
+                           diag::magic_identifier_unknown_arg_name,
+                           argLabel.getString(scratch), kindString);
+          return PreparedArguments();
+        }
+
+    } else {
+      // Not a default argument and/or value didn't look like an identifier.
+      // Resolve the source code of the magic identifier's argument instead.
+      // This is syntactically acceptable, but it is unlikely to produce a
+      // useful string, so warn.
+      auto exprRange = arg.getExpr()->getSourceRange();
+      SGF.SGM.diagnose(exprRange.Start,
+                       diag::magic_identifier_poor_transcription);
+      transcription = transcribe(SGF, ctx, exprRange);
+    }
+  }
+
+  return emitStringLiteralArgs(SGF, magicLiteral, transcription, C,
+                               magicLiteral->getStringEncoding());
 }
 
 static inline PreparedArguments
@@ -2061,50 +2133,8 @@ buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
     builtinLiteralArgs.add(magicLiteral, RValue(SGF, {integerManaged}, ty));
     return builtinLiteralArgs;
   }
-  case MagicIdentifierLiteralExpr::Transcription: {
-    // If we have a corresponding default argument expression, do the math
-    // and find the right argument in its argument list. Otherwise, just use the
-    // parameter expression captured during parsing (warn?)
-    // TODO: @Transcribed -- diagnostics, not assertions
-    auto argList = magicLiteral->getArgs();
-    assert(argList && "Magic identifier literal missing a parameter expression");
-    assert(argList->size() == 1 && "Magic identifier literal takes one argument");
-    Argument arg = argList->get(0);
-    assert(arg.getLabel().str() == "of" && "Magic identifier literal takes one argument 'of:'");
-
-    // Get us some source code!
-    StringRef transcription; {
-      auto defaultExpr = magicLiteral->getDefaultArgumentExpr();
-      auto declRefExpr = dyn_cast<UnresolvedDeclRefExpr>(arg.getExpr());
-      if (defaultExpr && declRefExpr) {
-        // Look for an argument in the argument list with an internal label that
-        // matches the one specified by the developer.
-        if (declRefExpr) {
-          // TODO: @Transcribed -- diagnostics, not assertions
-          assert(declRefExpr->getName().isSimpleName() && "Magic identifier literal just needs an argument label");
-          auto argLabel = declRefExpr->getName().getBaseIdentifier().str();
-
-          if (auto expr = findArgumentExprWithLabel(defaultExpr, argLabel)) {
-            transcription = transcribe(ctx, expr->getSourceRange());
-          } else {
-            // TODO: @Transcribed -- diagnostics, not assertions
-            assert("Argument with that name not found" && false);
-          }
-        } else {
-          // TODO: @Transcribed -- diagnostics, not assertions
-          assert("Invalid argument to #transcription" && false);
-        }
-
-      } else {
-        // Not a default argument and/or value didn't look like an identifier.
-        // Resolve the source code of the magic identifier's argument instead.
-        transcription = transcribe(ctx, arg.getExpr()->getSourceRange());
-      }
-    }
-
-    return emitStringLiteralArgs(SGF, magicLiteral, sourceCode, C,
-                                 magicLiteral->getStringEncoding());
-  }
+  case MagicIdentifierLiteralExpr::Transcription:
+    return buildTranscriptionLiteral(SGF, C, magicLiteral);
   case MagicIdentifierLiteralExpr::DSOHandle:
     llvm_unreachable("handled elsewhere");
   }

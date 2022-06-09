@@ -2372,8 +2372,8 @@ Parser::parseMagicIdentifierLiteral(MagicIdentifierLiteralExpr::Kind Kind) {
       auto args = parseArgumentList(tok::l_paren, tok::r_paren,
                                     /*isExprBasic=*/false);
       if (args.isParseError()) {
-        // TODO: @Transcribed -- diagnostics
-        // diagnose(Tok, ...);
+        auto kindString = MagicIdentifierLiteralExpr::getKindString(Kind);
+        diagnose(Tok, diag::magic_identifier_cannot_parse_args, kindString);
         return makeParserError();
       } else {
         argList = args.getPtrOrNull();

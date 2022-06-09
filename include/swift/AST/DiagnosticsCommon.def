@@ -214,5 +214,11 @@ REMARK(remark_save_cache, none,
 ERROR(unknown_attribute,none,
       "unknown attribute '%0'", (StringRef))
 
+//------------------------------------------------------------------------------
+// MARK: magic identifier diagnostics
+//------------------------------------------------------------------------------
+ERROR(magic_identifier_cannot_parse_args,none,
+      "unable to parse the arguments to literal expression %0", (StringRef))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
