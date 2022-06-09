@@ -499,6 +499,10 @@ def function_sections: Flag<["-"], "function-sections">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Emit functions to separate sections.">;
 
+def enable_single_module_llvm_emission: Flag<["-"], "enable-single-module-llvm-emission">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Emit LLVM IR into a single LLVM module in multithreaded mode.">;
+
 def stack_promotion_checks : Flag<["-"], "emit-stack-promotion-checks">,
   HelpText<"Emit runtime checks for correct stack promotion of objects.">;
 

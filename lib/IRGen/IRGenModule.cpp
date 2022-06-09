@@ -28,6 +28,7 @@
 #include "swift/IRGen/Linking.h"
 #include "swift/Runtime/RuntimeFnWrappersGen.h"
 #include "swift/Runtime/Config.h"
+#include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/TargetInfo.h"
@@ -1614,12 +1615,7 @@ void IRGenModule::emitAutolinkInfo() {
   }
 }
 
-void IRGenModule::cleanupClangCodeGenMetadata() {
-  // Remove llvm.ident that ClangCodeGen might have left in the module.
-  auto *LLVMIdent = Module.getNamedMetadata("llvm.ident");
-  if (LLVMIdent)
-    Module.eraseNamedMetadata(LLVMIdent);
-
+void emitSwiftVersionNumberIntoModule(llvm::Module *Module) {
   // LLVM's object-file emission collects a fixed set of keys for the
   // image info.
   // Using "Objective-C Garbage Collection" as the key here is a hack,
@@ -1629,21 +1625,29 @@ void IRGenModule::cleanupClangCodeGenMetadata() {
   const char *ObjectiveCGarbageCollection = "Objective-C Garbage Collection";
   uint8_t Major, Minor;
   std::tie(Major, Minor) = version::getSwiftNumericVersion();
-  uint32_t Value = (Major << 24) | (Minor << 16) | (swiftVersion << 8);
-
-  if (Module.getModuleFlag(ObjectiveCGarbageCollection)) {
+  uint32_t Value =
+      (Major << 24) | (Minor << 16) | (IRGenModule::swiftVersion << 8);
+  auto &llvmContext = Module->getContext();
+  if (Module->getModuleFlag(ObjectiveCGarbageCollection)) {
     bool FoundOldEntry = replaceModuleFlagsEntry(
-        Module.getContext(), Module, ObjectiveCGarbageCollection,
+        llvmContext, *Module, ObjectiveCGarbageCollection,
         llvm::Module::Override,
-        llvm::ConstantAsMetadata::get(
-            llvm::ConstantInt::get(Int32Ty, Value)));
+        llvm::ConstantAsMetadata::get(llvm::ConstantInt::get(
+            llvm::Type::getInt32Ty(llvmContext), Value)));
 
     (void)FoundOldEntry;
     assert(FoundOldEntry && "Could not replace old module flag entry?");
   } else
-    Module.addModuleFlag(llvm::Module::Override,
-                         ObjectiveCGarbageCollection,
-                         Value);
+    Module->addModuleFlag(llvm::Module::Override, ObjectiveCGarbageCollection,
+                          Value);
+}
+
+void IRGenModule::cleanupClangCodeGenMetadata() {
+  // Remove llvm.ident that ClangCodeGen might have left in the module.
+  auto *LLVMIdent = Module.getNamedMetadata("llvm.ident");
+  if (LLVMIdent)
+    Module.eraseNamedMetadata(LLVMIdent);
+  emitSwiftVersionNumberIntoModule(&Module);
 }
 
 bool IRGenModule::finalize() {
@@ -1861,4 +1865,41 @@ bool IRGenModule::isConcurrencyAvailable() {
   auto deploymentAvailability =
     AvailabilityContext::forDeploymentTarget(ctx);
   return deploymentAvailability.isContainedIn(ctx.getConcurrencyAvailability());
+}
+
+/// Pretend the other files that drivers/build systems expect exist by
+/// creating empty files. Used by UseSingleModuleLLVMEmission when
+/// num-threads > 0.
+bool swift::writeEmptyOutputFilesFor(
+  const ASTContext &Context,
+  std::vector<std::string>& ParallelOutputFilenames,
+  const IRGenOptions &IRGenOpts) {
+
+  for (auto fileName : ParallelOutputFilenames) {
+    // The first output file, was use for genuine output.
+    if (fileName == ParallelOutputFilenames[0])
+      continue;
+
+    std::unique_ptr<llvm::LLVMContext> llvmContext(new llvm::LLVMContext());
+    std::unique_ptr<clang::CodeGenerator> clangCodeGen(
+      createClangCodeGenerator(const_cast<ASTContext&>(Context),
+                               *llvmContext, IRGenOpts, fileName, ""));
+    auto *llvmModule = clangCodeGen->GetModule();
+
+    auto *clangImporter = static_cast<ClangImporter *>(
+      Context.getClangModuleLoader());
+    llvmModule->setTargetTriple(
+      clangImporter->getTargetInfo().getTargetOpts().Triple);
+
+    // Add LLVM module flags.
+    auto &clangASTContext = clangImporter->getClangASTContext();
+    clangCodeGen->HandleTranslationUnit(
+        const_cast<clang::ASTContext &>(clangASTContext));
+
+    emitSwiftVersionNumberIntoModule(llvmModule);
+
+    swift::performLLVM(IRGenOpts, const_cast<ASTContext&>(Context),
+                       llvmModule, fileName);
+  }
+  return false;
 }
