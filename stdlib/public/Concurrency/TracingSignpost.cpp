@@ -35,7 +35,7 @@ namespace trace {
 
 os_log_t ActorLog;
 os_log_t TaskLog;
-OnceToken_t LogsToken;
+swift::once_t LogsToken;
 
 void setupLogs(void *unused) {
   ActorLog = os_log_create(SWIFT_LOG_CONCURRENCY_ACTOR_SUBSYSTEM,

@@ -1,4 +1,4 @@
-//===--- Mutex.cpp - Mutex support code -----------------------------------===//
+//===--- ConditionVariable.cpp - A condition variable ---------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -11,20 +11,50 @@
 //===----------------------------------------------------------------------===//
 
 #include "Error.h"
-
-#define SWIFT_FATAL_ERROR swift_Concurrency_fatalError
-
-// Include the runtime's mutex support code.
-// FIXME: figure out some reasonable way to share this stuff
-
 #include "ConditionVariable.h"
-#include "../runtime/MutexPThread.cpp"
-#include "../runtime/MutexWin32.cpp"
-#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
-  #include "swift/Runtime/MutexSingleThreaded.h"
-#endif
 
 using namespace swift;
+
+#define fatalError swift_Concurrency_fatalError
+
+#define reportError(PThreadFunction)                                           \
+  do {                                                                         \
+    int errorcode = PThreadFunction;                                           \
+    if (errorcode != 0) {                                                      \
+      fatalError(/* flags = */ 0, "'%s' failed with error '%s'(%d)\n",         \
+                 #PThreadFunction, errorName(errorcode), errorcode);           \
+    }                                                                          \
+  } while (false)
+
+#define returnTrueOrReportError(PThreadFunction, returnFalseOnEBUSY)           \
+  do {                                                                         \
+    int errorcode = PThreadFunction;                                           \
+    if (errorcode == 0)                                                        \
+      return true;                                                             \
+    if (returnFalseOnEBUSY && errorcode == EBUSY)                              \
+      return false;                                                            \
+    fatalError(/* flags = */ 0, "'%s' failed with error '%s'(%d)\n",           \
+               #PThreadFunction, errorName(errorcode), errorcode);             \
+  } while (false)
+
+static const char *errorName(int errorcode) {
+  switch (errorcode) {
+  case EINVAL:
+    return "EINVAL";
+  case EPERM:
+    return "EPERM";
+  case EDEADLK:
+    return "EDEADLK";
+  case ENOMEM:
+    return "ENOMEM";
+  case EAGAIN:
+    return "EAGAIN";
+  case EBUSY:
+    return "EBUSY";
+  default:
+    return "<unknown>";
+  }
+}
 
 void ConditionPlatformHelper::init(pthread_cond_t &condition) {
   reportError(pthread_cond_init(&condition, nullptr));

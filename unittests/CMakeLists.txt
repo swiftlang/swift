@@ -22,6 +22,7 @@ if(SWIFT_INCLUDE_TOOLS)
   if(SWIFT_BUILD_SYNTAXPARSERLIB)
     add_subdirectory(SyntaxParser)
   endif()
+  add_subdirectory(Threading)
 
   if(SWIFT_BUILD_SDK_OVERLAY)
     # Runtime tests depend on symbols in StdlibUnittest.
