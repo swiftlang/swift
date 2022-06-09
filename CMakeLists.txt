@@ -730,6 +730,7 @@ set(SWIFT_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/include")
 set(SWIFT_RUNTIME_OUTPUT_INTDIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/bin")
 set(SWIFT_LIBRARY_OUTPUT_INTDIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib")
 if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
+  # This is the normal case. We are not cross-compiling.
   set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
   set(SWIFT_EXEC_FOR_SWIFT_MODULES "${CMAKE_Swift_COMPILER}")
 elseif(BOOTSTRAPPING_MODE MATCHES "BOOTSTRAPPING.*")
@@ -744,6 +745,12 @@ elseif(BOOTSTRAPPING_MODE MATCHES "BOOTSTRAPPING.*")
   else()
     set(BOOTSTRAPPING_MODE "HOSTTOOLS")
   endif()
+elseif(BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
+  # We are building using a pre-installed host toolchain but not bootstrapping
+  # the Swift modules. This happens when building using 'build-tooling-libs'
+  # where we haven't built a new Swift compiler. Use the Swift compiler from the
+  # pre-installed host toolchain to build the Swift modules.
+  set(SWIFT_EXEC_FOR_SWIFT_MODULES "${CMAKE_Swift_COMPILER}")
 endif()
 
 if(BOOTSTRAPPING_MODE MATCHES "HOSTTOOLS|.*-WITH-HOSTLIBS")
