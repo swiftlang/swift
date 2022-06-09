@@ -39,7 +39,8 @@ getKnownTypeInfo(const TypeDecl *typeDecl, PrimitiveTypeMapping &typeMapping,
              : typeMapping.getKnownCTypeInfo(typeDecl);
 }
 
-bool isKnownCxxType(Type t, PrimitiveTypeMapping &typeMapping) {
+bool isKnownType(Type t, PrimitiveTypeMapping &typeMapping,
+                 OutputLanguageMode languageMode) {
   const TypeDecl *typeDecl;
   if (auto *typeAliasType = dyn_cast<TypeAliasType>(t.getPointer()))
     typeDecl = typeAliasType->getDecl();
@@ -47,8 +48,15 @@ bool isKnownCxxType(Type t, PrimitiveTypeMapping &typeMapping) {
     typeDecl = structDecl;
   else
     return false;
-  return getKnownTypeInfo(typeDecl, typeMapping, OutputLanguageMode::Cxx) !=
-         None;
+  return getKnownTypeInfo(typeDecl, typeMapping, languageMode) != None;
+}
+
+bool isKnownCxxType(Type t, PrimitiveTypeMapping &typeMapping) {
+  return isKnownType(t, typeMapping, OutputLanguageMode::Cxx);
+}
+
+bool isKnownCType(Type t, PrimitiveTypeMapping &typeMapping) {
+  return isKnownType(t, typeMapping, OutputLanguageMode::ObjC);
 }
 
 // Prints types in the C function signature that corresponds to the
@@ -164,6 +172,7 @@ void DeclAndTypeClangFunctionPrinter::printFunctionSignature(
   // Print out the return type.
   bool isIndirectReturnType =
       kind == FunctionSignatureKind::CFunctionProto &&
+      !isKnownCType(resultTy, typeMapping) &&
       interopContext.getIrABIDetails().shouldReturnIndirectly(resultTy);
   if (!isIndirectReturnType) {
     OptionalTypeKind retKind;

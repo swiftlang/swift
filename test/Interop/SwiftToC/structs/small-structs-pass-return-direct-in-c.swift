@@ -136,13 +136,13 @@ public func printStructI8AndU32AndI16(_ x: StructI8AndU32AndI16) {
 
 // CHECK:      static inline void swift_interop_returnDirect_Structs_StructU16AndPointer(char * _Nonnull result, struct swift_interop_stub_Structs_StructU16AndPointer value) __attribute__((always_inline)) {
 // CHECK-NEXT:  memcpy(result + 0, &value._1, 1);
-// CHECK-NEXT:  memcpy(result + 8, &value._2, 8);
+// CHECK-NEXT:  memcpy(result + [[PTRSIZE:[48]]], &value._2, [[PTRSIZE]]);
 // CHECK-NEXT: }
 
 // CHECK:      static inline struct swift_interop_stub_Structs_StructU16AndPointer swift_interop_passDirect_Structs_StructU16AndPointer(const char * _Nonnull value) __attribute__((always_inline)) {
 // CHECK-NEXT:  struct swift_interop_stub_Structs_StructU16AndPointer result;
 // CHECK-NEXT:  memcpy(&result._1, value + 0, 1);
-// CHECK-NEXT:  memcpy(&result._2, value + 8, 8);
+// CHECK-NEXT:  memcpy(&result._2, value + [[PTRSIZE]], [[PTRSIZE]]);
 // CHECK-NEXT:  return result;
 // CHECK-NEXT: }
 
