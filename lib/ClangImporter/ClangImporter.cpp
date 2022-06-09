@@ -4132,35 +4132,49 @@ bool ClangImporter::Implementation::lookupValue(SwiftLookupTable &table,
   bool declFound = false;
 
   if (name.isOperator()) {
-
-    auto findAndConsumeBaseNameFromTable = [this, &table, &consumer, &declFound,
-                                            &name](DeclBaseName declBaseName) {
-      for (auto entry : table.lookupMemberOperators(declBaseName)) {
-        if (isVisibleClangEntry(entry)) {
-          if (auto decl = dyn_cast_or_null<ValueDecl>(
-                  importDeclReal(entry->getMostRecentDecl(), CurrentVersion))) {
-            consumer.foundDecl(decl, DeclVisibilityKind::VisibleAtTopLevel);
-            declFound = true;
-            for (auto alternate : getAlternateDecls(decl)) {
-              if (alternate->getName().matchesRef(name)) {
-                consumer.foundDecl(alternate, DeclVisibilityKind::DynamicLookup,
-                                   DynamicLookupInfo::AnyObject);
-              }
-            }
-          }
+    for (auto entry : table.lookupMemberOperators(name.getBaseName())) {
+      if (isVisibleClangEntry(entry)) {
+        if (auto decl = dyn_cast_or_null<ValueDecl>(
+                importDeclReal(entry->getMostRecentDecl(), CurrentVersion))) {
+          consumer.foundDecl(decl, DeclVisibilityKind::VisibleAtTopLevel);
+          declFound = true;
         }
       }
-    };
-
-    findAndConsumeBaseNameFromTable(name.getBaseName());
+    }
 
     // If CXXInterop is enabled we need to check the modified operator name as
     // well
     if (SwiftContext.LangOpts.EnableCXXInterop) {
-      auto declBaseName = DeclBaseName(SwiftContext.getIdentifier(
+      auto funcBaseName = DeclBaseName(SwiftContext.getIdentifier(
           "__operator" + getOperatorNameForToken(
                              name.getBaseName().getIdentifier().str().str())));
-      findAndConsumeBaseNameFromTable(declBaseName);
+      for (auto entry : table.lookupMemberOperators(funcBaseName)) {
+        if (isVisibleClangEntry(entry)) {
+          if (auto func = dyn_cast_or_null<ValueDecl>(
+                  importDeclReal(entry->getMostRecentDecl(), CurrentVersion))) {
+            // `func` is not an operator, it is a regular function which has a
+            // name that starts with `__operator`. We were asked for a
+            // corresponding synthesized Swift operator, so let's retrieve it.
+
+            // The synthesized Swift operator was added as an alternative decl
+            // for `func`.
+            auto alternateDecls = getAlternateDecls(func);
+            // Did we actually synthesize an operator for `func`?
+            if (alternateDecls.empty())
+              continue;
+            // If we did, then we should have only synthesized one.
+            assert(alternateDecls.size() == 1 &&
+                   "expected only the synthesized operator as an alternative");
+
+            auto synthesizedOperator = alternateDecls.front();
+            assert(synthesizedOperator->isOperator() &&
+                   "expected the alternative to be a synthesized operator");
+
+            consumer.foundDecl(synthesizedOperator,
+                               DeclVisibilityKind::VisibleAtTopLevel);
+          }
+        }
+      }
     }
   }
 
