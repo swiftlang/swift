@@ -9,8 +9,6 @@
 // REQUIRES: concurrency
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
-//
-// UNSUPPORTED: OS=macosx,ios,watchos,tvos
 
 import Swift
 import _Concurrency
