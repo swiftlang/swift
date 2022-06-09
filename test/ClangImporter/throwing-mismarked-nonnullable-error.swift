@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -import-objc-header %S/Inputs/throwing-mismarked-nonnullable-error.h %s -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend -enable-objc-interop -import-objc-header %S/Inputs/throwing-mismarked-nonnullable-error.h %s -emit-sil | %FileCheck %s
+
+// REQUIRES: objc_interop
 
 // Make sure that we do not crash when importing a non-null NSError as
 // throwing. We really just shouldn't expect this at all. I filed: rdar://94656178
