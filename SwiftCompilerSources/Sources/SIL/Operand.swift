@@ -70,6 +70,9 @@ public struct OperandArray : RandomAccessCollection, CustomReflectable {
     return Mirror(self, children: c)
   }
   
+  /// Returns a sub-array defined by `bounds`.
+  ///
+  /// Note: this does not return a Slice. The first index of the returnd array is always 0.
   public subscript(bounds: Range<Int>) -> OperandArray {
     precondition(bounds.lowerBound >= 0)
     precondition(bounds.upperBound <= endIndex)
