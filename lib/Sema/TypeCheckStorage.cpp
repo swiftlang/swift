@@ -2690,7 +2690,7 @@ static VarDecl *synthesizePropertyWrapperProjectionVar(
 
 static void typeCheckSynthesizedWrapperInitializer(VarDecl *wrappedVar,
                                                    Expr *&initializer,
-                                                   bool contextualize = false) {
+                                                   bool contextualize) {
   auto *dc = wrappedVar->getInnermostDeclContext();
   auto &ctx = wrappedVar->getASTContext();
   auto *initContext = new (ctx) PropertyWrapperInitializer(
@@ -2985,7 +2985,8 @@ PropertyWrapperInitializerInfoRequest::evaluate(Evaluator &evaluator,
         && !wrapperInfo.defaultInit) {
       auto ty = parentPBD->getPattern(patternNumber)->getType();
       if (auto defaultInit = TypeChecker::buildDefaultInitializer(ty)) {
-        typeCheckSynthesizedWrapperInitializer(var, defaultInit);
+        typeCheckSynthesizedWrapperInitializer(var, defaultInit,
+                                               /*contextualize=*/false);
         parentPBD->setInit(0, defaultInit);
         parentPBD->setInitializerChecked(0);
       }
@@ -3003,6 +3004,8 @@ PropertyWrapperInitializerInfoRequest::evaluate(Evaluator &evaluator,
         // FIXME: Record this expression somewhere so that DI can perform the
         // initialization itself.
         Expr *defaultInit = nullptr;
+        // Only contextualize local wrapped property, the rest of wrapped
+        // property will be contextualized in visitPatternBindingDecl.
         typeCheckSynthesizedWrapperInitializer(var, defaultInit, dc->isLocalContext());
         pbd->setInit(0, defaultInit);
         pbd->setInitializerChecked(0);
@@ -3073,7 +3076,8 @@ PropertyWrapperInitializerInfoRequest::evaluate(Evaluator &evaluator,
              !var->getName().hasDollarPrefix()) {
     wrappedValueInit = PropertyWrapperValuePlaceholderExpr::create(
         ctx, var->getSourceRange(), var->getType(), /*wrappedValue=*/nullptr);
-    typeCheckSynthesizedWrapperInitializer(var, wrappedValueInit, true);
+    typeCheckSynthesizedWrapperInitializer(var, wrappedValueInit,
+                                           /*contextualize=*/true);
   }
 
   return PropertyWrapperInitializerInfo(wrappedValueInit, projectedValueInit);
