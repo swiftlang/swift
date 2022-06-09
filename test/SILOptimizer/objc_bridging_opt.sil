@@ -1,0 +1,395 @@
+// RUN: %target-sil-opt -objc-bridging-opt %s | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+class NSString {}
+class NSArray {}
+
+enum E {
+  case A(NSString)
+  case B
+}
+
+sil [readonly] @$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ : $@convention(method) (@guaranteed Optional<NSString>, @thin String.Type) -> @owned String
+sil [_semantics "convertToObjectiveC"] @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF : $@convention(method) (@guaranteed String) -> @owned NSString
+sil @useNSString : $@convention(c) (NSString) -> ()
+sil @useOptNSString : $@convention(c) (Optional<NSString>) -> ()
+
+sil [readonly] @$sSa10FoundationE36_unconditionallyBridgeFromObjectiveCySayxGSo7NSArrayCSgFZ : $@convention(method) <τ_0_0> (@guaranteed Optional<NSArray>, @thin Array<τ_0_0>.Type) -> @owned Array<τ_0_0>
+sil [_semantics "convertToObjectiveC"] @$sSa10FoundationE19_bridgeToObjectiveCSo7NSArrayCyF : $@convention(method) <τ_0_0> (@guaranteed Array<τ_0_0>) -> @owned NSArray
+
+// CHECK-LABEL: sil [ossa] @nonOptionalStringBridgingSimple
+// CHECK-NOT:    apply
+// CHECK:        [[BF:%[0-9]+]] = function_ref @$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ
+// CHECK:        [[MT:%[0-9]+]] = metatype $@thin String.Type
+// CHECK-NOT:    apply
+// CHECK:        [[COPIED:%[0-9]+]] = copy_value %0
+// CHECK-NEXT:   switch_enum [[COPIED]] : $Optional<NSString>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+// CHECK:      bb1([[SOME:%[0-9]+]] : @owned $NSString):
+// CHECK-NEXT:   br bb3([[SOME]] : $NSString)
+// CHECK:      bb2:
+// CHECK:        [[EMPTY:%[0-9]+]] = apply [[BF]](%0, [[MT]])
+// CHECK:        [[BRIDGEF:%[0-9]+]] = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
+// CHECK:        [[EMPTYNS:%[0-9]+]] = apply [[BRIDGEF]]([[EMPTY]])
+// CHECK:        br bb3([[EMPTYNS]] : $NSString)
+// CHECK:      bb3([[RESULT:%[0-9]+]] : @owned $NSString):
+// CHECK-NEXT:   apply
+// CHECK-NOT:    apply
+// CHECK:        return [[RESULT]]
+// CHECK:      } // end sil function 'nonOptionalStringBridgingSimple' 
+sil [ossa] @nonOptionalStringBridgingSimple : $@convention(thin) (@guaranteed Optional<NSString>) -> @owned NSString {
+bb0(%0 : @guaranteed $Optional<NSString>):
+  %2 = function_ref @$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ : $@convention(method) (@guaranteed Optional<NSString>, @thin String.Type) -> @owned String
+  %3 = metatype $@thin String.Type
+  %4 = apply %2(%0, %3) : $@convention(method) (@guaranteed Optional<NSString>, @thin String.Type) -> @owned String
+  %5 = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF : $@convention(method) (@guaranteed String) -> @owned NSString
+  %6 = apply %5(%4) : $@convention(method) (@guaranteed String) -> @owned NSString
+  destroy_value %4 : $String
+  return %6 : $NSString
+}
+
+// CHECK-LABEL: sil [ossa] @testArrays
+// CHECK:      bb3([[RESULT:%[0-9]+]] : @owned $NSArray):
+// CHECK:        return [[RESULT]]
+// CHECK-NOT:    apply
+// CHECK:       } // end sil function 'testArrays' 
+sil [ossa] @testArrays : $@convention(thin) (@guaranteed Optional<NSArray>) -> @owned NSArray {
+bb0(%0 : @guaranteed $Optional<NSArray>):
+  %2 = function_ref @$sSa10FoundationE36_unconditionallyBridgeFromObjectiveCySayxGSo7NSArrayCSgFZ : $@convention(method) <τ_0_0> (@guaranteed Optional<NSArray>, @thin Array<τ_0_0>.Type) -> @owned Array<τ_0_0>
+  %3 = metatype $@thin Array<Any>.Type
+  %4 = apply %2<Any>(%0, %3) : $@convention(method) <τ_0_0> (@guaranteed Optional<NSArray>, @thin Array<τ_0_0>.Type) -> @owned Array<τ_0_0>
+  %5 = function_ref @$sSa10FoundationE19_bridgeToObjectiveCSo7NSArrayCyF : $@convention(method) <τ_0_0> (@guaranteed Array<τ_0_0>) -> @owned NSArray
+  %6 = apply %5<Any>(%4) : $@convention(method) <τ_0_0> (@guaranteed Array<τ_0_0>) -> @owned NSArray
+  destroy_value %4 : $Array<Any>
+  return %6 : $NSArray
+}
+
+// CHECK-LABEL: sil [ossa] @nonOptionalStringBridgingInLoop
+// CHECK:    bb2:
+// CHECK:      function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
+// CHECK:    bb3([[S:%[0-9]+]] : @owned $NSString):
+// CHECK:    bb4:
+// CHECK:      [[C:%[0-9]+]] = copy_value [[S]]
+// CHECK:      [[F:%[0-9]+]] = function_ref @useNSString
+// CHECK:      apply [[F]]([[C]])
+// CHECK:    bb5:
+// CHECK:  } // end sil function 'nonOptionalStringBridgingInLoop'
+sil [ossa] @nonOptionalStringBridgingInLoop : $@convention(thin) (@guaranteed Optional<NSString>) -> () {
+bb0(%0 : @guaranteed $Optional<NSString>):
+  %2 = function_ref @$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ : $@convention(method) (@guaranteed Optional<NSString>, @thin String.Type) -> @owned String
+  %3 = metatype $@thin String.Type
+  %4 = apply %2(%0, %3) : $@convention(method) (@guaranteed Optional<NSString>, @thin String.Type) -> @owned String
+  %b = begin_borrow [lexical] %4 : $String
+  br bb1
+
+bb1:
+  %5 = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF : $@convention(method) (@guaranteed String) -> @owned NSString
+  %6 = apply %5(%b) : $@convention(method) (@guaranteed String) -> @owned NSString
+  %9 = function_ref @useNSString : $@convention(c) (NSString) -> ()
+  %10 = apply %9(%6) : $@convention(c) (NSString) -> ()
+  destroy_value %6 : $NSString
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  end_borrow %b : $String
+  destroy_value %4 : $String
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @optionalStringBridgingSimple
+// CHECK:      bb0({{.*}}):
+// CHECK:        [[C:%[0-9]+]] = copy_value %0
+// CHECK:      bb4({{.*}}):
+// CHECK-NOT:     apply
+// CHECK-NOT:     enum
+// CHECK:         return [[C]]
+// CHECK:      } // end sil function 'optionalStringBridgingSimple'
+sil [ossa] @optionalStringBridgingSimple : $@convention(thin) (@owned Optional<NSString>) -> @owned Optional<NSString> {
+bb0(%0 : @owned $Optional<NSString>):
+  switch_enum %0 : $Optional<NSString>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%3 : @owned $NSString):
+  %4 = function_ref @$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ : $@convention(method) (@guaranteed Optional<NSString>, @thin String.Type) -> @owned String
+  %5 = enum $Optional<NSString>, #Optional.some!enumelt, %3 : $NSString
+  %6 = metatype $@thin String.Type
+  %7 = apply %4(%5, %6) : $@convention(method) (@guaranteed Optional<NSString>, @thin String.Type) -> @owned String
+  %8 = enum $Optional<String>, #Optional.some!enumelt, %7 : $String
+  destroy_value %5 : $Optional<NSString>
+  br bb3(%8 : $Optional<String>)
+
+bb2:
+  %11 = enum $Optional<String>, #Optional.none!enumelt
+  br bb3(%11 : $Optional<String>)
+
+bb3(%13 : @owned $Optional<String>):
+  switch_enum %13 : $Optional<String>, case #Optional.some!enumelt: bb4, case #Optional.none!enumelt: bb5
+
+bb4(%15 : @owned $String):
+  %16 = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF : $@convention(method) (@guaranteed String) -> @owned NSString
+  %17 = apply %16(%15) : $@convention(method) (@guaranteed String) -> @owned NSString
+  %18 = enum $Optional<NSString>, #Optional.some!enumelt, %17 : $NSString
+  destroy_value %15 : $String
+  br bb6(%18 : $Optional<NSString>)
+
+bb5:
+  %21 = enum $Optional<NSString>, #Optional.none!enumelt
+  br bb6(%21 : $Optional<NSString>)
+
+bb6(%23 : @owned $Optional<NSString>):
+  return %23 : $Optional<NSString>
+}
+
+// CHECK-LABEL: sil [ossa] @dontOptimizeDifferentEnums
+// CHECK:      apply
+// CHECK:      apply
+// CHECK:    bb6([[S:%[0-9]+]] : @owned $Optional<NSString>):
+// CHECK:      return [[S]]
+// CHECK:    } // end sil function 'dontOptimizeDifferentEnums'
+sil [ossa] @dontOptimizeDifferentEnums : $@convention(thin) (@owned E) -> @owned Optional<NSString> {
+bb0(%0 : @owned $E):
+  switch_enum %0 : $E, case #E.A!enumelt: bb1, case #E.B!enumelt: bb2
+
+bb1(%3 : @owned $NSString):
+  %4 = function_ref @$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ : $@convention(method) (@guaranteed Optional<NSString>, @thin String.Type) -> @owned String
+  %5 = enum $Optional<NSString>, #Optional.some!enumelt, %3 : $NSString
+  %6 = metatype $@thin String.Type
+  %7 = apply %4(%5, %6) : $@convention(method) (@guaranteed Optional<NSString>, @thin String.Type) -> @owned String
+  %8 = enum $Optional<String>, #Optional.some!enumelt, %7 : $String
+  destroy_value %5 : $Optional<NSString>
+  br bb3(%8 : $Optional<String>)
+
+bb2:
+  %11 = enum $Optional<String>, #Optional.none!enumelt
+  br bb3(%11 : $Optional<String>)
+
+bb3(%13 : @owned $Optional<String>):
+  switch_enum %13 : $Optional<String>, case #Optional.some!enumelt: bb4, case #Optional.none!enumelt: bb5
+
+bb4(%15 : @owned $String):
+  %16 = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF : $@convention(method) (@guaranteed String) -> @owned NSString
+  %17 = apply %16(%15) : $@convention(method) (@guaranteed String) -> @owned NSString
+  %18 = enum $Optional<NSString>, #Optional.some!enumelt, %17 : $NSString
+  destroy_value %15 : $String
+  br bb6(%18 : $Optional<NSString>)
+
+bb5:
+  %21 = enum $Optional<NSString>, #Optional.none!enumelt
+  br bb6(%21 : $Optional<NSString>)
+
+bb6(%23 : @owned $Optional<NSString>):
+  return %23 : $Optional<NSString>
+}
+
+// CHECK-LABEL: sil [ossa] @singleUseViolation1
+// CHECK:      {{^}}bb0({{.*}}):
+// CHECK:        [[C:%[0-9]+]] = copy_value %0
+// CHECK:      {{^}}bb4({{.*}}):
+// CHECK:        [[ED:%[0-9]+]] = unchecked_enum_data [[C]]
+// CHECK:        [[E:%[0-9]+]] = enum {{.*}} [[ED]]
+// CHECK:        br bb6([[E]] : $Optional<NSString>)
+// CHECK:    } // end sil function 'singleUseViolation1'
+sil [ossa] @singleUseViolation1 : $@convention(thin) (@owned Optional<NSString>) -> @owned Optional<NSString> {
+bb0(%0 : @owned $Optional<NSString>):
+  switch_enum %0 : $Optional<NSString>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%3 : @owned $NSString):
+  %4 = function_ref @$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ : $@convention(method) (@guaranteed Optional<NSString>, @thin String.Type) -> @owned String
+  %5 = enum $Optional<NSString>, #Optional.some!enumelt, %3 : $NSString
+  %6 = metatype $@thin String.Type
+  %7 = apply %4(%5, %6) : $@convention(method) (@guaranteed Optional<NSString>, @thin String.Type) -> @owned String
+  %8 = enum $Optional<String>, #Optional.some!enumelt, %7 : $String
+  destroy_value %5 : $Optional<NSString>
+  br bb3(%8 : $Optional<String>)
+
+bb2:
+  %11 = enum $Optional<String>, #Optional.none!enumelt
+  br bb3(%11 : $Optional<String>)
+
+bb3(%13 : @owned $Optional<String>):
+  switch_enum %13 : $Optional<String>, case #Optional.some!enumelt: bb4, case #Optional.none!enumelt: bb5
+
+bb4(%15 : @owned $String):
+  %16 = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF : $@convention(method) (@guaranteed String) -> @owned NSString
+  %17 = apply %16(%15) : $@convention(method) (@guaranteed String) -> @owned NSString
+  %18 = enum $Optional<NSString>, #Optional.some!enumelt, %17 : $NSString
+  destroy_value %15 : $String
+  br bb6(%18 : $Optional<NSString>)
+
+bb5:
+  %21 = enum $Optional<NSString>, #Optional.none!enumelt
+  %b = begin_borrow %21 : $Optional<NSString>
+  end_borrow %b : $Optional<NSString>
+  br bb6(%21 : $Optional<NSString>)
+
+bb6(%23 : @owned $Optional<NSString>):
+  return %23 : $Optional<NSString>
+}
+
+// CHECK-LABEL: sil [ossa] @singleUseViolation2
+// CHECK:      {{^}}bb0({{.*}}):
+// CHECK:        [[C:%[0-9]+]] = copy_value %0
+// CHECK:      {{^}}bb4({{.*}}):
+// CHECK:        [[ED:%[0-9]+]] = unchecked_enum_data [[C]]
+// CHECK:        [[E:%[0-9]+]] = enum {{.*}} [[ED]]
+// CHECK:        br bb6([[E]] : $Optional<NSString>)
+// CHECK:    } // end sil function 'singleUseViolation2'
+sil [ossa] @singleUseViolation2 : $@convention(thin) (@owned Optional<NSString>) -> @owned Optional<NSString> {
+bb0(%0 : @owned $Optional<NSString>):
+  switch_enum %0 : $Optional<NSString>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%3 : @owned $NSString):
+  %4 = function_ref @$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ : $@convention(method) (@guaranteed Optional<NSString>, @thin String.Type) -> @owned String
+  %5 = enum $Optional<NSString>, #Optional.some!enumelt, %3 : $NSString
+  %6 = metatype $@thin String.Type
+  %7 = apply %4(%5, %6) : $@convention(method) (@guaranteed Optional<NSString>, @thin String.Type) -> @owned String
+  %8 = enum $Optional<String>, #Optional.some!enumelt, %7 : $String
+  destroy_value %5 : $Optional<NSString>
+  br bb3(%8 : $Optional<String>)
+
+bb2:
+  %11 = enum $Optional<String>, #Optional.none!enumelt
+  br bb3(%11 : $Optional<String>)
+
+bb3(%13 : @owned $Optional<String>):
+  switch_enum %13 : $Optional<String>, case #Optional.some!enumelt: bb4, case #Optional.none!enumelt: bb5
+
+bb4(%15 : @owned $String):
+  %16 = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF : $@convention(method) (@guaranteed String) -> @owned NSString
+  %17 = apply %16(%15) : $@convention(method) (@guaranteed String) -> @owned NSString
+  %b = begin_borrow %17 : $NSString
+  end_borrow %b : $NSString
+  %18 = enum $Optional<NSString>, #Optional.some!enumelt, %17 : $NSString
+  destroy_value %15 : $String
+  br bb6(%18 : $Optional<NSString>)
+
+bb5:
+  %21 = enum $Optional<NSString>, #Optional.none!enumelt
+  br bb6(%21 : $Optional<NSString>)
+
+bb6(%23 : @owned $Optional<NSString>):
+  return %23 : $Optional<NSString>
+}
+
+// CHECK-LABEL: sil [ossa] @optionalStringBridgingLoop
+// CHECK:      {{^}}bb0({{.*}}):
+// CHECK:        [[C:%[0-9]+]] = copy_value %0
+// CHECK:      {{^}}bb7:
+// CHECK:        [[C2:%[0-9]+]] = copy_value [[C]]
+// CHECK:        [[F:%[0-9]+]] = function_ref @useOptNSString
+// CHECK:        apply [[F]]([[C2]])
+// CHECK:      {{^}}bb8:
+// CHECK:      {{^}}bb9:
+// CHECK:        destroy_value [[C]]
+// CHECK:      } // end sil function 'optionalStringBridgingLoop'
+sil [ossa] @optionalStringBridgingLoop : $@convention(thin) (@owned Optional<NSString>) -> () {
+bb0(%0 : @owned $Optional<NSString>):
+  switch_enum %0 : $Optional<NSString>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+
+bb1(%3 : @owned $NSString):
+  %4 = function_ref @$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ : $@convention(method) (@guaranteed Optional<NSString>, @thin String.Type) -> @owned String
+  %5 = enum $Optional<NSString>, #Optional.some!enumelt, %3 : $NSString
+  %6 = metatype $@thin String.Type
+  %7 = apply %4(%5, %6) : $@convention(method) (@guaranteed Optional<NSString>, @thin String.Type) -> @owned String
+  %8 = enum $Optional<String>, #Optional.some!enumelt, %7 : $String
+  destroy_value %5 : $Optional<NSString>
+  br bb3(%8 : $Optional<String>)
+
+bb2:
+  %11 = enum $Optional<String>, #Optional.none!enumelt
+  br bb3(%11 : $Optional<String>)
+
+
+bb3(%13 : @owned $Optional<String>):
+  %14 = begin_borrow [lexical] %13 : $Optional<String>
+  br bb4
+
+bb4:
+  switch_enum %14 : $Optional<String>, case #Optional.some!enumelt: bb5, case #Optional.none!enumelt: bb6
+
+bb5(%77 : @guaranteed $String):
+  %78 = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF : $@convention(method) (@guaranteed String) -> @owned NSString
+  %79 = apply %78(%77) : $@convention(method) (@guaranteed String) -> @owned NSString
+  %80 = enum $Optional<NSString>, #Optional.some!enumelt, %79 : $NSString
+  br bb7(%80 : $Optional<NSString>)
+
+bb6:
+  %82 = enum $Optional<NSString>, #Optional.none!enumelt
+  br bb7(%82 : $Optional<NSString>)
+
+bb7(%84 : @owned $Optional<NSString>):
+  %85 = function_ref @useOptNSString : $@convention(c) (Optional<NSString>) -> ()
+  %86 = apply %85(%84) : $@convention(c) (Optional<NSString>) -> ()
+  destroy_value %84 : $Optional<NSString>
+  cond_br undef, bb8, bb9
+
+bb8:
+  br bb4
+
+bb9:
+  end_borrow %14 : $Optional<String>
+  destroy_value %13 : $Optional<String>
+  %93 = tuple ()
+  return %93 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @optionalStringToNonOptional
+// CHECK:      {{^}}bb0({{.*}}):
+// CHECK:        [[C:%[0-9]+]] = copy_value %0
+// CHECK:      {{^}}bb5({{.*}}):
+// CHECK:        [[ED:%[0-9]+]] = unchecked_enum_data [[C]]
+// CHECK:        [[F:%[0-9]+]] = function_ref @useNSString
+// CHECK:        apply [[F]]([[ED]])
+// CHECK:        destroy_value [[ED]]
+// CHECK:      {{^}}bb6:
+// CHECK:      } // end sil function 'optionalStringToNonOptional'
+sil [ossa] @optionalStringToNonOptional : $@convention(thin) (@owned Optional<NSString>) -> () {
+bb0(%0 : @owned $Optional<NSString>):
+  switch_enum %0 : $Optional<NSString>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%3 : @owned $NSString):
+  %4 = function_ref @$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ : $@convention(method) (@guaranteed Optional<NSString>, @thin String.Type) -> @owned String
+  %5 = enum $Optional<NSString>, #Optional.some!enumelt, %3 : $NSString
+  %6 = metatype $@thin String.Type
+  %7 = apply %4(%5, %6) : $@convention(method) (@guaranteed Optional<NSString>, @thin String.Type) -> @owned String
+  %8 = enum $Optional<String>, #Optional.some!enumelt, %7 : $String
+  destroy_value %5 : $Optional<NSString>
+  br bb3(%8 : $Optional<String>)
+
+bb2:
+  %11 = enum $Optional<String>, #Optional.none!enumelt
+  br bb3(%11 : $Optional<String>)
+
+bb3(%13 : @owned $Optional<String>):
+  switch_enum %13 : $Optional<String>, case #Optional.some!enumelt: bb5, case #Optional.none!enumelt: bb4
+
+bb4:
+  br bb6
+
+bb5(%16 : @owned $String):
+  %17 = begin_borrow [lexical] %16 : $String
+  %19 = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF : $@convention(method) (@guaranteed String) -> @owned NSString
+  %20 = apply %19(%17) : $@convention(method) (@guaranteed String) -> @owned NSString
+  %21 = function_ref @useNSString : $@convention(c) (NSString) -> ()
+  %22 = apply %21(%20) : $@convention(c) (NSString) -> ()
+  end_borrow %17 : $String
+  destroy_value %20 : $NSString
+  destroy_value %16 : $String
+  br bb6
+
+bb6:
+  %27 = tuple ()
+  return %27 : $()
+}
+

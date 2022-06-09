@@ -364,6 +364,10 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   // splits up copy_addr.
   P.addCopyForwarding();
 
+  // This DCE pass is the only DCE on ownership SIL. It can cleanup OSSA related
+  // dead code, e.g. left behind by the ObjCBridgingOptimization.
+  P.addDCE();
+
   // Optimize copies from a temporary (an "l-value") to a destination.
   P.addTempLValueOpt();
 
@@ -612,6 +616,7 @@ static void addHighLevelFunctionPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("HighLevel,Function+EarlyLoopOpt");
   // FIXME: update EagerSpecializer to be a function pass!
   P.addEagerSpecializer();
+  P.addObjCBridgingOptimization();
 
   addFunctionPasses(P, OptimizationLevelKind::HighLevel);
 

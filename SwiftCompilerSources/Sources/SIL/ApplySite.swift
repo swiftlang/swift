@@ -30,7 +30,10 @@ extension ApplySite {
   public var callee: Value { operands[ApplyOperands.calleeOperandIndex].value }
 
   public var arguments: LazyMapSequence<OperandArray, Value> {
-    operands[1..<operands.count].lazy.map { $0.value }
+    let numArgs = ApplySite_getNumArguments(bridged)
+    let offset = ApplyOperands.firstArgumentIndex
+    let argOps = operands[offset..<(numArgs + offset)]
+    return argOps.lazy.map { $0.value }
   }
 
   public var substitutionMap: SubstitutionMap {

@@ -328,6 +328,7 @@ SwiftInt CondBranchInst_getNumTrueArgs(BridgedInstruction cbr);
 BridgedSubstitutionMap ApplySite_getSubstitutionMap(BridgedInstruction inst);
 BridgedArgumentConvention
 ApplySite_getArgumentConvention(BridgedInstruction inst, SwiftInt calleeArgIdx);
+SwiftInt ApplySite_getNumArguments(BridgedInstruction inst);
 
 BridgedInstruction SILBuilder_createBuiltinBinaryFunction(
           BridgedBuilder builder, BridgedStringRef name,
