@@ -177,7 +177,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   For example, this allows writing down the types `some Collection<Int>` and
   `any Collection<Int>`.
 
-* References to `optional` methods on a protocol metatype, as well as references to dynamically looked up methods on the `AnyObject` metatype are now supported. These references always have the type of a function that accepts a single argument and returns an optional value of function type:
+* References to `optional` methods on a protocol metatype, as well as references to dynamically looked up methods on `AnyObject` are now fully supported. The type of such a reference, formerly a direct optional by mistake, has been altered to that of a function that accepts a single argument and returns an optional value of function type:
 
   ```swift
   class Object {
@@ -192,6 +192,9 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
   let didUpdateObject: (any P) -> ((Int) -> Void)? = P.didUpdateObject
   ```
+  
+  > **Note**  
+  > Due to the change in types, selectors for foregoing methods that require writing out the type explicitly for disambiguation will no longer compile. Authors have the options of either fixing up the type or resorting to the `#if swift(<=5.7)` directive to retain compatibility with older compiler versions.
 
 * [SE-0349][]:
 
