@@ -798,6 +798,17 @@ CanType CanType::getOptionalObjectTypeImpl(CanType type) {
   return CanType();
 }
 
+Type TypeBase::wrapInOptionalType() const {
+  auto &ctx = getASTContext();
+  auto *result = BoundGenericEnumType::get(ctx.getOptionalDecl(), Type(),
+                                           { getCanonicalType() });
+  return result;
+}
+
+CanType CanType::wrapInOptionalTypeImpl(CanType type) {
+  return type->wrapInOptionalType()->getCanonicalType();
+}
+
 Type TypeBase::getAnyPointerElementType(PointerTypeKind &PTK) {
   auto &C = getASTContext();
   if (isUnsafeMutableRawPointer()) {
