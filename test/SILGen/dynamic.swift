@@ -72,12 +72,12 @@ protocol Proto {
 // CHECK-LABEL: sil hidden [exact_self_class] [ossa] @$s7dynamic3FooC{{.*}}tcfC
 // CHECK:         function_ref @$s7dynamic3FooC{{.*}}tcfc
 
-// CHECK-LABEL: sil hidden [thunk] [ossa] @$s7dynamic3{{[_0-9a-zA-Z]*}}fcTo
-// CHECK-LABEL: sil hidden [thunk] [ossa] @$s7dynamic3FooC10objcMethod{{[_0-9a-zA-Z]*}}FTo
-// CHECK-LABEL: sil hidden [transparent] [thunk] [ossa] @$s7dynamic3FooC8objcPropSivgTo
-// CHECK-LABEL: sil hidden [transparent] [thunk] [ossa] @$s7dynamic3FooC8objcPropSivsTo
-// CHECK-LABEL: sil hidden [thunk] [ossa] @$s7dynamic3FooC4objcSiyXl_tcigTo
-// CHECK-LABEL: sil hidden [thunk] [ossa] @$s7dynamic3FooC4objcSiyXl_tcisTo
+// CHECK-LABEL: sil private [thunk] [ossa] @$s7dynamic3{{[_0-9a-zA-Z]*}}fcTo
+// CHECK-LABEL: sil private [thunk] [ossa] @$s7dynamic3FooC10objcMethod{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s7dynamic3FooC8objcPropSivgTo
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s7dynamic3FooC8objcPropSivsTo
+// CHECK-LABEL: sil private [thunk] [ossa] @$s7dynamic3FooC4objcSiyXl_tcigTo
+// CHECK-LABEL: sil private [thunk] [ossa] @$s7dynamic3FooC4objcSiyXl_tcisTo
 
 // TODO: dynamic initializing ctor must be objc dispatched
 // CHECK-LABEL: sil hidden [ossa] @$s7dynamic3{{[_0-9a-zA-Z]*}}fC
@@ -85,12 +85,12 @@ protocol Proto {
 // CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [ossa] @$s7dynamic3{{[_0-9a-zA-Z]*}}fcTD
 // CHECK:         objc_method {{%.*}} : $Foo, #Foo.init!initializer.foreign :
 
-// CHECK-LABEL: sil hidden [thunk] [ossa] @$s7dynamic3{{[_0-9a-zA-Z]*}}fcTo
-// CHECK-LABEL: sil hidden [thunk] [ossa] @$s7dynamic3FooC0A6Method{{[_0-9a-zA-Z]*}}FTo
-// CHECK-LABEL: sil hidden [transparent] [thunk] [ossa] @$s7dynamic3FooC0A4PropSivgTo
-// CHECK-LABEL: sil hidden [transparent] [thunk] [ossa] @$s7dynamic3FooC0A4PropSivsTo
-// CHECK-LABEL: sil hidden [thunk] [ossa] @$s7dynamic3FooCAAS2i_tcigTo
-// CHECK-LABEL: sil hidden [thunk] [ossa] @$s7dynamic3FooCAAS2i_tcisTo
+// CHECK-LABEL: sil private [thunk] [ossa] @$s7dynamic3{{[_0-9a-zA-Z]*}}fcTo
+// CHECK-LABEL: sil private [thunk] [ossa] @$s7dynamic3FooC0A6Method{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s7dynamic3FooC0A4PropSivgTo
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s7dynamic3FooC0A4PropSivsTo
+// CHECK-LABEL: sil private [thunk] [ossa] @$s7dynamic3FooCAAS2i_tcigTo
+// CHECK-LABEL: sil private [thunk] [ossa] @$s7dynamic3FooCAAS2i_tcisTo
 
 // Protocol witnesses use best appropriate dispatch
 

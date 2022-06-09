@@ -95,6 +95,7 @@ public:
   Job(JobFlags flags, JobInvokeFunction *invoke,
       const HeapMetadata *metadata = &jobHeapMetadata)
       : HeapObject(metadata), Flags(flags), RunJob(invoke) {
+    initHeapObject();
     Voucher = voucher_copy();
     assert(!isAsyncTask() && "wrong constructor for a task");
   }
@@ -103,6 +104,7 @@ public:
       const HeapMetadata *metadata = &jobHeapMetadata,
       bool captureCurrentVoucher = true)
       : HeapObject(metadata), Flags(flags), ResumeTask(invoke) {
+    initHeapObject();
     if (captureCurrentVoucher)
       Voucher = voucher_copy();
     assert(isAsyncTask() && "wrong constructor for a non-task job");
@@ -114,9 +116,16 @@ public:
       const HeapMetadata *metadata, InlineRefCounts::Immortal_t immortal,
       bool captureCurrentVoucher = true)
       : HeapObject(metadata, immortal), Flags(flags), ResumeTask(invoke) {
+    // By a lucky coincidence, the modern bit pattern for immortal objects also
+    // sets the immortal bit for older runtimes, so we don't need an immortal
+    // equivalent to initHeapObject().
     if (captureCurrentVoucher)
       Voucher = voucher_copy();
     assert(isAsyncTask() && "wrong constructor for a non-task job");
+  }
+
+  void initHeapObject() {
+    _swift_instantiateInertHeapObject(this, metadata);
   }
 
   ~Job() { swift_voucher_release(Voucher); }

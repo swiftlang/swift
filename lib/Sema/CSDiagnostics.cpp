@@ -920,8 +920,21 @@ bool ArrayLiteralToDictionaryConversionFailure::diagnoseAsError() {
                  CTP == CTP_Initialization);
 
   auto diagnostic = emitDiagnostic(diag::meant_dictionary_lit);
-  if (AE->getNumElements() == 1)
+  const auto numElements = AE->getNumElements();
+  if (numElements == 1) {
     diagnostic.fixItInsertAfter(AE->getElement(0)->getEndLoc(), ": <#value#>");
+  } else {
+    // If there is an even number of elements in the array, let's produce
+    // a fix-it which suggests to replace "," with ":" to form a dictionary
+    // literal.
+    if ((numElements & 1) == 0) {
+      const auto commaLocs = AE->getCommaLocs();
+      if (commaLocs.size() == numElements - 1) {
+        for (unsigned i = 0, e = numElements / 2; i != e; ++i)
+          diagnostic.fixItReplace(commaLocs[i * 2], ":");
+      }
+    }
+  }
   return true;
 }
 
