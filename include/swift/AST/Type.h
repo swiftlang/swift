@@ -419,6 +419,7 @@ class CanType : public Type {
   static bool isObjCExistentialTypeImpl(CanType type);
   static bool isTypeErasedGenericClassTypeImpl(CanType type);
   static CanType getOptionalObjectTypeImpl(CanType type);
+  static CanType wrapInOptionalTypeImpl(CanType type);
   static CanType getReferenceStorageReferentImpl(CanType type);
   static CanType getWithoutSpecifierTypeImpl(CanType type);
 
@@ -523,6 +524,13 @@ public:
 
   bool isForeignReferenceType(); // in Types.h
 
+  /// Return this type wrapped into an Optional type. E.x.: 'T' ->
+  /// 'Optional<T>'.
+  CanType wrapInOptionalType() const {
+    return wrapInOptionalTypeImpl(*this);
+  }
+
+  /// If this is a type Optional<T>, return T. Otherwise return CanType().
   CanType getOptionalObjectType() const {
     return getOptionalObjectTypeImpl(*this);
   }
