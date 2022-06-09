@@ -25,6 +25,13 @@ endif()
 set(SWIFT_RUNTIME_CONCURRENCY_C_FLAGS)
 set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS)
 
+set(swift_concurrency_private_link_libraries)
+if(CMAKE_SYSTEM_NAME STREQUAL Windows)
+  list(APPEND swift_concurrency_private_link_libraries Synchronization)
+endif()
+
+set(swift_concurrency_incorporate_object_libraries_so swiftThreading)
+
 if("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "dispatch")
   if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
     include_directories(AFTER
@@ -43,7 +50,6 @@ elseif("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "singlethreaded" OR
 else()
   message(FATAL_ERROR "Invalid value for SWIFT_CONCURRENCY_GLOBAL_EXECUTOR (\"${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}\").")
 endif()
-
 
 if(NOT SWIFT_CONCURRENCY_USES_DISPATCH)
 
@@ -111,8 +117,8 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   TaskLocal.swift
   TaskSleep.swift
   ThreadSanitizer.cpp
+  ThreadingError.cpp
   TracingSignpost.cpp
-  Mutex.cpp
   AsyncStreamBuffer.swift
   AsyncStream.swift
   AsyncThrowingStream.swift
@@ -128,6 +134,9 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   SWIFT_MODULE_DEPENDS_HAIKU Glibc
   SWIFT_MODULE_DEPENDS_WINDOWS CRT
 
+  PRIVATE_LINK_LIBRARIES ${swift_concurrency_private_link_libraries}
+  INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY
+    ${swift_concurrency_incorporate_object_libraries_so}
   LINK_LIBRARIES ${swift_concurrency_link_libraries}
 
   C_COMPILE_FLAGS

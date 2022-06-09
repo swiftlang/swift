@@ -17,8 +17,8 @@
 
 #include "CompatibilityOverride.h"
 #include "ConcurrencyRuntime.h"
-#include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/AtomicWaitQueue.h"
+#include "swift/Threading/Mutex.h"
 #include "TaskStatus.h"
 #include "TaskPrivate.h"
 #include <atomic>
@@ -36,7 +36,7 @@ ActiveTaskStatus::getStatusRecordParent(TaskStatusRecord *ptr) {
 
 /// A lock used to protect management of task-specific status
 /// record locks.
-static StaticMutex StatusRecordLockLock;
+static LazyMutex StatusRecordLockLock;
 
 namespace {
 
@@ -62,7 +62,7 @@ namespace {
 /// must acquire the global status-record lock, find this record
 /// (which should be the innermost record), and wait for an unlock.
 class StatusRecordLockRecord :
-    public AtomicWaitQueue<StatusRecordLockRecord, StaticMutex>,
+    public AtomicWaitQueue<StatusRecordLockRecord, LazyMutex>,
     public TaskStatusRecord {
 public:
   StatusRecordLockRecord(TaskStatusRecord *parent)

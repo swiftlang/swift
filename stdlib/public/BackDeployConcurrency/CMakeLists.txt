@@ -16,7 +16,7 @@ cmake_minimum_required(VERSION 3.19.6)
 include("${CMAKE_CURRENT_SOURCE_DIR}/../../../cmake/modules/StandaloneOverlay.cmake")
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/modules")
 set(SWIFT_STDLIB_STABLE_ABI TRUE)
-set(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME FALSE)
+set(SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY FALSE)
 set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR "dispatch")
 include(AddSwiftStdlib)
 
@@ -99,6 +99,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   AsyncThrowingFlatMapSequence.swift
   AsyncThrowingMapSequence.swift
   AsyncThrowingPrefixWhileSequence.swift
+  ConditionVariable.cpp
   GlobalActor.swift
   MainActor.swift
   PartialAsyncTask.swift
@@ -114,7 +115,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   TaskLocal.swift
   TaskSleep.swift
   ThreadSanitizer.cpp
-  Mutex.cpp
+  ThreadingError.cpp
   AsyncStreamBuffer.swift
   AsyncStream.swift
   AsyncThrowingStream.swift
@@ -123,6 +124,8 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   ${swift_concurrency_extra_sources}
   ../Concurrency/linker-support/magic-symbols-for-install-name.c
 
+  INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY
+    swiftThreading
   LINK_LIBRARIES ${swift_concurrency_link_libraries}
 
   C_COMPILE_FLAGS
