@@ -113,7 +113,8 @@ ArgumentList *swift::buildForwardingArgumentList(ArrayRef<ParamDecl *> params,
       assert(ref->getType()->isEqual(type));
       ref = VarargExpansionExpr::createParamExpansion(ctx, ref);
     }
-    args.emplace_back(SourceLoc(), param->getArgumentName(), ref);
+    args.emplace_back(SourceLoc(), param->getArgumentName(),
+                      param->getParameterName(), ref);
   }
   return ArgumentList::createImplicit(ctx, args);
 }

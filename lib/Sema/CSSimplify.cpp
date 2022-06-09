@@ -12463,7 +12463,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
 
     if (!ArgumentLists.count(argumentsLoc)) {
       auto *argList = ArgumentList::createImplicit(
-          getASTContext(), {Argument(SourceLoc(), Identifier(), nullptr)},
+          getASTContext(), {Argument::unlabeled(nullptr)},
           /*firstTrailingClosureIndex=*/None,
           AllocationArena::ConstraintSolver);
       ArgumentLists.insert({argumentsLoc, argList});

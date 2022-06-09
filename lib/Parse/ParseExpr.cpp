@@ -3404,7 +3404,7 @@ Parser::parseTrailingClosures(bool isExprBasic, SourceRange calleeRange,
         CodeCompletion->completeLabeledTrailingClosure(CCExpr, Tok.isAtStartOfLine());
       consumeToken(tok::code_complete);
       result.setHasCodeCompletionAndIsError();
-      closures.emplace_back(SourceLoc(), Identifier(), CCExpr);
+      closures.push_back(Argument::unlabeled(CCExpr));
       continue;
     }
 

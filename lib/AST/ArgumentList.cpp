@@ -50,9 +50,11 @@ ArgumentList *ArgumentList::create(ASTContext &ctx, SourceLoc lParenLoc,
                                    AllocationArena arena) {
   SmallVector<Expr *, 4> exprs;
   SmallVector<Identifier, 4> labels;
+  SmallVector<Identifier, 4> internalLabels;
   SmallVector<SourceLoc, 4> labelLocs;
 
   bool hasLabels = false;
+  bool hasInternalLabels = false;
   bool hasLabelLocs = false;
   for (auto &arg : args) {
     exprs.push_back(arg.getExpr());
@@ -60,21 +62,35 @@ ArgumentList *ArgumentList::create(ASTContext &ctx, SourceLoc lParenLoc,
     hasLabels |= !arg.getLabel().empty();
     labels.push_back(arg.getLabel());
 
+    hasInternalLabels |= !arg.getInternalLabel().empty();
+    internalLabels.push_back(arg.getInternalLabel());
+
     hasLabelLocs |= arg.getLabelLoc().isValid();
     labelLocs.push_back(arg.getLabelLoc());
   }
   if (!hasLabels)
     labels.clear();
+  if (!hasInternalLabels)
+    internalLabels.clear();
   if (!hasLabelLocs)
     labelLocs.clear();
 
+  size_t identifierCount = 0;
+  if (hasLabels) {
+    identifierCount += labels.size();
+  }
+  if (hasInternalLabels) {
+    identifierCount += internalLabels.size();
+  }
   auto numBytes =
-      totalSizeToAlloc<Expr *, Identifier, SourceLoc, ArgumentList *>(
-          exprs.size(), labels.size(), labelLocs.size(), originalArgs ? 1 : 0);
+    totalSizeToAlloc<Expr *, Identifier, SourceLoc, ArgumentList *>(
+      exprs.size(), identifierCount, labelLocs.size(),
+      originalArgs ? 1 : 0);
   auto *mem = ctx.Allocate(numBytes, alignof(ArgumentList), arena);
   auto *argList = new (mem)
       ArgumentList(lParenLoc, rParenLoc, args.size(), firstTrailingClosureIndex,
-                   originalArgs, isImplicit, hasLabels, hasLabelLocs);
+                   originalArgs, isImplicit, hasLabels, hasLabelLocs,
+                   hasInternalLabels);
 
   std::uninitialized_copy(exprs.begin(), exprs.end(),
                           argList->getExprsBuffer().begin());
@@ -85,6 +101,10 @@ ArgumentList *ArgumentList::create(ASTContext &ctx, SourceLoc lParenLoc,
   if (hasLabelLocs) {
     std::uninitialized_copy(labelLocs.begin(), labelLocs.end(),
                             argList->getLabelLocsBuffer().begin());
+  }
+  if (hasInternalLabels) {
+      std::uninitialized_copy(internalLabels.begin(), internalLabels.end(),
+                              argList->getInternalLabelsBuffer().begin());
   }
   if (originalArgs) {
     *argList->getTrailingObjects<ArgumentList *>() = originalArgs;
@@ -160,7 +180,8 @@ ArgumentList *ArgumentList::forImplicitCallTo(ParameterList *params,
   for (auto idx : indices(argExprs)) {
     auto *param = params->get(idx);
     assert(param->isInOut() == argExprs[idx]->isSemanticallyInOutExpr());
-    args.emplace_back(SourceLoc(), param->getArgumentName(), argExprs[idx]);
+    args.emplace_back(SourceLoc(), param->getArgumentName(),
+                      param->getParameterName(), argExprs[idx]);
   }
   return createImplicit(ctx, args);
 }

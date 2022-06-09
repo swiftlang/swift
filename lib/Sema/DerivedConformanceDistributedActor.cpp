@@ -149,7 +149,7 @@ deriveBodyDistributed_doInvokeOnReturn(AbstractFunctionDecl *afd, void *arg) {
             /*argLabels=*/
             {C.getIdentifier("fromByteOffset"), C.getIdentifier("as")}),
         ArgumentList::createImplicit(
-            C, {Argument(sloc, C.getIdentifier("as"),
+            C, {Argument(sloc, C.getIdentifier("as"), C.getIdentifier("type"),
                          new (C) DeclRefExpr(ConcreteDeclRef(returnTypeParam),
                                              dloc, implicit))}));
 

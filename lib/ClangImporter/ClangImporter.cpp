@@ -5427,7 +5427,7 @@ synthesizeDependentTypeThunkParamForwarding(AbstractFunctionDecl *afd, void *con
                                                       specParamTy);
     }
 
-    forwardingParams.push_back(Argument(SourceLoc(), Identifier(), argExpr));
+    forwardingParams.push_back(Argument::unlabeled(argExpr));
     paramIndex++;
   }
 
@@ -5558,7 +5558,7 @@ synthesizeForwardingThunkBody(AbstractFunctionDecl *afd, void *context) {
       paramRefExpr->setType(InOutType::get(param->getType()));
     }
 
-    forwardingParams.push_back(Argument(SourceLoc(), Identifier(), paramRefExpr));
+    forwardingParams.push_back(Argument::unlabeled(paramRefExpr));
   }
 
   Expr *specializedFuncDeclRef = new (ctx) DeclRefExpr(ConcreteDeclRef(specializedFuncDecl),

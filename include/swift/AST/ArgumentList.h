@@ -39,12 +39,18 @@ Type __Expr_getType(Expr *E);
 class Argument final {
   SourceLoc LabelLoc;
   Identifier Label;
+  Identifier InternalLabel;
   Expr *ArgExpr;
   // TODO: Store inout bit here.
 
 public:
   Argument(SourceLoc labelLoc, Identifier label, Expr *expr)
-      : LabelLoc(labelLoc), Label(label), ArgExpr(expr) {}
+      : LabelLoc(labelLoc), Label(label), InternalLabel(), ArgExpr(expr) {}
+  
+  Argument(SourceLoc labelLoc, Identifier label, Identifier internalLabel,
+           Expr *expr)
+      : LabelLoc(labelLoc), Label(label), InternalLabel(internalLabel),
+        ArgExpr(expr) {}
 
   /// Make an unlabeled argument.
   static Argument unlabeled(Expr *expr) {
@@ -70,6 +76,15 @@ public:
   /// Note this is marked \c & to prevent its use on an rvalue Argument vended
   /// from an ArgumentList.
   void setLabel(Identifier newLabel) & { Label = newLabel; }
+
+  /// The internal label written in the corresponding parameter declaration.
+  Identifier getInternalLabel() const { return InternalLabel; }
+
+  /// Set a new internal argument label.
+  ///
+  /// Note this is marked \c & to prevent its use on an rvalue Argument vended
+  /// from an ArgumentList.
+  void setInternalLabel(Identifier newLabel) & { InternalLabel = newLabel; }
 
   /// The argument expression.
   Expr *getExpr() const { return ArgExpr; }
@@ -130,13 +145,21 @@ class alignas(Argument) ArgumentList final
   /// Whether any of the arguments have labels with location info.
   bool HasLabelLocs : 1;
 
+  /// Whether any of the arguments have internal labels.
+  ///
+  /// Internal labels are stored after (external) labels in the same buffer
+  /// since they share the same type. If there are no (external) labels, then
+  /// the shared buffer contains only internal labels.
+  bool HasInternalLabels : 1;
+
   ArgumentList(SourceLoc lParenLoc, SourceLoc rParenLoc, unsigned numArgs,
                Optional<unsigned> firstTrailingClosureIndex,
                ArgumentList *originalArgs, bool isImplicit, bool hasLabels,
-               bool hasLabelLocs)
+               bool hasLabelLocs, bool hasInternalLabels)
       : LParenLoc(lParenLoc), RParenLoc(rParenLoc), NumArgs(numArgs),
         HasOriginalArgs(originalArgs), IsImplicit(isImplicit),
-        HasLabels(hasLabels), HasLabelLocs(hasLabelLocs) {
+        HasLabels(hasLabels), HasLabelLocs(hasLabelLocs),
+        HasInternalLabels(hasInternalLabels) {
     assert(LParenLoc.isValid() == RParenLoc.isValid());
     assert(!(firstTrailingClosureIndex && originalArgs) &&
            "Cannot have trailing closure info if original args present");
@@ -188,6 +211,23 @@ class alignas(Argument) ArgumentList final
   MutableArrayRef<SourceLoc> getLabelLocsBuffer() {
     assert(HasLabelLocs);
     return {getTrailingObjects<SourceLoc>(), NumArgs};
+  }
+
+  ArrayRef<Identifier> getInternalLabelsBuffer() const {
+    assert(HasInternalLabels);
+    if (HasLabels) {
+      return {getTrailingObjects<Identifier>() + NumArgs, NumArgs};
+    } else {
+      return {getTrailingObjects<Identifier>(), NumArgs};
+    }
+  }
+  MutableArrayRef<Identifier> getInternalLabelsBuffer() {
+    assert(HasInternalLabels);
+    if (HasLabels) {
+      return {getTrailingObjects<Identifier>() + NumArgs, NumArgs};
+    } else {
+      return {getTrailingObjects<Identifier>(), NumArgs};
+    }
   }
 
   ArgumentList *getStoredOriginalArgs() const {
@@ -317,9 +357,17 @@ public:
     return getLabelLocsBuffer()[idx];
   }
 
+  /// Retrieve the internal argument label at a given index.
+  Identifier getInternalLabel(unsigned idx) const {
+    if (!HasInternalLabels)
+      return Identifier();
+    return Identifier(getInternalLabelsBuffer()[idx]);
+  }
+
   /// Retrieve the argument at a given index.
   Argument get(unsigned idx) const {
-    return Argument(getLabelLoc(idx), getLabel(idx), getExpr(idx));
+    return Argument(getLabelLoc(idx), getLabel(idx), getInternalLabel(idx),
+                    getExpr(idx));
   }
 
   // MARK: Iterator Logic

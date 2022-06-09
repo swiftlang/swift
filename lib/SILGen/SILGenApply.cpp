@@ -2002,7 +2002,7 @@ static Expr *findArgumentExprWithLabel(DefaultArgumentExpr *defaultArgExpr,
                                        StringRef expectedLabel) {
   if (auto argList = defaultArgExpr->getCallerArgs()) {
     for (auto arg : *argList) {
-      auto label = arg.getLabel().str(); // FIXME: @Transcribed -- internal label
+      auto label = arg.getInternalLabel().str();
       if (label.empty()) {
         label = arg.getLabel().str();
       }
@@ -2070,33 +2070,36 @@ buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
     assert(argList && "Magic identifier literal missing a parameter expression");
     assert(argList->size() == 1 && "Magic identifier literal takes one argument");
     Argument arg = argList->get(0);
+    assert(arg.getLabel().str() == "of" && "Magic identifier literal takes one argument 'of:'");
 
     // Get us some source code!
-    StringRef sourceCode;
-    if (auto defaultExpr = magicLiteral->getDefaultArgumentExpr()) {
-      // Look for an argument in the argument list with an internal label that
-      // matches the one specified by the developer.
+    StringRef transcription; {
+      auto defaultExpr = magicLiteral->getDefaultArgumentExpr();
       auto declRefExpr = dyn_cast<UnresolvedDeclRefExpr>(arg.getExpr());
-      if (arg.getLabel().str() == "of" && declRefExpr) {
-        // TODO: @Transcribed -- diagnostics, not assertions
-        assert(declRefExpr->getName().isSimpleName() && "Magic identifier literal just needs an argument label");
-        auto argLabel = declRefExpr->getName().getBaseIdentifier().str();
+      if (defaultExpr && declRefExpr) {
+        // Look for an argument in the argument list with an internal label that
+        // matches the one specified by the developer.
+        if (declRefExpr) {
+          // TODO: @Transcribed -- diagnostics, not assertions
+          assert(declRefExpr->getName().isSimpleName() && "Magic identifier literal just needs an argument label");
+          auto argLabel = declRefExpr->getName().getBaseIdentifier().str();
 
-        if (auto expr = findArgumentExprWithLabel(defaultExpr, argLabel)) {
-          sourceCode = transcribe(ctx, expr->getSourceRange());
+          if (auto expr = findArgumentExprWithLabel(defaultExpr, argLabel)) {
+            transcription = transcribe(ctx, expr->getSourceRange());
+          } else {
+            // TODO: @Transcribed -- diagnostics, not assertions
+            assert("Argument with that name not found" && false);
+          }
         } else {
           // TODO: @Transcribed -- diagnostics, not assertions
-          assert("Argument with that name not found" && false);
+          assert("Invalid argument to #transcription" && false);
         }
-      } else {
-        // TODO: @Transcribed -- diagnostics, not assertions
-        assert("Invalid argument to #transcription" && false);
-      }
 
-    } else {
-      // No argument list. Resolve the source code of the magic identifier's
-      // argument list itself.
-      sourceCode = transcribe(ctx, arg.getSourceRange());
+      } else {
+        // Not a default argument and/or value didn't look like an identifier.
+        // Resolve the source code of the magic identifier's argument instead.
+        transcription = transcribe(ctx, arg.getExpr()->getSourceRange());
+      }
     }
 
     return emitStringLiteralArgs(SGF, magicLiteral, sourceCode, C,

@@ -1085,7 +1085,8 @@ namespace {
           newCalleeParams.push_back(calleeParam);
         }
 
-        args.emplace_back(SourceLoc(), calleeParam.getLabel(), paramRef);
+        args.emplace_back(SourceLoc(), calleeParam.getLabel(),
+                          calleeParam.getInternalLabel(), paramRef);
       }
 
       // SILGen knows how to emit property-wrapped parameters, but the
@@ -5658,6 +5659,7 @@ ArgumentList *ExprRewriter::coerceCallArguments(
     // Extract the parameter.
     const auto &param = params[paramIdx];
     auto paramLabel = param.getLabel();
+    auto paramIntLabel = param.getInternalLabel();
 
     // Handle variadic generic parameters.
     if (ctx.LangOpts.hasFeature(Feature::VariadicGenerics) &&
@@ -5704,7 +5706,7 @@ ArgumentList *ExprRewriter::coerceCallArguments(
       packExpr->setType(paramTuple);
       cs.cacheType(packExpr);
 
-      newArgs.push_back(Argument(labelLoc, paramLabel, packExpr));
+      newArgs.emplace_back(labelLoc, paramLabel, paramIntLabel, packExpr);
       continue;
     }
 
@@ -5760,7 +5762,8 @@ ArgumentList *ExprRewriter::coerceCallArguments(
           VarargExpansionExpr::createArrayExpansion(ctx, arrayExpr);
       cs.cacheType(varargExpansionExpr);
 
-      newArgs.push_back(Argument(labelLoc, paramLabel, varargExpansionExpr));
+      newArgs.emplace_back(labelLoc, paramLabel, paramIntLabel,
+                           varargExpansionExpr);
       continue;
     }
 
@@ -5772,7 +5775,7 @@ ArgumentList *ExprRewriter::coerceCallArguments(
           owner, paramIdx, args->getStartLoc(), paramTy, dc);
       cs.cacheType(defArg);
       defaultArgs.push_back(defArg);
-      newArgs.emplace_back(SourceLoc(), param.getLabel(), defArg);
+      newArgs.emplace_back(SourceLoc(), paramLabel, paramIntLabel, defArg);
       continue;
     }
 
@@ -5788,6 +5791,7 @@ ArgumentList *ExprRewriter::coerceCallArguments(
     // Update the argument label to match the parameter. This may be necessary
     // for things like trailing closures and args to property wrapper params.
     arg.setLabel(param.getLabel());
+    arg.setInternalLabel(param.getInternalLabel());
 
     // Determine whether the closure argument should be treated as having
     // implicit self capture or inheriting actor context.
