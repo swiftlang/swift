@@ -3505,6 +3505,14 @@ getIdForKeyPathComponentComputedProperty(SILGenModule &SGM,
     // Identify the property by its vtable or wtable slot.
     return SGM.getAccessorDeclRef(getRepresentativeAccessorForKeyPath(storage));
   }
+
+  case AccessStrategy::DispatchToDistributedThunk: {
+    auto thunkRef = SILDeclRef(cast<VarDecl>(storage)->getDistributedThunk(),
+                               SILDeclRef::Kind::Func,
+                               /*isForeign=*/false,
+                               /*isDistributed=*/true);
+    return SGM.getFunction(thunkRef, NotForDefinition);
+  }
   }
   llvm_unreachable("unhandled access strategy");
 }
