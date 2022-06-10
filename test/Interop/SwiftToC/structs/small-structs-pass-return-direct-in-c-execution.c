@@ -1,9 +1,11 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend %S/small-structs-pass-return-direct-in-c.swift -typecheck -module-name Structs -clang-header-expose-public-decls -emit-clang-header-path %t/structs.h
+// RUN: cat %S/small-structs-pass-return-direct-in-c.swift %S/small-structs-64-bit-pass-return-direct-in-c.swift > %t/full-small-structs-pass-return-direct-in-c.swift
+
+// RUN: %target-swift-frontend %t/full-small-structs-pass-return-direct-in-c.swift -typecheck -module-name Structs -clang-header-expose-public-decls -emit-clang-header-path %t/structs.h
 
 // RUN: %target-interop-build-clang -c %s -I %t -o %t/swift-structs-execution.o -Wno-incompatible-pointer-types
-// RUN: %target-interop-build-swift %S/small-structs-pass-return-direct-in-c.swift -o %t/swift-structs-execution -Xlinker %t/swift-structs-execution.o -module-name Structs -Xfrontend -entry-point-function-name -Xfrontend swiftMain
+// RUN: %target-interop-build-swift %t/full-small-structs-pass-return-direct-in-c.swift -o %t/swift-structs-execution -Xlinker %t/swift-structs-execution.o -module-name Structs -Xfrontend -entry-point-function-name -Xfrontend swiftMain
 
 // RUN: %target-codesign %t/swift-structs-execution
 // RUN: %target-run %t/swift-structs-execution | %FileCheck %s
