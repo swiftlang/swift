@@ -39,6 +39,9 @@ public:
   /// trailing underscore.
   void printIdentifier(StringRef name);
 
+  /// Print the base name of the given declaration.
+  void printBaseName(const ValueDecl *decl);
+
   /// Print the C-style prefix for the given module name, that's used for
   /// C type names inside the module.
   void printModuleNameCPrefix(const ModuleDecl &mod);
