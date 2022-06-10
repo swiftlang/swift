@@ -473,6 +473,15 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   // running the relevant diagnostic.
   SINGLE_VALUE_INST(MarkMustCheckInst, mark_must_check,
                     SingleValueInstruction, None, DoesNotRelease)
+  // Convert a $T to $@moveOnly T. This is the method that one uses to convert a
+  // trivial value to a non-trivial move only value.
+  SINGLE_VALUE_INST(CopyableToMoveOnlyWrapperValueInst, copyable_to_moveonlywrapper,
+                    SingleValueInstruction, None, DoesNotRelease)
+  // Convert a $@moveOnly T to $T. Ownership is fixed at construction by
+  // frontend to express specific semantics: guaranteed for function arguments
+  // and owned for assignment/return values.
+  SINGLE_VALUE_INST(MoveOnlyWrapperToCopyableValueInst, moveonlywrapper_to_copyable,
+                    SingleValueInstruction, None, DoesNotRelease)
   // A move_addr is a Raw SIL only instruction that is equivalent to a copy_addr
   // [init]. It is lowered during the diagnostic passes to a copy_addr [init] if
   // the move checker found uses that prevented us from converting this to a

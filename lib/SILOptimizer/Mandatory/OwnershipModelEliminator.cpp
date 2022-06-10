@@ -22,7 +22,6 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#include "llvm/Support/ErrorHandling.h"
 #define DEBUG_TYPE "sil-ownership-model-eliminator"
 
 #include "swift/Basic/BlotSetVector.h"
@@ -36,6 +35,7 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/ErrorHandling.h"
 
 using namespace swift;
 
@@ -181,6 +181,7 @@ struct OwnershipModelEliminatorVisitor
     return true;                                                               \
   }
   HANDLE_FORWARDING_INST(ConvertFunction)
+  HANDLE_FORWARDING_INST(MoveOnlyWrapperToCopyableValue)
   HANDLE_FORWARDING_INST(Upcast)
   HANDLE_FORWARDING_INST(UncheckedRefCast)
   HANDLE_FORWARDING_INST(RefToBridgeObject)

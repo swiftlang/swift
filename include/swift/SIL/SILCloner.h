@@ -24,6 +24,7 @@
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILDebugScope.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILVisitor.h"
 
 namespace swift {
@@ -1766,6 +1767,31 @@ void SILCloner<ImplClass>::visitMarkMustCheckInst(MarkMustCheckInst *Inst) {
   auto *MVI = getBuilder().createMarkMustCheckInst(
       getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
       Inst->getCheckKind());
+  recordClonedInstruction(Inst, MVI);
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitMoveOnlyWrapperToCopyableValueInst(
+    MoveOnlyWrapperToCopyableValueInst *inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(inst->getDebugScope()));
+  MoveOnlyWrapperToCopyableValueInst *cvt;
+  if (inst->getOwnershipKind() == OwnershipKind::Owned) {
+    cvt = getBuilder().createOwnedMoveOnlyWrapperToCopyableValue(
+        getOpLocation(inst->getLoc()), getOpValue(inst->getOperand()));
+  } else {
+    assert(inst->getOwnershipKind() == OwnershipKind::Guaranteed);
+    cvt = getBuilder().createGuaranteedMoveOnlyWrapperToCopyableValue(
+        getOpLocation(inst->getLoc()), getOpValue(inst->getOperand()));
+  }
+  recordClonedInstruction(inst, cvt);
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitCopyableToMoveOnlyWrapperValueInst(
+    CopyableToMoveOnlyWrapperValueInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  auto *MVI = getBuilder().createCopyableToMoveOnlyWrapperValue(
+      getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()));
   recordClonedInstruction(Inst, MVI);
 }
 
