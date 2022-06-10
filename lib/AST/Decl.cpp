@@ -2259,6 +2259,11 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
     assert(hasStorage());
     return AccessStrategy::getStorage();
 
+  // FIXME: For now `DistributedThunk` behaves just like `Ordinary` but it
+  //        needs a new strategy to be useful.
+  case AccessSemantics::DistributedThunk:
+    LLVM_FALLTHROUGH;
+
   case AccessSemantics::Ordinary:
     // Skip these checks for local variables, both because they're unnecessary
     // and because we won't necessarily have computed access.
