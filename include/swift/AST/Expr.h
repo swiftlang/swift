@@ -124,6 +124,12 @@ enum class AccessSemantics : uint8_t {
   /// This is an ordinary access to a declaration, using whatever
   /// polymorphism is expected.
   Ordinary,
+
+  /// This is an access to the underlying storage through a distributed thunk.
+  ///
+  /// The declaration must be a 'distributed' computed property used outside
+  /// of its actor isolation context.
+  DistributedThunk,
 };
 
 /// Expr - Base class for all expressions in swift.
@@ -155,11 +161,10 @@ protected:
 
   SWIFT_INLINE_BITFIELD_EMPTY(LiteralExpr, Expr);
   SWIFT_INLINE_BITFIELD_EMPTY(IdentityExpr, Expr);
-  SWIFT_INLINE_BITFIELD(LookupExpr, Expr, 1+1+1+1,
+  SWIFT_INLINE_BITFIELD(LookupExpr, Expr, 1+1+1,
     IsSuper : 1,
     IsImplicitlyAsync : 1,
-    IsImplicitlyThrows : 1,
-    ShouldApplyDistributedThunk: 1
+    IsImplicitlyThrows : 1
   );
   SWIFT_INLINE_BITFIELD_EMPTY(DynamicLookupExpr, LookupExpr);
 
@@ -1656,18 +1661,6 @@ public:
     Bits.LookupExpr.IsImplicitlyThrows = isImplicitlyThrows;
   }
 
-  /// Informs IRGen to that this expression should be applied as its distributed
-  /// thunk, rather than invoking the function directly.
-  ///
-  /// Only intended to be set on distributed get-only computed properties.
-  bool shouldApplyLookupDistributedThunk() const {
-    return Bits.LookupExpr.ShouldApplyDistributedThunk;
-  }
-
-  void setShouldApplyLookupDistributedThunk(bool flag) {
-    Bits.LookupExpr.ShouldApplyDistributedThunk = flag;
-  }
-
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_LookupExpr &&
            E->getKind() <= ExprKind::Last_LookupExpr;
@@ -1695,6 +1688,14 @@ public:
   /// does not call the getter or setter.
   AccessSemantics getAccessSemantics() const {
     return (AccessSemantics) Bits.MemberRefExpr.Semantics;
+  }
+
+  /// Informs IRGen to that this member should be applied via its distributed
+  /// thunk, rather than invoking it directly.
+  ///
+  /// Only intended to be set on distributed get-only computed properties.
+  void setAccessViaDistributedThunk() {
+    Bits.MemberRefExpr.Semantics = (unsigned)AccessSemantics::DistributedThunk;
   }
 
   SourceLoc getLoc() const { return NameLoc.getBaseNameLoc(); }

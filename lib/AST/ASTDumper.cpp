@@ -255,6 +255,7 @@ static StringRef getAccessSemanticsString(AccessSemantics value) {
     case AccessSemantics::Ordinary: return "ordinary";
     case AccessSemantics::DirectToStorage: return "direct_to_storage";
     case AccessSemantics::DirectToImplementation: return "direct_to_impl";
+    case AccessSemantics::DistributedThunk: return "distributed_thunk";
   }
 
   llvm_unreachable("Unhandled AccessSemantics in switch.");
@@ -2035,9 +2036,6 @@ public:
 
   void visitMemberRefExpr(MemberRefExpr *E) {
     printCommon(E, "member_ref_expr");
-    if (E->shouldApplyLookupDistributedThunk()) {
-      OS << " distributed";
-    }
     PrintWithColorRAII(OS, DeclColor) << " decl=";
     printDeclRef(E->getMember());
     if (E->getAccessSemantics() != AccessSemantics::Ordinary)
