@@ -1112,7 +1112,8 @@ private:
     if (outputLang == OutputLanguageMode::Cxx) {
       // Don't expose async functions or @_alwaysEmitIntoClient functions
       // because they're currently unsupported
-      if (FD->hasAsync() || FD->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>()) {
+      if (FD->hasAsync() ||
+          FD->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>()) {
         return;
       }
 
