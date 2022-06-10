@@ -1404,6 +1404,15 @@ AbstractFunctionDecl *ASTContext::getRemoteCallOnDistributedActorSystem(
 /********************** Distributed Actor Properties **************************/
 /******************************************************************************/
 
+FuncDecl *VarDecl::getDistributedThunk() const {
+  if (!isDistributed())
+    return nullptr;
+
+  auto mutableThis = const_cast<VarDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           GetDistributedThunkRequest{mutableThis}, nullptr);
+}
+
 FuncDecl*
 AbstractFunctionDecl::getDistributedThunk() const {
   if (!isDistributed())
