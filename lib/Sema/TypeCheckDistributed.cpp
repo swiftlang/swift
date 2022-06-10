@@ -482,7 +482,12 @@ bool swift::checkDistributedFunction(AbstractFunctionDecl *func) {
 
 bool CheckDistributedFunctionRequest::evaluate(
     Evaluator &evaluator, AbstractFunctionDecl *func) const {
-  assert(func->isDistributed());
+  if (auto *accessor = dyn_cast<AccessorDecl>(func)) {
+    auto *var = cast<VarDecl>(accessor->getStorage());
+    assert(var->isDistributed() && accessor->isGetter());
+  } else {
+    assert(func->isDistributed());
+  }
 
   auto &C = func->getASTContext();
   auto DC = func->getDeclContext();
@@ -653,6 +658,18 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal
   (void)nominal->getDefaultInitializer();
 
   for (auto member : nominal->getMembers()) {
+    // A distributed computed property needs to have a thunk for
+    // its getter accessor.
+    if (auto *var = dyn_cast<VarDecl>(member)) {
+      if (!var->isDistributed())
+        continue;
+
+      if (auto thunk = var->getDistributedThunk())
+        SF->DelayedFunctions.push_back(thunk);
+
+      continue;
+    }
+
     // --- Ensure all thunks
     if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
       if (!func->isDistributed())
