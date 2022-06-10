@@ -2326,6 +2326,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                      "-num-threads");
     }
   }
+  Opts.UseSingleModuleLLVMEmission =
+      Opts.NumThreads != 0 &&
+      Args.hasArg(OPT_enable_single_module_llvm_emission);
 
   if (SWIFT_ENABLE_GLOBAL_ISEL_ARM64 &&
       Triple.getArch() == llvm::Triple::aarch64 &&
