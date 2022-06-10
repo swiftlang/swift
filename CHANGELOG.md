@@ -192,9 +192,10 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
   let didUpdateObjectWithTag: (Delegate) -> ((Int) -> Void)? = Delegate.didUpdateObject
   ```
-  
+
   > **Warning**  
-  > Due to the type change, selectors for aforementioned method references that require writing out their type explicitly for disambiguation will no longer compile. To fix this, simply adjust the written type, or resort to a `#if swift(<5.7)` directive when compatibility with older compiler versions is warranted. For example: 
+  > Due to the type change, selectors for aforementioned method references that require writing out their type explicitly for disambiguation will no longer compile. To fix this, simply adjust the written type, or resort to a `#if swift(<5.7)` directive when compatibility with older compiler versions is warranted. For example:
+  >
   > ```swift
   > #if swift(<5.7)
   > let decidePolicyForNavigationAction = #selector(WKNavigationDelegate.webView(_:decidePolicyFor:decisionHandler:) as ((WKNavigationDelegate) -> (WKWebView, WKNavigationAction, @escaping (WKNavigationActionPolicy) -> Void) -> Void)?)
