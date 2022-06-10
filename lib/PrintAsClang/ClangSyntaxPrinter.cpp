@@ -44,6 +44,11 @@ void ClangSyntaxPrinter::printIdentifier(StringRef name) {
     os << '_';
 }
 
+void ClangSyntaxPrinter::printBaseName(const ValueDecl *decl) {
+  assert(decl->getName().isSimpleName());
+  printIdentifier(decl->getBaseIdentifier().str());
+}
+
 void ClangSyntaxPrinter::printModuleNameCPrefix(const ModuleDecl &mod) {
   os << mod.getName().str() << '_';
 }
