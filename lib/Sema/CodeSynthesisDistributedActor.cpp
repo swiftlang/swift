@@ -674,7 +674,18 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
   assert(systemTy &&
          "Thunk synthesis must have concrete actor system type available");
 
-  DeclName thunkName = func->getName();
+  DeclName thunkName;
+
+  // Since accessors don't have names, let's generate one based on
+  // the computed property.
+  if (auto *accessor = dyn_cast<AccessorDecl>(func)) {
+    auto *var = accessor->getStorage();
+    thunkName = DeclName(C, var->getBaseName(),
+                         /*argumentNames=*/ArrayRef<Identifier>());
+  } else {
+    // Let's use the name of a 'distributed func'
+    thunkName = func->getName();
+  }
 
   // --- Prepare generic parameters
   GenericParamList *genericParamList = nullptr;
@@ -804,10 +815,21 @@ addDistributedActorCodableConformance(
 /*********************** SYNTHESIS ENTRY POINTS *******************************/
 /******************************************************************************/
 
-FuncDecl *GetDistributedThunkRequest::evaluate(
-    Evaluator &evaluator, AbstractFunctionDecl *distributedTarget) const {
-  if (!distributedTarget->isDistributed())
-    return nullptr;
+FuncDecl *GetDistributedThunkRequest::evaluate(Evaluator &evaluator,
+                                               Originator originator) const {
+  AbstractFunctionDecl *distributedTarget = nullptr;
+  if (auto *var = originator.dyn_cast<VarDecl *>()) {
+    if (!var->isDistributed())
+      return nullptr;
+
+    distributedTarget = var->getAccessor(AccessorKind::Get);
+  } else {
+    distributedTarget = originator.get<AbstractFunctionDecl *>();
+    if (!distributedTarget->isDistributed())
+      return nullptr;
+  }
+
+  assert(distributedTarget);
 
   auto &C = distributedTarget->getASTContext();
   auto DC = distributedTarget->getDeclContext();
