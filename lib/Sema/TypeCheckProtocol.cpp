@@ -3008,14 +3008,47 @@ bool ConformanceChecker::checkActorIsolation(
   bool isDistributed = refResult.isolation.isDistributedActor() &&
       !witness->getAttrs().hasAttribute<NonisolatedAttr>();
   if (isDistributed) {
-    // If we're coming from a non-distributed requirement, then the requirement
-    // must be 'throws' to accommodate failure.
-    if (!isDistributedDecl(requirement) && !isThrowsDecl(requirement))
-      missingOptions |= MissingFlags::RequirementThrows;
+    // Check if the protocol where the requirement originates from
+    // is a distributed actor constrained one.
+    auto proto = dyn_cast<ProtocolDecl>(requirement->getDeclContext());
+    if (proto && proto->isDistributedActor()) {
+      // The requirement was declared in a DistributedActor constrained proto.
+      //
+      // This means casting up to this `P` won't "strip off" the "distributed-ness"
+      // of the type, and all call-sites will be checking distributed isolation.
+      //
+      // This means that we can actually allow these specific requirements,
+      // to be witnessed without the distributed keyword (!), but they won't be
+      // possible to be called unless:
+      // - from inside the distributed actor (self),
+      // - on a known-to-be-local distributed actor reference.
+      //
+      // This allows us to implement protocols where a local distributed actor
+      // registers "call me when something happens", and that call can be
+      // expressed as non-distributed function which we are guaranteed to be
+      // able to call, since the whenLocal will give us access to this actor as
+      // known-to-be-local, so we can invoke this method.
 
-    if (!isDistributedDecl(witness) &&
-        (isDistributedDecl(requirement) || !missingOptions))
-      missingOptions |= MissingFlags::WitnessDistributed;
+      // If the requirement is distributed, we still need to require it on the witness though.
+      // We DO allow a non-distributed requirement to be witnessed here though!
+      if (isDistributedDecl(requirement) &&
+          !isDistributedDecl(witness))
+        missingOptions |= MissingFlags::WitnessDistributed;
+    } else {
+      // The protocol requirement comes from a normal (non-distributed actor)
+      // protocol; so the only witnesses allowed are such that we can witness
+      // them using a distributed, or nonisolated functions.
+
+      // If we're coming from a non-distributed requirement,
+      // then the requirement must be 'throws' to accommodate failure.
+      if (!isDistributedDecl(requirement) && !isThrowsDecl(requirement))
+        missingOptions |= MissingFlags::RequirementThrows;
+
+      // If the requirement is distributed, we require a distributed witness
+      if (!isDistributedDecl(witness) &&
+          (isDistributedDecl(requirement) || !missingOptions))
+        missingOptions |= MissingFlags::WitnessDistributed;
+    }
   }
 
   // If we aren't missing anything, do a Sendable check and move on.

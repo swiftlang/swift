@@ -169,6 +169,56 @@ func testAsyncThrowsAll(p: AsyncThrowsAll,
   _ = try await pp.maybe(param: "", int: 0)
 }
 
+// ==== -----------------------------------------------------------------------
+// MARK: Distributed actor protocols can have non-dist requirements
+
+protocol TerminationWatchingA {
+  func terminated(a: String) async
+  // expected-note@-1{{mark the protocol requirement 'terminated(a:)' 'throws' to allow actor-isolated conformances}}
+}
+
+protocol TerminationWatchingDA: DistributedActor {
+  func terminated(da: String) async
+  // expected-note@-1{{distributed actor-isolated instance method 'terminated(da:)' declared here}}
+  // expected-note@-2{{distributed actor-isolated instance method 'terminated(da:)' declared here}}
+}
+
+actor A_TerminationWatchingA: TerminationWatchingA {
+  func terminated(a: String) { } // ok, since: actor -> implicitly async
+}
+func test_watching_A(a: A_TerminationWatchingA) async throws {
+  await a.terminated(a: "normal")
+}
+
+distributed actor DA_TerminationWatchingA: TerminationWatchingA {
+  func terminated(a: String) { }
+  // expected-error@-1{{distributed actor-isolated instance method 'terminated(a:)' cannot be used to satisfy nonisolated protocol requirement}}
+  // expected-note@-2{{add 'nonisolated' to 'terminated(a:)' to make this instance method not isolated to the actor}}
+}
+
+distributed actor DA_TerminationWatchingDA: TerminationWatchingDA {
+  distributed func test() {}
+  func terminated(da: String) { }
+  // expected-note@-1{{distributed actor-isolated instance method 'terminated(da:)' declared here}}
+}
+
+func test_watchingDA(da: DA_TerminationWatchingDA) async throws {
+  try await da.test() // ok
+  da.terminated(da: "the terminated func is not distributed") // expected-error{{only 'distributed' instance methods can be called on a potentially remote distributed actor}}
+}
+
+func test_watchingDA<WDA: TerminationWatchingDA>(da: WDA) async throws {
+  try await da.terminated(da: "the terminated func is not distributed")
+  // expected-error@-1{{only 'distributed' instance methods can be called on a potentially remote distributed actor}}
+  // expected-warning@-2{{no calls to throwing functions occur within 'try' expression}}
+}
+
+func test_watchingDA_any(da: any TerminationWatchingDA) async throws {
+  try await da.terminated(da: "the terminated func is not distributed")
+  // expected-error@-1{{only 'distributed' instance methods can be called on a potentially remote distributed actor}}
+  // expected-warning@-2{{no calls to throwing functions occur within 'try' expression}}
+}
+
 // ==== ------------------------------------------------------------------------
 // MARK: Error cases
 
