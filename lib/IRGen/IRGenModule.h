@@ -874,6 +874,9 @@ public:
   llvm::PointerType *getValueWitnessTablePtrTy();
   llvm::PointerType *getEnumValueWitnessTablePtrTy();
 
+  llvm::IntegerType *getTypeMetadataRequestParamTy();
+  llvm::StructType *getTypeMetadataResponseTy();
+
   void unimplemented(SourceLoc, StringRef Message);
   [[noreturn]]
   void fatal_unimplemented(SourceLoc, StringRef Message);
