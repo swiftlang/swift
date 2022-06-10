@@ -116,7 +116,15 @@ inline void once_impl(once_t &predicate, void (*fn)(void *), void *context) {
 #define SWIFT_THREADING_USE_RESERVED_TLS_KEYS 1
 
 #if __has_include(<pthread/tsd_private.h>)
+} // namespace threading_impl
+} // namespace swift
+
+extern "C" {
 #include <pthread/tsd_private.h>
+}
+
+namespace swift {
+namespace threading_impl {
 #else
 #define __PTK_FRAMEWORK_SWIFT_KEY0 100
 #define __PTK_FRAMEWORK_SWIFT_KEY1 101
