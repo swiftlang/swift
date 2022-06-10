@@ -265,6 +265,9 @@ public:
       forwardDeclare(ED);
     } else if (isa<AbstractTypeParamDecl>(TD)) {
       llvm_unreachable("should not see type params here");
+    } else if (isa<StructDecl>(TD)) {
+      // FIXME: add support here.
+      return;
     } else {
       assert(false && "unknown local type decl");
     }
@@ -668,11 +671,13 @@ void swift::printModuleContentsAsCxx(
     M.ValueDecl::getName().print(os);
     os << " {\n";
     os << "namespace " << cxx_synthesis::getCxxImplNamespaceName() << " {\n";
+    os << "extern \"C\" {\n";
     os << "#endif\n\n";
 
     os << prologueOS.str();
 
     os << "\n#ifdef __cplusplus\n";
+    os << "}\n";
     os << "}\n";
     os << "}\n";
   }
