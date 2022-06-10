@@ -21,8 +21,7 @@ final public class Function : CustomStringConvertible, HasShortDescription {
   }
 
   final public var description: String {
-    var s = SILFunction_debugDescription(bridged)
-    return String(cString: s.c_str())
+    String(_cxxString: SILFunction_debugDescription(bridged))
   }
 
   public var shortDescription: String { name.string }
