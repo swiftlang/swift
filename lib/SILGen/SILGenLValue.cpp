@@ -2683,6 +2683,9 @@ namespace {
                                                  strategy.getWriteStrategy(),
                                                  typeData);
       }
+
+      case AccessStrategy::DispatchToDistributedThunk:
+        return asImpl().emitUsingDistributedThunk();
       }
       llvm_unreachable("unknown kind");
     }
@@ -2888,6 +2891,11 @@ void LValue::addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
       if (address.getType().is<ReferenceStorageType>())
         LV.add<OwnershipComponent>(typeData);
     }
+
+    void emitUsingDistributedThunk() {
+      llvm_unreachable("cannot dispatch non-member var via distributed thunk");
+    }
+
   } emitter(SGF, loc, var, subs, accessKind, formalRValueType, options,
             actorIso, *this);
 
@@ -3183,11 +3191,11 @@ static SGFAccessKind getBaseAccessKind(SILGenModule &SGM,
   }
 
   case AccessStrategy::DirectToAccessor:
-  case AccessStrategy::DispatchToAccessor: {
+  case AccessStrategy::DispatchToAccessor:
+  case AccessStrategy::DispatchToDistributedThunk: {
     auto accessor = member->getOpaqueAccessor(strategy.getAccessor());
     return getBaseAccessKindForAccessor(SGM, accessor, baseFormalType);
   }
-    
   }
   llvm_unreachable("bad access strategy");
 }
@@ -3395,6 +3403,19 @@ void LValue::addMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
         LV.add<OwnershipComponent>(typeData);
       }
     }
+
+    void emitUsingDistributedThunk() {
+      auto *var = cast<VarDecl>(Storage);
+      SILDeclRef accessor(var->getDistributedThunk(), SILDeclRef::Kind::Func,
+                          /*isForeign=*/false, /*isDistributed=*/true);
+
+      auto typeData = getLogicalStorageTypeData(
+          SGF.getTypeExpansionContext(), SGF.SGM, AccessKind, FormalRValueType);
+
+      asImpl().emitUsingGetterSetter(accessor, /*isDirect=*/false,
+                                     /*isDistributed=*/true, typeData);
+    }
+
   } emitter(SGF, loc, var, subs, isSuper, accessKind,
             formalRValueType, options, *this,
             /*indices for diags*/ nullptr, /*indices*/ PreparedArguments(),
@@ -3569,6 +3590,10 @@ void LValue::addMemberSubscriptComponent(SILGenFunction &SGF, SILLocation loc,
 
     void emitUsingStorage(LValueTypeData typeData) {
       llvm_unreachable("subscripts never have storage");
+    }
+
+    void emitUsingDistributedThunk() {
+      llvm_unreachable("subscripts cannot be dispatch via distributed thunk");
     }
   } emitter(SGF, loc, decl, subs, isSuper, accessKind, formalRValueType,
             options, *this, argListForDiagnostics, std::move(indices),
