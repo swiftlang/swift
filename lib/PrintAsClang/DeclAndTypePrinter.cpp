@@ -1097,6 +1097,13 @@ private:
 
   void visitFuncDecl(FuncDecl *FD) {
     if (outputLang == OutputLanguageMode::Cxx) {
+      // Don't expose async functions or @_alwaysEmitIntoClient functions
+      // because they're currently unsupported
+      if (FD->hasAsync() ||
+          FD->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>()) {
+        return;
+      }
+
       // Emit the underlying C signature that matches the Swift ABI
       // in the generated C++ implementation prologue for the module.
       std::string cFuncDecl;

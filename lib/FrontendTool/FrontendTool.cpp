@@ -1727,6 +1727,13 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   if (validateTBDIfNeeded(Invocation, MSF, *IRModule.getModule()))
     return true;
 
+  if (IRGenOpts.UseSingleModuleLLVMEmission) {
+    // Pretend the other files that drivers/build systems expect exist by
+    // creating empty files.
+    if (writeEmptyOutputFilesFor(Context, ParallelOutputFilenames, IRGenOpts))
+      return true;
+  }
+
   return generateCode(Instance, OutputFilename, IRModule.getModule(),
                       HashGlobal);
 }

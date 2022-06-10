@@ -258,6 +258,11 @@ namespace swift {
                    llvm::Module *Module,
                    StringRef OutputFilename);
 
+  bool writeEmptyOutputFilesFor(
+    const ASTContext &Context,
+    std::vector<std::string> &ParallelOutputFilenames,
+    const IRGenOptions &IRGenOpts);
+
   /// Run the LLVM passes. In multi-threaded compilation this will be done for
   /// multiple LLVM modules in parallel.
   /// \param Diags The Diagnostic Engine.
