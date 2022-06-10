@@ -3745,6 +3745,8 @@ store_borrow
 
 Stores the value ``%0`` to a stack location ``%1``, which must be an
 ``alloc_stack $T``.
+The stack location must not be modified by other instructions than
+``store_borrow``.
 The stored value is alive until the ``dealloc_stack`` or until another
 ``store_borrow`` overwrites the value. During the its lifetime, the stored
 value must not be modified or destroyed.
