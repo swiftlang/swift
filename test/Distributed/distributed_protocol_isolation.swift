@@ -211,6 +211,22 @@ func test_watchingDA<WDA: TerminationWatchingDA>(da: WDA) async throws {
   try await da.terminated(da: "the terminated func is not distributed")
   // expected-error@-1{{only 'distributed' instance methods can be called on a potentially remote distributed actor}}
   // expected-warning@-2{{no calls to throwing functions occur within 'try' expression}}
+
+//  // FIXME: pending fix of closure isolation checking with actors #59356
+//  await da.whenLocal { __secretlyKnownToBeLocal in
+//    await __secretlyKnownToBeLocal.terminated(da: "local calls are okey!") // OK
+//  }
+}
+
+func test_watchingDA_erased(da: DA_TerminationWatchingDA) async throws {
+  let wda: TerminationWatchingDA = da
+  try await wda.terminated(wda: "the terminated func is not distributed")
+  // expected-error@-1{{only 'distributed' instance methods can be called on a potentially remote distributed actor}}
+  // expected-warning@-2{{no calls to throwing functions occur within 'try' expression}}
+
+  await wda.whenLocal { __secretlyKnownToBeLocal in
+    await __secretlyKnownToBeLocal.terminated(da: "local calls are okey!") // OK
+  }
 }
 
 func test_watchingDA_any(da: any TerminationWatchingDA) async throws {
