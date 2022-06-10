@@ -2321,7 +2321,7 @@ namespace {
           if (auto lookupExpr = dyn_cast_or_null<LookupExpr>(context)) {
             if (auto memberRef = dyn_cast<MemberRefExpr>(lookupExpr)) {
               memberRef->setImplicitlyThrows(true);
-              memberRef->setShouldApplyLookupDistributedThunk(true);
+              memberRef->setAccessViaDistributedThunk();
             } else {
               llvm_unreachable("expected distributed prop to be a MemberRef");
             }
