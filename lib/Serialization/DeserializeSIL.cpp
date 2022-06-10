@@ -2034,6 +2034,29 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     break;
   }
 
+  case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst: {
+    auto Ty = MF->getType(TyID);
+    bool isOwned = bool(Attr);
+    if (isOwned)
+      ResultInst = Builder.createOwnedMoveOnlyWrapperToCopyableValue(
+          Loc, getLocalValue(ValID,
+                             getSILType(Ty, (SILValueCategory)TyCategory, Fn)));
+    else
+      ResultInst = Builder.createGuaranteedMoveOnlyWrapperToCopyableValue(
+          Loc, getLocalValue(ValID,
+                             getSILType(Ty, (SILValueCategory)TyCategory, Fn)));
+    break;
+  }
+
+  case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst: {
+    auto Ty = MF->getType(TyID);
+    auto *MVI = Builder.createCopyableToMoveOnlyWrapperValue(
+        Loc,
+        getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)));
+    ResultInst = MVI;
+    break;
+  }
+
   case SILInstructionKind::LoadInst: {
     auto Ty = MF->getType(TyID);
     auto Qualifier = LoadOwnershipQualifier(Attr);
