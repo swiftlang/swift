@@ -118,7 +118,7 @@ WARNING(nonmutating_without_mutable_fields,none,
 ERROR(module_map_not_found, none, "module map file '%0' not found", (StringRef))
 
 WARNING(libstdcxx_not_found, none,
-        "libstdc++ not found for '$0'; C++ stdlib may be unavailable",
+        "libstdc++ not found for '%0'; C++ stdlib may be unavailable",
         (StringRef))
 
 NOTE(macro_not_imported_unsupported_operator, none, "operator not supported in macro arithmetic", ())

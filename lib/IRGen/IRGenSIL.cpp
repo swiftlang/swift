@@ -4812,7 +4812,7 @@ void IRGenSILFunction::emitErrorResultVar(CanSILFunctionType FnTy,
                                           DebugValueInst *DbgValue) {
   // We don't need a shadow error variable for debugging on ABI's that return
   // swifterror in a register.
-  if (IGM.IsSwiftErrorInRegister)
+  if (IGM.ShouldUseSwiftError)
     return;
   auto ErrorResultSlot = getCalleeErrorResultSlot(IGM.silConv.getSILType(
       ErrorInfo, FnTy, IGM.getMaximalTypeExpansionContext()));

@@ -564,7 +564,7 @@ ParserResult<TypeRepr> Parser::parseType(
 
 ParserResult<TypeRepr> Parser::parseTypeWithOpaqueParams(Diag<> MessageID) {
   GenericParamList *genericParams = nullptr;
-  if (Context.LangOpts.EnableExperimentalNamedOpaqueTypes) {
+  if (Context.LangOpts.hasFeature(Feature::NamedOpaqueTypes)) {
     auto result = maybeParseGenericParams();
     genericParams = result.getPtrOrNull();
     if (result.hasCodeCompletion())
@@ -881,12 +881,19 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
         Tok.isContextualKeyword("any")) {
       auto keyword = Tok.getText();
       auto badLoc = consumeToken();
+                
+      // Suggest moving `some` or `any` in front of the first type unless
+      // the first type is an opaque or existential type.
+      if (opaqueLoc.isValid() || anyLoc.isValid()) {
+        diagnose(badLoc, diag::opaque_mid_composition, keyword)
+            .fixItRemove(badLoc);
+      } else {
+        diagnose(badLoc, diag::opaque_mid_composition, keyword)
+            .fixItRemove(badLoc)
+            .fixItInsert(FirstTypeLoc, keyword.str() + " ");
+      }
 
       const bool isAnyKeyword = keyword.equals("any");
-
-      diagnose(badLoc, diag::opaque_mid_composition, keyword)
-          .fixItRemove(badLoc)
-          .fixItInsert(FirstTypeLoc, keyword.str() + " ");
 
       if (isAnyKeyword) {
         if (anyLoc.isInvalid()) {

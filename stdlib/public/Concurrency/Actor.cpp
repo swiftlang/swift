@@ -19,27 +19,19 @@
 #include <atomic>
 #include <new>
 
-#ifdef _WIN32
-// On Windows, an include below triggers an indirect include of minwindef.h
-// which contains a definition of the `max` macro, generating an error in our
-// use of std::max in this file. This define prevents those macros from being
-// defined.
-#define NOMINMAX
-#endif
-
 #include "../CompatibilityOverride/CompatibilityOverride.h"
-#include "swift/Runtime/Atomic.h"
-#include "swift/Runtime/AccessibleFunction.h"
-#include "swift/Runtime/Casting.h"
-#include "swift/Runtime/Once.h"
-#include "swift/Runtime/Mutex.h"
-#include "swift/Runtime/ThreadLocal.h"
-#include "swift/Runtime/ThreadLocalStorage.h"
-#include "swift/Runtime/DispatchShims.h"
-#include "swift/ABI/Task.h"
 #include "swift/ABI/Actor.h"
+#include "swift/ABI/Task.h"
 #include "swift/Basic/ListMerger.h"
 #include "swift/Concurrency/Actor.h"
+#include "swift/Runtime/AccessibleFunction.h"
+#include "swift/Runtime/Atomic.h"
+#include "swift/Runtime/Casting.h"
+#include "swift/Runtime/DispatchShims.h"
+#include "swift/Threading/Mutex.h"
+#include "swift/Threading/Once.h"
+#include "swift/Threading/Thread.h"
+#include "swift/Threading/ThreadLocalStorage.h"
 #ifdef SWIFT_CONCURRENCY_BACK_DEPLOYMENT
 // All platforms where we care about back deployment have a known
 // configurations.
@@ -68,19 +60,8 @@
 #include <sys/syscall.h>
 #endif
 
-#if defined(_POSIX_THREADS)
-#include <pthread.h>
-
-// Only use __has_include since HAVE_PTHREAD_NP_H is not provided.
-#if __has_include(<pthread_np.h>)
-#include <pthread_np.h>
-#endif
-#endif
-
 #if defined(_WIN32)
 #include <io.h>
-#include <handleapi.h>
-#include <processthreadsapi.h>
 #endif
 
 #if SWIFT_OBJC_INTEROP
@@ -126,9 +107,9 @@ class ExecutorTrackingInfo {
   /// the right executor. It would make sense for that to be a
   /// separate thread-local variable (or whatever is most efficient
   /// on the target platform).
-  static SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(
-      Pointer<ExecutorTrackingInfo>, ActiveInfoInThread,
-      SWIFT_CONCURRENCY_EXECUTOR_TRACKING_INFO_KEY);
+  static SWIFT_THREAD_LOCAL_TYPE(Pointer<ExecutorTrackingInfo>,
+                                 tls_key::concurrency_executor_tracking_info)
+      ActiveInfoInThread;
 
   /// The active executor.
   ExecutorRef ActiveExecutor = ExecutorRef::generic();
@@ -194,8 +175,8 @@ public:
 class ActiveTask {
   /// A thread-local variable pointing to the active tracking
   /// information about the current thread, if any.
-  static SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(Pointer<AsyncTask>, Value,
-                                            SWIFT_CONCURRENCY_TASK_KEY);
+  static SWIFT_THREAD_LOCAL_TYPE(Pointer<AsyncTask>,
+                                 tls_key::concurrency_task) Value;
 
 public:
   static void set(AsyncTask *task) { Value.set(task); }
@@ -203,15 +184,12 @@ public:
 };
 
 /// Define the thread-locals.
-SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(
-  Pointer<AsyncTask>,
-  ActiveTask::Value,
-  SWIFT_CONCURRENCY_TASK_KEY);
+SWIFT_THREAD_LOCAL_TYPE(Pointer<AsyncTask>, tls_key::concurrency_task)
+ActiveTask::Value;
 
-SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(
-  Pointer<ExecutorTrackingInfo>,
-  ExecutorTrackingInfo::ActiveInfoInThread,
-  SWIFT_CONCURRENCY_EXECUTOR_TRACKING_INFO_KEY);
+SWIFT_THREAD_LOCAL_TYPE(Pointer<ExecutorTrackingInfo>,
+                        tls_key::concurrency_executor_tracking_info)
+ExecutorTrackingInfo::ActiveInfoInThread;
 
 } // end anonymous namespace
 
@@ -280,34 +258,18 @@ static ExecutorRef swift_task_getCurrentExecutorImpl() {
   return result;
 }
 
-#if defined(_WIN32)
-static HANDLE __initialPthread = INVALID_HANDLE_VALUE;
-#endif
-
 /// Determine whether we are currently executing on the main thread
 /// independently of whether we know that we are on the main actor.
 static bool isExecutingOnMainThread() {
-#if SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
-  return true;
-#elif defined(__linux__)
-  return syscall(SYS_gettid) == getpid();
-#elif defined(_WIN32)
-  if (__initialPthread == INVALID_HANDLE_VALUE) {
-    DuplicateHandle(GetCurrentProcess(), GetCurrentThread(),
-                    GetCurrentProcess(), &__initialPthread, 0, FALSE,
-                    DUPLICATE_SAME_ACCESS);
-  }
-
-  return __initialPthread == GetCurrentThread();
-#elif defined(__wasi__)
+#if SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY
   return true;
 #else
-  return pthread_main_np() == 1;
+  return Thread::onMainThread();
 #endif
 }
 
 JobPriority swift::swift_task_getCurrentThreadPriority() {
-#if SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+#if SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY
   return JobPriority::UserInitiated;
 #elif defined(__APPLE__)
   return static_cast<JobPriority>(qos_class_self());
@@ -351,8 +313,8 @@ void swift::swift_task_reportUnexpectedExecutor(
     const unsigned char *file, uintptr_t fileLength, bool fileIsASCII,
     uintptr_t line, ExecutorRef executor) {
   // Make sure we have an appropriate log level.
-  static swift_once_t logLevelToken;
-  swift_once(&logLevelToken, checkUnexpectedExecutorLogLevel, nullptr);
+  static swift::once_t logLevelToken;
+  swift::once(logLevelToken, checkUnexpectedExecutorLogLevel, nullptr);
 
   bool isFatalError = false;
   switch (unexpectedExecutorLogLevel) {

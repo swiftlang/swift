@@ -269,3 +269,30 @@ func test_tailored_diagnostic(ptr: UnsafeRawPointer, tptr: UnsafePointer<Int8>) 
   opt_arg_func(optrU8)
   // expected-error@-1 {{cannot convert value of type 'UnsafePointer<UInt8>?' to expected argument type 'UnsafePointer<Int8>?' because local function 'opt_arg_func' was not imported from C header}}
 }
+
+func test_inout_to_pointer_conversion() {
+% for Size in ['16', '32', '64']:
+  var x${Size}: Int${Size} = 0
+
+  void_ptr_func(&x${Size}) // Ok
+  const_void_ptr_func(&x${Size}) // Ok
+  opt_void_ptr_func(&x${Size}) // Ok
+
+  char_ptr_func(&x${Size}) // Ok
+  opt_char_ptr_func(&x${Size}) // Ok
+
+  const_char_ptr_func(&x${Size}) // Ok
+  const_opt_char_ptr_func(&x${Size}) // Ok
+
+  int_${Size}_ptr_func(&x${Size}) // Ok
+  uint_${Size}_ptr_func(&x${Size}) // Ok
+
+  opt_int_${Size}_ptr_func(&x${Size}) // Ok
+  opt_uint_${Size}_ptr_func(&x${Size}) // Ok
+
+  const_int_${Size}_ptr_func(&x${Size}) // OK
+  const_uint_${Size}_ptr_func(&x${Size}) // OK
+  const_opt_int_${Size}_ptr_func(&x${Size}) // OK
+  const_opt_uint_${Size}_ptr_func(&x${Size}) // OK
+% end
+}

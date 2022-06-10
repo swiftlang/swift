@@ -64,6 +64,7 @@ endif()
 
 add_subdirectory(SwiftShims)
 add_subdirectory(CommandLineSupport)
+add_subdirectory(Threading)
 
 # This static library is shared across swiftCore and swiftReflection
 if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)

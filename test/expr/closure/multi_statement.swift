@@ -1,3 +1,4 @@
+
 // RUN: %target-typecheck-verify-swift -swift-version 5 -enable-experimental-static-assert
 
 func isInt<T>(_ value: T) -> Bool {
@@ -380,6 +381,37 @@ func test_diagnosing_on_missing_member_in_case() {
   }
 }
 
+// rdar://92757114 - fallback diagnostic when member doesn't exist in a nested closure
+func test_diagnose_missing_member_in_inner_closure() {
+  struct B {
+    static var member: any StringProtocol = ""
+  }
+
+  struct Cont<T, E: Error> {
+    func resume(returning value: T) {}
+  }
+
+  func withCont<T>(function: String = #function,
+                   _ body: (Cont<T, Never>) -> Void) -> T {
+    fatalError()
+  }
+
+  func test(vals: [Int]?) -> [Int] {
+    withCont { continuation in
+      guard let vals = vals else {
+        return continuation.resume(returning: [])
+      }
+
+      B.member.get(0, // expected-error {{value of type 'any StringProtocol' has no member 'get'}}
+                   type: "type",
+                   withinSecs: Int(60*60)) { arr in
+        let result = arr.compactMap { $0 }
+        return continuation.resume(returning: result)
+      }
+    }
+  }
+}
+
 // Type finder shouldn't bring external closure result type
 // into the scope of an inner closure e.g. while solving
 // init of pattern binding `x`.
@@ -402,5 +434,84 @@ func test_type_finder_doesnt_walk_into_inner_closures() {
     }
 
     return x
+  }
+}
+
+// rdar://94049113 - compiler accepts non-optional `guard let` in a closure
+func test_non_optional_guard_let_is_diagnosed() {
+  func fn(_: (Int) -> Void) {}
+
+  fn {
+    if true {
+      guard let v = $0 else { // expected-error {{initializer for conditional binding must have Optional type, not 'Int'}}
+        return
+      }
+
+      print(v)
+    }
+  }
+
+  fn {
+    switch $0 {
+    case (let val):
+      fn {
+        guard let x = val else {  // expected-error {{initializer for conditional binding must have Optional type, not 'Int'}}
+          return
+        }
+
+        print($0 + x)
+      }
+
+    default: break
+    }
+  }
+}
+
+// rdar://93796211 (issue#59035) - crash during solution application to fallthrough statement
+func test_fallthrough_stmt() {
+  {
+    var collector: [Void] = []
+    for _: Void in [] {
+      switch (() as Void?, ()) {
+      case (let a?, let b):
+        // expected-warning@-1 {{constant 'b' inferred to have type '()', which may be unexpected}}
+        // expected-note@-2 {{add an explicit type annotation to silence this warning}}
+        collector.append(a)
+        fallthrough
+      case (nil,    let b):
+        // expected-warning@-1 {{constant 'b' inferred to have type '()', which may be unexpected}}
+        // expected-note@-2 {{add an explicit type annotation to silence this warning}}
+        collector.append(b)
+      }
+    }
+  }()
+}
+
+// rdar://93061432 - No diagnostic for invalid `for-in` statement
+func test_missing_conformance_diagnostics_in_for_sequence() {
+  struct Event {}
+
+  struct S {
+    struct Iterator: IteratorProtocol {
+      typealias Element = (event: Event, timestamp: Double)
+
+      mutating func next() -> Element? { return nil }
+    }
+  }
+
+  func fn(_: () -> Void) {}
+
+  func test(_ iter: inout S.Iterator) {
+    fn {
+      for v in iter.next() { // expected-error {{for-in loop requires 'S.Iterator.Element?' (aka 'Optional<(event: Event, timestamp: Double)>') to conform to 'Sequence'; did you mean to unwrap optional?}}
+        _ = v.event
+      }
+    }
+
+    fn {
+      while let v = iter.next() { // ok
+        _ = v.event
+      }
+    }
   }
 }

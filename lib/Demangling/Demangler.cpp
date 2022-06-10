@@ -1977,7 +1977,7 @@ NodePointer Demangler::demangleImplFunctionType() {
     FAttrNode->addChild(
         createNode(Node::Kind::ImplFunctionConventionName, FConv), *this);
     if (hasClangType)
-      FAttrNode->addChild(demangleClangType(), *this);
+      addChild(FAttrNode, demangleClangType());
     type->addChild(FAttrNode, *this);
   }
 

@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-parameterized-existential-types -Xfrontend -disable-availability-checking)
+// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking)
 // REQUIRES: executable_test
 
 // This test requires the new existential shape metadata accessors which are 

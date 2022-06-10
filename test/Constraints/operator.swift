@@ -296,3 +296,13 @@ postfix operator ^^^
 postfix func ^^^ (lhs: Int) -> Int! { 0 }
 
 let x: Int = 1^^^
+
+// https://github.com/apple/swift/issues/44672 - DiagnosticsQoI
+do {
+  enum TestEnum: Int {
+    case First, Second
+  }
+
+  let number = 1
+  let test = true || number == .First.rawValue // expected-error {{type 'Int' has no member 'First'}}
+}

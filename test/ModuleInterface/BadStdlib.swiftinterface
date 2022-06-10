@@ -16,4 +16,4 @@ import ClangMod
 public func useHasPointer(_: HasPointer)
 
 // FIXME: SR-14489
-// UNSUPPORTED: windows
+// UNSUPPORTED: OS=windows-msvc

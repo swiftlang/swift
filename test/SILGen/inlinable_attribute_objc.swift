@@ -20,10 +20,10 @@ public class Horse : NSObject {
 // @objc thunks are not serialized, since they are only referenced from
 // method tables.
 
-// CHECK-LABEL: sil [thunk] [ossa] @$s24inlinable_attribute_objc5HorseC6gallopyyFTo : $@convention(objc_method) (Horse) -> ()
-// CHECK-LABEL: sil [thunk] [ossa] @$s24inlinable_attribute_objc5HorseC10someMethodyyFTo : $@convention(objc_method) (Horse) -> ()
-// CHECK-LABEL: sil [thunk] [ossa] @$s24inlinable_attribute_objc5HorseC6saddleACyt_tcfcTo : $@convention(objc_method) (@owned Horse) -> @owned Horse
-// CHECK-LABEL: sil [thunk] [ossa] @$s24inlinable_attribute_objc5HorseCACycfcTo : $@convention(objc_method) (@owned Horse) -> @owned Horse
+// CHECK-LABEL: sil private [thunk] [ossa] @$s24inlinable_attribute_objc5HorseC6gallopyyFTo : $@convention(objc_method) (Horse) -> ()
+// CHECK-LABEL: sil private [thunk] [ossa] @$s24inlinable_attribute_objc5HorseC10someMethodyyFTo : $@convention(objc_method) (Horse) -> ()
+// CHECK-LABEL: sil private [thunk] [ossa] @$s24inlinable_attribute_objc5HorseC6saddleACyt_tcfcTo : $@convention(objc_method) (@owned Horse) -> @owned Horse
+// CHECK-LABEL: sil private [thunk] [ossa] @$s24inlinable_attribute_objc5HorseCACycfcTo : $@convention(objc_method) (@owned Horse) -> @owned Horse
 
 // However, make sure we can reference dynamic thunks and curry thunks
 // from inlinable scopes

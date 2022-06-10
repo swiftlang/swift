@@ -6,4 +6,4 @@
 // RUN: %t.shebang.swift a b c | %FileCheck -check-prefix=THREE-ARGS %S/shebang-env.swift
 
 // REQUIRES: swift_interpreter
-// UNSUPPORTED: linux
+// UNSUPPORTED: OS=linux-gnu

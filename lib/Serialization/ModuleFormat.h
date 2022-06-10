@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 691; // bump to avoid conflict
+const uint16_t SWIFTMODULE_VERSION_MINOR = 692; // move only type wrapper
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1206,6 +1206,11 @@ namespace decls_block {
   TYPE_LAYOUT(SILBlockStorageTypeLayout,
     SIL_BLOCK_STORAGE_TYPE,
     TypeIDField // capture type
+  );
+
+  TYPE_LAYOUT(SILMoveOnlyTypeLayout,
+    SIL_MOVE_ONLY_TYPE,
+    TypeIDField            // inner type
   );
 
   using SILLayoutLayout = BCRecordLayout<

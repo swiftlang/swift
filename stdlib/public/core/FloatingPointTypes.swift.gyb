@@ -22,9 +22,6 @@ from SwiftFloatingPointTypes import all_floating_point_types
 
 # Number of bits in the Builtin.Word type
 word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
-
-# Number of bits in integer literals.
-builtinIntLiteralBits = 2048
 }%
 
 % for self_type in all_floating_point_types():

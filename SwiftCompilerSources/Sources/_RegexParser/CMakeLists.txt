@@ -16,4 +16,6 @@ endforeach()
 message(STATUS "Using Experimental String Processing library for libswift _RegexParser (${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}).")
 
 add_swift_compiler_module(_CompilerRegexParser
+  ADD_TO_SYNTAXPARSE
+  SOURCES
   "${LIBSWIFT_REGEX_PARSER_SOURCES}")

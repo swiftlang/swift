@@ -2717,6 +2717,53 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose situations where inferring existential type for result of
+/// a call would result in loss of generic requirements.
+///
+/// \code
+/// protocol P {
+///  associatedtype A
+/// }
+///
+/// protocol Q {
+///  associatedtype B: P where B.A == Int
+/// }
+///
+/// func getB<T: Q>(_: T) -> T.B { ... }
+///
+/// func test(v: any Q) {
+///   let _ = getB(v) // <- produces `any P` which looses A == Int
+/// }
+/// \endcode
+class MissingExplicitExistentialCoercion final : public FailureDiagnostic {
+  Type ErasedResultType;
+
+public:
+  MissingExplicitExistentialCoercion(const Solution &solution,
+                                     Type erasedResultTy,
+                                     ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator),
+        ErasedResultType(resolveType(erasedResultTy)) {}
+
+  SourceRange getSourceRange() const override {
+    auto rawAnchor = getRawAnchor();
+    return {rawAnchor.getStartLoc(), rawAnchor.getEndLoc()};
+  }
+
+  bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
+
+private:
+  void fixIt(InFlightDiagnostic &diagnostic) const;
+
+  /// Determine whether the fix-it to add `as any ...` requires parens.
+  ///
+  /// Parens are required to avoid suppressing existential opening
+  /// if result of the call is passed as an argument to another call
+  /// that requires such opening.
+  bool fixItRequiresParens() const;
+};
+
 } // end namespace constraints
 } // end namespace swift
 

@@ -4,6 +4,11 @@ public class MyClass {
     public func pub_method()
 }
 
+public protocol MyProto<Assoc> {
+
+    associatedtype Assoc
+}
+
 public func pub_function()
 
 
@@ -46,15 +51,51 @@ public func pub_function()
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 64,
+    key.length: 8
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 73,
+    key.length: 7
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 81,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 95,
+    key.length: 14
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 110,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 119,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 126,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 69,
+    key.offset: 131,
     key.length: 12
   }
 ]
-<<NULL>>
+[
+  {
+    key.kind: source.lang.swift.ref.associatedtype,
+    key.offset: 81,
+    key.length: 5
+  }
+]
 [
   {
     key.kind: source.lang.swift.decl.class,
@@ -93,16 +134,45 @@ public func pub_function()
     ]
   },
   {
-    key.kind: source.lang.swift.decl.function.free,
+    key.kind: source.lang.swift.decl.protocol,
     key.accessibility: source.lang.swift.accessibility.public,
-    key.name: "pub_function()",
+    key.name: "MyProto",
     key.offset: 64,
-    key.length: 19,
-    key.nameoffset: 69,
-    key.namelength: 14,
+    key.length: 53,
+    key.nameoffset: 73,
+    key.namelength: 7,
+    key.bodyoffset: 89,
+    key.bodylength: 27,
     key.attributes: [
       {
         key.offset: 57,
+        key.length: 6,
+        key.attribute: source.decl.attribute.public
+      }
+    ],
+    key.substructure: [
+      {
+        key.kind: source.lang.swift.decl.associatedtype,
+        key.accessibility: source.lang.swift.accessibility.public,
+        key.name: "Assoc",
+        key.offset: 95,
+        key.length: 20,
+        key.nameoffset: 110,
+        key.namelength: 5
+      }
+    ]
+  },
+  {
+    key.kind: source.lang.swift.decl.function.free,
+    key.accessibility: source.lang.swift.accessibility.public,
+    key.name: "pub_function()",
+    key.offset: 126,
+    key.length: 19,
+    key.nameoffset: 131,
+    key.namelength: 14,
+    key.attributes: [
+      {
+        key.offset: 119,
         key.length: 6,
         key.attribute: source.decl.attribute.public
       }

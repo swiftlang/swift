@@ -778,6 +778,11 @@ ApplySite_getArgumentConvention(BridgedInstruction inst, SwiftInt calleeArgIdx) 
   }
 }
 
+SwiftInt ApplySite_getNumArguments(BridgedInstruction inst) {
+  auto as = ApplySite(castToInst(inst));
+  return as.getNumArguments();
+}
+
 //===----------------------------------------------------------------------===//
 //                                SILBuilder
 //===----------------------------------------------------------------------===//

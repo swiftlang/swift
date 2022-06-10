@@ -1,6 +1,6 @@
 // Tests to check that the driver finds standard library in the macabi environment.
 
-// UNSUPPORTED: windows
+// UNSUPPORTED: OS=windows-msvc
 
 // RUN: %swiftc_driver -sdk "" -sdk "" -driver-print-jobs -target x86_64-apple-ios13.1-macabi -sdk %S/../Inputs/clang-importer-sdk %s | %FileCheck -check-prefix=IOS13-MACABI %s
 // IOS13-MACABI: bin/swift

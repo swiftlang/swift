@@ -1353,6 +1353,11 @@ ERROR(expected_type_after_as,none,
 ERROR(string_interpolation_extra,none,
       "extra tokens after interpolated string expression", ())
 
+// String interpolation isnt closed by a )
+// ie: `let west = "ye \("`
+ERROR(string_interpolation_unclosed, none,
+      "cannot find ')' to match opening '(' in string interpolation", ())
+
 // Interpolations with parameter labels or multiple values
 WARNING(string_interpolation_list_changing,none,
       "interpolating multiple values will not form a tuple in Swift 5", ())
@@ -1816,7 +1821,10 @@ ERROR(version_component_not_number,none,
 ERROR(compiler_version_too_many_components,none,
       "compiler version must not have more than five components", ())
 WARNING(unused_compiler_version_component,NoUsage,
-      "the second version component is not used for comparison", ())
+      "the second version component is not used for comparison in legacy "
+      "compiler versions%select{|; are you trying to encode a new Swift "
+      "compiler version for compatibility with legacy compilers?}0",
+      (bool))
 ERROR(empty_version_component,none,
       "found empty version component", ())
 ERROR(compiler_version_component_out_of_range,none,

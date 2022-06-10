@@ -460,6 +460,9 @@ private:
     // Adds in a TRC that covers the entire declaration.
     if (auto DeclTRC = getNewContextForSignatureOfDecl(D)) {
       pushContext(DeclTRC, D);
+
+      // Possibly use this as an effective parent context later.
+      recordEffectiveParentContext(D, DeclTRC);
     }
 
     // Create TRCs that cover only the body of the declaration.
@@ -542,46 +545,63 @@ private:
           return nullptr;
     }
 
-    // A decl only introduces a new context when it either has explicit
-    // availability or requires the deployment target.
-    bool HasExplicitAvailability = hasActiveAvailableAttribute(D, Context);
-    bool ConstrainToDeploymentTarget =
-        shouldConstrainSignatureToDeploymentTarget(D);
-    if (!HasExplicitAvailability && !ConstrainToDeploymentTarget)
-      return nullptr;
+    // Declarations with an explicit availability attribute always get a TRC.
+    if (hasActiveAvailableAttribute(D, Context)) {
+      AvailabilityContext DeclaredAvailability =
+          swift::AvailabilityInference::availableRange(D, Context);
 
-    // We require a valid range in order to be able to query for the TRC
-    // corresponding to a given SourceLoc.
-    // If this assert fires, it means we have probably synthesized an implicit
-    // declaration without location information. The appropriate fix is
-    // probably to gin up a source range for the declaration when synthesizing
-    // it.
-    assert(D->getSourceRange().isValid());
+      return TypeRefinementContext::createForDecl(
+          Context, D, getCurrentTRC(),
+          getEffectiveAvailabilityForDeclSignature(D, DeclaredAvailability),
+          DeclaredAvailability, refinementSourceRangeForDecl(D));
+    }
 
-    // The potential versions in the declaration are constrained by both
-    // the declared availability of the declaration and the potential versions
-    // of its lexical context.
-    AvailabilityContext ExplicitDeclInfo =
-        swift::AvailabilityInference::availableRange(D, Context);
-    AvailabilityContext DeclInfo = ExplicitDeclInfo;
-    DeclInfo.intersectWith(getCurrentTRC()->getAvailabilityInfo());
+    // Declarations without explicit availability get a TRC if they are
+    // effectively less available than the surrounding context. For example, an
+    // internal property in a public struct can be effectively less available
+    // than the containing struct decl because the internal property will only
+    // be accessed by code running at the deployment target or later.
+    AvailabilityContext CurrentAvailability =
+        getCurrentTRC()->getAvailabilityInfo();
+    AvailabilityContext EffectiveAvailability =
+        getEffectiveAvailabilityForDeclSignature(D, CurrentAvailability);
+    if (CurrentAvailability.isSupersetOf(EffectiveAvailability))
+      return TypeRefinementContext::createForDeclImplicit(
+          Context, D, getCurrentTRC(), EffectiveAvailability,
+          refinementSourceRangeForDecl(D));
 
-    if (ConstrainToDeploymentTarget)
-      DeclInfo.intersectWith(AvailabilityContext::forDeploymentTarget(Context));
+    return nullptr;
+  }
 
-    SourceRange Range = refinementSourceRangeForDecl(D);
-    TypeRefinementContext *NewTRC;
-    if (HasExplicitAvailability)
-      NewTRC = TypeRefinementContext::createForDecl(
-          Context, D, getCurrentTRC(), DeclInfo, ExplicitDeclInfo, Range);
-    else
-      NewTRC = TypeRefinementContext::createForAPIBoundary(
-          Context, D, getCurrentTRC(), DeclInfo, Range);
+  AvailabilityContext getEffectiveAvailabilityForDeclSignature(
+      Decl *D, const AvailabilityContext BaseAvailability) {
+    AvailabilityContext EffectiveAvailability = BaseAvailability;
 
-    // Possibly use this as an effective parent context later.
-    recordEffectiveParentContext(D, NewTRC);
+    // As a special case, extension decls are treated as effectively as
+    // available as the nominal type they extend, up to the deployment target.
+    // This rule is a convenience for library authors who have written
+    // extensions without specifying availabilty on the extension itself.
+    if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+      auto *Nominal = ED->getExtendedNominal();
+      if (Nominal && !hasActiveAvailableAttribute(D, Context)) {
+        EffectiveAvailability.intersectWith(
+            swift::AvailabilityInference::availableRange(Nominal, Context));
 
-    return NewTRC;
+        // We want to require availability to be specified on extensions of
+        // types that would be potentially unavailable to the module containing
+        // the extension, so limit the effective availability to the deployment
+        // target.
+        EffectiveAvailability.unionWith(
+            AvailabilityContext::forDeploymentTarget(Context));
+      }
+    }
+
+    EffectiveAvailability.intersectWith(getCurrentTRC()->getAvailabilityInfo());
+    if (shouldConstrainSignatureToDeploymentTarget(D))
+      EffectiveAvailability.intersectWith(
+          AvailabilityContext::forDeploymentTarget(Context));
+
+    return EffectiveAvailability;
   }
 
   /// Checks whether the entire declaration, including its signature, should be
@@ -607,6 +627,14 @@ private:
   /// provides a convenient place to specify the refined range when it is
   /// different than the declaration's source range.
   SourceRange refinementSourceRangeForDecl(Decl *D) {
+    // We require a valid range in order to be able to query for the TRC
+    // corresponding to a given SourceLoc.
+    // If this assert fires, it means we have probably synthesized an implicit
+    // declaration without location information. The appropriate fix is
+    // probably to gin up a source range for the declaration when synthesizing
+    // it.
+    assert(D->getSourceRange().isValid());
+
     if (auto *storageDecl = dyn_cast<AbstractStorageDecl>(D)) {
       // Use the declaration's availability for the context when checking
       // the bodies of its accessors.
@@ -642,25 +670,26 @@ private:
     return D->getSourceRange();
   }
 
-  TypeRefinementContext *createAPIBoundaryContext(Decl *D, SourceRange range) {
-    AvailabilityContext DeploymentTargetInfo =
-        AvailabilityContext::forDeploymentTarget(Context);
-    DeploymentTargetInfo.intersectWith(getCurrentTRC()->getAvailabilityInfo());
-
-    return TypeRefinementContext::createForAPIBoundary(
-        Context, D, getCurrentTRC(), DeploymentTargetInfo, range);
-  }
-
   void buildContextsForBodyOfDecl(Decl *D) {
     // Are we already constrained by the deployment target? If not, adding
     // new contexts won't change availability.
     if (isCurrentTRCContainedByDeploymentTarget())
       return;
 
+    // A lambda that creates an implicit decl TRC specifying the deployment
+    // target for `range` in decl `D`.
+    auto createContext = [this](Decl *D, SourceRange range) {
+      AvailabilityContext Availability =
+          AvailabilityContext::forDeploymentTarget(Context);
+      Availability.intersectWith(getCurrentTRC()->getAvailabilityInfo());
+
+      return TypeRefinementContext::createForDeclImplicit(
+          Context, D, getCurrentTRC(), Availability, range);
+    };
+
     // Top level code always uses the deployment target.
     if (auto tlcd = dyn_cast<TopLevelCodeDecl>(D)) {
-      auto *topLevelTRC =
-          createAPIBoundaryContext(tlcd, tlcd->getSourceRange());
+      auto *topLevelTRC = createContext(tlcd, tlcd->getSourceRange());
       pushContext(topLevelTRC, D);
       return;
     }
@@ -670,8 +699,7 @@ private:
     if (auto afd = dyn_cast<AbstractFunctionDecl>(D)) {
       if (!afd->isImplicit() && afd->getBodySourceRange().isValid() &&
           afd->getResilienceExpansion() != ResilienceExpansion::Minimal) {
-        auto *functionBodyTRC =
-            createAPIBoundaryContext(afd, afd->getBodySourceRange());
+        auto *functionBodyTRC = createContext(afd, afd->getBodySourceRange());
         pushContext(functionBodyTRC, D);
       }
       return;
@@ -693,8 +721,7 @@ private:
           // Create a TRC for the init written in the source. The ASTWalker
           // won't visit these expressions so instead of pushing these onto the
           // stack we build them directly.
-          auto *initTRC =
-              createAPIBoundaryContext(vd, initExpr->getSourceRange());
+          auto *initTRC = createContext(vd, initExpr->getSourceRange());
           TypeRefinementContextBuilder(initTRC, Context).build(initExpr);
         }
 
@@ -710,7 +737,7 @@ private:
         // example, property wrapper initializers that takes block arguments
         // are not handled correctly because of this (rdar://77841331).
         for (auto *wrapper : vd->getAttachedPropertyWrappers()) {
-          createAPIBoundaryContext(vd, wrapper->getRange());
+          createContext(vd, wrapper->getRange());
         }
       }
 

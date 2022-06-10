@@ -1301,7 +1301,7 @@ func shouldPrintAnyAsKeyword(x x: Any)
   {
     key.kind: source.lang.swift.ref.generic_type_param,
     key.name: "Self",
-    key.usr: "s:4cake4ProtPAASi7ElementRtzrlE4Selfxmfp",
+    key.usr: "s:4cake4ProtP4Selfxmfp",
     key.offset: 1595,
     key.length: 4
   },
@@ -1649,7 +1649,7 @@ func shouldPrintAnyAsKeyword(x x: Any)
   {
     key.kind: source.lang.swift.ref.generic_type_param,
     key.name: "Wrapped",
-    key.usr: "s:4cake2S3VA2A2P6RzrlE7Wrappedxmfp",
+    key.usr: "s:4cake2S3V7Wrappedxmfp",
     key.offset: 2041,
     key.length: 7
   },
@@ -2557,7 +2557,7 @@ func shouldPrintAnyAsKeyword(x x: Any)
     ],
     key.offset: 1574,
     key.length: 63,
-    key.fully_annotated_decl: "<decl.extension.protocol><syntaxtype.keyword>extension</syntaxtype.keyword> <decl.name><ref.protocol usr=\"s:4cake4ProtP\">Prot</ref.protocol></decl.name> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:4cake4ProtPAASi7ElementRtzrlE4Selfxmfp\">Self</ref.generic_type_param>.<ref.associatedtype usr=\"s:4cake4ProtP7ElementQa\">Element</ref.associatedtype> == <ref.struct usr=\"s:Si\">Int</ref.struct></decl.generic_type_requirement></decl.extension.protocol>",
+    key.fully_annotated_decl: "<decl.extension.protocol><syntaxtype.keyword>extension</syntaxtype.keyword> <decl.name><ref.protocol usr=\"s:4cake4ProtP\">Prot</ref.protocol></decl.name> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:4cake4ProtP4Selfxmfp\">Self</ref.generic_type_param>.<ref.associatedtype usr=\"s:4cake4ProtP7ElementQa\">Element</ref.associatedtype> == <ref.struct usr=\"s:Si\">Int</ref.struct></decl.generic_type_requirement></decl.extension.protocol>",
     key.extends: {
       key.kind: source.lang.swift.ref.protocol,
       key.name: "Prot",
@@ -2758,6 +2758,11 @@ func shouldPrintAnyAsKeyword(x x: Any)
   },
   {
     key.kind: source.lang.swift.decl.extension.struct,
+    key.generic_params: [
+      {
+        key.name: "Wrapped"
+      }
+    ],
     key.generic_requirements: [
       {
         key.description: "Wrapped : P6"
@@ -2765,7 +2770,7 @@ func shouldPrintAnyAsKeyword(x x: Any)
     ],
     key.offset: 2022,
     key.length: 80,
-    key.fully_annotated_decl: "<syntaxtype.keyword>extension</syntaxtype.keyword> <ref.struct usr=\"s:4cake2S3V\">S3</ref.struct> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:4cake2S3VA2A2P6RzrlE7Wrappedxmfp\">Wrapped</ref.generic_type_param> : <ref.protocol usr=\"s:4cake2P6P\">P6</ref.protocol></decl.generic_type_requirement>",
+    key.fully_annotated_decl: "<syntaxtype.keyword>extension</syntaxtype.keyword> <ref.struct usr=\"s:4cake2S3V\">S3</ref.struct> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:4cake2S3V7Wrappedxmfp\">Wrapped</ref.generic_type_param> : <ref.protocol usr=\"s:4cake2P6P\">P6</ref.protocol></decl.generic_type_requirement>",
     key.extends: {
       key.kind: source.lang.swift.ref.struct,
       key.name: "S3",

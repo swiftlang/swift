@@ -416,6 +416,80 @@ AbstractionPattern::getTupleElementType(unsigned index) const {
   llvm_unreachable("bad kind");
 }
 
+AbstractionPattern AbstractionPattern::withoutMoveOnly() const {
+  switch (getKind()) {
+  case Kind::Invalid:
+    llvm_unreachable("querying invalid abstraction pattern!");
+  case Kind::PartialCurriedObjCMethodType:
+  case Kind::CurriedObjCMethodType:
+  case Kind::PartialCurriedCFunctionAsMethodType:
+  case Kind::CurriedCFunctionAsMethodType:
+  case Kind::CFunctionAsMethodType:
+  case Kind::ObjCMethodType:
+  case Kind::CXXMethodType:
+  case Kind::CurriedCXXMethodType:
+  case Kind::PartialCurriedCXXMethodType:
+  case Kind::CXXOperatorMethodType:
+  case Kind::CurriedCXXOperatorMethodType:
+  case Kind::PartialCurriedCXXOperatorMethodType:
+  case Kind::OpaqueFunction:
+  case Kind::OpaqueDerivativeFunction:
+    llvm_unreachable("function types can not be move only");
+  case Kind::ClangType:
+    llvm_unreachable("clang types can not be move only yet");
+  case Kind::ObjCCompletionHandlerArgumentsType:
+    llvm_unreachable("not handled yet");
+  case Kind::Discard:
+    llvm_unreachable("operation not needed on discarded abstractions yet");
+  case Kind::Opaque:
+  case Kind::Tuple:
+  case Kind::Type:
+    if (auto mvi = dyn_cast<SILMoveOnlyType>(getType())) {
+      return AbstractionPattern(getGenericSignature(), mvi->getInnerType());
+    }
+    return *this;
+  }
+
+  llvm_unreachable("bad kind");
+}
+
+AbstractionPattern AbstractionPattern::withMoveOnly() const {
+  switch (getKind()) {
+  case Kind::Invalid:
+    llvm_unreachable("querying invalid abstraction pattern!");
+  case Kind::PartialCurriedObjCMethodType:
+  case Kind::CurriedObjCMethodType:
+  case Kind::PartialCurriedCFunctionAsMethodType:
+  case Kind::CurriedCFunctionAsMethodType:
+  case Kind::CFunctionAsMethodType:
+  case Kind::ObjCMethodType:
+  case Kind::CXXMethodType:
+  case Kind::CurriedCXXMethodType:
+  case Kind::PartialCurriedCXXMethodType:
+  case Kind::CXXOperatorMethodType:
+  case Kind::CurriedCXXOperatorMethodType:
+  case Kind::PartialCurriedCXXOperatorMethodType:
+  case Kind::OpaqueFunction:
+  case Kind::OpaqueDerivativeFunction:
+    llvm_unreachable("function types can not be move only");
+  case Kind::ClangType:
+    llvm_unreachable("clang types can not be move only yet");
+  case Kind::ObjCCompletionHandlerArgumentsType:
+    llvm_unreachable("not handled yet");
+  case Kind::Discard:
+    llvm_unreachable("operation not needed on discarded abstractions yet");
+  case Kind::Opaque:
+  case Kind::Tuple:
+  case Kind::Type:
+    if (isa<SILMoveOnlyType>(getType()))
+      return *this;
+    return AbstractionPattern(getGenericSignature(),
+                              SILMoveOnlyType::get(getType()));
+  }
+
+  llvm_unreachable("bad kind");
+}
+
 /// Return a pattern corresponding to the 'self' parameter of the given
 /// Objective-C method.
 AbstractionPattern

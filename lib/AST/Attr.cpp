@@ -1720,6 +1720,13 @@ OriginallyDefinedInAttr::isActivePlatform(const ASTContext &ctx) const {
   return None;
 }
 
+OriginallyDefinedInAttr *OriginallyDefinedInAttr::clone(ASTContext &C,
+                                                        bool implicit) const {
+  return new (C) OriginallyDefinedInAttr(
+      implicit ? SourceLoc() : AtLoc, implicit ? SourceRange() : getRange(),
+      OriginalModuleName, Platform, MovedVersion, implicit);
+}
+
 bool AvailableAttr::isLanguageVersionSpecific() const {
   if (PlatformAgnostic ==
       PlatformAgnosticAvailabilityKind::SwiftVersionSpecific)
@@ -1938,6 +1945,15 @@ SPIAccessControlAttr::create(ASTContext &context,
   unsigned size = totalSizeToAlloc<Identifier>(spiGroups.size());
   void *mem = context.Allocate(size, alignof(SPIAccessControlAttr));
   return new (mem) SPIAccessControlAttr(atLoc, range, spiGroups);
+}
+
+SPIAccessControlAttr *SPIAccessControlAttr::clone(ASTContext &C,
+                                                  bool implicit) const {
+  auto *attr = SPIAccessControlAttr::create(
+      C, implicit ? SourceLoc() : AtLoc, implicit ? SourceRange() : getRange(),
+      getSPIGroups());
+  attr->setImplicit(implicit);
+  return attr;
 }
 
 DifferentiableAttr::DifferentiableAttr(bool implicit, SourceLoc atLoc,

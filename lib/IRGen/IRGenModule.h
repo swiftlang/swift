@@ -628,8 +628,8 @@ public:
   /// Should we add value names to local IR values?
   bool EnableValueNames = false;
 
-  // Is swifterror returned in a register by the target ABI.
-  bool IsSwiftErrorInRegister;
+  // Should `swifterror` attribute be explicitly added for the target ABI.
+  bool ShouldUseSwiftError;
 
   llvm::Type *VoidTy;                  /// void (usually {})
   llvm::IntegerType *Int1Ty;           /// i1

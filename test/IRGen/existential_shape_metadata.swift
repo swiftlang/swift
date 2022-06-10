@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir %s -swift-version 5  -disable-availability-checking -enable-parameterized-existential-types | %IRGenFileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s -swift-version 5 -disable-availability-checking | %IRGenFileCheck %s
 
 // CHECK-LABEL: @"$sl26existential_shape_metadata2Q0_pyxXPXGMq" = linkonce_odr hidden constant
 // CHECK-SAME:  { i32 {{.*}}sub ([[INT]] ptrtoint (i8** @{{[0-9]+}} to [[INT]])

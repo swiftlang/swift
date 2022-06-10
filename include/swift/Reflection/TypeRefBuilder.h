@@ -27,6 +27,7 @@
 #include <iomanip>
 #include <iostream>
 #include <ostream>
+#include <sstream>
 #include <unordered_map>
 #include <vector>
 
@@ -1035,88 +1036,111 @@ private:
           OpaquePointerReader(pointerReader),
           OpaqueDynamicSymbolResolver(dynamicSymbolResolver) {}
 
-    llvm::Optional<std::string>
-    getParentContextName(uintptr_t contextDescriptorAddress) {
-      llvm::Optional<std::string> optionalParentContextName;
-      auto contextTypeDescriptorBytes = OpaqueByteReader(
-          remote::RemoteAddress(contextDescriptorAddress),
-          sizeof(ExternalContextDescriptor<ObjCInteropKind, PointerSize>));
-      if (!contextTypeDescriptorBytes.get()) {
-        Error = "Failed to read context descriptor.";
-        return llvm::None;
-      }
-      const ExternalContextDescriptor<ObjCInteropKind, PointerSize>
-          *contextDescriptor =
-              (const ExternalContextDescriptor<ObjCInteropKind, PointerSize> *)
-                  contextTypeDescriptorBytes.get();
+    struct ContextNameInfo {
+      std::string name;
+      uintptr_t descriptorAddress;
+      bool isAnonymous;
 
+      ~ContextNameInfo() {}
+    };
+
+    bool isModuleDescriptor(
+        const ExternalContextDescriptor<ObjCInteropKind, PointerSize>
+            *contextDescriptor) {
+      return isa<ExternalModuleContextDescriptor<ObjCInteropKind, PointerSize>>(
+          contextDescriptor);
+    }
+
+    uintptr_t getParentDescriptorAddress(
+        uintptr_t contextDescriptorAddress,
+        const ExternalContextDescriptor<ObjCInteropKind, PointerSize>
+            *contextDescriptor) {
       auto parentOffsetAddress = detail::applyRelativeOffset(
           (const char *)contextDescriptorAddress,
           (int32_t)contextDescriptor->getParentOffset());
-      auto parentOffsetBytes = OpaqueByteReader(
+      auto parentOfsetBytes = OpaqueByteReader(
           remote::RemoteAddress(parentOffsetAddress), sizeof(uint32_t));
-      if (!parentOffsetBytes.get()) {
-        Error = "Failed to parent offset in a type descriptor.";
-        return llvm::None;
-      }
-      auto parentFieldOffset = (const int32_t *)parentOffsetBytes.get();
+      auto parentFieldOffset = (const int32_t *)parentOfsetBytes.get();
       auto parentTargetAddress = detail::applyRelativeOffset(
           (const char *)parentOffsetAddress, *parentFieldOffset);
+      return parentTargetAddress;
+    }
 
-      //
-      auto readContextParentName =
-          [&](uintptr_t descriptorAddress) -> llvm::Optional<std::string> {
-        llvm::Optional<std::string> optionalParentName;
+    llvm::Optional<ContextNameInfo>
+    getContextName(uintptr_t contextDescriptorAddress,
+                   const ExternalContextDescriptor<ObjCInteropKind, PointerSize>
+                       *contextDescriptor) {
+      if (auto moduleDescriptor = dyn_cast<
+              ExternalModuleContextDescriptor<ObjCInteropKind, PointerSize>>(
+              contextDescriptor)) {
+        auto moduleDescriptorName = readModuleNameFromModuleDescriptor(
+            moduleDescriptor, contextDescriptorAddress);
+        if (!moduleDescriptorName.hasValue())
+          return llvm::None;
+        else
+          return ContextNameInfo{moduleDescriptorName.getValue(),
+                                 contextDescriptorAddress, false};
+      } else if (auto typeDescriptor = dyn_cast<ExternalTypeContextDescriptor<
+                     ObjCInteropKind, PointerSize>>(contextDescriptor)) {
+        auto typeDescriptorName = readTypeNameFromTypeDescriptor(
+            typeDescriptor, contextDescriptorAddress);
+        if (!typeDescriptorName.hasValue())
+          return llvm::None;
+        else
+          return ContextNameInfo{typeDescriptorName.getValue(),
+                                 contextDescriptorAddress, false};
+      } else if (auto anonymousDescriptor =
+                     dyn_cast<ExternalAnonymousContextDescriptor<
+                         ObjCInteropKind, PointerSize>>(contextDescriptor)) {
+        auto anonymousDescriptorName = readAnonymousNameFromAnonymousDescriptor(
+            anonymousDescriptor, contextDescriptorAddress);
+        if (!anonymousDescriptorName.hasValue())
+          return llvm::None;
+        else
+          return ContextNameInfo{anonymousDescriptorName.getValue(),
+                                 contextDescriptorAddress, true};
+      } else {
+        Error = "Unexpected type of context descriptor.";
+        return llvm::None;
+      }
+    }
+
+    void getParentContextChain(
+        uintptr_t contextDescriptorAddress,
+        const ExternalContextDescriptor<ObjCInteropKind, PointerSize>
+            *contextDescriptor,
+        std::vector<ContextNameInfo> &chain) {
+      const auto parentDescriptorAddress = getParentDescriptorAddress(
+          contextDescriptorAddress, contextDescriptor);
+
+      auto addParentNameAndRecurse =
+          [&](uintptr_t parentContextDescriptorAddress,
+              std::vector<ContextNameInfo> &chain) -> void {
         auto parentContextDescriptorBytes = OpaqueByteReader(
-            remote::RemoteAddress(descriptorAddress),
+            remote::RemoteAddress(parentContextDescriptorAddress),
             sizeof(ExternalContextDescriptor<ObjCInteropKind, PointerSize>));
         if (!parentContextDescriptorBytes.get()) {
           Error = "Failed to read context descriptor.";
-          return llvm::None;
+          return;
         }
-        const ExternalContextDescriptor<ObjCInteropKind,
-                                        PointerSize> *parentContextDescriptor =
+        const auto parentDescriptor =
             (const ExternalContextDescriptor<ObjCInteropKind, PointerSize> *)
                 parentContextDescriptorBytes.get();
-
-        if (auto moduleDescriptor = dyn_cast<
-                ExternalModuleContextDescriptor<ObjCInteropKind, PointerSize>>(
-                parentContextDescriptor)) {
-          auto moduleDescriptorName = readModuleNameFromModuleDescriptor(
-              moduleDescriptor, parentTargetAddress);
-          if (!moduleDescriptorName.hasValue())
-            return llvm::None;
-          else
-            optionalParentName = moduleDescriptorName;
-        } else if (auto typeDescriptor =
-                       dyn_cast<ExternalTypeContextDescriptor<ObjCInteropKind,
-                                                              PointerSize>>(
-                           parentContextDescriptor)) {
-          auto typeDescriptorName = readTypeNameFromTypeDescriptor(
-              typeDescriptor, parentTargetAddress);
-          if (!typeDescriptorName.hasValue())
-            return llvm::None;
-          else
-            optionalParentName = typeDescriptorName;
-          // Recurse to get this type's parent.
-          auto optionalParentParentName =
-              getParentContextName(descriptorAddress);
-          if (optionalParentParentName.hasValue()) {
-            optionalParentName = optionalParentParentName.getValue() + "." +
-                                 optionalParentName.getValue();
-          }
-        } else {
-          Error = "Unexpected type of parent context descriptor.";
-          return llvm::None;
+        const auto parentNameInfo =
+            getContextName(parentContextDescriptorAddress, parentDescriptor);
+        if (!parentNameInfo.hasValue()) {
+          return;
         }
-
-        return optionalParentName;
+        chain.push_back(parentNameInfo.getValue());
+        if (!isModuleDescriptor(parentDescriptor)) {
+          getParentContextChain(parentContextDescriptorAddress,
+                                parentDescriptor, chain);
+        }
       };
 
-      // Set low bit indicates that this is an indirect
-      // reference
-      if (parentTargetAddress & 0x1) {
-        auto adjustedParentTargetAddress = parentTargetAddress & ~0x1;
+      // Set low bit indicates that this is an indirect reference
+      if (parentDescriptorAddress & 0x1) {
+        auto adjustedParentTargetAddress = parentDescriptorAddress & ~0x1;
         if (auto symbol = OpaquePointerReader(
                 remote::RemoteAddress(adjustedParentTargetAddress),
                 PointerSize)) {
@@ -1125,20 +1149,21 @@ private:
             auto demangledRoot =
                 Ctx.demangleSymbolAsNode(symbol->getSymbol().str());
             assert(demangledRoot->getKind() == Node::Kind::Global);
-            optionalParentContextName =
+            std::string nodeName =
                 nodeToString(demangledRoot->getChild(0)->getChild(0));
+            chain.push_back(
+                ContextNameInfo{nodeName, adjustedParentTargetAddress, false});
           } else {
-            optionalParentContextName =
-                readContextParentName(adjustedParentTargetAddress);
+            addParentNameAndRecurse(adjustedParentTargetAddress, chain);
           }
         } else {
           Error = "Error reading external symbol address.";
-          return llvm::None;
+          return;
         }
       } else {
-        optionalParentContextName = readContextParentName(parentTargetAddress);
+        addParentNameAndRecurse(parentDescriptorAddress, chain);
       }
-      return optionalParentContextName;
+      return;
     }
 
     llvm::Optional<std::string> readTypeNameFromTypeDescriptor(
@@ -1181,6 +1206,70 @@ private:
       std::string parentName;
       OpaqueStringReader(remote::RemoteAddress(parentNameAddress), parentName);
       return parentName;
+    }
+
+    llvm::Optional<std::string> readAnonymousNameFromAnonymousDescriptor(
+        const ExternalAnonymousContextDescriptor<ObjCInteropKind, PointerSize>
+            *anonymousDescriptor,
+        uintptr_t anonymousDescriptorAddress) {
+      if (!anonymousDescriptor->hasMangledName()) {
+        std::stringstream stream;
+        stream << "(unknown context at $" << std::hex
+               << anonymousDescriptorAddress << ")";
+        return stream.str();
+      }
+      return llvm::None;
+    }
+
+    std::string constructFullyQualifiedNameFromContextChain(
+        const std::vector<ContextNameInfo> &contextNameChain) {
+      std::string newQualifiedTypeName = "";
+      std::vector<std::string> reversedQualifiedTypeNameMembers;
+
+      // Traverse the context chain, adding up context names.
+      // Anonymous contexts require special handling: when a type is nested in
+      // an anonymous context, its qualified name is printed as `(type_name in
+      // $hex_val)` where hex_val is the address of the descriptor of the
+      // anonymous parent context.
+      bool skipNext = false;
+      for (size_t i = 0; i < contextNameChain.size(); ++i) {
+        if (skipNext) {
+          skipNext = false;
+          continue;
+        }
+        const auto &contextNameInfo = contextNameChain[i];
+        bool lastContext = (i == contextNameChain.size() - 1);
+        bool currentContextIsAnonymous = contextNameInfo.isAnonymous;
+        bool nextContextIsAnonymous =
+            lastContext ? false : contextNameChain[i + 1].isAnonymous;
+        if (nextContextIsAnonymous && !currentContextIsAnonymous) {
+          std::stringstream stream;
+          stream << "(" << contextNameInfo.name << " in $" << std::hex
+                 << contextNameChain[i + 1].descriptorAddress << ")";
+          reversedQualifiedTypeNameMembers.push_back(stream.str());
+          skipNext = true;
+        } else if (nextContextIsAnonymous && currentContextIsAnonymous) {
+
+        } else if (!nextContextIsAnonymous && !currentContextIsAnonymous) {
+          reversedQualifiedTypeNameMembers.push_back(contextNameInfo.name);
+        } else if (!nextContextIsAnonymous && currentContextIsAnonymous) {
+          reversedQualifiedTypeNameMembers.push_back(contextNameInfo.name);
+        } else {
+          llvm_unreachable("Exhausted possibilities.");
+        }
+      }
+
+      // Combine the individual context name reps into a single fully-qualified
+      // name string
+      for (auto it = reversedQualifiedTypeNameMembers.rbegin();
+           it != reversedQualifiedTypeNameMembers.rend(); ++it) {
+        newQualifiedTypeName.append(*it);
+        if (std::next(it) != reversedQualifiedTypeNameMembers.rend()) {
+          newQualifiedTypeName.append(".");
+        }
+      }
+
+      return newQualifiedTypeName;
     }
 
     llvm::Optional<std::string> readProtocolNameFromProtocolDescriptor(
@@ -1307,14 +1396,14 @@ private:
       else
         typeName = optionalTypeName.getValue();
 
-      // Prepend the parent context name
-      auto optionalParentName =
-          getParentContextName(contextTypeDescriptorAddress);
-      if (optionalParentName.hasValue()) {
-        typeName = optionalParentName.getValue() + "." + typeName;
-      }
-
-      return std::make_pair(mangledTypeName, typeName);
+      std::vector<ContextNameInfo> contextNameChain;
+      contextNameChain.push_back(
+          ContextNameInfo{typeName, contextTypeDescriptorAddress, false});
+      getParentContextChain(contextTypeDescriptorAddress, contextDescriptor,
+                            contextNameChain);
+      std::string fullyQualifiedName =
+          constructFullyQualifiedNameFromContextChain(contextNameChain);
+      return std::make_pair(mangledTypeName, fullyQualifiedName);
     }
 
     /// Extract protocol name from a Conformance Descriptor
@@ -1342,6 +1431,33 @@ private:
           (const char *)protocolDescriptorFieldAddress,
           (int32_t)*protocolDescriptorOffset);
 
+      auto constructFullyQualifiedProtocolName =
+          [&](uintptr_t protocolDescriptorAddress)
+          -> llvm::Optional<std::string> {
+        auto protocolName =
+            readProtocolNameFromProtocolDescriptor(protocolDescriptorAddress);
+
+        // Read the protocol conformance descriptor itself
+        auto protocolContextDescriptorBytes = OpaqueByteReader(
+            remote::RemoteAddress(protocolDescriptorAddress),
+            sizeof(ExternalContextDescriptor<ObjCInteropKind, PointerSize>));
+        if (!protocolContextDescriptorBytes.get()) {
+          Error = "Failed to read context (protocol) descriptor.";
+          return llvm::None;
+        }
+        const ExternalContextDescriptor<ObjCInteropKind,
+                                        PointerSize> *protocolDescriptor =
+            (const ExternalContextDescriptor<ObjCInteropKind, PointerSize> *)
+                protocolContextDescriptorBytes.get();
+
+        std::vector<ContextNameInfo> contextNameChain;
+        contextNameChain.push_back(ContextNameInfo{
+            protocolName.getValue(), protocolDescriptorAddress, false});
+        getParentContextChain(protocolDescriptorAddress, protocolDescriptor,
+                              contextNameChain);
+        return constructFullyQualifiedNameFromContextChain(contextNameChain);
+      };
+
       // Set low bit indicates that this is an indirect
       // reference
       if (protocolDescriptorTarget & 0x1) {
@@ -1360,16 +1476,9 @@ private:
                 nodeToString(demangledRoot->getChild(0)->getChild(0));
           } else {
             // This is an absolute address of a protocol descriptor
-            auto protocolDescriptorAddress = symbol->getOffset();
-            protocolName = readProtocolNameFromProtocolDescriptor(
-                protocolDescriptorAddress);
-            // Prepend the parent context name
-            auto optionalParentName =
-                getParentContextName(protocolDescriptorAddress);
-            if (optionalParentName.hasValue()) {
-              protocolName =
-                  optionalParentName.getValue() + "." + *protocolName;
-            }
+            auto protocolDescriptorAddress = (uintptr_t)symbol->getOffset();
+            protocolName =
+                constructFullyQualifiedProtocolName(protocolDescriptorAddress);
           }
         } else {
           Error = "Error reading external protocol address.";
@@ -1379,13 +1488,7 @@ private:
         // If this is a direct reference, get symbol name from the protocol
         // descriptor.
         protocolName =
-            readProtocolNameFromProtocolDescriptor(protocolDescriptorTarget);
-        // Prepend the parent context name
-        auto optionalParentName =
-            getParentContextName(protocolDescriptorTarget);
-        if (optionalParentName.hasValue()) {
-          protocolName = optionalParentName.getValue() + "." + *protocolName;
-        }
+            constructFullyQualifiedProtocolName(protocolDescriptorTarget);
       }
 
       return protocolName;

@@ -13,6 +13,7 @@
 #include "swift/PrintAsClang/PrintAsClang.h"
 
 #include "ModuleContentsWriter.h"
+#include "SwiftToClangInteropContext.h"
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Module.h"
@@ -458,23 +459,28 @@ static std::string computeMacroGuard(const ModuleDecl *M) {
   return (llvm::Twine(M->getNameStr().upper()) + "_SWIFT_H").str();
 }
 
-static std::string getModuleContentsCxxString(ModuleDecl &M) {
+static std::string
+getModuleContentsCxxString(ModuleDecl &M,
+                           SwiftToClangInteropContext &interopContext) {
   SmallPtrSet<ImportModuleTy, 8> imports;
   std::string moduleContentsBuf;
   llvm::raw_string_ostream moduleContents{moduleContentsBuf};
-  printModuleContentsAsCxx(moduleContents, imports, M);
+  printModuleContentsAsCxx(moduleContents, imports, M, interopContext);
   return moduleContents.str();
 }
 
 bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
                                StringRef bridgingHeader,
-                               bool ExposePublicDeclsInClangHeader) {
+                               bool ExposePublicDeclsInClangHeader,
+                               const IRGenOptions &irGenOpts) {
   llvm::PrettyStackTraceString trace("While generating Clang header");
+
+  SwiftToClangInteropContext interopContext(*M, irGenOpts);
 
   SmallPtrSet<ImportModuleTy, 8> imports;
   std::string objcModuleContentsBuf;
   llvm::raw_string_ostream objcModuleContents{objcModuleContentsBuf};
-  printModuleContentsAsObjC(objcModuleContents, imports, *M);
+  printModuleContentsAsObjC(objcModuleContents, imports, *M, interopContext);
   writePrologue(os, M->getASTContext(), computeMacroGuard(M));
   emitObjCConditional(os,
                       [&] { writeImports(os, imports, *M, bridgingHeader); });
@@ -483,7 +489,7 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
   emitCxxConditional(os, [&] {
     // FIXME: Expose Swift with @expose by default.
     if (ExposePublicDeclsInClangHeader) {
-      os << getModuleContentsCxxString(*M);
+      os << getModuleContentsCxxString(*M, interopContext);
     }
   });
   writeEpilogue(os);

@@ -299,15 +299,22 @@ void constraints::performSyntacticDiagnosticsForTarget(
     // First emit diagnostics for the main expression.
     performSyntacticExprDiagnostics(target.getAsExpr(), dc,
                                     isExprStmt, disableExprAvailabilityChecking);
-
-    // If this is a for-in statement, we also need to check the where clause if
-    // present.
-    if (target.isForEachStmt()) {
-      if (auto *whereExpr = target.getForEachStmtInfo().whereExpr)
-        performSyntacticExprDiagnostics(whereExpr, dc, /*isExprStmt*/ false);
-    }
     return;
   }
+
+  case SolutionApplicationTarget::Kind::forEachStmt: {
+    auto *stmt = target.getAsForEachStmt();
+
+    // First emit diagnostics for the main expression.
+    performSyntacticExprDiagnostics(stmt->getTypeCheckedSequence(), dc,
+                                    isExprStmt,
+                                    disableExprAvailabilityChecking);
+
+    if (auto *whereExpr = stmt->getWhere())
+      performSyntacticExprDiagnostics(whereExpr, dc, /*isExprStmt*/ false);
+    return;
+  }
+
   case SolutionApplicationTarget::Kind::function: {
     FunctionSyntacticDiagnosticWalker walker(dc);
     target.getFunctionBody()->walk(walker);
@@ -341,6 +348,9 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   return expr->getType();
 }
 
+/// FIXME: In order to remote this function both \c FrontendStatsTracer
+/// and \c PrettyStackTrace* have to be updated to accept `ASTNode`
+// instead of each individual syntactic element types.
 Optional<SolutionApplicationTarget>
 TypeChecker::typeCheckExpression(SolutionApplicationTarget &target,
                                  TypeCheckExprOptions options) {
@@ -350,7 +360,18 @@ TypeChecker::typeCheckExpression(SolutionApplicationTarget &target,
                                   target.getAsExpr());
   PrettyStackTraceExpr stackTrace(Context, "type-checking", target.getAsExpr());
 
-  // First, pre-check the expression, validating any types that occur in the
+  return typeCheckTarget(target, options);
+}
+
+Optional<SolutionApplicationTarget>
+TypeChecker::typeCheckTarget(SolutionApplicationTarget &target,
+                             TypeCheckExprOptions options) {
+  DeclContext *dc = target.getDeclContext();
+  auto &Context = dc->getASTContext();
+  PrettyStackTraceLocation stackTrace(Context, "type-checking-target",
+                                      target.getLoc());
+
+  // First, pre-check the target, validating any types that occur in the
   // expression and folding sequence expressions.
   if (ConstraintSystem::preCheckTarget(
           target, /*replaceInvalidRefsWithErrors=*/true,
@@ -358,15 +379,13 @@ TypeChecker::typeCheckExpression(SolutionApplicationTarget &target,
     return None;
   }
 
-  auto *expr = target.getAsExpr();
-
-  // Check whether given expression has a code completion token which requires
+  // Check whether given target has a code completion token which requires
   // special handling.
   if (Context.CompletionCallback &&
-      typeCheckForCodeCompletion(target, /*needsPrecheck*/false,
+      typeCheckForCodeCompletion(target, /*needsPrecheck*/ false,
                                  [&](const constraints::Solution &S) {
-        Context.CompletionCallback->sawSolution(S);
-      }))
+                                   Context.CompletionCallback->sawSolution(S);
+                                 }))
     return None;
 
   // Construct a constraint system from this expression.
@@ -380,18 +399,18 @@ TypeChecker::typeCheckExpression(SolutionApplicationTarget &target,
 
   ConstraintSystem cs(dc, csOptions);
 
-  // Tell the constraint system what the contextual type is.  This informs
-  // diagnostics and is a hint for various performance optimizations.
-  cs.setContextualType(
-      expr,
-      target.getExprContextualTypeLoc(),
-      target.getExprContextualTypePurpose());
+  if (auto *expr = target.getAsExpr()) {
+    // Tell the constraint system what the contextual type is.  This informs
+    // diagnostics and is a hint for various performance optimizations.
+    cs.setContextualType(expr, target.getExprContextualTypeLoc(),
+                         target.getExprContextualTypePurpose());
 
-  // Try to shrink the system by reducing disjunction domains. This
-  // goes through every sub-expression and generate its own sub-system, to
-  // try to reduce the domains of those subexpressions.
-  cs.shrink(expr);
-  target.setExpr(expr);
+    // Try to shrink the system by reducing disjunction domains. This
+    // goes through every sub-expression and generate its own sub-system, to
+    // try to reduce the domains of those subexpressions.
+    cs.shrink(expr);
+    target.setExpr(expr);
+  }
 
   // If the client can handle unresolved type variables, leave them in the
   // system.
@@ -399,10 +418,8 @@ TypeChecker::typeCheckExpression(SolutionApplicationTarget &target,
 
   // Attempt to solve the constraint system.
   auto viable = cs.solve(target, allowFreeTypeVariables);
-  if (!viable) {
-    target.setExpr(expr);
+  if (!viable)
     return None;
-  }
 
   // Apply this solution to the constraint system.
   // FIXME: This shouldn't be necessary.
@@ -415,7 +432,6 @@ TypeChecker::typeCheckExpression(SolutionApplicationTarget &target,
     // Failure already diagnosed, above, as part of applying the solution.
     return None;
   }
-  Expr *result = resultTarget->getAsExpr();
 
   // Unless the client has disabled them, perform syntactic checks on the
   // expression now.
@@ -426,7 +442,6 @@ TypeChecker::typeCheckExpression(SolutionApplicationTarget &target,
         options.contains(TypeCheckExprFlags::DisableExprAvailabilityChecking));
   }
 
-  resultTarget->setExpr(result);
   return *resultTarget;
 }
 
@@ -805,6 +820,8 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
 
 bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
   auto &Context = dc->getASTContext();
+  FrontendStatsTracer statsTracer(Context.Stats, "typecheck-for-each", stmt);
+  PrettyStackTraceStmt stackTrace(Context, "type-checking-for-each", stmt);
 
   auto failed = [&]() -> bool {
     // Invalidate the pattern and the var decl.
@@ -817,16 +834,9 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
     return true;
   };
 
-  auto sequenceProto = TypeChecker::getProtocol(
-      dc->getASTContext(), stmt->getForLoc(), 
-      stmt->getAwaitLoc().isValid() ? 
-        KnownProtocolKind::AsyncSequence : KnownProtocolKind::Sequence);
-  if (!sequenceProto)
-    return failed();
-
   auto target = SolutionApplicationTarget::forForEachStmt(
-      stmt, sequenceProto, dc, /*bindPatternVarsOneWay=*/false);
-  if (!typeCheckExpression(target))
+      stmt, dc, /*bindPatternVarsOneWay=*/false);
+  if (!typeCheckTarget(target))
     return failed();
 
   // Check to see if the sequence expr is throwing (in async context),

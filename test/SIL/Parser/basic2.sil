@@ -97,3 +97,19 @@ bb0(%0 : @owned $Builtin.NativeObject):
   %9999 = tuple()
   return %9999 : $()
 }
+
+// Make sure that we properly can parse/print/round trip move only type annotation.
+// CHECK-LABEL: sil [ossa] @test_moveonlytype_parsing : $@convention(thin) (@owned @moveOnly Builtin.NativeObject) -> () {
+// CHECK: bb0(%0 : @owned $@moveOnly Builtin.NativeObject):
+// CHECK-NEXT:   %1 = copy_value %0 : $@moveOnly Builtin.NativeObject
+// CHECK-NEXT:   destroy_value %0 : $@moveOnly Builtin.NativeObject
+// CHECK-NEXT:   destroy_value %1 : $@moveOnly Builtin.NativeObject
+// CHECK: } // end sil function 'test_moveonlytype_parsing'
+sil [ossa] @test_moveonlytype_parsing : $@convention(thin) (@owned @moveOnly Builtin.NativeObject) -> () {
+bb0(%0 : @owned $@moveOnly Builtin.NativeObject):
+  %1 = copy_value %0 : $@moveOnly Builtin.NativeObject
+  destroy_value %0 : $@moveOnly Builtin.NativeObject
+  destroy_value %1 : $@moveOnly Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}

@@ -5939,6 +5939,13 @@ Expected<Type> DESERIALIZE_TYPE(SIL_BLOCK_STORAGE_TYPE)(
   return SILBlockStorageType::get(MF.getType(captureID)->getCanonicalType());
 }
 
+Expected<Type> DESERIALIZE_TYPE(SIL_MOVE_ONLY_TYPE)(
+    ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData) {
+  TypeID innerType;
+  decls_block::SILMoveOnlyTypeLayout::readRecord(scratch, innerType);
+  return SILMoveOnlyType::get(MF.getType(innerType)->getCanonicalType());
+}
+
 Expected<Type> DESERIALIZE_TYPE(SIL_BOX_TYPE)(
     ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData) {
   SILLayoutID layoutID;

@@ -28,9 +28,9 @@ extension AsyncSequence {
   ///     let stream = Counter(howHigh: 10)
   ///         .drop { $0 % 3 != 0 }
   ///     for await number in stream {
-  ///         print("\(number) ", terminator: " ")
+  ///         print(number, terminator: " ")
   ///     }
-  ///     // prints "3 4 5 6 7 8 9 10"
+  ///     // Prints "3 4 5 6 7 8 9 10"
   ///
   /// After the predicate returns `false`, the sequence never executes it again,
   /// and from then on the sequence passes through elements from its underlying

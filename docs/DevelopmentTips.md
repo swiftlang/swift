@@ -92,19 +92,21 @@ This is very convenient because you get the benefits of the ninja build system a
 
 To setup this environment a few steps are necessary:
 * Create a new workspace.
-* Create Xcode projects for LLVM and Swift with `utils/build-script --skip-build --xcode --skip-early-swift-driver`. Beside configuring, this needs to build a few LLVM files which are need to configure the swift project.
+* Create Xcode projects for LLVM and Swift with `utils/build-script --skip-build --xcode --skip-early-swift-driver`. Beside configuring, this needs to build a few LLVM files which are needed to configure the swift project.
 * Add the generated LLVM and Swift projects to your workspace. They can be found in the build directories `build/Xcode-DebugAssert/llvm-macosx-x86_64/LLVM.xcodeproj` and `build/Xcode-DebugAssert/swift-macosx-x86_64/Swift.xcodeproj`.
 * Add the `swift/SwiftCompilerSources` package to the workspace.
 * Create a new empty project `build-targets` (or however you want to name it) in the workspace, using the "External Build System" template.
 * For each compiler tool you want to build (`swift-frontend`, `sil-opt`, etc.), add an "External Build System" target to the `build-targets` project.
-* In the "Info" section of the target configuration, set
-	  * the _Build Tool_ to the full path of the `ninja` command
-	  * the _Argument_ to the tool name (e.g. `swift-frontend`)
-	  * the _Directory_ to the ninja swift build directory, e.g. `/absolute/path/to/build/Ninja-DebugAssert/swift-macosx-x86_64`. For debugging to work, this has to be a debug build of course.
+* In the "Info" section of the target configuration, set:
+    * the _Build Tool_ to the full path of the `ninja` command
+    * the _Argument_ to the tool name (e.g. `swift-frontend`)
+    * the _Directory_ to the ninja swift build directory, e.g. `/absolute/path/to/build/Ninja-DebugAssert/swift-macosx-x86_64`. For debugging to work, this has to be a debug build of course.
 * For each target, create a new scheme:
-    * In the _Build_ section add the corresponding build target what you created before.
+    * In the _Build_ section add the corresponding build target that you created before.
     * In the _Run/Info_ section select the built _Executable_ in the build directory (e.g. `/absolute/path/to/build/Ninja-DebugAssert/swift-macosx-x86_64/bin/swift-frontend`).
     * In the _Run/Arguments_ section you can set the command line arguments with which you want to run the compiler tool.
     * In the _Run/Options_ section you can set the working directory for debugging.
 
 Now you are all set. You can build and debug like with a native Xcode project.
+
+If the project structure changes, e.g. new source files are added or deleted, you just have to re-create the LLVM and Swift projects with `utils/build-script --skip-build --xcode --skip-early-swift-driver`.

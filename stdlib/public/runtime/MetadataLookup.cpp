@@ -14,32 +14,32 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "../CompatibilityOverride/CompatibilityOverride.h"
+#include "ImageInspection.h"
+#include "Private.h"
+#include "swift/ABI/TypeIdentity.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/TypeDecoder.h"
 #include "swift/Reflection/Records.h"
-#include "swift/ABI/TypeIdentity.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
-#include "swift/Runtime/Mutex.h"
 #include "swift/Strings.h"
+#include "swift/Threading/Mutex.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/StringExtras.h"
-#include "Private.h"
-#include "../CompatibilityOverride/CompatibilityOverride.h"
-#include "ImageInspection.h"
+#include <cstring>
 #include <functional>
-#include <vector>
 #include <list>
 #include <new>
-#include <cstring>
+#include <vector>
 
 using namespace swift;
 using namespace Demangle;
@@ -1930,7 +1930,7 @@ swift_stdlib_getTypeByMangledNameUntrusted(const char *typeNameStart,
     if (c >= '\x01' && c <= '\x1F')
       return nullptr;
   }
-  
+
   return swift_getTypeByMangledName(MetadataState::Complete, typeName, nullptr,
                                     {}, {}).getType().getMetadata();
 }
@@ -2197,6 +2197,23 @@ swift_getOpaqueTypeConformance(const void * const *arguments,
 // Return the ObjC class for the given type name.
 // This gets installed as a callback from libobjc.
 
+static bool validateObjCMangledName(const char *_Nonnull typeName) {
+  // Accept names with a mangling prefix.
+  if (getManglingPrefixLength(typeName))
+    return true;
+
+  // Accept names that start with a digit (unprefixed mangled names).
+  if (isdigit(typeName[0]))
+    return true;
+
+  // Accept names that contain a dot.
+  if (strchr(typeName, '.'))
+    return true;
+
+  // Reject anything else.
+  return false;
+}
+
 // FIXME: delete this #if and dlsym once we don't
 // need to build with older libobjc headers
 #if !OBJC_GETCLASSHOOK_DEFINED
@@ -2232,8 +2249,9 @@ getObjCClassByMangledName(const char * _Nonnull typeName,
       [&](const Metadata *type, unsigned index) { return nullptr; }
     ).getType().getMetadata();
   } else {
-    metadata = swift_stdlib_getTypeByMangledNameUntrusted(typeStr.data(),
-                                                          typeStr.size());
+    if (validateObjCMangledName(typeName))
+      metadata = swift_stdlib_getTypeByMangledNameUntrusted(typeStr.data(),
+                                                            typeStr.size());
   }
   if (metadata) {
     auto objcClass =

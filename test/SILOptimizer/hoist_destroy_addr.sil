@@ -239,7 +239,7 @@ bb3:
 // CHECK-NEXT: br bb1
 // CHECK: bb3:
 // CHECKDEB:   debug_value [[ALLOC]] : $*T, let, name "t"
-// CHECKOPT-NONE: debug_value
+// CHECKOPT-NOT: debug_value
 // CHECK:   destroy_addr [[ALLOC]] : $*T
 // CHECK:   dealloc_stack [[ALLOC]] : $*T
 // CHECK-LABEL: } // end sil function 'destroyLoop'
@@ -346,6 +346,106 @@ backedge:
 exit:
   %321 = tuple ()
   return %321 : $()
+}
+
+// Exercise portion of IterativeBackwardReachability where an
+// unreachable-at-begin block is added to the worklist but its predecessor
+// isn't discovered.
+//
+// CHECK-LABEL: sil [ossa] @undiscovered_predecessor_of_unreachable_at_begin : {{.*}} {
+// CHECK:         apply undef
+// CHECK-NEXT:    destroy_addr
+// CHECK-LABEL: } // end sil function 'undiscovered_predecessor_of_unreachable_at_begin'
+sil [ossa] @undiscovered_predecessor_of_unreachable_at_begin : $@convention(thin) (@owned S) -> () {
+entry(%instance : @owned $S):
+  %addr = alloc_stack $S
+  store %instance to [init] %addr : $*S
+  br applier
+
+applier:
+  apply undef() : $@convention(thin) () -> ()
+  br good
+
+good:
+  destroy_addr %addr : $*S
+  dealloc_stack %addr : $*S
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Access scopes that are open at barrier blocks are barriers.  Otherwise, we
+// would hoist destroy_addrs into the scopes when the destroy_addrs are hoisted
+// up to the begin of blocks whose predecessor is the barrier block.
+//
+// CHECK-LABEL: sil [ossa] @nohoist_into_access_scope_barred_by_barrier_block : {{.*}} {
+// CHECK:       {{bb[0-9]+}}({{%[^,]+}} : @owned $X, [[INOUT:%[^,]+]] : $*X):
+// CHECK:         [[ADDR:%[^,]+]] = alloc_stack $X                             
+// CHECK:         [[SCOPE:%[^,]+]] = begin_access [modify] [static] [[INOUT]] : $*X    
+// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]],
+// CHECK:       [[LEFT]]:                                              
+// CHECK:         end_access [[SCOPE]] : $*X                             
+// CHECK-NEXT:    destroy_addr [[ADDR]] : $*X                           
+// CHECK-LABEL: } // end sil function 'nohoist_into_access_scope_barred_by_barrier_block'
+sil [ossa] @nohoist_into_access_scope_barred_by_barrier_block : $@convention(thin) (@owned X, @inout X) -> () {
+entry(%instance : @owned $X, %second : $*X):
+    %addr = alloc_stack $X
+    store %instance to [init] %addr : $*X
+    %scope = begin_access [modify] [static] %second : $*X
+    cond_br undef, left, right
+
+left:
+    end_access %scope : $*X
+    %ignore = tuple ()
+    destroy_addr %addr : $*X
+    br exit
+
+right:
+    end_access %scope : $*X
+    apply undef(%addr) : $@convention(thin) (@in X) -> ()
+    br exit
+
+exit:
+    dealloc_stack %addr : $*X
+    %retval = tuple ()
+    return %retval : $()
+}
+
+// Access scopes that are open at barrier blocks are barriers.  That includes 
+// barrier blocks both of whose successors contain gens (if one contains a prior
+// kill).
+//
+// CHECK-LABEL: sil [ossa] @nohoist_into_access_scope_barred_by_barrier_block_2 : {{.*}} {
+// CHECK:       {{bb[0-9]+}}({{%[^,]+}} : @owned $X, [[INOUT:%[^,]+]] : $*X):
+// CHECK:         [[ADDR:%[^,]+]] = alloc_stack $X                             
+// CHECK:         [[SCOPE:%[^,]+]] = begin_access [modify] [static] [[INOUT]] : $*X    
+// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]],
+// CHECK:       [[LEFT]]:                                              
+// CHECK:         end_access [[SCOPE]] : $*X                             
+// CHECK-NEXT:    destroy_addr [[ADDR]] : $*X                           
+// CHECK-LABEL: } // end sil function 'nohoist_into_access_scope_barred_by_barrier_block_2'
+sil [ossa] @nohoist_into_access_scope_barred_by_barrier_block_2 : $@convention(thin) (@owned X, @inout X) -> () {
+entry(%instance : @owned $X, %second : $*X):
+    %addr = alloc_stack $X
+    store %instance to [init] %addr : $*X
+    %scope = begin_access [modify] [static] %second : $*X
+    cond_br undef, left, right
+
+left:
+    end_access %scope : $*X
+    %ignore = tuple ()
+    destroy_addr %addr : $*X
+    br exit
+
+right:
+    end_access %scope : $*X
+    apply undef(%addr) : $@convention(thin) (@in_guaranteed X) -> ()
+    destroy_addr %addr : $*X
+    br exit
+
+exit:
+    dealloc_stack %addr : $*X
+    %retval = tuple ()
+    return %retval : $()
 }
 
 // Hoist a destroy_addr of an @in argument over a load from an alloc_stack.

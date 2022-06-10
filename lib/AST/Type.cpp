@@ -189,6 +189,9 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::DynamicSelf:
     return isReferenceTypeImpl(cast<DynamicSelfType>(type).getSelfType(),
                                sig, functionsCount);
+  case TypeKind::SILMoveOnly:
+    return isReferenceTypeImpl(cast<SILMoveOnlyType>(type)->getInnerType(), sig,
+                               functionsCount);
 
   // Archetypes and existentials are only class references if class-bounded.
   case TypeKind::PrimaryArchetype:
@@ -319,19 +322,25 @@ ExistentialLayout TypeBase::getExistentialLayout() {
 }
 
 ExistentialLayout CanType::getExistentialLayout() {
-  if (auto existential = dyn_cast<ExistentialType>(*this))
-    return existential.getConstraintType().getExistentialLayout();
+  CanType ty = *this;
 
-  if (auto metatype = dyn_cast<ExistentialMetatypeType>(*this))
-    return metatype.getInstanceType().getExistentialLayout();
+  // Always remove one layer of move only ness.
+  if (auto mv = dyn_cast<SILMoveOnlyType>(ty))
+    ty = mv->getInnerType();
 
-  if (auto proto = dyn_cast<ProtocolType>(*this))
+  if (auto existential = dyn_cast<ExistentialType>(ty))
+    return existential->getConstraintType()->getExistentialLayout();
+
+  if (auto metatype = dyn_cast<ExistentialMetatypeType>(ty))
+    return metatype->getInstanceType()->getExistentialLayout();
+
+  if (auto proto = dyn_cast<ProtocolType>(ty))
     return ExistentialLayout(proto);
 
-  if (auto param = dyn_cast<ParameterizedProtocolType>(*this))
+  if (auto param = dyn_cast<ParameterizedProtocolType>(ty))
     return ExistentialLayout(param);
 
-  auto comp = cast<ProtocolCompositionType>(*this);
+  auto comp = cast<ProtocolCompositionType>(ty);
   return ExistentialLayout(comp);
 }
 
@@ -1632,6 +1641,7 @@ CanType TypeBase::computeCanonicalType() {
   case TypeKind::SILBox:
   case TypeKind::SILFunction:
   case TypeKind::SILToken:
+  case TypeKind::SILMoveOnly:
     llvm_unreachable("SIL-only types are always canonical!");
 
   case TypeKind::ProtocolComposition: {
@@ -5086,6 +5096,18 @@ case TypeKind::Id:
     return storageTy;
   }
 
+  case TypeKind::SILMoveOnly: {
+    auto *storageTy = cast<SILMoveOnlyType>(base);
+    Type transCap = storageTy->getInnerType().transformWithPosition(
+        TypePosition::Invariant, fn);
+    if (!transCap)
+      return Type();
+    CanType canTransCap = transCap->getCanonicalType();
+    if (canTransCap != storageTy->getInnerType())
+      return SILMoveOnlyType::get(canTransCap);
+    return storageTy;
+  }
+
   case TypeKind::SILBox: {
     bool changed = false;
     auto boxTy = cast<SILBoxType>(base);
@@ -5996,6 +6018,8 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::DynamicSelf:
     return cast<DynamicSelfType>(type).getSelfType()
         ->getReferenceCounting();
+  case TypeKind::SILMoveOnly:
+    return cast<SILMoveOnlyType>(type)->getInnerType()->getReferenceCounting();
 
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:
@@ -6222,6 +6246,52 @@ bool TypeBase::isForeignReferenceType() {
   if (auto *classDecl = lookThroughAllOptionalTypes()->getClassOrBoundGenericClass())
     return classDecl->isForeignReferenceType();
   return false;
+}
+
+bool TypeBase::hasSimpleTypeRepr() const {
+  // NOTE: Please keep this logic in sync with TypeRepr::isSimple().
+  switch (getKind()) {
+  case TypeKind::Function:
+  case TypeKind::GenericFunction:
+    return false;
+
+  case TypeKind::Metatype:
+    return !cast<const AnyMetatypeType>(this)->hasRepresentation();
+
+  case TypeKind::ExistentialMetatype:
+  case TypeKind::Existential:
+    return false;
+
+  case TypeKind::OpaqueTypeArchetype:
+  case TypeKind::OpenedArchetype:
+    return false;
+
+  case TypeKind::PrimaryArchetype: {
+    auto archetype = cast<const PrimaryArchetypeType>(this);
+    auto interface = archetype->getInterfaceType();
+    return interface->hasSimpleTypeRepr();
+  }
+
+  case TypeKind::ProtocolComposition: {
+    // 'Any', 'AnyObject' and single protocol compositions are simple
+    auto composition = cast<const ProtocolCompositionType>(this);
+    auto memberCount = composition->getMembers().size();
+    if (composition->hasExplicitAnyObject())
+      return memberCount == 0;
+    return memberCount <= 1;
+  }
+
+  case TypeKind::GenericTypeParam: {
+    if (auto *decl = cast<const GenericTypeParamType>(this)->getDecl()) {
+      return !decl->isOpaqueType();
+    }
+
+    return true;
+  }
+
+  default:
+    return true;
+  }
 }
 
 bool CanType::isForeignReferenceType() {

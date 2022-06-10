@@ -2078,13 +2078,9 @@ static CanSILFunctionType getSILFunctionType(
     // Lower in the context of the closure. Since the set of captures is a
     // private contract between the closure and its enclosing context, we
     // don't need to keep its capture types opaque.
-    auto expansion = TypeExpansionContext::maximal(
-        constant->getAnyFunctionRef()->getAsDeclContext(), false);
-    // ...unless it's inlinable, in which case it might get inlined into
-    // some place we need to keep opaque types opaque.
-    if (constant->isSerialized())
-      expansion = TypeExpansionContext::minimal();
-    lowerCaptureContextParameters(TC, *constant, genericSig, expansion, inputs);
+    lowerCaptureContextParameters(TC, *constant, genericSig,
+                                  TC.getCaptureTypeExpansionContext(*constant),
+                                  inputs);
   }
   
   auto calleeConvention = ParameterConvention::Direct_Unowned;
@@ -3475,11 +3471,9 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
       bool staticOperator = method->isOverloadedOperator() &&
                             method->getOverloadedOperator() != clang::OO_Call &&
                             method->getOverloadedOperator() != clang::OO_Subscript;
-      return isa<clang::CXXConstructorDecl>(method) ||
-                     method->isStatic() ||
-                     staticOperator
-          ? SILFunctionTypeRepresentation::CFunctionPointer
-          : SILFunctionTypeRepresentation::CXXMethod;
+      return isa<clang::CXXConstructorDecl>(method) || method->isStatic()
+                 ? SILFunctionTypeRepresentation::CFunctionPointer
+                 : SILFunctionTypeRepresentation::CXXMethod;
     }
 
 

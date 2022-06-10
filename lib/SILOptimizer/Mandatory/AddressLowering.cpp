@@ -339,7 +339,7 @@ static bool isStoreCopy(SILValue value) {
     return false;
 
   auto *user = value->getSingleUse()->getUser();
-  return isa<StoreInst>(user) || isa<AssignInst>(user);
+  return isa<StoreInst>(user);
 }
 
 void ValueStorageMap::insertValue(SILValue value, SILValue storageAddress) {
@@ -1244,12 +1244,13 @@ AllocStackInst *OpaqueStorageAllocation::createStackAllocation(SILValue value) {
     deallocBuilder.createDeallocStack(pass.genLoc(), alloc);
   };
   if (latestOpeningInst) {
-    // Deallocate at the dominance frontier to ensure that allocation encloses
-    // not only the uses of the current value, but also of any values reusing
-    // this storage as a use projection.
-    SmallVector<SILBasicBlock *, 4> frontier;
-    computeDominanceFrontier(alloc->getParent(), pass.domInfo, frontier);
-    for (SILBasicBlock *deallocBlock : frontier) {
+    // Deallocate at the predecessors of dominance frontier blocks that are
+    // dominated by the alloc to ensure that allocation encloses not only the
+    // uses of the current value, but also of any values reusing this storage as
+    // a use projection.
+    SmallVector<SILBasicBlock *, 4> boundary;
+    computeDominatedBoundaryBlocks(alloc->getParent(), pass.domInfo, boundary);
+    for (SILBasicBlock *deallocBlock : boundary) {
       dealloc(deallocBlock->getTerminator()->getIterator());
     }
   } else {
@@ -1784,14 +1785,12 @@ void CallArgRewriter::rewriteIndirectArgument(Operand *operand) {
     });
   } else {
     auto borrow = argBuilder.emitBeginBorrowOperation(callLoc, argValue);
-    auto *storeInst =
-        argBuilder.emitStoreBorrowOperation(callLoc, borrow, allocInst);
+    argBuilder.emitStoreBorrowOperation(callLoc, borrow, allocInst);
 
     apply.insertAfterFullEvaluation([&](SILBuilder &callBuilder) {
-      if (auto *storeBorrow = dyn_cast<StoreBorrowInst>(storeInst)) {
-        callBuilder.emitEndBorrowOperation(callLoc, storeBorrow);
+      if (borrow != argValue) {
+        callBuilder.emitEndBorrowOperation(callLoc, borrow);
       }
-      callBuilder.emitEndBorrowOperation(callLoc, borrow);
       callBuilder.createDeallocStack(callLoc, allocInst);
     });
   }
@@ -2369,8 +2368,11 @@ private:
   /// Return the storageAddress if \p value is opaque, otherwise create and
   /// return a stack temporary.
   SILValue getAddressForCastEntity(SILValue value, bool needsInit) {
-    if (value->getType().isAddressOnly(*func))
-      return pass.valueStorageMap.getStorage(value).storageAddress;
+    if (value->getType().isAddressOnly(*func)) {
+      auto builder = pass.getBuilder(ccb->getIterator());
+      AddressMaterialization addrMat(pass, builder);
+      return addrMat.materializeAddress(value);
+    }
 
     // Create a stack temporary for a loadable value
     auto *addr = termBuilder.createAllocStack(castLoc, value->getType());
@@ -2595,12 +2597,14 @@ protected:
   }
 
   void visitYieldInst(YieldInst *yield) {
-    SILValue addr =
-        pass.valueStorageMap.getStorage(yield->getOperand(0)).storageAddress;
+    SILValue addr = addrMat.materializeAddress(use->get());
     yield->setOperand(0, addr);
   }
 
-  void visitAssignInst(AssignInst *assignInst);
+  void visitValueMetatypeInst(ValueMetatypeInst *vmi) {
+    SILValue opAddr = addrMat.materializeAddress(use->get());
+    vmi->setOperand(opAddr);
+  }
 
   void visitBeginBorrowInst(BeginBorrowInst *borrow);
 
@@ -2830,11 +2834,6 @@ void UseRewriter::visitStoreInst(StoreInst *storeInst) {
     isInit = IsNotInitialization;
   }
   rewriteStore(storeInst->getSrc(), storeInst->getDest(), isInit);
-}
-
-void UseRewriter::visitAssignInst(AssignInst *assignInst) {
-  rewriteStore(assignInst->getSrc(), assignInst->getDest(),
-               IsNotInitialization);
 }
 
 /// Emit end_borrows for a an incomplete BorrowedValue with only nonlifetime

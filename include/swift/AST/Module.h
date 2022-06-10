@@ -631,11 +631,18 @@ public:
   /// might include "missing" conformances, which are synthesized for some
   /// protocols as an error recovery mechanism.
   ///
+  /// \param allowUnavailable When \c true, the resulting conformance reference
+  /// might include "unavailable" conformances, meaning that the conformance
+  /// cannot actually be used and will be diagnosed if used later. Pass
+  /// \c false here for queries that want to determine whether the conformance
+  /// is likely to be usable.
+  ///
   /// \returns The result of the conformance search, which will be
   /// None if the type does not conform to the protocol or contain a
   /// ProtocolConformanceRef if it does conform.
   ProtocolConformanceRef lookupConformance(Type type, ProtocolDecl *protocol,
-                                           bool allowMissing = false);
+                                           bool allowMissing = false,
+                                           bool allowUnavailable = true);
 
   /// Look for the conformance of the given existential type to the given
   /// protocol.

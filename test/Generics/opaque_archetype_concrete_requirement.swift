@@ -30,7 +30,7 @@ struct DefinesOpaqueP1 : P {
 struct ConcreteHasP<T : P1, TT : P2, TU> {}
 
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=ConcreteHasP
-// CHECK-NEXT: Generic signature: <T, TT, TU where T == some P1, TT == (some P1).T, TU == (some P1).U>
+// CHECK-NEXT: Generic signature: <T, TT, TU where T == some P1, TT == (some P1).[P1]T, TU == (some P1).[P1]U>
 extension ConcreteHasP where T == DefinesOpaqueP1.T, TT == T.T, TU == T.U {
   func checkSameType1(_ t: TT) -> DefinesOpaqueP1.T.T { return t }
   func checkSameType2(_ u: TU) -> DefinesOpaqueP1.T.U { return u }
@@ -47,7 +47,7 @@ protocol HasP {
 }
 
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=HasP
-// CHECK-NEXT: Generic signature: <Self where Self : HasP, Self.[HasP]T == some P1, Self.[HasP]U == G<(some P1).T>>
+// CHECK-NEXT: Generic signature: <Self where Self : HasP, Self.[HasP]T == some P1, Self.[HasP]U == G<(some P1).[P1]T>>
 extension HasP where T == DefinesOpaqueP1.T, U == G<T.T> {
   func checkSameType1(_ t: T.T) -> DefinesOpaqueP1.T.T { return t }
   func checkSameType2(_ u: T.U) -> DefinesOpaqueP1.T.U { return u }

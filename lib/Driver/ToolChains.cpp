@@ -236,6 +236,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
                        options::OPT_disable_actor_data_race_checks);
   inputArgs.AddLastArg(arguments, options::OPT_warn_concurrency);
   inputArgs.AddLastArg(arguments, options::OPT_strict_concurrency);
+  inputArgs.AddAllArgs(arguments, options::OPT_enable_experimental_feature);
   inputArgs.AddLastArg(arguments, options::OPT_warn_implicit_overrides);
   inputArgs.AddLastArg(arguments, options::OPT_typo_correction_limit);
   inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension);
@@ -573,6 +574,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     context.Args.AddLastArg(Arguments, options::OPT_index_store_path);
     if (!context.Args.hasArg(options::OPT_index_ignore_system_modules))
       Arguments.push_back("-index-system-modules");
+    context.Args.AddLastArg(Arguments, options::OPT_index_ignore_clang_modules);
   }
 
   if (context.Args.hasArg(options::OPT_debug_info_store_invocation) ||

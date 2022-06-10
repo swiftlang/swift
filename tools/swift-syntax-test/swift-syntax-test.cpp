@@ -21,6 +21,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/InitializeSwiftModules.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
@@ -28,7 +29,6 @@
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
-#include "swift/Parse/SyntaxRegexFallbackLexing.h"
 #include "swift/Subsystems.h"
 #include "swift/Syntax/Serialization/SyntaxDeserialization.h"
 #include "swift/Syntax/Serialization/SyntaxSerialization.h"
@@ -552,7 +552,7 @@ struct ParseInfo {
 int parseFile(
     const char *MainExecutablePath, const StringRef InputFileName,
     llvm::function_ref<int(ParseInfo)> ActionSpecificCallback) {
-  registerSyntaxFallbackRegexParser();
+
   // The cache needs to be a heap allocated pointer since we construct it inside
   // an if block but need to keep it alive until the end of the function.
   SyntaxParsingCache *SyntaxCache = nullptr;
@@ -592,7 +592,7 @@ int parseFile(
   Invocation.getLangOptions().VerifySyntaxTree = options::VerifySyntaxTree;
   Invocation.getLangOptions().DisablePoundIfEvaluation = true;
   Invocation.getLangOptions().EnableExperimentalStringProcessing = true;
-  Invocation.getLangOptions().EnableBareSlashRegexLiterals = true;
+  Invocation.getLangOptions().Features.insert(Feature::BareSlashRegexLiterals);
 
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(InputFileName);
 
@@ -899,6 +899,7 @@ static int invokeCommand(const char *MainExecutablePath,
 
 int main(int argc, char *argv[]) {
   PROGRAM_START(argc, argv);
+  initializeSwiftParseModules();
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift Syntax Test\n");
 
   int ExitCode = EXIT_SUCCESS;

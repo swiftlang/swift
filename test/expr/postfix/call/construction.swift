@@ -119,5 +119,5 @@ func constructExistentialValue(_ pm: P.Type) {
 typealias P1_and_P2 = P & P2
 func constructExistentialCompositionValue(_ pm: (P & P2).Type) {
   _ = pm.init(int: 5)
-  _ = P1_and_P2(int: 5) // expected-error{{type 'any P1_and_P2' (aka 'P & P2') cannot be instantiated}}
+  _ = P1_and_P2(int: 5) // expected-error{{type 'any P1_and_P2' (aka 'any P & P2') cannot be instantiated}}
 }

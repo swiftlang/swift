@@ -1,6 +1,8 @@
 // RUN: rm -rf %t
 // RUN: split-file %s %t
 // RUN: not %target-swift-frontend -emit-ir -I %t/Inputs  %t/test.swift  -enable-experimental-cxx-interop 2>&1 | %FileCheck %s
+//
+// XFAIL: OS=linux-android, OS=linux-androideabi
 
 //--- Inputs/module.modulemap
 module Test {

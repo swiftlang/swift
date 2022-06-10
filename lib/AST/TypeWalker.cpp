@@ -234,6 +234,10 @@ class Traversal : public TypeVisitor<Traversal, bool>
     return doIt(ty->getCaptureType());
   }
 
+  bool visitSILMoveOnlyType(SILMoveOnlyType *ty) {
+    return doIt(ty->getInnerType());
+  }
+
   bool visitSILBoxType(SILBoxType *ty) {
     for (Type type : ty->getSubstitutions().getReplacementTypes()) {
       if (type && doIt(type))

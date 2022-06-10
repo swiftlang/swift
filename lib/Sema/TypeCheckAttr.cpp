@@ -328,7 +328,7 @@ public:
 void AttributeChecker::visitNoImplicitCopyAttr(NoImplicitCopyAttr *attr) {
   // Only allow for this attribute to be used when experimental move only is
   // enabled.
-  if (!D->getASTContext().LangOpts.EnableExperimentalMoveOnly) {
+  if (!D->getASTContext().LangOpts.hasFeature(Feature::MoveOnly)) {
     auto error =
         diag::experimental_moveonly_feature_can_only_be_used_when_enabled;
     diagnoseAndRemoveAttr(attr, error);
@@ -632,16 +632,16 @@ void AttributeChecker::visitIBInspectableAttr(IBInspectableAttr *attr) {
   // Only instance properties can be 'IBInspectable'.
   auto *VD = cast<VarDecl>(D);
   if (!VD->getDeclContext()->getSelfClassDecl() || VD->isStatic())
-    diagnoseAndRemoveAttr(attr, diag::invalid_ibinspectable,
-                                 attr->getAttrName());
+    diagnoseAndRemoveAttr(attr, diag::attr_must_be_used_on_class_instance,
+                          attr->getAttrName());
 }
 
 void AttributeChecker::visitGKInspectableAttr(GKInspectableAttr *attr) {
   // Only instance properties can be 'GKInspectable'.
   auto *VD = cast<VarDecl>(D);
   if (!VD->getDeclContext()->getSelfClassDecl() || VD->isStatic())
-    diagnoseAndRemoveAttr(attr, diag::invalid_ibinspectable,
-                                 attr->getAttrName());
+    diagnoseAndRemoveAttr(attr, diag::attr_must_be_used_on_class_instance,
+                          attr->getAttrName());
 }
 
 static Optional<Diag<bool,Type>>
@@ -690,7 +690,8 @@ void AttributeChecker::visitIBOutletAttr(IBOutletAttr *attr) {
   // Only instance properties can be 'IBOutlet'.
   auto *VD = cast<VarDecl>(D);
   if (!VD->getDeclContext()->getSelfClassDecl() || VD->isStatic())
-    diagnoseAndRemoveAttr(attr, diag::invalid_iboutlet);
+    diagnoseAndRemoveAttr(attr, diag::attr_must_be_used_on_class_instance,
+                          attr->getAttrName());
 
   if (!VD->isSettable(nullptr)) {
     // Allow non-mutable IBOutlet properties in module interfaces,
@@ -3022,6 +3023,7 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
     Failable,
     UnsatisfiedRequirements,
     Inaccessible,
+    SPI,
   };
   SmallVector<std::tuple<ConstructorDecl *, UnviableReason, Type>, 2> unviable;
 
@@ -3084,6 +3086,28 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
       return false;
     }
 
+    if (init->isSPI()) {
+      if (!protocol->isSPI()) {
+        unviable.push_back(
+            std::make_tuple(init, UnviableReason::SPI, genericParamType));
+        return false;
+      }
+      auto protocolSPIGroups = protocol->getSPIGroups();
+      auto initSPIGroups = init->getSPIGroups();
+      // If both are SPI, `init(erasing:)` must be available in all of the
+      // protocol's SPI groups.
+      // TODO: Do this more efficiently?
+      for (auto protocolGroup : protocolSPIGroups) {
+        auto foundIt = std::find(
+            initSPIGroups.begin(), initSPIGroups.end(), protocolGroup);
+        if (foundIt == initSPIGroups.end()) {
+          unviable.push_back(
+              std::make_tuple(init, UnviableReason::SPI, genericParamType));
+          return false;
+        }
+      }
+    }
+
     return true;
   });
 
@@ -3113,8 +3137,12 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
         break;
       case UnviableReason::Inaccessible:
         diags.diagnose(init->getLoc(), diag::type_eraser_init_not_accessible,
-                       init->getFormalAccess(), protocolType,
-                       protocol->getFormalAccess());
+                       init->getEffectiveAccess(), protocolType,
+                       protocol->getEffectiveAccess());
+        break;
+      case UnviableReason::SPI:
+        diags.diagnose(init->getLoc(), diag::type_eraser_init_spi,
+                       protocolType, protocol->isSPI());
         break;
       }
     }
@@ -3632,6 +3660,12 @@ void AttributeChecker::checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs) {
         diagnoseAndRemoveAttr(Attr, diag::attr_not_on_stored_properties, Attr);
         continue;
       }
+    }
+
+    if (isa<DestructorDecl>(D) || isa<ConstructorDecl>(D)) {
+      diagnoseAndRemoveAttr(Attr, diag::attr_invalid_on_decl_kind, Attr,
+                            D->getDescriptiveKind());
+      continue;
     }
 
     auto AtLoc = Attr->AtLoc;

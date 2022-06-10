@@ -2908,7 +2908,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
   }
   case DAK_TypeSequence: {
-    if (Context.LangOpts.EnableExperimentalVariadicGenerics) {
+    if (Context.LangOpts.hasFeature(Feature::VariadicGenerics)) {
       auto range = SourceRange(Loc, Tok.getRange().getStart());
       Attributes.add(TypeSequenceAttr::create(Context, AtLoc, range));
     } else {

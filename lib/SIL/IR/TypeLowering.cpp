@@ -171,13 +171,19 @@ namespace {
     //   RetTy handleTrivial(CanType);
     //   RetTy handleTrivial(CanType, RecursiveProperties properties);
     //   // A reference type.
+    //   RetTy handleReference(CanType);
     //   RetTy handleReference(CanType, RecursiveProperties properties);
-    //   RetTy handleReference(CanType, RecursiveProperties properties);
+    //   // Non-trivial, move only, loadable
+    //   RetTy handleMoveOnlyReference(CanType, RecursiveProperties properties);
+    //   // Non-trivial, move only, address only
+    //   RetTy handleMoveOnlyAddressOnly(CanType, RecursiveProperties
+    //   properties);
     //   // Non-trivial and address-only.
     //   RetTy handleAddressOnly(CanType, RecursiveProperties properties);
     // and, if it doesn't override handleTupleType,
     //   // An aggregate type that's non-trivial.
-    //   RetTy handleNonTrivialAggregate(CanType, RecursiveProperties properties);
+    //   RetTy handleNonTrivialAggregate(CanType, RecursiveProperties
+    //   properties);
     //
     // Alternatively, it can just implement:
     //   RetTy handle(CanType, RecursiveProperties properties);
@@ -208,6 +214,16 @@ namespace {
       return asImpl().handle(type, properties);
     }
 
+    RetTy handleMoveOnlyReference(CanType type,
+                                  RecursiveProperties properties) {
+      return asImpl().handle(type, properties);
+    }
+
+    RetTy handleMoveOnlyAddressOnly(CanType type,
+                                    RecursiveProperties properties) {
+      return asImpl().handle(type, properties);
+    }
+
     RecursiveProperties
     mergeIsTypeExpansionSensitive(IsTypeExpansionSensitive_t isSensitive,
                                   RecursiveProperties props) {
@@ -228,10 +244,22 @@ namespace {
                                            RecursiveProperties::forReference());
     }
 
+    RecursiveProperties getMoveOnlyReferenceRecursiveProperties(
+        IsTypeExpansionSensitive_t isSensitive) {
+      return mergeIsTypeExpansionSensitive(isSensitive,
+                                           RecursiveProperties::forReference());
+    }
+
     RecursiveProperties
     getOpaqueRecursiveProperties(IsTypeExpansionSensitive_t isSensitive) {
       return mergeIsTypeExpansionSensitive(isSensitive,
                                            RecursiveProperties::forOpaque());
+    }
+
+    RecursiveProperties getMoveOnlyOpaqueRecursiveProperties(
+        IsTypeExpansionSensitive_t isSensitive) {
+      return mergeIsTypeExpansionSensitive(
+          isSensitive, RecursiveProperties::forMoveOnlyOpaque());
     }
 
 #define IMPL(TYPE, LOWERING)                                                 \
@@ -664,6 +692,24 @@ namespace {
       // Should not be loaded.
       return asImpl().handleReference(
           type, getReferenceRecursiveProperties(isSensitive));
+    }
+
+    RetTy visitSILMoveOnlyType(CanSILMoveOnlyType type,
+                               AbstractionPattern origType,
+                               IsTypeExpansionSensitive_t isSensitive) {
+      AbstractionPattern innerAbstraction = origType.withoutMoveOnly();
+      CanType innerType = type->getInnerType();
+      auto &lowering =
+          TC.getTypeLowering(innerAbstraction, innerType, Expansion);
+      if (lowering.isAddressOnly()) {
+        return asImpl().handleMoveOnlyAddressOnly(
+            type->getCanonicalType(),
+            getMoveOnlyOpaqueRecursiveProperties(isSensitive));
+      }
+
+      return asImpl().handleMoveOnlyReference(
+          type->getCanonicalType(),
+          getMoveOnlyReferenceRecursiveProperties(isSensitive));
     }
 
     RetTy handleAggregateByProperties(CanType type, RecursiveProperties props) {
@@ -1469,6 +1515,37 @@ namespace {
     }
   };
 
+  /// A class for move only types which are non-trivial and loadable
+  class MoveOnlyReferenceTypeLowering : public LeafLoadableTypeLowering {
+  public:
+    MoveOnlyReferenceTypeLowering(SILType type, RecursiveProperties properties,
+                                  TypeExpansionContext forExpansion)
+        : LeafLoadableTypeLowering(type, properties, IsReferenceCounted,
+                                   forExpansion) {}
+
+    SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
+                           SILValue value) const override {
+      if (isa<FunctionRefInst>(value) || isa<DynamicFunctionRefInst>(value) ||
+          isa<PreviousDynamicFunctionRefInst>(value))
+        return value;
+
+      if (B.getFunction().hasOwnership())
+        return B.createCopyValue(loc, value);
+
+      B.createStrongRetain(loc, value, B.getDefaultAtomicity());
+      return value;
+    }
+
+    void emitDestroyValue(SILBuilder &B, SILLocation loc,
+                          SILValue value) const override {
+      if (B.getFunction().hasOwnership()) {
+        B.createDestroyValue(loc, value);
+        return;
+      }
+      B.createStrongRelease(loc, value, B.getDefaultAtomicity());
+    }
+  };
+
 /// A type lowering for loadable @unowned types.
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   class Loadable##Name##TypeLowering final : public LeafLoadableTypeLowering { \
@@ -1520,6 +1597,93 @@ namespace {
 
     void emitStoreOfCopy(SILBuilder &B, SILLocation loc,
                          SILValue newValue, SILValue addr,
+                         IsInitialization_t isInit) const override {
+      llvm_unreachable("calling emitStoreOfCopy on non-loadable type");
+    }
+
+    void emitStore(SILBuilder &B, SILLocation loc, SILValue value,
+                   SILValue addr, StoreOwnershipQualifier qual) const override {
+      llvm_unreachable("calling emitStore on non-loadable type");
+    }
+
+    SILValue emitLoad(SILBuilder &B, SILLocation loc, SILValue addr,
+                      LoadOwnershipQualifier qual) const override {
+      llvm_unreachable("calling emitLoad on non-loadable type");
+    }
+
+    SILValue emitLoweredLoad(SILBuilder &B, SILLocation loc, SILValue addr,
+                             LoadOwnershipQualifier qual,
+                             Lowering::TypeLowering::TypeExpansionKind
+                                 expansionKind) const override {
+      llvm_unreachable("calling emitLoweredLoad on non-loadable type?!");
+    }
+
+    void emitLoweredStore(SILBuilder &B, SILLocation loc, SILValue value,
+                          SILValue addr, StoreOwnershipQualifier qual,
+                          Lowering::TypeLowering::TypeExpansionKind
+                              expansionKind) const override {
+      llvm_unreachable("calling emitLoweredStore on non-loadable type?!");
+    }
+
+    void emitDestroyAddress(SILBuilder &B, SILLocation loc,
+                            SILValue addr) const override {
+      if (!isTrivial())
+        B.createDestroyAddr(loc, addr);
+    }
+
+    void emitDestroyRValue(SILBuilder &B, SILLocation loc,
+                           SILValue value) const override {
+      if (!isTrivial())
+        B.createDestroyAddr(loc, value);
+    }
+
+    SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
+                           SILValue value) const override {
+      llvm_unreachable("type is not loadable!");
+    }
+
+    SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
+                                  SILValue value,
+                                  TypeExpansionKind style) const override {
+      llvm_unreachable("type is not loadable!");
+    }
+
+    void emitDestroyValue(SILBuilder &B, SILLocation loc,
+                          SILValue value) const override {
+      llvm_unreachable("type is not loadable!");
+    }
+
+    void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue value,
+                                 TypeExpansionKind style) const override {
+      llvm_unreachable("type is not loadable!");
+    }
+  };
+
+  /// A class for non-trivial, address-only, move only types.
+  class MoveOnlyAddressOnlyTypeLowering : public TypeLowering {
+  public:
+    MoveOnlyAddressOnlyTypeLowering(SILType type,
+                                    RecursiveProperties properties,
+                                    TypeExpansionContext forExpansion)
+        : TypeLowering(type, properties, IsNotReferenceCounted, forExpansion) {
+      assert(properties.isAddressOnly());
+    }
+
+    void emitCopyInto(SILBuilder &B, SILLocation loc, SILValue src,
+                      SILValue dest, IsTake_t isTake,
+                      IsInitialization_t isInit) const override {
+      assert((B.getModule().getStage() == SILStage::Raw || isTake == true) &&
+             "Can only copy move only values in Raw SIL");
+      B.createCopyAddr(loc, src, dest, isTake, isInit);
+    }
+
+    SILValue emitLoadOfCopy(SILBuilder &B, SILLocation loc, SILValue addr,
+                            IsTake_t isTake) const override {
+      llvm_unreachable("calling emitLoadOfCopy on non-loadable type");
+    }
+
+    void emitStoreOfCopy(SILBuilder &B, SILLocation loc, SILValue newValue,
+                         SILValue addr,
                          IsInitialization_t isInit) const override {
       llvm_unreachable("calling emitStoreOfCopy on non-loadable type");
     }
@@ -1663,6 +1827,51 @@ namespace {
     }
   };
 
+  /// Lower address only types as opaque values.
+  ///
+  /// Opaque values behave like loadable leaf types in SIL.
+  ///
+  /// FIXME: When you remove an unreachable, just delete the method.
+  class MoveOnlyOpaqueValueTypeLowering : public LeafLoadableTypeLowering {
+  public:
+    MoveOnlyOpaqueValueTypeLowering(SILType type,
+                                    RecursiveProperties properties,
+                                    TypeExpansionContext forExpansion)
+        : LeafLoadableTypeLowering(type, properties, IsNotReferenceCounted,
+                                   forExpansion) {}
+
+    void emitCopyInto(SILBuilder &B, SILLocation loc, SILValue src,
+                      SILValue dest, IsTake_t isTake,
+                      IsInitialization_t isInit) const override {
+      llvm_unreachable("copy into");
+    }
+
+    // --- Same as LeafLoadableTypeLowering.
+
+    SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
+                                  SILValue value,
+                                  TypeExpansionKind style) const override {
+      llvm_unreachable("lowered copy");
+    }
+
+    void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue value,
+                                 TypeExpansionKind style) const override {
+      llvm_unreachable("destroy value");
+    }
+
+    SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
+                           SILValue value) const override {
+      assert(B.getModule().getStage() == SILStage::Raw &&
+             "Can not copy a move only value in non-Raw SIL");
+      return B.createCopyValue(loc, value);
+    }
+
+    void emitDestroyValue(SILBuilder &B, SILLocation loc,
+                          SILValue value) const override {
+      B.createDestroyValue(loc, value);
+    }
+  };
+
   /// Build the appropriate TypeLowering subclass for the given type,
   /// which is assumed to already have been lowered.
   class LowerType
@@ -1690,6 +1899,25 @@ namespace {
             silType, RecursiveProperties::forTrivial(), Expansion);
 
       return new (TC) ReferenceTypeLowering(silType, properties, Expansion);
+    }
+
+    TypeLowering *handleMoveOnlyReference(CanType type,
+                                          RecursiveProperties properties) {
+      auto silType = SILType::getPrimitiveObjectType(type);
+      return new (TC)
+          MoveOnlyReferenceTypeLowering(silType, properties, Expansion);
+    }
+
+    TypeLowering *handleMoveOnlyAddressOnly(CanType type,
+                                            RecursiveProperties properties) {
+      if (!TC.Context.SILOpts.EnableSILOpaqueValues) {
+        auto silType = SILType::getPrimitiveAddressType(type);
+        return new (TC)
+            MoveOnlyAddressOnlyTypeLowering(silType, properties, Expansion);
+      }
+      auto silType = SILType::getPrimitiveObjectType(type);
+      return new (TC)
+          MoveOnlyOpaqueValueTypeLowering(silType, properties, Expansion);
     }
 
     TypeLowering *handleReference(CanType type) {
@@ -3634,6 +3862,19 @@ TypeConverter::getConstantAbstractionPattern(SILDeclRef constant) {
   return None;
 }
 
+TypeExpansionContext
+TypeConverter::getCaptureTypeExpansionContext(SILDeclRef constant) {
+  auto found = CaptureTypeExpansionContexts.find(constant);
+  if (found != CaptureTypeExpansionContexts.end()) {
+    return found->second;
+  }
+  // Insert a minimal type expansion context into the cache, so that further
+  // attempts to change it raise an error.
+  auto minimal = TypeExpansionContext::minimal();
+  CaptureTypeExpansionContexts.insert({constant, minimal});
+  return minimal;
+}
+
 void TypeConverter::setAbstractionPattern(AbstractClosureExpr *closure,
                                           AbstractionPattern pattern) {
   auto existing = ClosureAbstractionPatterns.find(closure);
@@ -3642,6 +3883,31 @@ void TypeConverter::setAbstractionPattern(AbstractClosureExpr *closure,
      && "closure shouldn't be emitted at different abstraction level contexts");
   } else {
     ClosureAbstractionPatterns[closure] = pattern;
+  }
+}
+
+void TypeConverter::setCaptureTypeExpansionContext(SILDeclRef constant,
+                                                   SILModule &M) {
+  if (!hasLoweredLocalCaptures(constant)) {
+    return;
+  }
+  
+  TypeExpansionContext context = constant.isSerialized()
+    ? TypeExpansionContext::minimal()
+    : TypeExpansionContext::maximal(constant.getAnyFunctionRef()->getAsDeclContext(),
+                                    M.isWholeModule());
+
+  auto existing = CaptureTypeExpansionContexts.find(constant);
+  if (existing != CaptureTypeExpansionContexts.end()) {
+    assert(existing->second == context
+     && "closure shouldn't be emitted with different capture type expansion contexts");
+  } else {
+    // Lower in the context of the closure. Since the set of captures is a
+    // private contract between the closure and its enclosing context, we
+    // don't need to keep its capture types opaque.
+    // The exception is if it's inlinable, in which case it might get inlined into
+    // some place we need to keep opaque types opaque.
+    CaptureTypeExpansionContexts.insert({constant, context});
   }
 }
 

@@ -18,22 +18,24 @@
 #include "swift/AST/Identifier.h"
 
 namespace swift {
-  class ModuleDecl;
-  class ValueDecl;
+class IRGenOptions;
+class ModuleDecl;
+class ValueDecl;
 
-  /// Print the exposed declarations in a module into a Clang header.
-  ///
-  /// The Objective-C compatible declarations are printed into a block that
-  /// ensures that those declarations are only usable when the header is
-  /// compiled in Objective-C mode.
-  /// The C++ compatible declarations are printed into a block that ensures
-  /// that those declarations are only usable when the header is compiled in
-  /// C++ mode.
-  ///
-  /// Returns true on error.
-  bool printAsClangHeader(raw_ostream &out, ModuleDecl *M,
-                          StringRef bridgingHeader,
-                          bool ExposePublicDeclsInClangHeader);
+/// Print the exposed declarations in a module into a Clang header.
+///
+/// The Objective-C compatible declarations are printed into a block that
+/// ensures that those declarations are only usable when the header is
+/// compiled in Objective-C mode.
+/// The C++ compatible declarations are printed into a block that ensures
+/// that those declarations are only usable when the header is compiled in
+/// C++ mode.
+///
+/// Returns true on error.
+bool printAsClangHeader(raw_ostream &out, ModuleDecl *M,
+                        StringRef bridgingHeader,
+                        bool ExposePublicDeclsInClangHeader,
+                        const IRGenOptions &irGenOpts);
 }
 
 #endif

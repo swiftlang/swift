@@ -461,9 +461,12 @@ static void printSILTypeColorAndSigil(raw_ostream &OS, SILType t) {
 
 void SILType::print(raw_ostream &OS, const PrintOptions &PO) const {
   printSILTypeColorAndSigil(OS, *this);
-  
+
   // Print other types as their Swift representation.
-  getASTType().print(OS, PO);
+  //
+  // NOTE: We always print the Raw AST type so we don't look through
+  // move-onlyness.
+  getRawASTType().print(OS, PO);
 }
 
 void SILType::dump() const {
@@ -529,8 +532,6 @@ static void printSILFunctionNameAndType(llvm::raw_ostream &OS,
 }
 
 namespace {
-  
-class SILPrinter;
 
 // 1. Accumulate opcode-specific comments in this stream.
 // 2. Start emitting comments: lineComments.start()
@@ -595,6 +596,10 @@ protected:
   }
 };
 
+} // namespace
+
+namespace swift {
+
 /// SILPrinter class - This holds the internal implementation details of
 /// printing SIL structures.
 class SILPrinter : public SILInstructionVisitor<SILPrinter> {
@@ -647,7 +652,7 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
   
   SILPrinter &operator<<(SILType t) {
     printSILTypeColorAndSigil(PrintState.OS, t);
-    t.getASTType().print(PrintState.OS, PrintState.ASTOptions);
+    t.getRawASTType().print(PrintState.OS, PrintState.ASTOptions);
     return *this;
   }
   
@@ -2737,7 +2742,8 @@ public:
     }
   }
 };
-} // end anonymous namespace
+
+} // namespace swift
 
 static void printBlockID(raw_ostream &OS, SILBasicBlock *bb) {
   SILPrintContext Ctx(OS);

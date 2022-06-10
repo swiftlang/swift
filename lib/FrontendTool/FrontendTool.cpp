@@ -180,13 +180,14 @@ static bool writeSIL(SILModule &SM, const PrimarySpecificPaths &PSPs,
 /// \see swift::printAsClangHeader
 static bool printAsClangHeaderIfNeeded(StringRef outputPath, ModuleDecl *M,
                                        StringRef bridgingHeader,
-                                       bool ExposePublicDeclsInClangHeader) {
+                                       bool ExposePublicDeclsInClangHeader,
+                                       const IRGenOptions &irGenOpts) {
   if (outputPath.empty())
     return false;
   return withOutputFile(
       M->getDiags(), outputPath, [&](raw_ostream &out) -> bool {
         return printAsClangHeader(out, M, bridgingHeader,
-                                  ExposePublicDeclsInClangHeader);
+                                  ExposePublicDeclsInClangHeader, irGenOpts);
       });
 }
 
@@ -601,6 +602,7 @@ static swift::file_types::ID computeFileTypeForPath(const StringRef Path) {
     // then iterate over all preceeding possible extension variants.
     while (llvm::sys::path::has_extension(PathStem)) {
       auto NextExtension = llvm::sys::path::extension(PathStem);
+      PathStem = llvm::sys::path::stem(PathStem);
       Extension = NextExtension.str() + Extension;
       FileType = file_types::lookupTypeForExtension(Extension);
       if (FileType != swift::file_types::ID::TY_INVALID)
@@ -859,7 +861,7 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
     hadAnyError |= printAsClangHeaderIfNeeded(
         Invocation.getClangHeaderOutputPathForAtMostOnePrimary(),
         Instance.getMainModule(), BridgingHeaderPathForPrint,
-        opts.ExposePublicDeclsInClangHeader);
+        opts.ExposePublicDeclsInClangHeader, Invocation.getIRGenOptions());
   }
 
   // Only want the header if there's been any errors, ie. there's not much
@@ -1760,7 +1762,9 @@ static void emitIndexDataForSourceFile(SourceFile *PrimarySourceFile,
     if (OutputFile.empty())
       OutputFile = PSPs.OutputFilename;
     (void) index::indexAndRecord(PrimarySourceFile, OutputFile,
-                                 opts.IndexStorePath, opts.IndexSystemModules,
+                                 opts.IndexStorePath,
+                                 !opts.IndexIgnoreClangModules,
+                                 opts.IndexSystemModules,
                                  opts.IndexIgnoreStdlib, isDebugCompilation,
                                  Invocation.getTargetTriple(),
                                  *Instance.getDependencyTracker(),
@@ -1775,6 +1779,7 @@ static void emitIndexDataForSourceFile(SourceFile *PrimarySourceFile,
                                  opts.InputsAndOutputs
                                    .copyIndexUnitOutputFilenames(),
                                  moduleToken, opts.IndexStorePath,
+                                 !opts.IndexIgnoreClangModules,
                                  opts.IndexSystemModules,
                                  opts.IndexIgnoreStdlib,
                                  isDebugCompilation,

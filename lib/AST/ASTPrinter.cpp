@@ -57,6 +57,7 @@
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/Module.h"
 #include "clang/Basic/SourceManager.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ConvertUTF.h"
@@ -156,6 +157,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
   result.AlwaysTryPrintParameterLabels = true;
   result.PrintSPIs = printSPIs;
   result.PrintExplicitAny = true;
+  result.DesugarExistentialConstraint = true;
 
   // We should print __consuming, __owned, etc for the module interface file.
   result.SkipUnderscoredKeywords = false;
@@ -2997,6 +2999,58 @@ static bool usesFeatureNoAsyncAvailability(Decl *decl) {
    return decl->getAttrs().getNoAsync(decl->getASTContext()) != nullptr;
 }
 
+static bool usesFeatureConciseMagicFile(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureForwardTrailingClosures(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureBareSlashRegexLiterals(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureVariadicGenerics(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureNamedOpaqueTypes(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureFlowSensitiveConcurrencyCaptures(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureMoveOnly(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureOneWayClosureParameters(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureTypeWitnessSystemInference(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureBoundGenericExtensions(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureDifferentiableProgramming(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureForwardModeDifferentiation(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureAdditiveArithmeticDerivedConformances(Decl *decl) {
+  return false;
+}
+
 static void
 suppressingFeatureNoAsyncAvailability(PrintOptions &options,
                                       llvm::function_ref<void()> action) {
@@ -3529,8 +3583,9 @@ void PrintAST::printPrimaryAssociatedTypes(ProtocolDecl *decl) {
       [&](AssociatedTypeDecl *assocType) {
         Printer.callPrintStructurePre(PrintStructureKind::GenericParameter,
                                       assocType);
-        Printer.printName(assocType->getName(),
-                          PrintNameContext::GenericParameter);
+        Printer.printTypeRef(assocType->getDeclaredInterfaceType(), assocType,
+                             assocType->getName(),
+                             PrintNameContext::GenericParameter);
         Printer.printStructurePost(PrintStructureKind::GenericParameter,
                                    assocType);
       },
@@ -5249,6 +5304,16 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
       Name = Mod->getASTContext().getIdentifier(ExportedModuleName);
     }
 
+    if (Options.UseOriginallyDefinedInModuleNames) {
+      Decl *D = Ty->getDecl();
+      for (auto attr: D->getAttrs().getAttributes<OriginallyDefinedInAttr>()) {
+        Name = Mod->getASTContext()
+          .getIdentifier(const_cast<OriginallyDefinedInAttr*>(attr)
+                         ->OriginalModuleName);
+        break;
+      }
+    }
+
     Printer.printModuleRef(Mod, Name);
     Printer << ".";
   }
@@ -6139,6 +6204,11 @@ public:
     }
   }
 
+  void visitSILMoveOnlyType(SILMoveOnlyType *T) {
+    Printer << "@moveOnly ";
+    printWithParensIfNotSimple(T->getInnerType());
+  }
+
   void visitArraySliceType(ArraySliceType *T) {
     Printer << "[";
     visit(T->getBaseType());
@@ -6211,7 +6281,16 @@ public:
     if (Options.PrintExplicitAny)
       Printer << "any ";
 
-    visit(T->getConstraintType());
+    // FIXME: The desugared type is used here only to support
+    // existential types with protocol typealiases in Swift
+    // interfaces. Verifying that the underlying type of a
+    // protocol typealias is a constriant type is fundamentally
+    // circular, so the desugared type should be written in source.
+    if (Options.DesugarExistentialConstraint) {
+      visit(T->getConstraintType()->getDesugaredType());
+    } else {
+      visit(T->getConstraintType());
+    }
   }
 
   void visitLValueType(LValueType *T) {
@@ -6226,8 +6305,7 @@ public:
 
   void visitOpenedArchetypeType(OpenedArchetypeType *T) {
     if (auto parent = T->getParent()) {
-      visitParentType(parent);
-      printArchetypeCommon(T, getAbstractTypeParamDecl(T));
+      printArchetypeCommon(T);
       return;
     }
 
@@ -6236,8 +6314,20 @@ public:
     visit(T->getExistentialType());
   }
 
-  void printArchetypeCommon(ArchetypeType *T,
-                            const AbstractTypeParamDecl *Decl) {
+  void printDependentMember(DependentMemberType *T) {
+    if (auto *const Assoc = T->getAssocType()) {
+      if (Options.ProtocolQualifiedDependentMemberTypes) {
+        Printer << "[";
+        Printer.printName(Assoc->getProtocol()->getName());
+        Printer << "]";
+      }
+      Printer.printTypeRef(T, Assoc, T->getName());
+    } else {
+      Printer.printName(T->getName());
+    }
+  }
+
+  void printArchetypeCommon(ArchetypeType *T) {
     if (Options.AlternativeTypeNames) {
       auto found = Options.AlternativeTypeNames->find(T->getCanonicalType());
       if (found != Options.AlternativeTypeNames->end()) {
@@ -6246,36 +6336,22 @@ public:
       }
     }
 
-    const auto Name = T->getName();
-    if (Name.empty()) {
-      Printer << "<anonymous>";
-    } else if (Decl) {
-      Printer.printTypeRef(T, Decl, Name);
+    auto interfaceType = T->getInterfaceType();
+    if (auto *dependentMember = interfaceType->getAs<DependentMemberType>()) {
+      visitParentType(T->getParent());
+      printDependentMember(dependentMember);
     } else {
-      Printer.printName(Name);
+      visit(interfaceType);
     }
-  }
-
-  static AbstractTypeParamDecl *getAbstractTypeParamDecl(ArchetypeType *T) {
-    if (auto gp = T->getInterfaceType()->getAs<GenericTypeParamType>()) {
-      return gp->getDecl();
-    }
-
-    auto depMemTy = T->getInterfaceType()->castTo<DependentMemberType>();
-    return depMemTy->getAssocType();
   }
 
   void visitPrimaryArchetypeType(PrimaryArchetypeType *T) {
-    if (auto parent = T->getParent())
-      visitParentType(parent);
-
-    printArchetypeCommon(T, getAbstractTypeParamDecl(T));
+    printArchetypeCommon(T);
   }
 
   void visitOpaqueTypeArchetypeType(OpaqueTypeArchetypeType *T) {
     if (auto parent = T->getParent()) {
-      visitParentType(parent);
-      printArchetypeCommon(T, getAbstractTypeParamDecl(T));
+      printArchetypeCommon(T);
       return;
     }
 
@@ -6352,9 +6428,7 @@ public:
   }
 
   void visitSequenceArchetypeType(SequenceArchetypeType *T) {
-    if (auto parent = T->getParent())
-      visitParentType(parent);
-    printArchetypeCommon(T, getAbstractTypeParamDecl(T));
+    printArchetypeCommon(T);
   }
 
   void visitGenericTypeParamType(GenericTypeParamType *T) {
@@ -6387,10 +6461,16 @@ public:
 
       // Print based on the type.
       Printer << "some ";
-      if (auto inheritedType = decl->getInherited().front().getType())
-        inheritedType->print(Printer, Options);
-      else
+      if (!decl->getConformingProtocols().empty()) {
+        llvm::interleave(decl->getConformingProtocols(), Printer, [&](ProtocolDecl *proto){
+          if (auto printType = proto->getDeclaredType())
+            printType->print(Printer, Options);
+          else
+            Printer << proto->getNameStr();
+        }, " & ");
+      } else {
         Printer << "Any";
+      }
       return;
     }
 
@@ -6406,16 +6486,7 @@ public:
 
   void visitDependentMemberType(DependentMemberType *T) {
     visitParentType(T->getBase());
-    if (auto *const Assoc = T->getAssocType()) {
-      if (Options.ProtocolQualifiedDependentMemberTypes) {
-        Printer << "[";
-        Printer.printName(Assoc->getProtocol()->getName());
-        Printer << "]";
-      }
-      Printer.printTypeRef(T, Assoc, T->getName());
-    } else {
-      Printer.printName(T->getName());
-    }
+    printDependentMember(T);
   }
 
 #define REF_STORAGE(Name, name, ...) \

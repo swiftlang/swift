@@ -73,7 +73,7 @@ protocol PI {
 }
 
 struct SI<A: PI> : I where A : I, A.T == SI<A> {
-// expected-error@-1 3{{generic struct 'SI' has self-referential generic requirements}}
+// expected-error@-1 5{{generic struct 'SI' has self-referential generic requirements}}
   func ggg<T : I>(t: T.Type) -> T {
     return T()
   }
@@ -104,5 +104,5 @@ struct SU<A: P> where A.T == SU {
 }
 
 struct SIU<A: PI> : I where A : I, A.T == SIU {
-// expected-error@-1 3{{generic struct 'SIU' has self-referential generic requirements}}
+// expected-error@-1 5{{generic struct 'SIU' has self-referential generic requirements}}
 }

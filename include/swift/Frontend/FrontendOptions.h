@@ -99,6 +99,9 @@ public:
   /// Emit index data for imported serialized swift system modules.
   bool IndexSystemModules = false;
 
+  /// Avoid emitting index data for imported clang modules (pcms).
+  bool IndexIgnoreClangModules = false;
+
   /// If indexing system modules, don't index the stdlib.
   bool IndexIgnoreStdlib = false;
 

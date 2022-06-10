@@ -1,5 +1,4 @@
 // RUN: %target-swift-ide-test -print-module -module-to-print=MemberInline -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
-// XFAIL: *
 
 // CHECK: struct LoadableIntWrapper {
 // CHECK:   static func - (lhs: inout LoadableIntWrapper, rhs: LoadableIntWrapper) -> LoadableIntWrapper
@@ -134,11 +133,14 @@
 // CHECK: }
 // CHECK: typealias TemplatedDoubleArrayByVal = __CxxTemplateInst19TemplatedArrayByValIdE
 
+// CHECK: struct TemplatedByVal<T> {
+// CHECK-NEXT: }
 
-// CHECK: struct TemplatedSubscriptArrayByVal {
+// CHECK: struct TemplatedOperatorArrayByVal {
 // CHECK:   subscript(i: T) -> T { mutating get }
 // CHECK:   @available(*, unavailable, message: "use subscript")
 // CHECK:   mutating func __operatorSubscriptConst<T>(_ i: T) -> T
+// CHECK-NOT: mutating func __operatorPlus<T>(_ i: T) -> UnsafeMutablePointer<T>
 // CHECK: }
 
 // CHECK: struct NonTrivialArrayByVal {

@@ -128,6 +128,16 @@ extension TopLevelProtocol {
 @_backDeploy(before: macOS 12.0) // expected-error {{'@_backDeploy' attribute cannot be applied to this declaration}}
 public class CannotBackDeployClass {}
 
+public final class CannotBackDeployClassInitDeinit {
+  @available(macOS 11.0, *)
+  @_backDeploy(before: macOS 12.0) // expected-error {{'@_backDeploy' attribute cannot be applied to initializer declarations}}
+  public init() {}
+
+  @available(macOS 11.0, *)
+  @_backDeploy(before: macOS 12.0) // expected-error {{'@_backDeploy' attribute cannot be applied to deinitializer declarations}}
+  deinit {}
+}
+
 @_backDeploy(before: macOS 12.0) // expected-error {{'@_backDeploy' attribute cannot be applied to this declaration}}
 public struct CannotBackDeployStruct {
   @_backDeploy(before: macOS 12.0) // expected-error {{'@_backDeploy' must not be used on stored properties}}
