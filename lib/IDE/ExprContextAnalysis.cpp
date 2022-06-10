@@ -365,9 +365,15 @@ static void collectPossibleCalleesByQualifiedLookup(
   if (!baseInstanceTy->mayHaveMembers())
     return;
 
-  // 'AnyObject' is not initializable.
-  if (baseInstanceTy->isAnyObject() && name == DeclNameRef::createConstructor())
-    return;
+  if (name == DeclNameRef::createConstructor()) {
+    // Existential types cannot be instantiated. e.g. 'MyProtocol()'.
+    if (baseInstanceTy->isExistentialType())
+      return;
+
+    // 'AnyObject' is not initializable.
+    if (baseInstanceTy->isAnyObject())
+      return;
+  }
 
   // Make sure we've resolved implicit members.
   namelookup::installSemanticMembersIfNeeded(baseInstanceTy, name);
