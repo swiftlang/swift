@@ -13,11 +13,15 @@
 #ifndef SWIFT_PRINTASCLANG_PRINTCLANGVALUETYPE_H
 #define SWIFT_PRINTASCLANG_PRINTCLANGVALUETYPE_H
 
+#include "OutputLanguageMode.h"
+#include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/Support/raw_ostream.h"
 
 namespace swift {
 
+class NominalTypeDecl;
+class PrimitiveTypeMapping;
 class StructDecl;
 class SwiftToClangInteropContext;
 
@@ -25,16 +29,55 @@ class SwiftToClangInteropContext;
 /// be included in a Swift module's generated clang header.
 class ClangValueTypePrinter {
 public:
-  ClangValueTypePrinter(raw_ostream &os,
+  ClangValueTypePrinter(raw_ostream &os, raw_ostream &cPrologueOS,
+                        PrimitiveTypeMapping &typeMapping,
                         SwiftToClangInteropContext &interopContext)
-      : os(os), interopContext(interopContext) {}
+      : os(os), cPrologueOS(cPrologueOS), typeMapping(typeMapping),
+        interopContext(interopContext) {}
 
   /// Print the C struct thunk or the C++ class definition that
   /// corresponds to the given structure declaration.
   void printStructDecl(const StructDecl *SD);
 
+  /// Print the pararameter type that referes to a Swift struct type in C/C++.
+  void printValueTypeParameterType(const NominalTypeDecl *type,
+                                   OutputLanguageMode outputLang);
+
+  /// Print the use of a C++ struct/enum parameter value as it's passed to the
+  /// underlying C function that represents the native Swift function.
+  void
+  printParameterCxxToCUseScaffold(bool isIndirect, const NominalTypeDecl *type,
+                                  llvm::function_ref<void()> cxxParamPrinter);
+
+  /// Print the return type that refers to a Swift struct type in C/C++.
+  void printValueTypeReturnType(const NominalTypeDecl *typeDecl,
+                                OutputLanguageMode outputLang);
+
+  /// Print the supporting code  that's required to indirectly return a C++
+  /// class that represents a Swift value type as it's being indirectly passed
+  /// from the C function that represents the native Swift function.
+  void printValueTypeIndirectReturnScaffold(
+      const NominalTypeDecl *typeDecl,
+      llvm::function_ref<void(StringRef)> bodyPrinter);
+
+  /// Print the supporting code  that's required to directly return a C++ class
+  /// that represents a Swift value type as it's being returned from the C
+  /// function that represents the native Swift function.
+  void
+  printValueTypeDirectReturnScaffold(const NominalTypeDecl *typeDecl,
+                                     llvm::function_ref<void()> bodyPrinter);
+
 private:
+  /// Prints out the C stub name used to pass/return value directly for the
+  /// given value type.
+  ///
+  /// If the C stub isn't declared yet in the emitted header, that declaration
+  /// will be emitted by this function.
+  void printCStubTypeName(const NominalTypeDecl *type);
+
   raw_ostream &os;
+  raw_ostream &cPrologueOS;
+  PrimitiveTypeMapping &typeMapping;
   SwiftToClangInteropContext &interopContext;
 };
 
