@@ -21,15 +21,20 @@
 namespace swift {
 
 class FuncDecl;
+class ParamDecl;
+class ParameterList;
 class PrimitiveTypeMapping;
+class SwiftToClangInteropContext;
 
 /// Responsible for printing a Swift function decl or type in C or C++ mode, to
 /// be included in a Swift module's generated clang header.
 class DeclAndTypeClangFunctionPrinter {
 public:
-  DeclAndTypeClangFunctionPrinter(raw_ostream &os,
-                                  PrimitiveTypeMapping &typeMapping)
-      : os(os), typeMapping(typeMapping) {}
+  DeclAndTypeClangFunctionPrinter(raw_ostream &os, raw_ostream &cPrologueOS,
+                                  PrimitiveTypeMapping &typeMapping,
+                                  SwiftToClangInteropContext &interopContext)
+      : os(os), cPrologueOS(cPrologueOS), typeMapping(typeMapping),
+        interopContext(interopContext) {}
 
   /// What kind of function signature should be emitted for the given Swift
   /// function.
@@ -45,9 +50,20 @@ public:
   void printFunctionSignature(FuncDecl *FD, StringRef name, Type resultTy,
                               FunctionSignatureKind kind);
 
+  /// Print the use of the C++ function thunk parameter as it's passed to the C
+  /// function declaration.
+  void printCxxToCFunctionParameterUse(const ParamDecl *param, StringRef name);
+
+  /// Print the body of the inline C++ function thunk that calls the underlying
+  /// Swift function.
+  void printCxxThunkBody(StringRef swiftSymbolName, Type resultTy,
+                         ParameterList *params);
+
 private:
   raw_ostream &os;
+  raw_ostream &cPrologueOS;
   PrimitiveTypeMapping &typeMapping;
+  SwiftToClangInteropContext &interopContext;
 };
 
 } // end namespace swift

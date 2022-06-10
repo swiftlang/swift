@@ -26,3 +26,10 @@ IRABIDetailsProvider &SwiftToClangInteropContext::getIrABIDetails() {
     irABIDetails = std::make_unique<IRABIDetailsProvider>(mod, irGenOpts);
   return *irABIDetails;
 }
+
+void SwiftToClangInteropContext::runIfStubForDeclNotEmitted(
+    const Decl *d, llvm::function_ref<void(void)> function) {
+  auto result = emittedStubs.insert(d);
+  if (result.second)
+    function();
+}

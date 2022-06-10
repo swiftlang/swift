@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ClangSyntaxPrinter.h"
+#include "swift/AST/Module.h"
 
 using namespace swift;
 using namespace cxx_synthesis;
@@ -41,6 +42,10 @@ void ClangSyntaxPrinter::printIdentifier(StringRef name) {
   os << name;
   if (ClangSyntaxPrinter::isClangKeyword(name))
     os << '_';
+}
+
+void ClangSyntaxPrinter::printModuleNameCPrefix(const ModuleDecl &mod) {
+  os << mod.getName().str() << '_';
 }
 
 /// Print a C++ namespace declaration with the give name and body.
