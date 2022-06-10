@@ -89,6 +89,9 @@ class MemoryLifetimeVerifier {
   /// Register the destination address of a store_borrow as borrowed location.
   void registerStoreBorrowLocation(SILValue addr);
 
+  /// Registers all store_borrow instructions in a block.
+  void registerStoreBorrowsInBlock(SILBasicBlock *block);
+
   /// Handles locations of the predecessor's terminator, which are only valid
   /// in \p block.
   /// Example: @out results of try_apply. They are only valid in the
@@ -283,6 +286,13 @@ void MemoryLifetimeVerifier::registerStoreBorrowLocation(SILValue addr) {
   if (auto *loc = locations.getLocation(addr)) {
     storeBorrowLocations.resize(locations.getNumLocations());
     storeBorrowLocations |= loc->subLocations;
+  }
+}
+
+void MemoryLifetimeVerifier::registerStoreBorrowsInBlock(SILBasicBlock *block) {
+  for (SILInstruction &inst : *block) {
+    if (auto *sbi = dyn_cast<StoreBorrowInst>(&inst))
+      registerStoreBorrowLocation(sbi->getDest());
   }
 }
 
@@ -579,7 +589,6 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
       case SILInstructionKind::StoreBorrowInst: {
         SILValue destAddr = cast<StoreBorrowInst>(&I)->getDest();
         locations.setBits(bits, destAddr);
-        registerStoreBorrowLocation(destAddr);
         break;
       }
       case SILInstructionKind::CopyAddrInst: {
@@ -764,6 +773,7 @@ void MemoryLifetimeVerifier::verify() {
   locations.handleSingleBlockLocations([this](SILBasicBlock *block) {
     storeBorrowLocations.clear();
     Bits bits(locations.getNumLocations());
+    registerStoreBorrowsInBlock(block);
     checkBlock(block, bits);
   });
 }

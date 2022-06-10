@@ -361,6 +361,36 @@ bb0(%0 :  @guaranteed $Optional<T>):
   return %res : $()
 }
 
+// CHECK: SIL memory lifetime failure in @test_store_borrow_single_block: store-borrow location cannot be written
+sil [ossa] @test_store_borrow_single_block : $@convention(thin) (@guaranteed T) -> () {
+bb0(%0 : @guaranteed $T):
+  %stk = alloc_stack $T
+  %copy = copy_value %0 : $T
+  store %copy to [init] %stk : $*T
+  %ld = load [take] %stk : $*T
+  destroy_value %ld : $T
+  store_borrow %0 to %stk : $*T
+  dealloc_stack %stk : $*T
+  %8 = tuple ()
+  return %8 : $() 
+}
+
+// CHECK: SIL memory lifetime failure in @test_store_borrow_multi_block: store-borrow location cannot be written
+sil [ossa] @test_store_borrow_multi_block : $@convention(thin) (@guaranteed T) -> () {
+bb0(%0 : @guaranteed $T):
+  %stk = alloc_stack $T
+  %copy = copy_value %0 : $T
+  store %copy to [init] %stk : $*T
+  %ld = load [take] %stk : $*T
+  destroy_value %ld : $T
+  br bb1
+bb1:
+  store_borrow %0 to %stk : $*T
+  dealloc_stack %stk : $*T
+  %8 = tuple ()
+  return %8 : $() 
+}
+
 // CHECK: SIL memory lifetime failure in @test_cast_br_take_always: memory is not initialized, but should be
 sil [ossa] @test_cast_br_take_always : $@convention(thin) <U, V> (@in U) -> () {
 bb0(%0 : $*U):
