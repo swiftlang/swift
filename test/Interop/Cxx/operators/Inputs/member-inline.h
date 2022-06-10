@@ -43,10 +43,6 @@ struct AddressOnlyIntWrapper {
   int operator()(int x, int y) {
     return value + x * y;
   }
-
-  AddressOnlyIntWrapper operator-(AddressOnlyIntWrapper rhs) const {
-    return AddressOnlyIntWrapper(value - rhs.value);
-  }
 };
 
 struct HasDeletedOperator {
