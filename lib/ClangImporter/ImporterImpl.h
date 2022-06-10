@@ -1771,10 +1771,6 @@ bool shouldSuppressDeclImport(const clang::Decl *decl);
 /// but are now renamed using the swift_name attribute.
 bool isSpecialUIKitStructZeroProperty(const clang::NamedDecl *decl);
 
-/// \returns true if this operator should be made a static function
-/// even if imported as a non-static member function.
-bool isImportedAsStatic(clang::OverloadedOperatorKind op);
-
 /// \returns true if \p a has the same underlying type as \p b after removing
 /// any pointer/reference specifiers. Note that this does not currently look through
 /// nested types other than pointers or references.
