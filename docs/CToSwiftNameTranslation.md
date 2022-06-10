@@ -744,7 +744,7 @@ func doSomethingRisky() throws
 func doSomethingContrived(_ action: String, error: ()) throws
 ```
 
-A base name of "init" can be used on a *class* method that returns `instancetype` or the containing static type in order to import that method as an initializer. Any other custom name *prevents* a class method from being imported as an initializer even if it would normally be inferred as one.
+A base name of "init" can be used on a *class* method that returns `instancetype` or the containing static type to import that method as an initializer. Any other custom name *prevents* a class method from being imported as an initializer even if it would normally be inferred as one.
 
 ```objc
 + (Action *)makeActionWithHandler:(void(^)(void))handler
