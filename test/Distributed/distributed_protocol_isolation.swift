@@ -178,9 +178,7 @@ protocol TerminationWatchingA {
 }
 
 protocol TerminationWatchingDA: DistributedActor {
-  func terminated(da: String) async
-  // expected-note@-1{{distributed actor-isolated instance method 'terminated(da:)' declared here}}
-  // expected-note@-2{{distributed actor-isolated instance method 'terminated(da:)' declared here}}
+  func terminated(da: String) async // expected-note 3 {{distributed actor-isolated instance method 'terminated(da:)' declared here}}
 }
 
 actor A_TerminationWatchingA: TerminationWatchingA {
@@ -212,21 +210,26 @@ func test_watchingDA<WDA: TerminationWatchingDA>(da: WDA) async throws {
   // expected-error@-1{{only 'distributed' instance methods can be called on a potentially remote distributed actor}}
   // expected-warning@-2{{no calls to throwing functions occur within 'try' expression}}
 
-//  // FIXME: pending fix of closure isolation checking with actors #59356
-//  await da.whenLocal { __secretlyKnownToBeLocal in
-//    await __secretlyKnownToBeLocal.terminated(da: "local calls are okey!") // OK
-//  }
+  let __secretlyKnownToBeLocal = da
+  await __secretlyKnownToBeLocal.terminated(da: "local calls are okey!") // OK // FIXME(#59356): (the __secretlyKnown is a hack, but the whenLocal crashes now on pending isolation getting with generic actors for closures)
+  // FIXME: pending fix of closure isolation checking with actors #59356
+  // await da.whenLocal { __secretlyKnownToBeLocal in
+  //   await __secretlyKnownToBeLocal.terminated(da: "local calls are okey!") // OK
+  // }
 }
 
 func test_watchingDA_erased(da: DA_TerminationWatchingDA) async throws {
-  let wda: TerminationWatchingDA = da
-  try await wda.terminated(wda: "the terminated func is not distributed")
+  let wda: any TerminationWatchingDA = da
+  try await wda.terminated(da: "the terminated func is not distributed")
   // expected-error@-1{{only 'distributed' instance methods can be called on a potentially remote distributed actor}}
   // expected-warning@-2{{no calls to throwing functions occur within 'try' expression}}
 
-  await wda.whenLocal { __secretlyKnownToBeLocal in
-    await __secretlyKnownToBeLocal.terminated(da: "local calls are okey!") // OK
-  }
+  let __secretlyKnownToBeLocal = wda
+  await __secretlyKnownToBeLocal.terminated(da: "local calls are okey!") // OK // OK // FIXME(#59356): (the __secretlyKnown is a hack, but the whenLocal crashes now on pending isolation getting with generic actors for closures)
+  // FIXME: pending fix of closure isolation checking with actors #59356
+  // await wda.whenLocal { __secretlyKnownToBeLocal in
+  //   await __secretlyKnownToBeLocal.terminated(da: "local calls are okey!") // OK
+  // }
 }
 
 func test_watchingDA_any(da: any TerminationWatchingDA) async throws {
