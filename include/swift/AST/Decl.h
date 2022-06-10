@@ -3541,6 +3541,9 @@ public:
   /// Do we need to use resilient access patterns when accessing this
   /// type from the given module?
   bool isResilient(ModuleDecl *M, ResilienceExpansion expansion) const;
+  
+  /// Returns true if a declaration conforms to the `Reflectable` protocol.
+  bool isReflectable() const;
 
   /// Determine whether we have already attempted to add any
   /// implicitly-defined initializers to this declaration.

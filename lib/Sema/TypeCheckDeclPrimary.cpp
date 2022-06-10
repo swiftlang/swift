@@ -1159,6 +1159,23 @@ DefaultArgumentInitContextRequest::evaluate(Evaluator &eval,
   return result;
 }
 
+bool
+IsReflectableRequest::evaluate(Evaluator &evaluator,
+                               NominalTypeDecl *decl) const {
+  auto &Ctx = decl->getASTContext();
+  auto reflectable = Ctx.getProtocol(KnownProtocolKind::Reflectable);
+  if (!reflectable)
+    return true;
+
+  auto conformance = TypeChecker::conformsToProtocol(
+    decl->getDeclaredInterfaceType(), 
+    reflectable, 
+    decl->getParentModule());
+  if (conformance && conformance.isInvalid())
+    return false;
+  return (bool)conformance;
+}
+
 /// Check the requirements in the where clause of the given \c atd
 /// to ensure that they don't introduce additional 'Self' requirements.
 static void checkProtocolSelfRequirements(ProtocolDecl *proto,
@@ -1814,6 +1831,15 @@ public:
     DeclVisitor<DeclChecker>::visit(decl);
 
     TypeChecker::checkExistentialTypes(decl);
+
+    if (auto NTD = dyn_cast<NominalTypeDecl>(decl)) {
+      bool isDeclReflectable = NTD->isReflectable();
+      bool isReflectableMetadataDisabled = NTD->getASTContext().LangOpts.ReflectionMetadataIsDisabled;
+      auto &DE = getASTContext().Diags;
+      if (isDeclReflectable && isReflectableMetadataDisabled) {
+        DE.diagnose(NTD->getLoc(), diag::reflection_metadata_is_disabled);
+      }
+    }
 
     if (auto VD = dyn_cast<ValueDecl>(decl)) {
       auto &Context = getASTContext();

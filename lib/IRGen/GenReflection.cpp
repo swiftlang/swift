@@ -631,7 +631,8 @@ protected:
     // Only mark the reflection record as used when emitting for the runtime.
     // In ReflectionMetadataMode::DebuggerOnly mode we want to allow the linker
     // to remove/dead-strip these.
-    if (IGM.IRGen.Opts.ReflectionMetadata == ReflectionMetadataMode::Runtime) {
+    if (IGM.IRGen.Opts.ReflectionMetadata == ReflectionMetadataMode::Runtime ||
+      IGM.IRGen.Opts.ReflectionMetadata == ReflectionMetadataMode::OptIn) {
       IGM.addUsedGlobal(var);
     }
 
@@ -1523,8 +1524,10 @@ void IRGenerator::emitBuiltinReflectionMetadata() {
 }
 
 void IRGenModule::emitFieldDescriptor(const NominalTypeDecl *D) {
-  if (IRGen.Opts.ReflectionMetadata == ReflectionMetadataMode::None)
-    return;
+  bool shouldSupressReflectionForOptIn = !D->isReflectable() && IRGen.Opts.shouldOptimize();
+  if (IRGen.Opts.ReflectionMetadata == ReflectionMetadataMode::None || 
+      (IRGen.Opts.ReflectionMetadata == ReflectionMetadataMode::OptIn && shouldSupressReflectionForOptIn))
+      return;
 
   auto T = D->getDeclaredTypeInContext()->getCanonicalType();
 

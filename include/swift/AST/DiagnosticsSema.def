@@ -6638,5 +6638,13 @@ ERROR(experimental_no_metadata_feature_can_only_be_used_when_enabled,
       " -enable-experimental-feature LayoutPrespecialization to swift to enable "
       " the usage of this language feature", ())
 
+// MARK: Reflectable Diagnostics
+//------------------------------------------------------------------------------
+
+ERROR(reflection_metadata_is_disabled,none,
+      "reflection metadata emission must be enabled for modules "
+      "with `Reflectable` declarations",
+      ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

@@ -453,6 +453,10 @@ namespace swift {
     /// TODO: remove this when @_implementationOnly modules are robust enough.
     bool AllowDeserializingImplementationOnly = false;
 
+    /// Allows to diagnose `Reflectable` declarations
+    /// when reflection metadata is disabled.
+    bool ReflectionMetadataIsDisabled = false;
+
     // Allow errors during module generation. See corresponding option in
     // FrontendOptions.
     bool AllowModuleWithCompilerErrors = false;

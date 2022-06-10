@@ -3754,6 +3754,41 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Determine if the given declaration conforms to 'Reflectable'.
+class IsReflectableRequest :
+    public SimpleRequest<IsReflectableRequest,
+                         bool(NominalTypeDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  bool evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Retrieve the implicit conformance for the given nominal type to
+/// the Reflectable protocol.
+class GetImplicitReflectableRequest :
+    public SimpleRequest<GetImplicitReflectableRequest,
+                         ProtocolConformance *(NominalTypeDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ProtocolConformance *evaluate(Evaluator &evaluator, NominalTypeDecl *nominal) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 void simple_display(llvm::raw_ostream &out, ASTNode node);
 void simple_display(llvm::raw_ostream &out, Type value);
 void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);

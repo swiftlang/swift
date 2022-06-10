@@ -493,6 +493,9 @@ def disable_reflection_metadata : Flag<["-"], "disable-reflection-metadata">,
 def reflection_metadata_for_debugger_only : Flag<["-"], "reflection-metadata-for-debugger-only">,
   HelpText<"Emit reflection metadata for debugger only, don't make them available at runtime">;
 
+def enable_opt_in_reflection_metadata : Flag<["-"], "enable-opt-in-reflection-metadata">,
+  HelpText<"Enable selective emission of reflection metadata for types conforming to the `Reflectable` protocol">;
+
 def disable_reflection_names : Flag<["-"], "disable-reflection-names">,
   HelpText<"Disable emission of names of stored properties and enum cases in"
            "reflection metadata">;

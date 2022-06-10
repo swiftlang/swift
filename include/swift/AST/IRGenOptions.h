@@ -91,6 +91,8 @@ enum class ReflectionMetadataMode : unsigned {
   None,         ///< Don't emit reflection metadata at all.
   DebuggerOnly, ///< Emit reflection metadata for the debugger, don't link them
                 ///  into runtime metadata and don't force them to stay alive.
+  OptIn,        ///< Compiler emits reflection metadata for types
+                ///  that conform to Reflectable.
   Runtime,      ///< Make reflection metadata fully available.
 };
 

@@ -4319,6 +4319,13 @@ bool NominalTypeDecl::isResilient(ModuleDecl *M,
   llvm_unreachable("bad resilience expansion");
 }
 
+bool NominalTypeDecl::isReflectable() const {
+  ASTContext &ctx = getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+    IsReflectableRequest{const_cast<NominalTypeDecl *>(this)},
+    false);
+}
+
 enum class DeclTypeKind : unsigned {
   DeclaredType,
   DeclaredInterfaceType

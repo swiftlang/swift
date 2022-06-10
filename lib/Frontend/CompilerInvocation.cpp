@@ -218,6 +218,21 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
 }
 
 static void
+setLangOptsFromIRGenOptions(LangOptions &LangOpts,
+                            const IRGenOptions &IRGenOpts) {
+  switch (IRGenOpts.ReflectionMetadata) {
+    case ReflectionMetadataMode::None:
+      LangOpts.ReflectionMetadataIsDisabled = true;
+      break;
+    case ReflectionMetadataMode::Runtime:
+    case ReflectionMetadataMode::OptIn:
+    case ReflectionMetadataMode::DebuggerOnly:
+      LangOpts.ReflectionMetadataIsDisabled = false;
+      break;
+  }
+}
+
+static void
 setIRGenOutputOptsFromFrontendOptions(IRGenOptions &IRGenOpts,
                                       const FrontendOptions &FrontendOpts) {
   // Set the OutputKind for the given Action.
@@ -2238,19 +2253,20 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_disable_reflection_metadata)) {
     Opts.ReflectionMetadata = ReflectionMetadataMode::None;
     Opts.EnableReflectionNames = false;
-  }
+  } else {
+    if (Args.hasArg(OPT_disable_reflection_names))
+      Opts.EnableReflectionNames = false;
 
-  if (Args.hasArg(OPT_reflection_metadata_for_debugger_only)) {
-    Opts.ReflectionMetadata = ReflectionMetadataMode::DebuggerOnly;
-    Opts.EnableReflectionNames = true;
+    if (Args.hasArg(OPT_enable_opt_in_reflection_metadata)) {
+      Opts.ReflectionMetadata = ReflectionMetadataMode::OptIn;
+    } else if (Args.hasArg(OPT_reflection_metadata_for_debugger_only)) {
+      Opts.ReflectionMetadata = ReflectionMetadataMode::DebuggerOnly;
+      Opts.EnableReflectionNames = true;
+    }
   }
 
   if (Args.hasArg(OPT_enable_anonymous_context_mangled_names))
     Opts.EnableAnonymousContextMangledNames = true;
-
-  if (Args.hasArg(OPT_disable_reflection_names)) {
-    Opts.EnableReflectionNames = false;
-  }
 
   if (Args.hasArg(OPT_force_public_linkage)) {
     Opts.ForcePublicLinkage = true;
@@ -2625,6 +2641,7 @@ bool CompilerInvocation::parseArgs(
 
   // Now that we've parsed everything, setup some inter-option-dependent state.
   setIRGenOutputOptsFromFrontendOptions(IRGenOpts, FrontendOpts);
+  setLangOptsFromIRGenOptions(LangOpts, IRGenOpts);
   setBridgingHeaderFromFrontendOptions(ClangImporterOpts, FrontendOpts);
 
   return false;
