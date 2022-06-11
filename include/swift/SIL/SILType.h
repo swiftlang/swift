@@ -87,6 +87,7 @@ enum class SILValueCategory : uint8_t {
 };
 
 class SILPrinter;
+class SILParser;
 
 /// SILType - A Swift type that has been lowered to a SIL representation type.
 /// In addition to the Swift type system, SIL adds "address" types that can
@@ -116,6 +117,7 @@ private:
   friend class Lowering::TypeConverter;
   friend struct llvm::DenseMapInfo<SILType>;
   friend class SILPrinter;
+  friend class SILParser;
 
 public:
   SILType() = default;
@@ -160,13 +162,13 @@ public:
   /// Returns the address variant of this type.  Instructions which
   /// manipulate memory will generally work with object addresses.
   SILType getAddressType() const {
-    return SILType(getASTType(), SILValueCategory::Address);
+    return SILType(getRawASTType(), SILValueCategory::Address);
   }
 
   /// Returns the object variant of this type.  Note that address-only
   /// types are not legal to manipulate directly as objects in SIL.
   SILType getObjectType() const {
-    return SILType(getASTType(), SILValueCategory::Object);
+    return SILType(getRawASTType(), SILValueCategory::Object);
   }
 
   /// Returns the canonical AST type referenced by this SIL type.

@@ -129,7 +129,9 @@ namespace {
     ModuleDecl *spiModule;
     AvailabilityContext availability = AvailabilityContext::alwaysAvailable();
   };
+} // namespace
 
+namespace swift {
   class SILParser {
     friend SILParserState;
   public:
@@ -484,7 +486,7 @@ namespace {
         P.diagnose(loc, diag::unknown_attribute, name);
     }
   };
-} // end anonymous namespace
+} // namespace swift
 
 bool SILParser::parseSILIdentifier(Identifier &Result, SourceLoc &Loc,
                                    const Diagnostic &D) {
@@ -712,7 +714,7 @@ SILValue SILParser::getLocalValue(UnresolvedValueName Name, SILType Type,
     if (EntryTy != Type) {
       HadError = true;
       P.diagnose(Name.NameLoc, diag::sil_value_use_type_mismatch, Name.Name,
-                 EntryTy.getASTType(), Type.getASTType());
+                 EntryTy.getRawASTType(), Type.getRawASTType());
       // Make sure to return something of the requested type.
       return SILUndef::get(Type, B.getFunction());
     }
@@ -746,8 +748,8 @@ void SILParser::setLocalValue(ValueBase *Value, StringRef Name,
     // If the forward reference was of the wrong type, diagnose this now.
     if (Entry->getType() != Value->getType()) {
       P.diagnose(NameLoc, diag::sil_value_def_type_mismatch, Name,
-                 Entry->getType().getASTType(),
-                 Value->getType().getASTType());
+                 Entry->getType().getRawASTType(),
+                 Value->getType().getRawASTType());
       HadError = true;
     } else {
       // Forward references only live here if they have a single result.
@@ -2460,10 +2462,10 @@ SILParser::parseKeyPathPatternComponent(KeyPathPatternComponent &component,
            return true;
          
          if (patternEnv)
-           loweredTy = SILType::getPrimitiveType(
-             loweredTy.getASTType()->mapTypeOutOfContext()
-               ->getCanonicalType(),
-             loweredTy.getCategory());
+           loweredTy = SILType::getPrimitiveType(loweredTy.getRawASTType()
+                                                     ->mapTypeOutOfContext()
+                                                     ->getCanonicalType(),
+                                                 loweredTy.getCategory());
 
          // Formal type must be hashable.
          auto proto = P.Context.getProtocol(KnownProtocolKind::Hashable);
@@ -2486,10 +2488,9 @@ SILParser::parseKeyPathPatternComponent(KeyPathPatternComponent &component,
            operandTypes.resize(index+1);
          if (operandTypes[index] && operandTypes[index] != loweredTy) {
            P.diagnose(loweredTyLoc,
-                      diag::sil_keypath_index_operand_type_conflict,
-                      index,
-                      operandTypes[index].getASTType(),
-                      loweredTy.getASTType());
+                      diag::sil_keypath_index_operand_type_conflict, index,
+                      operandTypes[index].getRawASTType(),
+                      loweredTy.getRawASTType());
            return true;
          }
          operandTypes[index] = loweredTy;
@@ -3406,6 +3407,49 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     }
     auto *MVI = B.createMarkMustCheckInst(InstLoc, Val, CKind);
     ResultVal = MVI;
+    break;
+  }
+
+  case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst: {
+    if (parseTypedValueRef(Val, B))
+      return true;
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    auto *MVI = B.createCopyableToMoveOnlyWrapperValue(InstLoc, Val);
+    ResultVal = MVI;
+    break;
+  }
+
+  case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst: {
+    StringRef AttrName;
+    if (!parseSILOptional(AttrName, *this)) {
+      auto diag = diag::sil_moveonlytocopyable_requires_attribute;
+      P.diagnose(InstLoc.getSourceLoc(), diag);
+      return true;
+    }
+
+    OwnershipKind OwnershipKind =
+        llvm::StringSwitch<ValueOwnershipKind>(AttrName)
+            .Case("owned", OwnershipKind::Owned)
+            .Case("guaranteed", OwnershipKind::Guaranteed)
+            .Default(OwnershipKind::None);
+
+    if (OwnershipKind == OwnershipKind::None) {
+      auto diag = diag::sil_moveonlytocopyable_invalid_attribute;
+      P.diagnose(InstLoc.getSourceLoc(), diag, AttrName);
+      return true;
+    }
+
+    if (parseTypedValueRef(Val, B))
+      return true;
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+    if (OwnershipKind == OwnershipKind::Owned)
+      ResultVal = B.createOwnedMoveOnlyWrapperToCopyableValue(InstLoc, Val);
+    else
+      ResultVal =
+          B.createGuaranteedMoveOnlyWrapperToCopyableValue(InstLoc, Val);
     break;
   }
 
@@ -4459,7 +4503,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
             if (parseTypedValueRef(Val, B))
               return true;
             OpList.push_back(Val);
-            TypeElts.push_back(Val->getType().getASTType());
+            TypeElts.push_back(Val->getType().getRawASTType());
           } while (P.consumeIf(tok::comma));
         }
         HadError |=
@@ -4507,7 +4551,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
                   RegularLocation(P.Tok.getLoc()), B))
             return true;
           OpList.push_back(Val);
-          TypeElts.push_back(Val->getType().getASTType());
+          TypeElts.push_back(Val->getType().getRawASTType());
         } while (P.consumeIf(tok::comma));
       }
       HadError |= P.parseToken(tok::r_paren,
@@ -5111,7 +5155,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
                                   : global->getLoweredType());
       if (expectedType != Ty) {
         P.diagnose(IdLoc, diag::sil_value_use_type_mismatch, GlobalName.str(),
-                   global->getLoweredType().getASTType(), Ty.getASTType());
+                   global->getLoweredType().getRawASTType(),
+                   Ty.getRawASTType());
         return true;
       }
 

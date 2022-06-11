@@ -29,13 +29,14 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/ApplySite.h"
+#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/PrettyStackTrace.h"
-#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILDeclRef.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
@@ -1189,6 +1190,16 @@ public:
   }
   void visitMarkMustCheckInst(MarkMustCheckInst *i) {
     llvm_unreachable("Invalid in Lowered SIL");
+  }
+  void visitCopyableToMoveOnlyWrapperValueInst(
+      CopyableToMoveOnlyWrapperValueInst *i) {
+    auto e = getLoweredExplosion(i->getOperand());
+    setLoweredExplosion(i, e);
+  }
+  void visitMoveOnlyWrapperToCopyableValueInst(
+      MoveOnlyWrapperToCopyableValueInst *i) {
+    auto e = getLoweredExplosion(i->getOperand());
+    setLoweredExplosion(i, e);
   }
   void visitReleaseValueInst(ReleaseValueInst *i);
   void visitReleaseValueAddrInst(ReleaseValueAddrInst *i);

@@ -26,8 +26,8 @@
 #include "swift/Basic/STLExtras.h"
 #include "ConcurrencyRuntime.h"
 #include "swift/Runtime/Config.h"
-#include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/HeapObject.h"
+#include "swift/Threading/Mutex.h"
 #include "Debug.h"
 #include "bitset"
 #include "string"
@@ -41,6 +41,8 @@
 #if !defined(_WIN32)
 #include <dlfcn.h>
 #endif
+
+#include <mutex>
 
 using namespace swift;
 

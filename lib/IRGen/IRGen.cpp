@@ -1487,7 +1487,8 @@ GeneratedModule swift::performIRGeneration(
       outModuleHash);
 
   if (Opts.shouldPerformIRGenerationInParallel() &&
-      !parallelOutputFilenames.empty()) {
+      !parallelOutputFilenames.empty() &&
+      !Opts.UseSingleModuleLLVMEmission) {
     ::performParallelIRGeneration(desc);
     // TODO: Parallel LLVM compilation cannot be used if a (single) module is
     // needed as return value.

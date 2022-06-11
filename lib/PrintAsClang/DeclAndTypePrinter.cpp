@@ -332,7 +332,9 @@ private:
     if (outputLang != OutputLanguageMode::Cxx)
       return;
     // FIXME: Print struct's availability.
-    ClangValueTypePrinter printer(os, owningPrinter.interopContext);
+    ClangValueTypePrinter printer(os, owningPrinter.prologueOS,
+                                  owningPrinter.typeMapping,
+                                  owningPrinter.interopContext);
     printer.printStructDecl(SD);
   }
 
@@ -834,7 +836,9 @@ private:
 
     os << "SWIFT_EXTERN ";
 
-    DeclAndTypeClangFunctionPrinter funcPrinter(os, owningPrinter.typeMapping);
+    DeclAndTypeClangFunctionPrinter funcPrinter(os, owningPrinter.prologueOS,
+                                                owningPrinter.typeMapping,
+                                                owningPrinter.interopContext);
     funcPrinter.printFunctionSignature(
         FD, funcABI.getSymbolName(), resultTy,
         DeclAndTypeClangFunctionPrinter::FunctionSignatureKind::CFunctionProto);
@@ -873,7 +877,9 @@ private:
         getForeignResultType(FD, funcTy, asyncConvention, errorConvention);
 
     os << "inline ";
-    DeclAndTypeClangFunctionPrinter funcPrinter(os, owningPrinter.typeMapping);
+    DeclAndTypeClangFunctionPrinter funcPrinter(os, owningPrinter.prologueOS,
+                                                owningPrinter.typeMapping,
+                                                owningPrinter.interopContext);
     funcPrinter.printFunctionSignature(
         FD, FD->getName().getBaseIdentifier().get(), resultTy,
         DeclAndTypeClangFunctionPrinter::FunctionSignatureKind::CxxInlineThunk);
@@ -882,27 +888,8 @@ private:
     printFunctionClangAttributes(FD, funcTy);
     printAvailability(FD);
     os << " {\n";
-    os << "  return " << cxx_synthesis::getCxxImplNamespaceName()
-       << "::" << funcABI.getSymbolName() << '(';
-
-    auto params = FD->getParameters();
-    if (params->size()) {
-      size_t index = 1;
-      interleaveComma(*params, os, [&](const ParamDecl *param) {
-        if (param->isInOut()) {
-          os << "&";
-        }
-
-        if (param->hasName()) {
-          ClangSyntaxPrinter(os).printIdentifier(param->getName().str());
-        } else {
-          os << "_" << index;
-        }
-        ++index;
-      });
-    }
-
-    os << ");\n";
+    funcPrinter.printCxxThunkBody(funcABI.getSymbolName(), resultTy,
+                                  FD->getParameters());
     os << "}\n";
   }
 
@@ -1110,10 +1097,20 @@ private:
 
   void visitFuncDecl(FuncDecl *FD) {
     if (outputLang == OutputLanguageMode::Cxx) {
+      // Don't expose async functions or @_alwaysEmitIntoClient functions
+      // because they're currently unsupported
+      if (FD->hasAsync() ||
+          FD->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>()) {
+        return;
+      }
+
       // Emit the underlying C signature that matches the Swift ABI
       // in the generated C++ implementation prologue for the module.
-      auto funcABI = getModuleProloguePrinter()
+      std::string cFuncDecl;
+      llvm::raw_string_ostream cFuncPrologueOS(cFuncDecl);
+      auto funcABI = Implementation(cFuncPrologueOS, owningPrinter, outputLang)
                          .printSwiftABIFunctionSignatureAsCxxFunction(FD);
+      owningPrinter.prologueOS << cFuncPrologueOS.str();
       printAbstractFunctionAsCxxFunctionThunk(FD, funcABI);
       return;
     }

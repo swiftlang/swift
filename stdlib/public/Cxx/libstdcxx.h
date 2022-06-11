@@ -33,7 +33,6 @@
 #include "array"
 #include "atomic"
 #include "chrono"
-#include "codecvt"
 #include "condition_variable"
 #include "forward_list"
 #include "future"
@@ -50,6 +49,11 @@
 #include "type_traits"
 #include "unordered_map"
 #include "unordered_set"
+
+// libstdc++ 4.8.5 bundled with CentOS 7 does not include corecvt.
+#if __has_include("codecvt")
+#include "codecvt"
+#endif
 
 // C++17 and newer:
 

@@ -13,9 +13,8 @@
 #include <cstring>
 
 #include "SwiftShims/ThreadLocalStorage.h"
-#include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Debug.h"
-#include "swift/Runtime/ThreadLocalStorage.h"
+#include "swift/Threading/ThreadLocalStorage.h"
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 void _stdlib_destroyTLS(void *);
@@ -23,97 +22,46 @@ void _stdlib_destroyTLS(void *);
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 void *_stdlib_createTLS(void);
 
-#if !SWIFT_TLS_HAS_RESERVED_PTHREAD_SPECIFIC || (defined(_WIN32) && !defined(__CYGWIN__))
-
-static void
-#if defined(_M_IX86)
-__stdcall
-#endif
-destroyTLS_CCAdjustmentThunk(void *ptr) {
-  _stdlib_destroyTLS(ptr);
-}
-
-#endif
-
-#if defined(_WIN32) && !defined(__CYGWIN__)
-
-typedef
-#if defined(_M_IX86)
-__stdcall
-#endif
-void (*__swift_thread_key_destructor)(void *);
-
-static inline int
-_stdlib_thread_key_create(__swift_thread_key_t * _Nonnull key,
-                          __swift_thread_key_destructor _Nullable destructor) {
-  *key = FlsAlloc(destroyTLS_CCAdjustmentThunk);
-  if (*key == FLS_OUT_OF_INDEXES)
-    return GetLastError();
-  return 0;
-}
-
-#endif
-
-#if defined(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
-
 SWIFT_RUNTIME_STDLIB_INTERNAL
 void *
 _swift_stdlib_threadLocalStorageGet(void) {
-  static void *value;
-  if (!value) {
-    value = _stdlib_createTLS();
-  }
+
+#if SWIFT_THREADING_NONE
+
+  // If there's no threading, we can just keep a static variable.
+  static void *value = _stdlib_createTLS();
   return value;
-}
 
-#elif SWIFT_TLS_HAS_RESERVED_PTHREAD_SPECIFIC
+#elif SWIFT_THREADING_USE_RESERVED_TLS_KEYS
 
-SWIFT_RUNTIME_STDLIB_INTERNAL
-void *
-_swift_stdlib_threadLocalStorageGet(void) {
-  void *value = SWIFT_THREAD_GETSPECIFIC(SWIFT_STDLIB_TLS_KEY);
+  // If we have reserved keys, use those
+  void *value = swift::tls_get(swift::tls_key::stdlib);
   if (value)
     return value;
-  
-  static swift::OnceToken_t token;
-  SWIFT_ONCE_F(token, [](void *) {
-    int result = pthread_key_init_np(SWIFT_STDLIB_TLS_KEY, [](void *pointer) {
-      _stdlib_destroyTLS(pointer);
-    });
-    if (result != 0)
-      swift::fatalError(0, "couldn't create pthread key for stdlib TLS: %s\n",
-                        std::strerror(result));
-  }, nullptr);
-  
+
+  static swift::once_t token;
+  swift::tls_init_once(token, swift::tls_key::stdlib,
+                       [](void *pointer) { _stdlib_destroyTLS(pointer); });
+
   value = _stdlib_createTLS();
-  SWIFT_THREAD_SETSPECIFIC(SWIFT_STDLIB_TLS_KEY, value);
+  swift::tls_set(swift::tls_key::stdlib, value);
   return value;
-}
 
-#else
+#else // Threaded, but not using reserved keys
 
-SWIFT_RUNTIME_STDLIB_INTERNAL
-void *
-_swift_stdlib_threadLocalStorageGet(void) {
-  static swift::OnceToken_t token;
-  static __swift_thread_key_t key;
+  // Register a key and use it
+  static swift::tls_key_t key;
+  static swift::once_t token;
 
-  SWIFT_ONCE_F(token, [](void *) {
-    int result = SWIFT_THREAD_KEY_CREATE(&key, destroyTLS_CCAdjustmentThunk);
-    if (result != 0)
-      swift::fatalError(0, "couldn't create pthread key for stdlib TLS: %s\n",
-                        std::strerror(result));
-  }, nullptr);
+  swift::tls_alloc_once(token, key,
+                        [](void *pointer) { _stdlib_destroyTLS(pointer); });
 
-  void *value = SWIFT_THREAD_GETSPECIFIC(key);
+  void *value = swift::tls_get(key);
   if (!value) {
     value = _stdlib_createTLS();
-    int result = SWIFT_THREAD_SETSPECIFIC(key, value);
-    if (result != 0)
-      swift::fatalError(0, "pthread_setspecific failed: %s\n",
-                        std::strerror(result));
+    swift::tls_set(key, value);
   }
   return value;
-}
 
 #endif
+}

@@ -210,7 +210,8 @@ KNOWN_SETTINGS=(
     swift-stdlib-has-dladdr                       "1"               "whether to build stdlib assuming the runtime environment provides dladdr API"
     swift-stdlib-supports-backtrace-reporting     ""                "whether to build stdlib assuming the runtime environment provides the backtrace(3) API, if not set defaults to true on all platforms except for Cygwin, Haiku and wasm"
     swift-runtime-static-image-inspection         "0"               "whether to build stdlib assuming the runtime environment only supports a single runtime image with Swift code"
-    swift-stdlib-single-threaded-runtime          "0"               "whether to build stdlib as a single-threaded runtime only"
+    swift-threading-package                       ""                "which threading package to use for Swift; valid values are empty string (default based on platform), 'pthreads', 'darwin', 'linux', 'win32', 'c11', 'none'"
+    swift-stdlib-single-threaded-concurrency      "0"               "build Swift concurrency in single-threaded mode"
     swift-stdlib-concurrency-tracing              ""                "whether to enable tracing signposts for concurrency; default is 1 on Darwin platforms, 0 otherwise"
     swift-stdlib-os-versioning                    "1"               "whether to build stdlib with availability based on OS versions (Darwin only)"
     swift-stdlib-has-commandline                  "1"               "whether to build stdlib with the CommandLine enum and support for argv/argc"
@@ -2019,7 +2020,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_ENABLE_DISPATCH:BOOL=$(true_false "${SWIFT_ENABLE_DISPATCH}")
                     -DSWIFT_IMPLICIT_CONCURRENCY_IMPORT:BOOL=$(true_false "${SWIFT_IMPLICIT_CONCURRENCY_IMPORT}")
                     -DSWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT:BOOL=$(true_false "${SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT}")
-                    -DSWIFT_STDLIB_SINGLE_THREADED_RUNTIME:BOOL=$(true_false "${SWIFT_STDLIB_SINGLE_THREADED_RUNTIME}")
+                    -DSWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY:BOOL=$(true_false "${SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY}")
                     -DSWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS:BOOL=$(true_false "${SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS}")
                     -DSWIFT_STDLIB_HAS_DLADDR:BOOL=$(true_false "${SWIFT_STDLIB_HAS_DLADDR}")
                     -DSWIFT_RUNTIME_STATIC_IMAGE_INSPECTION:BOOL=$(true_false "${SWIFT_RUNTIME_STATIC_IMAGE_INSPECTION}")
@@ -2238,6 +2239,21 @@ for host in "${ALL_HOSTS[@]}"; do
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DSWIFT_STDLIB_CONCURRENCY_TRACING:BOOL=$(true_false "${SWIFT_STDLIB_CONCURRENCY_TRACING}")
+                    )
+                fi
+
+                if [[ "${SWIFT_THREADING_PACKAGE}" ]] ; then
+                    case "${SWIFT_THREADING_PACKAGE}" in
+                        "" | pthreads | darwin | linux | win32 | c11 | none) ;;
+                        *)
+                            echo "build-script: unknown threading package ${SWIFT_THREADING_PACKAGE}; must be one of 'pthreads', 'darwin', 'linux', 'win32', 'c11', 'none', or empty for platform default" >&2
+                            exit 1
+                            ;;
+                    esac
+
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_THREADING_PACKAGE:STRING="${SWIFT_THREADING_PACKAGE}"
                     )
                 fi
 

@@ -86,6 +86,6 @@ _ = Z().capturesSelf()
 // CHECK-NOT: function_ref @$s11inline_self1ZC12capturesSelfACXDyF :
 // CHECK: }
 
-// CHECK-LABEL: sil hidden @$s11inline_self1ZC20callBaseCapturesSelfACXDyF
+// CHECK-LABEL: sil hidden {{.*}}@$s11inline_self1ZC20callBaseCapturesSelfACXDyF
 // CHECK-NOT: function_ref @$s11inline_self5BaseZC16baseCapturesSelfACXDyF :
 // CHECK: }

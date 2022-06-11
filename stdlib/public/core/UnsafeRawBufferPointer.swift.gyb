@@ -30,11 +30,12 @@
 /// a raw buffer are untyped operations. Accessing this collection's bytes
 /// does not bind the underlying memory to `UInt8`.
 ///
-/// In addition to its collection interface, an `${Self}` instance also supports
-/// the following methods provided by `UnsafeMutableRawPointer`, including
-/// bounds checks in debug mode:
+/// In addition to its collection interface, an `${Self}`
+/// instance also supports the following methods provided by
+/// `UnsafeMutableRawPointer`, including bounds checks in debug mode:
 ///
 /// - `load(fromByteOffset:as:)`
+/// - `loadUnaligned(fromByteOffset:as:)`
 /// - `storeBytes(of:toByteOffset:as:)`
 /// - `copyMemory(from:)`
 %  else:
@@ -43,9 +44,10 @@
 /// of values held in that memory. Reading from memory through a raw buffer is
 /// an untyped operation.
 ///
-/// In addition to its collection interface, an `${Self}` instance also supports
-/// the `load(fromByteOffset:as:)` method provided by `UnsafeRawPointer`,
-/// including bounds checks in debug mode.
+/// In addition to its collection interface, an `${Self}`
+/// instance also supports the `load(fromByteOffset:as:)`
+/// and `loadUnaligned(fromByteOffset:as:)` methods provided by
+/// `UnsafeRawPointer`, including bounds checks in debug mode.
 %  end
 ///
 /// To access the underlying memory through typed operations, the memory must

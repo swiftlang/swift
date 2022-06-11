@@ -10,31 +10,28 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <new>
+
 #include "swift/Runtime/Config.h"
-#include "swift/Runtime/Mutex.h"
+#include "swift/Threading/Mutex.h"
 
 namespace swift {
 // return the size in words for the given mutex primitive
 extern "C" SWIFT_CC(swift)
 size_t _swift_async_stream_lock_size() {
-  size_t words = sizeof(MutexHandle) / sizeof(void *);
+  size_t words = sizeof(Mutex) / sizeof(void *);
   if (words < 1) { return 1; }
   return words;
 }
 
-extern "C" SWIFT_CC(swift)
-void _swift_async_stream_lock_init(MutexHandle &lock) {
-  MutexPlatformHelper::init(lock);
+SWIFT_CC(swift)
+extern "C" void _swift_async_stream_lock_init(Mutex &lock) {
+  new (&lock) Mutex();
 }
 
-extern "C" SWIFT_CC(swift)
-void _swift_async_stream_lock_lock(MutexHandle &lock) {
-  MutexPlatformHelper::lock(lock);
-}
+SWIFT_CC(swift)
+extern "C" void _swift_async_stream_lock_lock(Mutex &lock) { lock.lock(); }
 
-extern "C" SWIFT_CC(swift)
-void _swift_async_stream_lock_unlock(MutexHandle &lock) {
-  MutexPlatformHelper::unlock(lock);
-}
-
+SWIFT_CC(swift)
+extern "C" void _swift_async_stream_lock_unlock(Mutex &lock) { lock.unlock(); }
 }

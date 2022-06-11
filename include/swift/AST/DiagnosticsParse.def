@@ -655,6 +655,10 @@ ERROR(sil_markmustcheck_invalid_attribute,none,
       "Attribute '[%0]' can not be applied to mark_value_as_moveonly", (StringRef))
 ERROR(sil_markmustcheck_requires_attribute,none,
       "mark_must_check requires an attribute like 'noImplicitCopy'", ())
+ERROR(sil_moveonlytocopyable_invalid_attribute,none,
+      "Attribute '[%0]' can not be applied to moveonlywrapper_to_copyable", (StringRef))
+ERROR(sil_moveonlytocopyable_requires_attribute,none,
+      "moveonlywrapper_to_copyable requires either a [guaranteed] or [owned] attribute", ())
 
 // SIL Basic Blocks
 ERROR(expected_sil_block_name,none,

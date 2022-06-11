@@ -18,7 +18,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: long_test
-// XFAIL: OS=linux-gnu
+// XFAIL: OS=linux-gnu, OS=linux-android
 
 import StdlibUnittest
 import simd

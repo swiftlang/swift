@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-verifier"
+
 #include "VerifierPrivate.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AnyFunctionRef.h"
@@ -36,6 +37,7 @@
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/SILVTableVisitor.h"
@@ -2709,6 +2711,9 @@ public:
     require(!fnConv.useLoweredAddresses() || F.hasOwnership(),
             "copy_value is only valid in functions with qualified "
             "ownership");
+    require(I->getModule().getStage() == SILStage::Raw ||
+                !I->getOperand()->getType().isMoveOnlyWrapped(),
+            "@moveOnly types can only be copied in Raw SIL?!");
   }
 
   void checkDestroyValueInst(DestroyValueInst *I) {
@@ -5391,6 +5396,26 @@ public:
     require(i->getModule().getStage() == SILStage::Raw,
             "Only valid in Raw SIL! Should have been eliminated by /some/ "
             "diagnostic pass");
+  }
+
+  void checkMoveOnlyWrapperToCopyableValueInst(
+      MoveOnlyWrapperToCopyableValueInst *cvt) {
+    require(cvt->getOperand()->getType().isObject(),
+            "Operand value should be an object");
+    require(!cvt->getType().isMoveOnlyWrapped(), "Output should not move only");
+    require(cvt->getType() ==
+                cvt->getOperand()->getType().removingMoveOnlyWrapper(),
+            "Result and operand must have the same type, today.");
+  }
+
+  void checkCopyableToMoveOnlyWrapperValueInst(
+      CopyableToMoveOnlyWrapperValueInst *cvt) {
+    require(cvt->getOperand()->getType().isObject(),
+            "Operand value should be an object");
+    require(cvt->getType().isMoveOnlyWrapped(), "Output should be move only");
+    require(cvt->getType() ==
+                cvt->getOperand()->getType().addingMoveOnlyWrapper(),
+            "Result and operand must have the same type, today.");
   }
 
   void verifyEpilogBlocks(SILFunction *F) {

@@ -1316,6 +1316,7 @@ FirstArgOwnershipForwardingSingleValueInst::classof(SILInstructionKind kind) {
   case SILInstructionKind::OpenExistentialRefInst:
   case SILInstructionKind::InitExistentialRefInst:
   case SILInstructionKind::MarkDependenceInst:
+  case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:
     return true;
   default:
     return false;
@@ -7587,6 +7588,60 @@ public:
   bool isNoImplicitCopy() const { return kind == CheckKind::NoImplicitCopy; }
 };
 
+class CopyableToMoveOnlyWrapperValueInst
+    : public UnaryInstructionBase<
+          SILInstructionKind::CopyableToMoveOnlyWrapperValueInst,
+          SingleValueInstruction> {
+  friend class SILBuilder;
+
+  CopyableToMoveOnlyWrapperValueInst(SILDebugLocation DebugLoc,
+                                     SILValue operand)
+      : UnaryInstructionBase(DebugLoc, operand,
+                             operand->getType().addingMoveOnlyWrapper()) {}
+};
+
+/// Convert from an @moveOnly wrapper type to the underlying copyable type. Can
+/// be either owned or guaranteed.
+///
+/// IMPORTANT: Unlike other forwarding instructions, the ownership of moveonly
+/// to copyable is not forwarded from the operand. Instead in SILBuilder one
+/// must select the specific type of ownership one wishes by using the following
+/// APIs:
+///
+/// * SILBuilder::createOwnedMoveOnlyWrapperToCopyableValueInst
+/// * SILBuilder::createGuaranteedMoveOnlyWrapperToCopyableValueInst
+///
+/// The reason why this instruction was designed in this manner is that a
+/// frontend chooses the ownership form of this instruction based off of the
+/// semantic place that the value is used. As an example:
+///
+/// 1. When calling a function semantically with guaranteed ownership, the
+///    frontend would use the "guaranteed variant".
+///
+/// 2. When returning a value or assigning into another binding, a frontend
+///    would want to use the owned variant so that the move only checker will
+///    enforce the end of the moved value's lifetime.
+///
+/// NOTE: With time, we are going to eliminate the guaranteed form of this
+/// instruction in favor of a function conversion instruction.
+class MoveOnlyWrapperToCopyableValueInst
+    : public UnaryInstructionBase<
+          SILInstructionKind::MoveOnlyWrapperToCopyableValueInst,
+          SingleValueInstruction>,
+      public OwnershipForwardingMixin {
+  friend class SILBuilder;
+
+  MoveOnlyWrapperToCopyableValueInst(const SILFunction &fn,
+                                     SILDebugLocation DebugLoc,
+                                     SILValue operand,
+                                     OwnershipKind forwardingOwnershipKind)
+      : UnaryInstructionBase(DebugLoc, operand,
+                             operand->getType().removingMoveOnlyWrapper()),
+        OwnershipForwardingMixin(
+            SILInstructionKind::MoveOnlyWrapperToCopyableValueInst,
+            forwardingOwnershipKind) {}
+};
+
 /// Given an object reference, return true iff it is non-nil and refers
 /// to a native swift object with strong reference count of 1.
 class IsUniqueInst
@@ -9728,7 +9783,8 @@ inline bool OwnershipForwardingMixin::isa(SILInstructionKind kind) {
          OwnershipForwardingConversionInst::classof(kind) ||
          OwnershipForwardingSelectEnumInstBase::classof(kind) ||
          OwnershipForwardingMultipleValueInstruction::classof(kind) ||
-         kind == SILInstructionKind::MarkMustCheckInst;
+         kind == SILInstructionKind::MarkMustCheckInst ||
+         kind == SILInstructionKind::MoveOnlyWrapperToCopyableValueInst;
 }
 
 inline OwnershipForwardingMixin *
@@ -9751,6 +9807,8 @@ OwnershipForwardingMixin::get(SILInstruction *inst) {
           dyn_cast<OwnershipForwardingMultipleValueInstruction>(inst))
     return result;
   if (auto *result = dyn_cast<MarkMustCheckInst>(inst))
+    return result;
+  if (auto *result = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(inst))
     return result;
   return nullptr;
 }
