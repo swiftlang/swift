@@ -36,6 +36,10 @@ public:
 
 MainThreadRememberer rememberer;
 
+#if !defined(__LP64__) && !defined(_LP64)
+pthread_mutex_t once_mutex = PTHREAD_MUTEX_INITIALIZER;
+#endif
+
 #pragma clang diagnostic pop
 
 } // namespace
@@ -49,12 +53,21 @@ bool swift::threading_impl::thread_is_main() {
 
 void swift::threading_impl::once_slow(once_t &predicate, void (*fn)(void *),
                                       void *context) {
+  // On 32-bit Linux we can't have per-once locks
+#if defined(__LP64__) || defined(_LP64)
   linux::ulock_lock(&predicate.lock);
+#else
+  pthread_mutex_lock(&once_mutex);
+#endif
   if (predicate.flag.load(std::memory_order_acquire) == 0) {
     fn(context);
     predicate.flag.store(-1, std::memory_order_release);
   }
+#if defined(__LP64__) || defined(_LP64)
   linux::ulock_unlock(&predicate.lock);
+#else
+  pthread_mutex_unlock(&once_mutex);
+#endif
 }
 
 llvm::Optional<swift::threading_impl::stack_bounds>

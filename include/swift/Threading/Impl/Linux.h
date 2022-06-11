@@ -135,7 +135,10 @@ inline void lazy_mutex_unsafe_unlock(lazy_mutex_handle &handle) {
 
 struct once_t {
   std::atomic<std::int32_t> flag;
+#if defined(__LP64__) || defined(_LP64)
+  // On 32-bit Linux we can't have the lock, so we'll be less efficient
   linux::ulock_t lock;
+#endif
 };
 
 void once_slow(once_t &predicate, void (*fn)(void *), void *context);
