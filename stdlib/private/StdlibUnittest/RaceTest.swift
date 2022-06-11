@@ -621,12 +621,6 @@ class _InterruptibleSleep {
 }
 #endif
 
-#if os(Windows)
-typealias ThreadHandle = HANDLE
-#else
-typealias ThreadHandle = pthread_t
-#endif
-
 public func runRaceTest<RT : RaceTestWithPerTrialData>(
   _: RT.Type,
   trials: Int,

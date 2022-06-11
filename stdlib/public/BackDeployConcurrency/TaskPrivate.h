@@ -24,6 +24,7 @@
 #include "swift/Runtime/Error.h"
 #include "swift/Runtime/Exclusivity.h"
 #include "swift/Runtime/HeapObject.h"
+#include "swift/Threading/Thread.h"
 #include "Task.h"
 
 #define SWIFT_FATAL_ERROR swift_Concurrency_fatalError
@@ -46,26 +47,12 @@ namespace swift {
 #if 0
 #define SWIFT_TASK_DEBUG_LOG(fmt, ...)                                         \
   fprintf(stderr, "[%lu] [%s:%d](%s) " fmt "\n",                               \
-          (unsigned long)_swift_get_thread_id(),                               \
+          (unsigned long)Thread::current()::platformThreadId(),                \
           __FILE__, __LINE__, __FUNCTION__,                                    \
           __VA_ARGS__)
 #else
 #define SWIFT_TASK_DEBUG_LOG(fmt, ...) (void)0
 #endif
-
-#if defined(_WIN32)
-using ThreadID = decltype(GetCurrentThreadId());
-#else
-using ThreadID = decltype(pthread_self());
-#endif
-
-inline ThreadID _swift_get_thread_id() {
-#if defined(_WIN32)
-  return GetCurrentThreadId();
-#else
-  return pthread_self();
-#endif
-}
 
 class AsyncTask;
 class TaskGroup;
@@ -109,7 +96,7 @@ void _swift_tsan_release(void *addr);
 /// executors.
 #define DISPATCH_QUEUE_GLOBAL_EXECUTOR (void *)1
 
-#if !defined(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
+#if !defined(SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY)
 inline SerialExecutorWitnessTable *
 _swift_task_getDispatchQueueSerialExecutorWitnessTable() {
   extern SerialExecutorWitnessTable wtable

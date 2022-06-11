@@ -13,7 +13,7 @@
 
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 // REQUIRES: long_test
-// REQUIRES: CPU=arm64 || CPU=x86_64
+// REQUIRES: CPU=arm64 || CPU=x86_64 || CPU=aarch64
 
 // Check if the optimizer can optimize the whole array into a statically
 // initialized global

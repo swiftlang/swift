@@ -4358,6 +4358,14 @@ IRGenModule::getAddrOfObjCResilientClassStub(ClassDecl *classDecl,
   return getAddrOfLLVMVariable(entity, forDefinition, DebugTypeInfo());
 }
 
+llvm::IntegerType *IRGenModule::getTypeMetadataRequestParamTy() {
+  return SizeTy;
+}
+
+llvm::StructType *IRGenModule::getTypeMetadataResponseTy() {
+  return TypeMetadataResponseTy;
+}
+
 /// Fetch the type metadata access function for a non-generic type.
 llvm::Function *
 IRGenModule::getAddrOfTypeMetadataAccessFunction(CanType type,
@@ -4373,8 +4381,9 @@ IRGenModule::getAddrOfTypeMetadataAccessFunction(CanType type,
     return entry;
   }
 
-  llvm::Type *params[] = { SizeTy }; // MetadataRequest
-  auto fnType = llvm::FunctionType::get(TypeMetadataResponseTy, params, false);
+  llvm::Type *params[] = {getTypeMetadataRequestParamTy()}; // MetadataRequest
+  auto fnType =
+      llvm::FunctionType::get(getTypeMetadataResponseTy(), params, false);
   Signature signature(fnType, llvm::AttributeList(), SwiftCC);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   entry = createFunction(*this, link, signature);

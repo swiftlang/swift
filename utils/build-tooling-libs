@@ -172,6 +172,7 @@ class Builder(object):
             "-DSWIFT_HOST_VARIANT_SDK=" + host_sdk,
             "-DSWIFT_HOST_VARIANT_ARCH=" + self.arch,
             "-DCMAKE_Swift_COMPILER_TARGET=" + host_triple,
+            "-DCMAKE_Swift_COMPILER=" + self.toolchain.swiftc,
             "-DCMAKE_C_FLAGS=" + llvm_c_flags,
             "-DCMAKE_CXX_FLAGS=" + llvm_c_flags,
         ]
@@ -262,6 +263,13 @@ class Builder(object):
             "-DCLANG_INCLUDE_TESTS=FALSE",
             "-DSWIFT_INCLUDE_TESTS=FALSE",
         ]
+        cmake_args += [
+            "-DBOOTSTRAPPING_MODE=HOSTTOOLS",
+            "-DEXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR=" +
+            os.path.join(SWIFT_SOURCE_ROOT,
+                         "swift-experimental-string-processing"),
+        ]
+
         llvm_src_path = os.path.join(SWIFT_SOURCE_ROOT, "llvm") \
             if isSwiftContainedInLLVMProject \
             else os.path.join(SWIFT_SOURCE_ROOT, "llvm-project", "llvm")

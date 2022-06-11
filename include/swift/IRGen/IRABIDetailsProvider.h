@@ -13,13 +13,17 @@
 #ifndef SWIFT_IRGEN_IRABIDETAILSPROVIDER_H
 #define SWIFT_IRGEN_IRABIDETAILSPROVIDER_H
 
+#include "swift/AST/Type.h"
+#include "clang/AST/CharUnits.h"
 #include "llvm/ADT/Optional.h"
+#include "llvm/ADT/STLExtras.h"
 #include <cstdint>
 #include <memory>
 #include <utility>
 
 namespace swift {
 
+class ASTContext;
 class IRGenOptions;
 class ModuleDecl;
 class NominalTypeDecl;
@@ -44,6 +48,24 @@ public:
   /// is not a fixed layout type.
   llvm::Optional<SizeAndAlignment>
   getTypeSizeAlignment(const NominalTypeDecl *TD);
+
+  /// Returns true if the given type should be passed indirectly into a swiftcc
+  /// function.
+  bool shouldPassIndirectly(Type t);
+
+  /// Returns true if the given type should be returned indirectly from a
+  /// swiftcc function.
+  bool shouldReturnIndirectly(Type t);
+
+  /// Enumerates all of the members of the underlying record in terms of their
+  /// primitive types that needs to be stored in a Clang/LLVM record when this
+  /// type is passed or returned directly to/from swiftcc function.
+  ///
+  /// Returns true if an error occurred when a particular member can't be
+  /// represented with an AST type.
+  bool enumerateDirectPassingRecordMembers(
+      Type t, llvm::function_ref<void(clang::CharUnits, clang::CharUnits, Type)>
+                  callback);
 
 private:
   std::unique_ptr<IRABIDetailsProviderImpl> impl;

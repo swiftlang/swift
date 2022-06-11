@@ -18,7 +18,7 @@
 #ifndef SWIFT_RUNTIME_CONDITION_VARIABLE_H
 #define SWIFT_RUNTIME_CONDITION_VARIABLE_H
 
-#include "swift/Runtime/Mutex.h"
+#include "swift/Threading/Mutex.h"
 #include <type_traits>
 #include <utility>
 

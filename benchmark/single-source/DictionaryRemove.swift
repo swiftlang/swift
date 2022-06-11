@@ -22,10 +22,32 @@ let boxedNums = (1...size).lazy.map { Box($0) }
 let boxedNumMap = Dictionary(uniqueKeysWithValues: zip(boxedNums, boxedNums))
 
 public let benchmarks = [
-  BenchmarkInfo(name: "DictionaryRemove",
-    runFunction: remove, tags: t, legacyFactor: 10),
-  BenchmarkInfo(name: "DictionaryRemoveOfObjects",
-    runFunction: removeObjects, tags: t, legacyFactor: 100),
+  BenchmarkInfo(
+    name: "DictionaryRemove",
+    runFunction: remove,
+    tags: t,
+    setUpFunction: { blackHole(numberMap) },
+    legacyFactor: 10),
+  BenchmarkInfo(
+    name: "DictionaryRemoveOfObjects",
+    runFunction: removeObjects,
+    tags: t,
+    setUpFunction: { blackHole(boxedNumMap) },
+    legacyFactor: 100),
+
+  BenchmarkInfo(
+    name: "DictionaryFilter",
+    runFunction: filter,
+    tags: t,
+    setUpFunction: { blackHole(numberMap) },
+    legacyFactor: 1),
+
+  BenchmarkInfo(
+    name: "DictionaryFilterOfObjects",
+    runFunction: filterObjects,
+    tags: t,
+    setUpFunction: { blackHole(boxedNumMap) },
+    legacyFactor: 1),
 ]
 
 class Box<T : Hashable> : Hashable {
@@ -57,5 +79,21 @@ func removeObjects(n: Int) {
     var dict = boxedNumMap
     for i in 1...size { dict.removeValue(forKey: Box(i)) }
     check(dict.isEmpty)
+  }
+}
+
+func filter(n: Int) {
+  for _ in 1...1000*n {
+    let dict = numberMap
+    let result = dict.filter {key, value in value % 2 == 0}
+    check(result.count == size/2)
+  }
+}
+
+func filterObjects(n: Int) {
+  for _ in 1...1000*n {
+    let dict = boxedNumMap
+    let result = dict.filter {key, value in value.value % 2 == 0}
+    check(result.count == size/2)
   }
 }

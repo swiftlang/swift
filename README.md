@@ -113,14 +113,14 @@ will be created in the directory you run the script with a filename
 of the form: ``swift-LOCAL-YYYY-MM-DD-a-osx.tar.gz``.
 
 Beyond building the toolchain, ``build-toolchain`` also supports the 
-following (non-exhaustive) set of useful options::
+following (non-exhaustive) set of useful options:
 
 - ``--dry-run``: Perform a dry run build. This is off by default.
 - ``--test``: Test the toolchain after it has been compiled. This is off by default.
-- ``--distcc``: Use distcc to speed up the build by distributing the c++ part of
+- ``--distcc``: Use distcc to speed up the build by distributing the C++ part of
   the swift build. This is off by default.
 - ``--sccache``: Use sccache to speed up subsequent builds of the compiler by
-  caching more c++ build artifacts. This is off by default.
+  caching more C++ build artifacts. This is off by default.
 
 More options may be added over time. Please pass ``--help`` to
 ``build-toolchain`` to see the full set of options.

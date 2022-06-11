@@ -20,6 +20,8 @@
 
 namespace swift {
 
+class ModuleDecl;
+
 namespace cxx_synthesis {
 
 /// Return the name of the implementation namespace that is used to hide
@@ -36,6 +38,13 @@ public:
   /// Print a given identifier. If the identifer conflicts with a keyword, add a
   /// trailing underscore.
   void printIdentifier(StringRef name);
+
+  /// Print the base name of the given declaration.
+  void printBaseName(const ValueDecl *decl);
+
+  /// Print the C-style prefix for the given module name, that's used for
+  /// C type names inside the module.
+  void printModuleNameCPrefix(const ModuleDecl &mod);
 
   /// Print a C++ namespace declaration with the give name and body.
   void

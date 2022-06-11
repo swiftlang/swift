@@ -40,10 +40,11 @@
 #endif
 
 #include <stdlib.h>
+#include <unistd.h>
 
-#include "swift/Runtime/Debug.h"
-#include "swift/Runtime/Mutex.h"
 #include "SwiftShims/Random.h"
+#include "swift/Runtime/Debug.h"
+#include "swift/Threading/Mutex.h"
 
 #include <algorithm> // required for std::min
 
@@ -108,7 +109,8 @@ void swift_stdlib_random(void *buf, __swift_size_t nbytes) {
         WHILE_EINTR(open("/dev/urandom", O_RDONLY | O_CLOEXEC, 0));
         
       if (fd != -1) {
-        static StaticMutex mutex;
+        // ###FIXME: Why is this locked?  None of the others are.
+        static LazyMutex mutex;
         mutex.withLock([&] {
           actual_nbytes = WHILE_EINTR(read(fd, buf, nbytes));
         });

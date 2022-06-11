@@ -15,12 +15,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "../CompatibilityOverride/CompatibilityOverride.h"
-#include "swift/Runtime/Concurrency.h"
-#include "swift/Runtime/Mutex.h"
-#include "swift/Runtime/AtomicWaitQueue.h"
 #include "swift/ABI/TaskStatus.h"
+#include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "TaskPrivate.h"
+#include "swift/Runtime/AtomicWaitQueue.h"
+#include "swift/Runtime/Concurrency.h"
+#include "swift/Threading/Mutex.h"
 #include <atomic>
 
 using namespace swift;
@@ -36,7 +36,7 @@ ActiveTaskStatus::getStatusRecordParent(TaskStatusRecord *ptr) {
 
 /// A lock used to protect management of task-specific status
 /// record locks.
-static StaticMutex StatusRecordLockLock;
+static LazyMutex StatusRecordLockLock;
 
 namespace {
 
@@ -61,9 +61,9 @@ namespace {
 /// it sees that the locked bit is set in the `Status` field, it
 /// must acquire the global status-record lock, find this record
 /// (which should be the innermost record), and wait for an unlock.
-class StatusRecordLockRecord :
-    public AtomicWaitQueue<StatusRecordLockRecord, StaticMutex>,
-    public TaskStatusRecord {
+class StatusRecordLockRecord
+    : public AtomicWaitQueue<StatusRecordLockRecord, LazyMutex>,
+      public TaskStatusRecord {
 public:
   StatusRecordLockRecord(TaskStatusRecord *parent)
     : TaskStatusRecord(TaskStatusRecordKind::Private_RecordLock, parent) {
@@ -77,7 +77,6 @@ public:
     return record->getKind() == TaskStatusRecordKind::Private_RecordLock;
   }
 };
-
 }
 
 /// Wait for a task's status record lock to be unlocked.

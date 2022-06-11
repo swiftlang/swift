@@ -1,5 +1,6 @@
 include(macCatalystUtils)
 include(SwiftUtils)
+include(Threading)
 
 function(_compute_lto_swift_flag option out_var)
   string(TOLOWER "${option}" lowercase_option)
@@ -330,9 +331,12 @@ function(_add_target_variant_swift_compile_flags
     list(APPEND result "-Xcc" "-DSWIFT_STDLIB_HAS_ENVIRON")
   endif()
 
-  if(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
-    list(APPEND result "-D" "SWIFT_STDLIB_SINGLE_THREADED_RUNTIME")
+  if(SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY)
+    list(APPEND result "-D" "SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY")
   endif()
+
+  threading_package_name("${sdk}" _threading_package)
+  list(APPEND result "-D" "SWIFT_THREADING_${_threading_package}")
 
   set("${result_var_name}" "${result}" PARENT_SCOPE)
 endfunction()
@@ -487,7 +491,7 @@ function(_compile_swift_files
     list(APPEND swift_flags "-Xfrontend" "-library-level"  "-Xfrontend" "api")
   endif()
 
-  if(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
+  if(SWIFT_THREADING_PACKAGE STREQUAL "none")
     list(APPEND swift_flags "-Xfrontend" "-assume-single-threaded")
   endif()
 

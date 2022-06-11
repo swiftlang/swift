@@ -7,8 +7,6 @@
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
 // REQUIRES: tsan_runtime
-// UNSUPPORTED: OS=linux-gnu
-// UNSUPPORTED: OS=windows-msvc
 
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib
