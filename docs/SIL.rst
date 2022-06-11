@@ -7471,7 +7471,7 @@ copyable_to_moveonlywrapper
 
   sil-instruction ::= 'copyable_to_moveonlywrapper'
 
-`copyably_to_moveonlywrapper`_ takes in a 'T' and maps it to a move only wrapped
+`copyable_to_moveonlywrapper`_ takes in a 'T' and maps it to a move only wrapped
 '@moveOnly T'. This is semantically used by a code generator initializing a new
 moveOnly binding from a copyable value. It semantically destroys its input
 @owned value and returns a brand new independent @owned @moveOnly value. It also
@@ -7492,18 +7492,18 @@ one to choose it to be [owned] or [guaranteed]. With time, we may eliminate the
 need for the guaranteed form in the future.
 
 * `moveonlywrapper_to_copyable [owned]` is used to signal the end of lifetime of
-the '@moveOnly' wrapper. SILGen inserts these when ever a move only value has
-its ownership passed to a situation where a copyable value is needed. Since it
-is consuming, we know that the no implicit copy or no-escape checker will ensure
-that if we need a copy for it, the program will emit a diagnostic.
+  the '@moveOnly' wrapper. SILGen inserts these when ever a move only value has
+  its ownership passed to a situation where a copyable value is needed. Since it
+  is consuming, we know that the no implicit copy or no-escape checker will ensure
+  that if we need a copy for it, the program will emit a diagnostic.
 
 * `moveonlywrapper_to_copyable [guaranteed]` is used to pass a @moveOnly T value
-as a copyable guaranteed parameter with type 'T' to a function. In the case of
-using no-implicit-copy checking this is always fine since no-implicit-copy is a
-local pattern. This would be an error when performing no escape
-checking. Importantly, this instruction also is where in the case of an
-@moveOnly trivial type, we convert from the non-trivial representation to the
-trivial representation.
+  as a copyable guaranteed parameter with type 'T' to a function. In the case of
+  using no-implicit-copy checking this is always fine since no-implicit-copy is a
+  local pattern. This would be an error when performing no escape
+  checking. Importantly, this instruction also is where in the case of an
+  @moveOnly trivial type, we convert from the non-trivial representation to the
+  trivial representation.
 
 Assertion configuration
 ~~~~~~~~~~~~~~~~~~~~~~~

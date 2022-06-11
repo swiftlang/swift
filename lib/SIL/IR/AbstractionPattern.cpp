@@ -171,12 +171,6 @@ AbstractionPattern::getCurriedCXXMethod(CanType origType,
   return getCurriedCXXMethod(origType, clangMethod, function->getImportAsMemberStatus());
 }
 
-AbstractionPattern AbstractionPattern::getCurriedCXXOperatorMethod(
-    CanType origType, const AbstractFunctionDecl *function) {
-  auto clangMethod = cast<clang::CXXMethodDecl>(function->getClangDecl());
-  return getCurriedCXXOperatorMethod(origType, clangMethod, function->getImportAsMemberStatus());
-}
-
 AbstractionPattern
 AbstractionPattern::getOptional(AbstractionPattern object) {
   switch (object.getKind()) {
@@ -192,9 +186,6 @@ AbstractionPattern::getOptional(AbstractionPattern object) {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
-  case Kind::CXXOperatorMethodType:
-  case Kind::CurriedCXXOperatorMethodType:
-  case Kind::PartialCurriedCXXOperatorMethodType:
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
   case Kind::ObjCCompletionHandlerArgumentsType:
@@ -295,9 +286,6 @@ bool AbstractionPattern::matchesTuple(CanTupleType substType) {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
-  case Kind::CXXOperatorMethodType:
-  case Kind::CurriedCXXOperatorMethodType:
-  case Kind::PartialCurriedCXXOperatorMethodType:
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
     return false;
@@ -371,9 +359,6 @@ AbstractionPattern::getTupleElementType(unsigned index) const {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
-  case Kind::CXXOperatorMethodType:
-  case Kind::CurriedCXXOperatorMethodType:
-  case Kind::PartialCurriedCXXOperatorMethodType:
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
     llvm_unreachable("function types are not tuples");
@@ -429,9 +414,6 @@ AbstractionPattern AbstractionPattern::withoutMoveOnly() const {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
-  case Kind::CXXOperatorMethodType:
-  case Kind::CurriedCXXOperatorMethodType:
-  case Kind::PartialCurriedCXXOperatorMethodType:
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
     llvm_unreachable("function types can not be move only");
@@ -466,9 +448,6 @@ AbstractionPattern AbstractionPattern::withMoveOnly() const {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
-  case Kind::CXXOperatorMethodType:
-  case Kind::CurriedCXXOperatorMethodType:
-  case Kind::PartialCurriedCXXOperatorMethodType:
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
     llvm_unreachable("function types can not be move only");
@@ -574,8 +553,6 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
   }
   case Kind::CXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
-  case Kind::CXXOperatorMethodType:
-  case Kind::PartialCurriedCXXOperatorMethodType:
     return AbstractionPattern(getGenericSignatureForFunctionComponent(),
                               getResultType(getType()),
                               getCXXMethod()->getReturnType().getTypePtr());
@@ -595,10 +572,6 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
     return getPartialCurriedCXXMethod(getGenericSignatureForFunctionComponent(),
                                       getResultType(getType()), getCXXMethod(),
                                       getImportAsMemberStatus());
-  case Kind::CurriedCXXOperatorMethodType:
-    return getPartialCurriedCXXOperatorMethod(
-        getGenericSignatureForFunctionComponent(), getResultType(getType()),
-        getCXXMethod(), getImportAsMemberStatus());
   case Kind::PartialCurriedObjCMethodType:
   case Kind::ObjCMethodType: {
     // If this is a foreign async function, the result type comes from the
@@ -718,12 +691,9 @@ AbstractionPattern::getObjCMethodAsyncCompletionHandlerType(
   case Kind::PartialCurriedCFunctionAsMethodType:
   case Kind::CXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
-  case Kind::CXXOperatorMethodType:
-  case Kind::PartialCurriedCXXOperatorMethodType:
   case Kind::CurriedObjCMethodType:
   case Kind::CurriedCFunctionAsMethodType:
   case Kind::CurriedCXXMethodType:
-  case Kind::CurriedCXXOperatorMethodType:
   case Kind::ObjCCompletionHandlerArgumentsType:
     swift_unreachable("not appropriate for this kind");
   }
@@ -775,16 +745,6 @@ AbstractionPattern::getFunctionParamType(unsigned index) const {
     auto params = cast<AnyFunctionType>(getType()).getParams();
     assert(params.size() == 1);
     return getCXXMethodSelfPattern(params[0].getParameterType());
-  }
-  case Kind::CurriedCXXOperatorMethodType: {
-    auto params = cast<AnyFunctionType>(getType()).getParams();
-    assert(params.size() == 1);
-
-    // The formal metatype parameter to a C++ member operator function imported
-    // as a static method is dropped on the floor. Leave it untransformed.
-    return AbstractionPattern::getDiscard(
-        getGenericSignatureForFunctionComponent(),
-        params[0].getParameterType());
   }
   case Kind::CFunctionAsMethodType:
   case Kind::PartialCurriedCFunctionAsMethodType: {
@@ -839,35 +799,6 @@ AbstractionPattern::getFunctionParamType(unsigned index) const {
     return AbstractionPattern(getGenericSignatureForFunctionComponent(),
                               paramType,
                               getClangFunctionParameterType(methodType, index));
-  }
-  case Kind::CXXOperatorMethodType:
-  case Kind::PartialCurriedCXXOperatorMethodType: {
-    auto params = cast<AnyFunctionType>(getType()).getParams();
-    auto paramType = params[index].getParameterType();
-
-    // See importer::isImportedAsStatic
-    bool isStatic = getImportAsMemberStatus().isStatic();
-    if (isStatic) {
-      // The first parameter holds the left-hand-side operand, which gets passed
-      // to the C++ function as the this pointer.
-      if (index == 0)
-        return getCXXMethodSelfPattern(paramType);
-    } else {
-      // The last parameter is 'self'.
-      if (getKind() == Kind::CXXOperatorMethodType &&
-          index == params.size() - 1)
-        return getCXXMethodSelfPattern(params.back().getParameterType());
-    }
-
-    // A parameter of type () does not correspond to a Clang parameter.
-    if (paramType->isVoid())
-      return AbstractionPattern(paramType);
-    
-    // Otherwise, we're talking about the formal parameter clause.
-    auto methodType = getCXXMethod()->getType().getTypePtr();
-    return AbstractionPattern(
-        getGenericSignatureForFunctionComponent(), paramType,
-        getClangFunctionParameterType(methodType, index - (isStatic ? 1 : 0)));
   }
   case Kind::CurriedObjCMethodType: {
     auto params = cast<AnyFunctionType>(getType()).getParams();
@@ -950,9 +881,6 @@ AbstractionPattern AbstractionPattern::getOptionalObjectType() const {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
-  case Kind::CXXOperatorMethodType:
-  case Kind::CurriedCXXOperatorMethodType:
-  case Kind::PartialCurriedCXXOperatorMethodType:
   case Kind::Tuple:
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
@@ -995,9 +923,6 @@ AbstractionPattern AbstractionPattern::getReferenceStorageReferentType() const {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
-  case Kind::CXXOperatorMethodType:
-  case Kind::CurriedCXXOperatorMethodType:
-  case Kind::PartialCurriedCXXOperatorMethodType:
   case Kind::Tuple:
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
@@ -1101,16 +1026,7 @@ void AbstractionPattern::print(raw_ostream &out) const {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
-  case Kind::CXXOperatorMethodType:
-  case Kind::CurriedCXXOperatorMethodType:
-  case Kind::PartialCurriedCXXOperatorMethodType:
-    out << (getKind() == Kind::CXXOperatorMethodType
-              ? "AP::CXXOperatorMethodType(" :
-            getKind() == Kind::CurriedCXXOperatorMethodType
-              ? "AP::CurriedCXXOperatorMethodType(" :
-            getKind() == Kind::PartialCurriedCXXOperatorMethodType
-              ? "AP::PartialCurriedCXXOperatorMethodType(" :
-            getKind() == Kind::CXXMethodType
+    out << (getKind() == Kind::CXXMethodType
               ? "AP::CXXMethodType(" :
             getKind() == Kind::CurriedCXXMethodType
               ? "AP::CurriedCXXMethodType("
@@ -1261,9 +1177,6 @@ const {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
-  case Kind::CXXOperatorMethodType:
-  case Kind::CurriedCXXOperatorMethodType:
-  case Kind::PartialCurriedCXXOperatorMethodType:
   case Kind::ClangType:
   case Kind::Type:
   case Kind::Discard:
@@ -1322,9 +1235,6 @@ AbstractionPattern::getResultConvention(TypeConverter &TC) const {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
-  case Kind::CXXOperatorMethodType:
-  case Kind::CurriedCXXOperatorMethodType:
-  case Kind::PartialCurriedCXXOperatorMethodType:
     // Function types are always passed directly
     return Direct;
       
@@ -1366,9 +1276,6 @@ AbstractionPattern::getParameterConvention(TypeConverter &TC) const {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
-  case Kind::CXXOperatorMethodType:
-  case Kind::CurriedCXXOperatorMethodType:
-  case Kind::PartialCurriedCXXOperatorMethodType:
     // Function types are always passed directly
     return Direct;
       
@@ -1440,11 +1347,8 @@ AbstractionPattern::operator==(const AbstractionPattern &other) const {
       && OtherData == other.OtherData;
       
   case Kind::CXXMethodType:
-  case Kind::CXXOperatorMethodType:
   case Kind::CurriedCXXMethodType:
-  case Kind::CurriedCXXOperatorMethodType:
   case Kind::PartialCurriedCXXMethodType:
-  case Kind::PartialCurriedCXXOperatorMethodType:
     return OrigType == other.OrigType
       && GenericSig == other.GenericSig
       && CXXMethod == other.CXXMethod

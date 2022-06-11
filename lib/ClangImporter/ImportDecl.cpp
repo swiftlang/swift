@@ -8872,16 +8872,6 @@ bool importer::isSpecialUIKitStructZeroProperty(const clang::NamedDecl *decl) {
   return ident->isStr("UIEdgeInsetsZero") || ident->isStr("UIOffsetZero");
 }
 
-bool importer::isImportedAsStatic(const clang::OverloadedOperatorKind op) {
-  switch (op) {
-#define OVERLOADED_OPERATOR(Name,Spelling,Token,Unary,Binary,MemberOnly) \
-  case clang::OO_##Name: return !MemberOnly;
-#include "clang/Basic/OperatorKinds.def"
-  default:
-    llvm_unreachable("not an operator");
-  }
-}
-
 bool importer::hasSameUnderlyingType(const clang::Type *a,
                                      const clang::TemplateTypeParmDecl *b) {
   while (a->isPointerType() || a->isReferenceType())
