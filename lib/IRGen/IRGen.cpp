@@ -1340,8 +1340,11 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
 
   for (auto *File : M->getFiles()) {
     if (auto *SF = dyn_cast<SourceFile>(File)) {
-      CurrentIGMPtr IGM = irgen.getGenModule(SF);
-      IGM->emitSourceFile(*SF);
+      {
+        CurrentIGMPtr IGM = irgen.getGenModule(SF);
+        IGM->emitSourceFile(*SF);
+      }
+      
       if (auto *synthSFU = File->getSynthesizedFile()) {
         CurrentIGMPtr IGM = irgen.getGenModule(synthSFU);
         IGM->emitSynthesizedFileUnit(*synthSFU);
