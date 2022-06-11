@@ -71,7 +71,7 @@ void swift::threading_impl::once_slow(once_t &predicate, void (*fn)(void *),
 
   pthread_mutex_lock(&onceMutex);
   while (predicate.load(std::memory_order_acquire) >= (std::int64_t)0) {
-    pthread_cond_wait(&onceCond);
+    pthread_cond_wait(&onceCond, &onceMutex);
   }
   pthread_mutex_unlock(&onceMutex);
 }
