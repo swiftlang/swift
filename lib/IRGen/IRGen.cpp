@@ -1096,8 +1096,9 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
     for (auto *file : filesToEmit) {
       if (auto *nextSF = dyn_cast<SourceFile>(file)) {
         IGM.emitSourceFile(*nextSF);
-      } else if (auto *nextSFU = dyn_cast<SynthesizedFileUnit>(file)) {
-        IGM.emitSynthesizedFileUnit(*nextSFU);
+        if (auto *synthSFU = file->getSynthesizedFile()) {
+          IGM.emitSynthesizedFileUnit(*synthSFU);
+        }
       } else {
         file->collectLinkLibraries([&IGM](LinkLibrary LinkLib) {
           IGM.addLinkLibrary(LinkLib);
@@ -1341,9 +1342,10 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
     if (auto *SF = dyn_cast<SourceFile>(File)) {
       CurrentIGMPtr IGM = irgen.getGenModule(SF);
       IGM->emitSourceFile(*SF);
-    } else if (auto *nextSFU = dyn_cast<SynthesizedFileUnit>(File)) {
-      CurrentIGMPtr IGM = irgen.getGenModule(nextSFU);
-      IGM->emitSynthesizedFileUnit(*nextSFU);
+      if (auto *synthSFU = File->getSynthesizedFile()) {
+        CurrentIGMPtr IGM = irgen.getGenModule(synthSFU);
+        IGM->emitSynthesizedFileUnit(*synthSFU);
+      }
     } else {
       File->collectLinkLibraries([&](LinkLibrary LinkLib) {
         irgen.getPrimaryIGM()->addLinkLibrary(LinkLib);
