@@ -146,7 +146,7 @@ recompiling the entire project by passing `--reconfigure` to `build-script`.
 ## Learning More
 
 Be sure to look at the [documentation index](/docs/README.md) for a bird's eye
-view of the available documentation. In particular, the documents titled
+view of the available documentation. In particular, the markdown files titled
 [Debugging the Swift Compiler](docs/DebuggingTheCompiler.md) and
 [Continuous Integration for Swift](docs/ContinuousIntegration.md) are very
-helpful to understand before submitting your first PR.
+helpful before before submitting your first PR.
