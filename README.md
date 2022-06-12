@@ -149,4 +149,4 @@ Be sure to look at the [documentation index](/docs/README.md) for a bird's eye
 view of the available documentation. In particular, the markdown files titled
 [Debugging the Swift Compiler](docs/DebuggingTheCompiler.md) and
 [Continuous Integration for Swift](docs/ContinuousIntegration.md) are very
-helpful before before submitting your first PR.
+helpful before submitting your first PR.
