@@ -153,3 +153,23 @@ bb0(%0 : @owned $K):
   return %r : $()
 }
 
+sil @use_guaranteed : $@convention(thin) (@guaranteed K) -> ()
+
+sil [ossa] @test_write_reborrow : $@convention(thin) (@owned K, @owned K) -> () {
+bb0(%0 : @owned $K, %1 : @owned $K):
+  %stk = alloc_stack [lexical] $K
+  store %0 to [init] %stk : $*K
+  %ld1 = load_borrow %stk : $*K
+  br bb2(%ld1 : $K)
+
+bb2(%ld : @guaranteed $K):
+  %3 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed K) -> ()
+  %4 = apply %3(%ld) : $@convention(thin) (@guaranteed K) -> ()
+  end_borrow %ld : $K
+  store %1 to [assign] %stk : $*K
+  destroy_addr %stk : $*K
+  dealloc_stack %stk : $*K
+  %6 = tuple ()
+  return %6 : $()
+}
+
