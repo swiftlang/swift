@@ -1,0 +1,27 @@
+// RUN: %target-sil-opt %s -verify-continue-on-failure=true -o /dev/null 2>&1 | %FileCheck %s
+
+class Klass {}
+
+sil @use_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
+
+// Write:   store {{.*}} [assign] {{.*}}
+// CHECK: Begin Error in function test_write_reborrow
+// CHECK: SIL verification failed: Found load borrow that is invalidated by a local write?!: loadBorrowImmutabilityAnalysis.isImmutable(LBI)
+// CHECK: End Error in function test_write_reborrow
+sil [ossa] @test_write_reborrow : $@convention(thin) (@owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %stk = alloc_stack [lexical] $Klass
+  store %0 to [init] %stk : $*Klass
+  %ld1 = load_borrow %stk : $*Klass
+  br bb2(%ld1 : $Klass)
+
+bb2(%ld : @guaranteed $Klass):
+  store %1 to [assign] %stk : $*Klass
+  %3 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
+  %4 = apply %3(%ld) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %ld : $Klass
+  destroy_addr %stk : $*Klass
+  dealloc_stack %stk : $*Klass
+  %6 = tuple ()
+  return %6 : $()
+}
