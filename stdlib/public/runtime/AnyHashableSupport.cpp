@@ -155,7 +155,8 @@ void _swift_makeAnyHashableUpcastingToHashableBaseType(
   switch (type->getKind()) {
   case MetadataKind::Class:
   case MetadataKind::ObjCClassWrapper:
-  case MetadataKind::ForeignClass: {
+  case MetadataKind::ForeignClass:
+  case MetadataKind::ForeignReferenceType: {
 #if SWIFT_OBJC_INTEROP
     id srcObject;
     memcpy(&srcObject, value, sizeof(id));

@@ -150,7 +150,7 @@ template<> void ProtocolConformanceDescriptor::dump() const {
   
   printf(" => ");
   
-  printf("witness table %pattern s\n", symbolName(getWitnessTablePattern()));
+  printf("witness table pattern (%p) %s\n", getWitnessTablePattern(), symbolName(getWitnessTablePattern()));
 }
 #endif
 

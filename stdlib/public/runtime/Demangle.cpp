@@ -282,6 +282,11 @@ _buildDemanglingForNominalType(const Metadata *type, Demangle::Demangler &Dem) {
     description = foreignType->Description;
     break;
   }
+  case MetadataKind::ForeignReferenceType: {
+    auto foreignType = static_cast<const ForeignReferenceTypeMetadata *>(type);
+    description = foreignType->Description;
+    break;
+  }
   default:
     return nullptr;
   }
@@ -330,6 +335,7 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
   case MetadataKind::Optional:
   case MetadataKind::Struct:
   case MetadataKind::ForeignClass:
+  case MetadataKind::ForeignReferenceType:
     return _buildDemanglingForNominalType(type, Dem);
   case MetadataKind::ObjCClassWrapper: {
 #if SWIFT_OBJC_INTEROP

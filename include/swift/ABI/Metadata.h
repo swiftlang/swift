@@ -55,6 +55,7 @@ template <typename Runtime> struct TargetStructMetadata;
 template <typename Runtime> struct TargetOpaqueMetadata;
 template <typename Runtime> struct TargetValueMetadata;
 template <typename Runtime> struct TargetForeignClassMetadata;
+template <typename Runtime> struct TargetForeignReferenceTypeMetadata;
 template <typename Runtime> struct TargetContextDescriptor;
 template <typename Runtime> class TargetTypeContextDescriptor;
 template <typename Runtime> class TargetClassDescriptor;
@@ -258,6 +259,7 @@ public:
     case MetadataKind::Class:
     case MetadataKind::ObjCClassWrapper:
     case MetadataKind::ForeignClass:
+    case MetadataKind::ForeignReferenceType:
       return true;
 
     default:
@@ -374,6 +376,9 @@ public:
           ->Description;
     case MetadataKind::ForeignClass:
       return static_cast<const TargetForeignClassMetadata<Runtime> *>(this)
+          ->Description;
+    case MetadataKind::ForeignReferenceType:
+      return static_cast<const TargetForeignReferenceTypeMetadata<Runtime> *>(this)
           ->Description;
     default:
       return nullptr;
@@ -1158,6 +1163,34 @@ struct TargetForeignClassMetadata : public TargetForeignTypeMetadata<Runtime> {
   }
 };
 using ForeignClassMetadata = TargetForeignClassMetadata<InProcess>;
+
+template <typename Runtime>
+struct TargetForeignReferenceTypeMetadata : public TargetForeignTypeMetadata<Runtime> {
+  using StoredPointer = typename Runtime::StoredPointer;
+
+  /// An out-of-line description of the type.
+  TargetSignedPointer<Runtime, const TargetClassDescriptor<Runtime> * __ptrauth_swift_type_descriptor> Description;
+
+  /// Reserved space.  For now, this should be zero-initialized.
+  /// If this is used for anything in the future, at least some of these
+  /// first bits should be flags.
+  StoredPointer Reserved[1];
+
+  ConstTargetMetadataPointer<Runtime, TargetClassDescriptor>
+  getDescription() const {
+    return Description;
+  }
+
+  typename Runtime::StoredSignedPointer
+  getDescriptionAsSignedPointer() const {
+    return Description;
+  }
+
+  static bool classof(const TargetMetadata<Runtime> *metadata) {
+    return metadata->getKind() == MetadataKind::ForeignReferenceType;
+  }
+};
+using ForeignReferenceTypeMetadata = TargetForeignReferenceTypeMetadata<InProcess>;
 
 /// The common structure of metadata for structs and enums.
 template <typename Runtime>
