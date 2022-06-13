@@ -599,6 +599,27 @@ extension _NativeDictionary {
     (_values + a.offset).moveInitialize(from: _values + b.offset, count: 1)
     (_values + b.offset).initialize(to: value)
   }
+  
+  @_alwaysEmitIntoClient
+  internal func extractDictionary(
+    using bitset: _UnsafeBitset, 
+    count: Int
+  ) -> _NativeDictionary<Key, Value> {
+    var count = count
+    if count == 0 { return _NativeDictionary<Key, Value>() }
+    if count == self.count { return self }
+    let result = _NativeDictionary<Key, Value>(capacity: count)
+    for offset in bitset {
+      let key = self.uncheckedKey(at: Bucket(offset: offset))
+      let value = self.uncheckedValue(at: Bucket(offset: offset))
+      result._unsafeInsertNew(key: key, value: value)
+      // The hash table can have set bits after the end of the bitmap.
+      // Ignore them.
+      count -= 1
+      if count == 0 { break }
+    }
+    return result
+  }
 }
 
 extension _NativeDictionary where Value: Equatable {
@@ -769,6 +790,26 @@ extension _NativeDictionary { // High-level operations
       } else {
         _insert(at: bucket, key: key, value: [value])
       }
+    }
+  }
+
+  @_alwaysEmitIntoClient
+  internal func filter(
+    _ isIncluded: (Element) throws -> Bool
+  ) rethrows -> _NativeDictionary<Key, Value> {
+    try _UnsafeBitset.withTemporaryBitset(
+      capacity: _storage._bucketCount
+    ) { bitset in
+      var count = 0
+      for bucket in hashTable {
+        if try isIncluded(
+          (uncheckedKey(at: bucket), uncheckedValue(at: bucket))
+        ) {
+          bitset.uncheckedInsert(bucket.offset)
+          count += 1
+        }
+      }
+      return extractDictionary(using: bitset, count: count)
     }
   }
 }
