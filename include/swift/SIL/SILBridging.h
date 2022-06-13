@@ -223,7 +223,7 @@ std::string SILGlobalVariable_debugDescription(BridgedGlobalVar global);
 OptionalBridgedBasicBlock SILBasicBlock_next(BridgedBasicBlock block);
 OptionalBridgedBasicBlock SILBasicBlock_previous(BridgedBasicBlock block);
 BridgedFunction SILBasicBlock_getFunction(BridgedBasicBlock block);
-std::string SILBasicBlock_debugDescription(BridgedBasicBlock block);
+BridgedStringRef SILBasicBlock_debugDescription(BridgedBasicBlock block);
 OptionalBridgedInstruction SILBasicBlock_firstInst(BridgedBasicBlock block);
 OptionalBridgedInstruction SILBasicBlock_lastInst(BridgedBasicBlock block);
 SwiftInt SILBasicBlock_getNumArguments(BridgedBasicBlock block);

@@ -251,12 +251,11 @@ BridgedFunction SILBasicBlock_getFunction(BridgedBasicBlock block) {
   return {castToBasicBlock(block)->getParent()};
 }
 
-std::string SILBasicBlock_debugDescription(BridgedBasicBlock block) {
+BridgedStringRef SILBasicBlock_debugDescription(BridgedBasicBlock block) {
   std::string str;
   llvm::raw_string_ostream os(str);
   castToBasicBlock(block)->print(os);
-  str.pop_back(); // Remove trailing newline.
-  return str;
+  return getCopiedBridgedStringRef(str, /*removeTrailingNewline*/ true);
 }
 
 OptionalBridgedInstruction SILBasicBlock_firstInst(BridgedBasicBlock block) {
