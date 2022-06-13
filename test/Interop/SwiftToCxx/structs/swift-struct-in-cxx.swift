@@ -20,6 +20,10 @@
 // CHECK-NEXT: }
 
 // CHECK:      class StructWithIntField final {
+// CHECK-NEXT: public:
+// CHECK-NEXT:   inline ~StructWithIntField() {
+// CHECK:        inline StructWithIntField(const StructWithIntField &) = default;
+// CHECK-NEXT:   inline StructWithIntField(StructWithIntField &&) = default;
 // CHECK-NEXT: private:
 // CHECK-NEXT:   inline StructWithIntField() {}
 // CHECK-NEXT:   static inline StructWithIntField _make() { return StructWithIntField(); }
