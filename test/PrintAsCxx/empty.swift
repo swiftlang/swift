@@ -35,6 +35,13 @@
 // CHECK-NEXT:  #include <stdbool.h>
 // CHECK-NEXT:  #include <string.h>
 // CHECK-NEXT:  #endif
+// CHECK-NEXT:  #if __has_include(<ptrauth.h>)
+// CHECK-NEXT:  # include <ptrauth.h>
+// CHECK-NEXT:  #else
+// CHECK-NEXT:  # ifndef __ptrauth_swift_value_witness_function_pointer
+// CHECK-NEXT:  #  define __ptrauth_swift_value_witness_function_pointer(x)
+// CHECK-NEXT:  # endif
+// CHECK-NEXT:  #endif
 
 // CHECK-LABEL: !defined(SWIFT_TYPEDEFS)
 // CHECK-NEXT:  # define SWIFT_TYPEDEFS 1

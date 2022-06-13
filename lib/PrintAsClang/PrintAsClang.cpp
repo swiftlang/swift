@@ -51,6 +51,16 @@ static void emitObjCConditional(raw_ostream &out,
   out << "#endif\n";
 }
 
+static void writePtrauthPrologue(raw_ostream &os) {
+  os << "#if __has_include(<ptrauth.h>)\n";
+  os << "# include <ptrauth.h>\n";
+  os << "#else\n";
+  os << "# ifndef __ptrauth_swift_value_witness_function_pointer\n";
+  os << "#  define __ptrauth_swift_value_witness_function_pointer(x)\n";
+  os << "# endif\n";
+  os << "#endif\n";
+}
+
 static void writePrologue(raw_ostream &out, ASTContext &ctx,
                           StringRef macroGuard) {
 
@@ -98,6 +108,7 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
                "#include <stdbool.h>\n"
                "#include <string.h>\n";
       });
+  writePtrauthPrologue(out);
   out << "\n"
          "#if !defined(SWIFT_TYPEDEFS)\n"
          "# define SWIFT_TYPEDEFS 1\n"
