@@ -2,6 +2,9 @@
 
 // REQUIRES: swift_in_compiler
 
+// rdar92963081
+// UNSUPPORTED: OS=linux-gnu
+
 sil_stage canonical
 
 // CHECK-LABEL: Instruction range in basic_test:
