@@ -320,13 +320,13 @@ SourceLookupCache::SourceLookupCache(const ModuleDecl &M) {
   FrontendStatsTracer tracer(M.getASTContext().Stats,
                              "module-populate-cache");
   for (const FileUnit *file : M.getFiles()) {
-    if (auto *SFU = dyn_cast<SynthesizedFileUnit>(file)) {
-      addToUnqualifiedLookupCache(SFU->getTopLevelDecls(), false);
-      continue;
-    }
     auto *SF = cast<SourceFile>(file);
     addToUnqualifiedLookupCache(SF->getTopLevelDecls(), false);
     addToUnqualifiedLookupCache(SF->getHoistedDecls(), false);
+
+    if (auto *SFU = file->getSynthesizedFile()) {
+      addToUnqualifiedLookupCache(SFU->getTopLevelDecls(), false);
+    }
   }
 }
 
@@ -548,9 +548,13 @@ SourceFile *CodeCompletionFileRequest::evaluate(Evaluator &evaluator,
   llvm_unreachable("Couldn't find the completion file?");
 }
 
-#define FORWARD(name, args) \
-  for (const FileUnit *file : getFiles()) \
-    file->name args;
+#define FORWARD(name, args)                                                    \
+  for (const FileUnit *file : getFiles()) {                                    \
+    file->name args;                                                           \
+    if (auto *synth = file->getSynthesizedFile()) {                            \
+      synth->name args;                                                        \
+    }                                                                          \
+  }
 
 SourceLookupCache &ModuleDecl::getSourceLookupCache() const {
   if (!Cache) {
@@ -3064,16 +3068,9 @@ SynthesizedFileUnit &FileUnit::getOrCreateSynthesizedFile() {
       return *thisSynth;
     SynthesizedFile = new (getASTContext()) SynthesizedFileUnit(*this);
     SynthesizedFileAndKind.setPointer(SynthesizedFile);
-    // FIXME: Mutating the module in-flight is not a good idea. Any
-    // callers above us in the stack that are iterating over
-    // the module's files will have their iterators invalidated. There's
-    // a strong chance that whatever analysis led to this function being
-    // called is doing just that!
-    //
-    // Instead we ought to just call ModuleDecl::clearLookupCache() here
-    // and patch out the places looking for synthesized files hanging off of
-    // source files.
-    getParentModule()->addFile(*SynthesizedFile);
+    // Rebuild the source lookup caches now that we have a synthesized file
+    // full of declarations to look into.
+    getParentModule()->clearLookupCache();
   }
   return *SynthesizedFile;
 }

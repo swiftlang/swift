@@ -55,6 +55,13 @@ public:
   printNamespace(StringRef name,
                  llvm::function_ref<void(raw_ostream &OS)> bodyPrinter) const;
 
+  /// Print an extern C block with given body.
+  void
+  printExternC(llvm::function_ref<void(raw_ostream &OS)> bodyPrinter) const;
+
+  /// Print the `swift::_impl::` namespace qualifier.
+  void printSwiftImplQualifier() const;
+
   /// Where nullability information should be printed.
   enum class NullabilityPrintKind {
     Before,

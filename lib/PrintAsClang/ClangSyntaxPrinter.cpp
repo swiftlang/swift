@@ -72,6 +72,21 @@ void ClangSyntaxPrinter::printNamespace(
   printNamespace([&](raw_ostream &os) { os << name; }, bodyPrinter);
 }
 
+void ClangSyntaxPrinter::printExternC(
+    llvm::function_ref<void(raw_ostream &OS)> bodyPrinter) const {
+  os << "#ifdef __cplusplus\n";
+  os << "extern \"C\" {\n";
+  os << "#endif\n\n";
+  bodyPrinter(os);
+  os << "\n#ifdef __cplusplus\n";
+  os << "}\n";
+  os << "#endif\n";
+}
+
+void ClangSyntaxPrinter::printSwiftImplQualifier() const {
+  os << "swift::" << cxx_synthesis::getCxxImplNamespaceName() << "::";
+}
+
 void ClangSyntaxPrinter::printNullability(
     Optional<OptionalTypeKind> kind, NullabilityPrintKind printKind) const {
   if (!kind)
