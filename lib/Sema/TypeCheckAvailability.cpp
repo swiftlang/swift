@@ -582,10 +582,10 @@ private:
     // This rule is a convenience for library authors who have written
     // extensions without specifying availabilty on the extension itself.
     if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
-      auto *Nominal = ED->getExtendedNominal();
-      if (Nominal && !hasActiveAvailableAttribute(D, Context)) {
+      auto ET = ED->getExtendedType();
+      if (ET && !hasActiveAvailableAttribute(D, Context)) {
         EffectiveAvailability.intersectWith(
-            swift::AvailabilityInference::availableRange(Nominal, Context));
+            swift::AvailabilityInference::inferForType(ET));
 
         // We want to require availability to be specified on extensions of
         // types that would be potentially unavailable to the module containing
