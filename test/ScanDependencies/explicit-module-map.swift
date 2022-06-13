@@ -26,6 +26,11 @@
 // RUN: echo "\"moduleName\": \"_Concurrency\"," >> %/t/inputs/map.json
 // RUN: echo "\"modulePath\": \"%/concurrency_module\"," >> %/t/inputs/map.json
 // RUN: echo "\"isFramework\": false" >> %/t/inputs/map.json
+// RUN: echo "}," >> %/t/inputs/map.json
+// RUN: echo "{" >> %/t/inputs/map.json
+// RUN: echo "\"moduleName\": \"_StringProcessing\"," >> %/t/inputs/map.json
+// RUN: echo "\"modulePath\": \"%/string_processing_module\"," >> %/t/inputs/map.json
+// RUN: echo "\"isFramework\": false" >> %/t/inputs/map.json
 // RUN: echo "}]" >> %/t/inputs/map.json
 
 // RUN: %target-swift-ide-test -print-module-comments -module-to-print=Foo -enable-swiftsourceinfo -source-filename %s -explicit-swift-module-map-file %t/inputs/map.json | %FileCheck %s
