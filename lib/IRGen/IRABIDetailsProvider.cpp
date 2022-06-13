@@ -107,6 +107,21 @@ public:
     return hasError;
   }
 
+  IRABIDetailsProvider::FunctionABISignature
+  getTypeMetadataAccessFunctionSignature() {
+    auto &ctx = IGM.getSwiftModule()->getASTContext();
+    llvm::StructType *responseTy = IGM.getTypeMetadataResponseTy();
+    IRABIDetailsProvider::TypeRecordABIRepresentation::MemberVectorTy members;
+    for (auto *elementTy : responseTy->elements())
+      members.push_back(*getPrimitiveTypeFromLLVMType(ctx, elementTy));
+    auto returnTy =
+        IRABIDetailsProvider::TypeRecordABIRepresentation(std::move(members));
+    auto paramTy = IRABIDetailsProvider::TypeRecordABIRepresentation(
+        {*getPrimitiveTypeFromLLVMType(ctx,
+                                       IGM.getTypeMetadataRequestParamTy())});
+    return {returnTy, {paramTy}};
+  }
+
 private:
   Lowering::TypeConverter typeConverter;
   // Default silOptions are sufficient, as we don't need to generated SIL.
@@ -141,4 +156,9 @@ bool IRABIDetailsProvider::enumerateDirectPassingRecordMembers(
     Type t, llvm::function_ref<void(clang::CharUnits, clang::CharUnits, Type)>
                 callback) {
   return impl->enumerateDirectPassingRecordMembers(t, callback);
+}
+
+IRABIDetailsProvider::FunctionABISignature
+IRABIDetailsProvider::getTypeMetadataAccessFunctionSignature() {
+  return impl->getTypeMetadataAccessFunctionSignature();
 }

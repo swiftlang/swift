@@ -70,7 +70,11 @@
 // CHECK-LABEL: #if defined(__OBJC__)
 // CHECK-NEXT:  #endif
 // CHECK-NEXT:  #if defined(__cplusplus)
-// CHECK-NEXT:  namespace empty {
+// CHECK-NEXT:  #ifndef SWIFT_PRINTED_CORE
+// CHECK:       } // namespace swift
+// CHECK-EMPTY:
+// CHECK-NEXT:  #endif
+// CHECK:       namespace empty {
 // CHECK:       } // namespace empty
 // CHECK:       #endif
 
