@@ -22,7 +22,9 @@
 // CHECK:      class StructWithIntField final {
 // CHECK-NEXT: public:
 // CHECK-NEXT:   inline ~StructWithIntField() {
-// CHECK:        inline StructWithIntField(const StructWithIntField &) = default;
+// CHECK:        }
+// CHECK-NEXT:   inline StructWithIntField(const StructWithIntField &other) {
+// CHECK:        }
 // CHECK-NEXT:   inline StructWithIntField(StructWithIntField &&) = default;
 // CHECK-NEXT: private:
 // CHECK-NEXT:   inline StructWithIntField() {}

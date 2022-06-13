@@ -20,7 +20,29 @@ int main() {
   {
     StructWithRefcountedMember value = returnNewStructWithRefcountedMember();
   }
+  printBreak(1);
 // CHECK:      create RefCountedClass
 // CHECK-NEXT: destroy RefCountedClass
+// CHECK-NEXT: breakpoint 1
+
+  {
+    StructWithRefcountedMember value = returnNewStructWithRefcountedMember();
+    StructWithRefcountedMember copyValue(value);
+  }
+  printBreak(2);
+// CHECK-NEXT: create RefCountedClass
+// CHECK-NEXT: destroy RefCountedClass
+// CHECK-NEXT: breakpoint 2
+
+  {
+    StructWithRefcountedMember value = returnNewStructWithRefcountedMember();
+    StructWithRefcountedMember value2(returnNewStructWithRefcountedMember());
+  }
+  printBreak(3);
+// CHECK-NEXT: create RefCountedClass
+// CHECK-NEXT: create RefCountedClass
+// CHECK-NEXT: destroy RefCountedClass
+// CHECK-NEXT: destroy RefCountedClass
+// CHECK-NEXT: breakpoint 3
   return 0;
 }

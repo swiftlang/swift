@@ -21,6 +21,10 @@ public func returnNewStructWithRefcountedMember() -> StructWithRefcountedMember 
     return StructWithRefcountedMember(x: RefCountedClass())
 }
 
+public func printBreak(_ x: Int) {
+    print("breakpoint \(x)")
+}
+
 // CHECK:      class StructWithRefcountedMember final {
 // CHECK-NEXT: public:
 // CHECK-NEXT:   inline ~StructWithRefcountedMember() {
@@ -28,6 +32,10 @@ public func returnNewStructWithRefcountedMember() -> StructWithRefcountedMember 
 // CHECK-NEXT:     auto *vwTable = *(reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1);
 // CHECK-NEXT:     vwTable->destroy(_getOpaquePointer(), metadata._0);
 // CHECK-NEXT:   }
-// CHECK-NEXT:   inline StructWithRefcountedMember(const StructWithRefcountedMember &) = default;
+// CHECK-NEXT:   inline StructWithRefcountedMember(const StructWithRefcountedMember &other) {
+// CHECK-NEXT:     auto metadata = _impl::$s7Structs26StructWithRefcountedMemberVMa(0);
+// CHECK-NEXT:     auto *vwTable = *(reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1);
+// CHECK-NEXT:     vwTable->initializeWithCopy(_getOpaquePointer(), const_cast<char *>(other._getOpaquePointer()), metadata._0);
+// CHECK-NEXT:   }
 // CHECK-NEXT:   inline StructWithRefcountedMember(StructWithRefcountedMember &&) = default;
 // CHECK-NEXT: private:

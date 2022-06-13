@@ -126,7 +126,15 @@ void ClangValueTypePrinter::printStructDecl(const StructDecl *SD) {
   printer.printBaseName(SD);
   os << "(const ";
   printer.printBaseName(SD);
-  os << " &) = default;\n";
+  os << " &other) {\n";
+  os << "    auto metadata = " << cxx_synthesis::getCxxImplNamespaceName()
+     << "::" << typeMetadataFuncName << "(0);\n";
+  os << "    auto *vwTable = "
+        "*(reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - "
+        "1);\n";
+  os << "    vwTable->initializeWithCopy(_getOpaquePointer(), const_cast<char "
+        "*>(other._getOpaquePointer()), metadata._0);\n";
+  os << "  }\n";
 
   // FIXME: the move constructor should be hidden somehow.
   os << "  inline ";
