@@ -331,7 +331,7 @@ bool LoadBorrowImmutabilityAnalysis::isImmutableInScope(
     }
     // See if the write is within the load borrow's lifetime. If it isn't, we
     // don't have to worry about it.
-    if (!checker.validateLifetime(lbi, endBorrowUses, op)) {
+    if (checker.usesNotContainedWithinLifetime(lbi, endBorrowUses, op)) {
       continue;
     }
     llvm::errs() << "Write: " << *op->getUser();
