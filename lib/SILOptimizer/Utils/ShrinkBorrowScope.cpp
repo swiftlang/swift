@@ -290,14 +290,12 @@ Dataflow::Effect Dataflow::effectForPhi(SILBasicBlock *block) {
 /// Implements BarrierAccessScopeFinder::Visitor
 class BarrierAccessScopeFinder final {
   using Impl = VisitBarrierAccessScopes<Dataflow, BarrierAccessScopeFinder>;
-  Context const &context;
   Impl impl;
   Dataflow &dataflow;
 
 public:
   BarrierAccessScopeFinder(Context const &context, Dataflow &dataflow)
-      : context(context), impl(&context.function, dataflow, *this),
-        dataflow(dataflow) {}
+      : impl(&context.function, dataflow, *this), dataflow(dataflow) {}
 
   void find() { impl.visit(); }
 
