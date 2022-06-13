@@ -90,10 +90,11 @@ using Convert = ConvertForWcharSize<sizeof(wchar_t)>;
 
 static void convertFromUTF8(llvm::StringRef utf8,
                             llvm::SmallVectorImpl<wchar_t> &out) {
+  size_t original_out_size = out.size();
   size_t reserve = out.size() + utf8.size();
   out.resize_for_overwrite(reserve);
   const char *utf8_begin = utf8.begin();
-  wchar_t *wide_begin = out.end();
+  wchar_t *wide_begin = out.begin() + original_out_size;
   auto res = Convert::ConvertFromUTF8(&utf8_begin, utf8.end(),
                                       &wide_begin, out.data() + reserve,
                                       lenientConversion);
@@ -104,10 +105,11 @@ static void convertFromUTF8(llvm::StringRef utf8,
 
 static void convertToUTF8(llvm::ArrayRef<wchar_t> wide,
                           llvm::SmallVectorImpl<char> &out) {
+  size_t original_out_size = out.size();
   size_t reserve = out.size() + wide.size()*4;
   out.resize_for_overwrite(reserve);
   const wchar_t *wide_begin = wide.begin();
-  char *utf8_begin = out.end();
+  char *utf8_begin = out.begin() + original_out_size;
   auto res = Convert::ConvertToUTF8(&wide_begin, wide.end(),
                                     &utf8_begin, out.data() + reserve,
                                     lenientConversion);
