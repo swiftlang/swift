@@ -17,6 +17,7 @@
 #include "clang/AST/CharUnits.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
 #include <cstdint>
 #include <memory>
 #include <utility>
@@ -66,6 +67,31 @@ public:
   bool enumerateDirectPassingRecordMembers(
       Type t, llvm::function_ref<void(clang::CharUnits, clang::CharUnits, Type)>
                   callback);
+
+  /// An representation of a single type, or a C struct with multiple members
+  /// with specified types. The C struct is expected to be passed via swiftcc
+  /// functions.
+  class TypeRecordABIRepresentation {
+  public:
+    ArrayRef<Type> getMembers() const { return members; }
+
+    using MemberVectorTy = SmallVector<Type, 4>;
+
+  private:
+    friend class IRABIDetailsProviderImpl;
+    TypeRecordABIRepresentation(MemberVectorTy members) : members(members) {}
+
+    MemberVectorTy members;
+  };
+
+  struct FunctionABISignature {
+    TypeRecordABIRepresentation returnType;
+    SmallVector<TypeRecordABIRepresentation, 4> parameterTypes;
+  };
+
+  /// Returns the function signature that is used for the the type metadata
+  /// access function.
+  FunctionABISignature getTypeMetadataAccessFunctionSignature();
 
 private:
   std::unique_ptr<IRABIDetailsProviderImpl> impl;
