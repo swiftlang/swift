@@ -271,12 +271,9 @@ swift::getDistributedSerializationRequirements(
   if (existentialRequirementTy->isAny())
     return true; // we're done here, any means there are no requirements
 
-  if (auto alias = dyn_cast<TypeAliasType>(existentialRequirementTy.getPointer())) {
-    auto ty = alias->getDesugaredType();
-    if (isa<ClassType>(ty) || isa<StructType>(ty) || isa<EnumType>(ty)) {
-      // SerializationRequirement cannot be class or struct nowadays
-      return false;
-    }
+  if (!existentialRequirementTy->isExistentialType()) {
+    // SerializationRequirement must be an existential type
+    return false;
   }
 
   ExistentialType *serialReqType = existentialRequirementTy
