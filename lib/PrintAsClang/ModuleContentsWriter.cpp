@@ -16,6 +16,7 @@
 #include "DeclAndTypePrinter.h"
 #include "OutputLanguageMode.h"
 #include "PrimitiveTypeMapping.h"
+#include "PrintSwiftToClangCoreScaffold.h"
 
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Module.h"
@@ -137,6 +138,8 @@ public:
         printer(M, os, prologueOS, delayedMembers, typeMapping, interopContext,
                 access, outputLang),
         outputLangMode(outputLang) {}
+
+  PrimitiveTypeMapping &getTypeMapping() { return typeMapping; }
 
   /// Returns true if we added the decl's module to the import set, false if
   /// the decl is a local decl.
@@ -659,9 +662,14 @@ void swift::printModuleContentsAsCxx(
   std::string modulePrologueBuf;
   llvm::raw_string_ostream prologueOS{modulePrologueBuf};
 
-  ModuleWriter(moduleOS, prologueOS, imports, M, interopContext,
-               getRequiredAccess(M), OutputLanguageMode::Cxx)
-      .write();
+  ModuleWriter writer(moduleOS, prologueOS, imports, M, interopContext,
+                      getRequiredAccess(M), OutputLanguageMode::Cxx);
+  writer.write();
+
+  os << "#ifndef SWIFT_PRINTED_CORE\n";
+  os << "#define SWIFT_PRINTED_CORE\n";
+  printSwiftToClangCoreScaffold(interopContext, writer.getTypeMapping(), os);
+  os << "#endif\n";
 
   // FIXME: refactor.
   if (!prologueOS.str().empty()) {

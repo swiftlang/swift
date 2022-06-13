@@ -21,6 +21,7 @@
 #include "swift/AST/TypeVisitor.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IRGen/IRABIDetailsProvider.h"
+#include "swift/IRGen/Linking.h"
 #include "llvm/ADT/STLExtras.h"
 
 using namespace swift;
@@ -59,6 +60,22 @@ printCValueTypeStorageStruct(raw_ostream &os, const NominalTypeDecl *typeDecl,
   os << "};\n\n";
 }
 
+void printCTypeMetadataTypeFunction(raw_ostream &os,
+                                    const NominalTypeDecl *typeDecl) {
+  os << "// Type metadata accessor for " << typeDecl->getNameStr() << "\n";
+  auto entity = irgen::LinkEntity::forTypeMetadataAccessFunction(
+      typeDecl->getDeclaredType()->getCanonicalType());
+  os << "SWIFT_EXTERN ";
+  ClangSyntaxPrinter printer(os);
+  printer.printSwiftImplQualifier();
+  os << "MetadataResponseTy ";
+  entity.mangle(os);
+  os << '(';
+  printer.printSwiftImplQualifier();
+  os << "MetadataRequestTy)";
+  os << " SWIFT_NOEXCEPT SWIFT_CALL;\n\n";
+}
+
 void ClangValueTypePrinter::printStructDecl(const StructDecl *SD) {
   auto typeSizeAlign =
       interopContext.getIrABIDetails().getTypeSizeAlignment(SD);
@@ -78,7 +95,11 @@ void ClangValueTypePrinter::printStructDecl(const StructDecl *SD) {
                          [&](raw_ostream &os) {
                            os << "class ";
                            printCxxImplClassName(os, SD);
-                           os << ";\n";
+                           os << ";\n\n";
+
+                           // Print out special functions, like functions that
+                           // access type metadata.
+                           printCTypeMetadataTypeFunction(os, SD);
                          });
 
   // Print out the C++ class itself.
