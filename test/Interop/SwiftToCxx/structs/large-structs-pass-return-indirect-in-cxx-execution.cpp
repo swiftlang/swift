@@ -24,5 +24,13 @@ int main() {
   StructSeveralI64 structSeveralI64_copy = passThroughStructSeveralI64(100, returnNewStructSeveralI64(11), 6.0);
   printStructSeveralI64(structSeveralI64_copy);
 // CHECK-NEXT: StructSeveralI64.1 = 11, .2 = 100, .3 = -17, .4 = -12345612, .5 = -65529
+
+  auto myStruct = returnNewStructSeveralI64(99);
+  printStructSeveralI64(myStruct);
+// CHECK-NEXT: StructSeveralI64.1 = 99, .2 = 0, .3 = -17, .4 = 12345612, .5 = -65535
+
+  inoutStructSeveralI64(myStruct);
+  printStructSeveralI64(myStruct);
+// CHECK-NEXT: StructSeveralI64.1 = -1, .2 = -2, .3 = -3, .4 = -4, .5 = -5
   return 0;
 }

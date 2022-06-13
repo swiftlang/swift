@@ -224,25 +224,34 @@ void ClangValueTypePrinter::printCStubTypeName(const NominalTypeDecl *type) {
 }
 
 void ClangValueTypePrinter::printValueTypeParameterType(
-    const NominalTypeDecl *type, OutputLanguageMode outputLang) {
+    const NominalTypeDecl *type, OutputLanguageMode outputLang,
+    bool isInOutParam) {
   assert(isa<StructDecl>(type) || isa<EnumDecl>(type));
   if (outputLang != OutputLanguageMode::Cxx) {
-    // C functions only take stub values directly as parameters.
-    os << "struct ";
-    printCStubTypeName(type);
+    if (!isInOutParam) {
+      // C functions only take stub values directly as parameters.
+      os << "struct ";
+      printCStubTypeName(type);
+    } else {
+      // Directly pass the pointer (from getOpaquePointer) to C interface
+      // when in inout mode
+      os << "char * _Nonnull";
+    }
     return;
   }
-  os << "const ";
+  if (!isInOutParam) {
+    os << "const ";
+  }
   printCxxTypeName(os, type);
   os << '&';
 }
 
 void ClangValueTypePrinter::printParameterCxxToCUseScaffold(
     bool isIndirect, const NominalTypeDecl *type,
-    llvm::function_ref<void()> cxxParamPrinter) {
+    llvm::function_ref<void()> cxxParamPrinter, bool isInOut) {
   // A Swift value type is passed to its underlying Swift function
   assert(isa<StructDecl>(type) || isa<EnumDecl>(type));
-  if (!isIndirect) {
+  if (!isIndirect && !isInOut) {
     os << cxx_synthesis::getCxxImplNamespaceName() << "::"
        << "swift_interop_passDirect_";
     printCTypeName(os, type);
@@ -253,8 +262,9 @@ void ClangValueTypePrinter::printParameterCxxToCUseScaffold(
   os << "::getOpaquePointer(";
   cxxParamPrinter();
   os << ')';
-  if (!isIndirect)
+  if (!isIndirect && !isInOut) {
     os << ')';
+  }
 }
 
 void ClangValueTypePrinter::printValueTypeReturnType(
