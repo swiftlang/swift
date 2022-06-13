@@ -1234,6 +1234,10 @@ void TBDGenVisitor::visit(const TBDGenDescriptor &desc) {
   llvm::for_each(Modules, [&](ModuleDecl *M) {
     for (auto *file : M->getFiles()) {
       visitFile(file);
+
+      // Visit synthesized file, if it exists.
+      if (auto *synthesizedFile = file->getSynthesizedFile())
+        visitFile(synthesizedFile);
     }
   });
 }

@@ -317,6 +317,15 @@ public:
     return { Files.begin(), Files.size() };
   }
 
+  /// Add the given file to this module.
+  ///
+  /// FIXME: Remove this function from public view. Modules never need to add
+  /// files once they are created.
+  ///
+  /// \warning There are very few safe points to call this function once a
+  /// \c ModuleDecl has been created. If you find yourself needing to insert
+  /// a file in the middle of e.g. semantic analysis, use a \c
+  /// SynthesizedFileUnit instead.
   void addFile(FileUnit &newFile);
 
   /// Creates a map from \c #filePath strings to corresponding \c #fileID
