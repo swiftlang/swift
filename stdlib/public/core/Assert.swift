@@ -100,11 +100,7 @@ public func precondition(
 
 /// Indicates that an internal sanity check failed.
 ///
-/// Use this function to stop the program, without impacting the performance of
-/// shipping code, when control flow is not expected to reach the call---for
-/// example, in the `default` case of a `switch` where you have knowledge that
-/// one of the other cases must be satisfied. To protect code from invalid
-/// usage in Release builds, see `preconditionFailure(_:file:line:)`.
+/// This function's effect varies depending on the build flag used:
 ///
 /// * In playgrounds and `-Onone` builds (the default for Xcode's Debug
 ///   configuration), stop program execution in a debuggable state after
@@ -141,8 +137,11 @@ public func assertionFailure(
 /// Indicates that a precondition was violated.
 ///
 /// Use this function to stop the program when control flow can only reach the
-/// call if your API was improperly used. This function's effects vary
-/// depending on the build flag used:
+/// call if your API was improperly used and execution flow is not expected to
+/// reach the call---for example, in the `default` case of a `switch` where
+/// you have knowledge that one of the other cases must be satisfied.
+///
+/// This function's effect varies depending on the build flag used:
 ///
 /// * In playgrounds and `-Onone` builds (the default for Xcode's Debug
 ///   configuration), stops program execution in a debuggable state after
