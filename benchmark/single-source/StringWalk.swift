@@ -1010,14 +1010,14 @@ public let benchmarks = [
 
 @inline(never)
 public func run_StringWalk_ascii_scalars(_ n: Int) {
-  for _ in 1...n*400 {
+  for _ in 1...n*10 {
     count_scalars(ascii!.unicodeScalars)
   }
 }
 
 @inline(never)
 public func run_StringWalk_ascii_scalarsBackwards(_ n: Int) {
-  for _ in 1...n*400 {
+  for _ in 1...n*10 {
     count_scalars_rev(ascii!.unicodeScalars.reversed())
   }
 }
@@ -1025,14 +1025,14 @@ public func run_StringWalk_ascii_scalarsBackwards(_ n: Int) {
 
 @inline(never)
 public func run_StringWalk_ascii_chars(_ n: Int) {
-  for _ in 1...n*40 {
+  for _ in 1...n*1 {
     count_chars(ascii!)
   }
 }
 
 @inline(never)
 public func run_StringWalk_ascii_charsBackwards(_ n: Int) {
-  for _ in 1...n*40 {
+  for _ in 1...n*1 {
     count_chars_rev(ascii!.reversed())
   }
 }
@@ -1040,14 +1040,14 @@ public func run_StringWalk_ascii_charsBackwards(_ n: Int) {
 
 @inline(never)
 public func run_StringWalk_ascii_charsIndexed(_ n: Int) {
-  for _ in 1...n*40 {
+  for _ in 1...n*1 {
     count_charsIndexed(ascii!)
   }
 }
 
 @inline(never)
 public func run_StringWalk_ascii_charsIndexedBackwards(_ n: Int) {
-  for _ in 1...n*40 {
+  for _ in 1...n*1 {
     count_charsIndexed_rev(ascii!.reversed())
   }
 }
@@ -1113,14 +1113,14 @@ public func run_CharIndexing_ascii_unicodeScalars_Backwards(_ n: Int) {
 
 @inline(never)
 public func run_StringWalk_utf16_scalars(_ n: Int) {
-  for _ in 1...n*400 {
+  for _ in 1...n*10 {
     count_scalars(utf16!.unicodeScalars)
   }
 }
 
 @inline(never)
 public func run_StringWalk_utf16_scalarsBackwards(_ n: Int) {
-  for _ in 1...n*400 {
+  for _ in 1...n*10 {
     count_scalars_rev(utf16!.unicodeScalars.reversed())
   }
 }
@@ -1128,14 +1128,14 @@ public func run_StringWalk_utf16_scalarsBackwards(_ n: Int) {
 
 @inline(never)
 public func run_StringWalk_utf16_chars(_ n: Int) {
-  for _ in 1...n*40 {
+  for _ in 1...n*1 {
     count_chars(utf16!)
   }
 }
 
 @inline(never)
 public func run_StringWalk_utf16_charsBackwards(_ n: Int) {
-  for _ in 1...n*40 {
+  for _ in 1...n*1 {
     count_chars_rev(utf16!.reversed())
   }
 }
@@ -1143,14 +1143,14 @@ public func run_StringWalk_utf16_charsBackwards(_ n: Int) {
 
 @inline(never)
 public func run_StringWalk_utf16_charsIndexed(_ n: Int) {
-  for _ in 1...n*40 {
+  for _ in 1...n*1 {
     count_charsIndexed(utf16!)
   }
 }
 
 @inline(never)
 public func run_StringWalk_utf16_charsIndexedBackwards(_ n: Int) {
-  for _ in 1...n*40 {
+  for _ in 1...n*1 {
     count_charsIndexed_rev(utf16!.reversed())
   }
 }
@@ -1216,14 +1216,14 @@ public func run_CharIndexing_utf16_unicodeScalars_Backwards(_ n: Int) {
 
 @inline(never)
 public func run_StringWalk_tweet_scalars(_ n: Int) {
-  for _ in 1...n*400 {
+  for _ in 1...n*10 {
     count_scalars(tweet!.unicodeScalars)
   }
 }
 
 @inline(never)
 public func run_StringWalk_tweet_scalarsBackwards(_ n: Int) {
-  for _ in 1...n*400 {
+  for _ in 1...n*10 {
     count_scalars_rev(tweet!.unicodeScalars.reversed())
   }
 }
@@ -1231,14 +1231,14 @@ public func run_StringWalk_tweet_scalarsBackwards(_ n: Int) {
 
 @inline(never)
 public func run_StringWalk_tweet_chars(_ n: Int) {
-  for _ in 1...n*40 {
+  for _ in 1...n*1 {
     count_chars(tweet!)
   }
 }
 
 @inline(never)
 public func run_StringWalk_tweet_charsBackwards(_ n: Int) {
-  for _ in 1...n*40 {
+  for _ in 1...n*1 {
     count_chars_rev(tweet!.reversed())
   }
 }
@@ -1246,14 +1246,14 @@ public func run_StringWalk_tweet_charsBackwards(_ n: Int) {
 
 @inline(never)
 public func run_StringWalk_tweet_charsIndexed(_ n: Int) {
-  for _ in 1...n*40 {
+  for _ in 1...n*1 {
     count_charsIndexed(tweet!)
   }
 }
 
 @inline(never)
 public func run_StringWalk_tweet_charsIndexedBackwards(_ n: Int) {
-  for _ in 1...n*40 {
+  for _ in 1...n*1 {
     count_charsIndexed_rev(tweet!.reversed())
   }
 }
@@ -1319,14 +1319,14 @@ public func run_CharIndexing_tweet_unicodeScalars_Backwards(_ n: Int) {
 
 @inline(never)
 public func run_StringWalk_japanese_scalars(_ n: Int) {
-  for _ in 1...n*400 {
+  for _ in 1...n*10 {
     count_scalars(japanese!.unicodeScalars)
   }
 }
 
 @inline(never)
 public func run_StringWalk_japanese_scalarsBackwards(_ n: Int) {
-  for _ in 1...n*400 {
+  for _ in 1...n*10 {
     count_scalars_rev(japanese!.unicodeScalars.reversed())
   }
 }
@@ -1334,14 +1334,14 @@ public func run_StringWalk_japanese_scalarsBackwards(_ n: Int) {
 
 @inline(never)
 public func run_StringWalk_japanese_chars(_ n: Int) {
-  for _ in 1...n*40 {
+  for _ in 1...n*1 {
     count_chars(japanese!)
   }
 }
 
 @inline(never)
 public func run_StringWalk_japanese_charsBackwards(_ n: Int) {
-  for _ in 1...n*40 {
+  for _ in 1...n*1 {
     count_chars_rev(japanese!.reversed())
   }
 }
@@ -1349,14 +1349,14 @@ public func run_StringWalk_japanese_charsBackwards(_ n: Int) {
 
 @inline(never)
 public func run_StringWalk_japanese_charsIndexed(_ n: Int) {
-  for _ in 1...n*40 {
+  for _ in 1...n*1 {
     count_charsIndexed(japanese!)
   }
 }
 
 @inline(never)
 public func run_StringWalk_japanese_charsIndexedBackwards(_ n: Int) {
-  for _ in 1...n*40 {
+  for _ in 1...n*1 {
     count_charsIndexed_rev(japanese!.reversed())
   }
 }
@@ -1422,14 +1422,14 @@ public func run_CharIndexing_japanese_unicodeScalars_Backwards(_ n: Int) {
 
 @inline(never)
 public func run_StringWalk_chinese_scalars(_ n: Int) {
-  for _ in 1...n*400 {
+  for _ in 1...n*10 {
     count_scalars(chinese!.unicodeScalars)
   }
 }
 
 @inline(never)
 public func run_StringWalk_chinese_scalarsBackwards(_ n: Int) {
-  for _ in 1...n*400 {
+  for _ in 1...n*10 {
     count_scalars_rev(chinese!.unicodeScalars.reversed())
   }
 }
@@ -1437,14 +1437,14 @@ public func run_StringWalk_chinese_scalarsBackwards(_ n: Int) {
 
 @inline(never)
 public func run_StringWalk_chinese_chars(_ n: Int) {
-  for _ in 1...n*40 {
+  for _ in 1...n*1 {
     count_chars(chinese!)
   }
 }
 
 @inline(never)
 public func run_StringWalk_chinese_charsBackwards(_ n: Int) {
-  for _ in 1...n*40 {
+  for _ in 1...n*1 {
     count_chars_rev(chinese!.reversed())
   }
 }
@@ -1452,14 +1452,14 @@ public func run_StringWalk_chinese_charsBackwards(_ n: Int) {
 
 @inline(never)
 public func run_StringWalk_chinese_charsIndexed(_ n: Int) {
-  for _ in 1...n*40 {
+  for _ in 1...n*1 {
     count_charsIndexed(chinese!)
   }
 }
 
 @inline(never)
 public func run_StringWalk_chinese_charsIndexedBackwards(_ n: Int) {
-  for _ in 1...n*40 {
+  for _ in 1...n*1 {
     count_charsIndexed_rev(chinese!.reversed())
   }
 }
@@ -1525,14 +1525,14 @@ public func run_CharIndexing_chinese_unicodeScalars_Backwards(_ n: Int) {
 
 @inline(never)
 public func run_StringWalk_korean_scalars(_ n: Int) {
-  for _ in 1...n*400 {
+  for _ in 1...n*10 {
     count_scalars(korean!.unicodeScalars)
   }
 }
 
 @inline(never)
 public func run_StringWalk_korean_scalarsBackwards(_ n: Int) {
-  for _ in 1...n*400 {
+  for _ in 1...n*10 {
     count_scalars_rev(korean!.unicodeScalars.reversed())
   }
 }
@@ -1540,14 +1540,14 @@ public func run_StringWalk_korean_scalarsBackwards(_ n: Int) {
 
 @inline(never)
 public func run_StringWalk_korean_chars(_ n: Int) {
-  for _ in 1...n*40 {
+  for _ in 1...n*1 {
     count_chars(korean!)
   }
 }
 
 @inline(never)
 public func run_StringWalk_korean_charsBackwards(_ n: Int) {
-  for _ in 1...n*40 {
+  for _ in 1...n*1 {
     count_chars_rev(korean!.reversed())
   }
 }
@@ -1555,14 +1555,14 @@ public func run_StringWalk_korean_charsBackwards(_ n: Int) {
 
 @inline(never)
 public func run_StringWalk_korean_charsIndexed(_ n: Int) {
-  for _ in 1...n*40 {
+  for _ in 1...n*1 {
     count_charsIndexed(korean!)
   }
 }
 
 @inline(never)
 public func run_StringWalk_korean_charsIndexedBackwards(_ n: Int) {
-  for _ in 1...n*40 {
+  for _ in 1...n*1 {
     count_charsIndexed_rev(korean!.reversed())
   }
 }
@@ -1628,14 +1628,14 @@ public func run_CharIndexing_korean_unicodeScalars_Backwards(_ n: Int) {
 
 @inline(never)
 public func run_StringWalk_russian_scalars(_ n: Int) {
-  for _ in 1...n*400 {
+  for _ in 1...n*10 {
     count_scalars(russian!.unicodeScalars)
   }
 }
 
 @inline(never)
 public func run_StringWalk_russian_scalarsBackwards(_ n: Int) {
-  for _ in 1...n*400 {
+  for _ in 1...n*10 {
     count_scalars_rev(russian!.unicodeScalars.reversed())
   }
 }
@@ -1643,14 +1643,14 @@ public func run_StringWalk_russian_scalarsBackwards(_ n: Int) {
 
 @inline(never)
 public func run_StringWalk_russian_chars(_ n: Int) {
-  for _ in 1...n*40 {
+  for _ in 1...n*1 {
     count_chars(russian!)
   }
 }
 
 @inline(never)
 public func run_StringWalk_russian_charsBackwards(_ n: Int) {
-  for _ in 1...n*40 {
+  for _ in 1...n*1 {
     count_chars_rev(russian!.reversed())
   }
 }
@@ -1658,14 +1658,14 @@ public func run_StringWalk_russian_charsBackwards(_ n: Int) {
 
 @inline(never)
 public func run_StringWalk_russian_charsIndexed(_ n: Int) {
-  for _ in 1...n*40 {
+  for _ in 1...n*1 {
     count_charsIndexed(russian!)
   }
 }
 
 @inline(never)
 public func run_StringWalk_russian_charsIndexedBackwards(_ n: Int) {
-  for _ in 1...n*40 {
+  for _ in 1...n*1 {
     count_charsIndexed_rev(russian!.reversed())
   }
 }
@@ -1731,14 +1731,14 @@ public func run_CharIndexing_russian_unicodeScalars_Backwards(_ n: Int) {
 
 @inline(never)
 public func run_StringWalk_punctuated_scalars(_ n: Int) {
-  for _ in 1...n*400 {
+  for _ in 1...n*10 {
     count_scalars(punctuated!.unicodeScalars)
   }
 }
 
 @inline(never)
 public func run_StringWalk_punctuated_scalarsBackwards(_ n: Int) {
-  for _ in 1...n*400 {
+  for _ in 1...n*10 {
     count_scalars_rev(punctuated!.unicodeScalars.reversed())
   }
 }
@@ -1746,14 +1746,14 @@ public func run_StringWalk_punctuated_scalarsBackwards(_ n: Int) {
 
 @inline(never)
 public func run_StringWalk_punctuated_chars(_ n: Int) {
-  for _ in 1...n*40 {
+  for _ in 1...n*1 {
     count_chars(punctuated!)
   }
 }
 
 @inline(never)
 public func run_StringWalk_punctuated_charsBackwards(_ n: Int) {
-  for _ in 1...n*40 {
+  for _ in 1...n*1 {
     count_chars_rev(punctuated!.reversed())
   }
 }
@@ -1761,14 +1761,14 @@ public func run_StringWalk_punctuated_charsBackwards(_ n: Int) {
 
 @inline(never)
 public func run_StringWalk_punctuated_charsIndexed(_ n: Int) {
-  for _ in 1...n*40 {
+  for _ in 1...n*1 {
     count_charsIndexed(punctuated!)
   }
 }
 
 @inline(never)
 public func run_StringWalk_punctuated_charsIndexedBackwards(_ n: Int) {
-  for _ in 1...n*40 {
+  for _ in 1...n*1 {
     count_charsIndexed_rev(punctuated!.reversed())
   }
 }
@@ -1834,14 +1834,14 @@ public func run_CharIndexing_punctuated_unicodeScalars_Backwards(_ n: Int) {
 
 @inline(never)
 public func run_StringWalk_punctuatedJapanese_scalars(_ n: Int) {
-  for _ in 1...n*400 {
+  for _ in 1...n*10 {
     count_scalars(punctuatedJapanese!.unicodeScalars)
   }
 }
 
 @inline(never)
 public func run_StringWalk_punctuatedJapanese_scalarsBackwards(_ n: Int) {
-  for _ in 1...n*400 {
+  for _ in 1...n*10 {
     count_scalars_rev(punctuatedJapanese!.unicodeScalars.reversed())
   }
 }
@@ -1849,14 +1849,14 @@ public func run_StringWalk_punctuatedJapanese_scalarsBackwards(_ n: Int) {
 
 @inline(never)
 public func run_StringWalk_punctuatedJapanese_chars(_ n: Int) {
-  for _ in 1...n*40 {
+  for _ in 1...n*1 {
     count_chars(punctuatedJapanese!)
   }
 }
 
 @inline(never)
 public func run_StringWalk_punctuatedJapanese_charsBackwards(_ n: Int) {
-  for _ in 1...n*40 {
+  for _ in 1...n*1 {
     count_chars_rev(punctuatedJapanese!.reversed())
   }
 }
@@ -1864,14 +1864,14 @@ public func run_StringWalk_punctuatedJapanese_charsBackwards(_ n: Int) {
 
 @inline(never)
 public func run_StringWalk_punctuatedJapanese_charsIndexed(_ n: Int) {
-  for _ in 1...n*40 {
+  for _ in 1...n*1 {
     count_charsIndexed(punctuatedJapanese!)
   }
 }
 
 @inline(never)
 public func run_StringWalk_punctuatedJapanese_charsIndexedBackwards(_ n: Int) {
-  for _ in 1...n*40 {
+  for _ in 1...n*1 {
     count_charsIndexed_rev(punctuatedJapanese!.reversed())
   }
 }

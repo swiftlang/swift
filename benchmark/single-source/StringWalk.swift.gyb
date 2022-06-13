@@ -219,7 +219,7 @@ public let benchmarks = [
 ]
 
 % for Name in Names:
-%   for (Kind, View, Scale) in zip(Kinds, [".unicodeScalars", "", ""], [400, 40, 40]):
+%   for (Kind, View, Scale) in zip(Kinds, [".unicodeScalars", "", ""], [10, 1, 1]):
 
 @inline(never)
 public func run_StringWalk_${Name}_${Kind}(_ n: Int) {
