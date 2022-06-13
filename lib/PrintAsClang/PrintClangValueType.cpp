@@ -115,10 +115,12 @@ void ClangValueTypePrinter::printStructDecl(const StructDecl *SD) {
   printer.printBaseName(SD);
   os << "() {\n";
   os << "    auto metadata = " << cxx_synthesis::getCxxImplNamespaceName()
-     << "::" << typeMetadataFuncName << "(0);\n";
-  os << "    auto *vwTable = "
-        "*(reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - "
-        "1);\n";
+     << "::";
+  printer.printSwiftTypeMetadataAccessFunctionCall(typeMetadataFuncName);
+  os << ";\n";
+  os << "    auto *vwTable = ";
+  printer.printValueWitnessTableAccessFromTypeMetadata("metadata");
+  os << ";\n";
   os << "    vwTable->destroy(_getOpaquePointer(), metadata._0);\n";
   os << "  }\n";
 
@@ -128,10 +130,12 @@ void ClangValueTypePrinter::printStructDecl(const StructDecl *SD) {
   printer.printBaseName(SD);
   os << " &other) {\n";
   os << "    auto metadata = " << cxx_synthesis::getCxxImplNamespaceName()
-     << "::" << typeMetadataFuncName << "(0);\n";
-  os << "    auto *vwTable = "
-        "*(reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - "
-        "1);\n";
+     << "::";
+  printer.printSwiftTypeMetadataAccessFunctionCall(typeMetadataFuncName);
+  os << ";\n";
+  os << "    auto *vwTable = ";
+  printer.printValueWitnessTableAccessFromTypeMetadata("metadata");
+  os << ";\n";
   os << "    vwTable->initializeWithCopy(_getOpaquePointer(), const_cast<char "
         "*>(other._getOpaquePointer()), metadata._0);\n";
   os << "  }\n";
