@@ -476,6 +476,17 @@ void State::performDataflow(DeadEndBlocks &deBlocks) {
         continue;
       }
 
+      // Don't keep looking past the begin block
+      bool dominatesBeginBlock = false;
+      for (auto *succ : predBlock->getSuccessorBlocks()) {
+        if (succ == getBeginBlock()) {
+          dominatesBeginBlock = true;
+          break;
+        }
+      }
+      if (dominatesBeginBlock) {
+        continue;
+      }
       visitedBlocks.insert(predBlock);
       worklist.push_back(predBlock);
     }
