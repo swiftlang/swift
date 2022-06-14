@@ -4358,6 +4358,8 @@ int main(int argc, char *argv[]) {
     options::ImportObjCHeader;
   InitInvok.getClangImporterOptions().BridgingHeader =
     options::ImportObjCHeader;
+  InitInvok.getLangOptions().Features.insert(
+      Feature::ResultBuilderASTTransform);
   InitInvok.getLangOptions().EnableAccessControl =
     !options::DisableAccessControl;
   InitInvok.getLangOptions().EnableSwift3ObjCInference =

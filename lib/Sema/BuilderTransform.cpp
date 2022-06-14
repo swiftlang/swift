@@ -1077,11 +1077,19 @@ protected:
                                  {Identifier()});
       }
 
-      auto *capture = captureExpr(expr, newBody);
-      // A reference to the synthesized variable is passed as an argument
-      // to buildBlock.
-      buildBlockArguments.push_back(
-          builder.buildVarRef(capture, element.getStartLoc()));
+      if (isa<CodeCompletionExpr>(expr)) {
+        // Insert the CodeCompletionExpr directly into the buildBlock call. That
+        // way, we can extract the contextual type of the code completion token
+        // to rank code completion items that match the type expected by
+        // buildBlock higher.
+        buildBlockArguments.push_back(expr);
+      } else {
+        auto *capture = captureExpr(expr, newBody);
+        // A reference to the synthesized variable is passed as an argument
+        // to buildBlock.
+        buildBlockArguments.push_back(
+            builder.buildVarRef(capture, element.getStartLoc()));
+      }
     }
 
     // Synthesize `buildBlock` or `buildPartial` based on captured arguments.
