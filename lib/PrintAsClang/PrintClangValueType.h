@@ -35,9 +35,9 @@ public:
       : os(os), cPrologueOS(cPrologueOS), typeMapping(typeMapping),
         interopContext(interopContext) {}
 
-  /// Print the C struct thunk or the C++ class definition that
-  /// corresponds to the given structure declaration.
-  void printStructDecl(const StructDecl *SD);
+  /// Print the C++ class definition that
+  /// corresponds to the given structure or enum declaration.
+  void printValueTypeDecl(const NominalTypeDecl *typeDecl);
 
   /// Print the pararameter type that referes to a Swift struct type in C/C++.
   void printValueTypeParameterType(const NominalTypeDecl *type,
