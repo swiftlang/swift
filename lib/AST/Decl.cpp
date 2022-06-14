@@ -9224,7 +9224,7 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
       auto selfDecl = isolation.getActorInstance();
       auto actorClass = selfDecl->getType()->getReferenceStorageReferent()
           ->getClassOrBoundGenericClass();
-      // FIXME: Doesn't work properly with generics
+      // FIXME: Doesn't work properly with generics #59356
       assert(actorClass && "Bad closure actor isolation?");
       return ActorIsolation::forActorInstance(actorClass)
                 .withPreconcurrency(isolation.preconcurrency());
