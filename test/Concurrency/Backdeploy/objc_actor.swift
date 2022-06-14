@@ -5,6 +5,7 @@
 // REQUIRES: OS=macosx
 // REQUIRES: executable_test
 // REQUIRES: concurrency_runtime
+// UNSUPPORTED: back_deployment_runtime
 
 import Foundation
 
