@@ -3031,12 +3031,12 @@ bool ConformanceChecker::checkActorIsolation(
   if (isDistributed) {
     // Check if the protocol where the requirement originates from
     // is a distributed actor constrained one.
-    auto proto = dyn_cast<ProtocolDecl>(requirement->getDeclContext());
-    if (proto && proto->isDistributedActor()) {
+    if (cast<ProtocolDecl>(requirement->getDeclContext())->isDistributedActor()) {
       // The requirement was declared in a DistributedActor constrained proto.
       //
-      // This means casting up to this `P` won't "strip off" the "distributed-ness"
-      // of the type, and all call-sites will be checking distributed isolation.
+      // This means casting up to this `P` won't "strip off" the
+      // "distributed-ness" of the type, and all call-sites will be checking
+      // distributed isolation.
       //
       // This means that we can actually allow these specific requirements,
       // to be witnessed without the distributed keyword (!), but they won't be
@@ -3052,8 +3052,7 @@ bool ConformanceChecker::checkActorIsolation(
 
       // If the requirement is distributed, we still need to require it on the witness though.
       // We DO allow a non-distributed requirement to be witnessed here though!
-      if (isDistributedDecl(requirement) &&
-          !isDistributedDecl(witness))
+      if (isDistributedDecl(requirement) && !isDistributedDecl(witness))
         missingOptions |= MissingFlags::WitnessDistributed;
     } else {
       // The protocol requirement comes from a normal (non-distributed actor)
@@ -3062,12 +3061,12 @@ bool ConformanceChecker::checkActorIsolation(
 
       // If we're coming from a non-distributed requirement,
       // then the requirement must be 'throws' to accommodate failure.
-      if (!isDistributedDecl(requirement) && !isThrowsDecl(requirement))
+      if (!isThrowsDecl(requirement))
         missingOptions |= MissingFlags::RequirementThrows;
 
-      // If the requirement is distributed, we require a distributed witness
-      if (!isDistributedDecl(witness) &&
-          (isDistributedDecl(requirement) || !missingOptions))
+      // If the witness is distributed, it is able to witness a requirement
+      // only if the requirement is `async throws`.
+      if (!isDistributedDecl(witness) && !missingOptions)
         missingOptions |= MissingFlags::WitnessDistributed;
     }
   }
