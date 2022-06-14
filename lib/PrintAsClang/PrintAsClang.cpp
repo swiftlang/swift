@@ -52,13 +52,15 @@ static void emitObjCConditional(raw_ostream &out,
 }
 
 static void writePtrauthPrologue(raw_ostream &os) {
-  os << "#if __has_include(<ptrauth.h>)\n";
-  os << "# include <ptrauth.h>\n";
-  os << "#else\n";
-  os << "# ifndef __ptrauth_swift_value_witness_function_pointer\n";
-  os << "#  define __ptrauth_swift_value_witness_function_pointer(x)\n";
-  os << "# endif\n";
-  os << "#endif\n";
+  emitCxxConditional(os, [&]() {
+    os << "#if __has_include(<ptrauth.h>)\n";
+    os << "# include <ptrauth.h>\n";
+    os << "#else\n";
+    os << "# ifndef __ptrauth_swift_value_witness_function_pointer\n";
+    os << "#  define __ptrauth_swift_value_witness_function_pointer(x)\n";
+    os << "# endif\n";
+    os << "#endif\n";
+  });
 }
 
 static void writePrologue(raw_ostream &out, ASTContext &ctx,
