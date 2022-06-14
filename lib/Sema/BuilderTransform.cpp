@@ -959,8 +959,8 @@ protected:
   VarDecl *captureExpr(Expr *expr, SmallVectorImpl<ASTNode> &container) {
     auto *var = builder.buildVar(expr->getStartLoc());
     Pattern *pattern = NamedPattern::createImplicit(ctx, var);
-    auto *PB = PatternBindingDecl::createImplicit(ctx, StaticSpellingKind::None,
-                                                  pattern, expr, dc);
+    auto *PB = PatternBindingDecl::createImplicit(
+        ctx, StaticSpellingKind::None, pattern, expr, dc, var->getStartLoc());
     return recordVar(PB, container);
   }
 
@@ -972,7 +972,8 @@ protected:
         ctx, NamedPattern::createImplicit(ctx, var),
         type ? type : PlaceholderType::get(ctx, var));
     auto *PB = PatternBindingDecl::createImplicit(
-        ctx, StaticSpellingKind::None, placeholder, /*init=*/initExpr, dc);
+        ctx, StaticSpellingKind::None, placeholder, /*init=*/initExpr, dc,
+        var->getStartLoc());
     return recordVar(PB, container);
   }
 
