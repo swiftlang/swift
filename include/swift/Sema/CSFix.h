@@ -398,6 +398,10 @@ enum class FixKind : uint8_t {
   /// Coerce a result type of a call to a particular existential type
   /// by adding `as any <#Type#>`.
   AddExplicitExistentialCoercion,
+
+  /// For example `.a(let x), .b(let x)` where `x` gets bound to different
+  /// types.
+  RenameConflictingPatternVariables,
 };
 
 class ConstraintFix {
@@ -3017,6 +3021,50 @@ public:
   static AddExplicitExistentialCoercion *create(ConstraintSystem &cs,
                                                 Type resultTy,
                                                 ConstraintLocator *locator);
+};
+
+class RenameConflictingPatternVariables final
+    : public ConstraintFix,
+      private llvm::TrailingObjects<RenameConflictingPatternVariables,
+                                    VarDecl *> {
+  friend TrailingObjects;
+
+  Type ExpectedType;
+  unsigned NumConflicts;
+
+  RenameConflictingPatternVariables(ConstraintSystem &cs, Type expectedTy,
+                                    ArrayRef<VarDecl *> conflicts,
+                                    ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::RenameConflictingPatternVariables, locator),
+        ExpectedType(expectedTy), NumConflicts(conflicts.size()) {
+    std::uninitialized_copy(conflicts.begin(), conflicts.end(),
+                            getConflictingBuffer().begin());
+  }
+
+  MutableArrayRef<VarDecl *> getConflictingBuffer() {
+    return {getTrailingObjects<VarDecl *>(), NumConflicts};
+  }
+
+public:
+  std::string getName() const override { return "rename pattern variables"; }
+
+  ArrayRef<VarDecl *> getConflictingVars() const {
+    return {getTrailingObjects<VarDecl *>(), NumConflicts};
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  static RenameConflictingPatternVariables *
+  create(ConstraintSystem &cs, Type expectedTy, ArrayRef<VarDecl *> conflicts,
+         ConstraintLocator *locator);
+
+  static bool classof(ConstraintFix *fix) {
+    return fix->getKind() == FixKind::RenameConflictingPatternVariables;
+  }
 };
 
 } // end namespace constraints
