@@ -85,7 +85,8 @@ public:
     os << knownTypeInfo->name;
     if (knownTypeInfo->canBeNullable) {
       printNullability(optionalKind);
-    } else if (isInOutParam) {
+    }
+    if (isInOutParam) {
       os << (languageMode == swift::OutputLanguageMode::Cxx ? " &" : " *");
     }
     return true;
