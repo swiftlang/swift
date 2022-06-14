@@ -127,3 +127,15 @@ void ClangSyntaxPrinter::printNullability(
   if (printKind != NullabilityPrintKind::After)
     os << ' ';
 }
+
+void ClangSyntaxPrinter::printSwiftTypeMetadataAccessFunctionCall(
+    StringRef name) {
+  os << name << "(0)";
+}
+
+void ClangSyntaxPrinter::printValueWitnessTableAccessFromTypeMetadata(
+    StringRef metadataVariable) {
+  os << "*(reinterpret_cast<";
+  printSwiftImplQualifier();
+  os << "ValueWitnessTable **>(" << metadataVariable << "._0) - 1)";
+}
