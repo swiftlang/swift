@@ -1896,6 +1896,10 @@ public:
     getMutablePatternList()[i].setInit(E);
   }
 
+  void setOriginalInit(unsigned i, Expr *E) {
+    getMutablePatternList()[i].setOriginalInit(E);
+  }
+
   Pattern *getPattern(unsigned i) const {
     return getPatternList()[i].getPattern();
   }
