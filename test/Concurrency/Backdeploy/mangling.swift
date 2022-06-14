@@ -12,10 +12,10 @@
 // RUN: %target-build-swift -target %target-cpu-apple-macosx10.15 %s -o %t/test_mangling -Xfrontend -disable-availability-checking
 // RUN: %target-run %t/test_mangling
 
-// REQUIRESx: CPU=x86_64
 // REQUIRES: OS=macosx
 // REQUIRES: executable_test
 // REQUIRES: concurrency_runtime
+// UNSUPPORTED: back_deployment_runtime
 
 actor MyActor { }
 
