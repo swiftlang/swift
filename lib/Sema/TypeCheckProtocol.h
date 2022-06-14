@@ -788,8 +788,11 @@ private:
 
   /// Check that the witness and requirement have compatible actor contexts.
   ///
-  /// \returns true if an error occurred, false otherwise.
-  bool checkActorIsolation(ValueDecl *requirement, ValueDecl *witness);
+  /// \returns the isolation that needs to be enforced to invoke the witness
+  /// from the requirement, used when entering an actor-isolated synchronous
+  /// witness from an asynchronous requirement.
+  Optional<ActorIsolation>
+  checkActorIsolation(ValueDecl *requirement, ValueDecl *witness);
 
   /// Record a type witness.
   ///
