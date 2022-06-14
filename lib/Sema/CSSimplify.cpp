@@ -467,6 +467,35 @@ static bool matchCallArgumentsImpl(
         return;
       }
 
+      // Let's consider current closure to be extraneous if:
+      //
+      // - current parameter has a default value and doesn't accept a trailing
+      //   closure; and
+      // - no other free parameter after this one accepts a trailing closure via
+      //   forward or backward scan. This check makes sure that it's safe to
+      //   reject and push it to the next parameter without affecting backward
+      //   scan logic.
+      //
+      // In other words - let's push the closure argument through defaulted
+      // parameters until it can be considered extraneous if no parameters
+      // could possibly match it.
+      if (!paramInfo.acceptsUnlabeledTrailingClosureArgument(paramIdx) &&
+          !parameterRequiresArgument(params, paramInfo, paramIdx)) {
+        if (llvm::none_of(
+                range(paramIdx + 1, params.size()), [&](unsigned idx) {
+                  return parameterBindings[idx].empty() &&
+                         (paramInfo.acceptsUnlabeledTrailingClosureArgument(
+                              idx) ||
+                          backwardScanAcceptsTrailingClosure(params[idx]));
+                })) {
+          haveUnfulfilledParams = true;
+          return;
+        }
+
+        // If one or more parameters can match the closure, let's check
+        // whether backward scan is applicable here.
+      }
+
       // If this parameter does not require an argument, consider applying a
       // backward-match rule that skips this parameter if doing so is the only
       // way to successfully match arguments to parameters.
