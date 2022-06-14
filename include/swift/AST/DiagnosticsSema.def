@@ -4563,6 +4563,9 @@ ERROR(effectful_keypath_component,none,
 ERROR(local_function_executed_concurrently,none,
       "concurrently-executed %0 %1 must be marked as '@Sendable'",
       (DescriptiveDeclKind, DeclName))
+ERROR(sendable_isolated_sync_function,none,
+      "%0 synchronous %1 %2 cannot be marked as '@Sendable'",
+      (ActorIsolation, DescriptiveDeclKind, DeclName))
 ERROR(concurrent_access_of_local_capture,none,
       "%select{mutation of|reference to}0 captured %1 %2 in "
       "concurrently-executing code",
