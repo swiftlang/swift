@@ -270,7 +270,7 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
       Target.getOS() != llvm::Triple::MacOSX || 
       Target.getOS() != llvm::Triple::TvOS ||
       Target.getOS() != llvm::Triple::WatchOS ||
-      Target.getOS() != llvm::Triple::IOS ||
+      Target.getOS() != llvm::Triple::IOS
       ) break;
   case llvm::Triple::MacOSX:
     addPlatformConditionValue(PlatformConditionKind::OS, "OSX");
