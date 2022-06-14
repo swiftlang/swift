@@ -54,6 +54,7 @@ static const SupportedConditionalValue SupportedConditionalCompilationOSs[] = {
   "Cygwin",
   "Haiku",
   "WASI",
+  "Darwin", // All inclusive for all Darwin platforms.
 };
 
 static const SupportedConditionalValue SupportedConditionalCompilationArches[] = {
@@ -264,6 +265,13 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   // Set the "os" platform condition.
   switch (Target.getOS()) {
   case llvm::Triple::Darwin:
+    addPlatformConditionValue(PlatformConditionKind::OS, "Darwin");
+    if (
+      Target.getOS() != llvm::Triple::MacOSX || 
+      Target.getOS() != llvm::Triple::TvOS ||
+      Target.getOS() != llvm::Triple::WatchOS ||
+      Target.getOS() != llvm::Triple::IOS ||
+      ) break;
   case llvm::Triple::MacOSX:
     addPlatformConditionValue(PlatformConditionKind::OS, "OSX");
     break;
