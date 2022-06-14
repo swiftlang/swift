@@ -10,12 +10,18 @@ func someOtherPlatformFunc() {}
 #endif
 
 #if !os(Darwin) 
-let someNum = 3
+struct SomeNonDarwinType {}
 #endif
 
+#if os(Darwin)
 xDarwinFunc()
 someOtherPlatformFunc() // expected-error {{cannot find 'someOtherPlatformFunc' in scope}}
+#endif
 
-func anotherFunc() -> Int {
-    return someNum // expected-error {{cannot find 'someNum' in scope}}
+#if os(Darwin)
+let x = SomeNonDarwinType() // expected-error {{cannot find 'SomeNonDarwinType' in scope}}
+#else
+func NonDarwinTypeReturningFunc() -> SomeNonDarwinType {
+    return SomeNonDarwinType()
 }
+#endif
