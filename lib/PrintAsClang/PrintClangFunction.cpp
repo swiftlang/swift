@@ -77,13 +77,17 @@ public:
         languageMode(languageMode), typeUseKind(typeUseKind) {}
 
   bool printIfKnownSimpleType(const TypeDecl *typeDecl,
-                              Optional<OptionalTypeKind> optionalKind) {
+                              Optional<OptionalTypeKind> optionalKind,
+                              bool isInOutParam) {
     auto knownTypeInfo = getKnownTypeInfo(typeDecl, typeMapping, languageMode);
     if (!knownTypeInfo)
       return false;
     os << knownTypeInfo->name;
-    if (knownTypeInfo->canBeNullable)
+    if (knownTypeInfo->canBeNullable) {
       printNullability(optionalKind);
+    } else if (isInOutParam) {
+      os << (languageMode == swift::OutputLanguageMode::Cxx ? " &" : " *");
+    }
     return true;
   }
 
@@ -106,7 +110,7 @@ public:
                           Optional<OptionalTypeKind> optionalKind,
                           bool isInOutParam) {
     const TypeAliasDecl *alias = aliasTy->getDecl();
-    if (printIfKnownSimpleType(alias, optionalKind))
+    if (printIfKnownSimpleType(alias, optionalKind, isInOutParam))
       return;
 
     visitPart(aliasTy->getSinglyDesugaredType(), optionalKind, isInOutParam);
@@ -117,7 +121,7 @@ public:
     const StructDecl *SD = ST->getStructOrBoundGenericStruct();
 
     // Handle known type names.
-    if (printIfKnownSimpleType(SD, optionalKind))
+    if (printIfKnownSimpleType(SD, optionalKind, isInOutParam))
       return;
     // FIXME: Handle optional structures.
     if (typeUseKind == FunctionSignatureTypeUse::ParamType) {
@@ -168,16 +172,6 @@ void DeclAndTypeClangFunctionPrinter::printFunctionSignature(
                                               outputLang, interopContext);
     typePrinter.visit(ty, optionalKind, isInOutParam);
 
-    if (isInOutParam) {
-      if (outputLang == OutputLanguageMode::Cxx &&
-          isKnownCxxType(ty, typeMapping)) {
-        os << " &";
-      } else if (outputLang == OutputLanguageMode::ObjC &&
-                 isKnownCType(ty, typeMapping)) {
-        os << " *";
-      }
-    }
-
     if (!name.empty()) {
       os << ' ';
       ClangSyntaxPrinter(os).printIdentifier(name);
@@ -197,9 +191,8 @@ void DeclAndTypeClangFunctionPrinter::printFunctionSignature(
     CFunctionSignatureTypePrinter typePrinter(
         os, cPrologueOS, typeMapping, outputLang, interopContext,
         FunctionSignatureTypeUse::ReturnType);
-    // Pass false because it's a parameter for indirect return.
-    // Not an actual parameter, which means it can never be inout
-    typePrinter.visit(objTy, retKind, false);
+    // Param for indirect return cannot be marked as inout
+    typePrinter.visit(objTy, retKind, /*isInOutParam=*/false);
   } else {
     os << "void";
   }
