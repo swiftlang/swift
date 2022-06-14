@@ -200,6 +200,14 @@ checkPlatformCondition(PlatformConditionKind Kind, StringRef Value) const {
   if (Kind == PlatformConditionKind::OS && Value == "macOS")
     return checkPlatformCondition(Kind, "OSX");
 
+  if (Kind == PlatformConditionKind::OS && Value == "Darwin") {
+    // "Darwin" is an alias for all Darwin platforms.
+    return checkPlatformCondition(Kind, "macOS") ||
+           checkPlatformCondition(Kind, "iOS") ||
+           checkPlatformCondition(Kind, "tvOS") ||
+           checkPlatformCondition(Kind, "watchOS");
+  }
+
   // When compiling for iOS we consider "macCatalyst" to be a
   // synonym of "macabi". This enables the use of
   // #if targetEnvironment(macCatalyst) as a compilation
@@ -266,12 +274,7 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   switch (Target.getOS()) {
   case llvm::Triple::Darwin:
     addPlatformConditionValue(PlatformConditionKind::OS, "Darwin");
-    if (
-      Target.getOS() != llvm::Triple::MacOSX || 
-      Target.getOS() != llvm::Triple::TvOS ||
-      Target.getOS() != llvm::Triple::WatchOS ||
-      Target.getOS() != llvm::Triple::IOS
-      ) break;
+    break;
   case llvm::Triple::MacOSX:
     addPlatformConditionValue(PlatformConditionKind::OS, "OSX");
     break;
