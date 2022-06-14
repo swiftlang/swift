@@ -2590,12 +2590,6 @@ public:
     }
     Indent -= 2;
 
-    // If we printed any args, then print the closing ')' on a new line,
-    // otherwise print inline with the '(argument_list'.
-    if (!argList->empty()) {
-      OS << '\n';
-      OS.indent(Indent);
-    }
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
 
     if (indent)
