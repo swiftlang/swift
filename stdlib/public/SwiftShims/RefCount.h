@@ -418,6 +418,13 @@ class RefCountBitsT {
   }
 
   SWIFT_ALWAYS_INLINE
+  static constexpr BitsType immortalBits() {
+    return (BitsType(2) << Offsets::StrongExtraRefCountShift) |
+           (BitsType(Offsets::IsImmortalMask)) |
+           (BitsType(1) << Offsets::UseSlowRCShift);
+  }
+
+  SWIFT_ALWAYS_INLINE
   RefCountBitsT() = default;
 
   SWIFT_ALWAYS_INLINE
@@ -431,9 +438,7 @@ class RefCountBitsT {
   SWIFT_ALWAYS_INLINE
   constexpr
   RefCountBitsT(Immortal_t immortal)
-  : bits((BitsType(2) << Offsets::StrongExtraRefCountShift) |
-         (BitsType(Offsets::IsImmortalMask)) |
-         (BitsType(1) << Offsets::UseSlowRCShift))
+  : bits(immortalBits())
   { }
 
   SWIFT_ALWAYS_INLINE
