@@ -786,6 +786,10 @@ public:
   /// Break an existential down into a set of constraints.
   ExistentialLayout getExistentialLayout();
 
+  /// If this is an actor or distributed type, get the nominal type declaration
+  /// for the actor.
+  NominalTypeDecl *getAnyActor();
+
   /// Determines whether this type is an actor type.
   bool isActorType();
 
