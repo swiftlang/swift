@@ -16,8 +16,10 @@ struct MyLayout {
   init(alignment: Align? = .center, spacing: Double? = 0.0) {}
 
   func callAsFunction<V: View>(content: () -> V) -> MyLayout { .init() }
+  // expected-note@-1 {{where 'V' = 'Int'}}
   func callAsFunction<V: View>(answer: () -> Int,
                                content: () -> V) -> MyLayout { .init() }
+  // expected-note@-2 {{where 'V' = 'Int'}}
 }
 
 struct Test {
@@ -59,6 +61,31 @@ struct Test {
       42
     } content: {
       EmptyView() // Ok
+    }
+  }
+
+  var body6: MyLayout {
+    MyLayout(spacing: 1.0) {
+      _ = EmptyView()
+      return 42
+    } // expected-error {{instance method 'callAsFunction(content:)' requires that 'Int' conform to 'View'}}
+  }
+
+  var body7: MyLayout {
+    MyLayout(alignment: .center) {
+      42
+    } content: {
+      _ = EmptyView()
+      return 42
+    } // expected-error {{instance method 'callAsFunction(answer:content:)' requires that 'Int' conform to 'View'}}
+  }
+
+  var body8: MyLayout {
+    MyLayout {
+      let x = ""
+      return x // expected-error {{cannot convert return expression of type 'String' to return type 'Int'}}
+    } content: {
+      EmptyView()
     }
   }
 }

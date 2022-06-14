@@ -1105,8 +1105,10 @@ constraints::getCompletionArgInfo(ASTNode anchor, ConstraintSystem &CS) {
 class ArgumentFailureTracker : public MatchCallArgumentListener {
 protected:
   ConstraintSystem &CS;
+  NullablePtr<ValueDecl> Callee;
   SmallVectorImpl<AnyFunctionType::Param> &Arguments;
   ArrayRef<AnyFunctionType::Param> Parameters;
+  Optional<unsigned> UnlabeledTrailingClosureArgIndex;
   ConstraintLocatorBuilder Locator;
 
 private:
@@ -1138,11 +1140,14 @@ protected:
   }
 
 public:
-  ArgumentFailureTracker(ConstraintSystem &cs,
+  ArgumentFailureTracker(ConstraintSystem &cs, ValueDecl *callee,
                          SmallVectorImpl<AnyFunctionType::Param> &args,
                          ArrayRef<AnyFunctionType::Param> params,
+                         Optional<unsigned> unlabeledTrailingClosureArgIndex,
                          ConstraintLocatorBuilder locator)
-      : CS(cs), Arguments(args), Parameters(params), Locator(locator) {}
+      : CS(cs), Callee(callee), Arguments(args), Parameters(params),
+        UnlabeledTrailingClosureArgIndex(unlabeledTrailingClosureArgIndex),
+        Locator(locator) {}
 
   ~ArgumentFailureTracker() override {
     if (!MissingArguments.empty()) {
@@ -1171,6 +1176,19 @@ public:
   bool extraArgument(unsigned argIdx) override {
     if (!CS.shouldAttemptFixes())
       return true;
+
+    // If this is a trailing closure, let's check if the call is
+    // to an init of a callable type. If so, let's not record it
+    // as extraneous since it would be matched against implicitly
+    // injected `.callAsFunction` call.
+    if (UnlabeledTrailingClosureArgIndex &&
+        argIdx == *UnlabeledTrailingClosureArgIndex && Callee) {
+      if (auto *ctor = dyn_cast<ConstructorDecl>(Callee.get())) {
+        auto resultTy = ctor->getResultInterfaceType();
+        if (resultTy->isCallableNominalType(CS.DC))
+          return true;
+      }
+    }
 
     ExtraArguments.push_back(std::make_pair(argIdx, Arguments[argIdx]));
     return false;
@@ -1280,12 +1298,15 @@ class CompletionArgumentTracker : public ArgumentFailureTracker {
   struct CompletionArgInfo ArgInfo;
 
 public:
-  CompletionArgumentTracker(ConstraintSystem &cs,
+  CompletionArgumentTracker(ConstraintSystem &cs, ValueDecl *callee,
                             SmallVectorImpl<AnyFunctionType::Param> &args,
                             ArrayRef<AnyFunctionType::Param> params,
+                            Optional<unsigned> unlabeledTrailingClosureArgIndex,
                             ConstraintLocatorBuilder locator,
                             struct CompletionArgInfo ArgInfo)
-      : ArgumentFailureTracker(cs, args, params, locator), ArgInfo(ArgInfo) {}
+      : ArgumentFailureTracker(cs, callee, args, params,
+                               unlabeledTrailingClosureArgIndex, locator),
+        ArgInfo(ArgInfo) {}
 
   Optional<unsigned> missingArgument(unsigned paramIdx,
                                      unsigned argInsertIdx) override {
@@ -1695,14 +1716,16 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
     if (cs.isForCodeCompletion()) {
       if (auto completionInfo = getCompletionArgInfo(locator.getAnchor(), cs)) {
         listener = std::make_unique<CompletionArgumentTracker>(
-            cs, argsWithLabels, params, locator, *completionInfo);
+            cs, callee, argsWithLabels, params,
+            argList->getFirstTrailingClosureIndex(), locator, *completionInfo);
       }
     }
     if (!listener) {
       // We didn't create an argument tracker for code completion. Create a
       // normal one.
-      listener = std::make_unique<ArgumentFailureTracker>(cs, argsWithLabels,
-                                                          params, locator);
+      listener = std::make_unique<ArgumentFailureTracker>(
+          cs, callee, argsWithLabels, params,
+          argList->getFirstTrailingClosureIndex(), locator);
     }
     auto callArgumentMatch = constraints::matchCallArguments(
         argsWithLabels, params, paramInfo,
