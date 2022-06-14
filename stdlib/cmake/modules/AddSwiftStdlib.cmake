@@ -1635,6 +1635,12 @@ function(add_swift_target_library name)
         BACK_DEPLOYMENT_LIBRARY)
   set(SWIFTLIB_multiple_parameter_options
         C_COMPILE_FLAGS
+        C_COMPILE_FLAGS_IOS
+        C_COMPILE_FLAGS_OSX
+        C_COMPILE_FLAGS_TVOS
+        C_COMPILE_FLAGS_WATCHOS
+        C_COMPILE_FLAGS_LINUX
+        C_COMPILE_FLAGS_WINDOWS
         DEPENDS
         FILE_DEPENDS
         FRAMEWORK_DEPENDS
@@ -1867,7 +1873,7 @@ function(add_swift_target_library name)
            ${SWIFTLIB_FRAMEWORK_DEPENDS_IOS_TVOS})
     endif()
 
-    # Collect architecutre agnostic compiler flags
+    # Collect architecture agnostic swift compiler flags
     set(swiftlib_swift_compile_flags_all ${SWIFTLIB_SWIFT_COMPILE_FLAGS})
     if(${sdk} STREQUAL OSX)
       list(APPEND swiftlib_swift_compile_flags_all
@@ -2022,6 +2028,27 @@ function(add_swift_target_library name)
       # Add PrivateFrameworks, rdar://28466433
       set(swiftlib_c_compile_flags_all ${SWIFTLIB_C_COMPILE_FLAGS})
       set(swiftlib_link_flags_all ${SWIFTLIB_LINK_FLAGS})
+
+      # Collect architecture agnostic c compiler flags
+      if(${sdk} STREQUAL OSX)
+        list(APPEND swiftlib_c_compile_flags_all
+             ${SWIFTLIB_C_COMPILE_FLAGS_OSX})
+      elseif(${sdk} STREQUAL IOS OR ${sdk} STREQUAL IOS_SIMULATOR)
+        list(APPEND swiftlib_c_compile_flags_all
+             ${SWIFTLIB_C_COMPILE_FLAGS_IOS})
+      elseif(${sdk} STREQUAL TVOS OR ${sdk} STREQUAL TVOS_SIMULATOR)
+        list(APPEND swiftlib_c_compile_flags_all
+             ${SWIFTLIB_C_COMPILE_FLAGS_TVOS})
+      elseif(${sdk} STREQUAL WATCHOS OR ${sdk} STREQUAL WATCHOS_SIMULATOR)
+        list(APPEND swiftlib_c_compile_flags_all
+             ${SWIFTLIB_C_COMPILE_FLAGS_WATCHOS})
+      elseif(${sdk} STREQUAL LINUX)
+        list(APPEND swiftlib_c_compile_flags_all
+             ${SWIFTLIB_C_COMPILE_FLAGS_LINUX})
+      elseif(${sdk} STREQUAL WINDOWS)
+        list(APPEND swiftlib_c_compile_flags_all
+             ${SWIFTLIB_C_COMPILE_FLAGS_WINDOWS})
+      endif()
 
       # Add flags to prepend framework search paths for the parallel framework
       # hierarchy rooted at /System/iOSSupport/...
