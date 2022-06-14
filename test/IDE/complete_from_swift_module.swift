@@ -184,7 +184,7 @@ func testAmbiguousResultBuilder() {
     // Results should only contain globalVar once
     // AMBIGOUS_RESULT_BUILER: Begin completions
     // AMBIGOUS_RESULT_BUILER-NOT: globalVar
-    // AMBIGOUS_RESULT_BUILER-DAG: Decl[GlobalVar]/OtherModule[foo_swift_module]: globalVar[#Int#]; name=globalVar
+    // AMBIGOUS_RESULT_BUILER-DAG: Decl[GlobalVar]/OtherModule[foo_swift_module]/TypeRelation[Convertible]: globalVar[#Int#]; name=globalVar
     // AMBIGOUS_RESULT_BUILER-NOT: globalVar
     // AMBIGOUS_RESULT_BUILER: End completions
   }
