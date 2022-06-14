@@ -194,6 +194,25 @@ suite.test("intersection.${inputKind}.${argumentKind}") {
 %     if needsCocoa:
 #if _runtime(_ObjC)
 %     end
+suite.test("intersection.same-number-of-duplicates-as-missing-items") {
+  let a = ${inputGenerator}([3, 6, 0, 1, 5, 2, 4], identity: 1)
+  let b = ${argumentGenerator}([0, 1, 1, 2, 3, 4, 5], identity: 2)
+  let c = a.intersection(b)
+  expectEqual(c.count, 6)
+  expectEqual(c, makeNativeSet(0 ..< 6, identity: 1))
+}
+%     if needsCocoa:
+#endif
+%     end
+%   end
+% end
+
+% for inputKind, inputGenerator in inputKinds.items():
+%   for argumentKind, argumentGenerator in argumentKinds.items():
+%     needsCocoa = inputKind == "cocoa" or argumentKind == "cocoa"
+%     if needsCocoa:
+#if _runtime(_ObjC)
+%     end
 suite.test("formIntersection.${inputKind}.${argumentKind}") {
   var a = ${inputGenerator}(0 ..< 10, identity: 1)
   let b = ${argumentGenerator}(5 ..< 15, identity: 2)
