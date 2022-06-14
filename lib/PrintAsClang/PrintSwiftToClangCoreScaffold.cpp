@@ -14,9 +14,11 @@
 #include "ClangSyntaxPrinter.h"
 #include "PrimitiveTypeMapping.h"
 #include "SwiftToClangInteropContext.h"
+#include "swift/ABI/MetadataValues.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Type.h"
 #include "swift/IRGen/IRABIDetailsProvider.h"
+#include "llvm/ADT/STLExtras.h"
 
 using namespace swift;
 
@@ -60,6 +62,49 @@ static void printKnownType(
   printKnownStruct(typeMapping, os, name, typeRecord);
 }
 
+static void printValueWitnessTableFunctionType(raw_ostream &os, StringRef name,
+                                               StringRef returnType,
+                                               std::string paramTypes,
+                                               uint16_t ptrauthDisc) {
+  os << "using ValueWitness" << name << "Ty = " << returnType << "(*)("
+     << paramTypes << ") __ptrauth_swift_value_witness_function_pointer("
+     << ptrauthDisc << ");\n";
+}
+
+static std::string makeParams(const char *arg) { return arg; }
+
+template <class... T>
+static std::string makeParams(const char *arg, const T... args) {
+  return std::string(arg) + ", " + makeParams(args...);
+}
+
+static void printValueWitnessTable(raw_ostream &os) {
+  std::string members;
+  llvm::raw_string_ostream membersOS(members);
+
+#define WANT_ONLY_REQUIRED_VALUE_WITNESSES
+#define DATA_VALUE_WITNESS(lowerId, upperId, type)                             \
+  membersOS << "  " << type << " " << #lowerId << ";\n";
+#define FUNCTION_VALUE_WITNESS(lowerId, upperId, returnType, paramTypes)       \
+  printValueWitnessTableFunctionType(                                          \
+      os, #upperId, returnType, makeParams paramTypes,                         \
+      SpecialPointerAuthDiscriminators::upperId);                              \
+  membersOS << "  ValueWitness" << #upperId << "Ty _Nonnull " << #lowerId      \
+            << ";\n";
+#define MUTABLE_VALUE_TYPE "void * _Nonnull"
+#define IMMUTABLE_VALUE_TYPE "const void * _Nonnull"
+#define MUTABLE_BUFFER_TYPE "void * _Nonnull"
+#define IMMUTABLE_BUFFER_TYPE "const void * _Nonnull"
+#define TYPE_TYPE "void * _Nonnull"
+#define SIZE_TYPE "size_t"
+#define INT_TYPE "int"
+#define UINT_TYPE "unsigned"
+#define VOID_TYPE "void"
+#include "swift/ABI/ValueWitness.def"
+
+  os << "\nstruct ValueWitnessTable {\n" << membersOS.str() << "};\n";
+}
+
 static void printTypeMetadataResponseType(SwiftToClangInteropContext &ctx,
                                           PrimitiveTypeMapping &typeMapping,
                                           raw_ostream &os) {
@@ -82,6 +127,8 @@ void swift::printSwiftToClangCoreScaffold(SwiftToClangInteropContext &ctx,
         cxx_synthesis::getCxxImplNamespaceName(), [&](raw_ostream &) {
           printer.printExternC([&](raw_ostream &os) {
             printTypeMetadataResponseType(ctx, typeMapping, os);
+            os << "\n";
+            printValueWitnessTable(os);
           });
         });
   });

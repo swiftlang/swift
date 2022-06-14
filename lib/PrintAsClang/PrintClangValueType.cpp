@@ -61,16 +61,13 @@ printCValueTypeStorageStruct(raw_ostream &os, const NominalTypeDecl *typeDecl,
 }
 
 void printCTypeMetadataTypeFunction(raw_ostream &os,
-                                    const NominalTypeDecl *typeDecl) {
+                                    const NominalTypeDecl *typeDecl,
+                                    StringRef typeMetadataFuncName) {
   os << "// Type metadata accessor for " << typeDecl->getNameStr() << "\n";
-  auto entity = irgen::LinkEntity::forTypeMetadataAccessFunction(
-      typeDecl->getDeclaredType()->getCanonicalType());
   os << "SWIFT_EXTERN ";
   ClangSyntaxPrinter printer(os);
   printer.printSwiftImplQualifier();
-  os << "MetadataResponseTy ";
-  entity.mangle(os);
-  os << '(';
+  os << "MetadataResponseTy " << typeMetadataFuncName << '(';
   printer.printSwiftImplQualifier();
   os << "MetadataRequestTy)";
   os << " SWIFT_NOEXCEPT SWIFT_CALL;\n\n";
@@ -90,6 +87,10 @@ void ClangValueTypePrinter::printStructDecl(const StructDecl *SD) {
 
   ClangSyntaxPrinter printer(os);
 
+  auto typeMetadataFunc = irgen::LinkEntity::forTypeMetadataAccessFunction(
+      SD->getDeclaredType()->getCanonicalType());
+  std::string typeMetadataFuncName = typeMetadataFunc.mangleAsString();
+
   // Print out a forward declaration of the "hidden" _impl class.
   printer.printNamespace(cxx_synthesis::getCxxImplNamespaceName(),
                          [&](raw_ostream &os) {
@@ -99,13 +100,53 @@ void ClangValueTypePrinter::printStructDecl(const StructDecl *SD) {
 
                            // Print out special functions, like functions that
                            // access type metadata.
-                           printCTypeMetadataTypeFunction(os, SD);
+                           printCTypeMetadataTypeFunction(os, SD,
+                                                          typeMetadataFuncName);
                          });
 
   // Print out the C++ class itself.
   os << "class ";
   ClangSyntaxPrinter(os).printBaseName(SD);
   os << " final {\n";
+  os << "public:\n";
+
+  // Print out the destructor.
+  os << "  inline ~";
+  printer.printBaseName(SD);
+  os << "() {\n";
+  os << "    auto metadata = " << cxx_synthesis::getCxxImplNamespaceName()
+     << "::";
+  printer.printSwiftTypeMetadataAccessFunctionCall(typeMetadataFuncName);
+  os << ";\n";
+  os << "    auto *vwTable = ";
+  printer.printValueWitnessTableAccessFromTypeMetadata("metadata");
+  os << ";\n";
+  os << "    vwTable->destroy(_getOpaquePointer(), metadata._0);\n";
+  os << "  }\n";
+
+  os << "  inline ";
+  printer.printBaseName(SD);
+  os << "(const ";
+  printer.printBaseName(SD);
+  os << " &other) {\n";
+  os << "    auto metadata = " << cxx_synthesis::getCxxImplNamespaceName()
+     << "::";
+  printer.printSwiftTypeMetadataAccessFunctionCall(typeMetadataFuncName);
+  os << ";\n";
+  os << "    auto *vwTable = ";
+  printer.printValueWitnessTableAccessFromTypeMetadata("metadata");
+  os << ";\n";
+  os << "    vwTable->initializeWithCopy(_getOpaquePointer(), const_cast<char "
+        "*>(other._getOpaquePointer()), metadata._0);\n";
+  os << "  }\n";
+
+  // FIXME: the move constructor should be hidden somehow.
+  os << "  inline ";
+  printer.printBaseName(SD);
+  os << "(";
+  printer.printBaseName(SD);
+  os << " &&) = default;\n";
+
   // FIXME: Print the other members of the struct.
   os << "private:\n";
 

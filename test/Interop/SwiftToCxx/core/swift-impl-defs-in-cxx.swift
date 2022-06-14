@@ -23,6 +23,30 @@
 // CHECK-NEXT: // Swift type metadata request type.
 // CHECK-NEXT: typedef uint{{.*}}_t MetadataRequestTy;
 // CHECK-EMPTY:
+// CHECK-NEXT: using ValueWitnessInitializeBufferWithCopyOfBufferTy = void * _Nonnull(*)(void * _Nonnull, void * _Nonnull, void * _Nonnull) __ptrauth_swift_value_witness_function_pointer(
+// CHECK-NEXT: using ValueWitnessDestroyTy = void(*)(void * _Nonnull, void * _Nonnull) __ptrauth_swift_value_witness_function_pointer(
+// CHECK-NEXT: using ValueWitnessInitializeWithCopyTy = void * _Nonnull(*)(void * _Nonnull, void * _Nonnull, void * _Nonnull) __ptrauth_swift_value_witness_function_pointer(
+// CHECK-NEXT: using ValueWitnessAssignWithCopyTy = void * _Nonnull(*)(void * _Nonnull, void * _Nonnull, void * _Nonnull) __ptrauth_swift_value_witness_function_pointer(
+// CHECK-NEXT: using ValueWitnessInitializeWithTakeTy = void * _Nonnull(*)(void * _Nonnull, void * _Nonnull, void * _Nonnull) __ptrauth_swift_value_witness_function_pointer(
+// CHECK-NEXT: using ValueWitnessAssignWithTakeTy = void * _Nonnull(*)(void * _Nonnull, void * _Nonnull, void * _Nonnull) __ptrauth_swift_value_witness_function_pointer(
+// CHECK-NEXT: using ValueWitnessGetEnumTagSinglePayloadTy = unsigned(*)(const void * _Nonnull, unsigned, void * _Nonnull) __ptrauth_swift_value_witness_function_pointer(
+// CHECK-NEXT: using ValueWitnessStoreEnumTagSinglePayloadTy = void(*)(void * _Nonnull, unsigned, unsigned, void * _Nonnull) __ptrauth_swift_value_witness_function_pointer(
+// CHECK-EMPTY:
+// CHECK-NEXT: struct ValueWitnessTable {
+// CHECK-NEXT:  ValueWitnessInitializeBufferWithCopyOfBufferTy _Nonnull initializeBufferWithCopyOfBuffer;
+// CHECK-NEXT:  ValueWitnessDestroyTy _Nonnull destroy;
+// CHECK-NEXT:  ValueWitnessInitializeWithCopyTy _Nonnull initializeWithCopy;
+// CHECK-NEXT:  ValueWitnessAssignWithCopyTy _Nonnull assignWithCopy;
+// CHECK-NEXT:  ValueWitnessInitializeWithTakeTy _Nonnull initializeWithTake;
+// CHECK-NEXT:  ValueWitnessAssignWithTakeTy _Nonnull assignWithTake;
+// CHECK-NEXT:  ValueWitnessGetEnumTagSinglePayloadTy _Nonnull getEnumTagSinglePayload;
+// CHECK-NEXT:  ValueWitnessStoreEnumTagSinglePayloadTy _Nonnull storeEnumTagSinglePayload;
+// CHECK-NEXT:  size_t size;
+// CHECK-NEXT:  size_t stride;
+// CHECK-NEXT:  unsigned flags;
+// CHECK-NEXT:  unsigned extraInhabitantCount;
+// CHECK-NEXT: };
+// CHECK-EMPTY:
 // CHECK-NEXT: #ifdef __cplusplus
 // CHECK-NEXT: }
 // CHECK-NEXT: #endif

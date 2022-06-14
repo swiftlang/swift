@@ -77,6 +77,13 @@ public:
   static bool isClangKeyword(StringRef name);
   static bool isClangKeyword(Identifier name);
 
+  /// Print the call expression to the Swift type metadata access function.
+  void printSwiftTypeMetadataAccessFunctionCall(StringRef name);
+
+  /// Print the expression to access the value witness table pointer from the
+  /// given type metadata variable.
+  void printValueWitnessTableAccessFromTypeMetadata(StringRef metadataVariable);
+
 protected:
   raw_ostream &os;
 };
