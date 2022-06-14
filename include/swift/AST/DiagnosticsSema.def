@@ -4636,6 +4636,9 @@ ERROR(distributed_actor_func_param_not_codable,none,
 ERROR(distributed_actor_target_result_not_codable,none,
       "result type %0 of %1 %2 does not conform to serialization requirement '%3'",
       (Type, DescriptiveDeclKind, Identifier, StringRef))
+ERROR(distributed_actor_system_serialization_req_must_be_protocol,none,
+      "'SerializationRequirement' type witness %0 must be a protocol type",
+      (Type))
 ERROR(distributed_actor_remote_func_implemented_manually,none,
       "distributed instance method's %0 remote counterpart %1 cannot not be implemented manually.",
       (Identifier, Identifier))

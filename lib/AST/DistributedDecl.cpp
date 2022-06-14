@@ -355,12 +355,21 @@ swift::getDistributedSerializationRequirements(
   if (existentialRequirementTy->isAny())
     return true; // we're done here, any means there are no requirements
 
-  auto serialReqType = existentialRequirementTy->castTo<ExistentialType>()
-                           ->getConstraintType()
-                           ->getDesugaredType();
+  if (!existentialRequirementTy->isExistentialType()) {
+    // SerializationRequirement must be an existential type
+    return false;
+  }
+
+  ExistentialType *serialReqType = existentialRequirementTy
+                                       ->castTo<ExistentialType>();
+  if (!serialReqType || serialReqType->hasError()) {
+    return false;
+  }
+
+  auto desugaredTy = serialReqType->getConstraintType()->getDesugaredType();
   auto flattenedRequirements =
       flattenDistributedSerializationTypeToRequiredProtocols(
-          serialReqType);
+          desugaredTy);
   for (auto p : flattenedRequirements) {
     requirementProtos.insert(p);
   }
