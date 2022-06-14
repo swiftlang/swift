@@ -9152,12 +9152,11 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
 
     case ClosureActorIsolation::ActorInstance: {
       auto selfDecl = isolation.getActorInstance();
-      auto actorClass = selfDecl->getType()->getReferenceStorageReferent()
-          ->getClassOrBoundGenericClass();
-      // FIXME: Doesn't work properly with generics #59356
-      assert(actorClass && "Bad closure actor isolation?");
-      return ActorIsolation::forActorInstance(actorClass)
-                .withPreconcurrency(isolation.preconcurrency());
+      auto actor = selfDecl->getType()->getReferenceStorageReferent()
+          ->getAnyActor();
+      assert(actor && "Bad closure actor isolation?");
+      return ActorIsolation::forActorInstance(actor)
+        .withPreconcurrency(isolation.preconcurrency());
     }
     }
   }
