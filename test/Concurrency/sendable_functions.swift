@@ -4,6 +4,7 @@
 
 @Sendable func globalFunc() { }
 
+@available(SwiftStdlib 5.1, *)
 actor A {
   var state: Bool = false
   
@@ -18,6 +19,8 @@ actor A {
   }
 }
 
+@available(SwiftStdlib 5.1, *)
 @MainActor @Sendable func globalActorFunc() { } // expected-warning{{main actor-isolated synchronous global function 'globalActorFunc()' cannot be marked as '@Sendable'}}
 
+@available(SwiftStdlib 5.1, *)
 @MainActor @Sendable func globalActorFuncAsync() async { }
