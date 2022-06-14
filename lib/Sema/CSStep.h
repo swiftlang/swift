@@ -931,6 +931,11 @@ class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
   /// in isolated mode.
   SmallVector<Solution, 4> IsolatedSolutions;
 
+  /// If \c ConjunctionStep::attempt modified the constraint system options,
+  /// it will store the original options in this \c llvm::SaveAndRestore.
+  /// Upon \c resume, these values will be restored.
+  Optional<llvm::SaveAndRestore<ConstraintSystemOptions>> ModifiedOptions;
+
 public:
   ConjunctionStep(ConstraintSystem &cs, Constraint *conjunction,
                   SmallVectorImpl<Solution> &solutions)

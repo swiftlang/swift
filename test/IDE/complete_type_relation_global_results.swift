@@ -137,15 +137,14 @@ func testGenericReturn<T: MyProto>() -> T {
   return #^GENERIC_RETURN^#
 }
 
-// FIXME: We don't support USR-based type comparison in generic contexts. MyProto, returnMyProto, makeFoo and FooBar should be 'Convertible'
 // GENERIC_RETURN: Begin completions
-// GENERIC_RETURN-DAG: Decl[Struct]/OtherModule[Lib]: Foo[#Foo#];
-// GENERIC_RETURN-DAG: Decl[GlobalVar]/OtherModule[Lib]: GLOBAL_FOO[#Foo#];
+// GENERIC_RETURN-DAG: Decl[Struct]/OtherModule[Lib]/TypeRelation[Convertible]: Foo[#Foo#];
+// GENERIC_RETURN-DAG: Decl[GlobalVar]/OtherModule[Lib]/TypeRelation[Convertible]: GLOBAL_FOO[#Foo#];
 // GENERIC_RETURN-DAG: Decl[Struct]/OtherModule[Lib]:      Bar[#Bar#];
-// GENERIC_RETURN-DAG: Decl[Protocol]/OtherModule[Lib]/Flair[RareType]: MyProto[#MyProto#];
-// GENERIC_RETURN-DAG: Decl[FreeFunction]/OtherModule[Lib]: makeFoo()[#Foo#];
-// GENERIC_RETURN-DAG: Decl[Struct]/OtherModule[Lib]: FooBar[#FooBar#];
-// GENERIC_RETURN-DAG: Decl[FreeFunction]/OtherModule[Lib]: returnSomeMyProto()[#MyProto#];
+// GENERIC_RETURN-DAG: Decl[Protocol]/OtherModule[Lib]/Flair[RareType]/TypeRelation[Convertible]: MyProto[#MyProto#];
+// GENERIC_RETURN-DAG: Decl[FreeFunction]/OtherModule[Lib]/TypeRelation[Convertible]: makeFoo()[#Foo#];
+// GENERIC_RETURN-DAG: Decl[Struct]/OtherModule[Lib]/TypeRelation[Convertible]: FooBar[#FooBar#];
+// GENERIC_RETURN-DAG: Decl[FreeFunction]/OtherModule[Lib]/TypeRelation[Convertible]: returnSomeMyProto()[#MyProto#];
 // GENERIC_RETURN: End completions
 
 // RUN: %empty-directory(%t/completion-cache)
@@ -220,9 +219,9 @@ func protoWithAssocTypeInGenericContext<T: ProtoWithAssocType>() -> T {
 }
 
 // PROTO_WITH_ASSOC_TYPE_GENERIC_RETURN_CONTEXT: Begin completions
-// PROTO_WITH_ASSOC_TYPE_GENERIC_RETURN_CONTEXT-DAG: Decl[Struct]/OtherModule[Lib]: StructWithAssocType[#StructWithAssocType#];
-// PROTO_WITH_ASSOC_TYPE_GENERIC_RETURN_CONTEXT-DAG: Decl[FreeFunction]/OtherModule[Lib]: makeProtoWithAssocType()[#ProtoWithAssocType#];
-// PROTO_WITH_ASSOC_TYPE_GENERIC_RETURN_CONTEXT-DAG: Decl[Protocol]/OtherModule[Lib]/Flair[RareType]: ProtoWithAssocType[#ProtoWithAssocType#];
+// PROTO_WITH_ASSOC_TYPE_GENERIC_RETURN_CONTEXT-DAG: Decl[Struct]/OtherModule[Lib]/TypeRelation[Convertible]: StructWithAssocType[#StructWithAssocType#];
+// PROTO_WITH_ASSOC_TYPE_GENERIC_RETURN_CONTEXT-DAG: Decl[FreeFunction]/OtherModule[Lib]/TypeRelation[Convertible]: makeProtoWithAssocType()[#ProtoWithAssocType#];
+// PROTO_WITH_ASSOC_TYPE_GENERIC_RETURN_CONTEXT-DAG: Decl[Protocol]/OtherModule[Lib]/Flair[RareType]/TypeRelation[Convertible]: ProtoWithAssocType[#ProtoWithAssocType#];
 // PROTO_WITH_ASSOC_TYPE_GENERIC_RETURN_CONTEXT: End completions
 
 

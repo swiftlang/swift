@@ -6139,6 +6139,10 @@ public:
     Element->print(Out, SM);
   }
 
+  /// Returns \c false if this conjunction element is known not to contain the
+  /// code compleiton token.
+  bool mightContainCodeCompletionToken(const ConstraintSystem &cs) const;
+
 private:
   /// Find type variables referenced by this conjunction element.
   /// If this is a closure body element, it would look inside \c ASTNode.

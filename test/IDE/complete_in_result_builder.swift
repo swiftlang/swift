@@ -250,3 +250,27 @@ func testTypeRelationInResultBuilder() {
     }
   }
 }
+
+func testAmbiguousInResultBuilder() {
+  @resultBuilder
+  struct MyViewBuilder {
+    static func buildBlock(_ x: Int) -> Int { return x }
+  }
+
+  struct QStack {
+    init(@MyViewBuilder content: () -> Int) {}
+  }
+
+  struct Foo {
+    func qtroke(_ content: Int, style: Int) -> Int { return 1 }
+    func qtroke(_ content: Int, lineWidth: Int = 1) -> Int { return 2 }
+  }
+
+  QStack {
+    Foo().qtroke(0, #^AMBIGUOUS_IN_RESULT_BUILDER^#)
+// AMBIGUOUS_IN_RESULT_BUILDER: Begin completions, 2 items
+// AMBIGUOUS_IN_RESULT_BUILDER-DAG: Pattern/Local/Flair[ArgLabels]:     {#style: Int#}[#Int#];
+// AMBIGUOUS_IN_RESULT_BUILDER-DAG: Pattern/Local/Flair[ArgLabels]:     {#lineWidth: Int#}[#Int#];
+// AMBIGUOUS_IN_RESULT_BUILDER: End completions
+  }
+}

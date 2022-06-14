@@ -828,6 +828,17 @@ bool ConjunctionStep::attempt(const ConjunctionElement &element) {
     CS.Timer.emplace(element.getLocator(), CS);
   }
 
+  assert(!ModifiedOptions.hasValue() &&
+         "Previously modified options should have been restored in resume");
+  if (CS.isForCodeCompletion() &&
+      !element.mightContainCodeCompletionToken(CS)) {
+    ModifiedOptions.emplace(CS.Options);
+    // If we know that this conjunction element doesn't contain the code
+    // completion token, type check it in normal mode without any special
+    // behavior that is intended for the code completion token.
+    CS.Options -= ConstraintSystemFlags::ForCodeCompletion;
+  }
+
   auto success = element.attempt(CS);
 
   // If element attempt has failed, mark whole conjunction
@@ -839,6 +850,9 @@ bool ConjunctionStep::attempt(const ConjunctionElement &element) {
 }
 
 StepResult ConjunctionStep::resume(bool prevFailed) {
+  // Restore the old ConstraintSystemOptions if 'attempt' modified them.
+  ModifiedOptions.reset();
+
   // Return from the follow-up splitter step that
   // attempted to apply information gained from the
   // isolated constraint to the outer context.
