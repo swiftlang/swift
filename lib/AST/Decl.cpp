@@ -5227,6 +5227,40 @@ bool ClassDecl::isForeignReferenceType() const {
   return getClangDecl() && isa<clang::RecordDecl>(getClangDecl());
 }
 
+bool ClassDecl::hasRefCountingAnnotations() const {
+  auto decl = dyn_cast_or_null<clang::RecordDecl>(getClangDecl());
+  if (!decl)
+    return false;
+
+  bool hasRetain = decl->hasAttrs() && llvm::any_of(decl->getAttrs(),
+         [](auto *attr) {
+           if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
+             return swiftAttr->getAttribute().startswith("retain:");
+           return false;
+         });
+
+  bool hasRelease = decl->hasAttrs() && llvm::any_of(decl->getAttrs(),
+         [](auto *attr) {
+           if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
+             return swiftAttr->getAttribute().startswith("release:");
+           return false;
+         });
+
+  return hasRetain && hasRelease;
+}
+
+ReferenceCounting ClassDecl::getObjectModel() const {
+  if (isForeignReferenceType())
+    return hasRefCountingAnnotations()
+               ? ReferenceCounting::CxxCustom
+               : ReferenceCounting::None;
+
+  if (checkAncestry(AncestryFlags::ObjCObjectModel))
+    return ReferenceCounting::ObjC;
+
+  return ReferenceCounting::Native;
+}
+
 EnumCaseDecl *EnumCaseDecl::create(SourceLoc CaseLoc,
                                    ArrayRef<EnumElementDecl *> Elements,
                                    DeclContext *DC) {

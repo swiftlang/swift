@@ -1163,6 +1163,7 @@ getAddrOfKnownValueWitnessTable(IRGenModule &IGM, CanType type,
       break;
     case ReferenceCounting::Error:
     case ReferenceCounting::None:
+    case ReferenceCounting::CxxCustom:
       break;
     }
   }

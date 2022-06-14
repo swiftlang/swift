@@ -33,6 +33,10 @@ enum class ReferenceCounting : uint8_t {
   /// types.
   None,
 
+  /// The object uses swift_attr("retain:XXX") and "release:XXX" to implement
+  /// reference counting.
+  CxxCustom,
+
   /// The object uses _Block_copy/_Block_release reference counting.
   ///
   /// This is a strict subset of ObjC; all blocks are also ObjC reference

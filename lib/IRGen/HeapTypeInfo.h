@@ -18,7 +18,10 @@
 #ifndef SWIFT_IRGEN_HEAPTYPEINFO_H
 #define SWIFT_IRGEN_HEAPTYPEINFO_H
 
+#include "clang/AST/Attr.h"
 #include "llvm/IR/DerivedTypes.h"
+#include "swift/AST/ASTContext.h"
+
 #include "ExtraInhabitants.h"
 #include "ReferenceTypeInfo.h"
 #include "ScalarTypeInfo.h"
@@ -27,6 +30,33 @@
 
 namespace swift {
 namespace irgen {
+
+enum class ForeignReferenceTypeRefCountingOperation { retain, release };
+
+static ValueDecl *findForeignReferenceTypeRefCountingOperation(ClassDecl *swiftDecl,
+                                                               ForeignReferenceTypeRefCountingOperation operation) {
+  std::string operationStr = operation == ForeignReferenceTypeRefCountingOperation::retain ? "retain:" : "release:";
+
+  auto decl = cast<clang::RecordDecl>(swiftDecl->getClangDecl());
+  assert(decl->hasAttrs());
+
+  auto retainFnAttr = llvm::find_if(decl->getAttrs(),
+                                    [&operationStr](auto *attr) {
+                                      if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
+                                        return swiftAttr->getAttribute().startswith(operationStr);
+                                      return false;
+                                    });
+  assert(retainFnAttr != decl->getAttrs().end());
+
+  auto name = cast<clang::SwiftAttrAttr>(*retainFnAttr)->getAttribute().drop_front(StringRef(operationStr).size());
+  auto &ctx = swiftDecl->getASTContext();
+
+  llvm::SmallVector<ValueDecl *, 1> results;
+  ctx.lookupInModule(swiftDecl->getParentModule(), name, results);
+
+  assert(results.size() == 1);
+  return results.front();
+}
 
 /// \group HeapTypeInfo
   
@@ -43,6 +73,8 @@ enum class IsaEncoding : uint8_t {
   /// way.
   Unknown = ObjC,
 };
+
+class ClassTypeInfo;
 
 /// HeapTypeInfo - A type designed for use implementing a type
 /// which consists solely of something reference-counted.
@@ -104,6 +136,18 @@ public:
   // using strong reference counting.
   void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value,
                          Atomicity atomicity) const {
+    if (asDerived().getReferenceCounting() == ReferenceCounting::CxxCustom) {
+      if constexpr (__is_same(Impl, ClassTypeInfo)) {
+        auto releaseFn = findForeignReferenceTypeRefCountingOperation(
+            asDerived().getClass(),
+            ForeignReferenceTypeRefCountingOperation::release);
+        IGF.emitForeignReferenceTypeLifetimeOperation(releaseFn, value);
+        return;
+      } else {
+        llvm_unreachable("");
+      }
+    }
+
     IGF.emitStrongRelease(value, asDerived().getReferenceCounting(), atomicity);
   }
 
@@ -113,6 +157,18 @@ public:
 
   void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value,
                         Atomicity atomicity) const {
+    if (asDerived().getReferenceCounting() == ReferenceCounting::CxxCustom) {
+      if constexpr (__is_same(Impl, ClassTypeInfo)) {
+        auto releaseFn = findForeignReferenceTypeRefCountingOperation(
+            asDerived().getClass(),
+            ForeignReferenceTypeRefCountingOperation::retain);
+        IGF.emitForeignReferenceTypeLifetimeOperation(releaseFn, value);
+        return;
+      } else {
+        llvm_unreachable("");
+      }
+    }
+
     IGF.emitStrongRetain(value, asDerived().getReferenceCounting(), atomicity);
   }
 
@@ -121,12 +177,38 @@ public:
   void strongRetain(IRGenFunction &IGF, Explosion &e,
                     Atomicity atomicity) const override {
     llvm::Value *value = e.claimNext();
+
+    if (asDerived().getReferenceCounting() == ReferenceCounting::CxxCustom) {
+      if constexpr (__is_same(Impl, ClassTypeInfo)) {
+        auto releaseFn = findForeignReferenceTypeRefCountingOperation(
+            asDerived().getClass(),
+            ForeignReferenceTypeRefCountingOperation::retain);
+        IGF.emitForeignReferenceTypeLifetimeOperation(releaseFn, value);
+        return;
+      } else {
+        llvm_unreachable("");
+      }
+    }
+
     asDerived().emitScalarRetain(IGF, value, atomicity);
   }
 
   void strongRelease(IRGenFunction &IGF, Explosion &e,
                      Atomicity atomicity) const override {
     llvm::Value *value = e.claimNext();
+
+    if (asDerived().getReferenceCounting() == ReferenceCounting::CxxCustom) {
+      if constexpr (__is_same(Impl, ClassTypeInfo)) {
+        auto releaseFn = findForeignReferenceTypeRefCountingOperation(
+            asDerived().getClass(),
+            ForeignReferenceTypeRefCountingOperation::release);
+        IGF.emitForeignReferenceTypeLifetimeOperation(releaseFn, value);
+        return;
+      } else {
+        llvm_unreachable("");
+      }
+    }
+
     asDerived().emitScalarRelease(IGF, value, atomicity);
   }
 
@@ -181,25 +263,29 @@ public:
   }
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, name) \
   void strongRetain##Name(IRGenFunction &IGF, Explosion &e, \
-                          Atomicity atomicity) const override { \
+                          Atomicity atomicity) const override {\
+    assert(asDerived().getReferenceCounting() != ReferenceCounting::CxxCustom);                                                           \
     llvm::Value *value = e.claimNext(); \
     assert(asDerived().getReferenceCounting() == ReferenceCounting::Native); \
     IGF.emitNativeStrongRetain##Name(value, atomicity); \
   } \
   void strongRetain##Name##Release(IRGenFunction &IGF, Explosion &e, \
-                                   Atomicity atomicity) const override { \
+                                   Atomicity atomicity) const override {                                                                  \
+    assert(asDerived().getReferenceCounting() != ReferenceCounting::CxxCustom);                                                           \
     llvm::Value *value = e.claimNext(); \
     assert(asDerived().getReferenceCounting() == ReferenceCounting::Native); \
     IGF.emitNativeStrongRetainAnd##Name##Release(value, atomicity); \
   } \
   void name##Retain(IRGenFunction &IGF, Explosion &e, \
-                    Atomicity atomicity) const override { \
+                    Atomicity atomicity) const override {      \
+    assert(asDerived().getReferenceCounting() != ReferenceCounting::CxxCustom);                                                           \
     llvm::Value *value = e.claimNext(); \
     assert(asDerived().getReferenceCounting() == ReferenceCounting::Native); \
     IGF.emitNative##Name##Retain(value, atomicity); \
   } \
   void name##Release(IRGenFunction &IGF, Explosion &e, \
-                      Atomicity atomicity) const override { \
+                      Atomicity atomicity) const override {    \
+    assert(asDerived().getReferenceCounting() != ReferenceCounting::CxxCustom);                                                           \
     llvm::Value *value = e.claimNext(); \
     assert(asDerived().getReferenceCounting() == ReferenceCounting::Native); \
     IGF.emitNative##Name##Release(value, atomicity); \

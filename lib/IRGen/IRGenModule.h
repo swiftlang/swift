@@ -837,6 +837,7 @@ public:
     case ReferenceCounting::ObjC:
     case ReferenceCounting::Block:
     case ReferenceCounting::None:
+    case ReferenceCounting::CxxCustom:
       return true;
 
     case ReferenceCounting::Bridge:
