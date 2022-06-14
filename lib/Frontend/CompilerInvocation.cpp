@@ -607,7 +607,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   // Determine whether string processing is enabled
   Opts.EnableExperimentalStringProcessing =
     Args.hasFlag(OPT_enable_experimental_string_processing,
-                 OPT_disable_experimental_string_processing);
+                 OPT_disable_experimental_string_processing, /*Default=*/true);
 
   // Add a future feature if it is not already implied by the language version.
   auto addFutureFeatureIfNotImplied = [&](Feature feature) {
