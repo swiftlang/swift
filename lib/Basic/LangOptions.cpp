@@ -202,7 +202,7 @@ checkPlatformCondition(PlatformConditionKind Kind, StringRef Value) const {
 
   if (Kind == PlatformConditionKind::OS && Value == "Darwin") {
     // "Darwin" is an alias for all Darwin platforms.
-    return checkPlatformCondition(Kind, "macOS") ||
+    return checkPlatformCondition(Kind, "OSX") ||
            checkPlatformCondition(Kind, "iOS") ||
            checkPlatformCondition(Kind, "tvOS") ||
            checkPlatformCondition(Kind, "watchOS");
@@ -273,8 +273,6 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   // Set the "os" platform condition.
   switch (Target.getOS()) {
   case llvm::Triple::Darwin:
-    addPlatformConditionValue(PlatformConditionKind::OS, "Darwin");
-    break;
   case llvm::Triple::MacOSX:
     addPlatformConditionValue(PlatformConditionKind::OS, "OSX");
     break;
