@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -target arm64-apple-ios8.0
+// RUN: %swift -typecheck %s -verify -target arm64-apple-ios8.0
 
 // REQUIRES: OS=ios
 
