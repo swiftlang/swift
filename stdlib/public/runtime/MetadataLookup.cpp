@@ -2374,49 +2374,32 @@ buildEnvironmentPath(
 unsigned SubstGenericParametersFromMetadata::buildShapePath(
     const TargetExtendedExistentialTypeShape<InProcess> *shape) const {
   unsigned totalParamCount = 0;
-  unsigned totalKeyParamCount = 0;
 
   auto genSig = shape->getGeneralizationSignature();
   if (!genSig.getParams().empty()) {
-    bool hasNonKeyGenericParams = false;
-    unsigned numKeyGenericParamsHere = 0;
-    for (const auto &gp : genSig.getParams()) {
-      if (gp.hasKeyArgument())
-        numKeyGenericParamsHere++;
-      else
-        hasNonKeyGenericParams = true;
-    }
-    totalParamCount += numKeyGenericParamsHere;
-    totalKeyParamCount += numKeyGenericParamsHere;
-    descriptorPath.push_back(PathElement{genSig.getParams(), totalParamCount,
+    totalParamCount += genSig.getParams().size();
+    descriptorPath.push_back(PathElement{genSig.getParams(),
+                                         totalParamCount,
                                          /*numKeyGenericParamsInParent*/ 0,
-                                         numKeyGenericParamsHere,
-                                         hasNonKeyGenericParams});
+                                         (unsigned)genSig.getParams().size(),
+                                         /*hasNonKeyGenericParams*/ false});
   }
 
   const unsigned genSigParamCount = genSig.getParams().size();
   auto reqSig = shape->getRequirementSignature();
   assert(reqSig.getParams().size() > genSig.getParams().size());
   {
-    bool hasNonKeyGenericParams = false;
-    unsigned numKeyGenericParamsHere = 0;
     auto remainingParams = reqSig.getParams().drop_front(genSig.getParams().size());
-    for (const auto &gp : remainingParams) {
-      if (gp.hasKeyArgument())
-        numKeyGenericParamsHere++;
-      else
-        hasNonKeyGenericParams = true;
-    }
-    totalParamCount += numKeyGenericParamsHere;
-    totalKeyParamCount += numKeyGenericParamsHere;
+    totalParamCount += remainingParams.size();
     descriptorPath.push_back(PathElement{remainingParams,
                                          totalParamCount,
                                          genSigParamCount,
-                                         numKeyGenericParamsHere,
-                                         hasNonKeyGenericParams});
+                                         (unsigned)remainingParams.size(),
+                                         /*hasNonKeyGenericParams*/ false});
   }
 
-  return totalKeyParamCount;
+  // All parameters in this signature are key parameters.
+  return totalParamCount;
 }
 
 void SubstGenericParametersFromMetadata::setup() const {

@@ -3980,32 +3980,6 @@ ExistentialTypeMetadata::projectValue(const OpaqueValue *container) const {
       "Unhandled ExistentialTypeRepresentation in switch.");
 }
 
-template <>
-const OpaqueValue *ExtendedExistentialTypeMetadata::projectValue(
-    const OpaqueValue *container) const {
-  switch (Shape->Flags.getSpecialKind()) {
-  case ExtendedExistentialTypeShape::SpecialKind::None: {
-    auto *opaqueContainer =
-        reinterpret_cast<const OpaqueExistentialContainer *>(container);
-    return opaqueContainer->projectValue();
-  }
-  case ExtendedExistentialTypeShape::SpecialKind::Class: {
-    auto classContainer =
-        reinterpret_cast<const ClassExistentialContainer *>(container);
-    return reinterpret_cast<const OpaqueValue *>(&classContainer->Value);
-  }
-  case ExtendedExistentialTypeShape::SpecialKind::Metatype: {
-    auto *metatypeContainer =
-        reinterpret_cast<const ExistentialMetatypeContainer *>(container);
-    return reinterpret_cast<const OpaqueValue *>(&metatypeContainer->Value);
-  }
-  case ExtendedExistentialTypeShape::SpecialKind::ExplicitLayout:
-    swift_unreachable("ExplicitLayout not yet handled.");
-  }
-
-  swift_unreachable("Unhandled ExistentialTypeRepresentation in switch.");
-}
-
 template<> const Metadata *
 ExistentialTypeMetadata::getDynamicType(const OpaqueValue *container) const {
   switch (getRepresentation()) {
