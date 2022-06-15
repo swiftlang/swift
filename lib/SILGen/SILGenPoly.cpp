@@ -4440,6 +4440,34 @@ void SILGenFunction::emitProtocolWitness(
   SmallVector<ManagedValue, 8> origParams;
   collectThunkParams(loc, origParams);
 
+  // If we are supposed to enter the actor, do so now.
+  if (enterIsolation) {
+    if (enterIsolation->isDistributedActor()) {
+      // For a distributed actor, call through the distributed thunk.
+      witness = witness.asDistributed();
+    } else {
+      // For a non-distributed actor, hop to the actor.
+      Optional<ManagedValue> actorSelf;
+
+      // For an instance actor, get the actor 'self'.
+      if (*enterIsolation == ActorIsolation::ActorInstance) {
+        auto actorSelfVal = origParams.back();
+
+        if (actorSelfVal.getType().isAddress()) {
+          auto &actorSelfTL = getTypeLowering(actorSelfVal.getType());
+          if (!actorSelfTL.isAddressOnly()) {
+            actorSelfVal = emitManagedLoad(
+                *this, loc, actorSelfVal, actorSelfTL);
+          }
+        }
+
+        actorSelf = actorSelfVal;
+      }
+
+      emitHopToTargetActor(loc, enterIsolation, actorSelf);
+    }
+  }
+
   // Get the type of the witness.
   auto witnessInfo = getConstantInfo(getTypeExpansionContext(), witness);
   CanAnyFunctionType witnessSubstTy = witnessInfo.LoweredType;
@@ -4479,25 +4507,6 @@ void SILGenFunction::emitProtocolWitness(
       emitOpenExistentialInSelfConformance(*this, loc, witness, witnessSubs,
                                          origParams.back(),
                                          witnessUnsubstTy->getSelfParameter());
-  }
-
-  // If we are supposed to hop to the actor, do so now.
-  if (enterIsolation) {
-    Optional<ManagedValue> actorSelf;
-    if (*enterIsolation == ActorIsolation::ActorInstance) {
-      auto actorSelfVal = origParams.back();
-
-      if (actorSelfVal.getType().isAddress()) {
-        auto &actorSelfTL = getTypeLowering(actorSelfVal.getType());
-        if (!actorSelfTL.isAddressOnly()) {
-          actorSelfVal = emitManagedLoad(*this, loc, actorSelfVal, actorSelfTL);
-        }
-      }
-
-      actorSelf = actorSelfVal;
-    }
-
-    emitHopToTargetActor(loc, enterIsolation, actorSelf);
   }
 
   // For static C++ methods and constructors, we need to drop the (metatype)
