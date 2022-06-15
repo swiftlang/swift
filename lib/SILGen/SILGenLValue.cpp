@@ -1357,10 +1357,6 @@ namespace {
                                std::move(indices), isOnSelfParameter,
                                actorIso)
     {
-       if (isDistributedAccessor) {
-         fprintf(stderr, "[%s:%d] (%s) DIST ACCESSOR GOOD!\n", __FILE__, __LINE__, __FUNCTION__);
-         decl->dump();
-       }
       assert(getAccessorDecl()->isGetterOrSetter());
     }
     
@@ -1650,11 +1646,6 @@ namespace {
     RValue get(SILGenFunction &SGF, SILLocation loc,
                ManagedValue base, SGFContext c) && override {
       assert(getAccessorDecl()->isGetter());
-
-      if (IsDistributedAccessor) {
-        fprintf(stderr, "[%s:%d] (%s) EMIT DIST GETTER\n", __FILE__, __LINE__, __FUNCTION__);
-        base.dump();
-      }
 
       SILDeclRef getter = Accessor;
       ExecutorBreadcrumb prevExecutor;
@@ -2664,7 +2655,6 @@ namespace {
         AccessKind(accessKind) {}
 
     void emitUsingStrategy(AccessStrategy strategy) {
-      auto var = dyn_cast<VarDecl>(Storage);
       bool isDistributed = var && var->isDistributed();
 
       switch (strategy.getKind()) {
