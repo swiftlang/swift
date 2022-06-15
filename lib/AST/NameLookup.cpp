@@ -1714,12 +1714,11 @@ void NominalTypeDecl::recordObjCMethod(AbstractFunctionDecl *method,
     return;
 
   if (auto *sf = method->getParentSourceFile()) {
-    if (vec.size() == 1) {
-      // We have a conflict.
-      sf->ObjCMethodConflicts.push_back(std::make_tuple(this, selector,
-                                                        isInstanceMethod));
-    } if (vec.empty()) {
+    if (vec.empty()) {
       sf->ObjCMethodList.push_back(method);
+    } else {
+      // We have a conflict.
+      sf->ObjCMethodConflicts.insert({ this, selector, isInstanceMethod });
     }
   }
 
