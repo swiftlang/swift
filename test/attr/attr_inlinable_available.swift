@@ -655,7 +655,7 @@ public func backDeployedToInliningTarget(
 
 // MARK: - Default arguments
 
-// Default arguments act like @inlinable.
+// Default arguments act like @inlinable when in a public function.
 
 public func defaultArgsUseNoAvailable( // expected-note 3 {{add @available attribute}}
   _: Any = NoAvailable.self,
@@ -663,6 +663,15 @@ public func defaultArgsUseNoAvailable( // expected-note 3 {{add @available attri
   _: Any = AtInliningTarget.self,
   _: Any = BetweenTargets.self, // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
   _: Any = AtDeploymentTarget.self, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
+  _: Any = AfterDeploymentTarget.self // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
+) {}
+
+func defaultArgsUseInternal( // expected-note {{add @available attribute}}
+  _: Any = NoAvailable.self,
+  _: Any = BeforeInliningTarget.self,
+  _: Any = AtInliningTarget.self,
+  _: Any = BetweenTargets.self,
+  _: Any = AtDeploymentTarget.self,
   _: Any = AfterDeploymentTarget.self // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
 ) {}
 
@@ -686,6 +695,46 @@ public func spiDefaultArgsUseNoAvailable( // expected-note 1 {{add @available at
   _: Any = AtDeploymentTarget.self,
   _: Any = AfterDeploymentTarget.self // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
 ) {}
+
+// Verify that complex default argument expressions are checked appropriately.
+public func defaultArgsClosureExprNoAvailable( // expected-note 3 {{add @available attribute}}
+  _: Int = {
+    _ = NoAvailable.self
+    _ = BeforeInliningTarget.self
+    _ = AtInliningTarget.self
+    _ = BetweenTargets.self // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available' version check}}
+    _ = AtDeploymentTarget.self // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available' version check}}
+    _ = AfterDeploymentTarget.self // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available' version check}}
+    if #available(macOS 10.14.5, *) {
+      _ = BetweenTargets.self
+    }
+    if #available(macOS 10.15, *) {
+      _ = AtDeploymentTarget.self
+    }
+    if #available(macOS 11, *) {
+      _ = AfterDeploymentTarget.self
+    }
+    return 42
+  }()
+) {}
+
+func defaultArgsClosureExprInternal( // expected-note {{add @available attribute}}
+  _: Int = {
+    _ = NoAvailable.self
+    _ = BeforeInliningTarget.self
+    _ = AtInliningTarget.self
+    _ = BetweenTargets.self
+    _ = AtDeploymentTarget.self
+    _ = AfterDeploymentTarget.self // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available' version check}}
+    if #available(macOS 11, *) {
+      _ = AfterDeploymentTarget.self
+    }
+    return 42
+  }()
+) {}
+
+
+// MARK: - Properties
 
 @propertyWrapper
 public struct PropertyWrapper<T> {
