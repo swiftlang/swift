@@ -102,7 +102,7 @@ swift::Witness RequirementMatch::getWitness(ASTContext &ctx) const {
   auto syntheticEnv = ReqEnv->getSyntheticEnvironment();
   return swift::Witness(this->Witness, WitnessSubstitutions,
                         syntheticEnv, ReqEnv->getRequirementToSyntheticMap(),
-                        DerivativeGenSig);
+                        DerivativeGenSig, None);
 }
 
 AssociatedTypeDecl *
@@ -2953,7 +2953,7 @@ static bool hasExplicitGlobalActorAttr(ValueDecl *decl) {
   return !globalActorAttr->first->isImplicit();
 }
 
-bool ConformanceChecker::checkActorIsolation(
+Optional<ActorIsolation> ConformanceChecker::checkActorIsolation(
     ValueDecl *requirement, ValueDecl *witness) {
   /// Retrieve a concrete witness for Sendable checking.
   auto getConcreteWitness = [&] {
@@ -2993,12 +2993,12 @@ bool ConformanceChecker::checkActorIsolation(
     }
 
     // Otherwise, we're done.
-    return false;
+    return None;
 
   case ActorReferenceResult::ExitsActorToNonisolated:
     diagnoseNonSendableTypesInReference(
         getConcreteWitness(), DC, loc, SendableCheckReason::Conformance);
-    return false;
+    return None;
 
   case ActorReferenceResult::EntersActor:
     // Handled below.
@@ -3077,12 +3077,16 @@ bool ConformanceChecker::checkActorIsolation(
     // that is explicitly marked nonisolated.
     if (isa<ConstructorDecl>(witness) &&
         witness->getAttrs().hasAttribute<NonisolatedAttr>())
-      return false;
+      return None;
 
     diagnoseNonSendableTypesInReference(
         getConcreteWitness(), DC, loc, SendableCheckReason::Conformance);
 
-    return false;
+    if (refResult.isolation.isActorIsolated() && isAsyncDecl(requirement) &&
+        !isAsyncDecl(witness))
+      return refResult.isolation;
+
+    return None;
   }
 
   // Limit the behavior of the diagnostic based on context.
@@ -3101,7 +3105,6 @@ bool ConformanceChecker::checkActorIsolation(
 
   // Complain that this witness cannot conform to the requirement due to
   // actor isolation.
-  bool isError = (behavior == DiagnosticBehavior::Unspecified);
   witness->diagnose(diag::actor_isolated_witness,
                     isDistributed && !isDistributedDecl(witness),
                     refResult.isolation, witness->getDescriptiveKind(),
@@ -3189,7 +3192,7 @@ bool ConformanceChecker::checkActorIsolation(
     requirement->diagnose(diag::decl_declared_here, requirement->getName());
   }
 
-  return isError;
+  return None;
 }
 
 bool ConformanceChecker::checkObjCTypeErasedGenerics(
@@ -5092,8 +5095,13 @@ void ConformanceChecker::resolveValueWitnesses() {
 
       auto &C = witness->getASTContext();
 
-      if (checkActorIsolation(requirement, witness)) {
-        return;
+      // Check actor isolation. If we need to enter into the actor's
+      // isolation within the witness thunk, record that.
+      if (auto enteringIsolation = checkActorIsolation(requirement, witness)) {
+        Conformance->overrideWitness(
+            requirement,
+            Conformance->getWitnessUncached(requirement)
+              .withEnterIsolation(*enteringIsolation));
       }
 
       // Objective-C checking for @objc requirements.
