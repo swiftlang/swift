@@ -1444,7 +1444,6 @@ public:
                          SubstitutionMap substitutions,
                          ArgumentSource &&optionalSelfValue, bool isSuper,
                          bool isDirectAccessorUse,
-                         bool isDistributed,
                          PreparedArguments &&optionalSubscripts, SGFContext C,
                          bool isOnSelfParameter);
 
@@ -1478,7 +1477,7 @@ public:
   ManagedValue emitAddressorAccessor(
       SILLocation loc, SILDeclRef addressor, SubstitutionMap substitutions,
       ArgumentSource &&optionalSelfValue, bool isSuper,
-      bool isDirectAccessorUse, bool isDistributed,
+      bool isDirectAccessorUse,
       PreparedArguments &&optionalSubscripts,
       SILType addressType, bool isOnSelfParameter);
 
