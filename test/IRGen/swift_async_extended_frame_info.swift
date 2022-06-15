@@ -8,6 +8,7 @@
 // RUN: %target-swift-frontend -disable-availability-checking -swift-async-frame-pointer=always -target x86_64-apple-macosx12 %s -S | %FileCheck  -check-prefix=ALWAYS %s
 
 // REQUIRES: OS=macosx
+// REQUIRES: CPU=x86_64
 
 public func someAsyncFunction() async {
 }
