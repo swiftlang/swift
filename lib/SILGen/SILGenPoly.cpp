@@ -4411,14 +4411,16 @@ emitOpenExistentialInSelfConformance(SILGenFunction &SGF, SILLocation loc,
                                    : AccessKind::Read);
 }
 
-void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
-                                         CanAnyFunctionType reqtSubstTy,
-                                         SILDeclRef requirement,
-                                         SubstitutionMap reqtSubs,
-                                         SILDeclRef witness,
-                                         SubstitutionMap witnessSubs,
-                                         IsFreeFunctionWitness_t isFree,
-                                         bool isSelfConformance) {
+void SILGenFunction::emitProtocolWitness(
+    AbstractionPattern reqtOrigTy,
+    CanAnyFunctionType reqtSubstTy,
+    SILDeclRef requirement,
+    SubstitutionMap reqtSubs,
+    SILDeclRef witness,
+    SubstitutionMap witnessSubs,
+    IsFreeFunctionWitness_t isFree,
+    bool isSelfConformance,
+    Optional<ActorIsolation> enterIsolation) {
   // FIXME: Disable checks that the protocol witness carries debug info.
   // Should we carry debug info for witnesses?
   F.setBare(IsBare);
@@ -4437,6 +4439,34 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
 
   SmallVector<ManagedValue, 8> origParams;
   collectThunkParams(loc, origParams);
+
+  // If we are supposed to enter the actor, do so now.
+  if (enterIsolation) {
+    if (enterIsolation->isDistributedActor()) {
+      // For a distributed actor, call through the distributed thunk.
+      witness = witness.asDistributed();
+    } else {
+      // For a non-distributed actor, hop to the actor.
+      Optional<ManagedValue> actorSelf;
+
+      // For an instance actor, get the actor 'self'.
+      if (*enterIsolation == ActorIsolation::ActorInstance) {
+        auto actorSelfVal = origParams.back();
+
+        if (actorSelfVal.getType().isAddress()) {
+          auto &actorSelfTL = getTypeLowering(actorSelfVal.getType());
+          if (!actorSelfTL.isAddressOnly()) {
+            actorSelfVal = emitManagedLoad(
+                *this, loc, actorSelfVal, actorSelfTL);
+          }
+        }
+
+        actorSelf = actorSelfVal;
+      }
+
+      emitHopToTargetActor(loc, enterIsolation, actorSelf);
+    }
+  }
 
   // Get the type of the witness.
   auto witnessInfo = getConstantInfo(getTypeExpansionContext(), witness);

@@ -6936,6 +6936,12 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
         fatal(witnessSubstitutions.takeError());
     }
 
+    // Determine whether we need to enter the actor isolation of the witness.
+    Optional<ActorIsolation> enterIsolation;
+    if (*rawIDIter++) {
+      enterIsolation = getActorIsolation(witness);
+    }
+
     // Handle opaque witnesses that couldn't be deserialized.
     if (isOpaque) {
       trySetOpaqueWitness();
@@ -6943,7 +6949,9 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     }
 
     // Set the witness.
-    trySetWitness(Witness::forDeserialized(witness, witnessSubstitutions.get()));
+    trySetWitness(
+        Witness::forDeserialized(
+          witness, witnessSubstitutions.get(), enterIsolation));
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");
   
