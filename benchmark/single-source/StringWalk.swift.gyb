@@ -115,7 +115,7 @@ public let benchmarks = [
   BenchmarkInfo(
     name: "StringWalk_${Name}_${Kind}${Direction}",
     runFunction: run_StringWalk_${Name}_${Kind}${Direction},
-    tags: [.api, .String, .skip],
+    tags: [.validation, .api, .String],
     legacyFactor: 40),
 
 %     end # Kinds
