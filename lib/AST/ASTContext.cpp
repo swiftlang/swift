@@ -606,10 +606,9 @@ ASTContext::ASTContext(
     symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
     SourceManager &SourceMgr, DiagnosticEngine &Diags,
     std::function<bool(llvm::StringRef, bool)> PreModuleImportCallback)
-    : LangOpts(langOpts), TypeCheckerOpts(typecheckOpts), SILOpts(silOpts),
+    : LangOpts(langOpts), TypeCheckerOpts(typeckOpts), SILOpts(silOpts),
       SearchPathOpts(SearchPathOpts), ClangImporterOpts(ClangImporterOpts),
       SymbolGraphOpts(SymbolGraphOpts), SourceMgr(SourceMgr), Diags(Diags),
-      PreModuleImportCallback(PreModuleImportCallback),
       evaluator(Diags, langOpts), TheBuiltinModule(createBuiltinModule(*this)),
       StdlibModuleName(getIdentifier(STDLIB_NAME)),
       SwiftShimsModuleName(getIdentifier(SWIFT_SHIMS_NAME)),
@@ -625,6 +624,7 @@ ASTContext::ASTContext(
     The##SHORT_ID##Type(new (*this, AllocationArena::Permanent) \
                           ID##Type(*this)),
 #include "swift/AST/TypeNodes.def"
+      PreModuleImportCallback(PreModuleImportCallback),
       TheIEEE32Type(new (*this, AllocationArena::Permanent)
                         BuiltinFloatType(BuiltinFloatType::IEEE32, *this)),
       TheIEEE64Type(new (*this, AllocationArena::Permanent)
