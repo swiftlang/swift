@@ -902,7 +902,14 @@ getClangInvocationFileMapping(ASTContext &ctx) {
       new clang::DiagnosticOptions());
   clang::driver::Driver clangDriver(ctx.ClangImporterOpts.clangPath,
                                     triple.str(), *clangDiags);
-  llvm::opt::InputArgList clangDriverArgs;
+  // Flags passed to Swift with `-Xcc` might affect include paths.
+  unsigned unused1, unused2;
+  std::vector<const char *> clangArgs;
+  for (const auto &each : ctx.ClangImporterOpts.ExtraArgs) {
+    clangArgs.push_back(each.c_str());
+  }
+  llvm::opt::InputArgList clangDriverArgs =
+      clangDriver.getOpts().ParseArgs(clangArgs, unused1, unused2);
   // If an SDK path was explicitly passed to Swift, make sure to pass it to
   // Clang driver as well. It affects the resulting include paths.
   auto sdkPath = ctx.SearchPathOpts.getSDKPath();
