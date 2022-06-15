@@ -447,8 +447,6 @@ bool swift::checkDistributedActorSystem(const NominalTypeDecl *system) {
   // work to enable associatedtypes to be constrained to class or protocol,
   // which then will unlock using them as generic constraints in protocols.
   Type requirementTy = getDistributedSerializationRequirementType(nominal, DAS);
-  requirementTy->dump();
-
   if (auto existentialTy = requirementTy->getAs<ExistentialType>()) {
     requirementTy = existentialTy->getConstraintType();
   }

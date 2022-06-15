@@ -41,67 +41,6 @@ struct MissingRemoteCall: DistributedActorSystem {
   }
 }
 
-struct MissingRemoteCall_missingInout_on_encoder: DistributedActorSystem {
-  // expected-error@-1{{struct 'MissingRemoteCall_missingInout_on_encoder' is missing witness for protocol requirement 'remoteCall'}}
-  // expected-note@-2{{protocol 'MissingRemoteCall_missingInout_on_encoder' requires function 'remoteCall' with signature:}}
-
-  // expected-error@-4{{struct 'MissingRemoteCall_missingInout_on_encoder' is missing witness for protocol requirement 'remoteCallVoid'}}
-  // expected-note@-5{{protocol 'MissingRemoteCall_missingInout_on_encoder' requires function 'remoteCallVoid' with signature:}}
-
-  typealias ActorID = ActorAddress
-  typealias InvocationDecoder = FakeInvocationDecoder
-  typealias InvocationEncoder = FakeInvocationEncoder
-  typealias SerializationRequirement = Codable
-  typealias ResultHandler = FakeResultHandler
-
-  func resolve<Act>(id: ActorID, as actorType: Act.Type)
-    throws -> Act? where Act: DistributedActor {
-    return nil
-  }
-
-  func assignID<Act>(_ actorType: Act.Type) -> ActorID
-    where Act: DistributedActor {
-    ActorAddress(parse: "fake://123")
-  }
-
-  func actorReady<Act>(_ actor: Act)
-    where Act: DistributedActor,
-    Act.ID == ActorID {
-  }
-
-  func resignID(_ id: ActorID) {
-  }
-
-  func remoteCall<Act, Err, Res>(
-      on actor: Act,
-      target: RemoteCallTarget,
-      invocation: InvocationEncoder, // MISSING 'inout'
-      throwing: Err.Type,
-      returning: Res.Type
-  ) async throws -> Res
-      where Act: DistributedActor,
-      Act.ID == ActorID,
-      Err: Error,
-      Res: SerializationRequirement {
-    fatalError("NOT IMPLEMENTED \(#function)")
-  }
-
-  func remoteCallVoid<Act, Err>(
-      on actor: Act,
-      target: RemoteCallTarget,
-      invocation: InvocationEncoder, // MISSING 'inout'
-      throwing: Err.Type
-  ) async throws
-      where Act: DistributedActor,
-      Act.ID == ActorID,
-      Err: Error {
-    fatalError("NOT IMPLEMENTED \(#function)")
-  }
-
-  func makeInvocationEncoder() -> InvocationEncoder {
-  }
-}
-
 struct RemoteCallMutating: DistributedActorSystem {
   // expected-error@-1{{struct 'RemoteCallMutating' is missing witness for protocol requirement 'remoteCall'}}
   // expected-note@-2{{protocol 'DistributedActorSystem' requires function 'remoteCall' with signature:}}
