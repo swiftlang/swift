@@ -63,7 +63,7 @@ bool isKnownCType(Type t, PrimitiveTypeMapping &typeMapping) {
 // native Swift function/method.
 class CFunctionSignatureTypePrinter
     : public TypeVisitor<CFunctionSignatureTypePrinter, void,
-                         Optional<OptionalTypeKind>>,
+                         Optional<OptionalTypeKind>, bool>,
       private ClangSyntaxPrinter {
 public:
   CFunctionSignatureTypePrinter(raw_ostream &os, raw_ostream &cPrologueOS,
@@ -77,62 +77,76 @@ public:
         languageMode(languageMode), typeUseKind(typeUseKind) {}
 
   bool printIfKnownSimpleType(const TypeDecl *typeDecl,
-                              Optional<OptionalTypeKind> optionalKind) {
+                              Optional<OptionalTypeKind> optionalKind,
+                              bool isInOutParam) {
     auto knownTypeInfo = getKnownTypeInfo(typeDecl, typeMapping, languageMode);
     if (!knownTypeInfo)
       return false;
     os << knownTypeInfo->name;
-    if (knownTypeInfo->canBeNullable)
+    if (knownTypeInfo->canBeNullable) {
       printNullability(optionalKind);
+    }
+    if (isInOutParam) {
+      os << (languageMode == swift::OutputLanguageMode::Cxx ? " &" : " *");
+    }
     return true;
   }
 
-  void visitType(TypeBase *Ty, Optional<OptionalTypeKind> optionalKind) {
+  void visitType(TypeBase *Ty, Optional<OptionalTypeKind> optionalKind,
+                 bool isInOutParam) {
     assert(Ty->getDesugaredType() == Ty && "unhandled sugared type");
     os << "/* ";
     Ty->print(os);
     os << " */";
   }
 
-  void visitTupleType(TupleType *TT, Optional<OptionalTypeKind> optionalKind) {
+  void visitTupleType(TupleType *TT, Optional<OptionalTypeKind> optionalKind,
+                      bool isInOutParam) {
     assert(TT->getNumElements() == 0);
     // FIXME: Handle non-void type.
     os << "void";
   }
 
   void visitTypeAliasType(TypeAliasType *aliasTy,
-                          Optional<OptionalTypeKind> optionalKind) {
+                          Optional<OptionalTypeKind> optionalKind,
+                          bool isInOutParam) {
     const TypeAliasDecl *alias = aliasTy->getDecl();
-    if (printIfKnownSimpleType(alias, optionalKind))
+    if (printIfKnownSimpleType(alias, optionalKind, isInOutParam))
       return;
 
-    visitPart(aliasTy->getSinglyDesugaredType(), optionalKind);
+    visitPart(aliasTy->getSinglyDesugaredType(), optionalKind, isInOutParam);
   }
 
-  void visitStructType(StructType *ST,
-                       Optional<OptionalTypeKind> optionalKind) {
+  void visitStructType(StructType *ST, Optional<OptionalTypeKind> optionalKind,
+                       bool isInOutParam) {
     const StructDecl *SD = ST->getStructOrBoundGenericStruct();
 
     // Handle known type names.
-    if (printIfKnownSimpleType(SD, optionalKind))
+    if (printIfKnownSimpleType(SD, optionalKind, isInOutParam))
       return;
     // FIXME: Handle optional structures.
     if (typeUseKind == FunctionSignatureTypeUse::ParamType) {
       if (languageMode != OutputLanguageMode::Cxx &&
           interopContext.getIrABIDetails().shouldPassIndirectly(ST)) {
         // FIXME: it would be nice to print out the C struct type here.
-        os << "const void * _Nonnull";
+        if (isInOutParam) {
+          os << "void * _Nonnull";
+        } else {
+          os << "const void * _Nonnull";
+        }
+
       } else {
         ClangValueTypePrinter(os, cPrologueOS, typeMapping, interopContext)
-            .printValueTypeParameterType(SD, languageMode);
+            .printValueTypeParameterType(SD, languageMode, isInOutParam);
       }
     } else
       ClangValueTypePrinter(os, cPrologueOS, typeMapping, interopContext)
           .printValueTypeReturnType(SD, languageMode);
   }
 
-  void visitPart(Type Ty, Optional<OptionalTypeKind> optionalKind) {
-    TypeVisitor::visit(Ty, optionalKind);
+  void visitPart(Type Ty, Optional<OptionalTypeKind> optionalKind,
+                 bool isInOutParam) {
+    TypeVisitor::visit(Ty, optionalKind, isInOutParam);
   }
 
 private:
@@ -157,11 +171,7 @@ void DeclAndTypeClangFunctionPrinter::printFunctionSignature(
     // see DeclAndTypePrinter::print.
     CFunctionSignatureTypePrinter typePrinter(os, cPrologueOS, typeMapping,
                                               outputLang, interopContext);
-    typePrinter.visit(ty, optionalKind);
-
-    if (isInOutParam) {
-      os << (outputLang == OutputLanguageMode::Cxx ? " &" : " *");
-    }
+    typePrinter.visit(ty, optionalKind, isInOutParam);
 
     if (!name.empty()) {
       os << ' ';
@@ -182,7 +192,8 @@ void DeclAndTypeClangFunctionPrinter::printFunctionSignature(
     CFunctionSignatureTypePrinter typePrinter(
         os, cPrologueOS, typeMapping, outputLang, interopContext,
         FunctionSignatureTypeUse::ReturnType);
-    typePrinter.visit(objTy, retKind);
+    // Param for indirect return cannot be marked as inout
+    typePrinter.visit(objTy, retKind, /*isInOutParam=*/false);
   } else {
     os << "void";
   }
@@ -236,11 +247,14 @@ void DeclAndTypeClangFunctionPrinter::printCxxToCFunctionParameterUse(
       ClangValueTypePrinter(os, cPrologueOS, typeMapping, interopContext)
           .printParameterCxxToCUseScaffold(
               interopContext.getIrABIDetails().shouldPassIndirectly(type),
-              structDecl, namePrinter);
+              structDecl, namePrinter, param->isInOut());
       return;
     }
   }
   // Primitive types are passed directly without any conversions.
+  if (param->isInOut()) {
+    os << "&";
+  }
   namePrinter();
 }
 
@@ -261,10 +275,6 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
         os << ", ";
       size_t index = 1;
       interleaveComma(*params, os, [&](const ParamDecl *param) {
-        if (param->isInOut()) {
-          os << "&";
-        }
-
         if (param->hasName()) {
           printCxxToCFunctionParameterUse(param, param->getName().str());
         } else {

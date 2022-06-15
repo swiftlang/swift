@@ -35,19 +35,21 @@ public:
       : os(os), cPrologueOS(cPrologueOS), typeMapping(typeMapping),
         interopContext(interopContext) {}
 
-  /// Print the C struct thunk or the C++ class definition that
-  /// corresponds to the given structure declaration.
-  void printStructDecl(const StructDecl *SD);
+  /// Print the C++ class definition that
+  /// corresponds to the given structure or enum declaration.
+  void printValueTypeDecl(const NominalTypeDecl *typeDecl);
 
   /// Print the pararameter type that referes to a Swift struct type in C/C++.
   void printValueTypeParameterType(const NominalTypeDecl *type,
-                                   OutputLanguageMode outputLang);
+                                   OutputLanguageMode outputLang,
+                                   bool isInOutParam);
 
   /// Print the use of a C++ struct/enum parameter value as it's passed to the
   /// underlying C function that represents the native Swift function.
   void
   printParameterCxxToCUseScaffold(bool isIndirect, const NominalTypeDecl *type,
-                                  llvm::function_ref<void()> cxxParamPrinter);
+                                  llvm::function_ref<void()> cxxParamPrinter,
+                                  bool isInOut);
 
   /// Print the return type that refers to a Swift struct type in C/C++.
   void printValueTypeReturnType(const NominalTypeDecl *typeDecl,

@@ -39,4 +39,12 @@ int main() {
         assert(x);
         assert(y == 3.14);
     }
+
+    {
+        char c[2] = {'A', 'B'};
+        const void *p = &c[0];
+        assert(*static_cast<const char *>(p) == 'A');
+        inoutTypeWithNullability(p);
+        assert(*static_cast<const char *>(p) == 'B');
+    }
 }
