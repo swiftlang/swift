@@ -71,7 +71,7 @@ SILGenFunction::emitGlobalVariableRef(SILLocation loc, VarDecl *var,
                                       Optional<ActorIsolation> actorIso) {
   assert(!VarLocs.count(var));
 
-  if (var->isLazilyInitializedGlobal()) {
+  if (var->isLazilyInitializedGlobal() && !var->hasStorageOrWrapsStorage()) {
     // Call the global accessor to get the variable's address.
     SILFunction *accessorFn = SGM.getFunction(
                             SILDeclRef(var, SILDeclRef::Kind::GlobalAccessor),
