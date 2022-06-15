@@ -71,8 +71,6 @@
             "remote": { "id": "apple/swift-docc-symbolkit" } },
         "swift-markdown": {
             "remote": { "id": "apple/swift-markdown" } },
-        "swift-cmark-gfm": {
-            "remote": { "id": "apple/swift-cmark" } },
         "swift-nio": {
             "remote": { "id": "apple/swift-nio" } },
         "swift-nio-ssl": {
@@ -120,7 +118,6 @@
                 "swift-docc-render-artifact": "main",
                 "swift-docc-symbolkit": "main",
                 "swift-markdown": "main",
-                "swift-cmark-gfm": "gfm",
                 "swift-nio": "2.31.2",
                 "swift-nio-ssl": "2.15.0",
                 "swift-experimental-string-processing": "swift/main"
@@ -162,7 +159,6 @@
                 "swift-docc-render-artifact": "main",
                 "swift-docc-symbolkit": "main",
                 "swift-markdown": "main",
-                "swift-cmark-gfm": "gfm",
                 "swift-nio": "2.31.2",
                 "swift-nio-ssl": "2.15.0",
                 "swift-experimental-string-processing": "swift/main"
