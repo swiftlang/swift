@@ -273,9 +273,6 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
     }
 
     auto returnLocalPropertyAccess = new (C) ReturnStmt(sloc, localPropertyAccess, implicit);
-
-    fprintf(stderr, "[%s:%d] (%s) LOCAL BRANCH\n", __FILE__, __LINE__, __FUNCTION__);
-    returnLocalPropertyAccess->dump();
     localBranchStmt =
         BraceStmt::create(C, sloc, {returnLocalPropertyAccess}, sloc, implicit);
   } else {

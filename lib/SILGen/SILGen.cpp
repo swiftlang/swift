@@ -1764,9 +1764,6 @@ void SILGenModule::visitVarDecl(VarDecl *vd) {
   if (vd->hasStorage())
     addGlobalVariable(vd);
 
-  fprintf(stderr, "[%s:%d] (%s) VISIT VAR DECL\n", __FILE__, __LINE__, __FUNCTION__);
-  vd->dump();
-
   vd->visitEmittedAccessors([&](AccessorDecl *accessor) {
     emitFunction(accessor);
   });
@@ -1833,7 +1830,6 @@ SILGenModule::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl,
   case AccessStrategy::DirectToAccessor:
   case AccessStrategy::DispatchToAccessor:
   case AccessStrategy::MaterializeToTemporary:
-//  case AccessStrategy::DirectToDistributedThunkAccessor:
     return false;
   }
   llvm_unreachable("unhandled strategy");
