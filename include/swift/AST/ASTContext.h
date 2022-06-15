@@ -223,13 +223,11 @@ class ASTContext final {
   ASTContext(const ASTContext&) = delete;
   void operator=(const ASTContext&) = delete;
 
-  ASTContext(
-      LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
-      SILOptions &silOpts, SearchPathOptions &SearchPathOpts,
-      ClangImporterOptions &ClangImporterOpts,
-      symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
-      SourceManager &SourceMgr, DiagnosticEngine &Diags,
-      std::function<bool(llvm::StringRef, bool)> PreModuleImportCallback = {});
+  ASTContext(LangOptions &langOpts, TypeCheckerOptions &typecheckOpts,
+             SILOptions &silOpts, SearchPathOptions &SearchPathOpts,
+             ClangImporterOptions &ClangImporterOpts,
+             symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
+             SourceManager &SourceMgr, DiagnosticEngine &Diags);
 
 public:
   // Members that should only be used by ASTContext.cpp.
@@ -240,13 +238,11 @@ public:
 
   void operator delete(void *Data) throw();
 
-  static ASTContext *
-  get(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
-      SILOptions &silOpts, SearchPathOptions &SearchPathOpts,
-      ClangImporterOptions &ClangImporterOpts,
-      symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
-      SourceManager &SourceMgr, DiagnosticEngine &Diags,
-      std::function<bool(llvm::StringRef, bool)> PreModuleImportCallback = {});
+  static ASTContext *get(LangOptions &langOpts, TypeCheckerOptions &typecheckOpts,
+                         SILOptions &silOpts, SearchPathOptions &SearchPathOpts,
+                         ClangImporterOptions &ClangImporterOpts,
+                         symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
+                         SourceManager &SourceMgr, DiagnosticEngine &Diags);
   ~ASTContext();
 
   /// Optional table of counters to report, nullptr when not collecting.
@@ -377,10 +373,6 @@ private:
   /// Retrieve the allocator for the given arena.
   llvm::BumpPtrAllocator &
   getAllocator(AllocationArena arena = AllocationArena::Permanent) const;
-
-  /// An optional generic callback function invoked prior to importing a module.
-  mutable std::function<bool(llvm::StringRef ModuleName, bool IsOverlay)>
-      PreModuleImportCallback;
 
 public:
   /// Allocate - Allocate memory from the ASTContext bump pointer.
@@ -1115,9 +1107,6 @@ public:
   /// If a module by this name has already been loaded, the existing module will
   /// be returned.
   ///
-  /// \param ModulePath The module's \c ImportPath which describes
-  /// the name of the module being loaded, possibly including submodules.
-
   /// \returns The requested module, or NULL if the module cannot be found.
   ModuleDecl *getModule(ImportPath::Module ModulePath);
 
