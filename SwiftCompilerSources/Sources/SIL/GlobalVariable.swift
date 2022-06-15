@@ -19,7 +19,8 @@ final public class GlobalVariable : CustomStringConvertible, HasShortDescription
   }
 
   public var description: String {
-    String(_cxxString: SILGlobalVariable_debugDescription(bridged))
+    let stdString = SILGlobalVariable_debugDescription(bridged)
+    return String(_cxxString: stdString)
   }
 
   public var shortDescription: String { name.string }
