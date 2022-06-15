@@ -662,8 +662,9 @@ void swift::printModuleContentsAsCxx(
   std::string modulePrologueBuf;
   llvm::raw_string_ostream prologueOS{modulePrologueBuf};
 
+  // FIXME: Use getRequiredAccess once @expose is supported.
   ModuleWriter writer(moduleOS, prologueOS, imports, M, interopContext,
-                      getRequiredAccess(M), OutputLanguageMode::Cxx);
+                      AccessLevel::Public, OutputLanguageMode::Cxx);
   writer.write();
 
   os << "#ifndef SWIFT_PRINTED_CORE\n";

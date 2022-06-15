@@ -74,7 +74,8 @@ void printCTypeMetadataTypeFunction(raw_ostream &os,
 }
 
 void ClangValueTypePrinter::printValueTypeDecl(
-    const NominalTypeDecl *typeDecl) {
+    const NominalTypeDecl *typeDecl,
+    llvm::function_ref<void(void)> bodyPrinter) {
   auto typeSizeAlign =
       interopContext.getIrABIDetails().getTypeSizeAlignment(typeDecl);
   if (!typeSizeAlign) {
@@ -148,7 +149,8 @@ void ClangValueTypePrinter::printValueTypeDecl(
   printer.printBaseName(typeDecl);
   os << " &&) = default;\n";
 
-  // FIXME: Print the other members of the struct.
+  bodyPrinter();
+
   os << "private:\n";
 
   // Print out private default constructor.
@@ -311,7 +313,7 @@ void ClangValueTypePrinter::printValueTypeParameterType(
 
 void ClangValueTypePrinter::printParameterCxxToCUseScaffold(
     bool isIndirect, const NominalTypeDecl *type,
-    llvm::function_ref<void()> cxxParamPrinter, bool isInOut) {
+    llvm::function_ref<void()> cxxParamPrinter, bool isInOut, bool isSelf) {
   // A Swift value type is passed to its underlying Swift function
   assert(isa<StructDecl>(type) || isa<EnumDecl>(type));
   if (!isIndirect && !isInOut) {
@@ -320,11 +322,15 @@ void ClangValueTypePrinter::printParameterCxxToCUseScaffold(
     printCTypeName(os, type);
     os << '(';
   }
-  os << cxx_synthesis::getCxxImplNamespaceName() << "::";
-  printCxxImplClassName(os, type);
-  os << "::getOpaquePointer(";
-  cxxParamPrinter();
-  os << ')';
+  if (isSelf) {
+    os << "_getOpaquePointer()";
+  } else {
+    os << cxx_synthesis::getCxxImplNamespaceName() << "::";
+    printCxxImplClassName(os, type);
+    os << "::getOpaquePointer(";
+    cxxParamPrinter();
+    os << ')';
+  }
   if (!isIndirect && !isInOut) {
     os << ')';
   }
