@@ -153,12 +153,14 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
     // subclasses of 'C' which are 'Sendable'.
     bool allowMissing = (requirementKind == RequirementKind::SameType);
 
-    bool allowUnavailable =
-        !proto->isSpecificProtocol(KnownProtocolKind::Sendable);
     auto conformance = module->lookupConformance(concreteType,
                                                  const_cast<ProtocolDecl *>(proto),
-                                                 allowMissing,
-                                                 allowUnavailable);
+                                                 allowMissing);
+    if (proto->isSpecificProtocol(KnownProtocolKind::Sendable) &&
+        conformance.hasUnavailableConformance()) {
+      conformance = ProtocolConformanceRef::forInvalid();
+    }
+
     if (conformance.isInvalid()) {
       // For superclass rules, it is totally fine to have a signature like:
       //

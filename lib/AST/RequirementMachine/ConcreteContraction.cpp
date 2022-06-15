@@ -271,16 +271,18 @@ Optional<Type> ConcreteContraction::substTypeParameterRec(
       auto *proto = assocType->getProtocol();
       auto *module = proto->getParentModule();
 
-      bool allowUnavailable =
-          !proto->isSpecificProtocol(KnownProtocolKind::Sendable);
       // The 'Sendable' protocol does not declare any associated types, so the
       // 'allowMissing' value here is actually irrelevant.
       auto conformance = ((*substBaseType)->isTypeParameter()
                           ? ProtocolConformanceRef(proto)
                           : module->lookupConformance(
                               *substBaseType, proto,
-                              /*allowMissing=*/false,
-                              allowUnavailable));
+                              /*allowMissing=*/false));
+
+      if (proto->isSpecificProtocol(KnownProtocolKind::Sendable) &&
+          conformance.hasUnavailableConformance()) {
+        conformance = ProtocolConformanceRef::forInvalid();
+      }
 
       // The base type doesn't conform, in which case the requirement remains
       // unsubstituted.
@@ -393,16 +395,22 @@ ConcreteContraction::substRequirement(const Requirement &req) const {
     if (ConcreteTypes.count(stripBoundDependentMemberTypes(firstType)) > 0)
       allowMissing = true;
 
-    bool allowUnavailable =
-        !proto->isSpecificProtocol(KnownProtocolKind::Sendable);
-    if (!substFirstType->isTypeParameter() &&
-        !module->lookupConformance(substFirstType, proto,
-                                   allowMissing, allowUnavailable)) {
-      // Handle the case of <T where T : P, T : C> where C is a class and
-      // C does not conform to P and only substitute the parent type of T
-      // by pretending we have a same-type requirement here.
-      substFirstType = substTypeParameter(
-          firstType, Position::SameTypeRequirement);
+    if (!substFirstType->isTypeParameter()) {
+      auto conformance = module->lookupConformance(substFirstType, proto,
+                                                   allowMissing);
+
+      if (proto->isSpecificProtocol(KnownProtocolKind::Sendable) &&
+          conformance.hasUnavailableConformance()) {
+        conformance = ProtocolConformanceRef::forInvalid();
+      }
+
+      if (!conformance) {
+        // Handle the case of <T where T : P, T : C> where C is a class and
+        // C does not conform to P and only substitute the parent type of T
+        // by pretending we have a same-type requirement here.
+        substFirstType = substTypeParameter(
+            firstType, Position::SameTypeRequirement);
+      }
     }
 
     // Otherwise, replace the generic parameter in the conformance

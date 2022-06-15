@@ -4357,10 +4357,13 @@ ProtocolConformance *GetImplicitSendableRequest::evaluate(
   if (classDecl) {
     if (Type superclass = classDecl->getSuperclass()) {
       auto classModule = classDecl->getParentModule();
-      if (auto inheritedConformance = TypeChecker::conformsToProtocol(
-              classDecl->mapTypeIntoContext(superclass),
-              proto, classModule, /*allowMissing=*/false,
-              /*allowUnavailable=*/false)) {
+      auto inheritedConformance = TypeChecker::conformsToProtocol(
+          classDecl->mapTypeIntoContext(superclass),
+          proto, classModule, /*allowMissing=*/false);
+      if (inheritedConformance.hasUnavailableConformance())
+        inheritedConformance = ProtocolConformanceRef::forInvalid();
+
+      if (inheritedConformance) {
         inheritedConformance = inheritedConformance
             .mapConformanceOutOfContext();
         if (inheritedConformance.isConcrete()) {
