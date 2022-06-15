@@ -697,7 +697,7 @@ namespace {
     RetTy visitSILMoveOnlyType(CanSILMoveOnlyType type,
                                AbstractionPattern origType,
                                IsTypeExpansionSensitive_t isSensitive) {
-      AbstractionPattern innerAbstraction = origType.withoutMoveOnly();
+      AbstractionPattern innerAbstraction = origType.removingMoveOnlyWrapper();
       CanType innerType = type->getInnerType();
       auto &lowering =
           TC.getTypeLowering(innerAbstraction, innerType, Expansion);
