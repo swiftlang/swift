@@ -67,6 +67,7 @@ set(swift_runtime_sources
     RuntimeInvocationsTracking.cpp
     SwiftDtoa.cpp
     SwiftTLSContext.cpp
+    ThreadingError.cpp
     AccessibleFunction.cpp)
 
 # Acknowledge that the following sources are known.
