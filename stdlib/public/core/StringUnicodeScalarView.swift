@@ -390,7 +390,10 @@ extension String.UnicodeScalarView: RangeReplaceableCollection {
     _ subrange: Range<Index>,
     with newElements: C
   ) where C: Collection, C.Element == Unicode.Scalar {
-    let subrange = _guts.validateScalarRange(subrange)
+    // FIXME: This method used to not properly validate indices before 5.7;
+    // temporarily allow older binaries to keep invoking undefined behavior as
+    // before.
+    let subrange = _guts.validateScalarRange_5_7(subrange)
     _guts.replaceSubrange(subrange, with: newElements)
     _invariantCheck()
   }
@@ -428,8 +431,14 @@ extension String.UnicodeScalarIndex {
     _ sourcePosition: String.Index,
     within unicodeScalars: String.UnicodeScalarView
   ) {
+    // As a special exception, we allow `sourcePosition` to be an UTF-16 index
+    // when `self` is a UTF-8 string (or vice versa), to preserve compatibility
+    // with (broken) code that keeps using indices from a bridged string after
+    // converting the string to a native representation. Such indices are
+    // invalid, but returning nil here can break code that appeared to work fine
+    // for ASCII strings in Swift releases prior to 5.7.
+    let i = unicodeScalars._guts.ensureMatchingEncoding(sourcePosition)
     guard
-      let i = unicodeScalars._guts.ensureMatchingEncodingNoTrap(sourcePosition),
       i._encodedOffset <= unicodeScalars._guts.count,
       unicodeScalars._guts.isOnUnicodeScalarBoundary(i)
     else {

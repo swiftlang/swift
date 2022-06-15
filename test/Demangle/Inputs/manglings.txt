@@ -431,4 +431,5 @@ $s4test3FooVAAyyAA1P_pyxqd__XPlF ---> test.Foo.test<A>(test.P<A, A1>) -> ()
 $s4test3FooVAAyyAA1P_pyxXPF ---> test.Foo.test(test.P<A>) -> ()
 $s4test3FooVAAyyAA1P_pF ---> test.Foo.test(test.P) -> ()
 $s4test3FooVAAyyAA1P_pyqd__XPAaDRd__lF ---> test.Foo.test<A where A1: test.P>(test.P<A1>) -> ()
-
+$sxxxIxzCXxxxesy -> $sxxxIxzCXxxxesy
+$Sxxx_x_xxIxzCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC$x -> $Sxxx_x_xxIxzCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC$x

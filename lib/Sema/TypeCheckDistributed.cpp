@@ -247,7 +247,7 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
           decl->getDescriptiveKind(), decl->getName(), identifier);
       decl->diagnose(
           diag::note_distributed_actor_system_conformance_missing_adhoc_requirement,
-          decl->getName(), identifier,
+          Proto->getName(), identifier,
           "func remoteCall<Act, Err, Res>(\n"
           "    on actor: Act,\n"
           "    target: RemoteCallTarget,\n"
@@ -274,7 +274,7 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
           decl->getDescriptiveKind(), decl->getName(), identifier);
       decl->diagnose(
           diag::note_distributed_actor_system_conformance_missing_adhoc_requirement,
-          decl->getName(), identifier,
+          Proto->getName(), identifier,
           "func remoteCallVoid<Act, Err>(\n"
           "    on actor: Act,\n"
           "    target: RemoteCallTarget,\n"
@@ -303,7 +303,7 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
           diag::distributed_actor_system_conformance_missing_adhoc_requirement,
           decl->getDescriptiveKind(), decl->getName(), identifier);
       decl->diagnose(diag::note_distributed_actor_system_conformance_missing_adhoc_requirement,
-                     decl->getName(), identifier,
+                     Proto->getName(), identifier,
                      "mutating func recordArgument<Value: SerializationRequirement>(_ argument: RemoteCallArgument<Value>) throws\n");
       anyMissingAdHocRequirements = true;
     }
@@ -318,7 +318,7 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
           diag::distributed_actor_system_conformance_missing_adhoc_requirement,
           decl->getDescriptiveKind(), decl->getName(), identifier);
       decl->diagnose(diag::note_distributed_actor_system_conformance_missing_adhoc_requirement,
-                     decl->getName(), identifier,
+                     Proto->getName(), identifier,
                      "mutating func recordReturnType<Res: SerializationRequirement>(_ resultType: Res.Type) throws\n");
       anyMissingAdHocRequirements = true;
     }
@@ -339,7 +339,7 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
           diag::distributed_actor_system_conformance_missing_adhoc_requirement,
           decl->getDescriptiveKind(), decl->getName(), identifier);
       decl->diagnose(diag::note_distributed_actor_system_conformance_missing_adhoc_requirement,
-                     decl->getName(), identifier,
+                     Proto->getName(), identifier,
                      "mutating func decodeNextArgument<Argument: SerializationRequirement>() throws -> Argument\n");
       anyMissingAdHocRequirements = true;
     }
@@ -360,10 +360,9 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
           diag::distributed_actor_system_conformance_missing_adhoc_requirement,
           decl->getDescriptiveKind(), decl->getName(), identifier);
       decl->diagnose(
-          diag::
-              note_distributed_actor_system_conformance_missing_adhoc_requirement,
-          decl->getName(), identifier,
-          "mutating func onReturn<Success: SerializationRequirement>(value: "
+          diag::note_distributed_actor_system_conformance_missing_adhoc_requirement,
+          Proto->getName(), identifier,
+          "func onReturn<Success: SerializationRequirement>(value: "
           "Success) async throws\n");
       anyMissingAdHocRequirements = true;
     }
@@ -428,6 +427,45 @@ static bool checkDistributedTargetResultType(
     }
   }
 
+  return false;
+}
+
+bool swift::checkDistributedActorSystem(const NominalTypeDecl *system) {
+  auto nominal = const_cast<NominalTypeDecl *>(system);
+
+  // ==== Ensure the Distributed module is available,
+  // without it there's no reason to check the decl in more detail anyway.
+  if (!swift::ensureDistributedModuleLoaded(nominal))
+    return true;
+
+  auto &C = nominal->getASTContext();
+  auto DAS = C.getDistributedActorSystemDecl();
+
+  // === AssociatedTypes
+  // --- SerializationRequirement MUST be a protocol TODO(distributed): rdar://91663941
+  // we may lift this in the future and allow classes but this requires more
+  // work to enable associatedtypes to be constrained to class or protocol,
+  // which then will unlock using them as generic constraints in protocols.
+  Type requirementTy = getDistributedSerializationRequirementType(nominal, DAS);
+  if (auto existentialTy = requirementTy->getAs<ExistentialType>()) {
+    requirementTy = existentialTy->getConstraintType();
+  }
+
+  if (auto alias = dyn_cast<TypeAliasType>(requirementTy.getPointer())) {
+    auto concreteReqTy = alias->getDesugaredType();
+    if (auto comp = dyn_cast<ProtocolCompositionType>(concreteReqTy)) {
+      // ok, protocol composition is fine as requirement,
+      // since special case of just a single protocol
+    } else if (auto proto = dyn_cast<ProtocolType>(concreteReqTy)) {
+      // ok, protocols is exactly what we want to be used as constraints here
+    } else {
+      nominal->diagnose(diag::distributed_actor_system_serialization_req_must_be_protocol,
+                        requirementTy);
+      return true;
+    }
+  }
+
+  // all good, didn't find any errors
   return false;
 }
 

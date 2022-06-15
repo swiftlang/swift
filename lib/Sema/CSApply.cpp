@@ -7852,18 +7852,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   return ctorCall;
 }
 
-/// Determine whether this closure should be treated as Sendable.
-static bool isSendableClosure(ConstraintSystem &cs,
-                              const AbstractClosureExpr *closure) {
-  if (auto fnType = cs.getType(const_cast<AbstractClosureExpr *>(closure))
-                        ->getAs<FunctionType>()) {
-    if (fnType->isSendable())
-      return true;
-  }
-
-  return false;
-}
-
 bool ExprRewriter::isDistributedThunk(ConcreteDeclRef ref, Expr *context) {
   auto *FD = dyn_cast_or_null<AbstractFunctionDecl>(ref.getDecl());
   if (!(FD && FD->isInstanceMember() && FD->isDistributed()))
@@ -7887,52 +7875,60 @@ bool ExprRewriter::isDistributedThunk(ConcreteDeclRef ref, Expr *context) {
 
   // If this is a method reference on an potentially isolated
   // actor then it cannot be a remote thunk.
-  if (isPotentiallyIsolatedActor(actor, [&](ParamDecl *P) {
-        return P->isIsolated() ||
-               llvm::is_contained(solution.isolatedParams, P);
-      }))
-    return false;
+  bool isPotentiallyIsolated = isPotentiallyIsolatedActor(
+      actor,
+    [&](ParamDecl *P) {
+    return P->isIsolated() ||
+           llvm::is_contained(solution.isolatedParams, P);
+  });
 
-  bool isInAsyncLetInitializer = target && target->isAsyncLetInitializer();
+  // Adjust the declaration context to the innermost context that is neither
+  // a local function nor a closure, so that the actor reference is checked
+  auto referenceDC = dc;
+  while (true) {
+    switch (referenceDC->getContextKind()) {
+    case DeclContextKind::AbstractClosureExpr:
+    case DeclContextKind::Initializer:
+    case DeclContextKind::SerializedLocal:
+      referenceDC = referenceDC->getParent();
+      continue;
 
-  auto isActorInitOrDeInitContext = [&](const DeclContext *dc) {
-    return ::isActorInitOrDeInitContext(
-        dc, [&](const AbstractClosureExpr *closure) {
-          return isSendableClosure(cs, closure);
-        });
-  };
+      case DeclContextKind::AbstractFunctionDecl:
+      case DeclContextKind::GenericTypeDecl:
+      case DeclContextKind::SubscriptDecl:
+        if (auto value = dyn_cast<ValueDecl>(referenceDC->getAsDecl())) {
+          if (value->isLocalCapture()) {
+            referenceDC = referenceDC->getParent();
+            continue;
+          }
+        }
+        break;
 
-  switch (ActorIsolationRestriction::forDeclaration(ref, dc)) {
-  case ActorIsolationRestriction::CrossActorSelf: {
-    // Not a thunk if it's used in actor init or de-init.
-    if (!isInAsyncLetInitializer && isActorInitOrDeInitContext(dc))
-      return false;
-
-    // Here we know that the method could be used across actors
-    // and the actor it's used on is non-isolated, which means
-    // that it could be a thunk, so we have to be conservative
-    // about it.
-    return true;
-  }
-
-  case ActorIsolationRestriction::ActorSelf: {
-    // An instance member of an actor can be referenced from an actor's
-    // designated initializer or deinitializer.
-    if (actor->isActorSelf() && !isInAsyncLetInitializer) {
-      if (auto *fn = isActorInitOrDeInitContext(dc)) {
-        if (!(isa<ConstructorDecl>(fn) &&
-              cast<ConstructorDecl>(fn)->isConvenienceInit()))
-          return false;
-      }
+      case DeclContextKind::EnumElementDecl:
+      case DeclContextKind::ExtensionDecl:
+      case DeclContextKind::FileUnit:
+      case DeclContextKind::Module:
+      case DeclContextKind::TopLevelCodeDecl:
+        break;
     }
 
-    // Call on a non-isolated actor in async context requires
-    // implicit thunk.
-    return isInAsyncLetInitializer || cs.isAsynchronousContext(dc);
+    break;
   }
 
-  default:
+  // Create a simple actor reference, assuming that we might be in a
+  // non-isolated context but knowing whether it's potentially isolated.
+  // We only care about the "distributed" flag.
+  ReferencedActor actorRef = ReferencedActor(
+      actor, isPotentiallyIsolated, ReferencedActor::NonIsolatedContext);
+  auto refResult = ActorReferenceResult::forReference(
+      ref, context->getLoc(), referenceDC, None, actorRef);
+  switch (refResult) {
+  case ActorReferenceResult::ExitsActorToNonisolated:
+  case ActorReferenceResult::SameConcurrencyDomain:
     return false;
+
+  case ActorReferenceResult::EntersActor:
+    return refResult.options.contains(ActorReferenceResult::Flags::Distributed);
   }
 }
 
@@ -8588,109 +8584,110 @@ static Optional<SolutionApplicationTarget> applySolutionToInitialization(
 ///
 /// \returns the resulting initialization expression.
 static Optional<SolutionApplicationTarget> applySolutionToForEachStmt(
-    Solution &solution, SolutionApplicationTarget target, Expr *sequence) {
+    Solution &solution, SolutionApplicationTarget target,
+    llvm::function_ref<
+        Optional<SolutionApplicationTarget>(SolutionApplicationTarget)>
+        rewriteTarget) {
   auto resultTarget = target;
   auto &forEachStmtInfo = resultTarget.getForEachStmtInfo();
+  auto *stmt = target.getAsForEachStmt();
+  auto *parsedSequence = stmt->getParsedSequence();
+  bool isAsync = stmt->getAwaitLoc().isValid();
 
   // Simplify the various types.
-  forEachStmtInfo.elementType =
-      solution.simplifyType(forEachStmtInfo.elementType);
-  forEachStmtInfo.iteratorType =
-      solution.simplifyType(forEachStmtInfo.iteratorType);
-  forEachStmtInfo.initType =
-      solution.simplifyType(forEachStmtInfo.initType);
   forEachStmtInfo.sequenceType =
       solution.simplifyType(forEachStmtInfo.sequenceType);
+  forEachStmtInfo.elementType =
+      solution.simplifyType(forEachStmtInfo.elementType);
+  forEachStmtInfo.initType =
+      solution.simplifyType(forEachStmtInfo.initType);
 
-  // Coerce the sequence to the sequence type.
   auto &cs = solution.getConstraintSystem();
-  auto locator = cs.getConstraintLocator(target.getAsExpr());
-  sequence = solution.coerceToType(
-     sequence, forEachStmtInfo.sequenceType, locator);
-  if (!sequence)
-    return None;
-
-  resultTarget.setExpr(sequence);
-
   auto *dc = target.getDeclContext();
 
-  // Get the conformance of the sequence type to the Sequence protocol.
-  auto stmt = forEachStmtInfo.stmt;
-  auto sequenceProto = TypeChecker::getProtocol(
-      cs.getASTContext(), stmt->getForLoc(), 
-      stmt->getAwaitLoc().isValid() ? 
-        KnownProtocolKind::AsyncSequence : KnownProtocolKind::Sequence);
-  auto sequenceConformance = TypeChecker::conformsToProtocol(
-      forEachStmtInfo.sequenceType, sequenceProto, dc->getParentModule());
-  assert(!sequenceConformance.isInvalid() &&
-         "Couldn't find sequence conformance");
+  // First, let's apply the solution to the sequence expression.
+  {
+    auto *makeIteratorVar = forEachStmtInfo.makeIteratorVar;
+
+    auto makeIteratorTarget =
+        *cs.getSolutionApplicationTarget({makeIteratorVar, /*index=*/0});
+
+    auto rewrittenTarget = rewriteTarget(makeIteratorTarget);
+    if (!rewrittenTarget)
+      return None;
+
+    // Set type-checked initializer and mark it as such.
+    {
+      makeIteratorVar->setInit(/*index=*/0, rewrittenTarget->getAsExpr());
+      makeIteratorVar->setInitializerChecked(/*index=*/0);
+    }
+
+    stmt->setIteratorVar(makeIteratorVar);
+  }
+
+  // Now, `$iterator.next()` call.
+  {
+    auto nextTarget =
+        *cs.getSolutionApplicationTarget(forEachStmtInfo.nextCall);
+
+    auto rewrittenTarget = rewriteTarget(nextTarget);
+    if (!rewrittenTarget)
+      return None;
+
+    Expr *nextCall = rewrittenTarget->getAsExpr();
+    // Wrap a call to `next()` into `try await` since `AsyncIteratorProtocol`
+    // requirement is `async throws`
+    if (isAsync) {
+      auto &ctx = cs.getASTContext();
+      auto nextRefType =
+          solution
+              .getResolvedType(
+                  cast<ApplyExpr>(cast<AwaitExpr>(nextCall)->getSubExpr())
+                      ->getFn())
+              ->castTo<FunctionType>();
+
+      // If the inferred witness is throwing, we need to wrap the call
+      // into `try` expression.
+      if (nextRefType->isThrowing())
+        nextCall = TryExpr::createImplicit(ctx, /*tryLoc=*/SourceLoc(),
+                                           nextCall, nextCall->getType());
+    }
+
+    stmt->setNextCall(nextCall);
+  }
 
   // Coerce the pattern to the element type.
-  TypeResolutionOptions options(TypeResolverContext::ForEachStmt);
-  options |= TypeResolutionFlags::OverrideType;
+  {
+    TypeResolutionOptions options(TypeResolverContext::ForEachStmt);
+    options |= TypeResolutionFlags::OverrideType;
 
-  // Apply the solution to the pattern as well.
-  auto contextualPattern = target.getContextualPattern();
-  if (auto coercedPattern = TypeChecker::coercePatternToType(
-          contextualPattern, forEachStmtInfo.initType, options)) {
+    // Apply the solution to the pattern as well.
+    auto contextualPattern = target.getContextualPattern();
+    auto coercedPattern = TypeChecker::coercePatternToType(
+        contextualPattern, forEachStmtInfo.initType, options);
+    if (!coercedPattern)
+      return None;
+
+    stmt->setPattern(coercedPattern);
     resultTarget.setPattern(coercedPattern);
-  } else {
-    return None;
   }
 
   // Apply the solution to the filtering condition, if there is one.
-  if (forEachStmtInfo.whereExpr) {
-    auto *boolDecl = dc->getASTContext().getBoolDecl();
-    assert(boolDecl);
-    Type boolType = boolDecl->getDeclaredInterfaceType();
-    assert(boolType);
+  if (auto *whereExpr = stmt->getWhere()) {
+    auto whereTarget = *cs.getSolutionApplicationTarget(whereExpr);
 
-    SolutionApplicationTarget whereTarget(
-        forEachStmtInfo.whereExpr, dc, CTP_Condition, boolType,
-        /*isDiscarded=*/false);
-    auto newWhereTarget = cs.applySolution(solution, whereTarget);
-    if (!newWhereTarget)
+    auto rewrittenTarget = rewriteTarget(whereTarget);
+    if (!rewrittenTarget)
       return None;
 
-    forEachStmtInfo.whereExpr = newWhereTarget->getAsExpr();
+    stmt->setWhere(rewrittenTarget->getAsExpr());
   }
-
-  // Invoke iterator() to get an iterator from the sequence.
-  ASTContext &ctx = cs.getASTContext();
-  VarDecl *iterator;
-  Type nextResultType = OptionalType::get(forEachStmtInfo.elementType);
-  {
-    // Create a local variable to capture the iterator.
-    std::string name;
-    if (auto np = dyn_cast_or_null<NamedPattern>(stmt->getPattern()))
-      name = "$"+np->getBoundName().str().str();
-    name += "$generator";
-
-    iterator = new (ctx) VarDecl(
-        /*IsStatic*/ false, VarDecl::Introducer::Var, stmt->getInLoc(),
-        ctx.getIdentifier(name), dc);
-    iterator->setInterfaceType(
-        forEachStmtInfo.iteratorType->mapTypeOutOfContext());
-    iterator->setImplicit();
-
-    auto genPat = new (ctx) NamedPattern(iterator);
-    genPat->setImplicit();
-
-    // TODO: test/DebugInfo/iteration.swift requires this extra info to
-    // be around.
-    PatternBindingDecl::createImplicit(
-        ctx, StaticSpellingKind::None, genPat,
-        new (ctx) OpaqueValueExpr(stmt->getInLoc(), nextResultType),
-        dc, /*VarLoc*/ stmt->getForLoc());
-  }
-
-  // Create the iterator variable.
-  auto *varRef = TypeChecker::buildCheckedRefExpr(
-      iterator, dc, DeclNameLoc(stmt->getInLoc()), /*implicit*/ true);
 
   // Convert that Optional<Element> value to the type of the pattern.
   auto optPatternType = OptionalType::get(forEachStmtInfo.initType);
+  Type nextResultType = OptionalType::get(forEachStmtInfo.elementType);
   if (!optPatternType->isEqual(nextResultType)) {
+    ASTContext &ctx = cs.getASTContext();
     OpaqueValueExpr *elementExpr = new (ctx) OpaqueValueExpr(
         stmt->getInLoc(), nextResultType->getOptionalObjectType(),
         /*isPlaceholder=*/true);
@@ -8706,13 +8703,25 @@ static Optional<SolutionApplicationTarget> applySolutionToForEachStmt(
     stmt->setConvertElementExpr(convertElementExpr);
   }
 
-  // Write the result back into the AST.
-  stmt->setSequence(resultTarget.getAsExpr());
-  stmt->setPattern(resultTarget.getContextualPattern().getPattern());
-  stmt->setSequenceConformance(sequenceConformance);
-  stmt->setWhere(forEachStmtInfo.whereExpr);
-  stmt->setIteratorVar(iterator);
-  stmt->setIteratorVarRef(varRef);
+  // Get the conformance of the sequence type to the Sequence protocol.
+  {
+    auto sequenceProto = TypeChecker::getProtocol(
+        cs.getASTContext(), stmt->getForLoc(),
+        stmt->getAwaitLoc().isValid() ? KnownProtocolKind::AsyncSequence
+                                      : KnownProtocolKind::Sequence);
+
+    auto type = forEachStmtInfo.sequenceType->getRValueType();
+    if (type->isExistentialType()) {
+      auto *contextualLoc = solution.getConstraintLocator(
+          parsedSequence, LocatorPathElt::ContextualType(CTP_ForEachSequence));
+      type = Type(solution.OpenedExistentialTypes[contextualLoc]);
+    }
+    auto sequenceConformance = TypeChecker::conformsToProtocol(
+        type, sequenceProto, dc->getParentModule());
+    assert(!sequenceConformance.isInvalid() &&
+           "Couldn't find sequence conformance");
+    stmt->setSequenceConformance(sequenceConformance);
+  }
 
   return resultTarget;
 }
@@ -8751,21 +8760,12 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
       break;
     }
 
-    case CTP_ForEachStmt:
-    case CTP_ForEachSequence: {
-      auto forEachResultTarget = applySolutionToForEachStmt(
-          solution, target, rewrittenExpr);
-      if (!forEachResultTarget)
-        return None;
-
-      result = *forEachResultTarget;
-      break;
-    }
-
     case CTP_Unused:
     case CTP_CaseStmt:
     case CTP_ReturnStmt:
     case CTP_ExprPattern:
+    case CTP_ForEachStmt:
+    case CTP_ForEachSequence:
     case swift::CTP_ReturnSingleExpr:
     case swift::CTP_YieldByValue:
     case swift::CTP_YieldByReference:
@@ -8895,6 +8895,9 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
   } else if (auto patternBinding = target.getAsPatternBinding()) {
     ConstraintSystem &cs = solution.getConstraintSystem();
     for (unsigned index : range(patternBinding->getNumPatternEntries())) {
+      if (patternBinding->isInitializerChecked(index))
+        continue;
+
       // Find the solution application target for this.
       auto knownTarget = *cs.getSolutionApplicationTarget(
           {patternBinding, index});
@@ -8944,6 +8947,21 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
     }
 
     return None;
+  } else if (auto *forEach = target.getAsForEachStmt()) {
+    auto forEachResultTarget = applySolutionToForEachStmt(
+        solution, target, [&](SolutionApplicationTarget target) {
+          auto resultTarget = rewriteTarget(target);
+          if (resultTarget) {
+            if (auto expr = resultTarget->getAsExpr())
+              solution.setExprTypes(expr);
+          }
+
+          return resultTarget;
+        });
+    if (!forEachResultTarget)
+      return None;
+
+    result = *forEachResultTarget;
   } else {
     auto fn = *target.getAsFunction();
     if (rewriteFunction(fn))
@@ -9222,6 +9240,9 @@ SolutionApplicationTarget SolutionApplicationTarget::walk(ASTWalker &walker) {
     return *this;
 
   case Kind::uninitializedVar:
+    return *this;
+
+  case Kind::forEachStmt:
     return *this;
   }
 

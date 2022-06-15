@@ -747,8 +747,8 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
                                  charSourceRangeFromSourceRange(SM, ElemRange));
       }
     }
-    if (ForEachS->getSequence())
-      addExprElem(SyntaxStructureElementKind::Expr, ForEachS->getSequence(),SN);
+    if (auto *S = ForEachS->getParsedSequence())
+      addExprElem(SyntaxStructureElementKind::Expr, S, SN);
     pushStructureNode(SN, S);
 
   } else if (auto *WhileS = dyn_cast<WhileStmt>(S)) {

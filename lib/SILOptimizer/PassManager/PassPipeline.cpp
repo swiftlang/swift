@@ -927,12 +927,17 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   // be no need to run another analysis of copies at -Onone.
   P.addMandatoryARCOpts();
 
+  // Create pre-specializations.
+  // This needs to run pre-serialization because it needs to identify native
+  // inlinable functions from imported ones.
+  P.addOnonePrespecializations();
+
   // First serialize the SIL if we are asked to.
   P.startPipeline("Serialization");
   P.addSerializeSILPass();
 
-  // Fix up debug info by propagating dbg_values.
-  P.addDebugInfoCanonicalizer();
+  // Now that we have serialized, propagate debug info.
+  P.addMovedAsyncVarDebugInfoPropagator();
 
   // Now strip any transparent functions that still have ownership.
   P.addOwnershipModelEliminator();
@@ -945,9 +950,6 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   if (P.getOptions().AssumeSingleThreaded) {
     P.addAssumeSingleThreaded();
   }
-
-  // Create pre-specializations.
-  P.addOnonePrespecializations();
 
   // Has only an effect if the -sil-based-debuginfo option is specified.
   P.addSILDebugInfoGenerator();

@@ -756,6 +756,23 @@ public:
 
     auto errorType =
         CanType(unwrappedPtrType->getAnyPointerElementType(ptrKind));
+
+    // In cases when from swift, we call objc imported methods written like so:
+    //
+    // (1) - (BOOL)submit:(NSError *_Nonnull __autoreleasing *_Nullable)errorOut;
+    //
+    // the clang importer will successfully import the given method as having a
+    // non-null NSError. This doesn't follow the normal convention where we
+    // expect the NSError to be Optional<NSError>. In order to preserve source
+    // compatibility, we want to allow SILGen to handle this behavior. Luckily
+    // in this case, NSError and Optional<NSError> are layout compatible, so we
+    // can just pass in the Optional<NSError> and everything works.
+    if (auto nsErrorTy = SGF.getASTContext().getNSErrorType()->getCanonicalType()) {
+      if (errorType == nsErrorTy) {
+        errorType = errorType.wrapInOptionalType();
+      }
+    }
+
     auto &errorTL = SGF.getTypeLowering(errorType);
 
     // Allocate a temporary.

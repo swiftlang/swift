@@ -17,6 +17,7 @@ namespace {
 static PrintOptions getTypePrintOpts(CheckerOptions CheckerOpts) {
   PrintOptions Opts;
   Opts.SynthesizeSugarOnTypes = true;
+  Opts.UseOriginallyDefinedInModuleNames = true;
   if (!CheckerOpts.Migrator) {
     // We should always print fully qualified type names for checking either
     // API or ABI stability.
@@ -53,6 +54,16 @@ struct swift::ide::api::SDKNodeInitInfo {
   SDKNodeInitInfo(SDKContext &Ctx, Type Ty, TypeInitInfo Info = TypeInitInfo());
   SDKNode* createSDKNode(SDKNodeKind Kind);
 };
+
+bool swift::ide::api::hasValidParentPtr(SDKNodeKind kind) {
+  switch(kind) {
+  case SDKNodeKind::Conformance:
+  case SDKNodeKind::DeclAccessor:
+    return false;
+  default:
+    return true;
+  }
+}
 
 SDKContext::SDKContext(CheckerOptions Opts): Diags(SourceMgr), Opts(Opts) {}
 
@@ -103,12 +114,15 @@ SDKNodeDecl::SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind)
       : SDKNode(Info, Kind), DKind(Info.DKind), Usr(Info.Usr),
         MangledName(Info.MangledName), Loc(Info.Loc),
         Location(Info.Location), ModuleName(Info.ModuleName),
-        DeclAttributes(Info.DeclAttrs), IsImplicit(Info.IsImplicit),
+        DeclAttributes(Info.DeclAttrs),
+        SPIGroups(Info.SPIGroups),
+        IsImplicit(Info.IsImplicit),
         IsStatic(Info.IsStatic), IsDeprecated(Info.IsDeprecated),
         IsProtocolReq(Info.IsProtocolReq),
         IsOverriding(Info.IsOverriding),
         IsOpen(Info.IsOpen),
         IsInternal(Info.IsInternal), IsABIPlaceholder(Info.IsABIPlaceholder),
+        IsFromExtension(Info.IsFromExtension),
         ReferenceOwnership(uint8_t(Info.ReferenceOwnership)),
         GenericSig(Info.GenericSig),
         SugaredGenericSig(Info.SugaredGenericSig),
@@ -826,6 +840,25 @@ static bool hasSameParameterFlags(const SDKNodeType *Left, const SDKNodeType *Ri
   return true;
 }
 
+// Return whether a decl has been moved in/out to an extension
+static Optional<bool> isFromExtensionChanged(const SDKNode &L, const SDKNode &R) {
+  assert(L.getKind() == R.getKind());
+  // Version 8 starts to include whether a decl is from an extension.
+  if (L.getJsonFormatVersion() + R.getJsonFormatVersion() < 2 * 8) {
+    return llvm::None;
+  }
+  auto *Left = dyn_cast<SDKNodeDecl>(&L);
+  auto *Right = dyn_cast<SDKNodeDecl>(&R);
+  if (!Left) {
+    return llvm::None;
+  }
+  if (Left->isFromExtension() == Right->isFromExtension()) {
+    return llvm::None;
+  } else {
+    return Right->isFromExtension();
+  }
+}
+
 static bool isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) {
   auto *LeftAlias = dyn_cast<SDKNodeTypeAlias>(&L);
   auto *RightAlias = dyn_cast<SDKNodeTypeAlias>(&R);
@@ -965,6 +998,8 @@ static bool isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
     case SDKNodeKind::TypeWitness:
     case SDKNodeKind::DeclImport:
     case SDKNodeKind::Root: {
+      if (isFromExtensionChanged(L, R))
+        return false;
       return L.getPrintedName() == R.getPrintedName() &&
         L.hasSameChildren(R);
     }
@@ -1064,7 +1099,8 @@ static StringRef calculateMangledName(SDKContext &Ctx, ValueDecl *VD) {
     return Ctx.buffer(attr->Name);
   }
   Mangle::ASTMangler NewMangler;
-  return Ctx.buffer(NewMangler.mangleAnyDecl(VD, true));
+  return Ctx.buffer(NewMangler.mangleAnyDecl(VD, true,
+                                    /*bool respectOriginallyDefinedIn*/true));
 }
 
 static StringRef calculateLocation(SDKContext &SDKCtx, Decl *D) {
@@ -1376,6 +1412,13 @@ StringRef SDKContext::getInitKind(Decl *D) {
   return StringRef();
 }
 
+static bool isDeclaredInExtension(Decl *D) {
+  if (auto *DC = D->getDeclContext()->getAsDecl()) {
+    return isa<ExtensionDecl>(DC);
+  }
+  return false;
+}
+
 SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Decl *D):
       Ctx(Ctx), DKind(D->getKind()), Loc(D->getLoc()),
       Location(calculateLocation(Ctx, D)),
@@ -1394,7 +1437,13 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Decl *D):
       IsImplicit(D->isImplicit()),
       IsDeprecated(D->getAttrs().getDeprecated(D->getASTContext())),
       IsABIPlaceholder(isABIPlaceholderRecursive(D)),
-      DeclAttrs(collectDeclAttributes(D)) {}
+      IsFromExtension(isDeclaredInExtension(D)),
+      DeclAttrs(collectDeclAttributes(D)) {
+  // Keep track of SPI group names
+  for (auto id: D->getSPIGroups()) {
+    SPIGroups.push_back(id.str());
+  }
+}
 
 SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, OperatorDecl *OD):
     SDKNodeInitInfo(Ctx, cast<Decl>(OD)) {
@@ -2038,6 +2087,8 @@ void SDKNodeDecl::jsonize(json::Output &out) {
     uint8_t Raw = uint8_t(getReferenceOwnership());
     out.mapRequired(getKeyContent(Ctx, KeyKind::KK_ownership).data(), Raw);
   }
+  output(out, KeyKind::KK_isFromExtension, IsFromExtension);
+  out.mapOptional(getKeyContent(Ctx, KeyKind::KK_spi_group_names).data(), SPIGroups);
 }
 
 void SDKNodeDeclAbstractFunc::jsonize(json::Output &out) {
@@ -2608,6 +2659,23 @@ void swift::ide::api::SDKNodeDeclAbstractFunc::diagnose(SDKNode *Right) {
   if (Ctx.checkingABI()) {
     if (reqNewWitnessTableEntry() != R->reqNewWitnessTableEntry()) {
       emitDiag(Loc, diag::decl_new_witness_table_entry, reqNewWitnessTableEntry());
+    }
+
+    // Diagnose moving a non-final class member to an extension.
+    if (hasValidParentPtr(getKind())) {
+      while(auto *parent = dyn_cast<SDKNodeDecl>(getParent())) {
+        if (parent->getDeclKind() != DeclKind::Class) {
+          break;
+        }
+        if (hasDeclAttribute(DeclAttrKind::DAK_Final)) {
+          break;
+        }
+        auto result = isFromExtensionChanged(*this, *Right);
+        if (result.hasValue() && *result) {
+          emitDiag(Loc, diag::class_member_moved_to_extension);
+        }
+        break;
+      }
     }
   }
 }

@@ -65,6 +65,13 @@ Type QueryTypeSubstitutionMap::operator()(SubstitutableType *type) const {
 
 Type
 QueryTypeSubstitutionMapOrIdentity::operator()(SubstitutableType *type) const {
+  // FIXME: Type::subst should not be pass in non-root archetypes.
+  // Consider only root archetypes.
+  if (auto *archetype = dyn_cast<ArchetypeType>(type)) {
+    if (!archetype->isRoot())
+      return Type();
+  }
+
   auto key = type->getCanonicalType()->castTo<SubstitutableType>();
   auto known = substitutions.find(key);
   if (known != substitutions.end() && known->second)
@@ -384,84 +391,51 @@ bool CanType::isTypeErasedGenericClassTypeImpl(CanType type) {
   return false;
 }
 
-static bool archetypeConformsTo(ArchetypeType *archetype, KnownProtocolKind protocol) {
-  auto &ctx = archetype->getASTContext();
-  auto expectedProto = ctx.getProtocol(protocol);
-  if (!expectedProto)
-    return false;
-
-  for (auto proto : archetype->getConformsTo()) {
-    if (proto == expectedProto || proto->inheritsFrom(expectedProto))
-      return true;
-  }
-
-  return false;
-}
-
-bool TypeBase::isActorType() {
+NominalTypeDecl *TypeBase::getAnyActor() {
   // Nominal types: check whether the declaration is an actor.
-  if (auto nominal = getAnyNominal())
-    return nominal->isActor();
+  if (auto nominal = getAnyNominal()) {
+    if (nominal->isAnyActor())
+      return nominal;
+  }
 
   // Archetypes check for conformance to Actor.
   if (auto archetype = getAs<ArchetypeType>()) {
-    return archetypeConformsTo(archetype, KnownProtocolKind::Actor);
+    for (auto proto : archetype->getConformsTo()) {
+      if (proto->isAnyActor())
+        return proto;
+    }
+
+    return nullptr;
   }
 
   // Existential types: check for Actor protocol.
   if (isExistentialType()) {
-    auto actorProto = getASTContext().getProtocol(KnownProtocolKind::Actor);
-    if (!actorProto)
-      return false;
-
     auto layout = getExistentialLayout();
     if (auto superclass = layout.getSuperclass()) {
-      if (superclass->isActorType())
-        return true;
+      if (auto actor = superclass->getAnyActor())
+        return actor;
     }
 
     for (auto proto : layout.getProtocols()) {
-      if (proto->isActor())
-        return true;
+      if (proto->isAnyActor())
+        return proto;
     }
 
-    return false;
+    return nullptr;
   }
 
+  return nullptr;
+}
+
+bool TypeBase::isActorType() {
+  if (auto actor = getAnyActor())
+    return actor->isActor();
   return false;
 }
 
 bool TypeBase::isDistributedActor() {
-  // Nominal types: check whether the declaration is an actor.
-  if (auto *nominal = getAnyNominal()) {
-    if (auto *classDecl = dyn_cast<ClassDecl>(nominal))
-      return classDecl->isDistributedActor();
-
-    if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal))
-      return false;
-  }
-
-  // Archetypes check for conformance to DistributedActor.
-  if (auto archetype = getAs<ArchetypeType>()) {
-    return archetypeConformsTo(archetype, KnownProtocolKind::DistributedActor);
-  }
-
-  // Existential types: check for DistributedActor protocol conformance.
-  if (isExistentialType()) {
-    auto actorProto = getASTContext().getDistributedActorDecl();
-    if (!actorProto)
-      return false;
-
-    // TODO(distributed): Inheritance is not yet supported.
-
-    auto layout = getExistentialLayout();
-    return llvm::any_of(layout.getProtocols(),
-                        [&actorProto](ProtocolDecl *protocol) {
-                          return protocol == actorProto ||
-                                 protocol->inheritsFrom(actorProto);
-                        });
-  }
-
+  if (auto actor = getAnyActor())
+    return actor->isDistributedActor();
   return false;
 }
 
@@ -780,6 +754,17 @@ CanType CanType::getOptionalObjectTypeImpl(CanType type) {
     if (boundTy->getDecl()->isOptionalDecl())
       return boundTy.getGenericArgs()[0];
   return CanType();
+}
+
+Type TypeBase::wrapInOptionalType() const {
+  auto &ctx = getASTContext();
+  auto *result = BoundGenericEnumType::get(ctx.getOptionalDecl(), Type(),
+                                           { getCanonicalType() });
+  return result;
+}
+
+CanType CanType::wrapInOptionalTypeImpl(CanType type) {
+  return type->wrapInOptionalType()->getCanonicalType();
 }
 
 Type TypeBase::getAnyPointerElementType(PointerTypeKind &PTK) {
@@ -6213,6 +6198,52 @@ bool TypeBase::isForeignReferenceType() {
   if (auto *classDecl = lookThroughAllOptionalTypes()->getClassOrBoundGenericClass())
     return classDecl->isForeignReferenceType();
   return false;
+}
+
+bool TypeBase::hasSimpleTypeRepr() const {
+  // NOTE: Please keep this logic in sync with TypeRepr::isSimple().
+  switch (getKind()) {
+  case TypeKind::Function:
+  case TypeKind::GenericFunction:
+    return false;
+
+  case TypeKind::Metatype:
+    return !cast<const AnyMetatypeType>(this)->hasRepresentation();
+
+  case TypeKind::ExistentialMetatype:
+  case TypeKind::Existential:
+    return false;
+
+  case TypeKind::OpaqueTypeArchetype:
+  case TypeKind::OpenedArchetype:
+    return false;
+
+  case TypeKind::PrimaryArchetype: {
+    auto archetype = cast<const PrimaryArchetypeType>(this);
+    auto interface = archetype->getInterfaceType();
+    return interface->hasSimpleTypeRepr();
+  }
+
+  case TypeKind::ProtocolComposition: {
+    // 'Any', 'AnyObject' and single protocol compositions are simple
+    auto composition = cast<const ProtocolCompositionType>(this);
+    auto memberCount = composition->getMembers().size();
+    if (composition->hasExplicitAnyObject())
+      return memberCount == 0;
+    return memberCount <= 1;
+  }
+
+  case TypeKind::GenericTypeParam: {
+    if (auto *decl = cast<const GenericTypeParamType>(this)->getDecl()) {
+      return !decl->isOpaqueType();
+    }
+
+    return true;
+  }
+
+  default:
+    return true;
+  }
 }
 
 bool CanType::isForeignReferenceType() {

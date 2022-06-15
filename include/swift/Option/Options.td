@@ -1402,6 +1402,10 @@ def ignored_usrs: Separate<["-", "--"], "ignored-usrs">,
   HelpText<"the file containing USRs of removed decls that the digester should ignore">,
   MetaVarName<"<path>">;
 
+def ignore_spi_groups : Separate<["-", "--"], "ignore-spi-group">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+  HelpText<"SPI group name to not diagnose about">;
+
 def protocol_requirement_allow_list: Separate<["-", "--"], "protocol-requirement-allow-list">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption, ArgumentIsPath]>,
   HelpText<"File containing a new-line separated list of protocol names">,

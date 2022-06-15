@@ -1,4 +1,11 @@
-// RUN: %target-run-stdlib-swift %S/Inputs/
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift -g %s -o %t/StringIndex
+// RUN: %target-codesign %t/StringIndex
+// RUN: env %env-SWIFT_BINARY_COMPATIBILITY_VERSION=0x050700 %target-run %t/StringIndex %S/Inputs/
+
+// Note: the environment variable above forces the stdlib's bincompat version to
+// 5.7 so that we can test new behavior even if the SDK we're using predates it.
+
 // REQUIRES: executable_test
 // UNSUPPORTED: freestanding
 
@@ -755,7 +762,7 @@ suite.test("Global vs local grapheme cluster boundaries") {
 }
 
 #if _runtime(_ObjC)
-suite.test("Index encoding correction/subscripts") {
+suite.test("Index encoding correction/UTF-16→8/subscripts") {
   guard #available(SwiftStdlib 5.7, *) else {
     // String indices did not track their encoding until 5.7.
     return
@@ -778,10 +785,10 @@ suite.test("Index encoding correction/subscripts") {
   // automatically converts UTF-16-encoded indices to UTF-8 when needed.
   // This can be quite slow, but it always produces the "right" results.
   //
-  // This conversion is one way only (see StringTraps.swift for the other
-  // direction), and it does not account for the effect of the actual mutation.
-  // If the mutation's effect included the data addressed by the original index,
-  // then we may still get nonsensical results.
+  // This conversion also works in the other direction, and it does not account
+  // for the effect of the actual mutation. If the mutation's effect included
+  // the data addressed by the original index, then we may still get nonsensical
+  // results.
   var s = ("🫱🏼‍🫲🏽 a 🧑🏽‍🌾 b" as NSString) as String
   //s.dumpIndices()
 
@@ -802,7 +809,36 @@ suite.test("Index encoding correction/subscripts") {
 #endif
 
 #if _runtime(_ObjC)
-suite.test("Index encoding correction/conversions/characters") {
+suite.test("Index encoding correction/UTF-8→16/subscripts") {
+  guard #available(SwiftStdlib 5.7, *) else {
+    // String indices did not track their encoding until 5.7.
+    return
+  }
+  // This tests the UTF-8 to UTF-16 direction of the special case in String's
+  // index validation above.
+  let native = "🫱🏼‍🫲🏽 a 🧑🏽‍🌾 b"
+  let cocoa = ("🫱🏼‍🫲🏽 a 🧑🏽‍🌾 b" as NSString) as String
+
+  let nativeIndices = native.allIndices(includingEnd: false).map {
+    (
+      $0,
+      native[$0],
+      native.unicodeScalars[$0],
+      native.utf8[$0],
+      native.utf16[$0])
+  }
+
+  for (i, char, scalar, u8, u16) in nativeIndices {
+    expectEqual(cocoa[i], char, "i: \(i)")
+    expectEqual(cocoa.unicodeScalars[i], scalar, "i: \(i)")
+    expectEqual(cocoa.utf8[i], u8, "i: \(i)")
+    expectEqual(cocoa.utf16[i], u16, "i: \(i)")
+  }
+}
+#endif
+
+#if _runtime(_ObjC)
+suite.test("Index encoding correction/UTF-16→8/conversions/characters") {
   guard #available(SwiftStdlib 5.7, *) else {
     // String indices did not track their encoding until 5.7.
     return
@@ -822,7 +858,26 @@ suite.test("Index encoding correction/conversions/characters") {
 #endif
 
 #if _runtime(_ObjC)
-suite.test("Index encoding correction/conversions/scalars") {
+suite.test("Index encoding correction/UTF-8→16/conversions/characters") {
+  guard #available(SwiftStdlib 5.7, *) else {
+    // String indices did not track their encoding until 5.7.
+    return
+  }
+  let native = "🫱🏼‍🫲🏽 a 🧑🏽‍🌾 b"
+  let cocoa = ("🫱🏼‍🫲🏽 a 🧑🏽‍🌾 b" as NSString) as String
+
+  let chars = native.indices.map { ($0, native[$0]) }
+
+  for (i, char) in chars {
+    let j = String.Index(i, within: cocoa)
+    expectNotNil(j, "i: \(i)")
+    expectEqual(j.map { cocoa[$0] }, char, "i: \(i)")
+  }
+}
+#endif
+
+#if _runtime(_ObjC)
+suite.test("Index encoding correction/UTF-16→8/conversions/scalars") {
   guard #available(SwiftStdlib 5.7, *) else {
     // String indices did not track their encoding until 5.7.
     return
@@ -842,7 +897,28 @@ suite.test("Index encoding correction/conversions/scalars") {
 #endif
 
 #if _runtime(_ObjC)
-suite.test("Index encoding correction/conversions/UTF-8") {
+suite.test("Index encoding correction/UTF-8→16/conversions/scalars") {
+  guard #available(SwiftStdlib 5.7, *) else {
+    // String indices did not track their encoding until 5.7.
+    return
+  }
+  let native = "🫱🏼‍🫲🏽 a 🧑🏽‍🌾 b"
+  let cocoa = ("🫱🏼‍🫲🏽 a 🧑🏽‍🌾 b" as NSString) as String
+
+  let scalars = native.unicodeScalars.indices.map {
+    ($0, native.unicodeScalars[$0])
+  }
+
+  for (i, scalar) in scalars {
+    let j = String.Index(i, within: cocoa.unicodeScalars)
+    expectNotNil(j, "i: \(i)")
+    expectEqual(j.map { cocoa.unicodeScalars[$0] }, scalar, "i: \(i)")
+  }
+}
+#endif
+
+#if _runtime(_ObjC)
+suite.test("Index encoding correction/UTF-16→8/conversions/UTF-8") {
   guard #available(SwiftStdlib 5.7, *) else {
     // String indices did not track their encoding until 5.7.
     return
@@ -862,7 +938,26 @@ suite.test("Index encoding correction/conversions/UTF-8") {
 #endif
 
 #if _runtime(_ObjC)
-suite.test("Index encoding correction/conversions/UTF-16") {
+suite.test("Index encoding correction/UTF-8→16/conversions/UTF-8") {
+  guard #available(SwiftStdlib 5.7, *) else {
+    // String indices did not track their encoding until 5.7.
+    return
+  }
+  let native = "🫱🏼‍🫲🏽 a 🧑🏽‍🌾 b"
+  let cocoa = ("🫱🏼‍🫲🏽 a 🧑🏽‍🌾 b" as NSString) as String
+
+  let utf8Units = native.utf8.indices.map { ($0, native.utf8[$0]) }
+
+  for (i, u8) in utf8Units {
+    let j = String.Index(i, within: cocoa.utf8)
+    expectNotNil(j, "i: \(i)")
+    expectEqual(j.map { cocoa.utf8[$0] }, u8, "i: \(i)")
+  }
+}
+#endif
+
+#if _runtime(_ObjC)
+suite.test("Index encoding correction/UTF-16→8/conversions/UTF-16") {
   guard #available(SwiftStdlib 5.7, *) else {
     // String indices did not track their encoding until 5.7.
     return
@@ -877,6 +972,25 @@ suite.test("Index encoding correction/conversions/UTF-16") {
     let j = String.Index(i, within: s.utf16)
     expectNotNil(j, "i: \(i)")
     expectEqual(j.map { s.utf16[$0] }, u16, "i: \(i)")
+  }
+}
+#endif
+
+#if _runtime(_ObjC)
+suite.test("Index encoding correction/UTF-8→16/conversions/UTF-16") {
+  guard #available(SwiftStdlib 5.7, *) else {
+    // String indices did not track their encoding until 5.7.
+    return
+  }
+  let native = "🫱🏼‍🫲🏽 a 🧑🏽‍🌾 b"
+  let cocoa = ("🫱🏼‍🫲🏽 a 🧑🏽‍🌾 b" as NSString) as String
+
+  let utf16Units = native.utf16.indices.map { ($0, native.utf16[$0]) }
+
+  for (i, u16) in utf16Units {
+    let j = String.Index(i, within: cocoa.utf16)
+    expectNotNil(j, "i: \(i)")
+    expectEqual(j.map { cocoa.utf16[$0] }, u16, "i: \(i)")
   }
 }
 #endif

@@ -20,4 +20,3 @@
 // ROUNDTRIP: --------
 // ROUNDTRIP: main-path: SOURCE_DIR{{/|\\}}test{{/|\\}}Index{{/|\\}}Store{{/|\\}}unit-one-sourcefile-remapped.swift
 // ROUNDTRIP-NOT: work-dir: REMAPPED_OUT_DIR
-// ROUNDTRIP-NOT: out-file: REMAPPED_OUT_DIR

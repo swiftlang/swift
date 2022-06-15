@@ -278,11 +278,11 @@ func blender(_ peeler : () -> Void) {
   var money = await dollarsInBananaStand
   money -= 1200
 
-  dollarsInBananaStand = money // expected-error{{var 'dollarsInBananaStand' isolated to global actor 'BananaActor' can not be mutated from different global actor 'OrangeActor'}}
+  dollarsInBananaStand = money // expected-error{{global actor 'BananaActor'-isolated var 'dollarsInBananaStand' can not be mutated from global actor 'OrangeActor'}}
 
   // FIXME: these two errors seem a bit redundant.
   // expected-error@+2 {{actor-isolated var 'dollarsInBananaStand' cannot be passed 'inout' to implicitly 'async' function call}}
-  // expected-error@+1 {{var 'dollarsInBananaStand' isolated to global actor 'BananaActor' can not be used 'inout' from different global actor 'OrangeActor'}}
+  // expected-error@+1 {{global actor 'BananaActor'-isolated var 'dollarsInBananaStand' can not be used 'inout' from global actor 'OrangeActor'}}
   await takeInout(&dollarsInBananaStand)
 
   _ = wisk
@@ -459,7 +459,7 @@ func tryEffPropsFromSync() {
   _ = effPropA // expected-error{{'async' property access in a function that does not support concurrency}}
 
   // expected-error@+1 {{property access can throw, but it is not marked with 'try' and the error is not handled}}
-  _ = effPropT // expected-error{{var 'effPropT' isolated to global actor 'BananaActor' can not be referenced from this synchronous context}}
+  _ = effPropT // expected-error{{global actor 'BananaActor'-isolated var 'effPropT' can not be referenced from a non-isolated context}}
   // NOTE: that we don't complain about async access on `effPropT` because it's not declared async, and we're not in an async context!
 
   // expected-error@+1 {{property access can throw, but it is not marked with 'try' and the error is not handled}}

@@ -149,7 +149,6 @@ public:
   IGNORED_ATTR(OriginallyDefinedIn)
   IGNORED_ATTR(NoDerivative)
   IGNORED_ATTR(SpecializeExtension)
-  IGNORED_ATTR(Sendable)
   IGNORED_ATTR(NonSendable)
   IGNORED_ATTR(AtRethrows)
   IGNORED_ATTR(AtReasync)
@@ -321,6 +320,8 @@ public:
   void checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs);
 
   void visitKnownToBeLocalAttr(KnownToBeLocalAttr *attr);
+
+  void visitSendableAttr(SendableAttr *attr);
 };
 
 } // end anonymous namespace
@@ -3626,6 +3627,12 @@ void AttributeChecker::checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs) {
       }
     }
 
+    if (isa<DestructorDecl>(D) || isa<ConstructorDecl>(D)) {
+      diagnoseAndRemoveAttr(Attr, diag::attr_invalid_on_decl_kind, Attr,
+                            D->getDescriptiveKind());
+      continue;
+    }
+
     auto AtLoc = Attr->AtLoc;
     auto Platform = Attr->Platform;
 
@@ -5792,6 +5799,21 @@ void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
 void AttributeChecker::visitKnownToBeLocalAttr(KnownToBeLocalAttr *attr) {
   if (!D->isImplicit()) {
     diagnoseAndRemoveAttr(attr, diag::distributed_local_cannot_be_used);
+  }
+}
+
+void AttributeChecker::visitSendableAttr(SendableAttr *attr) {
+
+  if ((isa<AbstractFunctionDecl>(D) || isa<AbstractStorageDecl>(D)) &&
+      !isAsyncDecl(cast<ValueDecl>(D))) {
+    auto value = cast<ValueDecl>(D);
+    ActorIsolation isolation = getActorIsolation(value);
+    if (isolation.isActorIsolated()) {
+      diagnoseAndRemoveAttr(
+          attr, diag::sendable_isolated_sync_function,
+          isolation, value->getDescriptiveKind(), value->getName())
+        .warnUntilSwiftVersion(6);
+    }
   }
 }
 

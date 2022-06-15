@@ -21,6 +21,7 @@ target_sources(swiftSILOptimizer PRIVATE
   LexicalLifetimeEliminator.cpp
   LowerHopToActor.cpp
   MandatoryInlining.cpp
+  MovedAsyncVarDebugInfoPropagator.cpp
   MoveFunctionCanonicalization.cpp
   MoveKillsCopyableAddressesChecker.cpp
   MoveKillsCopyableValuesChecker.cpp

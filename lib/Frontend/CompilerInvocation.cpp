@@ -188,7 +188,15 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
     LibPath = SearchPathOpts.getSDKPath();
     llvm::sys::path::append(LibPath, "usr", "lib", "swift");
     if (!Triple.isOSDarwin()) {
+      // Use the non-architecture suffixed form with directory-layout
+      // swiftmodules.
       llvm::sys::path::append(LibPath, getPlatformNameForTriple(Triple));
+      RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
+
+      // Compatibility with older releases - use the architecture suffixed form
+      // for pre-directory-layout multi-architecture layout.  Note that some
+      // platforms (e.g. Windows) will use this even with directory layout in
+      // older releases.
       llvm::sys::path::append(LibPath, swift::getMajorArchitectureName(Triple));
     }
     RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
@@ -2318,6 +2326,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                      "-num-threads");
     }
   }
+  Opts.UseSingleModuleLLVMEmission =
+      Opts.NumThreads != 0 &&
+      Args.hasArg(OPT_enable_single_module_llvm_emission);
 
   if (SWIFT_ENABLE_GLOBAL_ISEL_ARM64 &&
       Triple.getArch() == llvm::Triple::aarch64 &&

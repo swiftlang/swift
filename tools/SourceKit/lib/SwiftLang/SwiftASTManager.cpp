@@ -1150,14 +1150,16 @@ void ASTBuildOperation::schedule(WorkQueue Queue) {
         std::string Error;
         assert(!Result && "We should only be producing a result once");
         ASTUnitRef AST = buildASTUnit(Error);
+        SmallVector<SwiftASTConsumerRef, 4> LocalConsumers;
         {
           llvm::sys::ScopedLock L(ConsumersAndResultMtx);
           bool WasCancelled = CancellationFlag->load(std::memory_order_relaxed);
           Result.emplace(AST, Error, WasCancelled);
-          for (auto &Consumer : Consumers) {
-            informConsumer(Consumer);
-          }
+          LocalConsumers = Consumers;
           Consumers = {};
+        }
+        for (auto &Consumer : LocalConsumers) {
+          informConsumer(Consumer);
         }
         DidFinishCallback();
       },
@@ -1165,23 +1167,25 @@ void ASTBuildOperation::schedule(WorkQueue Queue) {
 }
 
 bool ASTBuildOperation::addConsumer(SwiftASTConsumerRef Consumer) {
-  llvm::sys::ScopedLock L(ConsumersAndResultMtx);
-  if (isCancelled()) {
-    return false;
-  }
-  if (Result) {
-    informConsumer(Consumer);
-  } else {
+  {
+    llvm::sys::ScopedLock L(ConsumersAndResultMtx);
+    if (isCancelled()) {
+      return false;
+    }
+    if (Result) {
+      informConsumer(Consumer);
+      return true;
+    }
     assert(OperationState != State::Finished);
-    auto WeakThis = std::weak_ptr<ASTBuildOperation>(shared_from_this());
     Consumers.push_back(Consumer);
-    Consumer->setCancellationRequestCallback(
-        [WeakThis](SwiftASTConsumerRef Consumer) {
-          if (auto This = WeakThis.lock()) {
-            This->requestConsumerCancellation(Consumer);
-          }
-        });
   }
+  auto WeakThis = std::weak_ptr<ASTBuildOperation>(shared_from_this());
+  Consumer->setCancellationRequestCallback(
+      [WeakThis](SwiftASTConsumerRef Consumer) {
+        if (auto This = WeakThis.lock()) {
+          This->requestConsumerCancellation(Consumer);
+        }
+      });
   return true;
 }
 

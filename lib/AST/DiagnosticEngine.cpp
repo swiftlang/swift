@@ -737,7 +737,7 @@ static void formatDiagnosticArgument(StringRef Modifier,
         llvm::SmallString<256> AkaText;
         llvm::raw_svector_ostream OutAka(AkaText);
 
-        OutAka << getAkaTypeForDisplay(type);
+        getAkaTypeForDisplay(type)->print(OutAka, printOptions);
         Out << llvm::format(FormatOpts.AKAFormatString.c_str(),
                             typeName.c_str(), AkaText.c_str());
       } else {

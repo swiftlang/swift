@@ -65,13 +65,13 @@ distributed actor D4 {
 
 protocol P1: DistributedActor {
   distributed func dist() -> String
-  // expected-note@-1{{distributed instance method requirement 'dist()' declared here}}
+  // expected-note@-1{{'dist()' declared here}}
 }
 
 distributed actor D5: P1 {
   func dist() -> String { "" }
-  // expected-error@-1{{distributed actor-isolated instance method 'dist()' cannot be used to satisfy a protocol requirement}}
-  // expected-note@-2{{add 'distributed' to 'dist()' to make this instance method witness the protocol requirement}}{{3-3=distributed }}
+  // expected-error@-1{{distributed actor-isolated instance method 'dist()' cannot be used to satisfy actor-isolated protocol requirement}}
+  // expected-note@-2{{add 'distributed' to 'dist()' to make this instance method satisfy the protocol requirement}}{{3-3=distributed }}
 }
 
 // ==== Tests ------------------------------------------------------------------

@@ -9152,12 +9152,11 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
 
     case ClosureActorIsolation::ActorInstance: {
       auto selfDecl = isolation.getActorInstance();
-      auto actorClass = selfDecl->getType()->getReferenceStorageReferent()
-          ->getClassOrBoundGenericClass();
-      // FIXME: Doesn't work properly with generics
-      assert(actorClass && "Bad closure actor isolation?");
-      return ActorIsolation::forActorInstance(actorClass)
-                .withPreconcurrency(isolation.preconcurrency());
+      auto actor = selfDecl->getType()->getReferenceStorageReferent()
+          ->getAnyActor();
+      assert(actor && "Bad closure actor isolation?");
+      return ActorIsolation::forActorInstance(actor)
+        .withPreconcurrency(isolation.preconcurrency());
     }
     }
   }
@@ -9374,4 +9373,8 @@ void swift::simple_display(llvm::raw_ostream &out, AnyFunctionRef fn) {
     simple_display(out, func);
   else
     out << "closure";
+}
+
+bool ActorIsolation::isDistributedActor() const {
+  return getKind() == ActorInstance && getActor()->isDistributedActor();
 }

@@ -365,6 +365,10 @@ static void collectPossibleCalleesByQualifiedLookup(
   if (!baseInstanceTy->mayHaveMembers())
     return;
 
+  // 'AnyObject' is not initializable.
+  if (baseInstanceTy->isAnyObject() && name == DeclNameRef::createConstructor())
+    return;
+
   // Make sure we've resolved implicit members.
   namelookup::installSemanticMembersIfNeeded(baseInstanceTy, name);
 
@@ -1088,7 +1092,7 @@ class ExprContextAnalyzer {
       break;
     }
     case StmtKind::ForEach:
-      if (auto SEQ = cast<ForEachStmt>(Parent)->getSequence()) {
+      if (auto SEQ = cast<ForEachStmt>(Parent)->getParsedSequence()) {
         if (containsTarget(SEQ)) {
           recordPossibleType(Context.getSequenceType());
         }

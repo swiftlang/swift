@@ -694,7 +694,7 @@ protocol MiscTestsProto {
 do {
   func miscTests(_ arg: any MiscTestsProto) {
     var r: any Sequence & IteratorProtocol = arg.getR()
-    r.makeIterator() // expected-warning {{result of call to 'makeIterator()' is unused}}
+    r.makeIterator() // expected-error {{inferred result type 'any IteratorProtocol' requires explicit coercion due to loss of generic requirements}} {{19-19=as any IteratorProtocol}}
     r.next() // expected-warning {{result of call to 'next()' is unused}}
     r.nonexistent() // expected-error {{value of type 'any IteratorProtocol & Sequence' has no member 'nonexistent'}}
 

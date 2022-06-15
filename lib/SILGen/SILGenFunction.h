@@ -756,7 +756,8 @@ public:
                            SILDeclRef witness,
                            SubstitutionMap witnessSubs,
                            IsFreeFunctionWitness_t isFree,
-                           bool isSelfConformance);
+                           bool isSelfConformance,
+                           Optional<ActorIsolation> enterIsolation);
 
   /// Generates subscript arguments for keypath. This function handles lowering
   /// of all index expressions including default arguments.
@@ -1678,7 +1679,6 @@ public:
                                         ConcreteDeclRef defaultArgsOwner,
                                         unsigned destIndex,
                                         CanType resultType,
-                                        AbstractionPattern origResultType,
                                         SGFContext C = SGFContext());
 
   RValue emitApplyOfStoredPropertyInitializer(

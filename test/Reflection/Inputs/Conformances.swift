@@ -3,6 +3,13 @@ struct StructA : MyProto, Hashable {
     var x: Int
 }
 
+struct SomeStruct {
+    public func someFunc() -> Int {
+        struct SomeNestedStruct : MyProto {}
+        return 42
+    }
+}
+
 struct foo {
     struct bar {
         struct baz {

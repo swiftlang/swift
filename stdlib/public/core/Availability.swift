@@ -59,3 +59,48 @@ public func _stdlib_isOSVersionAtLeastOrVariantVersionAtLeast(
   return _stdlib_isOSVersionAtLeast(major, minor, patch)
 }
 #endif
+
+public typealias _SwiftStdlibVersion = SwiftShims._SwiftStdlibVersion
+
+/// Return true if the main executable was linked with an SDK version
+/// corresponding to the given Swift Stdlib release, or later. Otherwise, return
+/// false.
+///
+/// This is useful to maintain compatibility with older binaries after a
+/// behavioral change in the stdlib.
+///
+/// This function must not be called from inlinable code.
+@inline(__always)
+internal func _isExecutableLinkedOnOrAfter(
+  _ stdlibVersion: _SwiftStdlibVersion
+) -> Bool {
+#if SWIFT_RUNTIME_OS_VERSIONING
+  return _swift_stdlib_isExecutableLinkedOnOrAfter(stdlibVersion)
+#else
+  return true
+#endif
+}
+
+extension _SwiftStdlibVersion {
+  @_alwaysEmitIntoClient
+  public static var v5_6_0: Self { Self(_value: 0x050600) }
+
+  @_alwaysEmitIntoClient
+  public static var v5_7_0: Self { Self(_value: 0x050700) }
+
+  @available(SwiftStdlib 5.7, *)
+  public static var current: Self { .v5_7_0 }
+}
+
+@available(SwiftStdlib 5.7, *)
+extension _SwiftStdlibVersion: CustomStringConvertible {
+  @available(SwiftStdlib 5.7, *)
+  public var description: String {
+    let major = _value >> 16
+    let minor = (_value >> 8) & 0xFF
+    let patch = _value & 0xFF
+    return "\(major).\(minor).\(patch)"
+  }
+}
+
+

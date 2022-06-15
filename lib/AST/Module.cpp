@@ -1015,8 +1015,14 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
   // If the existential is class-constrained, the class might conform
   // concretely.
   if (auto superclass = layout.explicitSuperclass) {
-    if (auto result = lookupConformance(superclass, protocol))
+    if (auto result = lookupConformance(
+            superclass, protocol, /*allowMissing=*/false)) {
+      if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable) &&
+          result.hasUnavailableConformance())
+        result = ProtocolConformanceRef::forInvalid();
+
       return result;
+    }
   }
 
   // Otherwise, the existential might conform abstractly.
@@ -1088,8 +1094,8 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
   auto result = evaluateOrDefault(
       getASTContext().evaluator, request, ProtocolConformanceRef::forInvalid());
 
-  // If we aren't supposed to allow missing conformances through for this
-  // protocol, replace the result with an "invalid" result.
+  // If we aren't supposed to allow missing conformances but we have one,
+  // replace the result with an "invalid" result.
   if (!allowMissing &&
       shouldCreateMissingConformances(type, protocol) &&
       result.hasMissingConformance(this))
@@ -1248,7 +1254,12 @@ LookupConformanceInModuleRequest::evaluate(
     // able to be resolved by a substitution that makes the archetype
     // concrete.
     if (auto super = archetype->getSuperclass()) {
-      if (auto inheritedConformance = mod->lookupConformance(super, protocol)) {
+      auto inheritedConformance = mod->lookupConformance(
+          super, protocol, /*allowMissing=*/false);
+      if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable) &&
+          inheritedConformance.hasUnavailableConformance())
+        inheritedConformance = ProtocolConformanceRef::forInvalid();
+      if (inheritedConformance) {
         return ProtocolConformanceRef(ctx.getInheritedConformance(
             type, inheritedConformance.getConcrete()));
       }
@@ -3045,6 +3056,15 @@ SynthesizedFileUnit &FileUnit::getOrCreateSynthesizedFile() {
       return *thisSynth;
     SynthesizedFile = new (getASTContext()) SynthesizedFileUnit(*this);
     SynthesizedFileAndKind.setPointer(SynthesizedFile);
+    // FIXME: Mutating the module in-flight is not a good idea. Any
+    // callers above us in the stack that are iterating over
+    // the module's files will have their iterators invalidated. There's
+    // a strong chance that whatever analysis led to this function being
+    // called is doing just that!
+    //
+    // Instead we ought to just call ModuleDecl::clearLookupCache() here
+    // and patch out the places looking for synthesized files hanging off of
+    // source files.
     getParentModule()->addFile(*SynthesizedFile);
   }
   return *SynthesizedFile;

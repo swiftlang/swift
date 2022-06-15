@@ -2,13 +2,13 @@
 
 // CHECK: ---
 // CHECK: name:            Non-Diagnostic Mandatory Optimizations
-// CHECK: passes:          [ "for-each-loop-unroll", "mandatory-combine",
-// CHECK: "mandatory-arc-opts" ]
+// CHECK: passes:          [ "for-each-loop-unroll", "mandatory-combine", "mandatory-arc-opts",
+// CHECK: "onone-prespecializer" ]
 // CHECK: ---
 // CHECK: name:            Serialization
-// CHECK: passes:          [ "serialize-sil", "sil-onone-debuginfo-canonicalizer",
+// CHECK: passes:          [ "serialize-sil", "sil-moved-async-var-dbginfo-propagator",
 // CHECK-NEXT:               "ownership-model-eliminator" ]
 // CHECK: ---
 // CHECK: name:            Rest of Onone
-// CHECK: passes:          [ "use-prespecialized", "onone-prespecializer", "sil-debuginfo-gen" ]
+// CHECK: passes:          [ "use-prespecialized", "sil-debuginfo-gen" ]
 // CHECK: ...

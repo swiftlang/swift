@@ -183,6 +183,7 @@ set(SWIFTLIB_ESSENTIAL
   UnicodeParser.swift
   UnicodeScalarProperties.swift
   CharacterProperties.swift # ORDER DEPENDENCY: UnicodeScalarProperties.swift
+  UnicodeSPI.swift
   Unmanaged.swift
   UnmanagedOpaqueString.swift
   UnmanagedString.swift

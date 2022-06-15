@@ -14,12 +14,16 @@ typealias DefaultDistributedActorSystem = FakeActorSystem
 
 protocol LocalProto {
   func local()
-  // expected-note@-1{{mark the protocol requirement 'local()' 'async throws' in order witness it with 'distributed' function declared in distributed actor 'DAD'}}
+  // expected-note@-1 2{{mark the protocol requirement 'local()' 'async throws' to allow actor-isolated conformances}}
+
   func localAsync() async
-  // expected-note@-1{{mark the protocol requirement 'localAsync()' 'throws' in order witness it with 'distributed' function declared in distributed actor 'DAD'}}
+  // expected-note@-1 2{{mark the protocol requirement 'localAsync()' 'throws' to allow actor-isolated conformances}}{{26-26= throws}}
+
   func localThrows() throws
-  // expected-note@-1{{mark the protocol requirement 'localThrows()' 'async' in order witness it with 'distributed' function declared in distributed actor 'DAD'}}
+  // expected-note@-1 2{{mark the protocol requirement 'localThrows()' 'async' to allow actor-isolated conformances}}{{22-22=async }}
+
   func localAsyncThrows() async throws
+  // expected-note@-1{{'localAsyncThrows()' declared here}}
 }
 
 // TODO(distributed): It should be possible for a distributed actor to conform to this protocol (!),
@@ -50,28 +54,29 @@ protocol DistProtoDistributedActor: DistributedActor {
 
 distributed actor DAL: LocalProto {
   func local() {}
-  // expected-error@-1{{actor-isolated instance method 'local()' cannot be used to satisfy a protocol requirement}}
+  // expected-error@-1{{distributed actor-isolated instance method 'local()' cannot be used to satisfy nonisolated protocol requirement}}
   // expected-note@-2{{add 'nonisolated' to 'local()' to make this instance method not isolated to the actor}}
   func localAsync() async {}
-  // expected-error@-1{{actor-isolated instance method 'localAsync()' cannot be used to satisfy a protocol requirement}}
+  // expected-error@-1{{distributed actor-isolated instance method 'localAsync()' cannot be used to satisfy nonisolated protocol requirement}}
+  // expected-note@-2{{add 'nonisolated' to 'localAsync()' to make this instance method not isolated to the actor}}
   func localThrows() throws {}
-  // expected-error@-1{{actor-isolated instance method 'localThrows()' cannot be used to satisfy a protocol requirement}}
+  // expected-error@-1{{distributed actor-isolated instance method 'localThrows()' cannot be used to satisfy nonisolated protocol requirement}}
   // expected-note@-2{{add 'nonisolated' to 'localThrows()' to make this instance method not isolated to the actor}}
   func localAsyncThrows() async throws {}
-  // expected-error@-1{{actor-isolated instance method 'localAsyncThrows()' cannot be used to satisfy a protocol requirement}}
+  // expected-error@-1{{distributed actor-isolated instance method 'localAsyncThrows()' cannot be used to satisfy nonisolated protocol requirement}}
+  // expected-note@-2{{add 'nonisolated' to 'localAsyncThrows()' to make this instance method not isolated to the actor}}
+  // expected-note@-3{{add 'distributed' to 'localAsyncThrows()' to make this instance method satisfy the protocol requirement}}
 }
 
 distributed actor DAD: LocalProto {
   distributed func local() {}
-  // expected-error@-1{{distributed actor-isolated distributed instance method 'local()' cannot be used to satisfy a protocol requirement}}
-  // expected-note@-2{{add 'nonisolated' to 'local()' to make this distributed instance method not isolated to the actor}}
+  // expected-error@-1{{actor-isolated distributed instance method 'local()' cannot be used to satisfy nonisolated protocol requirement}}
 
   distributed func localAsync() async {}
-  // expected-error@-1{{distributed actor-isolated distributed instance method 'localAsync()' cannot be used to satisfy a protocol requirement}}
+  // expected-error@-1{{actor-isolated distributed instance method 'localAsync()' cannot be used to satisfy nonisolated protocol requirement}}
 
   distributed func localThrows() throws {}
-  // expected-error@-1{{distributed actor-isolated distributed instance method 'localThrows()' cannot be used to satisfy a protocol requirement}}
-  // expected-note@-2{{add 'nonisolated' to 'localThrows()' to make this distributed instance method not isolated to the actor}}
+  // expected-error@-1{{actor-isolated distributed instance method 'localThrows()' cannot be used to satisfy nonisolated protocol requirement}}
 
   distributed func localAsyncThrows() async throws {} // ok!
 }

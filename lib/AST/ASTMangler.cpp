@@ -633,6 +633,7 @@ std::string ASTMangler::mangleTypeForDebugger(Type Ty, GenericSignature sig) {
                                         "mangling type for debugger", Ty);
 
   DWARFMangling = true;
+  RespectOriginallyDefinedIn = false;
   OptimizeProtocolNames = false;
   beginMangling();
 
@@ -651,6 +652,7 @@ std::string ASTMangler::mangleTypeForTypeName(Type type) {
 
 std::string ASTMangler::mangleDeclType(const ValueDecl *decl) {
   DWARFMangling = true;
+  RespectOriginallyDefinedIn = false;
   beginMangling();
   
   appendDeclType(decl);
@@ -742,6 +744,7 @@ std::string ASTMangler::mangleTypeAsContextUSR(const NominalTypeDecl *type) {
 
 std::string ASTMangler::mangleTypeAsUSR(Type Ty) {
   DWARFMangling = true;
+  RespectOriginallyDefinedIn = false;
   beginMangling();
 
   Ty = getTypeForDWARFMangling(Ty);
@@ -756,8 +759,12 @@ std::string ASTMangler::mangleTypeAsUSR(Type Ty) {
   return finalize();
 }
 
-std::string ASTMangler::mangleAnyDecl(const ValueDecl *Decl, bool prefix) {
+std::string
+ASTMangler::mangleAnyDecl(const ValueDecl *Decl,
+                          bool prefix,
+                          bool respectOriginallyDefinedIn) {
   DWARFMangling = true;
+  RespectOriginallyDefinedIn = respectOriginallyDefinedIn;
   if (prefix) {
     beginMangling();
   } else {
@@ -1032,6 +1039,14 @@ void ASTMangler::appendOpaqueDeclName(const OpaqueTypeDecl *opaqueDecl) {
   if (canSymbolicReference(opaqueDecl)) {
     appendSymbolicReference(opaqueDecl);
   } else if (auto namingDecl = opaqueDecl->getNamingDecl()) {
+    // Set this to true temporarily, even if we're doing DWARF
+    // mangling for debug info, where it is false. Otherwise,
+    // the mangled opaque result type name will not be able to
+    // be looked up, since we rely on an exact match with the
+    // ABI name.
+    llvm::SaveAndRestore<bool> savedRespectOriginallyDefinedIn(
+        RespectOriginallyDefinedIn, true);
+
     appendEntity(namingDecl);
     appendOperator("QO");
   } else {
@@ -1637,6 +1652,10 @@ static bool isRetroactiveConformance(const RootProtocolConformance *root) {
     return false; // self-conformances are never retroactive. nor are builtin.
   }
 
+  // Don't consider marker protocols at all.
+  if (conformance->getProtocol()->isMarkerProtocol())
+    return false;
+
   return conformance->isRetroactive();
 }
 
@@ -1682,6 +1701,12 @@ void ASTMangler::appendRetroactiveConformances(SubstitutionMap subMap,
 
   unsigned numProtocolRequirements = 0;
   for (auto conformance : subMap.getConformances()) {
+    if (conformance.isInvalid())
+      continue;
+
+    if (conformance.getRequirement()->isMarkerProtocol())
+      continue;
+
     SWIFT_DEFER {
       ++numProtocolRequirements;
     };
@@ -2259,10 +2284,11 @@ void ASTMangler::appendModule(const ModuleDecl *module,
   // Use the module real name in mangling; this is the physical name
   // of the module on-disk, which can be different if -module-alias is
   // used.
+  //
   // For example, if a module Foo has 'import Bar', and '-module-alias Bar=Baz'
   // was passed, the name 'Baz' will be used for mangling besides loading.
   StringRef ModName = module->getRealName().str();
-  if (!DWARFMangling &&
+  if (RespectOriginallyDefinedIn &&
       module->getABIName() != module->getName()) { // check if the ABI name is set
     ModName = module->getABIName().str();
   }
@@ -2271,7 +2297,7 @@ void ASTMangler::appendModule(const ModuleDecl *module,
   if (ModName == STDLIB_NAME) {
     if (useModuleName.empty()) {
       appendOperator("s");
-    } else if (DWARFMangling) {
+    } else if (!RespectOriginallyDefinedIn) {
       appendOperator("s");
     } else {
       appendIdentifier(useModuleName);
@@ -2288,11 +2314,11 @@ void ASTMangler::appendModule(const ModuleDecl *module,
     return appendOperator("SC");
   }
 
-  // Enabling DWARFMangling indicate the mangled names are not part of the ABI,
-  // probably used by the debugger or IDE (USR). These mangled names will not be
-  // demangled successfully if we use the original module name instead of the
-  // actual module name.
-  if (!useModuleName.empty() && !DWARFMangling)
+  // Disabling RespectOriginallyDefinedIn indicate the mangled names are not part
+  // of the ABI, probably used by the debugger or IDE (USR). These mangled names
+  // will not be demangled successfully if we use the original module name instead
+  // of the actual module name.
+  if (!useModuleName.empty() && RespectOriginallyDefinedIn)
     appendIdentifier(useModuleName);
   else
     appendIdentifier(ModName);

@@ -223,7 +223,7 @@ protocol AsyncProto {
 }
 
 extension A1: AsyncProto {
-  func asyncMethod(_: NotConcurrent) async { } // expected-warning{{non-sendable type 'NotConcurrent' in parameter of actor-isolated instance method 'asyncMethod' satisfying non-isolated protocol requirement cannot cross actor boundary}}
+  func asyncMethod(_: NotConcurrent) async { } // expected-warning{{non-sendable type 'NotConcurrent' in parameter of actor-isolated instance method 'asyncMethod' satisfying protocol requirement cannot cross actor boundary}}
 }
 
 protocol MainActorProto {
@@ -232,7 +232,7 @@ protocol MainActorProto {
 
 class SomeClass: MainActorProto {
   @SomeGlobalActor
-  func asyncMainMethod(_: NotConcurrent) async { } // expected-warning{{non-sendable type 'NotConcurrent' in parameter of global actor 'SomeGlobalActor'-isolated instance method 'asyncMainMethod' satisfying non-isolated protocol requirement cannot cross actor boundary}}
+  func asyncMainMethod(_: NotConcurrent) async { } // expected-warning{{non-sendable type 'NotConcurrent' in parameter of global actor 'SomeGlobalActor'-isolated instance method 'asyncMainMethod' satisfying protocol requirement cannot cross actor boundary}}
 }
 
 // ----------------------------------------------------------------------

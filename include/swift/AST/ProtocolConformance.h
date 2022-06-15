@@ -601,6 +601,9 @@ public:
   /// Set the witness for the given requirement.
   void setWitness(ValueDecl *requirement, Witness witness) const;
 
+  /// Override the witness for a given requirement.
+  void overrideWitness(ValueDecl *requirement, Witness newWitness);
+
   /// Retrieve the protocol conformances that satisfy the requirements of the
   /// protocol, which line up with the conformance constraints in the
   /// protocol's requirement signature.

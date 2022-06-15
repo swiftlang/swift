@@ -1569,14 +1569,14 @@ public:
     }
     printRec(S->getPattern());
     OS << '\n';
-    printRec(S->getSequence());
+    printRec(S->getParsedSequence());
     OS << '\n';
     if (S->getIteratorVar()) {
       printRec(S->getIteratorVar());
       OS << '\n';
     }
-    if (S->getIteratorVarRef()) {
-      printRec(S->getIteratorVarRef());
+    if (S->getNextCall()) {
+      printRec(S->getNextCall());
       OS << '\n';
     }
     if (S->getConvertElementExpr()) {

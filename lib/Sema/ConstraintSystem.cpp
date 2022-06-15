@@ -2296,11 +2296,30 @@ ConstraintSystem::getTypeOfMemberReference(
       baseObjTy->isExistentialType() && outerDC->getSelfProtocolDecl() &&
       // If there are no type variables, there were no references to 'Self'.
       type->hasTypeVariable()) {
+    auto getResultType = [](Type type) {
+      if (auto *funcTy = type->getAs<FunctionType>())
+        return funcTy->getResult();
+      return type;
+    };
+
+    auto nonErasedResultTy = getResultType(type);
+
     const auto selfGP = cast<GenericTypeParamType>(
         outerDC->getSelfInterfaceType()->getCanonicalType());
     auto openedTypeVar = replacements.lookup(selfGP);
     type = typeEraseOpenedExistentialReference(type, baseObjTy, openedTypeVar,
                                                TypePosition::Covariant);
+
+    if (!hasFixFor(locator) &&
+        AddExplicitExistentialCoercion::isRequired(
+            *this, nonErasedResultTy,
+            [&](TypeVariableType *typeVar) {
+              return openedTypeVar == typeVar ? baseObjTy : Optional<Type>();
+            },
+            locator)) {
+      recordFix(AddExplicitExistentialCoercion::create(
+          *this, getResultType(type), locator));
+    }
   }
 
   // Construct an idealized parameter type of the initializer associated
@@ -5089,8 +5108,8 @@ void constraints::simplifyLocator(ASTNode &anchor,
       continue;
     }
 
-    case ConstraintLocator::ClosureBodyElement: {
-      auto bodyElt = path[0].castTo<LocatorPathElt::ClosureBodyElement>();
+    case ConstraintLocator::SyntacticElement: {
+      auto bodyElt = path[0].castTo<LocatorPathElt::SyntacticElement>();
       anchor = bodyElt.getElement();
       path = path.slice(1);
       continue;
@@ -6104,17 +6123,11 @@ SolutionApplicationTarget SolutionApplicationTarget::forInitialization(
     return result;
 }
 
-SolutionApplicationTarget SolutionApplicationTarget::forForEachStmt(
-    ForEachStmt *stmt, ProtocolDecl *sequenceProto, DeclContext *dc,
-    bool bindPatternVarsOneWay, ContextualTypePurpose purpose) {
+SolutionApplicationTarget
+SolutionApplicationTarget::forForEachStmt(ForEachStmt *stmt, DeclContext *dc,
+                                          bool bindPatternVarsOneWay) {
   SolutionApplicationTarget target(
-      stmt->getSequence(), dc, purpose,
-      sequenceProto->getDeclaredInterfaceType(), /*isDiscarded=*/false);
-  target.expression.pattern = stmt->getPattern();
-  target.expression.bindPatternVarsOneWay =
-    bindPatternVarsOneWay || (stmt->getWhere() != nullptr);
-  target.expression.forEachStmt.stmt = stmt;
-  target.expression.forEachStmt.whereExpr = stmt->getWhere();
+      stmt, dc, bindPatternVarsOneWay || bool(stmt->getWhere()));
   return target;
 }
 
@@ -6143,10 +6156,13 @@ SolutionApplicationTarget::getContextualPattern() const {
                                                     uninitializedVar.index);
   }
 
+  if (isForEachStmt()) {
+    return ContextualPattern::forRawPattern(forEachStmt.pattern,
+                                            forEachStmt.dc);
+  }
+
   assert(kind == Kind::expression);
-  assert(expression.contextualPurpose == CTP_Initialization ||
-         expression.contextualPurpose == CTP_ForEachStmt ||
-         expression.contextualPurpose == CTP_ForEachSequence);
+  assert(expression.contextualPurpose == CTP_Initialization);
   if (expression.contextualPurpose == CTP_Initialization &&
       expression.initialization.patternBinding) {
     return ContextualPattern::forPatternBindingDecl(
@@ -6263,6 +6279,8 @@ void ConstraintSystem::diagnoseFailureFor(SolutionApplicationTarget target) {
                         nominal->getName());
     }
   } else if (auto *var = target.getAsUninitializedVar()) {
+    DE.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
+  } else if (target.isForEachStmt()) {
     DE.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
   } else {
     // Emit a poor fallback message.

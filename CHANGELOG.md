@@ -30,6 +30,39 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   There are [new string-processing algorithms][SE-0357] that support
   `String`, `Regex` and arbitrary `Collection` types.
 
+* [SE-0338][]:
+
+  Non-isolated async functions now always execute on the global concurrent pool,
+  so calling a non-isolated async function from actor-isolated code will leave
+  the actor. For example:
+
+  ```swift
+  class C { }
+
+  func f(_: C) async { /* always executes on the global concurrent pool */ }
+
+  actor A {
+    func g(c: C) async {
+      /* always executes on the actor */
+      print("on the actor")
+
+      await f(c)
+    }
+  }
+  ```
+
+  Prior to this change, the call from `f` to `g` might have started execution of
+  `g` on the actor, which could lead to actors being busy longer than strictly
+  necessary. Now, the non-isolated async function will always hop to the global
+  cooperative pool, not run on the actor. This can result in a behavior change
+  for programs that assumed that a non-isolated async function called from a
+  `@MainActor` context will be executed on the main actor, although such
+  programs were already technically incorrect.
+
+  Additionally, when leaving an actor to execution on the global cooperative
+  pool, `Sendable` checking will be performed, so the compiler will emit a
+  diagnostic in the call to `f` if `c` is not of `Sendable` type.
+
 * [SE-0353][]:
 
   Protocols with primary associated types can now be used in existential types,
@@ -82,21 +115,32 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   }
   ```
 
-* References to `optional` methods on a protocol metatype, as well as references to dynamically looked up methods on the `AnyObject` metatype are now supported. These references always have the type of a function that accepts a single argument and returns an optional value of function type:
+* References to `optional` methods on a protocol metatype, as well as references to dynamically looked up methods on `AnyObject` are now supported on par with other function references. The type of such a reference (formerly an immediate optional by mistake) has been altered to that of a function that takes a single argument and returns an optional value of function type:
 
   ```swift
   class Object {
-    @objc func getTag() -> Int
-  }
-
-  @objc protocol P {
-    @objc optional func didUpdateObject(withTag tag: Int)
+    @objc func getTag() -> Int { ... }
   }
 
   let getTag: (AnyObject) -> (() -> Int)? = AnyObject.getTag
 
-  let didUpdateObject: (any P) -> ((Int) -> Void)? = P.didUpdateObject
+  @objc protocol Delegate {
+    @objc optional func didUpdateObject(withTag tag: Int)
+  }
+
+  let didUpdateObjectWithTag: (Delegate) -> ((Int) -> Void)? = Delegate.didUpdateObject
   ```
+
+  > **Warning**  
+  > Due to the type change, selectors for aforementioned method references that require writing out their type explicitly for disambiguation will no longer compile. To fix this, simply adjust the written type, or resort to a `#if swift(<5.7)` directive when compatibility with older compiler versions is warranted. For example:
+  >
+  > ```swift
+  > #if swift(<5.7)
+  > let decidePolicyForNavigationAction = #selector(WKNavigationDelegate.webView(_:decidePolicyFor:decisionHandler:) as ((WKNavigationDelegate) -> (WKWebView, WKNavigationAction, @escaping (WKNavigationActionPolicy) -> Void) -> Void)?)
+  > #else
+  > let decidePolicyForNavigationAction = #selector(WKNavigationDelegate.webView(_:decidePolicyFor:decisionHandler:) as (WKNavigationDelegate) -> ((WKWebView, WKNavigationAction, @escaping (WKNavigationActionPolicy) -> Void) -> Void)?)
+  > #endif
+  > ```
 
 * [SE-0349][]:
 
@@ -9341,6 +9385,7 @@ Swift 1.0
 [SE-0335]: <https://github.com/apple/swift-evolution/blob/main/proposals/0335-existential-any.md>
 [SE-0336]: <https://github.com/apple/swift-evolution/blob/main/proposals/0336-distributed-actor-isolation.md>
 [SE-0337]: <https://github.com/apple/swift-evolution/blob/main/proposals/0337-support-incremental-migration-to-concurrency-checking.md>
+[SE-0338]: <https://github.com/apple/swift-evolution/blob/main/proposals/0338-clarify-execution-non-actor-async.md>
 [SE-0340]: <https://github.com/apple/swift-evolution/blob/main/proposals/0340-swift-noasync.md>
 [SE-0341]: <https://github.com/apple/swift-evolution/blob/main/proposals/0341-opaque-parameters.md>
 [SE-0343]: <https://github.com/apple/swift-evolution/blob/main/proposals/0343-top-level-concurrency.md>

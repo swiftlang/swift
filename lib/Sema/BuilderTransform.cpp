@@ -847,24 +847,10 @@ protected:
       return nullptr;
     }
 
-    // For-each statements require the Sequence protocol. If we don't have
-    // it (which generally means the standard library isn't loaded), fall
-    // out of the result-builder path entirely to let normal type checking
-    // take care of this.
-    auto sequenceProto = TypeChecker::getProtocol(
-        dc->getASTContext(), forEachStmt->getForLoc(),
-        forEachStmt->getAwaitLoc().isValid() ? 
-          KnownProtocolKind::AsyncSequence : KnownProtocolKind::Sequence);
-    if (!sequenceProto) {
-      if (!unhandledNode)
-        unhandledNode = forEachStmt;
-      return nullptr;
-    }
-
     // Generate constraints for the loop header. This also wires up the
     // types for the patterns.
     auto target = SolutionApplicationTarget::forForEachStmt(
-        forEachStmt, sequenceProto, dc, /*bindPatternVarsOneWay=*/true);
+        forEachStmt, dc, /*bindPatternVarsOneWay=*/true);
     if (cs) {
       if (cs->generateConstraints(target, FreeTypeVariableBinding::Disallow)) {
         hadError = true;

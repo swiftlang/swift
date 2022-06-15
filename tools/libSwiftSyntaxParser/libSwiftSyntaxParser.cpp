@@ -19,8 +19,10 @@
 #include "swift/AST/Module.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/Version.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Parse/SyntaxParseActions.h"
+#include "swift/Parse/SyntaxRegexFallbackLexing.h"
 #include "swift/Syntax/Serialization/SyntaxSerialization.h"
 #include "swift/Syntax/SyntaxNodes.h"
 #include "swift/Subsystems.h"
@@ -57,6 +59,13 @@ class SynParser {
   swiftparse_node_handler_t NodeHandler = nullptr;
   swiftparse_node_lookup_t NodeLookup = nullptr;
   swiftparse_diagnostic_handler_t DiagHandler = nullptr;
+  /// The language version that should be used to parse the Swift source file.
+  /// If \c None this is the default langauge version specified in LangOptions.h
+  Optional<version::Version> EffectiveLanguageVersion;
+
+  /// Whether bare slash regex literals are enabled.
+  /// If \c None this is the default specified in LangOptions.h
+  Optional<bool> EnableBareSlashRegexLiteral;
 
 public:
   swiftparse_node_handler_t getNodeHandler() const {
@@ -87,6 +96,17 @@ public:
     auto prevBlk = DiagHandler;
     DiagHandler = Block_copy(hdl);
     Block_release(prevBlk);
+  }
+
+  void setLanguageVersion(const char *versionString) {
+    if (auto version = version::Version::parseVersionString(
+            versionString, SourceLoc(), /*Diags=*/nullptr)) {
+      this->EffectiveLanguageVersion = version;
+    }
+  }
+
+  void setEnableBareSlashRegexLiteral(bool EnableBareSlashRegexLiteral) {
+    this->EnableBareSlashRegexLiteral = EnableBareSlashRegexLiteral;
   }
 
   ~SynParser() {
@@ -478,6 +498,7 @@ struct SynParserDiagConsumer: public DiagnosticConsumer {
 };
 
 swiftparse_client_node_t SynParser::parse(const char *source, size_t len) {
+  registerSyntaxFallbackRegexParser();
   SourceManager SM;
   unsigned bufID = SM.addNewSourceBuffer(llvm::MemoryBuffer::getMemBuffer(
       StringRef(source, len), "syntax_parse_source"));
@@ -488,6 +509,15 @@ swiftparse_client_node_t SynParser::parse(const char *source, size_t len) {
   // Disable name lookups during parsing.
   // Not ready yet:
   // langOpts.EnableASTScopeLookup = true;
+
+  // Always enable bare /.../ regex literal in syntax parser.
+  langOpts.EnableExperimentalStringProcessing = true;
+  if (EnableBareSlashRegexLiteral && *EnableBareSlashRegexLiteral) {
+    langOpts.EnableBareSlashRegexLiterals = true;
+  }
+  if (EffectiveLanguageVersion) {
+    langOpts.EffectiveLanguageVersion = *EffectiveLanguageVersion;
+  }
 
   auto parseActions =
     std::make_shared<CLibParseActions>(*this, SM, bufID);
@@ -509,6 +539,18 @@ swiftparse_client_node_t SynParser::parse(const char *source, size_t len) {
 swiftparse_parser_t
 swiftparse_parser_create(void) {
   return new SynParser();
+}
+
+void swiftparse_parser_set_language_version(swiftparse_parser_t c_parser,
+                                            const char *version) {
+  SynParser *parser = static_cast<SynParser *>(c_parser);
+  parser->setLanguageVersion(version);
+}
+
+void swiftparse_parser_set_enable_bare_slash_regex_literal(
+    swiftparse_parser_t c_parser, bool enabled) {
+  SynParser *parser = static_cast<SynParser *>(c_parser);
+  parser->setEnableBareSlashRegexLiteral(enabled);
 }
 
 void

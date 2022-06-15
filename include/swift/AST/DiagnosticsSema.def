@@ -1524,6 +1524,9 @@ WARNING(access_control_non_objc_open_member,none,
 
 ERROR(invalid_decl_attribute,none,
       "'%0' attribute cannot be applied to this declaration", (DeclAttribute))
+ERROR(attr_invalid_on_decl_kind,none,
+      "'%0' attribute cannot be applied to %1 declarations",
+      (DeclAttribute, DescriptiveDeclKind))
 ERROR(invalid_decl_modifier,none,
       "%0 modifier cannot be applied to this declaration", (DeclAttribute))
 ERROR(attribute_does_not_apply_to_type,none,
@@ -3788,8 +3791,6 @@ ERROR(protocol_declares_unknown_primary_assoc_type,none,
       (Identifier, Type))
 ERROR(protocol_declares_duplicate_primary_assoc_type,none,
       "duplicate primary associated type name %0", (Identifier))
-ERROR(parameterized_protocol_not_supported,none,
-      "protocol type with type arguments can only be used as a generic constraint", ())
 ERROR(protocol_does_not_have_primary_assoc_type,none,
       "cannot specialize protocol type %0", (Type))
 ERROR(parameterized_protocol_type_argument_count_mismatch,none,
@@ -4470,14 +4471,11 @@ NOTE(note_add_nonisolated_to_decl,none,
      (DeclName, DescriptiveDeclKind))
 NOTE(note_add_async_and_throws_to_decl,none,
      "mark the protocol requirement %0 '%select{|async|throws|async throws}1' "
-     "in order witness it with 'distributed' function declared in distributed actor %2",
-     (DeclName, unsigned, DeclName))
+     "to allow actor-isolated conformances",
+     (DeclName, unsigned))
 NOTE(note_add_distributed_to_decl,none,
-     "add 'distributed' to %0 to make this %1 witness the protocol requirement",
+     "add 'distributed' to %0 to make this %1 satisfy the protocol requirement",
      (DeclName, DescriptiveDeclKind))
-NOTE(note_distributed_requirement_defined_here,none,
-     "distributed instance method requirement %0 declared here",
-     (DeclName))
 NOTE(note_add_globalactor_to_function,none,
      "add '@%0' to make %1 %2 part of global actor %3", 
      (StringRef, DescriptiveDeclKind, DeclName, Type))
@@ -4558,13 +4556,16 @@ ERROR(override_implicit_unowned_executor,none,
       "cannot override an actor's 'unownedExecutor' property that wasn't "
       "explicitly defined", ())
 ERROR(actor_isolated_non_self_reference,none,
-        "actor-isolated %0 %1 can not be "
+        "%5 %0 %1 can not be "
         "%select{referenced|mutated|used 'inout'}2 "
-        "%select{on a non-isolated actor instance|"
+        "%select{from outside the actor|on a different actor instance|"
+        "on a non-isolated actor instance|"
         "from a Sendable function|from a Sendable closure|"
         "from an 'async let' initializer|from global actor %4|"
-        "from the main actor|from a non-isolated context|from a non-isolated autoclosure}3",
-        (DescriptiveDeclKind, DeclName, unsigned, unsigned, Type))
+        "from the main actor|from a non-isolated context|"
+        "from a non-isolated autoclosure}3",
+        (DescriptiveDeclKind, DeclName, unsigned, unsigned, Type,
+         ActorIsolation))
 ERROR(distributed_actor_isolated_non_self_reference,none,
       "distributed actor-isolated %0 %1 can not be accessed from a "
       "non-isolated context",
@@ -4579,18 +4580,6 @@ ERROR(actor_isolated_inout_state,none,
 ERROR(actor_isolated_mutating_func,none,
       "cannot call mutating async function %0 on actor-isolated %1 %2",
       (DeclName, DescriptiveDeclKind, DeclName))
-ERROR(global_actor_from_instance_actor_context,none,
-      "%0 %1 isolated to global actor %2 can not be %select{referenced|mutated|used 'inout'}4"
-      " from actor %3 %select{|in a synchronous context}5",
-      (DescriptiveDeclKind, DeclName, Type, DeclName, unsigned, bool))
-ERROR(global_actor_from_other_global_actor_context,none,
-      "%0 %1 isolated to global actor %2 can not be %select{referenced|mutated|used 'inout'}4"
-      " from different global actor %3 %select{|in a synchronous context}5",
-      (DescriptiveDeclKind, DeclName, Type, Type, unsigned, bool))
-ERROR(global_actor_from_nonactor_context,none,
-      "%0 %1 isolated to global actor %2 can not be %select{referenced|mutated|used 'inout'}4"
-      " from %select{this|a non-isolated}3%select{| synchronous}5 context",
-      (DescriptiveDeclKind, DeclName, Type, bool, unsigned, bool))
 ERROR(actor_isolated_call,none,
       "call to %0 function in a synchronous %1 context",
       (ActorIsolation, ActorIsolation))
@@ -4612,6 +4601,9 @@ ERROR(effectful_keypath_component,none,
 ERROR(local_function_executed_concurrently,none,
       "concurrently-executed %0 %1 must be marked as '@Sendable'",
       (DescriptiveDeclKind, DeclName))
+ERROR(sendable_isolated_sync_function,none,
+      "%0 synchronous %1 %2 cannot be marked as '@Sendable'",
+      (ActorIsolation, DescriptiveDeclKind, DeclName))
 ERROR(concurrent_access_of_local_capture,none,
       "%select{mutation of|reference to}0 captured %1 %2 in "
       "concurrently-executing code",
@@ -4647,6 +4639,9 @@ ERROR(distributed_actor_func_param_not_codable,none,
 ERROR(distributed_actor_target_result_not_codable,none,
       "result type %0 of %1 %2 does not conform to serialization requirement '%3'",
       (Type, DescriptiveDeclKind, Identifier, StringRef))
+ERROR(distributed_actor_system_serialization_req_must_be_protocol,none,
+      "'SerializationRequirement' type witness %0 must be a protocol type",
+      (Type))
 ERROR(distributed_actor_remote_func_implemented_manually,none,
       "distributed instance method's %0 remote counterpart %1 cannot not be implemented manually.",
       (Identifier, Identifier))
@@ -4684,19 +4679,9 @@ WARNING(shared_mutable_state_access,none,
         "reference to %0 %1 is not concurrency-safe because it involves "
         "shared mutable state", (DescriptiveDeclKind, DeclName))
 ERROR(actor_isolated_witness,none,
-     "actor-isolated %0 %1 cannot be used to satisfy a protocol requirement",
-     (DescriptiveDeclKind, DeclName))
-ERROR(distributed_actor_isolated_witness,none,
-     "distributed actor-isolated %0 %1 cannot be used to satisfy a protocol requirement",
-     (DescriptiveDeclKind, DeclName))
-ERROR(global_actor_isolated_witness,none,
-      "%0 %1 isolated to global actor %2 can not satisfy corresponding "
-      "requirement from protocol %3",
-      (DescriptiveDeclKind, DeclName, Type, Identifier))
-ERROR(global_actor_isolated_requirement_witness_conflict,none,
-      "%0 %1 isolated to global actor %2 can not satisfy corresponding "
-      "requirement from protocol %3 isolated to global actor %4",
-      (DescriptiveDeclKind, DeclName, Type, Identifier, Type))
+     "%select{|distributed }0%1 %2 %3 cannot be used to satisfy %4 protocol "
+     "requirement",
+     (bool, ActorIsolation, DescriptiveDeclKind, DeclName, ActorIsolation))
 ERROR(actor_cannot_conform_to_global_actor_protocol,none,
       "actor %0 cannot conform to global actor isolated protocol %1",
       (Type, Type))
@@ -4708,9 +4693,10 @@ ERROR(isolated_parameter_not_actor,none,
 
 WARNING(non_sendable_param_type,none,
         "non-sendable type %0 %select{passed in call to %4 %2 %3|"
+        "exiting %4 context in call to non-isolated %2 %3|"
         "passed in implicitly asynchronous call to %4 %2 %3|"
-        "in parameter of %4 %2 %3 satisfying non-isolated protocol "
-        "requirement|"
+        "in parameter of %4 %2 %3 satisfying protocol requirement|"
+        "in parameter of %4 overriding %2 %3|"
         "in parameter of %4 '@objc' %2 %3}1 cannot cross actor boundary",
         (Type, unsigned, DescriptiveDeclKind, DeclName, ActorIsolation))
 WARNING(non_sendable_call_param_type,none,
@@ -4719,8 +4705,10 @@ WARNING(non_sendable_call_param_type,none,
         (Type, bool, ActorIsolation))
 WARNING(non_sendable_result_type,none,
         "non-sendable type %0 returned by %select{call to %4 %2 %3|"
+        "call from %4 context to non-isolated %2 %3|"
         "implicitly asynchronous call to %4 %2 %3|"
-        "%4 %2 %3 satisfying non-isolated protocol requirement|"
+        "%4 %2 %3 satisfying protocol requirement|"
+        "%4 overriding %2 %3|"
         "%4 '@objc' %2 %3}1 cannot cross actor boundary",
         (Type, unsigned, DescriptiveDeclKind, DeclName, ActorIsolation))
 WARNING(non_sendable_call_result_type,none,
@@ -4730,8 +4718,10 @@ WARNING(non_sendable_call_result_type,none,
 WARNING(non_sendable_property_type,none,
         "non-sendable type %0 in %select{"
         "%select{asynchronous access to %5 %1 %2|"
+        "asynchronous access from %5 context to non-isolated %1 %2|"
         "implicitly asynchronous access to %5 %1 %2|"
-        "conformance of %5 %1 %2 to non-isolated protocol requirement|"
+        "conformance of %5 %1 %2 to protocol requirement|"
+        "%5 overriding %1 %2|"
         "%5 '@objc' %1 %2}4|captured local %1 %2}3 cannot "
         "cross %select{actor|task}3 boundary",
         (Type, DescriptiveDeclKind, DeclName, bool, unsigned, ActorIsolation))
@@ -5601,6 +5591,16 @@ ERROR(availability_decl_only_version_newer, none,
       "%0 is only available in %1 %2 or newer",
       (DeclName, StringRef, llvm::VersionTuple))
 
+ERROR(availability_decl_only_version_newer_for_clients, none,
+      "%0 is only available in %1 %2 or newer; clients of %3 may have a lower"
+      " deployment target",
+      (DeclName, StringRef, llvm::VersionTuple, ModuleDecl *))
+
+WARNING(availability_decl_only_version_newer_for_clients_warn, none,
+        "%0 is only available in %1 %2 or newer; clients of %3 may have a lower"
+        " deployment target",
+        (DeclName, StringRef, llvm::VersionTuple, ModuleDecl *))
+
 ERROR(availability_opaque_types_only_version_newer, none,
       "'some' return types are only available in %0 %1 or newer",
       (StringRef, llvm::VersionTuple))
@@ -6356,6 +6356,20 @@ ERROR(cannot_convert_default_value_type_to_argument_type, none,
 ERROR(attr_incompatible_with_back_deploy,none,
       "'%0' cannot be applied to a back deployed %1",
       (DeclAttribute, DescriptiveDeclKind))
+
+//------------------------------------------------------------------------------
+// MARK: Implicit opening of existential types
+//------------------------------------------------------------------------------
+
+ERROR(result_requires_explicit_coercion,none,
+      "inferred result type %0 requires explicit coercion due to "
+      "loss of generic requirements",
+      (Type))
+
+NOTE(candidate_result_requires_explicit_coercion,none,
+     "inferred result type %0 requires explicit coercion due to "
+     "loss of generic requirements",
+     (Type))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

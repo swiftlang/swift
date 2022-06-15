@@ -786,6 +786,10 @@ public:
   /// Break an existential down into a set of constraints.
   ExistentialLayout getExistentialLayout();
 
+  /// If this is an actor or distributed type, get the nominal type declaration
+  /// for the actor.
+  NominalTypeDecl *getAnyActor();
+
   /// Determines whether this type is an actor type.
   bool isActorType();
 
@@ -1231,6 +1235,9 @@ public:
   Type adjustSuperclassMemberDeclType(const ValueDecl *baseDecl,
                                       const ValueDecl *derivedDecl,
                                       Type memberType);
+
+  /// If this type is T, return Optional<T>.
+  Type wrapInOptionalType() const;
 
   /// Return T if this type is Optional<T>; otherwise, return the null type.
   Type getOptionalObjectType();
@@ -6750,38 +6757,6 @@ inline TypeBase *TypeBase::getDesugaredType() {
   if (!isa<SugarType>(this))
     return this;
   return cast<SugarType>(this)->getSinglyDesugaredType()->getDesugaredType();
-}
-
-inline bool TypeBase::hasSimpleTypeRepr() const {
-  // NOTE: Please keep this logic in sync with TypeRepr::isSimple().
-  switch (getKind()) {
-  case TypeKind::Function:
-  case TypeKind::GenericFunction:
-    return false;
-
-  case TypeKind::Metatype:
-    return !cast<const AnyMetatypeType>(this)->hasRepresentation();
-
-  case TypeKind::ExistentialMetatype:
-  case TypeKind::Existential:
-    return false;
-
-  case TypeKind::OpaqueTypeArchetype:
-  case TypeKind::OpenedArchetype:
-    return false;
-
-  case TypeKind::ProtocolComposition: {
-    // 'Any', 'AnyObject' and single protocol compositions are simple
-    auto composition = cast<const ProtocolCompositionType>(this);
-    auto memberCount = composition->getMembers().size();
-    if (composition->hasExplicitAnyObject())
-      return memberCount == 0;
-    return memberCount <= 1;
-  }
-
-  default:
-    return true;
-  }
 }
 
 } // end namespace swift

@@ -4,8 +4,12 @@
 // KW_RETURN: Keyword[return]/None: return{{; name=.+$}}
 // KW_NO_RETURN-NOT: Keyword[return]
 
+// KW_IN: Keyword[in]/None: in{{; name=.+$}}
+// KW_NO_IN-NOT: Keyword[in]
+
 // KW_DECL: Begin completions
 // KW_DECL-DAG: Keyword[class]/None: class{{; name=.+$}}
+// KW_DECL-DAG: Keyword/None: actor{{; name=.+$}}
 // KW_DECL-DAG: Keyword/None: convenience{{; name=.+$}}
 // KW_DECL-DAG: Keyword[deinit]/None: deinit{{; name=.+$}}
 // KW_DECL-DAG: Keyword/None: dynamic{{; name=.+$}}
@@ -42,6 +46,7 @@
 
 // KW_DECL_PROTOCOL: Begin completions
 // KW_DECL_PROTOCOL-DAG: Keyword[class]/None/Flair[RareKeyword]: class{{; name=.+$}}
+// KW_DECL_PROTOCOL-DAG: Keyword/None/Flair[RareKeyword]: actor{{; name=.+$}}
 // KW_DECL_PROTOCOL-DAG: Keyword/None: convenience{{; name=.+$}}
 // KW_DECL_PROTOCOL-DAG: Keyword[deinit]/None: deinit{{; name=.+$}}
 // KW_DECL_PROTOCOL-DAG: Keyword/None: dynamic{{; name=.+$}}
@@ -78,6 +83,7 @@
 
 // KW_DECL_TYPECONTEXT: Begin completions
 // KW_DECL_TYPECONTEXT-DAG: Keyword[class]/None: class{{; name=.+$}}
+// KW_DECL_TYPECONTEXT-DAG: Keyword/None: actor{{; name=.+$}}
 // KW_DECL_TYPECONTEXT-DAG: Keyword/None: convenience{{; name=.+$}}
 // KW_DECL_TYPECONTEXT-DAG: Keyword[deinit]/None: deinit{{; name=.+$}}
 // KW_DECL_TYPECONTEXT-DAG: Keyword/None: dynamic{{; name=.+$}}
@@ -118,6 +124,7 @@
 // Declaration keywords.
 //
 // KW_DECL_STMT_TOPLEVEL-DAG: Keyword[class]/None: class{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword/None: actor{{; name=.+$}}
 // KW_DECL_STMT_TOPLEVEL-DAG: Keyword/None: convenience{{; name=.+$}}
 // KW_DECL_STMT_TOPLEVEL-DAG: Keyword[deinit]/None: deinit{{; name=.+$}}
 // KW_DECL_STMT_TOPLEVEL-DAG: Keyword/None: dynamic{{; name=.+$}}
@@ -157,7 +164,6 @@
 // KW_DECL_STMT_TOPLEVEL-DAG: Keyword[do]/None: do{{; name=.+$}}
 // KW_DECL_STMT_TOPLEVEL-DAG: Keyword[else]/None: else{{; name=.+$}}
 // KW_DECL_STMT_TOPLEVEL-DAG: Keyword[for]/None: for{{; name=.+$}}
-// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[in]/None: in{{; name=.+$}}
 // KW_DECL_STMT_TOPLEVEL-DAG: Keyword[while]/None: while{{; name=.+$}}
 // KW_DECL_STMT_TOPLEVEL-DAG: Keyword[break]/None: break{{; name=.+$}}
 // KW_DECL_STMT_TOPLEVEL-DAG: Keyword[continue]/None: continue{{; name=.+$}}
@@ -230,7 +236,6 @@
 // KW_DECL_STMT-DAG: Keyword[do]/None: do{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword[else]/None: else{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword[for]/None: for{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword[in]/None: in{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword[while]/None: while{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword[break]/None: break{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword[continue]/None: continue{{; name=.+$}}
@@ -302,15 +307,15 @@
 // KW_EXPR_NEG-NOT: Keyword{{.*}}break
 // KW_EXPR_NEG: End completions
 
-#^TOP_LEVEL_1?check=KW_DECL_STMT_TOPLEVEL;check=KW_NO_RETURN^#
+#^TOP_LEVEL_1?check=KW_DECL_STMT_TOPLEVEL;check=KW_NO_RETURN;check=KW_NO_IN^#
 
 for _ in 1...10 {
-  #^TOP_LEVEL_2?check=KW_DECL_STMT;check=KW_NO_RETURN^#
+  #^TOP_LEVEL_2?check=KW_DECL_STMT;check=KW_NO_RETURN;check=KW_NO_IN^#
 }
 
-if true {} #^TOP_LEVEL_AFTER_IF_1?check=KW_DECL_STMT_TOPLEVEL;check=KW_NO_RETURN^#
+if true {} #^TOP_LEVEL_AFTER_IF_1?check=KW_DECL_STMT_TOPLEVEL;check=KW_NO_RETURN;check=KW_NO_IN^#
 if true {} 
-#^TOP_LEVEL_AFTER_IF_2?check=KW_DECL_STMT_TOPLEVEL;check=KW_NO_RETURN^#
+#^TOP_LEVEL_AFTER_IF_2?check=KW_DECL_STMT_TOPLEVEL;check=KW_NO_RETURN;check=KW_NO_IN^#
 
 
 if true {} else #^TOP_LEVEL_AFTER_IF_ELSE_1?check=AFTER_IF_ELSE^# {}
@@ -319,60 +324,60 @@ if true {} else #^TOP_LEVEL_AFTER_IF_ELSE_1?check=AFTER_IF_ELSE^# {}
 // AFTER_IF_ELSE: Keyword[if]/None: if;
 
 func testAfterIf1() {
-  if true {} #^AFTER_IF_1?check=KW_DECL_STMT;check=KW_RETURN^#
+  if true {} #^AFTER_IF_1?check=KW_DECL_STMT;check=KW_RETURN;check=KW_NO_IN^#
 }
 func testAfterIfElse1() {
   if true {} else #^AFTER_IF_ELSE_1?check=AFTER_IF_ELSE^# {}
 }
 
 func testInFuncBody1() {
-  #^IN_FUNC_BODY_1?check=KW_DECL_STMT;check=KW_RETURN^#
+  #^IN_FUNC_BODY_1?check=KW_DECL_STMT;check=KW_RETURN;check=KW_NO_IN^#
 }
 
 struct InStructFunc {
   func testInFuncBody2() {
-    #^IN_FUNC_BODY_2?check=KW_DECL_STMT;check=KW_RETURN^#
+    #^IN_FUNC_BODY_2?check=KW_DECL_STMT;check=KW_RETURN;check=KW_NO_IN^#
   }
 }
 
 enum InEnumFunc {
   func testInFuncBody3() {
-    #^IN_FUNC_BODY_3?check=KW_DECL_STMT;check=KW_RETURN^#
+    #^IN_FUNC_BODY_3?check=KW_DECL_STMT;check=KW_RETURN;check=KW_NO_IN^#
   }
 }
 
 class InClassFunc {
   func testInFuncBody4() {
-    #^IN_FUNC_BODY_4?check=KW_DECL_STMT;check=KW_RETURN^#
+    #^IN_FUNC_BODY_4?check=KW_DECL_STMT;check=KW_RETURN;check=KW_NO_IN^#
   }
 }
 
 class InClassFunc {
   class Nested {
     func testInFuncBody5() {
-      #^IN_FUNC_BODY_5?check=KW_DECL_STMT;check=KW_RETURN^#
+      #^IN_FUNC_BODY_5?check=KW_DECL_STMT;check=KW_RETURN;check=KW_NO_IN^#
     }
   }
 }
 
 func testInClosure1() {
-  { #^IN_CLOSURE_1?check=KW_DECL_STMT;check=KW_RETURN^# }
+  { #^IN_CLOSURE_1?check=KW_DECL_STMT;check=KW_RETURN;check=KW_IN^# }
 }
 func testInClosure2() {
-  { #^IN_CLOSURE_2?check=KW_DECL_STMT;check=KW_RETURN^#
+  { #^IN_CLOSURE_2?check=KW_DECL_STMT;check=KW_RETURN;check=KW_IN^#
 }
 struct InVarClosureInit {
-  let x = { #^IN_CLOSURE_3?check=KW_DECL_STMT;check=KW_RETURN^# }()
+  let x = { #^IN_CLOSURE_3?check=KW_DECL_STMT;check=KW_RETURN;check=KW_IN^# }()
 }
 
-{ #^IN_CLOSURE_4?check=KW_DECL_STMT;check=KW_RETURN^# }
+{ #^IN_CLOSURE_4?check=KW_DECL_STMT;check=KW_RETURN;check=KW_IN^# }
 
 struct InSubscript {
-  subscript(x: Int) -> Int { #^IN_SUBSCRIPT_1?check=KW_DECL_STMT;check=KW_RETURN^# }
+  subscript(x: Int) -> Int { #^IN_SUBSCRIPT_1?check=KW_DECL_STMT;check=KW_RETURN;check=KW_NO_IN^# }
 }
 
 struct InInit {
-  init?() { #^IN_INIT_1?check=KW_DECL_STMT;check=KW_RETURN^# }
+  init?() { #^IN_INIT_1?check=KW_DECL_STMT;check=KW_RETURN;check=KW_NO_IN^# }
 }
 
 struct InStruct {

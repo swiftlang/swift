@@ -2078,13 +2078,9 @@ static CanSILFunctionType getSILFunctionType(
     // Lower in the context of the closure. Since the set of captures is a
     // private contract between the closure and its enclosing context, we
     // don't need to keep its capture types opaque.
-    auto expansion = TypeExpansionContext::maximal(
-        constant->getAnyFunctionRef()->getAsDeclContext(), false);
-    // ...unless it's inlinable, in which case it might get inlined into
-    // some place we need to keep opaque types opaque.
-    if (constant->isSerialized())
-      expansion = TypeExpansionContext::minimal();
-    lowerCaptureContextParameters(TC, *constant, genericSig, expansion, inputs);
+    lowerCaptureContextParameters(TC, *constant, genericSig,
+                                  TC.getCaptureTypeExpansionContext(*constant),
+                                  inputs);
   }
   
   auto calleeConvention = ParameterConvention::Direct_Unowned;
@@ -2582,17 +2578,15 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
   }
 
   auto substTypeHelper = [&](SubstitutableType *type) -> Type {
+    // FIXME: Type::subst should not pass in non-root archetypes.
+    // Consider only root archetypes.
+    if (auto *archetype = dyn_cast<ArchetypeType>(type)) {
+      if (!archetype->isRoot())
+        return Type();
+    }
+
     if (CanType(type) == openedExistential)
       return newArchetype;
-
-    // If a nested archetype is rooted on our opened existential, fail:
-    // Type::subst attempts to substitute the parent of a nested archetype
-    // only if it fails to find a replacement for the nested one.
-    if (auto *opened = dyn_cast<OpenedArchetypeType>(type)) {
-      if (openedExistential->isEqual(opened->getRoot())) {
-        return nullptr;
-      }
-    }
 
     return Type(type).subst(contextSubs);
   };

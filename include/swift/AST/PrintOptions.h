@@ -209,6 +209,9 @@ struct PrintOptions {
   /// \see FileUnit::getExportedModuleName
   bool UseExportedModuleNames = false;
 
+  /// Use the original module name to qualify a symbol.
+  bool UseOriginallyDefinedInModuleNames = false;
+
   /// Print Swift.Array and Swift.Optional with sugared syntax
   /// ([] and ?), even if there are no sugar type nodes.
   bool SynthesizeSugarOnTypes = false;

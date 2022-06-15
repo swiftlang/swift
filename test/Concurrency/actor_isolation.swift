@@ -68,7 +68,7 @@ actor MyActor: MySuperActor { // expected-error{{actor types do not support inhe
   var name : String = "koala" // expected-note{{property declared here}}
 
   func accessProp() -> String {
-    return self.name // expected-error{{property 'name' isolated to global actor 'MainActor' can not be referenced from actor 'MyActor' in a synchronous context}}
+    return self.name // expected-error{{main actor-isolated property 'name' can not be referenced on a different actor instance}}
   }
 
   static func synchronousClass() { }
@@ -426,11 +426,11 @@ actor Crystal {
   func referToGlobProps() async {
     _ = await globActorVar + globActorProp
 
-    globActorProp = 20 // expected-error {{property 'globActorProp' isolated to global actor 'SomeGlobalActor' can not be mutated from actor 'Crystal'}}
+    globActorProp = 20 // expected-error {{global actor 'SomeGlobalActor'-isolated property 'globActorProp' can not be mutated on a different actor instance}}
 
-    globActorVar = 30 // expected-error {{property 'globActorVar' isolated to global actor 'SomeGlobalActor' can not be mutated from actor 'Crystal'}}
+    globActorVar = 30 // expected-error {{global actor 'SomeGlobalActor'-isolated property 'globActorVar' can not be mutated on a different actor instance}}
 
-    // expected-error@+2 {{property 'globActorVar' isolated to global actor 'SomeGlobalActor' can not be used 'inout' from actor 'Crystal'}}
+    // expected-error@+2 {{global actor 'SomeGlobalActor'-isolated property 'globActorVar' can not be used 'inout' on a different actor instance}}
     // expected-error@+1 {{actor-isolated property 'globActorVar' cannot be passed 'inout' to implicitly 'async' function call}}
     await self.foo(&globActorVar)
 
@@ -566,7 +566,7 @@ var number: Int = 42 // expected-note {{var declared here}}
 
 // expected-note@+1 {{add '@SomeGlobalActor' to make global function 'badNumberUser()' part of global actor 'SomeGlobalActor'}}
 func badNumberUser() {
-  //expected-error@+1{{var 'number' isolated to global actor 'SomeGlobalActor' can not be referenced from this synchronous context}}
+  //expected-error@+1{{global actor 'SomeGlobalActor'-isolated var 'number' can not be referenced from a non-isolated context}}
   print("The protected number is: \(number)")
 }
 
@@ -959,7 +959,7 @@ class SomeClassWithInits {
 
   deinit {
     print(mutableState) // Okay, we're actor-isolated
-    print(SomeClassWithInits.shared) // expected-error{{static property 'shared' isolated to global actor 'MainActor' can not be referenced from this synchronous context}}
+    print(SomeClassWithInits.shared) // expected-error{{main actor-isolated static property 'shared' can not be referenced from a non-isolated context}}
     beets_ma() //expected-error{{call to main actor-isolated global function 'beets_ma()' in a synchronous nonisolated context}}
   }
 
@@ -985,7 +985,7 @@ class SomeClassWithInits {
 @available(SwiftStdlib 5.1, *)
 func outsideSomeClassWithInits() { // expected-note 3 {{add '@MainActor' to make global function 'outsideSomeClassWithInits()' part of global actor 'MainActor'}}
   _ = SomeClassWithInits() // expected-error{{call to main actor-isolated initializer 'init()' in a synchronous nonisolated context}}
-  _ = SomeClassWithInits.shared // expected-error{{static property 'shared' isolated to global actor 'MainActor' can not be referenced from this synchronous context}}
+  _ = SomeClassWithInits.shared // expected-error{{main actor-isolated static property 'shared' can not be referenced from a non-isolated context}}
   SomeClassWithInits.staticIsolated() // expected-error{{call to main actor-isolated static method 'staticIsolated()' in a synchronous nonisolated context}}
 }
 
@@ -1411,14 +1411,15 @@ class MA {
 @SomeGlobalActor class SGA: MA {} // expected-error {{global actor 'SomeGlobalActor'-isolated class 'SGA' has different actor isolation from main actor-isolated superclass 'MA'}}
 
 protocol SGA_Proto {
-  @SomeGlobalActor func method() // expected-note {{'method()' declared here}}
+  @SomeGlobalActor func method() // expected-note {{mark the protocol requirement 'method()' 'async' to allow actor-isolated conformances}}
 }
 
 // try to override a MA method with inferred isolation from a protocol requirement
 class SGA_MA: MA, SGA_Proto {
   // expected-error@+2 {{call to global actor 'SomeGlobalActor'-isolated global function 'onions_sga()' in a synchronous main actor-isolated context}}
-  // expected-warning@+1 {{instance method 'method()' isolated to global actor 'MainActor' can not satisfy corresponding requirement from protocol 'SGA_Proto' isolated to global actor 'SomeGlobalActor'}}
+  // expected-warning@+1 {{main actor-isolated instance method 'method()' cannot be used to satisfy global actor 'SomeGlobalActor'-isolated protocol requirement}}
   override func method() { onions_sga() }
+  // expected-note@-1{{add 'nonisolated' to 'method()' to make this instance method not isolated to the actor}}{{3-3=nonisolated }}
 }
 
 class None_MA: MA {

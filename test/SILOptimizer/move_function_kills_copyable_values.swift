@@ -48,6 +48,36 @@ public func loopUse1(_ x: Klass) {
 }
 
 //===---
+// Let + Non Consuming Assignment
+//
+
+public func simpleLinearUseAssignment(_ x: __owned Klass) {
+    let y = x // expected-error {{'y' used after being moved}}
+    let _ = _move(y) // expected-note {{move here}}
+    let m = y // expected-note {{use here}}
+    let _ = m
+}
+
+public func conditionalUse1Assignment(_ x: Klass) {
+    let y = x
+    if booleanValue {
+        let _ = _move(y)
+    } else {
+        let m = y
+        let _ = m
+    }
+}
+
+public func loopUse1Assignment(_ x: Klass) {
+    let y = x  // expected-error {{'y' used after being moved}}
+    let _ = _move(y) // expected-note {{move here}}
+    for _ in 0..<1024 {
+        let m = y // expected-note {{use here}}
+        let _ = m
+    }
+}
+
+//===---
 // Let + Consuming Use
 //
 

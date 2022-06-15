@@ -263,6 +263,7 @@ MinimalConformances::decomposeTermIntoConformanceRuleLeftHandSides(
   bool simplified = System.simplify(term, &steps);
   if (!simplified) {
     llvm::errs() << "Term does not conform to protocol: " << term << "\n";
+    System.dump(llvm::errs());
     abort();
   }
 

@@ -9,7 +9,6 @@ func test() async {
 
 struct X {
   async let x = 1 // expected-error{{'async let' can only be used on local declarations}}
-  // FIXME: expected-error@-1{{'async' call cannot occur in a property initializer}}
 }
 
 func testAsyncFunc() async {

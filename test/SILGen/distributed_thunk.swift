@@ -17,3 +17,16 @@ extension DA {
 
   distributed func f() { }
 }
+
+protocol ServerProto {
+  func doSomething() async throws
+}
+
+extension DA: ServerProto {
+  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s17distributed_thunk2DACAA11ServerProtoA2aDP11doSomethingyyYaKFTW : $@convention(witness_method: ServerProto) @async (@in_guaranteed DA) -> @error Error
+  // CHECK-NOT: hop_to_executor
+  // CHECK-NOT: return
+  // CHECK: function_ref @$s17distributed_thunk2DAC11doSomethingyyFTE
+  // CHECK: return
+  distributed func doSomething() { }
+}
