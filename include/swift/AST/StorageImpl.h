@@ -362,11 +362,24 @@ public:
     return { ReadImplKind::Get };
   }
 
+  /// Equivalent to immutableComputed storage info, but with a read
+  /// accessor instead of a get accessor.
+  static StorageImplInfo getBorrowedImmutableComputed() {
+    return {ReadImplKind::Read};
+  }
+
   /// Describe the implementation of a mutable property implemented with
   /// getter and setter.
   static StorageImplInfo getMutableComputed() {
     return { ReadImplKind::Get, WriteImplKind::Set,
              ReadWriteImplKind::MaterializeToTemporary };
+  }
+
+  /// Equivalent to mutableComputed storage info, but with a read accessor
+  /// instead of a get accessor.
+  static StorageImplInfo getMutableComputedWithBorrowedRead() {
+    return {ReadImplKind::Read, WriteImplKind::Set,
+            ReadWriteImplKind::MaterializeToTemporary};
   }
 
   /// Does this implementation description require storage?

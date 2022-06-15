@@ -253,10 +253,25 @@ static void makeComputed(AbstractStorageDecl *storage,
                          AccessorDecl *getter, AccessorDecl *setter) {
   assert(getter);
   if (setter) {
-    storage->setImplInfo(StorageImplInfo::getMutableComputed());
+    if (getter->getAccessorKind() == AccessorKind::Read) {
+      storage->setImplInfo(
+          StorageImplInfo::getMutableComputedWithBorrowedRead());
+    } else if (getter->getAccessorKind() == AccessorKind::Get) {
+      storage->setImplInfo(StorageImplInfo::getMutableComputed());
+    } else {
+      llvm_unreachable("Only get and read accessors are currently supported "
+                       "for syntherized accessors");
+    }
     storage->setAccessors(SourceLoc(), {getter, setter}, SourceLoc());
   } else {
-    storage->setImplInfo(StorageImplInfo::getImmutableComputed());
+    if (getter->getAccessorKind() == AccessorKind::Read) {
+      storage->setImplInfo(StorageImplInfo::getBorrowedImmutableComputed());
+    } else if (getter->getAccessorKind() == AccessorKind::Get) {
+      storage->setImplInfo(StorageImplInfo::getImmutableComputed());
+    } else {
+      llvm_unreachable("Only get and read accessors are currently supported "
+                       "for syntherized accessors");
+    }
     storage->setAccessors(SourceLoc(), {getter}, SourceLoc());
   }
 }
@@ -7833,7 +7848,23 @@ SwiftDeclConverter::importAccessor(const clang::ObjCMethodDecl *clangAccessor,
   return accessor;
 }
 
-/// Synthesizer callback for a subscript getter.
+/// Determines if an accessor returning the given type should
+/// use a read accessor or a get accessor.
+static bool accessorResultTypeWorthYielding(const swift::Type &type) {
+  // For the time being, this optimization is focused C++ operator[]
+  // that return non trivial types by reference.
+  const auto pointerElementType = type->getAnyPointerElementType();
+  if (!pointerElementType)
+    return false;
+
+  const auto structDecl = pointerElementType->getStructOrBoundGenericStruct();
+  if (!structDecl)
+    return false;
+
+  return structDecl->isCxxNonTrivial();
+}
+
+/// Synthesizer callback for a subscript getter or reader.
 static std::pair<BraceStmt *, bool>
 synthesizeSubscriptGetterBody(AbstractFunctionDecl *afd, void *context) {
   auto getterDecl = cast<AccessorDecl>(afd);
@@ -7844,7 +7875,13 @@ synthesizeSubscriptGetterBody(AbstractFunctionDecl *afd, void *context) {
   Expr *selfExpr = createSelfExpr(getterDecl);
   DeclRefExpr *keyRefExpr = createParamRefExpr(getterDecl, 0);
 
-  Type elementTy = getterDecl->getResultInterfaceType();
+  const bool shouldUseReadAccessor =
+      accessorResultTypeWorthYielding(getterImpl->getResultInterfaceType());
+
+  const Type rawElementTy = getterImpl->getResultInterfaceType();
+  Type elementTy = rawElementTy->getAnyPointerElementType()
+                       ? rawElementTy->getAnyPointerElementType()
+                       : rawElementTy;
 
   auto *getterImplCallExpr =
       createAccessorImplCallExpr(getterImpl, selfExpr, keyRefExpr);
@@ -7876,12 +7913,18 @@ synthesizeSubscriptGetterBody(AbstractFunctionDecl *afd, void *context) {
     propertyExpr = pointeePropertyRefExpr;
   }
 
-  auto returnStmt = new (ctx) ReturnStmt(SourceLoc(),
-                                         propertyExpr,
-                                         /*implicit=*/ true);
+  // If generating a read accesor, synthesize a yield statement, and a return
+  // statement otherwise
+  const ASTNode braceStmtContents =
+      shouldUseReadAccessor
+          ? static_cast<ASTNode>(
+                YieldStmt::create(ctx, SourceLoc(), SourceLoc(), {propertyExpr},
+                                  SourceLoc(), /*implicit=*/true))
+          : new (ctx) ReturnStmt(SourceLoc(), propertyExpr, /*implicit=*/true);
 
-  auto body = BraceStmt::create(ctx, SourceLoc(), { returnStmt }, SourceLoc(),
-                                /*implicit=*/ true);
+  auto body =
+      BraceStmt::create(ctx, SourceLoc(), {braceStmtContents}, SourceLoc(),
+                        /*implicit=*/true);
   return { body, /*isTypeChecked=*/true };
 }
 
@@ -8031,19 +8074,17 @@ SwiftDeclConverter::makeSubscript(FuncDecl *getter, FuncDecl *setter) {
                                                            getterImpl->getClangNode());
   subscript->setAccess(AccessLevel::Public);
 
-  AccessorDecl *getterDecl = AccessorDecl::create(ctx,
-                                                  getterImpl->getLoc(),
-                                                  getterImpl->getLoc(),
-                                                  AccessorKind::Get,
-                                                  subscript,
-                                                  SourceLoc(),
-                                                  subscript->getStaticSpelling(),
-                                                  /*async*/ false, SourceLoc(),
-                                                  /*throws*/ false, SourceLoc(),
-                                                  nullptr,
-                                                  bodyParams,
-                                                  elementTy,
-                                                  dc);
+  const bool shouldUseReadAccessor =
+      accessorResultTypeWorthYielding(getterImpl->getResultInterfaceType());
+  AccessorDecl *getterDecl = AccessorDecl::create(
+      ctx, getterImpl->getLoc(), getterImpl->getLoc(),
+      shouldUseReadAccessor ? AccessorKind::Read : AccessorKind::Get, subscript,
+      SourceLoc(), subscript->getStaticSpelling(),
+      /*async*/ false, SourceLoc(),
+      /*throws*/ false, SourceLoc(), nullptr, bodyParams,
+      // Read accessors are special coroutines and return an empty tuple.
+      shouldUseReadAccessor ? TupleType::getEmpty(ctx) : elementTy, dc);
+
   getterDecl->setAccess(AccessLevel::Public);
   getterDecl->setImplicit();
   getterDecl->setIsDynamic(false);

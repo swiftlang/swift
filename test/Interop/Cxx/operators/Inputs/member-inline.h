@@ -232,6 +232,12 @@ private:
   NonTrivial S;
 };
 
+struct NonTrivialArrayByRef {
+  NonTrivial &operator[](int x) { return S; }
+private:
+  NonTrivial S;
+};
+
 struct PtrByVal {
   int *operator[](int x) { return &a; }
 private:
