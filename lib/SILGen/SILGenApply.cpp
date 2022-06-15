@@ -1090,7 +1090,7 @@ public:
 
     // If this is a direct reference to a vardecl, just emit its value directly.
     // Recursive references to callable declarations are allowed.
-    if (auto var = dyn_cast<VarDecl>(e->getDecl())) {
+    if (isa<VarDecl>(e->getDecl())) {
       visitExpr(e);
       return;
     }
@@ -1126,8 +1126,6 @@ public:
 
     /// Some special handling may be necessary for thunks:
     if (callSite && callSite->shouldApplyDistributedThunk()) {
-      fprintf(stderr, "[%s:%d] (%s) SHOULD APPLY DIST THUNK\n", __FILE__, __LINE__, __FUNCTION__);
-
       if (auto distributedThunk = cast<AbstractFunctionDecl>(e->getDecl())->getDistributedThunk()) {
         constant = SILDeclRef(distributedThunk).asDistributed();
       }
@@ -5782,15 +5780,8 @@ RValue SILGenFunction::emitGetAccessor(SILLocation loc, SILDeclRef get,
   // Scope any further writeback just within this operation.
   FormalEvaluationScope writebackScope(*this);
 
-  auto constant = get;
-
-//  if (isDistributed) {
-//    get.dump();
-//    assert(false && "should use dist thunk");
-//  }
-
   Callee getter = emitSpecializedAccessorFunctionRef(
-      *this, loc, constant, substitutions, selfValue, isSuper, isDirectUse,
+      *this, loc, get, substitutions, selfValue, isSuper, isDirectUse,
       isDistributed, isOnSelfParameter);
   bool hasSelf = (bool)selfValue;
   CanAnyFunctionType accessType = getter.getSubstFormalType();
