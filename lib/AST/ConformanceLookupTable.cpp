@@ -820,8 +820,9 @@ DeclContext *ConformanceLookupTable::getConformingContext(
         if (superclassTy->is<ErrorType>())
           return nullptr;
         auto inheritedConformance = module->lookupConformance(
-            superclassTy, protocol, /*allowMissing=*/false,
-            /*allowUnavailable=*/false);
+            superclassTy, protocol, /*allowMissing=*/false);
+        if (inheritedConformance.hasUnavailableConformance())
+          inheritedConformance = ProtocolConformanceRef::forInvalid();
         if (inheritedConformance)
           return superclassDecl;
       } while ((superclassDecl = superclassDecl->getSuperclassDecl()));
