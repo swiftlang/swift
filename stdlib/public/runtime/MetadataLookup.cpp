@@ -2269,7 +2269,7 @@ static void installGetClassHook() {
 unsigned SubstGenericParametersFromMetadata::
 buildDescriptorPath(const ContextDescriptor *context,
                     Demangler &borrowFrom) const {
-  assert(sourceIsMetadata);
+  assert(sourceKind == SourceKind::Metadata);
 
   // Terminating condition: we don't have a context.
   if (!context)
@@ -2360,19 +2360,75 @@ buildEnvironmentPath(
   return totalKeyParamCount;
 }
 
+unsigned SubstGenericParametersFromMetadata::buildShapePath(
+    const TargetExtendedExistentialTypeShape<InProcess> *shape) const {
+  unsigned totalParamCount = 0;
+  unsigned totalKeyParamCount = 0;
+
+  auto genSig = shape->getGeneralizationSignature();
+  if (!genSig.getParams().empty()) {
+    bool hasNonKeyGenericParams = false;
+    unsigned numKeyGenericParamsHere = 0;
+    for (const auto &gp : genSig.getParams()) {
+      if (gp.hasKeyArgument())
+        numKeyGenericParamsHere++;
+      else
+        hasNonKeyGenericParams = true;
+    }
+    totalParamCount += numKeyGenericParamsHere;
+    totalKeyParamCount += numKeyGenericParamsHere;
+    descriptorPath.push_back(PathElement{genSig.getParams(), totalParamCount,
+                                         /*numKeyGenericParamsInParent*/ 0,
+                                         numKeyGenericParamsHere,
+                                         hasNonKeyGenericParams});
+  }
+
+  const unsigned genSigParamCount = genSig.getParams().size();
+  auto reqSig = shape->getRequirementSignature();
+  assert(reqSig.getParams().size() > genSig.getParams().size());
+  {
+    bool hasNonKeyGenericParams = false;
+    unsigned numKeyGenericParamsHere = 0;
+    auto remainingParams = reqSig.getParams().drop_front(genSig.getParams().size());
+    for (const auto &gp : remainingParams) {
+      if (gp.hasKeyArgument())
+        numKeyGenericParamsHere++;
+      else
+        hasNonKeyGenericParams = true;
+    }
+    totalParamCount += numKeyGenericParamsHere;
+    totalKeyParamCount += numKeyGenericParamsHere;
+    descriptorPath.push_back(PathElement{remainingParams,
+                                         totalParamCount,
+                                         genSigParamCount,
+                                         numKeyGenericParamsHere,
+                                         hasNonKeyGenericParams});
+  }
+
+  return totalKeyParamCount;
+}
+
 void SubstGenericParametersFromMetadata::setup() const {
   if (!descriptorPath.empty())
     return;
 
-  if (sourceIsMetadata && baseContext) {
+  switch (sourceKind) {
+  case SourceKind::Metadata: {
+    assert(baseContext);
     DemanglerForRuntimeTypeResolution<StackAllocatedDemangler<2048>> demangler;
     numKeyGenericParameters = buildDescriptorPath(baseContext, demangler);
     return;
   }
-
-  if (!sourceIsMetadata && environment) {
+  case SourceKind::Environment: {
+    assert(environment);
     numKeyGenericParameters = buildEnvironmentPath(environment);
     return;
+  }
+  case SourceKind::Shape: {
+    assert(shape);
+    numKeyGenericParameters = buildShapePath(shape);
+    return;
+  }
   }
 }
 
