@@ -23,14 +23,14 @@
 // CHECK-NEXT: // Swift type metadata request type.
 // CHECK-NEXT: typedef uint{{.*}}_t MetadataRequestTy;
 // CHECK-EMPTY:
-// CHECK-NEXT: using ValueWitnessInitializeBufferWithCopyOfBufferTy = void * _Nonnull(*)(void * _Nonnull, void * _Nonnull, void * _Nonnull) __ptrauth_swift_value_witness_function_pointer(
-// CHECK-NEXT: using ValueWitnessDestroyTy = void(*)(void * _Nonnull, void * _Nonnull) __ptrauth_swift_value_witness_function_pointer(
-// CHECK-NEXT: using ValueWitnessInitializeWithCopyTy = void * _Nonnull(*)(void * _Nonnull, void * _Nonnull, void * _Nonnull) __ptrauth_swift_value_witness_function_pointer(
-// CHECK-NEXT: using ValueWitnessAssignWithCopyTy = void * _Nonnull(*)(void * _Nonnull, void * _Nonnull, void * _Nonnull) __ptrauth_swift_value_witness_function_pointer(
-// CHECK-NEXT: using ValueWitnessInitializeWithTakeTy = void * _Nonnull(*)(void * _Nonnull, void * _Nonnull, void * _Nonnull) __ptrauth_swift_value_witness_function_pointer(
-// CHECK-NEXT: using ValueWitnessAssignWithTakeTy = void * _Nonnull(*)(void * _Nonnull, void * _Nonnull, void * _Nonnull) __ptrauth_swift_value_witness_function_pointer(
-// CHECK-NEXT: using ValueWitnessGetEnumTagSinglePayloadTy = unsigned(*)(const void * _Nonnull, unsigned, void * _Nonnull) __ptrauth_swift_value_witness_function_pointer(
-// CHECK-NEXT: using ValueWitnessStoreEnumTagSinglePayloadTy = void(*)(void * _Nonnull, unsigned, unsigned, void * _Nonnull) __ptrauth_swift_value_witness_function_pointer(
+// CHECK-NEXT: using ValueWitnessInitializeBufferWithCopyOfBufferTy = void * _Nonnull(* __ptrauth_swift_value_witness_function_pointer(55882))(void * _Nonnull, void * _Nonnull, void * _Nonnull);
+// CHECK-NEXT: using ValueWitnessDestroyTy = void(* __ptrauth_swift_value_witness_function_pointer(1272))(void * _Nonnull, void * _Nonnull);
+// CHECK-NEXT: using ValueWitnessInitializeWithCopyTy = void * _Nonnull(* __ptrauth_swift_value_witness_function_pointer(58298))(void * _Nonnull, void * _Nonnull, void * _Nonnull);
+// CHECK-NEXT: using ValueWitnessAssignWithCopyTy = void * _Nonnull(* __ptrauth_swift_value_witness_function_pointer(34641))(void * _Nonnull, void * _Nonnull, void * _Nonnull);
+// CHECK-NEXT: using ValueWitnessInitializeWithTakeTy = void * _Nonnull(* __ptrauth_swift_value_witness_function_pointer(18648))(void * _Nonnull, void * _Nonnull, void * _Nonnull);
+// CHECK-NEXT: using ValueWitnessAssignWithTakeTy = void * _Nonnull(* __ptrauth_swift_value_witness_function_pointer(61402))(void * _Nonnull, void * _Nonnull, void * _Nonnull);
+// CHECK-NEXT: using ValueWitnessGetEnumTagSinglePayloadTy = unsigned(* __ptrauth_swift_value_witness_function_pointer(24816))(const void * _Nonnull, unsigned, void * _Nonnull);
+// CHECK-NEXT: using ValueWitnessStoreEnumTagSinglePayloadTy = void(* __ptrauth_swift_value_witness_function_pointer(41169))(void * _Nonnull, unsigned, unsigned, void * _Nonnull);
 // CHECK-EMPTY:
 // CHECK-NEXT: struct ValueWitnessTable {
 // CHECK-NEXT:  ValueWitnessInitializeBufferWithCopyOfBufferTy _Nonnull initializeBufferWithCopyOfBuffer;
