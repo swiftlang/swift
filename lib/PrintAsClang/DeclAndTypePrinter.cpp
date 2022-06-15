@@ -331,11 +331,12 @@ private:
   void visitStructDecl(StructDecl *SD) {
     if (outputLang != OutputLanguageMode::Cxx)
       return;
+    // FIXME: Print struct's doc comment.
     // FIXME: Print struct's availability.
     ClangValueTypePrinter printer(os, owningPrinter.prologueOS,
                                   owningPrinter.typeMapping,
                                   owningPrinter.interopContext);
-    printer.printStructDecl(SD);
+    printer.printValueTypeDecl(SD);
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {

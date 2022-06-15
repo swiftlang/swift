@@ -73,9 +73,10 @@ void printCTypeMetadataTypeFunction(raw_ostream &os,
   os << " SWIFT_NOEXCEPT SWIFT_CALL;\n\n";
 }
 
-void ClangValueTypePrinter::printStructDecl(const StructDecl *SD) {
+void ClangValueTypePrinter::printValueTypeDecl(
+    const NominalTypeDecl *typeDecl) {
   auto typeSizeAlign =
-      interopContext.getIrABIDetails().getTypeSizeAlignment(SD);
+      interopContext.getIrABIDetails().getTypeSizeAlignment(typeDecl);
   if (!typeSizeAlign) {
     // FIXME: handle non-fixed layout structs.
     return;
@@ -88,31 +89,31 @@ void ClangValueTypePrinter::printStructDecl(const StructDecl *SD) {
   ClangSyntaxPrinter printer(os);
 
   auto typeMetadataFunc = irgen::LinkEntity::forTypeMetadataAccessFunction(
-      SD->getDeclaredType()->getCanonicalType());
+      typeDecl->getDeclaredType()->getCanonicalType());
   std::string typeMetadataFuncName = typeMetadataFunc.mangleAsString();
 
   // Print out a forward declaration of the "hidden" _impl class.
   printer.printNamespace(cxx_synthesis::getCxxImplNamespaceName(),
                          [&](raw_ostream &os) {
                            os << "class ";
-                           printCxxImplClassName(os, SD);
+                           printCxxImplClassName(os, typeDecl);
                            os << ";\n\n";
 
                            // Print out special functions, like functions that
                            // access type metadata.
-                           printCTypeMetadataTypeFunction(os, SD,
+                           printCTypeMetadataTypeFunction(os, typeDecl,
                                                           typeMetadataFuncName);
                          });
 
   // Print out the C++ class itself.
   os << "class ";
-  ClangSyntaxPrinter(os).printBaseName(SD);
+  ClangSyntaxPrinter(os).printBaseName(typeDecl);
   os << " final {\n";
   os << "public:\n";
 
   // Print out the destructor.
   os << "  inline ~";
-  printer.printBaseName(SD);
+  printer.printBaseName(typeDecl);
   os << "() {\n";
   os << "    auto metadata = " << cxx_synthesis::getCxxImplNamespaceName()
      << "::";
@@ -125,9 +126,9 @@ void ClangValueTypePrinter::printStructDecl(const StructDecl *SD) {
   os << "  }\n";
 
   os << "  inline ";
-  printer.printBaseName(SD);
+  printer.printBaseName(typeDecl);
   os << "(const ";
-  printer.printBaseName(SD);
+  printer.printBaseName(typeDecl);
   os << " &other) {\n";
   os << "    auto metadata = " << cxx_synthesis::getCxxImplNamespaceName()
      << "::";
@@ -142,9 +143,9 @@ void ClangValueTypePrinter::printStructDecl(const StructDecl *SD) {
 
   // FIXME: the move constructor should be hidden somehow.
   os << "  inline ";
-  printer.printBaseName(SD);
+  printer.printBaseName(typeDecl);
   os << "(";
-  printer.printBaseName(SD);
+  printer.printBaseName(typeDecl);
   os << " &&) = default;\n";
 
   // FIXME: Print the other members of the struct.
@@ -152,14 +153,14 @@ void ClangValueTypePrinter::printStructDecl(const StructDecl *SD) {
 
   // Print out private default constructor.
   os << "  inline ";
-  printer.printBaseName(SD);
+  printer.printBaseName(typeDecl);
   os << "() {}\n";
   // Print out '_make' function which returns an unitialized instance for
   // passing to Swift.
   os << "  static inline ";
-  printer.printBaseName(SD);
+  printer.printBaseName(typeDecl);
   os << " _make() { return ";
-  printer.printBaseName(SD);
+  printer.printBaseName(typeDecl);
   os << "(); }\n";
   // Print out the private accessors to the underlying Swift value storage.
   os << "  inline const char * _Nonnull _getOpaquePointer() const { return "
@@ -172,7 +173,7 @@ void ClangValueTypePrinter::printStructDecl(const StructDecl *SD) {
   os << "char _storage[" << typeSizeAlign->size << "];\n";
   // Wrap up the value type.
   os << "  friend class " << cxx_synthesis::getCxxImplNamespaceName() << "::";
-  printCxxImplClassName(os, SD);
+  printCxxImplClassName(os, typeDecl);
   os << ";\n";
   os << "};\n\n";
 
@@ -180,24 +181,24 @@ void ClangValueTypePrinter::printStructDecl(const StructDecl *SD) {
   printer.printNamespace(
       cxx_synthesis::getCxxImplNamespaceName(), [&](raw_ostream &os) {
         os << "class ";
-        printCxxImplClassName(os, SD);
+        printCxxImplClassName(os, typeDecl);
         os << " {\n";
         os << "public:\n";
 
         os << "  static inline char * _Nonnull getOpaquePointer(";
-        printCxxTypeName(os, SD);
+        printCxxTypeName(os, typeDecl);
         os << " &object) { return object._getOpaquePointer(); }\n";
 
         os << "  static inline const char * _Nonnull getOpaquePointer(const ";
-        printCxxTypeName(os, SD);
+        printCxxTypeName(os, typeDecl);
         os << " &object) { return object._getOpaquePointer(); }\n";
 
         os << "  template<class T>\n";
         os << "  static inline ";
-        printCxxTypeName(os, SD);
+        printCxxTypeName(os, typeDecl);
         os << " returnNewValue(T callable) {\n";
         os << "    auto result = ";
-        printCxxTypeName(os, SD);
+        printCxxTypeName(os, typeDecl);
         os << "::_make();\n";
         os << "    callable(result._getOpaquePointer());\n";
         os << "    return result;\n";
@@ -206,7 +207,7 @@ void ClangValueTypePrinter::printStructDecl(const StructDecl *SD) {
         os << "};\n";
       });
 
-  printCValueTypeStorageStruct(cPrologueOS, SD, *typeSizeAlign);
+  printCValueTypeStorageStruct(cPrologueOS, typeDecl, *typeSizeAlign);
 }
 
 /// Print the name of the C stub struct for passing/returning a value type
