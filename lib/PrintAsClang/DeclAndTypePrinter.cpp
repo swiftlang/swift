@@ -1052,7 +1052,8 @@ private:
     assert(!AvAttr->Rename.empty());
 
     auto *renamedDecl = evaluateOrDefault(
-        getASTContext().evaluator, RenamedDeclRequest{D, AvAttr}, nullptr);
+        getASTContext().evaluator, RenamedDeclRequest{D, AvAttr, false},
+        nullptr);
     if (renamedDecl) {
       assert(shouldInclude(renamedDecl) &&
              "ObjC printer logic mismatch with renamed decl");
