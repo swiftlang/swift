@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -target x86_64-apple-macosx10.15 -swift-version 5 %S/Inputs/rdar84879566_invalid_decls.swift -primary-file %s -verify
+// RUN: %target-swift-frontend -typecheck -target %target-cpu-apple-macosx10.15 -swift-version 5 %S/Inputs/rdar84879566_invalid_decls.swift -primary-file %s -verify
 // REQUIRES: OS=macosx
 
 protocol Tupled {
