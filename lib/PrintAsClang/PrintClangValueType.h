@@ -16,6 +16,7 @@
 #include "OutputLanguageMode.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/raw_ostream.h"
 
 namespace swift {
@@ -37,7 +38,8 @@ public:
 
   /// Print the C++ class definition that
   /// corresponds to the given structure or enum declaration.
-  void printValueTypeDecl(const NominalTypeDecl *typeDecl);
+  void printValueTypeDecl(const NominalTypeDecl *typeDecl,
+                          llvm::function_ref<void(void)> bodyPrinter);
 
   /// Print the pararameter type that referes to a Swift struct type in C/C++.
   void printValueTypeParameterType(const NominalTypeDecl *type,
@@ -49,7 +51,7 @@ public:
   void
   printParameterCxxToCUseScaffold(bool isIndirect, const NominalTypeDecl *type,
                                   llvm::function_ref<void()> cxxParamPrinter,
-                                  bool isInOut);
+                                  bool isInOut, bool isSelf);
 
   /// Print the return type that refers to a Swift struct type in C/C++.
   void printValueTypeReturnType(const NominalTypeDecl *typeDecl,

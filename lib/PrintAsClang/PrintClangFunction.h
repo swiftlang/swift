@@ -15,12 +15,16 @@
 
 #include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
 
 namespace swift {
 
+class AbstractFunctionDecl;
 class FuncDecl;
+class NominalTypeDecl;
 class ParamDecl;
 class ParameterList;
 class PrimitiveTypeMapping;
@@ -45,10 +49,19 @@ public:
     CxxInlineThunk
   };
 
+  /// Information about any additional parameters.
+  struct AdditionalParam {
+    enum class Role { Self };
+
+    Role role;
+    Type type;
+  };
+
   /// Print the C function declaration or the C++ function thunk that
   /// corresponds to the given function declaration.
-  void printFunctionSignature(FuncDecl *FD, StringRef name, Type resultTy,
-                              FunctionSignatureKind kind);
+  void printFunctionSignature(AbstractFunctionDecl *FD, StringRef name,
+                              Type resultTy, FunctionSignatureKind kind,
+                              ArrayRef<AdditionalParam> additionalParams = {});
 
   /// Print the use of the C++ function thunk parameter as it's passed to the C
   /// function declaration.
@@ -57,9 +70,20 @@ public:
   /// Print the body of the inline C++ function thunk that calls the underlying
   /// Swift function.
   void printCxxThunkBody(StringRef swiftSymbolName, Type resultTy,
-                         ParameterList *params);
+                         const ParameterList *params,
+                         ArrayRef<AdditionalParam> additionalParams = {});
+
+  /// Print the C++ getter/setter method signature.
+  void printCxxPropertyAccessorMethod(const NominalTypeDecl *typeDeclContext,
+                                      const AbstractFunctionDecl *FD,
+                                      StringRef swiftSymbolName, Type resultTy,
+                                      bool isDefinition);
 
 private:
+  void printCxxToCFunctionParameterUse(
+      Type type, StringRef name, bool isInOut,
+      llvm::Optional<AdditionalParam::Role> paramRole = None);
+
   raw_ostream &os;
   raw_ostream &cPrologueOS;
   PrimitiveTypeMapping &typeMapping;
