@@ -316,6 +316,48 @@ _buildDemanglingForNominalType(const Metadata *type, Demangle::Demangler &Dem) {
   return _buildDemanglingForContext(description, demangledGenerics, Dem);
 }
 
+static Demangle::NodePointer
+_buildDemanglingForProtocolDescriptor(ProtocolDescriptorRef protocol,
+                                      Demangle::Demangler &Dem) {
+#if SWIFT_OBJC_INTEROP
+  if (protocol.isObjC()) {
+    // The protocol name is mangled as a type symbol, with the _Tt prefix.
+    StringRef ProtoName(protocol.getName());
+    NodePointer protocolNode = Dem.demangleSymbol(ProtoName);
+
+    // ObjC protocol names aren't mangled.
+    if (!protocolNode) {
+      auto module = Dem.createNode(Node::Kind::Module, MANGLING_MODULE_OBJC);
+      auto node = Dem.createNode(Node::Kind::Protocol);
+      node->addChild(module, Dem);
+      node->addChild(Dem.createNode(Node::Kind::Identifier, ProtoName), Dem);
+      auto typeNode = Dem.createNode(Node::Kind::Type);
+      typeNode->addChild(node, Dem);
+      return typeNode;
+    }
+
+    // Dig out the protocol node.
+    // Global -> (Protocol|TypeMangling)
+    protocolNode = protocolNode->getChild(0);
+    if (protocolNode->getKind() == Node::Kind::TypeMangling) {
+      protocolNode = protocolNode->getChild(0); // TypeMangling -> Type
+      protocolNode = protocolNode->getChild(0); // Type -> ProtocolList
+      protocolNode = protocolNode->getChild(0); // ProtocolList -> TypeList
+      protocolNode = protocolNode->getChild(0); // TypeList -> Type
+
+      assert(protocolNode->getKind() == Node::Kind::Type);
+      assert(protocolNode->getChild(0)->getKind() == Node::Kind::Protocol);
+    } else {
+      assert(protocolNode->getKind() == Node::Kind::Protocol);
+    }
+
+    return protocolNode;
+  }
+#endif
+
+  return _buildDemanglingForContext(protocol.getSwiftProtocol(), {}, Dem);
+}
+
 // Build a demangled type tree for a type.
 //
 // FIXME: This should use MetadataReader.h.
@@ -361,48 +403,7 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     // its canonical ordering of protocols.
 
     for (auto protocol : protocols) {
-#if SWIFT_OBJC_INTEROP
-      if (protocol.isObjC()) {
-        // The protocol name is mangled as a type symbol, with the _Tt prefix.
-        StringRef ProtoName(protocol.getName());
-        NodePointer protocolNode = Dem.demangleSymbol(ProtoName);
-
-        // ObjC protocol names aren't mangled.
-        if (!protocolNode) {
-          auto module = Dem.createNode(Node::Kind::Module,
-                                            MANGLING_MODULE_OBJC);
-          auto node = Dem.createNode(Node::Kind::Protocol);
-          node->addChild(module, Dem);
-          node->addChild(Dem.createNode(Node::Kind::Identifier, ProtoName),
-                         Dem);
-          auto typeNode = Dem.createNode(Node::Kind::Type);
-          typeNode->addChild(node, Dem);
-          type_list->addChild(typeNode, Dem);
-          continue;
-        }
-
-        // Dig out the protocol node.
-        // Global -> (Protocol|TypeMangling)
-        protocolNode = protocolNode->getChild(0);
-        if (protocolNode->getKind() == Node::Kind::TypeMangling) {
-          protocolNode = protocolNode->getChild(0); // TypeMangling -> Type
-          protocolNode = protocolNode->getChild(0); // Type -> ProtocolList
-          protocolNode = protocolNode->getChild(0); // ProtocolList -> TypeList
-          protocolNode = protocolNode->getChild(0); // TypeList -> Type
-
-          assert(protocolNode->getKind() == Node::Kind::Type);
-          assert(protocolNode->getChild(0)->getKind() == Node::Kind::Protocol);
-        } else {
-          assert(protocolNode->getKind() == Node::Kind::Protocol);
-        }
-
-        type_list->addChild(protocolNode, Dem);
-        continue;
-      }
-#endif
-
-      auto protocolNode =
-          _buildDemanglingForContext(protocol.getSwiftProtocol(), { }, Dem);
+      auto protocolNode = _buildDemanglingForProtocolDescriptor(protocol, Dem);
       if (!protocolNode)
         return nullptr;
 
@@ -442,6 +443,53 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
 
     // Just a simple composition of protocols.
     return proto_list;
+  }
+  case MetadataKind::ExtendedExistential: {
+    auto exis = static_cast<const ExtendedExistentialTypeMetadata *>(type);
+    auto genSig = exis->Shape->getGeneralizationSignature();
+    const unsigned selfParamIdx = genSig.getParams().size();
+    auto node = Dem.createNode(Node::Kind::ParameterizedProtocol);
+    for (const auto &reqt :
+         exis->Shape->getRequirementSignature().getRequirements()) {
+      if (reqt.getKind() != GenericRequirementKind::Protocol) {
+        continue;
+      }
+
+      if (!reqt.Flags.hasKeyArgument()) {
+        continue;
+      }
+
+      auto lhsTypeNode = Dem.demangleType(reqt.getParam());
+      if (!lhsTypeNode || lhsTypeNode->getKind() != Node::Kind::Type ||
+          !lhsTypeNode->hasChildren() ||
+          lhsTypeNode->getChild(0)->getKind() !=
+              Node::Kind::DependentGenericParamType ||
+          lhsTypeNode->getChild(0)->getNumChildren() != 2) {
+        continue;
+      }
+      auto index = lhsTypeNode->getChild(0)->getChild(1)->getIndex();
+      if (index + 1 != selfParamIdx)
+        continue;
+
+      auto *protocolNode =
+          _buildDemanglingForProtocolDescriptor(reqt.getProtocol(), Dem);
+      if (!protocolNode)
+        continue;
+
+      node->addChild(protocolNode, Dem);
+    }
+
+    const unsigned shapeArgumentCount =
+        exis->Shape->getGenSigArgumentLayoutSizeInWords();
+    auto type_list = Dem.createNode(Node::Kind::TypeList);
+    for (unsigned i = 0; i < shapeArgumentCount; ++i) {
+      auto genArg = exis->getGeneralizationArguments()[i];
+      auto eltType =
+          _swift_buildDemanglingForMetadata((const Metadata *)genArg, Dem);
+      type_list->addChild(eltType, Dem);
+    }
+    node->addChild(type_list, Dem);
+    return node;
   }
   case MetadataKind::ExistentialMetatype: {
     auto metatype = static_cast<const ExistentialMetatypeMetadata *>(type);
