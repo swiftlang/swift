@@ -6218,7 +6218,8 @@ static bool parametersMatch(const AbstractFunctionDecl *a,
 
 ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
                                         const ValueDecl *attached,
-                                        const AvailableAttr *attr) const {
+                                        const AvailableAttr *attr,
+                                        bool isKnownObjC) const {
   if (!attached || !attr)
     return nullptr;
 
@@ -6249,7 +6250,7 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
   auto minAccess = AccessLevel::Private;
   if (attached->getModuleContext()->isExternallyConsumed())
     minAccess = AccessLevel::Public;
-  bool attachedIsObjcVisible =
+  bool attachedIsObjcVisible = isKnownObjC ||
       objc_translation::isVisibleToObjC(attached, minAccess);
 
   SmallVector<ValueDecl *, 4> lookupResults;
