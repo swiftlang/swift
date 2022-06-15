@@ -2126,16 +2126,6 @@ public:
   }
 
 public:
-  /// Project the value pointer from an extended existential container of the
-  /// type described by this metadata.
-  const OpaqueValue *projectValue(const OpaqueValue *container) const;
-
-  OpaqueValue *projectValue(OpaqueValue *container) const {
-    return const_cast<OpaqueValue *>(
-        projectValue((const OpaqueValue *)container));
-  }
-
-public:
   static bool classof(const TargetMetadata<Runtime> *metadata) {
     return metadata->getKind() == MetadataKind::ExtendedExistential;
   }

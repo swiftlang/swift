@@ -1695,8 +1695,54 @@ tryCastUnwrappingExistentialSource(
   return tryCast(destLocation, destType,
                  srcInnerValue, srcInnerType,
                  destFailureType, srcFailureType,
-                 takeOnSuccess & (srcInnerValue == srcValue),
+                 takeOnSuccess && (srcInnerValue == srcValue),
                  mayDeferChecks);
+}
+
+static DynamicCastResult tryCastUnwrappingExtendedExistentialSource(
+    OpaqueValue *destLocation, const Metadata *destType, OpaqueValue *srcValue,
+    const Metadata *srcType, const Metadata *&destFailureType,
+    const Metadata *&srcFailureType, bool takeOnSuccess, bool mayDeferChecks) {
+  assert(srcType != destType);
+  assert(srcType->getKind() == MetadataKind::ExtendedExistential);
+
+  auto srcExistentialType = cast<ExtendedExistentialTypeMetadata>(srcType);
+
+  // Unpack the existential content
+  const Metadata *srcInnerType = nullptr;
+  OpaqueValue *srcInnerValue = nullptr;
+  switch (srcExistentialType->Shape->Flags.getSpecialKind()) {
+  case ExtendedExistentialTypeShape::SpecialKind::None: {
+    auto opaqueContainer =
+        reinterpret_cast<OpaqueExistentialContainer *>(srcValue);
+    srcInnerType = opaqueContainer->Type;
+    srcInnerValue = const_cast<OpaqueValue *>(opaqueContainer->projectValue());
+    break;
+  }
+  case ExtendedExistentialTypeShape::SpecialKind::Class: {
+    auto classContainer =
+        reinterpret_cast<ClassExistentialContainer *>(srcValue);
+    srcInnerType = swift_getObjectType((HeapObject *)classContainer->Value);
+    srcInnerValue = reinterpret_cast<OpaqueValue *>(&classContainer->Value);
+    break;
+  }
+  case ExtendedExistentialTypeShape::SpecialKind::Metatype: {
+    auto srcExistentialContainer =
+        reinterpret_cast<ExistentialMetatypeContainer *>(srcValue);
+    srcInnerType = swift_getMetatypeMetadata(srcExistentialContainer->Value);
+    srcInnerValue = reinterpret_cast<OpaqueValue *>(&srcExistentialContainer->Value);
+    break;
+  }
+  case ExtendedExistentialTypeShape::SpecialKind::ExplicitLayout: {
+    swift_unreachable("Explicit layout not yet implemented");
+    break;
+  }
+  }
+
+  srcFailureType = srcInnerType;
+  return tryCast(destLocation, destType, srcInnerValue, srcInnerType,
+                 destFailureType, srcFailureType,
+                 takeOnSuccess & (srcInnerValue == srcValue), mayDeferChecks);
 }
 
 static DynamicCastResult
@@ -1720,6 +1766,103 @@ tryCastUnwrappingExistentialMetatypeSource(
                  destFailureType, srcFailureType,
                  takeOnSuccess & (srcInnerValue == srcValue),
                  mayDeferChecks);
+}
+
+
+static DynamicCastResult tryCastToExtendedExistential(
+    OpaqueValue *destLocation, const Metadata *destType, OpaqueValue *srcValue,
+    const Metadata *srcType, const Metadata *&destFailureType,
+    const Metadata *&srcFailureType, bool takeOnSuccess, bool mayDeferChecks) {
+  assert(srcType != destType);
+  assert(destType->getKind() == MetadataKind::ExtendedExistential);
+
+  auto destExistentialType = cast<ExtendedExistentialTypeMetadata>(destType);
+  auto *destExistentialShape = destExistentialType->Shape;
+  const unsigned shapeArgumentCount =
+      destExistentialShape->getGenSigArgumentLayoutSizeInWords();
+
+  llvm::SmallVector<const void *, 8> allGenericArgsVec;
+  unsigned witnessesMark = 0;
+  {
+    // Line up the arguments to the requirement signature.
+    auto genArgs = destExistentialType->getGeneralizationArguments();
+    allGenericArgsVec.append(genArgs, genArgs + shapeArgumentCount);
+    // Tack on the `Self` argument.
+    allGenericArgsVec.push_back((const void *)srcType);
+    // Mark the point where the generic arguments end.
+    // _checkGenericRequirements is going to fill in a set of witness tables
+    // after that.
+    witnessesMark = allGenericArgsVec.size();
+
+    SubstGenericParametersFromMetadata substitutions(destExistentialShape,
+                                                     allGenericArgsVec.data());
+    // Verify the requirements in the requirement signature against the
+    // arguments from the source value.
+    auto error = swift::_checkGenericRequirements(
+        destExistentialShape->getRequirementSignature().getRequirements(),
+        allGenericArgsVec,
+        [&substitutions](unsigned depth, unsigned index) {
+          return substitutions.getMetadata(depth, index);
+        },
+        [](const Metadata *type, unsigned index) -> const WitnessTable * {
+          swift_unreachable("Resolution of witness tables is not supported");
+        });
+    if (error)
+      return DynamicCastResult::Failure;
+  }
+
+  OpaqueValue *destBox = nullptr;
+  const WitnessTable **destWitnesses = nullptr;
+  switch (destExistentialShape->Flags.getSpecialKind()) {
+  case ExtendedExistentialTypeShape::SpecialKind::None: {
+    auto destExistential =
+        reinterpret_cast<OpaqueExistentialContainer *>(destLocation);
+
+    // Allocate a box and fill in the type information.
+    destExistential->Type = srcType;
+    destBox = srcType->allocateBoxForExistentialIn(&destExistential->Buffer);
+    destWitnesses = destExistential->getWitnessTables();
+    break;
+  }
+  case ExtendedExistentialTypeShape::SpecialKind::Class: {
+    auto destExistential =
+        reinterpret_cast<ClassExistentialContainer *>(destLocation);
+    destBox = reinterpret_cast<OpaqueValue *>(&destExistential->Value);
+    destWitnesses = destExistential->getWitnessTables();
+    break;
+  }
+  case ExtendedExistentialTypeShape::SpecialKind::Metatype: {
+    auto destExistential =
+        reinterpret_cast<ExistentialMetatypeContainer *>(destLocation);
+    destBox = reinterpret_cast<OpaqueValue *>(&destExistential->Value);
+    destWitnesses = destExistential->getWitnessTables();
+    break;
+  }
+  case ExtendedExistentialTypeShape::SpecialKind::ExplicitLayout:
+    swift_unreachable("Witnesses for explicit layout not yet implemented");
+  }
+
+  // Fill in the trailing set of witness tables.
+  const unsigned numWitnessTables = allGenericArgsVec.size() - witnessesMark;
+  assert(numWitnessTables ==
+         llvm::count_if(destExistentialShape->getRequirementSignature().getRequirements(),
+                        [](const auto &req) -> bool {
+                          return req.getKind() ==
+                                 GenericRequirementKind::Protocol;
+                        }));
+  for (unsigned i = 0; i < numWitnessTables; ++i) {
+    const auto witness = i + witnessesMark;
+    destWitnesses[i] =
+        reinterpret_cast<const WitnessTable *>(allGenericArgsVec[witness]);
+  }
+
+  if (takeOnSuccess) {
+    srcType->vw_initializeWithTake(destBox, srcValue);
+    return DynamicCastResult::SuccessViaTake;
+  } else {
+    srcType->vw_initializeWithCopy(destBox, srcValue);
+    return DynamicCastResult::SuccessViaCopy;
+  }
 }
 
 /******************************************************************************/
@@ -2006,12 +2149,14 @@ static tryCastFunctionType *selectCasterForDest(const Metadata *destType) {
     swift_unreachable(
       "Unknown existential type representation in dynamic cast dispatch");
   }
+  case MetadataKind::ExtendedExistential:
+    return tryCastToExtendedExistential;
   case MetadataKind::Metatype:
-   return tryCastToMetatype;
- case MetadataKind::ObjCClassWrapper:
+    return tryCastToMetatype;
+  case MetadataKind::ObjCClassWrapper:
     return tryCastToObjectiveCClass;
   case MetadataKind::ExistentialMetatype:
-   return tryCastToExistentialMetatype;
+    return tryCastToExistentialMetatype;
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::HeapGenericLocalVariable:
   case MetadataKind::ErrorObject:
@@ -2169,6 +2314,15 @@ tryCast(
     break;
   }
 
+  case MetadataKind::ExtendedExistential: {
+    auto subcastResult = tryCastUnwrappingExtendedExistentialSource(
+        destLocation, destType, srcValue, srcType, destFailureType,
+        srcFailureType, takeOnSuccess, mayDeferChecks);
+    if (isSuccess(subcastResult)) {
+      return subcastResult;
+    }
+    break;
+  }
   default:
     break;
   }
