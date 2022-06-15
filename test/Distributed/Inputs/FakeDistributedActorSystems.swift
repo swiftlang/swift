@@ -14,6 +14,12 @@
 
 import Distributed
 
+@available(SwiftStdlib 5.7, *)
+public distributed actor Kappa {
+  public typealias ActorSystem = FakeRoundtripActorSystem
+  public distributed func theFunction() -> String { "hello" }
+}
+
 // ==== Fake Address -----------------------------------------------------------
 
 public struct ActorAddress: Hashable, Sendable, Codable {
