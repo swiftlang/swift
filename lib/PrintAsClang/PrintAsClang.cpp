@@ -317,6 +317,7 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
   };
   emitMacro("SWIFT_CALL", "__attribute__((swiftcall))");
   emitMacro("SWIFT_INDIRECT_RESULT", "__attribute__((swift_indirect_result))");
+  emitMacro("SWIFT_CONTEXT", "__attribute__((swift_context))");
   // SWIFT_NOEXCEPT applies 'noexcept' in C++ mode only.
   emitCxxConditional(
       out, [&] { emitMacro("SWIFT_NOEXCEPT", "noexcept"); },

@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend %s -typecheck -module-name Structs -clang-header-expose-public-decls -emit-clang-header-path %t/structs.h
 // RUN: %FileCheck %s < %t/structs.h
 
-// RUN: %check-interop-cxx-header-in-clang(%t/structs.h -Wno-unused-private-field)
+// RUN: %check-interop-cxx-header-in-clang(%t/structs.h -Wno-unused-private-field -Wno-unused-function)
 
 // CHECK: namespace Structs {
 // CHECK: namespace _impl {
