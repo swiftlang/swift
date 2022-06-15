@@ -37,6 +37,41 @@ using namespace swift;
 /************************ PROPERTY SYNTHESIS **********************************/
 /******************************************************************************/
 
+static VarDecl*
+ lookupDistributedActorProperty(NominalTypeDecl *decl, DeclName name) {
+   assert(decl && "decl was null");
+   auto &C = decl->getASTContext();
+
+   auto clazz = dyn_cast<ClassDecl>(decl);
+   if (!clazz)
+     return nullptr;
+
+   auto refs = decl->lookupDirect(name);
+   if (refs.size() != 1)
+     return nullptr;
+
+   auto var = dyn_cast<VarDecl>(refs.front());
+   if (!var)
+     return nullptr;
+
+   Type expectedType = Type();
+   if (name == C.Id_id) {
+     expectedType = getDistributedActorIDType(decl);
+   } else if (name == C.Id_actorSystem) {
+     expectedType = getDistributedActorSystemType(decl);
+   } else {
+     llvm_unreachable("Unexpected distributed actor property lookup!");
+   }
+   if (!expectedType)
+     return nullptr;
+
+   if (!var->getInterfaceType()->isEqual(expectedType))
+     return nullptr;
+
+   assert(var->isSynthesized() && "Expected compiler synthesized property");
+   return var;
+ }
+
 // Note: This would be nice to implement in DerivedConformanceDistributedActor,
 // but we can't since those are lazily triggered and an implementation exists
 // for the 'id' property because 'Identifiable.id' has an extension that impls
