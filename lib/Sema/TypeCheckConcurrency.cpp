@@ -2261,8 +2261,6 @@ namespace {
         // But computed distributed properties are okay,
         // and treated the same as a distributed func.
         if (var && var->isDistributed()) {
-          fprintf(stderr, "[%s:%d] (%s) HERE\n", __FILE__, __LINE__, __FUNCTION__);
-          var->dump();
           bool explicitlyThrowing = false;
           if (auto getter = var->getAccessor(swift::AccessorKind::Get)) {
             explicitlyThrowing = getter->hasThrows();
@@ -2313,25 +2311,18 @@ namespace {
       // is it an access to a property?
       if (isPropOrSubscript(decl)) {
         // Cannot reference properties or subscripts of distributed actors.
-        fprintf(stderr, "[%s:%d] (%s) prop\n", __FILE__, __LINE__, __FUNCTION__);
         if (isDistributed) {
-          fprintf(stderr, "[%s:%d] (%s) prop is dist\n", __FILE__, __LINE__, __FUNCTION__);
-
           bool setThrows = false;
           bool usesDistributedThunk = false;
           if (auto access = checkDistributedAccess(declLoc, decl, context)) {
             std::tie(setThrows, usesDistributedThunk) = *access;
           } else {
-            fprintf(stderr, "[%s:%d] (%s) prop is dist -> NOPE \n", __FILE__, __LINE__, __FUNCTION__);
             return AsyncMarkingResult::NotDistributed;
           }
 
           // distributed computed property access, mark it throws + async
           if (auto lookupExpr = dyn_cast_or_null<LookupExpr>(context)) {
             if (auto memberRef = dyn_cast<MemberRefExpr>(lookupExpr)) {
-              fprintf(stderr, "[%s:%d] (%s) SET DISTRIBUTED MEMBER REF\n", __FILE__, __LINE__, __FUNCTION__);
-              memberRef->dump();
-
               memberRef->setImplicitlyThrows(true);
               memberRef->setShouldApplyLookupDistributedThunk(true);
             } else {
@@ -2400,7 +2391,6 @@ namespace {
         if (isDistributed) {
           if (auto access = checkDistributedAccess(declLoc, decl, context)) {
             std::tie(setThrows, usesDistributedThunk) = *access;
-            fprintf(stderr, "[%s:%d] (%s) USE THUNK\n", __FILE__, __LINE__, __FUNCTION__);
           } else {
             return AsyncMarkingResult::NotDistributed;
           }
