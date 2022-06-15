@@ -224,11 +224,10 @@ func test_watchingDA<WDA: TerminationWatchingDA>(da: WDA) async throws {
   // expected-warning@-2{{no calls to throwing functions occur within 'try' expression}}
 
   let __secretlyKnownToBeLocal = da
-  await __secretlyKnownToBeLocal.terminated(da: "local calls are okey!") // OK // FIXME(#59356): (the __secretlyKnown is a hack, but the whenLocal crashes now on pending isolation getting with generic actors for closures)
-  // FIXME: pending fix of closure isolation checking with actors #59356
-  // await da.whenLocal { __secretlyKnownToBeLocal in
-  //   await __secretlyKnownToBeLocal.terminated(da: "local calls are okey!") // OK
-  // }
+  await __secretlyKnownToBeLocal.terminated(da: "local calls are okey!") // OK
+  await da.whenLocal { __secretlyKnownToBeLocal in
+    await __secretlyKnownToBeLocal.terminated(da: "local calls are okey!") // OK
+  }
 }
 
 func test_watchingDA_erased(da: DA_TerminationWatchingDA) async throws {
@@ -238,11 +237,10 @@ func test_watchingDA_erased(da: DA_TerminationWatchingDA) async throws {
   // expected-warning@-2{{no calls to throwing functions occur within 'try' expression}}
 
   let __secretlyKnownToBeLocal = wda
-  await __secretlyKnownToBeLocal.terminated(da: "local calls are okey!") // OK // FIXME(#59356): (the __secretlyKnown is a hack, but the whenLocal crashes now on pending isolation getting with generic actors for closures)
-  // FIXME: pending fix of closure isolation checking with actors #59356
-  // await wda.whenLocal { __secretlyKnownToBeLocal in
-  //   await __secretlyKnownToBeLocal.terminated(da: "local calls are okey!") // OK
-  // }
+  await __secretlyKnownToBeLocal.terminated(da: "local calls are okey!") // OK
+  await wda.whenLocal { __secretlyKnownToBeLocal in
+    await __secretlyKnownToBeLocal.terminated(da: "local calls are okey!") // OK
+  }
 }
 
 func test_watchingDA_any(da: any TerminationWatchingDA) async throws {
