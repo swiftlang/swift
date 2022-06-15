@@ -1683,6 +1683,9 @@ SILBasicBlock::iterator swift::replaceSingleUse(Operand *use, SILValue newValue,
 }
 
 SILValue swift::makeCopiedValueAvailable(SILValue value, SILBasicBlock *inBlock) {
+  if (isa<SILUndef>(value))
+    return value;
+
   if (!value->getFunction()->hasOwnership())
     return value;
 
@@ -1698,6 +1701,9 @@ SILValue swift::makeCopiedValueAvailable(SILValue value, SILBasicBlock *inBlock)
 }
 
 SILValue swift::makeValueAvailable(SILValue value, SILBasicBlock *inBlock) {
+  if (isa<SILUndef>(value))
+    return value;
+
   if (!value->getFunction()->hasOwnership())
     return value;
 
