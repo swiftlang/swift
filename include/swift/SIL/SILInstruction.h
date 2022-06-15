@@ -7627,19 +7627,29 @@ class CopyableToMoveOnlyWrapperValueInst
 class MoveOnlyWrapperToCopyableValueInst
     : public UnaryInstructionBase<
           SILInstructionKind::MoveOnlyWrapperToCopyableValueInst,
-          SingleValueInstruction>,
-      public OwnershipForwardingMixin {
+          FirstArgOwnershipForwardingSingleValueInst> {
+public:
+  enum InitialKind {
+    Guaranteed,
+    Owned,
+  };
+
+private:
   friend class SILBuilder;
+
+  InitialKind initialKind;
 
   MoveOnlyWrapperToCopyableValueInst(const SILFunction &fn,
                                      SILDebugLocation DebugLoc,
-                                     SILValue operand,
-                                     OwnershipKind forwardingOwnershipKind)
-      : UnaryInstructionBase(DebugLoc, operand,
-                             operand->getType().removingMoveOnlyWrapper()),
-        OwnershipForwardingMixin(
-            SILInstructionKind::MoveOnlyWrapperToCopyableValueInst,
-            forwardingOwnershipKind) {}
+                                     SILValue operand, InitialKind kind)
+      : UnaryInstructionBase(
+            DebugLoc, operand, operand->getType().removingMoveOnlyWrapper(),
+            kind == InitialKind::Guaranteed ? OwnershipKind::Guaranteed
+                                            : OwnershipKind::Owned),
+        initialKind(kind) {}
+
+public:
+  InitialKind getInitialKind() const { return initialKind; }
 };
 
 /// Given an object reference, return true iff it is non-nil and refers
@@ -9783,8 +9793,7 @@ inline bool OwnershipForwardingMixin::isa(SILInstructionKind kind) {
          OwnershipForwardingConversionInst::classof(kind) ||
          OwnershipForwardingSelectEnumInstBase::classof(kind) ||
          OwnershipForwardingMultipleValueInstruction::classof(kind) ||
-         kind == SILInstructionKind::MarkMustCheckInst ||
-         kind == SILInstructionKind::MoveOnlyWrapperToCopyableValueInst;
+         kind == SILInstructionKind::MarkMustCheckInst;
 }
 
 inline OwnershipForwardingMixin *
