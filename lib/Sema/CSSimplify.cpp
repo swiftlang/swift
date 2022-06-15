@@ -12895,7 +12895,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::SpecifyTypeForPlaceholder:
   case FixKind::AllowAutoClosurePointerConversion:
   case FixKind::IgnoreKeyPathContextualMismatch:
-  case FixKind::NotCompileTimeConst: {
+  case FixKind::NotCompileTimeConst:
+  case FixKind::RenameConflictingPatternVariables: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 

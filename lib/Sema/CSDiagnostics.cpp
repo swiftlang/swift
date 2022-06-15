@@ -8173,3 +8173,12 @@ void MissingExplicitExistentialCoercion::fixIt(
                               "as " + ErasedResultType->getString(printOpts) +
                                   (requiresParens ? ")" : ""));
 }
+
+bool ConflictingPatternVariables::diagnoseAsError() {
+  for (auto *var : Vars) {
+    emitDiagnosticAt(var->getStartLoc(),
+                     diag::type_mismatch_multiple_pattern_list, getType(var),
+                     ExpectedType);
+  }
+  return true;
+}

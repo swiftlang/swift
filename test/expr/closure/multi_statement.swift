@@ -483,3 +483,35 @@ func test_missing_conformance_diagnostics_in_for_sequence() {
     }
   }
 }
+
+func test_conflicting_pattern_vars() {
+  enum E {
+  case a(Int, String)
+  case b(String, Int)
+  }
+
+  func fn(_: (E) -> Void) {}
+  func fn<T>(_: (E) -> T) {}
+
+  func test(e: E) {
+    fn {
+      switch $0 {
+      case .a(let x, let y),
+           .b(let x, let y):
+        // expected-error@-1 {{pattern variable bound to type 'String', expected type 'Int'}}
+        // expected-error@-2 {{pattern variable bound to type 'Int', expected type 'String'}}
+        _ = x
+        _ = y
+      }
+    }
+
+    fn {
+      switch $0 {
+      case .a(let x, let y),
+           .b(let y, let x): // Ok
+        _ = x
+        _ = y
+      }
+    }
+  }
+}
