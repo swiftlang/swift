@@ -65,7 +65,8 @@ using namespace swift;
 /********************** Distributed Actor Properties **************************/
 /******************************************************************************/
 
-VarDecl* swift::lookupDistributedActorProperty(NominalTypeDecl *decl, DeclName name) {
+VarDecl*
+swift::lookupDistributedActorProperty(NominalTypeDecl *decl, DeclName name) {
   assert(decl && "decl was null");
   auto &C = decl->getASTContext();
 

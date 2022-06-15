@@ -33,46 +33,9 @@
 
 using namespace swift;
 
-
 /******************************************************************************/
 /************************ PROPERTY SYNTHESIS **********************************/
 /******************************************************************************/
-
-static VarDecl*
-lookupDistributedActorProperty(NominalTypeDecl *decl, DeclName name) {
-  assert(decl && "decl was null");
-  auto &C = decl->getASTContext();
-
-  auto clazz = dyn_cast<ClassDecl>(decl);
-  if (!clazz)
-    return nullptr;
-
-  auto refs = decl->lookupDirect(name);
-  if (refs.size() != 1)
-    return nullptr;
-
-  auto var = dyn_cast<VarDecl>(refs.front());
-  if (!var)
-    return nullptr;
-
-  Type expectedType = Type();
-  if (name == C.Id_id) {
-    expectedType = getDistributedActorIDType(decl);
-  } else if (name == C.Id_actorSystem) {
-    expectedType = getDistributedActorSystemType(decl);
-  } else {
-    llvm_unreachable("Unexpected distributed actor property lookup!");
-  }
-  if (!expectedType)
-    return nullptr;
-
-  if (!var->getInterfaceType()->isEqual(expectedType))
-    return nullptr;
-
-  assert(var->isSynthesized() && "Expected compiler synthesized property");
-  return var;
-}
-
 
 // Note: This would be nice to implement in DerivedConformanceDistributedActor,
 // but we can't since those are lazily triggered and an implementation exists
@@ -142,7 +105,7 @@ static VarDecl *addImplicitDistributedActorActorSystemProperty(
 
   auto &C = nominal->getASTContext();
 
-  // ==== Synthesize and add 'id' property to the actor decl
+  // ==== Synthesize and add 'actorSystem' property to the actor decl
   Type propertyType = getDistributedActorSystemType(nominal);
 
   auto *propDecl = new (C)
@@ -166,19 +129,22 @@ static VarDecl *addImplicitDistributedActorActorSystemProperty(
   // mark as nonisolated, allowing access to it from everywhere
   propDecl->getAttrs().add(
       new (C) NonisolatedAttr(/*IsImplicit=*/true));
-  // mark as @_compilerInitialized, since we synthesize the initializing
-  // assignment during SILGen.
-  propDecl->getAttrs().add(
-      new (C) CompilerInitializedAttr(/*IsImplicit=*/true));
 
   auto idProperty = nominal->getDistributedActorIDProperty();
+  // If the id was not yet synthesized, we need to ensure that eventually
+  // the order of fields will be: id, actorSystem (because IRGen needs the
+  // layouts to match with the AST we produce). We do this by inserting FIRST,
+  // and then as the ID gets synthesized, it'll also force FIRST and therefore
+  // the order will be okey -- ID and then system.
+  auto insertAtHead = idProperty == nullptr;
+
   // IMPORTANT: The `id` MUST be the first field of any distributed actor.
   // So we find the property and add the system AFTER it using the hint.
   //
   // If the `id` was not synthesized yet, we'll end up inserting at head,
   // but the id synthesis will force itself to be FIRST anyway, so it works out.
-  nominal->addMember(propDecl, /*hint=*/idProperty);
-  nominal->addMember(pbDecl, /*hint=*/idProperty);
+  nominal->addMember(propDecl, /*hint=*/idProperty, /*insertAtHead=*/insertAtHead);
+  nominal->addMember(pbDecl, /*hint=*/idProperty, /*insertAtHead=*/insertAtHead);
   return propDecl;
 }
 
