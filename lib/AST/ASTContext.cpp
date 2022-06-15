@@ -580,8 +580,9 @@ void ASTContext::operator delete(void *Data) throw() {
 }
 
 ASTContext *ASTContext::get(
-    LangOptions &langOpts, TypeCheckerOptions &typeckOpts, SILOptions &silOpts,
-    SearchPathOptions &SearchPathOpts, ClangImporterOptions &ClangImporterOpts,
+    LangOptions &langOpts, TypeCheckerOptions &typecheckOpts,
+    SILOptions &silOpts, SearchPathOptions &SearchPathOpts,
+    ClangImporterOptions &ClangImporterOpts,
     symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
     SourceManager &SourceMgr, DiagnosticEngine &Diags,
     std::function<bool(llvm::StringRef, bool)> PreModuleImportCallback) {
@@ -595,14 +596,15 @@ ASTContext *ASTContext::get(
   impl = reinterpret_cast<void *>(
       llvm::alignAddr(impl, llvm::Align(alignof(Implementation))));
   new (impl) Implementation();
-  return new (mem) ASTContext(langOpts, typeckOpts, silOpts, SearchPathOpts,
+  return new (mem) ASTContext(langOpts, typecheckOpts, silOpts, SearchPathOpts,
                               ClangImporterOpts, SymbolGraphOpts, SourceMgr,
                               Diags, PreModuleImportCallback);
 }
 
 ASTContext::ASTContext(
-    LangOptions &langOpts, TypeCheckerOptions &typeckOpts, SILOptions &silOpts,
-    SearchPathOptions &SearchPathOpts, ClangImporterOptions &ClangImporterOpts,
+    LangOptions &langOpts, TypeCheckerOptions &typecheckOpts,
+    SILOptions &silOpts, SearchPathOptions &SearchPathOpts,
+    ClangImporterOptions &ClangImporterOpts,
     symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
     SourceManager &SourceMgr, DiagnosticEngine &Diags,
     std::function<bool(llvm::StringRef, bool)> PreModuleImportCallback)
