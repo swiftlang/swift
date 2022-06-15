@@ -224,7 +224,7 @@ class ASTContext final {
   void operator=(const ASTContext&) = delete;
 
   ASTContext(
-      LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
+      LangOptions &langOpts, TypeCheckerOptions &typecheckOpts,
       SILOptions &silOpts, SearchPathOptions &SearchPathOpts,
       ClangImporterOptions &ClangImporterOpts,
       symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
@@ -241,7 +241,7 @@ public:
   void operator delete(void *Data) throw();
 
   static ASTContext *
-  get(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
+  get(LangOptions &langOpts, TypeCheckerOptions &typecheckOpts,
       SILOptions &silOpts, SearchPathOptions &SearchPathOpts,
       ClangImporterOptions &ClangImporterOpts,
       symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
