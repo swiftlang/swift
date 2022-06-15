@@ -25,18 +25,12 @@ func parseWordBreakTests(
       continue
     }
 
-    let info = line.split(separator: "#")
-    let components = info[0].split(separator: " ")
-    print(components)
+    let components = line.split(separator: "#").first!.split(separator: " ")
 
     var string = ""
     var words: [String] = [""]
 
-    for i in components.indices {
-      guard i != 0 else {
-        continue
-      }
-
+    for i in components.indices.dropFirst() {
       // If we're an odd index, this is a scalar.
       if !i.isMultiple(of: 2) {
         let scalar = Unicode.Scalar(UInt32(components[i], radix: 16)!)!

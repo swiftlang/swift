@@ -368,8 +368,7 @@ extension String.Index {
 extension String.Index {
   @_alwaysEmitIntoClient // Swift 5.7
   internal func _copyingAlignment(from index: Self) -> Self {
-    let mask = Self.__scalarAlignmentBit
-      | Self.__characterAlignmentBit
+    let mask = Self.__scalarAlignmentBit | Self.__characterAlignmentBit
     return Self((_rawBits & ~mask) | (index._rawBits & mask))
   }
 }

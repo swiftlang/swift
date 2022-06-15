@@ -10,7 +10,6 @@
 //===----------------------------------------------------------------------===//
 
 extension _StringGuts {
-  @inline(__always)
   internal func roundDownToNearestWord(
     _ i: String._WordView.Index
   ) -> String._WordView.Index {
@@ -30,11 +29,11 @@ extension _StringGuts {
     _ i: String._WordView.Index
   ) -> String._WordView.Index {
     let offset = i._encodedOffset
-    let start = _opaquePreviousWordIndex(endingAt: offset)
-    let stride = _opaqueNextWordIndex(startingAt: start) &- start
-    _internalInvariant(offset <= start + stride, "Word breaking inconsistency")
+    let start = previousWordIndex(endingAt: offset)
+    let end = nextWordIndex(startingAt: start)
+    _internalInvariant(offset <= end, "Word breaking inconsistency")
 
-    if offset >= start + stride {
+    if offset == end {
       return i
     }
 
@@ -43,9 +42,9 @@ extension _StringGuts {
 
   @inline(never)
   @_effects(releasenone)
-  internal func _opaqueNextWordIndex(startingAt i: Int) -> Int {
+  internal func nextWordIndex(startingAt i: Int) -> Int {
     if _slowPath(isForeign) {
-      return _foreignOpaqueNextWordIndex(startingAt: i)
+      return _foreignNextWordIndex(startingAt: i)
     }
 
     return withFastUTF8 { utf8 in
@@ -62,7 +61,7 @@ extension _StringGuts {
     }
   }
 
-  internal func _foreignOpaqueNextWordIndex(startingAt i: Int) -> Int {
+  internal func _foreignNextWordIndex(startingAt i: Int) -> Int {
 #if _runtime(_ObjC)
     return nextWordBoundary(startingAt: i) {
       _internalInvariant($0 >= 0)
@@ -84,9 +83,9 @@ extension _StringGuts {
 #endif
   }
 
-  internal func _opaquePreviousWordIndex(endingAt i: Int) -> Int {
+  internal func previousWordIndex(endingAt i: Int) -> Int {
     if _slowPath(isForeign) {
-      return _foreignOpaquePreviousWordIndex(endingAt: i)
+      return _foreignPreviousWordIndex(endingAt: i)
     }
 
     return withFastUTF8 { utf8 in
@@ -104,7 +103,7 @@ extension _StringGuts {
   }
 
   @inline(never)
-  internal func _foreignOpaquePreviousWordIndex(endingAt i: Int) -> Int {
+  internal func _foreignPreviousWordIndex(endingAt i: Int) -> Int {
     #if _runtime(_ObjC)
     return previousWordBoundary(endingAt: i) {
       _internalInvariant($0 <= count)
@@ -160,14 +159,12 @@ extension _StringGuts {
     startingAt index: Int,
     nextScalar: (Int) -> (scalar: Unicode.Scalar, end: Int)?
   ) -> Int {
+    _precondition(index < endIndex._encodedOffset)
+
     var (scalar, index) = nextScalar(index)!
     var state = _WordBreakingState(index: index)
 
-    while true {
-      guard let (scalar2, nextIndex) = nextScalar(state.index) else {
-        break
-      }
-
+    while let (scalar2, nextIndex) = nextScalar(state.index) {
       if shouldBreak(between: scalar, and: scalar2, with: &state) {
         break
       }
@@ -192,11 +189,7 @@ extension _StringGuts {
     var (scalar2, index) = previousScalar(index)!
     var state = _WordBreakingState(index: index)
 
-    while true {
-      guard let (scalar, previousIndex) = previousScalar(state.index) else {
-        break
-      }
-
+    while let (scalar, previousIndex) = previousScalar(state.index) {
       if shouldBreakBackward(between: scalar, and: scalar2, with: &state) {
         break
       }
@@ -271,11 +264,7 @@ extension _StringGuts {
       return false
 
     default:
-      var newX = x
-
-      if let previousProperty = state.previousProperty {
-        newX = previousProperty
-      }
+      let newX = state.previousProperty ?? x
 
       return decidePostFormat(between: newX, and: y, with: &state)
     }

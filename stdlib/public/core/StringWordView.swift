@@ -20,8 +20,7 @@ extension String {
 }
 
 extension String._WordView: Collection {
-  internal struct Index {
-    @usableFromInline
+  internal struct Index: Hashable {
     internal var _encodedOffset: Int
   }
 
@@ -36,32 +35,27 @@ extension String._WordView: Collection {
   }
 
   func index(after i: Index) -> Index {
-    _internalInvariant(i < endIndex)
+    _precondition(i < endIndex)
 
-    let nextOffset = _guts._opaqueNextWordIndex(startingAt: i._encodedOffset)
+    let nextOffset = _guts.nextWordIndex(startingAt: i._encodedOffset)
     return Index(_encodedOffset: nextOffset)
   }
 
   subscript(position: Index) -> Element {
     let indexAfter = index(after: position)
 
-    let l = String.Index(_encodedOffset: position._encodedOffset)
-    let u = String.Index(_encodedOffset: indexAfter._encodedOffset)
+    let l = String.Index(
+      _encodedOffset: position._encodedOffset
+    )._characterAligned
+    let u = String.Index(
+      _encodedOffset: indexAfter._encodedOffset
+    )._characterAligned
 
     return String(_guts)[l ..< u]
   }
 }
 
-extension String._WordView.Index: Equatable {
-  @inlinable
-  @inline(__always)
-  static func == (lhs: Self, rhs: Self) -> Bool {
-    lhs._encodedOffset == rhs._encodedOffset
-  }
-}
-
 extension String._WordView.Index: Comparable {
-  @inlinable
   @inline(__always)
   static func < (lhs: Self, rhs: Self) -> Bool {
     lhs._encodedOffset < rhs._encodedOffset
@@ -78,11 +72,10 @@ extension String._WordView.Index: Sendable {}
 
 extension String._WordView: BidirectionalCollection {
   func index(before i: Index) -> Index {
-    _internalInvariant(i > startIndex)
+    _precondition(i > startIndex)
+    _precondition(i <= endIndex)
 
-    let previousOffset = _guts._opaquePreviousWordIndex(
-      endingAt: i._encodedOffset
-    )
+    let previousOffset = _guts.previousWordIndex(endingAt: i._encodedOffset)
 
     return Index(_encodedOffset: previousOffset)
   }

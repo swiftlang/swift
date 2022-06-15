@@ -401,7 +401,6 @@ extension _StringGuts {
 
 // Word index validation (String)
 extension _StringGuts {
-  @available(SwiftStdlib 5.7, *)
   internal func validateWordIndex(
     _ i: String._WordView.Index
   ) -> String._WordView.Index {
@@ -412,7 +411,6 @@ extension _StringGuts {
     )
   }
 
-  @available(SwiftStdlib 5.7, *)
   internal func validateInclusiveWordIndex(
     _ i: String._WordView.Index
   ) -> String._WordView.Index {
