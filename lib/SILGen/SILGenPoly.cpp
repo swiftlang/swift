@@ -4505,25 +4505,6 @@ void SILGenFunction::emitProtocolWitness(
                                          witnessUnsubstTy->getSelfParameter());
   }
 
-  // If we are supposed to hop to the actor, do so now.
-  if (enterIsolation) {
-    Optional<ManagedValue> actorSelf;
-    if (*enterIsolation == ActorIsolation::ActorInstance) {
-      auto actorSelfVal = origParams.back();
-
-      if (actorSelfVal.getType().isAddress()) {
-        auto &actorSelfTL = getTypeLowering(actorSelfVal.getType());
-        if (!actorSelfTL.isAddressOnly()) {
-          actorSelfVal = emitManagedLoad(*this, loc, actorSelfVal, actorSelfTL);
-        }
-      }
-
-      actorSelf = actorSelfVal;
-    }
-
-    emitHopToTargetActor(loc, enterIsolation, actorSelf);
-  }
-
   // For static C++ methods and constructors, we need to drop the (metatype)
   // "self" param. The "native" SIL representation will look like this:
   //    @convention(method) (@thin Foo.Type) -> () but the "actual" SIL function
