@@ -812,7 +812,8 @@ SILFunction *SILGenModule::emitProtocolWitness(
 
   SGF.emitProtocolWitness(AbstractionPattern(reqtOrigTy), reqtSubstTy,
                           requirement, reqtSubMap, witnessRef,
-                          witnessSubs, isFree, /*isSelfConformance*/ false);
+                          witnessSubs, isFree, /*isSelfConformance*/ false,
+                          witness.getEnterIsolation());
 
   emitLazyConformancesForFunction(f);
   return f;
@@ -884,7 +885,8 @@ static SILFunction *emitSelfConformanceWitness(SILGenModule &SGM,
 
   SGF.emitProtocolWitness(AbstractionPattern(reqtOrigTy), reqtSubstTy,
                           requirement, reqtSubs, requirement,
-                          witnessSubs, isFree, /*isSelfConformance*/ true);
+                          witnessSubs, isFree, /*isSelfConformance*/ true,
+                          None);
 
   SGM.emitLazyConformancesForFunction(f);
 
