@@ -3,6 +3,7 @@
 // REQUIRES: concurrency
 // REQUIRES: executable_test
 // REQUIRES: concurrency_runtime
+// REQUIRES: rdar://94451729
 
 // Test requires _swift_task_enterThreadLocalContext which is not available 
 // in the back deployment runtime.
