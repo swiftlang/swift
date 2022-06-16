@@ -1299,14 +1299,16 @@ public:
   MoveOnlyWrapperToCopyableValueInst *
   createOwnedMoveOnlyWrapperToCopyableValue(SILLocation loc, SILValue src) {
     return insert(new (getModule()) MoveOnlyWrapperToCopyableValueInst(
-        *F, getSILDebugLocation(loc), src, OwnershipKind::Owned));
+        *F, getSILDebugLocation(loc), src,
+        MoveOnlyWrapperToCopyableValueInst::Owned));
   }
 
   MoveOnlyWrapperToCopyableValueInst *
   createGuaranteedMoveOnlyWrapperToCopyableValue(SILLocation loc,
                                                  SILValue src) {
     return insert(new (getModule()) MoveOnlyWrapperToCopyableValueInst(
-        *F, getSILDebugLocation(loc), src, OwnershipKind::Guaranteed));
+        *F, getSILDebugLocation(loc), src,
+        MoveOnlyWrapperToCopyableValueInst::Guaranteed));
   }
 
   UnconditionalCheckedCastInst *

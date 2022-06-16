@@ -1921,15 +1921,11 @@ public:
 
   void visitMoveOnlyWrapperToCopyableValueInst(
       MoveOnlyWrapperToCopyableValueInst *I) {
-    switch (I->getForwardingOwnershipKind()) {
-    case OwnershipKind::None:
-    case OwnershipKind::Any:
-    case OwnershipKind::Unowned:
-      llvm_unreachable("Move only values are always non-trivial");
-    case OwnershipKind::Owned:
+    switch (I->getInitialKind()) {
+    case MoveOnlyWrapperToCopyableValueInst::Owned:
       *this << "[owned] ";
       break;
-    case OwnershipKind::Guaranteed:
+    case MoveOnlyWrapperToCopyableValueInst::Guaranteed:
       *this << "[guaranteed] ";
       break;
     }
