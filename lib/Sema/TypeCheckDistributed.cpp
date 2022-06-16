@@ -26,7 +26,6 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/ExistentialLayout.h"
-#include "swift/Basic/Defer.h"
 
 using namespace swift;
 
@@ -578,36 +577,35 @@ bool swift::checkDistributedActorProperty(VarDecl *var, bool diagnose) {
   auto &C = var->getASTContext();
   auto DC = var->getDeclContext();
 
-  DiagnosticTransaction transaction(C.Diags);
-
-  SWIFT_DEFER {
-    if (!diagnose)
-      transaction.abort();
-  };
-
   // without the distributed module, we can't check any of these.
   if (!ensureDistributedModuleLoaded(var))
     return true;
 
   /// === Check if the declaration is a valid combination of attributes
   if (var->isStatic()) {
-    var->diagnose(diag::distributed_property_cannot_be_static,
-                      var->getName());
+    if (diagnose) {
+      var->diagnose(diag::distributed_property_cannot_be_static,
+                    var->getName());
+    }
     // TODO(distributed): fixit, offer removing the static keyword
     return true;
   }
 
   // it is not a computed property
   if (var->isLet() || var->hasStorageOrWrapsStorage()) {
-    var->diagnose(diag::distributed_property_can_only_be_computed,
-                  var->getDescriptiveKind(), var->getName());
+    if (diagnose) {
+      var->diagnose(diag::distributed_property_can_only_be_computed,
+                    var->getDescriptiveKind(), var->getName());
+    }
     return true;
   }
 
   // distributed properties cannot have setters
   if (var->getWriteImpl() != swift::WriteImplKind::Immutable) {
-    var->diagnose(diag::distributed_property_can_only_be_computed_get_only,
-                  var->getName());
+    if (diagnose) {
+      var->diagnose(diag::distributed_property_can_only_be_computed_get_only,
+                    var->getName());
+    }
     return true;
   }
 
