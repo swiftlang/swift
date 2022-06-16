@@ -1719,45 +1719,15 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
     // block which are the only instructions involving this alloc_stack.
     // This can only happen if all paths from this block end in unreachable.
     //
-    // We need to end the lexical lifetime at the last possible location, either
-    // just before an unreachable instruction or just before a branch to a block
-    // that is not dominated by parentBlock.
-
-    // Walk forward from parentBlock until finding blocks which either
-    // (1) terminate in unreachable
-    // (2) have successors which are not dominated by parentBlock
-    GraphNodeWorklist<SILBasicBlock *, 2> worklist;
-    worklist.initialize(parentBlock);
-    while (auto *block = worklist.pop()) {
-      assert(domInfo->dominates(parentBlock, block));
+    // We need to end the lexical lifetime at the last possible location, at the
+    // boundary blocks which are the predecessors of dominance frontier
+    // dominated by the alloc_stack.
+    SmallVector<SILBasicBlock *, 4> boundary;
+    computeDominatedBoundaryBlocks(asi->getParent(), domInfo, boundary);
+    for (auto *block : boundary) {
       auto *terminator = block->getTerminator();
-      if (isa<UnreachableInst>(terminator)) {
-        endLexicalLifetimeBeforeInst(asi, /*beforeInstruction=*/terminator, ctx,
-                                     runningVals->value);
-        continue;
-      }
-      SILBasicBlock *successor = nullptr;
-      // If any successor is not dominated by the parentBlock, then we must end
-      // the lifetime before that successor.
-      //
-      // Suppose that a successor is not dominated by parentBlock.  Recall that
-      // block _is_ dominated by parentBlock.  Thus that successor must have
-      // more than one predecessor: block, and at least one other.  (Otherwise
-      // it would be dominated by parentBlock contrary to our assumption.)
-      // Recall that SIL does not allow critical edges.  Therefore block has
-      // only a single successor.
-      //
-      // Use the above fact to only look for lack of domination of a successor
-      // if that successor is the single successor of block.
-      if ((successor = block->getSingleSuccessorBlock()) &&
-          (!domInfo->dominates(parentBlock, successor))) {
-        endLexicalLifetimeBeforeInst(asi, /*beforeInstruction=*/terminator, ctx,
-                                     runningVals->value);
-        continue;
-      }
-      for (auto *successor : block->getSuccessorBlocks()) {
-        worklist.insert(successor);
-      }
+      endLexicalLifetimeBeforeInst(asi, /*beforeInstruction=*/terminator, ctx,
+                                   runningVals->value);
     }
   }
 }
