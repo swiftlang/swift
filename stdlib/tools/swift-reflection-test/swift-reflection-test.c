@@ -648,47 +648,25 @@ int reflectEnumValue(SwiftReflectionContextRef RC,
     {
       // Get the pointer value from the target
       void *outFreeContext = NULL;
-      const void *rawPtr = PipeMemoryReader_readBytes(&Pipe, EnumInstance, 8, &outFreeContext);
+      const void *rawPtr = PipeMemoryReader_readBytes((void *)&Pipe, EnumInstance, 8, &outFreeContext);
       uintptr_t instance = *(uintptr_t *)rawPtr;
 
+      // Indirect enum is stored as the first field of a closure context...
       swift_typeinfo_t TI = swift_reflection_infoForInstance(RC, instance);
       if (TI.Kind == SWIFT_CLOSURE_CONTEXT) {
-        printf("********** FOUND Closure Context **************\n");
-        swift_typeref_t TR = swift_reflection_typeRefForInstance(RC, instance);
-        printf("Type reference for instance: ");
-        swift_reflection_dumpTypeRef(TR);
-        printf("\n");
-
-        swift_typeinfo_t TI1 = swift_reflection_infoForTypeRef(RC, TR);
-        printf("Type info for type ref: Kind: %d NumFields: %d\n", TI1.Kind, TI1.NumFields);
-
-        swift_typeinfo_t TI = swift_reflection_infoForInstance(RC, instance);
-        printf("Type info for instance: Kind: %d NumFields: %d\n", TI.Kind, TI.NumFields);
-
-        printf("Type info for instance:\n");
-        swift_reflection_dumpInfoForInstance(RC, instance);
-        printf("\n");
-
-        // XXX FIXME THIS BREAKS?!  What is the right way to reflect a closure context?
         swift_childinfo_t CaseInfo
-          = swift_reflection_childOfTypeRef(RC, TR, 0);
-
+          = swift_reflection_childOfInstance(RC, instance, 0);
         if (CaseInfo.TR != 0) {
-          printf("******** Read Case 0 *************\n");
-          swift_typeinfo_t maybeEnumTI = swift_reflection_infoForTypeRef(RC, CaseInfo.TR);
-          if (maybeEnumTI.Kind == SWIFT_NO_PAYLOAD_ENUM
-              || maybeEnumTI.Kind == SWIFT_SINGLE_PAYLOAD_ENUM
-              || maybeEnumTI.Kind == SWIFT_MULTI_PAYLOAD_ENUM) {
-            printf("******** FOUND INDIRECT ENUM *************\n");
-            EnumTypeRef = 0; // REMOVE ME
+          if (CaseInfo.Kind == SWIFT_NO_PAYLOAD_ENUM
+              || CaseInfo.Kind == SWIFT_SINGLE_PAYLOAD_ENUM
+              || CaseInfo.Kind == SWIFT_MULTI_PAYLOAD_ENUM) {
+            EnumTypeRef = CaseInfo.TR;
+            EnumInstance = instance + CaseInfo.Offset;
             break;
           }
-        } else {
-          printf("!!!!!!!!! Case 0 has no TR\n");
         }
-      } else {
-        printf("!!!!!!!!!! Not a closure context\n");
       }
+      __attribute__((fallthrough));
     }
     default:
     {
