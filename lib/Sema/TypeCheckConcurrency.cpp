@@ -2319,18 +2319,6 @@ namespace {
           } else {
             return AsyncMarkingResult::NotDistributed;
           }
-
-          // distributed computed property access, mark it throws + async
-          if (auto lookupExpr = dyn_cast_or_null<LookupExpr>(context)) {
-            if (auto memberRef = dyn_cast<MemberRefExpr>(lookupExpr)) {
-              memberRef->setImplicitlyThrows(true);
-              memberRef->setShouldApplyLookupDistributedThunk(true);
-            } else {
-              llvm_unreachable("expected distributed prop to be a MemberRef");
-            }
-          } else {
-            llvm_unreachable("expected distributed prop to have LookupExpr");
-          }
         }
 
         if (auto declRef = dyn_cast_or_null<DeclRefExpr>(context)) {
