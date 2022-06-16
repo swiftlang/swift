@@ -406,8 +406,9 @@ EXPR_NODES = [
              Child('LeftBrace', kind='LeftBraceToken'),
              Child('Signature', kind='ClosureSignature', is_optional=True),
              Child('Statements', kind='CodeBlockItemList',
-                   collection_element_name='Statement'),
-             Child('RightBrace', kind='RightBraceToken'),
+                   collection_element_name='Statement', is_indented=True),
+             Child('RightBrace', kind='RightBraceToken',
+                   requires_leading_newline=True),
          ]),
 
     # unresolved-pattern-expr -> pattern
