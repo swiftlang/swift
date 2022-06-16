@@ -69,6 +69,7 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (const Arg *A = Args.getLastArg(OPT_bridging_header_directory_for_print)) {
     Opts.BridgingHeaderDirForPrint = A->getValue();
   }
+  Opts.IndexIgnoreClangModules |= Args.hasArg(OPT_index_ignore_clang_modules);
   Opts.IndexSystemModules |= Args.hasArg(OPT_index_system_modules);
   Opts.IndexIgnoreStdlib |= Args.hasArg(OPT_index_ignore_stdlib);
 

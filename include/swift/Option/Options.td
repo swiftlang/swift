@@ -1265,6 +1265,10 @@ def index_unit_output_path : Separate<["-"], "index-unit-output-path">,
   Flags<[FrontendOption, ArgumentIsPath]>, MetaVarName<"<path>">,
   HelpText<"Use <path> as the output path in the produced index data.">;
 
+def index_ignore_clang_modules : Flag<["-"], "index-ignore-clang-modules">,
+  Flags<[FrontendOption]>,
+  HelpText<"Avoid indexing clang modules (pcms)">;
+
 def index_ignore_system_modules : Flag<["-"], "index-ignore-system-modules">,
   Flags<[NoInteractiveOption]>,
   HelpText<"Avoid indexing system modules">;

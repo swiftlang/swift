@@ -1766,7 +1766,9 @@ static void emitIndexDataForSourceFile(SourceFile *PrimarySourceFile,
     if (OutputFile.empty())
       OutputFile = PSPs.OutputFilename;
     (void) index::indexAndRecord(PrimarySourceFile, OutputFile,
-                                 opts.IndexStorePath, opts.IndexSystemModules,
+                                 opts.IndexStorePath,
+                                 !opts.IndexIgnoreClangModules,
+                                 opts.IndexSystemModules,
                                  opts.IndexIgnoreStdlib, isDebugCompilation,
                                  Invocation.getTargetTriple(),
                                  *Instance.getDependencyTracker(),
@@ -1781,6 +1783,7 @@ static void emitIndexDataForSourceFile(SourceFile *PrimarySourceFile,
                                  opts.InputsAndOutputs
                                    .copyIndexUnitOutputFilenames(),
                                  moduleToken, opts.IndexStorePath,
+                                 !opts.IndexIgnoreClangModules,
                                  opts.IndexSystemModules,
                                  opts.IndexIgnoreStdlib,
                                  isDebugCompilation,
