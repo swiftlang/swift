@@ -298,11 +298,17 @@ public:
   /// types.
   class SWIFT_RUNTIME_LIBRARY_VISIBILITY SubstGenericParametersFromMetadata {
     /// Whether the source is metadata (vs. a generic environment);
-    const bool sourceIsMetadata;
+    enum class SourceKind {
+      Metadata,
+      Environment,
+      Shape,
+    };
+    const SourceKind sourceKind;
 
     union {
       const TargetContextDescriptor<InProcess> *baseContext;
       const TargetGenericEnvironment<InProcess> *environment;
+      const TargetExtendedExistentialTypeShape<InProcess> *shape;
     };
 
     /// The generic arguments.
@@ -344,31 +350,40 @@ public:
     unsigned buildEnvironmentPath(
                const TargetGenericEnvironment<InProcess> *environment) const;
 
+    unsigned buildShapePath(
+        const TargetExtendedExistentialTypeShape<InProcess> *shape) const;
+
     // Set up the state we need to compute substitutions.
     void setup() const;
 
   public:
     /// Produce substitutions entirely from the given metadata.
     explicit SubstGenericParametersFromMetadata(const Metadata *base)
-      : sourceIsMetadata(true), baseContext(base->getTypeContextDescriptor()),
-        genericArgs(base ? (const void * const *)base->getGenericArgs()
-                         : nullptr) { }
-    
+        : sourceKind(SourceKind::Metadata),
+          baseContext(base->getTypeContextDescriptor()),
+          genericArgs(base ? (const void *const *)base->getGenericArgs()
+                           : nullptr) {}
+
     /// Produce substitutions from the given instantiation arguments for the
     /// given context.
     explicit SubstGenericParametersFromMetadata(const ContextDescriptor *base,
-                                                const void * const *args)
-      : sourceIsMetadata(true), baseContext(base), genericArgs(args)
-    {}
+                                                const void *const *args)
+        : sourceKind(SourceKind::Metadata), baseContext(base),
+          genericArgs(args) {}
 
     /// Produce substitutions from the given instantiation arguments for the
     /// given generic environment.
     explicit SubstGenericParametersFromMetadata(
-               const TargetGenericEnvironment<InProcess> *environment,
-               const void * const *arguments)
-      : sourceIsMetadata(false), environment(environment),
-        genericArgs(arguments) { }
-    
+        const TargetGenericEnvironment<InProcess> *environment,
+        const void *const *arguments)
+        : sourceKind(SourceKind::Environment), environment(environment),
+          genericArgs(arguments) {}
+
+    explicit SubstGenericParametersFromMetadata(
+        const TargetExtendedExistentialTypeShape<InProcess> *shape,
+        const void *const *arguments)
+        : sourceKind(SourceKind::Shape), shape(shape), genericArgs(arguments) {}
+
     const void * const *getGenericArgs() const { return genericArgs; }
 
     const Metadata *getMetadata(unsigned depth, unsigned index) const;
