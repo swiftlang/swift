@@ -132,6 +132,7 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
   llvm::DenseMap<TypeBase *, llvm::TrackingMDNodeRef> DITypeCache;
   llvm::DenseMap<const void *, llvm::TrackingMDNodeRef> DIModuleCache;
   llvm::StringMap<llvm::TrackingMDNodeRef> DIFileCache;
+  llvm::StringMap<llvm::TrackingMDNodeRef> RuntimeErrorFnCache;
   TrackingDIRefMap DIRefMap;
   TrackingDIRefMap InnerTypeCache;
   /// \}
@@ -2109,13 +2110,20 @@ void IRGenDebugInfoImpl::addFailureMessageToCurrentLoc(IRBuilder &Builder,
 
   llvm::DISubroutineType *DIFnTy = DBuilder.createSubroutineType(nullptr);
 
-  std::string FuncName = "Swift runtime failure: ";
-  FuncName += failureMsg;
-
-  llvm::DISubprogram *TrapSP = DBuilder.createFunction(
-      MainModule, FuncName, StringRef(), TrapLoc->getFile(), 0, DIFnTy, 0,
-      llvm::DINode::FlagArtificial, llvm::DISubprogram::SPFlagDefinition,
-      nullptr, nullptr, nullptr);
+  llvm::DISubprogram *TrapSP;
+  auto It = RuntimeErrorFnCache.find(failureMsg);
+  if (It != RuntimeErrorFnCache.end())
+    TrapSP = llvm::cast<llvm::DISubprogram>(It->second);
+  else {
+    std::string FuncName = "Swift runtime failure: ";
+    FuncName += failureMsg;
+    llvm::DIFile *File = getOrCreateFile({});
+    TrapSP = DBuilder.createFunction(
+        File, FuncName, StringRef(), File, 0,
+        DIFnTy, 0, llvm::DINode::FlagArtificial,
+        llvm::DISubprogram::SPFlagDefinition, nullptr, nullptr, nullptr);
+    RuntimeErrorFnCache.insert({failureMsg, llvm::TrackingMDNodeRef(TrapSP)});
+  }
 
   ScopeCache[TrapSc] = llvm::TrackingMDNodeRef(TrapSP);
   LastScope = TrapSc;
