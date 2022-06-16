@@ -356,21 +356,34 @@ namespace {
 /// A class to walk the AST to build the type refinement context hierarchy.
 class TypeRefinementContextBuilder : private ASTWalker {
 
+  ASTContext &Context;
+
+  /// Represents an entry in a stack of active type refinement contexts. The
+  /// stack is used to facilitate building the TRC's tree structure. A new TRC
+  /// is pushed onto this stack before visiting children whenever the current
+  /// AST node requires a new context and the TRC is then popped
+  /// post-visitation.
   struct ContextInfo {
     TypeRefinementContext *TRC;
 
-    /// The node whose end marks the end of the refinement context.
-    /// If the builder sees this node in a post-visitor, it will pop
-    /// the context from the stack. This node can be null (ParentTy()),
+    /// The AST node. This node can be null (ParentTy()),
     /// indicating that custom logic elsewhere will handle removing
     /// the context when needed.
     ParentTy ScopeNode;
 
     bool ContainedByDeploymentTarget;
   };
-
   std::vector<ContextInfo> ContextStack;
-  ASTContext &Context;
+
+  /// Represents an entry in a stack of pending decl body type refinement
+  /// contexts. TRCs in this stack should be pushed onto \p ContextStack when
+  /// \p BodyStmt is encountered.
+  struct DeclBodyContextInfo {
+    TypeRefinementContext *TRC;
+    Decl *Decl;
+    Stmt *BodyStmt;
+  };
+  std::vector<DeclBodyContextInfo> DeclBodyContextStack;
 
   /// A mapping from abstract storage declarations with accessors to
   /// to the type refinement contexts for those declarations. We refer to
@@ -409,6 +422,15 @@ class TypeRefinementContextBuilder : private ASTWalker {
     }
 
     ContextStack.push_back(Info);
+  }
+
+  void pushDeclBodyContext(TypeRefinementContext *TRC, Decl *D, Stmt *S) {
+    DeclBodyContextInfo Info;
+    Info.TRC = TRC;
+    Info.Decl = D;
+    Info.BodyStmt = S;
+
+    DeclBodyContextStack.push_back(Info);
   }
 
   const char *stackTraceAction() const {
@@ -474,6 +496,12 @@ private:
     while (ContextStack.back().ScopeNode.getAsDecl() == D) {
       ContextStack.pop_back();
     }
+
+    while (!DeclBodyContextStack.empty() &&
+           DeclBodyContextStack.back().Decl == D) {
+      DeclBodyContextStack.pop_back();
+    }
+
     return true;
   }
 
@@ -689,18 +717,22 @@ private:
 
     // Top level code always uses the deployment target.
     if (auto tlcd = dyn_cast<TopLevelCodeDecl>(D)) {
-      auto *topLevelTRC = createContext(tlcd, tlcd->getSourceRange());
-      pushContext(topLevelTRC, D);
+      if (auto bodyStmt = tlcd->getBody()) {
+        pushDeclBodyContext(createContext(tlcd, tlcd->getSourceRange()), tlcd,
+                            bodyStmt);
+      }
       return;
     }
 
     // Function bodies use the deployment target if they are within the module's
     // resilience domain.
     if (auto afd = dyn_cast<AbstractFunctionDecl>(D)) {
-      if (!afd->isImplicit() && afd->getBodySourceRange().isValid() &&
+      if (!afd->isImplicit() &&
           afd->getResilienceExpansion() != ResilienceExpansion::Minimal) {
-        auto *functionBodyTRC = createContext(afd, afd->getBodySourceRange());
-        pushContext(functionBodyTRC, D);
+        if (auto body = afd->getBody(/*canSynthesize*/ false)) {
+          pushDeclBodyContext(createContext(afd, afd->getBodySourceRange()),
+                              afd, body);
+        }
       }
       return;
     }
@@ -748,6 +780,10 @@ private:
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
     PrettyStackTraceStmt trace(Context, stackTraceAction(), S);
 
+    if (consumeDeclBodyContextIfNecessary(S)) {
+      return std::make_pair(true, S);
+    }
+
     if (auto *IS = dyn_cast<IfStmt>(S)) {
       buildIfStmtRefinementContext(IS);
       return std::make_pair(false, S);
@@ -776,6 +812,22 @@ private:
     }
 
     return S;
+  }
+
+  /// Consumes the top TRC from \p DeclBodyContextStack and pushes it onto the
+  /// \p Context stack if the given \p Stmt is the matching body statement.
+  /// Returns \p true if a context was pushed.
+  bool consumeDeclBodyContextIfNecessary(Stmt *S) {
+    if (DeclBodyContextStack.empty())
+      return false;
+
+    auto Info = DeclBodyContextStack.back();
+    if (S != Info.BodyStmt)
+      return false;
+
+    pushContext(Info.TRC, Info.BodyStmt);
+    DeclBodyContextStack.pop_back();
+    return true;
   }
 
   /// Builds the type refinement hierarchy for the IfStmt if the guard
