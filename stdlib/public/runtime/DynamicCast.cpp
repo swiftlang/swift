@@ -1803,6 +1803,14 @@ static DynamicCastResult tryCastToExtendedExistential(
       selfType = metatypeMetadata->InstanceType;
       node = node->getChild(0)->getChild(0);
     }
+
+    // Make sure the thing we've pulled out at the end is a dependent
+    // generic parameter.
+    if (!(node->getKind() == Demangle::Node::Kind::Type &&
+          node->getNumChildren() &&
+          node->getChild(0)->getKind() ==
+              Demangle::Node::Kind::DependentGenericParamType))
+      return DynamicCastResult::Failure;
   }
 
   llvm::SmallVector<const void *, 8> allGenericArgsVec;
