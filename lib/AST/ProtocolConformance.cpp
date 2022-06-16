@@ -1758,6 +1758,9 @@ SourceLoc swift::extractNearestSourceLoc(const ProtocolConformanceRef conformanc
 }
 
 bool ProtocolConformanceRef::hasUnavailableConformance() const {
+  if (isInvalid())
+    return false;
+
   // Abstract conformances are never unavailable.
   if (!isConcrete())
     return false;
