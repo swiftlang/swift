@@ -1310,7 +1310,24 @@ class swift::ObjCMethodLookupTable
         : public llvm::DenseMap<std::pair<ObjCSelector, char>,
                                 StoredObjCMethods>,
           public ASTAllocated<ObjCMethodLookupTable>
-{};
+{
+  SWIFT_DEBUG_DUMP {
+    llvm::errs() << "ObjCMethodLookupTable:\n";
+    for (auto pair : *this) {
+      auto selector = pair.getFirst().first;
+      auto isInstanceMethod = pair.getFirst().second;
+      auto &methods = pair.getSecond();
+
+      llvm::errs() << "  \"" << (isInstanceMethod ? "-" : "+") << selector
+                   << "\":\n";
+      for (auto method : methods.Methods) {
+        llvm::errs() << "  - \"";
+        method->dumpRef(llvm::errs());
+        llvm::errs() << "\"\n";
+      }
+    }
+  }
+};
 
 MemberLookupTable::MemberLookupTable(ASTContext &ctx) {
   // Register a cleanup with the ASTContext to call the lookup table
