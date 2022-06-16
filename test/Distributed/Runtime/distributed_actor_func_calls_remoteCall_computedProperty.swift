@@ -21,7 +21,7 @@ typealias DefaultDistributedActorSystem = FakeRoundtripActorSystem
 
 distributed actor Greeter {
   distributed var theDistributedProperty: String {
-    "Patrik the Seastar"
+    "Patrick the Seastar"
   }
 }
 
@@ -32,10 +32,10 @@ func test() async throws {
   let ref = try Greeter.resolve(id: local.id, using: system)
 
   let reply = try await ref.theDistributedProperty
-  // CHECK: >> remoteCall: on:main.Greeter, target:main.Greeter.name, invocation:FakeInvocationEncoder(genericSubs: [], arguments: [], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
+  // CHECK: >> remoteCall: on:main.Greeter, target:main.Greeter.theDistributedProperty(), invocation:FakeInvocationEncoder(genericSubs: [], arguments: [], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
   // CHECK: << remoteCall return: Patrick the Seastar
   print("reply: \(reply)")
-  // CHECK: reply: Echo: Caplin
+  // CHECK: reply: Patrick the Seastar
 }
 
 @main struct Main {
