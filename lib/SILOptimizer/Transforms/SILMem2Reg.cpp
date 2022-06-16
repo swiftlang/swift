@@ -93,7 +93,10 @@ struct LiveValues {
   /// For lexical AllocStackInsts, that is the copy made of the borrowed value.
   /// For those that are non-lexical, that is the value that was stored into the
   /// storage.
-  SILValue replacement(AllocStackInst *asi) {
+  SILValue replacement(AllocStackInst *asi, SILInstruction *toReplace) {
+    if (isa<LoadBorrowInst>(toReplace)) {
+      return shouldAddLexicalLifetime(asi) ? borrow : stored;
+    }
     return shouldAddLexicalLifetime(asi) ? copy : stored;
   };
 };
@@ -601,22 +604,8 @@ StoreInst *StackAllocationPromoter::promoteAllocationInBlock(
 
     if (isLoadFromStack(inst, asi)) {
       assert(!runningVals || runningVals->isStorageValid);
-      if (auto *lbi = dyn_cast<LoadBorrowInst>(inst)) {
-        if (runningVals) {
-          if (shouldAddLexicalLifetime(asi)) {
-            replaceLoad(lbi, runningVals->value.borrow, asi, ctx,
-                        deleter, instructionsToDelete);
-          }
-          else {
-            replaceLoad(lbi, runningVals->value.replacement(asi), asi, ctx,
-                        deleter, instructionsToDelete);
-          }
-          ++NumInstRemoved;
-        }
-        continue;
-      }
-      auto *li = cast<LoadInst>(inst);
-      if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
+      auto *li = dyn_cast<LoadInst>(inst);
+      if (li && li->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
         if (shouldAddLexicalLifetime(asi)) {
           // End the lexical lifetime at a load [take].  The storage is no
           // longer keeping the value alive.
@@ -639,11 +628,11 @@ StoreInst *StackAllocationPromoter::promoteAllocationInBlock(
       if (runningVals) {
         // If we are loading from the AllocStackInst and we already know the
         // content of the Alloca then use it.
-        LLVM_DEBUG(llvm::dbgs() << "*** Promoting load: " << *li);
-        replaceLoad(inst, runningVals->value.replacement(asi), asi, ctx,
+        LLVM_DEBUG(llvm::dbgs() << "*** Promoting load: " << *inst);
+        replaceLoad(inst, runningVals->value.replacement(asi, inst), asi, ctx,
                     deleter, instructionsToDelete);
         ++NumInstRemoved;
-      } else if (li->getOperand() == asi &&
+      } else if (li && li->getOperand() == asi &&
                  li->getOwnershipQualifier() != LoadOwnershipQualifier::Copy) {
         // If we don't know the content of the AllocStack then the loaded
         // value *is* the new value;
@@ -669,7 +658,7 @@ StoreInst *StackAllocationPromoter::promoteAllocationInBlock(
         if (runningVals) {
           assert(runningVals->isStorageValid);
           SILBuilderWithScope(si, ctx).createDestroyValue(
-              si->getLoc(), runningVals->value.replacement(asi));
+              si->getLoc(), runningVals->value.replacement(asi, si));
         } else {
           SILBuilderWithScope localBuilder(si, ctx);
           auto *newLoad = localBuilder.createLoad(si->getLoc(), asi,
@@ -736,8 +725,8 @@ StoreInst *StackAllocationPromoter::promoteAllocationInBlock(
     // promote this when we deal with hooking up phis.
     if (auto *dvi = DebugValueInst::hasAddrVal(inst)) {
       if (dvi->getOperand() == asi && runningVals)
-        promoteDebugValueAddr(dvi, runningVals->value.replacement(asi), ctx,
-                              deleter);
+        promoteDebugValueAddr(dvi, runningVals->value.replacement(asi, dvi),
+                              ctx, deleter);
       continue;
     }
 
@@ -745,8 +734,8 @@ StoreInst *StackAllocationPromoter::promoteAllocationInBlock(
     if (auto *dai = dyn_cast<DestroyAddrInst>(inst)) {
       if (dai->getOperand() == asi) {
         if (runningVals) {
-          replaceDestroy(dai, runningVals->value.replacement(asi), ctx, deleter,
-                         instructionsToDelete);
+          replaceDestroy(dai, runningVals->value.replacement(asi, dai), ctx,
+                         deleter, instructionsToDelete);
           if (shouldAddLexicalLifetime(asi)) {
             endLexicalLifetimeBeforeInst(asi, /*beforeInstruction=*/dai, ctx,
                                          runningVals->value);
@@ -764,7 +753,7 @@ StoreInst *StackAllocationPromoter::promoteAllocationInBlock(
 
     if (auto *dvi = dyn_cast<DestroyValueInst>(inst)) {
       if (runningVals &&
-          dvi->getOperand() == runningVals->value.replacement(asi)) {
+          dvi->getOperand() == runningVals->value.replacement(asi, dvi)) {
         // Reset LastStore.
         // So that we don't end up passing dead values as phi args in
         // StackAllocationPromoter::fixBranchesAndUses
@@ -928,7 +917,7 @@ void StackAllocationPromoter::fixPhiPredBlock(BlockSetVector &phiBlocks,
 
   LiveValues def = getEffectiveLiveOutValues(phiBlocks, predBlock);
 
-  LLVM_DEBUG(llvm::dbgs() << "*** Found the definition: " << def.replacement(asi));
+  LLVM_DEBUG(llvm::dbgs() << "*** Found the definition: " << def.stored);
 
   llvm::SmallVector<SILValue> vals;
   vals.push_back(def.stored);
@@ -1009,10 +998,10 @@ void StackAllocationPromoter::fixBranchesAndUses(BlockSetVector &phiBlocks,
       def = getEffectiveLiveInValues(phiBlocks, loadBlock);
 
       LLVM_DEBUG(llvm::dbgs() << "*** Replacing " << *li << " with Def "
-                              << def.replacement(asi));
+                              << def.replacement(asi, li));
 
       // Replace the load with the definition that we found.
-      replaceLoad(li, def.replacement(asi), asi, ctx, deleter,
+      replaceLoad(li, def.replacement(asi, li), asi, ctx, deleter,
                   instructionsToDelete);
       removedUser = true;
       ++NumInstRemoved;
@@ -1030,7 +1019,7 @@ void StackAllocationPromoter::fixBranchesAndUses(BlockSetVector &phiBlocks,
       // Replace debug_value w/ address-type value with
       // a new debug_value w/ promoted value.
       auto def = getEffectiveLiveInValues(phiBlocks, userBlock);
-      promoteDebugValueAddr(dvi, def.replacement(asi), ctx, deleter);
+      promoteDebugValueAddr(dvi, def.replacement(asi, dvi), ctx, deleter);
       ++NumInstRemoved;
       continue;
     }
@@ -1038,7 +1027,7 @@ void StackAllocationPromoter::fixBranchesAndUses(BlockSetVector &phiBlocks,
     // Replace destroys with a release of the value.
     if (auto *dai = dyn_cast<DestroyAddrInst>(user)) {
       auto def = getEffectiveLiveInValues(phiBlocks, userBlock);
-      replaceDestroy(dai, def.replacement(asi), ctx, deleter,
+      replaceDestroy(dai, def.replacement(asi, dai), ctx, deleter,
                      instructionsToDelete);
       continue;
     }
@@ -1638,8 +1627,8 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
         }
         runningVals->isStorageValid = false;
       }
-      replaceLoad(inst, runningVals->value.replacement(asi), asi, ctx, deleter,
-                  instructionsToDelete);
+      replaceLoad(inst, runningVals->value.replacement(asi, inst), asi, ctx,
+                  deleter, instructionsToDelete);
       ++NumInstRemoved;
       continue;
     }
@@ -1651,7 +1640,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
         if (si->getOwnershipQualifier() == StoreOwnershipQualifier::Assign) {
           assert(runningVals && runningVals->isStorageValid);
           SILBuilderWithScope(si, ctx).createDestroyValue(
-              si->getLoc(), runningVals->value.replacement(asi));
+              si->getLoc(), runningVals->value.replacement(asi, si));
         }
         auto oldRunningVals = runningVals;
         runningVals = {LiveValues::toReplace(asi, /*replacement=*/si->getSrc()),
@@ -1674,8 +1663,8 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
     if (auto *dvi = DebugValueInst::hasAddrVal(inst)) {
       if (dvi->getOperand() == asi) {
         if (runningVals) {
-          promoteDebugValueAddr(dvi, runningVals->value.replacement(asi), ctx,
-                                deleter);
+          promoteDebugValueAddr(dvi, runningVals->value.replacement(asi, dvi),
+                                ctx, deleter);
         } else {
           // Drop debug_value of uninitialized void values.
           assert(asi->getElementType().isVoid() &&
@@ -1690,8 +1679,8 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
     if (auto *dai = dyn_cast<DestroyAddrInst>(inst)) {
       if (dai->getOperand() == asi) {
         assert(runningVals && runningVals->isStorageValid);
-        replaceDestroy(dai, runningVals->value.replacement(asi), ctx, deleter,
-                       instructionsToDelete);
+        replaceDestroy(dai, runningVals->value.replacement(asi, dai), ctx,
+                       deleter, instructionsToDelete);
         if (shouldAddLexicalLifetime(asi)) {
           endLexicalLifetimeBeforeInst(asi, /*beforeInstruction=*/dai, ctx,
                                        runningVals->value);

@@ -10,6 +10,7 @@ struct WrapperStruct {
 sil [ossa] @use_inguaranteed : $@convention(thin) (@in_guaranteed Klass) -> ()
 sil [ossa] @use_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
 sil [ossa] @use_owned : $@convention(thin) (@owned Klass) -> ()
+sil [ossa] @get_owned : $@convention(thin) () -> @owned Klass
 
 // CHECK-LABEL: sil [ossa] @test_no_storeborrow1 :
 // CHECK-NOT: alloc_stack
@@ -67,6 +68,23 @@ bb4:
 sil [ossa] @test_no_storeborrow3 : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
   %1 = alloc_stack $Klass
+  store %0 to [init] %1 : $*Klass
+  %2 = load_borrow %1 : $*Klass
+  %3 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %2 : $Klass
+  destroy_addr %1 : $*Klass
+  dealloc_stack %1 : $*Klass
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_no_storeborrow4 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'test_no_storeborrow4'
+sil [ossa] @test_no_storeborrow4 : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack [lexical] $Klass
   store %0 to [init] %1 : $*Klass
   %2 = load_borrow %1 : $*Klass
   %3 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
@@ -371,3 +389,30 @@ bb3:
   return %8 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_control_flow6 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'test_control_flow6'
+sil [ossa] @test_control_flow6 : $@convention(thin) () -> () {
+bb0:
+  %4 = alloc_stack [lexical] $Klass
+  %f = function_ref @get_owned : $@convention(thin) () -> @owned Klass
+  %5 = apply %f() : $@convention(thin) () -> @owned Klass
+  store %5 to [init] %4 : $*Klass
+  %7 = load_borrow %4 : $*Klass
+  end_borrow %7 : $Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  %28 = load_borrow %4 : $*Klass
+  end_borrow %28 : $Klass
+  br bb3
+
+bb3:
+  destroy_addr %4 : $*Klass
+  dealloc_stack %4 : $*Klass
+  %r = tuple ()
+  return %r : $()
+}
