@@ -59,6 +59,8 @@
 // CHECK-NEXT:   inline OpaqueStorage(OpaqueStorage&& other) : storage(other.storage) { other.storage = nullptr; }
 // CHECK-NEXT:   inline OpaqueStorage(const OpaqueStorage&) = delete;
 // CHECK-NEXT:   inline ~OpaqueStorage() { if (storage) { delete[] storage; } }
+// CHECK-NEXT:   void operator =(OpaqueStorage&& other) { auto temp = storage; storage = other.storage; other.storage = temp; }
+// CHECK-NEXT:   void operator =(const OpaqueStorage&) = delete;
 // CHECK-NEXT:   inline char * _Nonnull getOpaquePointer() { return static_cast<char * _Nonnull>(storage); }
 // CHECK-NEXT:   inline const char * _Nonnull getOpaquePointer() const { return static_cast<char * _Nonnull>(storage); }
 // CHECK-NEXT: private:

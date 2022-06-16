@@ -140,6 +140,11 @@ void ClangValueTypePrinter::printValueTypeDecl(
   os << "    auto *vwTable = ";
   printer.printValueWitnessTableAccessFromTypeMetadata("metadata");
   os << ";\n";
+  if (isOpaqueLayout) {
+    os << "    _storage = ";
+    printer.printSwiftImplQualifier();
+    os << cxx_synthesis::getCxxOpaqueStorageClassName() << "(vwTable);\n";
+  }
   os << "    vwTable->initializeWithCopy(_getOpaquePointer(), const_cast<char "
         "*>(other._getOpaquePointer()), metadata._0);\n";
   os << "  }\n";

@@ -5,9 +5,9 @@
 // RUN: %check-interop-cxx-header-in-clang(%t/structs.h)
 
 public struct FirstSmallStruct {
-    public let x: UInt32
+    public var x: UInt32
 #if CHANGE_LAYOUT
-    public let y: UInt32 = 0
+    public var y: UInt32 = 0
 #endif
 
     public func dump() {
@@ -22,6 +22,12 @@ public struct FirstSmallStruct {
 
 // CHECK: class FirstSmallStruct final {
 // CHECK-NEXT: public:
+// CHECK: inline FirstSmallStruct(const FirstSmallStruct &other) {
+// CHECK-NEXT:   auto metadata = _impl::$s7Structs16FirstSmallStructVMa(0);
+// CHECK-NEXT:   auto *vwTable = *(reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1);
+// CHECK-NEXT:   _storage = swift::_impl::OpaqueStorage(vwTable);
+// CHECK-NEXT:   vwTable->initializeWithCopy(_getOpaquePointer(), const_cast<char *>(other._getOpaquePointer()), metadata._0);
+// CHECK-NEXT: }
 // CHECK: private:
 // CHECK-NEXT:  inline FirstSmallStruct(swift::_impl::ValueWitnessTable *vwTable) : _storage(vwTable) {}
 // CHECK-NEXT:  static inline FirstSmallStruct _make() {
@@ -57,6 +63,12 @@ public struct LargeStruct {
 
 // CHECK: class LargeStruct final {
 // CHECK-NEXT: public:
+// CHECK: inline LargeStruct(const LargeStruct &other) {
+// CHECK-NEXT:   auto metadata = _impl::$s7Structs11LargeStructVMa(0);
+// CHECK-NEXT:   auto *vwTable = *(reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1);
+// CHECK-NEXT:   _storage = swift::_impl::OpaqueStorage(vwTable);
+// CHECK-NEXT:   vwTable->initializeWithCopy(_getOpaquePointer(), const_cast<char *>(other._getOpaquePointer()), metadata._0);
+// CHECK-NEXT: }
 // CHECK: private:
 // CHECK-NEXT:  inline LargeStruct(swift::_impl::ValueWitnessTable *vwTable) : _storage(vwTable) {}
 // CHECK-NEXT:  static inline LargeStruct _make() {
@@ -124,6 +136,16 @@ public func createStructWithRefCountStoredProp() -> StructWithRefCountStoredProp
     return StructWithRefCountStoredProp(x: 0)
 }
 
+public func mutateSmall(_ x: inout FirstSmallStruct) {
+#if CHANGE_LAYOUT
+    let y = x.y
+    x.y = x.x
+    x.x = y
+#else
+    x.x += 1
+#endif
+}
+
 // CHECK:      inline LargeStruct createLargeStruct(swift::Int x) noexcept SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:   return _impl::_impl_LargeStruct::returnNewValue([&](void * _Nonnull result) {
 // CHECK-NEXT:     _impl::$s7Structs17createLargeStructyAA0cD0VSiF(result, x);
@@ -134,6 +156,10 @@ public func createStructWithRefCountStoredProp() -> StructWithRefCountStoredProp
 // CHECK-NEXT:   return _impl::_impl_StructWithRefCountStoredProp::returnNewValue([&](void * _Nonnull result) {
 // CHECK-NEXT:     _impl::$s7Structs34createStructWithRefCountStoredPropAA0cdefgH0VyF(result);
 // CHECK-NEXT:   });
+// CHECK-NEXT: }
+
+// CHECK:      inline void mutateSmall(FirstSmallStruct& x) noexcept {
+// CHECK-NEXT:   return _impl::$s7Structs11mutateSmallyyAA05FirstC6StructVzF(_impl::_impl_FirstSmallStruct::getOpaquePointer(x));
 // CHECK-NEXT: }
 
 // CHECK:      inline void printSmallAndLarge(const FirstSmallStruct& x, const LargeStruct& y) noexcept {

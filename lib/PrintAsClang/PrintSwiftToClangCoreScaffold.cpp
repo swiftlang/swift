@@ -132,6 +132,10 @@ static void printSwiftResilientStorageClass(raw_ostream &os) {
      << "&& other) : storage(other.storage) { other.storage = nullptr; }\n";
   os << "  inline " << name << "(const " << name << "&) = delete;\n";
   os << "  inline ~" << name << "() { if (storage) { delete[] storage; } }\n";
+  os << "  void operator =(" << name
+     << "&& other) { auto temp = storage; storage = other.storage; "
+        "other.storage = temp; }\n";
+  os << "  void operator =(const " << name << "&) = delete;\n";
   os << "  inline char * _Nonnull getOpaquePointer() { return static_cast<char "
         "* _Nonnull>(storage); }\n";
   os << "  inline const char * _Nonnull getOpaquePointer() const { return "

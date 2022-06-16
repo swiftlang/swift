@@ -34,6 +34,13 @@ int main() {
 // CURRENT-NEXT: x = 65
 // CHANGE-NEXT: x&y = 65&0
 
+  auto copySmallStruct = smallStruct;
+  mutateSmall(copySmallStruct);
+  copySmallStruct.dump();
+// CHECK: find - small dump
+// CURRENT-NEXT: x = 66
+// CHANGE-NEXT: x&y = 0&65
+
   printSmallAndLarge(smallStruct, largeStruct);
 // CHECK: find - small dump
 // CURRENT-NEXT: x = 65
@@ -44,8 +51,13 @@ int main() {
     auto structWithRefCountStoredProp =
       createStructWithRefCountStoredProp();
     structWithRefCountStoredProp.dump();
+    {
+       StructWithRefCountStoredProp copy(structWithRefCountStoredProp);
+    }
+    structWithRefCountStoredProp.dump();
   }
 // CHECK-NEXT: create RefCountedClass 0
+// CHECK-NEXT: storedRef = 0
 // CHECK-NEXT: storedRef = 0
 // CHECK-NEXT: destroy RefCountedClass 0
   return 0;
