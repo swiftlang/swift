@@ -443,6 +443,9 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     // Just a simple composition of protocols.
     return proto_list;
   }
+  case MetadataKind::ExtendedExistential: {
+    swift_unreachable("Extended existentials not supported");
+  }
   case MetadataKind::ExistentialMetatype: {
     auto metatype = static_cast<const ExistentialMetatypeMetadata *>(type);
     auto instance = _swift_buildDemanglingForMetadata(metatype->InstanceType,
