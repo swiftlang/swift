@@ -27,6 +27,20 @@ import objc_generics
 // CHECK-NEXT: @end
 @objc protocol B : A {}
 
+// CHECK-LABEL: @protocol CompletionAndAsync
+// CHECK-NEXT: - (void)helloWithCompletion:(void (^ _Nonnull)(BOOL))completion;
+// CHECK-NEXT: @end
+@objc protocol CompletionAndAsync {
+  // We don't want this one printed because it has more limited availability.
+  @available(SwiftStdlib 5.7, *)
+  @objc(helloWithCompletion:)
+  func hello() async -> Bool
+
+  @available(*, renamed: "hello()")
+  @objc(helloWithCompletion:)
+  func hello(completion: @escaping (Bool) -> Void)
+}
+
 // CHECK: @protocol CustomName2;
 // CHECK-LABEL: SWIFT_PROTOCOL_NAMED("CustomName")
 // CHECK-NEXT: @protocol CustomName{{$}}
