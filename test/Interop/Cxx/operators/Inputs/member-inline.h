@@ -274,4 +274,25 @@ struct DerivedFromReadWriteIntArray : ReadWriteIntArray {};
 
 struct DerivedFromNonTrivialArrayByVal : NonTrivialArrayByVal {};
 
+struct Iterator {
+private:
+  int value = 123;
+public:
+  int &operator*() { return value; }
+};
+
+struct ConstIterator {
+private:
+  int value = 234;
+public:
+  const int &operator*() const { return value; }
+};
+
+struct ConstIteratorByVal {
+private:
+  int value = 456;
+public:
+  int operator*() const { return value; }
+};
+
 #endif
