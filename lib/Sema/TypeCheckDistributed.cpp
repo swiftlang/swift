@@ -26,6 +26,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/Basic/Defer.h"
 
 using namespace swift;
 
@@ -575,6 +576,13 @@ bool CheckDistributedFunctionRequest::evaluate(
 bool swift::checkDistributedActorProperty(VarDecl *var, bool diagnose) {
   auto &C = var->getASTContext();
   auto DC = var->getDeclContext();
+
+  DiagnosticTransaction transaction(C.Diags);
+
+  SWIFT_DEFER {
+    if (!diagnose)
+      transaction.abort();
+  };
 
   // without the distributed module, we can't check any of these.
   if (!ensureDistributedModuleLoaded(var))

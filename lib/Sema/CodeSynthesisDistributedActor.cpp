@@ -791,6 +791,9 @@ FuncDecl *GetDistributedThunkRequest::evaluate(Evaluator &evaluator,
     if (!var->isDistributed())
       return nullptr;
 
+    if (checkDistributedActorProperty(var, /*diagnose=*/false))
+      return nullptr;
+
     distributedTarget = var->getAccessor(AccessorKind::Get);
   } else {
     distributedTarget = originator.get<AbstractFunctionDecl *>();
@@ -815,7 +818,8 @@ FuncDecl *GetDistributedThunkRequest::evaluate(Evaluator &evaluator,
   // we must avoid synthesis of the thunk because it'd also have errors,
   // giving an ugly user experience (errors in implicit code).
   if (distributedTarget->getInterfaceType()->hasError() ||
-      checkDistributedFunction(distributedTarget)) {
+      (!isa<AccessorDecl>(distributedTarget) &&
+       checkDistributedFunction(distributedTarget))) {
     return nullptr;
   }
 
