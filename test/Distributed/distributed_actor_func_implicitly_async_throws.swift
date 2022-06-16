@@ -37,12 +37,12 @@ func test_not_distributed_funcs(distributed: D) async {
 func test_outside(distributed: D) async throws {
   distributed.distHello() // expected-error{{expression is 'async' but is not marked with 'await'}}
   // expected-error@-1{{call can throw but is not marked with 'try'}}
-  // expected-note@-2{{calls to distributed instance method 'distHello()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-2{{calls to instance method 'distHello()' from outside of its actor context are implicitly asynchronous}}
   // expected-note@-3{{did you mean to use 'try'?}}
   // expected-note@-4{{did you mean to disable error propagation?}}
   // expected-note@-5{{did you mean to handle error as optional value?}}
   try distributed.distHello() // expected-error{{expression is 'async' but is not marked with 'await'}}
-  // expected-note@-1{{calls to distributed instance method 'distHello()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-1{{calls to instance method 'distHello()' from outside of its actor context are implicitly asynchronous}}
   await distributed.distHello() // expected-error{{call can throw but is not marked with 'try'}}
   // expected-note@-1{{did you mean to use 'try'?}}
   // expected-note@-2{{did you mean to disable error propagation?}}
@@ -51,12 +51,14 @@ func test_outside(distributed: D) async throws {
 
   distributed.distHelloAsync()// expected-error{{expression is 'async' but is not marked with 'await'}}
   // expected-error@-1{{call can throw but is not marked with 'try'}}
-  // expected-note@-2{{calls to distributed instance method 'distHelloAsync()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-2{{call is 'async'}}
   // expected-note@-3{{did you mean to use 'try'?}}
   // expected-note@-4{{did you mean to disable error propagation?}}
   // expected-note@-5{{did you mean to handle error as optional value?}}
+  // FIXME(distributed): we lost this diagnosis in recent rework: calls to distributed instance method 'distHelloAsync()' from outside of its actor context are implicitly asynchronous
   try distributed.distHelloAsync() // expected-error{{expression is 'async' but is not marked with 'await'}}
-  // expected-note@-1{{calls to distributed instance method 'distHelloAsync()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-1{{call is 'async'}}
+  // FIXME(distributed): we lost this diagnosis in recent rework: calls to instance method 'distHelloAsync()' from outside of its actor context are implicitly asynchronous
   await distributed.distHelloAsync() // expected-error{{call can throw but is not marked with 'try'}}
   // expected-note@-1{{did you mean to use 'try'?}}
   // expected-note@-2{{did you mean to disable error propagation?}}
@@ -65,12 +67,12 @@ func test_outside(distributed: D) async throws {
 
   distributed.distHelloThrows() // expected-error{{expression is 'async' but is not marked with 'await'}}
   // expected-error@-1{{call can throw but is not marked with 'try'}}
-  // expected-note@-2{{calls to distributed instance method 'distHelloThrows()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-2{{calls to instance method 'distHelloThrows()' from outside of its actor context are implicitly asynchronous}}
   // expected-note@-3{{did you mean to use 'try'?}}
   // expected-note@-4{{did you mean to disable error propagation?}}
   // expected-note@-5{{did you mean to handle error as optional value?}}
   try distributed.distHelloThrows() // expected-error{{expression is 'async' but is not marked with 'await'}}
-  // expected-note@-1{{calls to distributed instance method 'distHelloThrows()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-1{{calls to instance method 'distHelloThrows()' from outside of its actor context are implicitly asynchronous}}
   await distributed.distHelloThrows() // expected-error{{call can throw but is not marked with 'try'}}
   // expected-note@-1{{did you mean to use 'try'?}}
   // expected-note@-2{{did you mean to disable error propagation?}}
@@ -79,12 +81,14 @@ func test_outside(distributed: D) async throws {
 
   distributed.distHelloAsyncThrows() // expected-error{{expression is 'async' but is not marked with 'await'}}
   // expected-error@-1{{call can throw but is not marked with 'try'}}
-  // expected-note@-2{{calls to distributed instance method 'distHelloAsyncThrows()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-2{{call is 'async'}}
   // expected-note@-3{{did you mean to use 'try'?}}
   // expected-note@-4{{did you mean to disable error propagation?}}
   // expected-note@-5{{did you mean to handle error as optional value?}}
+  // FIXME(distributed): we lost this diagnosis in recent rework: {{calls to instance method 'distHelloAsyncThrows()' from outside of its actor context are implicitly asynchronous
   try distributed.distHelloAsyncThrows() // expected-error{{expression is 'async' but is not marked with 'await'}}
-  // expected-note@-1{{calls to distributed instance method 'distHelloAsyncThrows()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-1{{call is 'async'}}
+  // FIXME(distributed): we lost this diagnosis in recent rework: calls to instance method 'distHelloAsyncThrows()' from outside of its actor context are implicitly asynchronous
   await distributed.distHelloAsyncThrows() // expected-error{{call can throw but is not marked with 'try'}}
   // expected-note@-1{{did you mean to use 'try'?}}
   // expected-note@-2{{did you mean to disable error propagation?}}

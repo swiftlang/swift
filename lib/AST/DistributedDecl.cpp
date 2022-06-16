@@ -1377,11 +1377,6 @@ FuncDecl *VarDecl::getDistributedThunk() const {
   if (!isDistributed())
     return nullptr;
 
-  // Only get-only 'distributed' computed properties are considered valid.
-  if (isStatic() || isLet() || hasStorageOrWrapsStorage() ||
-      getWriteImpl() != swift::WriteImplKind::Immutable)
-    return nullptr;
-
   auto mutableThis = const_cast<VarDecl *>(this);
   return evaluateOrDefault(getASTContext().evaluator,
                            GetDistributedThunkRequest{mutableThis}, nullptr);

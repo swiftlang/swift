@@ -6397,6 +6397,9 @@ public:
   /// A function is concurrent if it has the @Sendable attribute.
   bool isSendable() const;
 
+  /// Determine if function has 'nonisolated' attribute
+  bool isNonisolated() const;
+
   /// Returns true if the function is a suitable 'async' context.
   ///
   /// Functions that are an 'async' context can make calls to 'async' functions.
