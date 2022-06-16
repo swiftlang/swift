@@ -421,9 +421,9 @@ static bool checkDistributedTargetResultType(
             addCodableFixIt(resultNominalType, diag);
           }
         }
-
-        return true;
-      }
+      } // end if: diagnose
+      
+      return true;
     }
   }
 
