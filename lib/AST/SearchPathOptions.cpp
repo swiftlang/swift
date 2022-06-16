@@ -12,6 +12,7 @@
 
 #include "swift/AST/SearchPathOptions.h"
 #include "llvm/ADT/SmallSet.h"
+#include "llvm/Support/Errc.h"
 
 using namespace swift;
 
@@ -19,16 +20,24 @@ void ModuleSearchPathLookup::addFilesInPathToLookupTable(
     llvm::vfs::FileSystem *FS, StringRef SearchPath, ModuleSearchPathKind Kind,
     bool IsSystem, unsigned SearchPathIndex) {
   std::error_code Error;
-  assert(llvm::all_of(LookupTable, [&](const auto &LookupTableEntry) {
-    return llvm::none_of(LookupTableEntry.second, [&](const ModuleSearchPath &ExistingSearchPath) -> bool {
-      return ExistingSearchPath.Kind == Kind && ExistingSearchPath.Index == SearchPathIndex;
+  auto entryAlreadyExists = [this](ModuleSearchPathKind Kind,
+                                   unsigned SearchPathIndex) -> bool {
+    return llvm::any_of(LookupTable, [&](const auto &LookupTableEntry) {
+      return llvm::any_of(
+          LookupTableEntry.second, [&](ModuleSearchPathPtr ExistingSearchPath) {
+            return ExistingSearchPath->getKind() == Kind &&
+                   ExistingSearchPath->getIndex() == SearchPathIndex;
+          });
     });
-  }) && "Search path with this kind and index already exists");
+  };
+  assert(!entryAlreadyExists(Kind, SearchPathIndex) &&
+         "Search path with this kind and index already exists");
+  ModuleSearchPathPtr TableEntry =
+      new ModuleSearchPath(SearchPath, Kind, IsSystem, SearchPathIndex);
   for (auto Dir = FS->dir_begin(SearchPath, Error);
        !Error && Dir != llvm::vfs::directory_iterator(); Dir.increment(Error)) {
     StringRef Filename = llvm::sys::path::filename(Dir->path());
-    LookupTable[Filename].push_back(
-        {SearchPath, Kind, IsSystem, SearchPathIndex});
+    LookupTable[Filename].push_back(TableEntry);
   }
 }
 
@@ -53,7 +62,7 @@ void ModuleSearchPathLookup::rebuildLookupTable(const SearchPathOptions *Opts,
   if (IsOSDarwin) {
     for (auto Entry : llvm::enumerate(Opts->getDarwinImplicitFrameworkSearchPaths())) {
       addFilesInPathToLookupTable(FS, Entry.value(),
-                                  ModuleSearchPathKind::DarwinImplictFramework,
+                                  ModuleSearchPathKind::DarwinImplicitFramework,
                                   /*isSystem=*/true, Entry.index());
     }
   }
@@ -85,15 +94,16 @@ ModuleSearchPathLookup::searchPathsContainingFile(
   // Note that if a search path is specified twice by including it twice in
   // compiler arguments or by specifying it as different kinds (e.g. once as
   // import and once as framework search path), these search paths are
-  // considered different (because they have different indicies/kinds and may
+  // considered different (because they have different indices/kinds and may
   // thus still be included twice.
   llvm::SmallVector<const ModuleSearchPath *, 4> Result;
   llvm::SmallSet<std::pair<ModuleSearchPathKind, unsigned>, 4> ResultIds;
 
   for (auto &Filename : Filenames) {
     for (auto &Entry : LookupTable[Filename]) {
-      if (ResultIds.insert(std::make_pair(Entry.Kind, Entry.Index)).second) {
-        Result.push_back(&Entry);
+      if (ResultIds.insert(std::make_pair(Entry->getKind(), Entry->getIndex()))
+              .second) {
+        Result.push_back(Entry.get());
       }
     }
   }
@@ -104,4 +114,48 @@ ModuleSearchPathLookup::searchPathsContainingFile(
   llvm::sort(Result, [](const ModuleSearchPath *Lhs,
                         const ModuleSearchPath *Rhs) { return *Lhs < *Rhs; });
   return Result;
+}
+
+/// Loads a VFS YAML file located at \p File using \p BaseFS and adds it to
+/// \p OverlayFS. Returns an error if either loading the \p File failed or it
+/// is invalid.
+static llvm::Error loadAndValidateVFSOverlay(
+    const std::string &File,
+    const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &BaseFS,
+    const llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem> &OverlayFS) {
+  auto Buffer = BaseFS->getBufferForFile(File);
+  if (!Buffer)
+    return llvm::createFileError(File, Buffer.getError());
+
+  auto VFS = llvm::vfs::getVFSFromYAML(std::move(Buffer.get()), nullptr, File);
+  if (!VFS)
+    return llvm::createFileError(File, llvm::errc::invalid_argument);
+
+  OverlayFS->pushOverlay(std::move(VFS));
+  return llvm::Error::success();
+}
+
+llvm::Expected<llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>>
+SearchPathOptions::makeOverlayFileSystem(
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> BaseFS) const {
+  // TODO: This implementation is different to how Clang reads overlays in.
+  // Expose a helper in Clang rather than doing this ourselves.
+
+  auto OverlayFS =
+      llvm::makeIntrusiveRefCnt<llvm::vfs::OverlayFileSystem>(BaseFS);
+
+  llvm::Error AllErrors = llvm::Error::success();
+  bool hasOverlays = false;
+  for (const auto &File : VFSOverlayFiles) {
+    hasOverlays = true;
+    if (auto Err = loadAndValidateVFSOverlay(File, BaseFS, OverlayFS))
+      AllErrors = llvm::joinErrors(std::move(AllErrors), std::move(Err));
+  }
+
+  if (AllErrors)
+    return std::move(AllErrors);
+
+  if (hasOverlays)
+    return OverlayFS;
+  return BaseFS;
 }

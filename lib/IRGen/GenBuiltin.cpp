@@ -1336,7 +1336,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     return;
   }
   if (Builtin.ID == BuiltinValueKind::AssumeAlignment) {
-    // A no-op pointer cast that passes on its first value. Common occurences of
+    // A no-op pointer cast that passes on its first value. Common occurrences of
     // this builtin should already be removed with the alignment guarantee moved
     // to the subsequent load or store.
     //

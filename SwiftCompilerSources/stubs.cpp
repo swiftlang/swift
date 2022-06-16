@@ -13,8 +13,9 @@
 extern "C" {
 
 void initializeSwiftModules();
+void initializeSwiftParseModules();
 
 }
 
 void initializeSwiftModules() {}
-
+void initializeSwiftParseModules() {}

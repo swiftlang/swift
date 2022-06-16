@@ -153,3 +153,14 @@ class C10Sub : C10Super, P8 {
 class C11 : P11 {
   func f(waggle: Int) { } // no warning
 }
+
+@objc protocol P12 {
+  @objc optional var prop: Bool { get set } // expected-note {{requirement 'prop' declared here}}
+}
+class C12: P12 {
+  var prop: Bool { true }
+  // expected-warning@-1 {{property 'prop' nearly matches optional requirement 'prop' of protocol 'P12'}}
+  // expected-note@-2 {{candidate is not settable, but protocol requires it}}
+  // expected-note@-3 {{move 'prop' to an extension to silence this warning}}
+  // expected-note@-4 {{make 'prop' private to silence this warning}}
+}

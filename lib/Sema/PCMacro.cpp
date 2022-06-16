@@ -224,7 +224,7 @@ public:
 
       // point at the for stmt, to look nice
       SourceLoc StartLoc = FES->getStartLoc();
-      SourceLoc EndLoc = FES->getSequence()->getEndLoc();
+      SourceLoc EndLoc = FES->getParsedSequence()->getEndLoc();
       // FIXME: get the 'end' of the for stmt
       // if (FD->getResultTypeRepr()) {
       //   EndLoc = FD->getResultTypeSourceRange().End;

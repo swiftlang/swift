@@ -66,6 +66,8 @@ set(LLVM_TOOL_LLVM_SHLIB_BUILD NO CACHE BOOL "")
 # Avoid swig dependency for lldb
 set(LLDB_ALLOW_STATIC_BINDINGS YES CACHE BOOL "")
 set(LLDB_USE_STATIC_BINDINGS YES CACHE BOOL "")
+set(LLDB_ENABLE_PYTHON YES CACHE BOOL "")
+set(LLDB_EMBED_PYTHON_HOME NO CACHE BOOL "")
 
 # This requires perl which may not be available on Windows
 set(SWIFT_INCLUDE_DOCS NO CACHE BOOL "")

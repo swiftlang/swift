@@ -33,7 +33,7 @@ let assumeSingleThreadedPass = FunctionPass(
       for inst in block.instructions {
         guard let rcInst = inst as? RefCountingInst else { continue }
 
-        context.setAtomicity(of: rcInst, isAtomic: false)
+        rcInst.setAtomicity(isAtomic: false, context)
       }
     }
   }

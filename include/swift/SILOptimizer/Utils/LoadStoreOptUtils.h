@@ -257,6 +257,8 @@ public:
   SILValue materialize(SILInstruction *Inst) {
     if (CoveringValue)
       return SILValue();
+    if (isa<SILUndef>(Base))
+      return Base;
     auto Val = Base;
     auto InsertPt = getInsertAfterPoint(Base).getValue();
     SILBuilderWithScope Builder(InsertPt);

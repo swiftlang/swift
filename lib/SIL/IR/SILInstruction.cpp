@@ -240,7 +240,7 @@ SILInstructionKind swift::getSILInstructionKind(StringRef name) {
   llvm::errs() << "Unknown SIL instruction name\n";
   abort();
 #endif
-  llvm_unreachable("Unknown SIL insruction name");
+  llvm_unreachable("Unknown SIL instruction name");
 }
 
 /// Map SILInstructionKind to a corresponding SILInstruction name.
@@ -844,12 +844,6 @@ namespace {
     bool visitClassifyBridgeObjectInst(ClassifyBridgeObjectInst *X) {
       return true;
     }
-    bool visitThinFunctionToPointerInst(ThinFunctionToPointerInst *X) {
-      return true;
-    }
-    bool visitPointerToThinFunctionInst(PointerToThinFunctionInst *X) {
-      return true;
-    }
 
     bool visitObjCProtocolInst(ObjCProtocolInst *RHS) {
       auto *X = cast<ObjCProtocolInst>(LHS);
@@ -1162,7 +1156,6 @@ bool SILInstruction::mayRelease() const {
     return true;
 
   case SILInstructionKind::UnconditionalCheckedCastAddrInst:
-  case SILInstructionKind::UnconditionalCheckedCastValueInst:
   case SILInstructionKind::UncheckedOwnershipConversionInst:
     return true;
 
@@ -1271,7 +1264,7 @@ bool SILInstruction::isAllocatingStack() const {
   if (isa<AllocStackInst>(this))
     return true;
 
-  if (auto *ARI = dyn_cast<AllocRefInst>(this)) {
+  if (auto *ARI = dyn_cast<AllocRefInstBase>(this)) {
     if (ARI->canAllocOnStack())
       return true;
   }
@@ -1318,10 +1311,6 @@ bool SILInstruction::isTriviallyDuplicatable() const {
   if (isAllocatingStack())
     return false;
 
-  if (auto *ARI = dyn_cast<AllocRefInst>(this)) {
-    if (ARI->canAllocOnStack())
-      return false;
-  }
   if (isa<OpenExistentialAddrInst>(this) || isa<OpenExistentialRefInst>(this) ||
       isa<OpenExistentialMetatypeInst>(this) ||
       isa<OpenExistentialValueInst>(this) || isa<OpenExistentialBoxInst>(this) ||
@@ -1372,7 +1361,6 @@ bool SILInstruction::mayTrap() const {
   case SILInstructionKind::CondFailInst:
   case SILInstructionKind::UnconditionalCheckedCastInst:
   case SILInstructionKind::UnconditionalCheckedCastAddrInst:
-  case SILInstructionKind::UnconditionalCheckedCastValueInst:
     return true;
   default:
     return false;
@@ -1382,7 +1370,8 @@ bool SILInstruction::mayTrap() const {
 bool SILInstruction::maySynchronize() const {
   // TODO: We need side-effect analysis and library annotation for this to be
   //       a reasonable API.  For now, this is just a placeholder.
-  return isa<FullApplySite>(this);
+  return isa<FullApplySite>(this) || isa<EndApplyInst>(this) ||
+         isa<AbortApplyInst>(this);
 }
 
 bool SILInstruction::isMetaInstruction() const {
@@ -1396,6 +1385,15 @@ bool SILInstruction::isMetaInstruction() const {
     return false;
   }
   llvm_unreachable("Instruction not handled in isMetaInstruction()!");
+}
+
+unsigned SILInstruction::getCachedFieldIndex(NominalTypeDecl *decl,
+                                             VarDecl *property) {
+  return getModule().getFieldIndex(decl, property);
+}
+
+unsigned SILInstruction::getCachedCaseIndex(EnumElementDecl *enumElement) {
+  return getModule().getCaseIndex(enumElement);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1455,7 +1453,7 @@ SILInstructionResultArray::SILInstructionResultArray(
   auto *Value = static_cast<const ValueBase *>(SVI);
   assert(uintptr_t(Value) != uintptr_t(SVI) &&
          "Expected value to be offset from SVI since it is not the first "
-         "multi-inheritence parent");
+         "multi-inheritance parent");
   Pointer = reinterpret_cast<const uint8_t *>(Value);
 
 #ifndef NDEBUG
@@ -1571,7 +1569,8 @@ const ValueBase *SILInstructionResultArray::back() const {
 //                           SingleValueInstruction
 //===----------------------------------------------------------------------===//
 
-CanArchetypeType SingleValueInstruction::getOpenedArchetype() const {
+CanOpenedArchetypeType
+SingleValueInstruction::getDefinedOpenedArchetype() const {
   switch (getKind()) {
   case SILInstructionKind::OpenExistentialAddrInst:
   case SILInstructionKind::OpenExistentialRefInst:
@@ -1579,13 +1578,12 @@ CanArchetypeType SingleValueInstruction::getOpenedArchetype() const {
   case SILInstructionKind::OpenExistentialBoxValueInst:
   case SILInstructionKind::OpenExistentialMetatypeInst:
   case SILInstructionKind::OpenExistentialValueInst: {
-    auto Ty = getOpenedArchetypeOf(getType().getASTType());
-    assert(Ty && Ty->isOpenedExistential() &&
-           "Type should be an opened archetype");
+    const auto Ty = getOpenedArchetypeOf(getType().getASTType());
+    assert(Ty && Ty->isRoot() && "Type should be a root opened archetype");
     return Ty;
   }
   default:
-    return CanArchetypeType();
+    return CanOpenedArchetypeType();
   }
 }
 
@@ -1656,6 +1654,10 @@ MultipleValueInstruction *MultipleValueInstructionResult::getParentImpl() const 
 bool SILInstruction::maySuspend() const {
   // await_async_continuation always suspends the current task.
   if (isa<AwaitAsyncContinuationInst>(this))
+    return true;
+
+  // hop_to_executor also may cause a suspension
+  if (isa<HopToExecutorInst>(this))
     return true;
   
   // Fully applying an async function may suspend the caller.

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # This source file is part of the Swift.org open source project
 #
@@ -13,8 +13,6 @@
 The ultimate tool for building Swift.
 """
 
-
-from __future__ import absolute_import, print_function, unicode_literals
 
 import json
 import os
@@ -31,8 +29,6 @@ from build_swift.build_swift.constants import BUILD_SCRIPT_IMPL_PATH
 from build_swift.build_swift.constants import SWIFT_BUILD_ROOT
 from build_swift.build_swift.constants import SWIFT_REPO_NAME
 from build_swift.build_swift.constants import SWIFT_SOURCE_ROOT
-
-import six
 
 from swift_build_support.swift_build_support import build_script_invocation
 from swift_build_support.swift_build_support import shell
@@ -52,15 +48,14 @@ from swift_build_support.swift_build_support.utils import fatal_error
 # These versions are community sourced. At any given time only the Xcode
 # version used by Swift CI is officially supported. See ci.swift.org
 _SUPPORTED_XCODE_BUILDS = [
-    ("12.3", "12C33"),
-    ("12.4", "12D4e"),
-    ("12.5", "12E262"),
-    ("13.0 beta", "13A5154h"),
     ("13.0 beta 4", "13A5201i"),
     ("13.0", "13A233"),
     ("13.1 RC 1", "13A1030d"),
     ("13.2 beta", "13C5066c"),
-    ("13.2.1", "13C100")
+    ("13.2.1", "13C100"),
+    ("13.3", "13E113"),
+    ("13.3.1", "13E500a"),
+    ("13.4", "13F17a"),
 ]
 
 # -----------------------------------------------------------------------------
@@ -120,7 +115,7 @@ class JSONDumper(json.JSONEncoder):
     def default(self, o):
         if hasattr(o, '__dict__'):
             return vars(o)
-        return six.text_type(o)
+        return str(o)
 
 
 def print_xcodebuild_versions(file=sys.stdout):
@@ -499,7 +494,7 @@ def main_preset():
     try:
         preset_parser.read_files(args.preset_file_names)
     except presets.PresetError as e:
-        fatal_error(six.text_type(e))
+        fatal_error(str(e))
 
     if args.show_presets:
         for name in sorted(preset_parser.preset_names,
@@ -520,7 +515,7 @@ def main_preset():
             args.preset,
             vars=args.preset_substitutions)
     except presets.PresetError as e:
-        fatal_error(six.text_type(e))
+        fatal_error(str(e))
 
     preset_args = migration.migrate_swift_sdks(preset.args)
 

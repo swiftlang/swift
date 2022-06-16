@@ -2,6 +2,7 @@
 // RUN: %target-swiftc_driver -### -debug-prefix-map old=new %s 2>&1 | %FileCheck %s -check-prefix CHECK-SIMPLE
 // RUN: %target-swiftc_driver -### -debug-prefix-map old=n=ew %s 2>&1 | %FileCheck %s -check-prefix CHECK-COMPLEX
 // RUN: %target-swiftc_driver -### -debug-prefix-map old= %s 2>&1 | %FileCheck %s -check-prefix CHECK-EMPTY
+// RUN: env RC_DEBUG_PREFIX_MAP=old=new %target-swiftc_driver -target arm64-apple-macos12 -### %s 2>&1 | %FileCheck %s -check-prefix CHECK-SIMPLE
 
 // CHECK-INVALID: error: values for '-debug-prefix-map' must be in the format 'original=remapped', but 'old' was provided
 // CHECK-SIMPLE: debug-prefix-map old=new

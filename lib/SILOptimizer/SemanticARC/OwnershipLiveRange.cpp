@@ -75,8 +75,7 @@ OwnershipLiveRange::OwnershipLiveRange(SILValue value)
     auto *ti = dyn_cast<TermInst>(user);
     if ((ti && !ti->isTransformationTerminator()) ||
         !canOpcodeForwardGuaranteedValues(op) ||
-        1 != count_if(user->getOperandValues(
-                          true /*ignore type dependent operands*/),
+        1 != count_if(user->getNonTypeDependentOperandValues(),
                       [&](SILValue v) {
                         return v.getOwnershipKind() == OwnershipKind::Owned;
                       })) {
@@ -92,7 +91,7 @@ OwnershipLiveRange::OwnershipLiveRange(SILValue value)
     // here), we could get back a different value. Thus we can not transform
     // such a thing from owned to guaranteed.
     if (auto *i = OwnershipForwardingMixin::get(op->getUser())) {
-      if (!i->isDirectlyForwarding()) {
+      if (!i->preservesOwnership()) {
         tmpUnknownConsumingUses.push_back(op);
         continue;
       }

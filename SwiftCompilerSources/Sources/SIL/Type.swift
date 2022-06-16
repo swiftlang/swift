@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Basic
 import SILBridging
 
 public struct Type : CustomStringConvertible, CustomReflectable {
@@ -20,6 +21,14 @@ public struct Type : CustomStringConvertible, CustomReflectable {
 
   public func isTrivial(in function: Function) -> Bool {
     return SILType_isTrivial(bridged, function.bridged) != 0
+  }
+
+  public func isReferenceCounted(in function: Function) -> Bool {
+    return SILType_isReferenceCounted(bridged, function.bridged) != 0
+  }
+
+  public func isNonTrivialOrContainsRawPointer(in function: Function) -> Bool {
+    return SILType_isNonTrivialOrContainsRawPointer(bridged, function.bridged) != 0
   }
 
   public var isNominal: Bool { SILType_isNominal(bridged) != 0 }
@@ -33,7 +42,14 @@ public struct Type : CustomStringConvertible, CustomReflectable {
   public func getNominalFields(in function: Function) -> NominalFieldsArray {
     NominalFieldsArray(type: self, function: function)
   }
-  
+
+  public func getIndexOfEnumCase(withName name: String) -> Int? {
+    let idx = name.withBridgedStringRef {
+      SILType_getCaseIdxOfEnumType(bridged, $0)
+    }
+    return idx >= 0 ? idx : nil
+  }
+
   public var description: String { SILType_debugDescription(bridged).takeString() }
 
   public var customMirror: Mirror { Mirror(self, children: []) }

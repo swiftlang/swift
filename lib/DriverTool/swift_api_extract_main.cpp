@@ -215,7 +215,7 @@ public:
       return 1;
 
     if (OutputFilename == "-") {
-      writeAPIJSONFile(M, llvm::outs(), PrettyPrint, nullptr);
+      writeAPIJSONFile(M, llvm::outs(), PrettyPrint);
       return 0;
     }
 
@@ -227,7 +227,7 @@ public:
       return 1;
     }
 
-    writeAPIJSONFile(M, OS, PrettyPrint, nullptr);
+    writeAPIJSONFile(M, OS, PrettyPrint);
     return 0;
   }
 };

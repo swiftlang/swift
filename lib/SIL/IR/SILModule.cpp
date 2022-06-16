@@ -67,22 +67,19 @@ class SILModule::SerializationCallback final
       decl->setLinkage(SILLinkage::PublicExternal);
       return;
     case SILLinkage::PublicNonABI:
-      // PublicNonABI functions receive SharedExternal linkage, so that
+      // PublicNonABI functions receive Shared linkage, so that
       // they have "link once" semantics when deserialized by multiple
       // translation units in the same Swift module.
-      decl->setLinkage(SILLinkage::SharedExternal);
+      decl->setLinkage(SILLinkage::Shared);
       return;
     case SILLinkage::Hidden:
       decl->setLinkage(SILLinkage::HiddenExternal);
-      return;
-    case SILLinkage::Shared:
-      decl->setLinkage(SILLinkage::SharedExternal);
       return;
     case SILLinkage::Private:
       llvm_unreachable("cannot make a private external symbol");
     case SILLinkage::PublicExternal:
     case SILLinkage::HiddenExternal:
-    case SILLinkage::SharedExternal:
+    case SILLinkage::Shared:
       return;
     }
   }
@@ -94,8 +91,8 @@ class SILModule::SerializationCallback final
 
 SILModule::SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
                      Lowering::TypeConverter &TC, const SILOptions &Options)
-    : Stage(SILStage::Raw), indexTrieRoot(new IndexTrieNode()),
-      Options(Options), serialized(false),
+    : Stage(SILStage::Raw), loweredAddresses(!Options.EnableSILOpaqueValues),
+      indexTrieRoot(new IndexTrieNode()), Options(Options), serialized(false),
       regDeserializationNotificationHandlerForNonTransparentFuncOME(false),
       regDeserializationNotificationHandlerForAllFuncOME(false),
       prespecializedFunctionDeclsImported(false), SerializeSILAction(),
@@ -141,6 +138,7 @@ SILModule::~SILModule() {
   for (SILFunction &F : *this) {
     F.dropAllReferences();
     F.dropDynamicallyReplacedFunction();
+    F.dropReferencedAdHocRequirementWitnessFunction();
     F.clearSpecializeAttrs();
   }
 
@@ -180,7 +178,7 @@ void SILModule::checkForLeaks() const {
                        
   if (numAllocated != instsInModule) {
     llvm::errs() << "Leaking instructions!\n";
-    llvm::errs() << "Alloated instructions: " << numAllocated << '\n';
+    llvm::errs() << "Allocated instructions: " << numAllocated << '\n';
     llvm::errs() << "Instructions in module: " << instsInModule << '\n';
     llvm_unreachable("leaking instructions");
   }
@@ -245,13 +243,14 @@ void *SILModule::allocateInst(unsigned Size, unsigned Align) const {
 }
 
 void SILModule::willDeleteInstruction(SILInstruction *I) {
-  // Update openedArchetypeDefs.
+  // Update RootOpenedArchetypeDefs.
   if (auto *svi = dyn_cast<SingleValueInstruction>(I)) {
-    if (CanArchetypeType archeTy = svi->getOpenedArchetype()) {
+    if (const CanOpenedArchetypeType archeTy =
+            svi->getDefinedOpenedArchetype()) {
       OpenedArchetypeKey key = {archeTy, svi->getFunction()};
-      assert(openedArchetypeDefs.lookup(key) == svi &&
+      assert(RootOpenedArchetypeDefs.lookup(key) == svi &&
              "archetype def was not registered");
-      openedArchetypeDefs.erase(key);
+      RootOpenedArchetypeDefs.erase(key);
     }
   }
 }
@@ -271,82 +270,16 @@ void SILModule::flushDeletedInsts() {
 }
 
 SILWitnessTable *
-SILModule::lookUpWitnessTable(ProtocolConformanceRef C,
-                              bool deserializeLazily) {
-  // If we have an abstract conformance passed in (a legal value), just return
-  // nullptr.
-  if (!C.isConcrete())
-    return nullptr;
-
-  return lookUpWitnessTable(C.getConcrete());
-}
-
-SILWitnessTable *
-SILModule::lookUpWitnessTable(const ProtocolConformance *C,
-                              bool deserializeLazily) {
+SILModule::lookUpWitnessTable(const ProtocolConformance *C) {
   assert(C && "null conformance passed to lookUpWitnessTable");
-
-  SILWitnessTable *wtable;
 
   auto rootC = C->getRootConformance();
   // Attempt to lookup the witness table from the table.
   auto found = WitnessTableMap.find(rootC);
-  if (found == WitnessTableMap.end()) {
-#ifndef NDEBUG
-    // Make sure that all witness tables are in the witness table lookup
-    // cache.
-    //
-    // This code should not be hit normally since we add witness tables to the
-    // lookup cache when we create them. We don't just assert here since there
-    // is the potential for a conformance without a witness table to be passed
-    // to this function.
-    for (SILWitnessTable &WT : witnessTables)
-      assert(WT.getConformance() != rootC &&
-             "Found witness table that is not"
-             " in the witness table lookup cache.");
-#endif
+  if (found == WitnessTableMap.end())
+    return nullptr;
 
-    // If we don't have a witness table and we're not going to try
-    // deserializing it, do not create a declaration.
-    if (!deserializeLazily)
-      return nullptr;
-
-    auto linkage = getLinkageForProtocolConformance(rootC, NotForDefinition);
-    wtable = SILWitnessTable::create(*this, linkage,
-                                 const_cast<RootProtocolConformance *>(rootC));
-  } else {
-    wtable = found->second;
-    assert(wtable != nullptr && "Should never map a conformance to a null witness"
-                            " table.");
-
-    // If we have a definition, return it.
-    if (wtable->isDefinition())
-      return wtable;
-  }
-
-  // If the module is at or past the Lowered stage, then we can't do any
-  // further deserialization, since pre-IRGen SIL lowering changes the types
-  // of definitions to make them incompatible with canonical serialized SIL.
-  switch (getStage()) {
-  case SILStage::Canonical:
-  case SILStage::Raw:
-    break;
-
-  case SILStage::Lowered:
-    return wtable;
-  }
-
-  // Otherwise try to deserialize it. If we succeed return the deserialized
-  // function.
-  //
-  // *NOTE* In practice, wtable will be deserializedTable, but I do not want to rely
-  // on that behavior for now.
-  if (deserializeLazily)
-    if (auto deserialized = getSILLoader()->lookupWitnessTable(wtable))
-      return deserialized;
-
-  // If we fail, just return the declaration.
-  return wtable;
+  return found->second;
 }
 
 SILDefaultWitnessTable *
@@ -384,7 +317,7 @@ SILModule::createDefaultWitnessTableDeclaration(const ProtocolDecl *Protocol,
 
 void SILModule::deleteWitnessTable(SILWitnessTable *Wt) {
   auto Conf = Wt->getConformance();
-  assert(lookUpWitnessTable(Conf, false) == Wt);
+  assert(lookUpWitnessTable(Conf) == Wt);
   getSILLoader()->invalidateWitnessTable(Wt);
   WitnessTableMap.erase(Conf);
   witnessTables.erase(Wt);
@@ -452,14 +385,29 @@ SILFunction *SILModule::lookUpFunction(SILDeclRef fnRef) {
   return lookUpFunction(name);
 }
 
-bool SILModule::loadFunction(SILFunction *F) {
+bool SILModule::loadFunction(SILFunction *F, LinkingMode LinkMode) {
   SILFunction *NewF =
     getSILLoader()->lookupSILFunction(F, /*onlyUpdateLinkage*/ false);
   if (!NewF)
     return false;
 
+  linkFunction(NewF, LinkMode);
+
   assert(F == NewF);
   return true;
+}
+
+SILFunction *SILModule::loadFunction(StringRef name,
+                                     LinkingMode LinkMode,
+                                     Optional<SILLinkage> linkage) {
+  SILFunction *func = lookUpFunction(name);
+  if (!func)
+    func = getSILLoader()->lookupSILFunction(name, linkage);
+  if (!func)
+    return nullptr;
+
+  linkFunction(func, LinkMode);
+  return func;
 }
 
 void SILModule::updateFunctionLinkage(SILFunction *F) {
@@ -468,71 +416,6 @@ void SILModule::updateFunctionLinkage(SILFunction *F) {
 
 bool SILModule::linkFunction(SILFunction *F, SILModule::LinkingMode Mode) {
   return SILLinkerVisitor(*this, Mode).processFunction(F);
-}
-
-SILFunction *SILModule::findFunction(StringRef Name, SILLinkage Linkage) {
-  assert((Linkage == SILLinkage::Public ||
-          Linkage == SILLinkage::SharedExternal ||
-          Linkage == SILLinkage::PublicExternal) &&
-         "Only a lookup of public functions is supported currently");
-
-  SILFunction *F = nullptr;
-
-  // First, check if there is a function with a required name in the
-  // current module.
-  SILFunction *CurF = lookUpFunction(Name);
-
-  // Nothing to do if the current module has a required function
-  // with a proper linkage already.
-  if (CurF && CurF->getLinkage() == Linkage) {
-    F = CurF;
-  } else {
-    assert((!CurF || CurF->getLinkage() != Linkage) &&
-           "hasFunction should be only called for functions that are not "
-           "contained in the SILModule yet or do not have a required linkage");
-  }
-
-  if (!F) {
-    if (CurF) {
-      // Perform this lookup only if a function with a given
-      // name is present in the current module.
-      // This is done to reduce the amount of IO from the
-      // swift module file.
-      if (!getSILLoader()->hasSILFunction(Name, Linkage))
-        return nullptr;
-      // The function in the current module will be changed.
-      F = CurF;
-    }
-
-    // If function with a given name wasn't seen anywhere yet
-    // or if it is known to exist, perform a lookup.
-    if (!F) {
-      // Try to load the function from other modules.
-      F = getSILLoader()->lookupSILFunction(Name, /*declarationOnly*/ true,
-                                            Linkage);
-      // Bail if nothing was found and we are not sure if
-      // this function exists elsewhere.
-      if (!F)
-        return nullptr;
-      assert(F && "SILFunction should be present in one of the modules");
-      assert(F->getLinkage() == Linkage && "SILFunction has a wrong linkage");
-    }
-  }
-
-  // If a function exists already and it is a non-optimizing
-  // compilation, simply convert it into an external declaration,
-  // so that a compiled version from the shared library is used.
-  if (F->isDefinition() &&
-      // Don't eliminate bodies of _alwaysEmitIntoClient functions
-      // (PublicNonABI linkage is de-serialized as SharedExternal)
-      F->getLinkage() != SILLinkage::SharedExternal &&
-      !F->getModule().getOptions().shouldOptimize()) {
-    F->convertToDeclaration();
-  }
-  if (F->isExternalDeclaration())
-    F->setSerialized(IsSerialized_t::IsNotSerialized);
-  F->setLinkage(Linkage);
-  return F;
 }
 
 bool SILModule::hasFunction(StringRef Name) {
@@ -585,6 +468,7 @@ void SILModule::eraseFunction(SILFunction *F) {
   // (References are not needed anymore.)
   F->clear();
   F->dropDynamicallyReplacedFunction();
+  F->dropReferencedAdHocRequirementWitnessFunction();
   // Drop references for any _specialize(target:) functions.
   F->clearSpecializeAttrs();
 }
@@ -637,21 +521,26 @@ SerializedSILLoader *SILModule::getSILLoader() {
 /// for the requirement.
 std::pair<SILFunction *, SILWitnessTable *>
 SILModule::lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
-                                        SILDeclRef Requirement) {
-  // Look up the witness table associated with our protocol conformance from the
-  // SILModule.
-  auto Ret = lookUpWitnessTable(C);
+                                        SILDeclRef Requirement,
+                                        SILModule::LinkingMode linkingMode) {
+  if (!C.isConcrete())
+    return {nullptr, nullptr};
 
-  // If no witness table was found, bail.
-  if (!Ret) {
+  if (getStage() != SILStage::Lowered) {
+    SILLinkerVisitor linker(*this, linkingMode);
+    linker.processConformance(C);
+  }
+  SILWitnessTable *wt = lookUpWitnessTable(C.getConcrete());
+
+  if (!wt) {
     LLVM_DEBUG(llvm::dbgs() << "        Failed speculative lookup of "
                "witness for: ";
                C.dump(llvm::dbgs()); Requirement.dump());
-    return std::make_pair(nullptr, nullptr);
+    return {nullptr, nullptr};
   }
 
   // Okay, we found the correct witness table. Now look for the method.
-  for (auto &Entry : Ret->getEntries()) {
+  for (auto &Entry : wt->getEntries()) {
     // Look at method entries only.
     if (Entry.getKind() != SILWitnessTable::WitnessKind::Method)
       continue;
@@ -661,10 +550,10 @@ SILModule::lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
     if (MethodEntry.Requirement != Requirement)
       continue;
 
-    return std::make_pair(MethodEntry.Witness, Ret);
+    return {MethodEntry.Witness, wt};
   }
 
-  return std::make_pair(nullptr, nullptr);
+  return {nullptr, nullptr};
 }
 
 /// Given a protocol \p Protocol and a requirement \p Requirement,
@@ -761,9 +650,11 @@ void SILModule::registerDeserializationNotificationHandler(
   deserializationNotificationHandlers.add(std::move(handler));
 }
 
-SILValue SILModule::getOpenedArchetypeDef(CanArchetypeType archetype,
-                                          SILFunction *inFunction) {
-  SILValue &def = openedArchetypeDefs[{archetype, inFunction}];
+SILValue SILModule::getRootOpenedArchetypeDef(CanOpenedArchetypeType archetype,
+                                              SILFunction *inFunction) {
+  assert(archetype->isRoot());
+
+  SILValue &def = RootOpenedArchetypeDefs[{archetype, inFunction}];
   if (!def) {
     numUnresolvedOpenedArchetypes++;
     def = ::new PlaceholderValue(SILType::getPrimitiveAddressType(archetype));
@@ -776,14 +667,57 @@ bool SILModule::hasUnresolvedOpenedArchetypeDefinitions() {
   return numUnresolvedOpenedArchetypes != 0;
 }
 
+/// Get a unique index for a struct or class field in layout order.
+unsigned SILModule::getFieldIndex(NominalTypeDecl *decl, VarDecl *field) {
+
+  auto iter = fieldIndices.find({decl, field});
+  if (iter != fieldIndices.end())
+    return iter->second;
+
+  unsigned index = 0;
+  if (auto *classDecl = dyn_cast<ClassDecl>(decl)) {
+    for (auto *superDecl = classDecl->getSuperclassDecl(); superDecl != nullptr;
+         superDecl = superDecl->getSuperclassDecl()) {
+      index += superDecl->getStoredProperties().size();
+    }
+  }
+  for (VarDecl *property : decl->getStoredProperties()) {
+    if (field == property) {
+      fieldIndices[{decl, field}] = index;
+      return index;
+    }
+    ++index;
+  }
+  llvm_unreachable("The field decl for a struct_extract, struct_element_addr, "
+                   "or ref_element_addr must be an accessible stored "
+                   "property of the operand type");
+}
+
+unsigned SILModule::getCaseIndex(EnumElementDecl *enumElement) {
+  auto iter = enumCaseIndices.find(enumElement);
+  if (iter != enumCaseIndices.end())
+    return iter->second;
+
+  unsigned idx = 0;
+  for (EnumElementDecl *e : enumElement->getParentEnum()->getAllElements()) {
+    if (e == enumElement) {
+      enumCaseIndices[enumElement] = idx;
+      return idx;
+    }
+    ++idx;
+  }
+  llvm_unreachable("enum element not found in enum decl");
+}
+
 void SILModule::notifyAddedInstruction(SILInstruction *inst) {
   if (auto *svi = dyn_cast<SingleValueInstruction>(inst)) {
-    if (CanArchetypeType archeTy = svi->getOpenedArchetype()) {
-      SILValue &val = openedArchetypeDefs[{archeTy, inst->getFunction()}];
+    if (const CanOpenedArchetypeType archeTy =
+            svi->getDefinedOpenedArchetype()) {
+      SILValue &val = RootOpenedArchetypeDefs[{archeTy, inst->getFunction()}];
       if (val) {
         if (!isa<PlaceholderValue>(val)) {
           // Print a useful error message (and not just abort with an assert).
-          llvm::errs() << "re-definition of opened archetype in function "
+          llvm::errs() << "re-definition of root opened archetype in function "
                        << svi->getFunction()->getName() << ":\n";
           svi->print(llvm::errs());
           llvm::errs() << "previously defined in function "
@@ -806,12 +740,13 @@ void SILModule::notifyAddedInstruction(SILInstruction *inst) {
 void SILModule::notifyMovedInstruction(SILInstruction *inst,
                                        SILFunction *fromFunction) {
   if (auto *svi = dyn_cast<SingleValueInstruction>(inst)) {
-    if (CanArchetypeType archeTy = svi->getOpenedArchetype()) {
+    if (const CanOpenedArchetypeType archeTy =
+            svi->getDefinedOpenedArchetype()) {
       OpenedArchetypeKey key = {archeTy, fromFunction};
-      assert(openedArchetypeDefs.lookup(key) == svi &&
+      assert(RootOpenedArchetypeDefs.lookup(key) == svi &&
              "archetype def was not registered");
-      openedArchetypeDefs.erase(key);
-      openedArchetypeDefs[{archeTy, svi->getFunction()}] = svi;
+      RootOpenedArchetypeDefs.erase(key);
+      RootOpenedArchetypeDefs[{archeTy, svi->getFunction()}] = svi;
     }
   }
 }
@@ -857,12 +792,6 @@ shouldSerializeEntitiesAssociatedWithDeclContext(const DeclContext *DC) const {
 bool SILModule::isOptimizedOnoneSupportModule() const {
   return getOptions().shouldOptimize() &&
          getSwiftModule()->isOnoneSupportModule();
-}
-
-void SILModule::addPublicCMOSymbol(StringRef symbol) {
-  if (!publicCMOSymbols)
-    publicCMOSymbols = std::make_shared<TBDSymbolSet>();
-  publicCMOSymbols->insert(symbol.str());
 }
 
 void SILModule::setSerializeSILAction(SILModule::ActionCallback Action) {

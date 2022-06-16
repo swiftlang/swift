@@ -54,7 +54,7 @@ enum TrailingSemi {
   };
 };
 
-// The substitution map for a declref should be relatively unobtrustive.
+// The substitution map for a declref should be relatively unobtrusive.
 // CHECK-AST-LABEL:   (func_decl{{.*}}"generic(_:)" <T : Hashable> interface type='<T where T : Hashable> (T) -> ()' access=internal captures=(<generic> )
 func generic<T: Hashable>(_: T) {}
 // CHECK-AST:       (pattern_binding_decl

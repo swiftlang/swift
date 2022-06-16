@@ -58,7 +58,9 @@ func test() {
 // CHECK-NORMAL-NEXT:       },
 // CHECK-NORMAL-NEXT:       "text": "Comment from A"
 // CHECK-NORMAL-NEXT:     }
-// CHECK-NORMAL-NEXT:   ]
+// CHECK-NORMAL-NEXT:   ],
+// CHECK-NORMAL-NEXT:   "module": "somemod",
+// CHECK-NORMAL-NEXT:   "uri": "file://{{.*}}cursor_info_multi_module.swift"
 // CHECK-NORMAL-NEXT: },
 // CHECK-NORMAL:      "location": {
 // CHECK-NORMAL-NEXT:   "position": {
@@ -87,7 +89,9 @@ func test() {
 // CHECK-BEFORE-NEXT:       },
 // CHECK-BEFORE-NEXT:       "text": "Comment from B"
 // CHECK-BEFORE-NEXT:     }
-// CHECK-BEFORE-NEXT:   ]
+// CHECK-BEFORE-NEXT:   ],
+// CHECK-BEFORE-NEXT:   "module": "somemod",
+// CHECK-BEFORE-NEXT:   "uri": "file://{{.*}}cursor_info_multi_module.swift"
 // CHECK-BEFORE-NEXT: },
 // CHECK-BEFORE:      "location": {
 // CHECK-BEFORE-NEXT:   "position": {
@@ -117,7 +121,9 @@ func test() {
 // CHECK-IN-NEXT:       },
 // CHECK-IN-NEXT:       "text": "Comment from #sourceLocation"
 // CHECK-IN-NEXT:     }
-// CHECK-IN-NEXT:   ]
+// CHECK-IN-NEXT:   ],
+// CHECK-IN-NEXT:   "module": "somemod",
+// CHECK-IN-NEXT:   "uri": "file://doesnotexist.swift"
 // CHECK-IN-NEXT: },
 // CHECK-IN:      "location": {
 // CHECK-IN-NEXT:   "position": {
@@ -146,7 +152,9 @@ func test() {
 // CHECK-AFTER-NEXT:       },
 // CHECK-AFTER-NEXT:       "text": "Comment from B"
 // CHECK-AFTER-NEXT:     }
-// CHECK-AFTER-NEXT:   ]
+// CHECK-AFTER-NEXT:   ],
+// CHECK-AFTER-NEXT:   "module": "somemod",
+// CHECK-AFTER-NEXT:   "uri": "file://{{.*}}cursor_info_multi_module.swift"
 // CHECK-AFTER-NEXT: },
 // CHECK-AFTER:      "location": {
 // CHECK-AFTER-NEXT:   "position": {

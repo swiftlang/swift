@@ -102,7 +102,7 @@ struct TypeWithSelfComputedVar {
     }
 }
 
-/// Test fix_unqualified_access_member_named_self doesn't appear appear for property called `self`
+/// Test fix_unqualified_access_member_named_self doesn't appear for property called `self`
 /// it can't currently be referenced as a static member -- unlike a method with the same name
 struct TypeWithSelfProperty {
     
@@ -115,4 +115,19 @@ struct TypeWithSelfProperty {
     let propertyFromFunc = funcThatReturnsSomething(self) // expected-error {{cannot use instance member 'self' within property initializer; property initializers run before 'self' is available}}
     
     let `self`: () = ()
+}
+
+enum EnumCaseNamedSelf {
+    case `self`
+
+    init() {
+        self = .self // OK
+        self = .`self` // OK
+        self = EnumCaseNamedSelf.`self` // OK
+    }
+}
+
+// rdar://90624344 - warning about `self` which cannot be fixed because it's located in implicitly generated code.
+struct TestImplicitSelfUse : Codable {
+  let `self`: Int // Ok
 }

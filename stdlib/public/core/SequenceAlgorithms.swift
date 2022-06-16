@@ -787,8 +787,7 @@ extension Sequence {
   /// - Returns: An array of the non-`nil` results of calling `transform`
   ///   with each element of the sequence.
   ///
-  /// - Complexity: O(*m* + *n*), where *n* is the length of this sequence
-  ///   and *m* is the length of the result.
+  /// - Complexity: O(*n*), where *n* is the length of this sequence.
   @inlinable // protocol-only
   public func compactMap<ElementOfResult>(
     _ transform: (Element) throws -> ElementOfResult?

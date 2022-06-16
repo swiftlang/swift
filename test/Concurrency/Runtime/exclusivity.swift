@@ -6,7 +6,7 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: OS=wasi
-// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deploy_concurrency
 
 // This test makes sure that:
 //
@@ -104,7 +104,7 @@ struct Runner {
         }
 
         // Then do a simple test with a single access to make sure that we do
-        // not hit any sccesses b/c we introduced the Task.
+        // not hit any successes b/c we introduced the Task.
         exclusivityTests.test("testDifferentTasksHaveDifferentExclusivityAccessSets") { @MainActor in
             let callee2 = { @MainActor (_ x: inout Int) -> Void in
                 debugLog("==> Enter callee2")
@@ -415,7 +415,7 @@ struct Runner {
                     await innerTaskHandle.value
                     debugLog("==> After")
                 }
-                // Accessis over. We shouldn't crash here.
+                // Access is over. We shouldn't crash here.
                 withExclusiveAccess(to: &global1) { _ in
                     debugLog("==> No crash!")
                 }

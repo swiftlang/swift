@@ -129,7 +129,7 @@ if #available(SwiftStdlib 5.5, *) {
   // Debug check was introduced in https://github.com/apple/swift/pull/34961
   RangeTraps.test("UncheckedHalfOpen")
   .xfail(.custom(
-      { !_isDebugAssertConfiguration() },
+      { !_isStdlibDebugChecksEnabled() },
       reason: "assertions are disabled in Release and Unchecked mode"))
   .code {
     expectCrashLater()
@@ -138,7 +138,7 @@ if #available(SwiftStdlib 5.5, *) {
 
   RangeTraps.test("UncheckedClosed")
   .xfail(.custom(
-      { !_isDebugAssertConfiguration() },
+      { !_isStdlibDebugChecksEnabled() },
       reason: "assertions are disabled in Release and Unchecked mode"))
   .code {
     expectCrashLater()

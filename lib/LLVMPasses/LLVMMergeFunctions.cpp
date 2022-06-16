@@ -120,8 +120,15 @@ static bool isCalleeOperand(const CallInst *CI, unsigned opIdx) {
 static bool canParameterizeCallOperand(const CallInst *CI, unsigned opIdx) {
   if (CI->isInlineAsm())
     return false;
-  if (Function *Callee = CI->getCalledFunction()) {
+
+  Function *Callee = CI->getCalledOperand() ?
+      dyn_cast_or_null<Function>(CI->getCalledOperand()->stripPointerCasts()) :
+      nullptr;
+  if (Callee) {
     if (Callee->isIntrinsic())
+      return false;
+    // objc_msgSend stubs must be called, and can't have their address taken.
+    if (Callee->getName().startswith("objc_msgSend$"))
       return false;
   }
   if (isCalleeOperand(CI, opIdx) &&

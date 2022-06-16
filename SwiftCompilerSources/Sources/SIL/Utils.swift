@@ -85,8 +85,8 @@ public struct ReverseList<NodeType: ListNode> :
 /// full object) in collection descriptions.
 ///
 /// This is useful to make collections, e.g. of BasicBlocks or Functions, readable.
-public protocol HasName {
-  var name: String { get }
+public protocol HasShortDescription {
+  var shortDescription: String { get }
 }
 
 private struct CustomMirrorChild : CustomStringConvertible, CustomReflectable {
@@ -104,8 +104,8 @@ extension FormattedLikeArray {
   /// Display a Sequence in an array like format, e.g. [a, b, c]
   public var description: String {
     "[" + map {
-      if let named = $0 as? HasName {
-        return named.name
+      if let named = $0 as? HasShortDescription {
+        return named.shortDescription
       }
       return String(describing: $0)
     }.joined(separator: ", ") + "]"
@@ -120,8 +120,8 @@ extension FormattedLikeArray {
     }
     let c: [Mirror.Child] = map {
       let val: Any
-      if let named = $0 as? HasName {
-        val = CustomMirrorChild(description: named.name)
+      if let named = $0 as? HasShortDescription {
+        val = CustomMirrorChild(description: named.shortDescription)
       } else {
         val = $0
       }
@@ -234,28 +234,6 @@ public struct ParsingError : Error {
 //                            Bridging Utilities
 //===----------------------------------------------------------------------===//
 
-extension BridgedStringRef {
-  public var string: String {
-    let buffer = UnsafeBufferPointer<UInt8>(start: data, count: Int(length))
-    return String(decoding: buffer, as: UTF8.self)
-  }
-
-  func takeString() -> String {
-    let str = string
-    freeBridgedStringRef(self)
-    return str
-  }
-}
-
-extension String {
-  public func withBridgedStringRef<T>(_ c: (BridgedStringRef) -> T) -> T {
-    var str = self
-    return str.withUTF8 { buffer in
-      return c(BridgedStringRef(data: buffer.baseAddress, length: buffer.count))
-    }
-  }
-}
-
 extension Array where Element == Value {
   public func withBridgedValues<T>(_ c: (BridgedValueArray) -> T) -> T {
     return self.withUnsafeBytes { valPtr in
@@ -265,33 +243,3 @@ extension Array where Element == Value {
   }
 }
 
-public typealias SwiftObject = UnsafeMutablePointer<BridgedSwiftObject>
-
-extension UnsafeMutablePointer where Pointee == BridgedSwiftObject {
-  init<T: AnyObject>(_ object: T) {
-    let ptr = Unmanaged.passUnretained(object).toOpaque()
-    self = ptr.bindMemory(to: BridgedSwiftObject.self, capacity: 1)
-  }
-
-  func getAs<T: AnyObject>(_ objectType: T.Type) -> T {
-    return Unmanaged<T>.fromOpaque(self).takeUnretainedValue()
-  }
-}
-
-extension Optional where Wrapped == UnsafeMutablePointer<BridgedSwiftObject> {
-  func getAs<T: AnyObject>(_ objectType: T.Type) -> T? {
-    if let pointer = self {
-      return Unmanaged<T>.fromOpaque(pointer).takeUnretainedValue()
-    }
-    return nil
-  }
-}
-
-extension BridgedArrayRef {
-  func withElements<T, R>(ofType ty: T.Type, _ c: (UnsafeBufferPointer<T>) -> R) -> R {
-    return data.withMemoryRebound(to: ty, capacity: numElements) { (ptr: UnsafePointer<T>) -> R in
-      let buffer = UnsafeBufferPointer(start: ptr, count: numElements)
-      return c(buffer)
-    }
-  }
-}

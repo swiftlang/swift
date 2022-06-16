@@ -183,7 +183,7 @@ protected:
     return S.getConstraintLocator(anchor, {element});
   }
 
-  /// Retrive the constraint locator for the given anchor and
+  /// Retrieve the constraint locator for the given anchor and
   /// path, uniqued and automatically calculate the summary flags
   ConstraintLocator *getConstraintLocator(
       ASTNode anchor,
@@ -333,7 +333,7 @@ private:
   /// Retrieve generic signature where this parameter originates from.
   GenericSignature getSignature(ConstraintLocator *locator);
 
-  void emitRequirementNote(const Decl *anchor, Type lhs, Type rhs) const;
+  void maybeEmitRequirementNote(const Decl *anchor, Type lhs, Type rhs) const;
 
   /// If this is a failure in conditional requirement, retrieve
   /// conformance information.
@@ -476,7 +476,7 @@ protected:
 /// or incorrect labels supplied by arguments, e.g.
 /// ```swift
 ///   func foo(q: String, _ a: Int) {}
-///   foo("ultimate quesiton", a: 42)
+///   foo("ultimate question", a: 42)
 /// ```
 /// Call to `foo` is going to be diagnosed as missing `q:`
 /// and having extraneous `a:` labels, with appropriate fix-its added.
@@ -589,10 +589,10 @@ private:
     return resolveImmutableBase(const_cast<Expr *>(expr));
   }
 
-  static Diag<StringRef> findDeclDiagonstic(ASTContext &ctx,
+  static Diag<StringRef> findDeclDiagnostic(ASTContext &ctx,
                                             const Expr *destExpr);
 
-  /// Retrive an member reference associated with given member
+  /// Retrieve an member reference associated with given member
   /// looking through dynamic member lookup on the way.
   Optional<OverloadChoice> getMemberRef(ConstraintLocator *locator) const;
 };
@@ -874,7 +874,7 @@ private:
 ///
 /// ```swift
 /// func foo<T>(_ t: T) throws -> Void {}
-/// let _: (Int) -> Void = foo // `foo` can't be implictly converted to
+/// let _: (Int) -> Void = foo // `foo` can't be implicitly converted to
 ///                            // non-throwing type `(Int) -> Void`
 /// ```
 class ThrowingFunctionConversionFailure final : public ContextualFailure {
@@ -897,7 +897,7 @@ public:
 ///
 /// ```swift
 /// func foo<T>(_ t: T) async -> Void {}
-/// let _: (Int) -> Void = foo // `foo` can't be implictly converted to
+/// let _: (Int) -> Void = foo // `foo` can't be implicitly converted to
 ///                            // synchronous function type `(Int) -> Void`
 /// ```
 class AsyncFunctionConversionFailure final : public ContextualFailure {
@@ -916,7 +916,7 @@ public:
 };
 
 /// Diagnose failures related attempt to implicitly convert types which
-/// do not support such implicit converstion.
+/// do not support such implicit conversion.
 /// "as" or "as!" has to be specified explicitly in cases like that.
 class MissingExplicitConversionFailure final : public ContextualFailure {
 public:
@@ -1188,6 +1188,12 @@ public:
       : InvalidMemberRefFailure(solution, baseType, memberName, locator) {}
 
   SourceLoc getLoc() const override {
+    auto *locator = getLocator();
+
+    if (locator->findLast<LocatorPathElt::SyntacticElement>()) {
+      return constraints::getLoc(getAnchor());
+    }
+
     // Diagnostic should point to the member instead of its base expression.
     return constraints::getLoc(getRawAnchor());
   }
@@ -1375,7 +1381,7 @@ public:
 };
 
 /// Diagnose an attempt to construct an instance using non-constant
-/// metatype base without explictly specifying `init`:
+/// metatype base without explicitly specifying `init`:
 ///
 /// ```swift
 /// let foo = Int.self
@@ -1863,7 +1869,7 @@ public:
 private:
   void emitGenericSignatureNote(ASTNode anchor) const;
 
-  /// Retrieve representative locations for associated generic prameters.
+  /// Retrieve representative locations for associated generic parameters.
   ///
   /// \returns true if all of the parameters have been covered.
   bool findArgumentLocations(
@@ -1905,7 +1911,7 @@ private:
 ///
 /// ```swift
 /// func foo<T>(_ x: (T, Bool)) {}
-/// foo(1, false) // foo exptects a single argument of tuple type `(1, false)`
+/// foo(1, false) // foo expects a single argument of tuple type `(1, false)`
 /// ```
 class InvalidTupleSplatWithSingleParameterFailure final
     : public FailureDiagnostic {
@@ -2214,9 +2220,9 @@ public:
 /// Here `max` refers to a global function `max<T>(_: T, _: T)` in `Swift`
 /// module and can only be accessed by adding `Swift.` to it, because `Sequence`
 /// has a member named `max` which accepts a single argument.
-class MissingQuialifierInMemberRefFailure final : public FailureDiagnostic {
+class MissingQualifierInMemberRefFailure final : public FailureDiagnostic {
 public:
-  MissingQuialifierInMemberRefFailure(const Solution &solution,
+  MissingQualifierInMemberRefFailure(const Solution &solution,
                                       ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator) {}
 
@@ -2363,7 +2369,7 @@ private:
   void fixIt(InFlightDiagnostic &diagnostic) const override;
 };
 
-/// Diagnose a key path optional base that should be unwraped in order to 
+/// Diagnose a key path optional base that should be unwrapped in order to 
 /// apply key path subscript.
 ///
 /// \code
@@ -2574,11 +2580,23 @@ public:
   bool diagnoseAsError() override;
 
 private:
-  bool diagnoseIfExpr() const;
+  bool diagnoseIsExpr() const;
 
   bool diagnoseForcedCastExpr() const;
 
   bool diagnoseConditionalCastExpr() const;
+};
+
+/// Warn situations where the compiler can statically know a runtime
+/// checked cast always succeed.
+class NoopExistentialToCFTypeCheckedCast final : public CheckedCastBaseFailure {
+public:
+  NoopExistentialToCFTypeCheckedCast(const Solution &solution, Type fromType,
+                                     Type toType, CheckedCastKind kind,
+                                     ConstraintLocator *locator)
+      : CheckedCastBaseFailure(solution, fromType, toType, kind, locator) {}
+
+  bool diagnoseAsError() override;
 };
 
 /// Warn situations where the compiler can statically know a runtime
@@ -2589,6 +2607,18 @@ public:
   UnsupportedRuntimeCheckedCastFailure(const Solution &solution, Type fromType,
                                        Type toType, CheckedCastKind kind,
                                        ConstraintLocator *locator)
+      : CheckedCastBaseFailure(solution, fromType, toType, kind, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Emit a warning when compiler can detect that checked cast would fail at
+/// runtime based on statically known types.
+class CheckedCastToUnrelatedFailure final : public CheckedCastBaseFailure {
+public:
+  CheckedCastToUnrelatedFailure(const Solution &solution, Type fromType,
+                                Type toType, CheckedCastKind kind,
+                                ConstraintLocator *locator)
       : CheckedCastBaseFailure(solution, fromType, toType, kind, locator) {}
 
   bool diagnoseAsError() override;
@@ -2661,6 +2691,110 @@ public:
   SwiftToCPointerConversionInInvalidContext(const Solution &solution,
                                             ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose situations where the type of default expression doesn't
+/// match expected type of the argument i.e. generic parameter type
+/// was inferred from result:
+///
+/// \code
+/// func test<T>(_: T = 42) -> T { ... }
+///
+/// let _: String = test() // conflict between `String` and `Int`.
+/// \endcode
+class DefaultExprTypeMismatch final : public ContextualFailure {
+public:
+  DefaultExprTypeMismatch(const Solution &solution, Type argType,
+                          Type paramType, ConstraintLocator *locator)
+      : ContextualFailure(solution, argType, paramType, locator) {}
+
+  SourceLoc getLoc() const override {
+    return constraints::getLoc(getLocator()->getAnchor());
+  }
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose situations where inferring existential type for result of
+/// a call would result in loss of generic requirements.
+///
+/// \code
+/// protocol P {
+///  associatedtype A
+/// }
+///
+/// protocol Q {
+///  associatedtype B: P where B.A == Int
+/// }
+///
+/// func getB<T: Q>(_: T) -> T.B { ... }
+///
+/// func test(v: any Q) {
+///   let _ = getB(v) // <- produces `any P` which looses A == Int
+/// }
+/// \endcode
+class MissingExplicitExistentialCoercion final : public FailureDiagnostic {
+  Type ErasedResultType;
+
+public:
+  MissingExplicitExistentialCoercion(const Solution &solution,
+                                     Type erasedResultTy,
+                                     ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator),
+        ErasedResultType(resolveType(erasedResultTy)) {}
+
+  SourceRange getSourceRange() const override {
+    auto rawAnchor = getRawAnchor();
+    return {rawAnchor.getStartLoc(), rawAnchor.getEndLoc()};
+  }
+
+  bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
+
+private:
+  void fixIt(InFlightDiagnostic &diagnostic) const;
+
+  /// Determine whether the fix-it to add `as any ...` requires parens.
+  ///
+  /// Parens are required to avoid suppressing existential opening
+  /// if result of the call is passed as an argument to another call
+  /// that requires such opening.
+  bool fixItRequiresParens() const;
+};
+
+/// Diagnose situations where pattern variables with the same name
+/// have conflicting types:
+///
+/// \code
+/// enum E {
+/// case a(Int)
+/// case b(String)
+/// }
+///
+/// func test(e: E) {
+///   switch e {
+///    case .a(let x), .b(let x): ...
+///   }
+/// }
+/// \endcode
+///
+/// In this example `x` is bound to `Int` and `String` at the same
+/// time which is incorrect.
+class ConflictingPatternVariables final : public FailureDiagnostic {
+  Type ExpectedType;
+  SmallVector<VarDecl *, 4> Vars;
+
+public:
+  ConflictingPatternVariables(const Solution &solution, Type expectedTy,
+                              ArrayRef<VarDecl *> conflicts,
+                              ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator),
+        ExpectedType(resolveType(expectedTy)),
+        Vars(conflicts.begin(), conflicts.end()) {
+    assert(!Vars.empty());
+  }
 
   bool diagnoseAsError() override;
 };

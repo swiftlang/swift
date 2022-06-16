@@ -169,9 +169,9 @@ func testTernaryWithNil<T>(b: Bool, s: String, i: Int, a: Any, t: T, m: T.Type, 
   let t16 = b ? nil : m
   let _: Double = t16 // expected-error{{value of type 'T.Type?'}}
   let t17 = b ? p : nil
-  let _: Double = t17 // expected-error{{value of type '(Proto1 & Proto2)?'}}
+  let _: Double = t17 // expected-error{{value of type '(any Proto1 & Proto2)?'}}
   let t18 = b ? nil : p
-  let _: Double = t18 // expected-error{{value of type '(Proto1 & Proto2)?'}}
+  let _: Double = t18 // expected-error{{value of type '(any Proto1 & Proto2)?'}}
   let t19 = b ? arr : nil
   let _: Double = t19 // expected-error{{value of type '[Int]?'}}
   let t20 = b ? nil : arr
@@ -426,7 +426,7 @@ func test_force_unwrap_not_being_too_eager() {
 // rdar://problem/57097401
 func invalidOptionalChaining(a: Any) {
   a == "="? // expected-error {{cannot use optional chaining on non-optional value of type 'String'}}
-  // expected-error@-1 {{protocol 'Any' as a type cannot conform to 'Equatable'}}
+  // expected-error@-1 {{type 'Any' cannot conform to 'Equatable'}}
   // expected-note@-2 {{requirement from conditional conformance of 'Any?' to 'Equatable'}} expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
 }
 
@@ -470,17 +470,17 @@ func rdar75146811() {
   var arr: [Double]! = []
 
   test(&arr) // expected-error {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
-  test((&arr)) // expected-error {{use of extraneous '&'}}
+  test((&arr)) // expected-error {{'&' may only be used to pass an argument to inout parameter}}
   // expected-error@-1 {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
   test(&(arr)) // expected-error {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
 
   test_tuple(&arr, x: 0) // expected-error {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
-  test_tuple((&arr), x: 0) // expected-error {{use of extraneous '&'}}
+  test_tuple((&arr), x: 0) // expected-error {{'&' may only be used to pass an argument to inout parameter}}
   // expected-error@-1 {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
   test_tuple(&(arr), x: 0) // expected-error {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
 
   test_named(x: &arr) // expected-error {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
-  test_named(x: (&arr)) // expected-error {{use of extraneous '&'}}
+  test_named(x: (&arr)) // expected-error {{'&' may only be used to pass an argument to inout parameter}}
   // expected-error@-1 {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
   test_named(x: &(arr)) // expected-error {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
 }
@@ -506,6 +506,9 @@ func rdar85166519() {
 
   var _: [Int: AnyObject] = [ // expected-error {{dictionary of type '[Int : AnyObject]' cannot be initialized with array literal}}
     // expected-note@-1 {{did you mean to use a dictionary literal instead?}}
-    v?.addingReportingOverflow(0) // expected-error {{cannot convert value of type '(partialValue: Int, overflow: Bool)?' to expected dictionary key type 'Int'}}
+    v?.addingReportingOverflow(0)
   ]
 }
+
+// https://github.com/apple/swift/issues/58539
+if let x = nil {} // expected-error{{'nil' requires a contextual type}}

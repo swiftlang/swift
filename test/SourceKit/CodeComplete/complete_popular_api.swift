@@ -83,7 +83,6 @@ struct OuterNominal {
 // POPULAR_STMT_0:   DDModuleColor
 // POPULAR_STMT_0:   EEModuleColor
 // POPULAR_STMT_0:   CCModuleColor
-// POPULAR_STMT_0:   fromOuterNominalColor
 // POPULAR_STMT_0:   globalColor
 // POPULAR_STMT_0:   okay()
 // POPULAR_STMT_0:   ModuleCollaborate
@@ -97,7 +96,6 @@ struct OuterNominal {
 // POPULAR_STMT_0:   DDModuleColor
 // POPULAR_STMT_0:   EEModuleColor
 // POPULAR_STMT_0:   CCModuleColor
-// POPULAR_STMT_0:   fromOuterNominalColor
 // POPULAR_STMT_0:   globalColor
 // POPULAR_STMT_0:   ModuleCollaborate
 // POPULAR_STMT_0:   BBModuleColor

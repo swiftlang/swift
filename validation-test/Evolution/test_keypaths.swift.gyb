@@ -102,4 +102,16 @@ tests.test("AFinalClass.${name}") {
 
 % end
 
+#if AFTER
+tests.test("AlwaysEmitIntoClient") {
+  // AEIC declarations are vendored into their importing module, so
+  // equality doesn't currently work reliably with them. We can however
+  // test that the reference to the property works and is backward-compatible
+  // when using the `after` test suite with the `before` dylib.
+  let kp = \AEIC.aeic
+
+  expectEqual(kp, kp)
+}
+#endif
+
 runAllTests()

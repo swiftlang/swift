@@ -12,8 +12,8 @@ import Foundation
 // --- initializer `let` of CFString.
 // The verifier should ignore this.
 
-// CHECK_LABEL: sil private @{{.*}}WZ : $@convention(c) () -> () {
-// CHECK: bb0:
+// CHECK_LABEL: sil private @{{.*}}WZ : $@convention(c) (Builtin.RawPointer) -> () {
+// CHECK: bb0(%0 : $Builtin.RawPointer):
 // CHECK:   alloc_global @$s25access_marker_verify_objc12testCFStringC8cfStringSo0F3RefavpZ
 // CHECK:   [[GA:%.*]] = global_addr @$s25access_marker_verify_objc12testCFStringC8cfStringSo0F3RefavpZ : $*CFString
 // CHECK-NOT: begin_access
@@ -34,7 +34,7 @@ class testCFString {
 class HasBlockImpl: HasBlock {
   @objc func block(_: (Int) -> Int) {}
 }
-// CHECK-LABEL: sil hidden [thunk] [ossa] @$s25access_marker_verify_objc12HasBlockImplC5blockyyS2iXEFTo : $@convention(objc_method) (@convention(block) @noescape (Int) -> Int, HasBlockImpl) -> () {
+// CHECK-LABEL: sil private [thunk] [ossa] @$s25access_marker_verify_objc12HasBlockImplC5blockyyS2iXEFTo : $@convention(objc_method) (@convention(block) @noescape (Int) -> Int, HasBlockImpl) -> () {
 // CHECK: bb0(%0 : @unowned $@convention(block) @noescape (Int) -> Int, %1 : @unowned $HasBlockImpl):
 // CHECK:   [[CP:%.*]] = copy_block %0 : $@convention(block) @noescape (Int) -> Int
             // function_ref thunk for @callee_unowned @convention(block) (@unowned Int) -> (@unowned Int)
@@ -47,7 +47,7 @@ class HasBlockImpl: HasBlock {
 // CHECK-LABEL: } // end sil function '$s25access_marker_verify_objc12HasBlockImplC5blockyyS2iXEFTo'
 
 // thunk for @callee_unowned @convention(block) (@unowned Int) -> (@unowned Int)
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sS2iIyByd_S2iIegyd_TR : $@convention(thin) (Int, @guaranteed @convention(block) @noescape (Int) -> Int) -> Int {
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sS2iIyByd_S2iIegyd_TR : $@convention(thin) (Int, @guaranteed @convention(block) @noescape (Int) -> Int) -> Int {
 // CHECK: bb0(%0 : $Int, %1 : @guaranteed $@convention(block) @noescape (Int) -> Int):
 // CHECK:   %{{.*}} = apply %1(%0) : $@convention(block) @noescape (Int) -> Int
 // CHECK:  return %{{.*}} : $Int                               

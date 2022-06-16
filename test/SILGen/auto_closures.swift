@@ -25,8 +25,7 @@ func test_auto_closure_with_capture(_ x: Bool) -> Bool {
 // CHECK-LABEL: sil hidden [ossa] @$s13auto_closures05test_A24_closure_without_capture{{[_0-9a-zA-Z]*}}F
 func test_auto_closure_without_capture() -> Bool {
   // CHECK: [[CLOSURE:%.*]] = function_ref @$s13auto_closures05test_A24_closure_without_capture
-  // CHECK: [[CVT:%.*]] = convert_function [[CLOSURE]]
-  // CHECK: [[THICK:%.*]] = thin_to_thick_function [[CVT]] : $@convention(thin) @noescape () -> Bool to $@noescape @callee_guaranteed () -> Bool
+  // CHECK: [[THICK:%.*]] = thin_to_thick_function [[CLOSURE]] : $@convention(thin) () -> Bool to $@noescape @callee_guaranteed () -> Bool
   // CHECK: [[RET:%.*]] = apply {{%.*}}([[THICK]])
   // CHECK: return [[RET]]
   return call_auto_closure(false_)

@@ -64,13 +64,11 @@
 #include <android/api-level.h>
 #endif
 
-#if defined(__FreeBSD__) || defined(__OpenBSD__)
-#include <pthread_np.h>
-#endif
-
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/SwiftDtoa.h"
 #include "swift/Basic/Lazy.h"
+
+#include "swift/Threading/Thread.h"
 
 #include "SwiftShims/LibcShims.h"
 #include "SwiftShims/RuntimeShims.h"
@@ -484,7 +482,7 @@ int _swift_stdlib_putc_stderr(int C) {
 }
 
 size_t _swift_stdlib_getHardwareConcurrency() {
-#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+#ifdef SWIFT_THREADING_NONE
   return 1;
 #else
   return std::thread::hardware_concurrency();
@@ -537,66 +535,11 @@ __swift_bool swift_stdlib_isStackAllocationSafe(__swift_size_t byteCount,
 
 __swift_bool _swift_stdlib_getCurrentStackBounds(__swift_uintptr_t *outBegin,
                                                  __swift_uintptr_t *outEnd) {
-#if defined(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
-  // This platform does not support threads, so the API we'd call to get stack
-  // bounds (i.e. libpthread) is not going to be usable.
-  return false;
-  
-#elif defined(__APPLE__)
-  pthread_t thread = pthread_self();
-  // On Apple platforms, the stack grows down, so that the end of the stack
-  // comes before the beginning on the number line, and an address on the stack
-  // will be LESS than the start of the stack and GREATER than the end.
-  void *end = pthread_get_stackaddr_np(thread);
-  if (!end) {
+  llvm::Optional<swift::Thread::StackBounds> bounds =
+    swift::Thread::stackBounds();
+  if (!bounds)
     return false;
-  }
-  *outEnd = (uintptr_t)end;
-  *outBegin = *outEnd - pthread_get_stacksize_np(thread);
+  *outBegin = (uintptr_t)bounds->low;
+  *outEnd = (uintptr_t)bounds->high;
   return true;
-
-#elif defined(_WIN32) && (_WIN32_WINNT >= 0x0602)
-  ULONG_PTR lowLimit = 0;
-  ULONG_PTR highLimit = 0;
-  GetCurrentThreadStackLimits(&lowLimit, &highLimit);
-  *outBegin = lowLimit;
-  *outEnd = highLimit;
-  return true;
-
-#elif defined(__OpenBSD__)
-  stack_t sinfo;
-  if (pthread_stackseg_np(pthread_self(), &sinfo) != 0) {
-    return false;
-  }
-
-  *outBegin = (uintptr_t)sinfo.ss_sp - sinfo.ss_size;
-  *outEnd = (uintptr_t)sinfo.ss_sp;
-  return true;
-#elif defined(__FreeBSD__) || defined(__ANDROID__) || defined(__linux__)
-  pthread_attr_t attr;
-
-#if defined(__FreeBSD__)
-  if (0 != pthread_attr_init(&attr) || 0 != pthread_attr_get_np(pthread_self(), &attr)) {
-    return false;
-  }
-#else
-  if (0 != pthread_getattr_np(pthread_self(), &attr)) {
-    return false;
-  }
-#endif
-
-  void *begin = nullptr;
-  size_t size = 0;
-  bool success = (0 == pthread_attr_getstack(&attr, &begin, &size));
-
-  *outBegin = (uintptr_t)begin;
-  *outEnd = *outBegin + size;
-
-  pthread_attr_destroy(&attr);
-  return success;
-
-#else
-  // FIXME: implement on this platform
-  return false;
-#endif
 }

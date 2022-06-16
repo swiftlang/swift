@@ -248,13 +248,6 @@ public:
                             const TypeLowering &lowering, SGFContext context,
                             llvm::function_ref<void(SILValue)> rvalueEmitter);
 
-  using SILBuilder::createUnconditionalCheckedCastValue;
-  ManagedValue
-  createUnconditionalCheckedCastValue(SILLocation loc,
-                                      ManagedValue op,
-                                      CanType srcFormalTy,
-                                      SILType destLoweredTy,
-                                      CanType destFormalTy);
   using SILBuilder::createUnconditionalCheckedCast;
   ManagedValue createUnconditionalCheckedCast(SILLocation loc,
                                               ManagedValue op,
@@ -270,15 +263,6 @@ public:
                                SILBasicBlock *falseBlock,
                                ProfileCounter Target1Count,
                                ProfileCounter Target2Count);
-
-  using SILBuilder::createCheckedCastValueBranch;
-  void createCheckedCastValueBranch(SILLocation loc,
-                                    ManagedValue op,
-                                    CanType srcFormalTy,
-                                    SILType destLoweredTy,
-                                    CanType destFormalTy,
-                                    SILBasicBlock *trueBlock,
-                                    SILBasicBlock *falseBlock);
 
   using SILBuilder::createUpcast;
   ManagedValue createUpcast(SILLocation loc, ManagedValue original,

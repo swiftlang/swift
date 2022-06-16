@@ -100,7 +100,7 @@ extension Task {
   /// depending on the executor's scheduling details.
   ///
   /// If the task throws an error, this property propagates that error.
-  /// Tasks that respond to cancellation by throwing `Task.CancellationError`
+  /// Tasks that respond to cancellation by throwing `CancellationError`
   /// have that error propagated here upon cancellation.
   ///
   /// - Returns: The task's result.
@@ -301,7 +301,7 @@ extension Task where Success == Never, Failure == Never {
   /// The current task's base priority.
   ///
   /// If you access this property outside of any task, this returns nil
-  @available(SwiftStdlib 9999, *)
+  @available(SwiftStdlib 5.7, *)
   public static var basePriority: TaskPriority? {
     withUnsafeCurrentTask { task in
       // If we are running on behalf of a task, use that task's priority.
@@ -695,9 +695,12 @@ extension Task where Success == Never, Failure == Never {
 /// Storing an unsafe reference doesn't affect the task's actual life cycle,
 /// and the behavior of accessing an unsafe task reference
 /// outside of the `withUnsafeCurrentTask(body:)` method's closure isn't defined.
-/// Instead, use the `task` property of `UnsafeCurrentTask`
-/// to access an instance of `Task` that you can store long-term
-/// and interact with outside of the closure body.
+/// There's no safe way to retrieve a reference to the current task
+/// and save it for long-term use.
+/// To query the current task without saving a reference to it,
+/// use properties like `currentPriority`.
+/// If you need to store a reference to a task,
+/// create an unstructured task using `Task.detached(priority:operation:)` instead.
 ///
 /// - Parameters:
 ///   - body: A closure that takes an `UnsafeCurrentTask` parameter.
@@ -813,6 +816,13 @@ func _enqueueJobGlobal(_ task: Builtin.Job)
 @usableFromInline
 func _enqueueJobGlobalWithDelay(_ delay: UInt64, _ task: Builtin.Job)
 
+@available(SwiftStdlib 5.7, *)
+@_silgen_name("swift_task_enqueueGlobalWithDeadline")
+@usableFromInline
+func _enqueueJobGlobalWithDeadline(_ seconds: Int64, _ nanoseconds: Int64,
+                                   _ toleranceSec: Int64, _ toleranceNSec: Int64,
+                                   _ clock: Int32, _ task: Builtin.Job)
+
 @available(SwiftStdlib 5.1, *)
 @usableFromInline
 @_silgen_name("swift_task_asyncMainDrainQueue")
@@ -824,7 +834,9 @@ internal func _asyncMainDrainQueue() -> Never
 internal func _getMainExecutor() -> Builtin.Executor
 
 @available(SwiftStdlib 5.1, *)
-public func _runAsyncMain(_ asyncFun: @escaping () async throws -> ()) {
+@usableFromInline
+@preconcurrency
+internal func _runAsyncMain(_ asyncFun: @Sendable @escaping () async throws -> ()) {
   Task.detached {
     do {
 #if !os(Windows)

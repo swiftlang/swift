@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-swift-frontend -typecheck -verify -enable-experimental-distributed -disable-availability-checking -I %t 2>&1 %s
+// RUN: %target-swift-frontend -typecheck -verify -disable-availability-checking -I %t 2>&1 %s
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
-import _Distributed
+import Distributed
 import FakeDistributedActorSystems
 
 typealias DefaultDistributedActorSystem = FakeActorSystem
@@ -57,41 +57,13 @@ distributed actor SomeDistributedActor_6 {
   distributed func yay() async throws -> Int { 42 } // ok
 }
 
-distributed actor SomeDistributedActor_7 {
-  distributed func dont_1() async throws -> Int { 42 } // expected-error{{distributed instance method's 'dont_1' remote counterpart '_remote_dont_1' cannot not be implemented manually.}}
-  distributed func dont_2() async throws -> Int { 42 } // expected-error{{distributed instance method's 'dont_2' remote counterpart '_remote_dont_2' cannot not be implemented manually.}}
-  distributed func dont_3() async throws -> Int { 42 } // expected-error{{distributed instance method's 'dont_3' remote counterpart '_remote_dont_3' cannot not be implemented manually.}}
-}
-
-extension SomeDistributedActor_7 {
-
-  // TODO: we should diagnose a bit more precisely here
-
-  static func _remote_dont_1(actor: SomeDistributedActor_6) async throws -> Int {
-    fatalError()
-  }
-  static func _remote_dont_2(actor: SomeDistributedActor_6) -> Int {
-    fatalError()
-  }
-  static func _remote_dont_3(actor: SomeDistributedActor_6) -> Int {
-    fatalError()
-  }
-
-  func _remote_dont_3(actor: SomeDistributedActor_6) -> Int {
-    fatalError()
-  }
-  func _remote_dont_4() -> Int {
-    fatalError()
-  }
-}
-
 distributed actor BadValuesDistributedActor_7 {
-  distributed var varItNope: Int { 13 } // expected-error{{'distributed' modifier cannot be applied to this declaration}}
-  distributed let letItNope: Int = 13 // expected-error{{'distributed' modifier cannot be applied to this declaration}}
-  distributed lazy var lazyVarNope: Int = 13 // expected-error{{'distributed' modifier cannot be applied to this declaration}}
+  distributed var varItNope: Int { 13 } // we allow these
+  distributed let letItNope: Int = 13 // expected-error{{property 'letItNope' cannot be 'distributed', only computed properties can}}
+  distributed lazy var lazyVarNope: Int = 13 // expected-error{{property 'lazyVarNope' cannot be 'distributed', only computed properties can}}
   distributed subscript(nope: Int) -> Int { nope * 2 } // expected-error{{'distributed' modifier cannot be applied to this declaration}}
-  distributed static let staticLetNope: Int = 13 // expected-error{{'distributed' modifier cannot be applied to this declaration}}
-  distributed static var staticVarNope: Int { 13 } // expected-error{{'distributed' modifier cannot be applied to this declaration}}
+  distributed static let staticLetNope: Int = 13 // expected-error{{'distributed' property 'staticLetNope' cannot be 'static'}}
+  distributed static var staticVarNope: Int { 13 } // expected-error{{'distributed' property 'staticVarNope' cannot be 'static'}}
   distributed static func staticNope() async throws -> Int { 13 } // expected-error{{'distributed' method cannot be 'static'}}
 }
 

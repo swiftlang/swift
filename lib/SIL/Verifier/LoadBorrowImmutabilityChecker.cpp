@@ -363,9 +363,9 @@ bool LoadBorrowImmutabilityAnalysis::isImmutable(LoadBorrowInst *lbi) {
   // cases to try and exhaustively identify if those writes overlap with our
   // load_borrow.
   SmallVector<Operand *, 8> endBorrowUses;
-  transform(lbi->getUsersOfType<EndBorrowInst>(),
-            std::back_inserter(endBorrowUses),
-            [](EndBorrowInst *ebi) { return &ebi->getAllOperands()[0]; });
+  visitTransitiveEndBorrows(lbi, [&](EndBorrowInst *endBorrow) {
+    endBorrowUses.push_back(&endBorrow->getOperandRef());
+  });
 
   switch (accessPath.getStorage().getKind()) {
   case AccessStorage::Nested: {

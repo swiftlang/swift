@@ -79,8 +79,7 @@ inline bool isForwardingConsume(SILValue value) {
 }
 
 /// Find leaf "use points" of \p guaranteedValue that determine its lifetime
-/// requirement. If \p usePoints is nullptr, then the simply returns true if no
-/// PointerEscape use was found.
+/// requirement. Return true if no PointerEscape use was found.
 ///
 /// Precondition: \p guaranteedValue is not a BorrowedValue.
 ///
@@ -91,10 +90,10 @@ inline bool isForwardingConsume(SILValue value) {
 /// borrow scope and may be reborrowed.
 ///
 /// In valid OSSA, this should never be called on values that introduce a new
-/// scope (doing so would be extremely innefficient). The lifetime of a borrow
+/// scope (doing so would be extremely inefficient). The lifetime of a borrow
 /// introducing instruction is always determined by its direct EndBorrow uses
 /// (see BorrowedValue::visitLocalScopeEndingUses). None of the non-scope-ending
-/// uses are relevant, and there's no need to transively follow forwarding
+/// uses are relevant, and there's no need to transitively follow forwarding
 /// uses. However, this utility may be used on borrow-introducing values when
 /// updating OSSA form to place EndBorrow uses after introducing new phis.
 ///
@@ -137,7 +136,7 @@ bool findExtendedUsesOfSimpleBorrowedValue(
 /// valid BorrowedValue), then its uses are discovered transitively by looking
 /// through forwarding operations. If any use is a PointerEscape, then this
 /// returns false without adding more uses--the guaranteed value's lifetime is
-/// indeterminite. If a use introduces a nested borrow scope, it creates use
+/// indeterminate. If a use introduces a nested borrow scope, it creates use
 /// points where the "extended" borrow scope ends. An extended borrow
 /// scope is found by looking through any reborrows that end the nested
 /// scope. Other uses within nested borrow scopes are ignored.
@@ -169,6 +168,14 @@ bool findExtendedTransitiveGuaranteedUses(
   SILValue guaranteedValue,
   SmallVectorImpl<Operand *> &usePoints);
 
+/// Find non-transitive uses of a simple (i.e. without looking through
+/// reborrows) value.
+///
+/// The scope-ending use of borrows of the value are included.  If a borrow of
+/// the value is reborrowed, returns false.
+bool findUsesOfSimpleValue(SILValue value,
+                           SmallVectorImpl<Operand *> *usePoints = nullptr);
+
 /// An operand that forwards ownership to one or more results.
 class ForwardingOperand {
   Operand *use = nullptr;
@@ -180,6 +187,11 @@ public:
     // We use a force unwrap since a ForwardingOperand should always have an
     // ownership constraint.
     return use->getOwnershipConstraint();
+  }
+
+  bool preservesOwnership() const {
+    auto &mixin = *OwnershipForwardingMixin::get(use->getUser());
+    return mixin.preservesOwnership();
   }
 
   ValueOwnershipKind getForwardingOwnershipKind() const;
@@ -531,7 +543,7 @@ struct BorrowedValue {
   /// called with a scope that is not local.
   ///
   /// NOTE: To determine if a scope is a local scope, call
-  /// BorrowScopeIntoducingValue::isLocalScope().
+  /// BorrowScopeIntroducingValue::isLocalScope().
   void getLocalScopeEndingInstructions(
       SmallVectorImpl<SILInstruction *> &scopeEndingInsts) const;
 
@@ -547,7 +559,7 @@ struct BorrowedValue {
   /// instructions before storing them.
   ///
   /// NOTE: To determine if a scope is a local scope, call
-  /// BorrowScopeIntoducingValue::isLocalScope().
+  /// BorrowScopeIntroducingValue::isLocalScope().
   bool visitLocalScopeEndingUses(function_ref<bool(Operand *)> visitor) const;
 
   bool isLocalScope() const { return kind.isLocalScope(); }
@@ -787,7 +799,7 @@ struct InteriorPointerOperand {
   }
 
   /// If \p val is a result of an instruction that is an interior pointer,
-  /// return an interor pointer operand based off of the base value operand of
+  /// return an interior pointer operand based off of the base value operand of
   /// the instruction.
   static InteriorPointerOperand inferFromResult(SILValue resultValue) {
     auto kind = InteriorPointerOperandKind::inferFromResult(resultValue);
@@ -853,7 +865,7 @@ struct InteriorPointerOperand {
   }
 
   /// Transitively compute the list of leaf uses that this interior pointer
-  /// operand puts on its parent guaranted value.
+  /// operand puts on its parent guaranteed value.
   ///
   /// If \p foundUses is nullptr, this simply returns true if no PointerEscapes
   /// were found.
@@ -889,7 +901,7 @@ private:
 /// scope and interiorPointerOp is irrelevant.
 ///
 /// If hasOwnership() is true, then interiorPointerOp refers to the operand that
-/// converts a non-address value into the address from which the contructor's
+/// converts a non-address value into the address from which the constructor's
 /// address is derived. If the best-effort to find an InteriorPointerOperand
 /// fails, then interiorPointerOp remains invalid, and clients must be
 /// conservative.
@@ -999,7 +1011,7 @@ public:
     /// An owned value from the formation of a new alloc_box.
     AllocBoxInit,
 
-    /// An owned value from the formataion of a new alloc_ref.
+    /// An owned value from the formation of a new alloc_ref.
     AllocRefInit,
   };
 
@@ -1203,7 +1215,7 @@ void findTransitiveReborrowBaseValuePairs(
 /// Given a begin of a borrow scope, visit all end_borrow users of the borrow or
 /// its reborrows.
 void visitTransitiveEndBorrows(
-    BorrowedValue beginBorrow,
+    SILValue value,
     function_ref<void(EndBorrowInst *)> visitEndBorrow);
 
 /// Whether the specified lexical begin_borrow instruction is nested.

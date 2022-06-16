@@ -14,10 +14,18 @@
 //
 //===----------------------------------------------------------------------===//
 
+// Define __STDC_WANT_LIB_EXT1__ to get memset_s on platforms that have it.
+// Other files may have included string.h without it already, so we also set
+// this with a -D flag when building, but this allows tests to build without
+// additional trouble.
+#define __STDC_WANT_LIB_EXT1__ 1
+#include <string.h>
+
 #include "swift/ABI/MetadataValues.h"
 #include "swift/Runtime/Debug.h"
 #include "llvm/Support/Alignment.h"
 #include <cstddef>
+#include <new>
 
 // Notes: swift::fatalError is not shared between libswiftCore and libswift_Concurrency
 // and libswift_Concurrency uses swift_Concurrency_fatalError instead.
@@ -64,15 +72,15 @@ private:
   /// The first slab.
   Slab *firstSlab;
 
-  /// Used for unit testing.
-  int32_t numAllocatedSlabs = 0;
-
   /// True if the first slab is pre-allocated.
-  bool firstSlabIsPreallocated;
+  uint32_t firstSlabIsPreallocated:1;
+  /// Used for unit testing.
+  uint32_t numAllocatedSlabs:31;
+
 
   /// The minimal alignment of allocated memory.
   static constexpr size_t alignment = MaximumAlignment;
-  
+
   /// If set to true, memory allocations are checked for buffer overflows and
   /// use-after-free, similar to guard-malloc.
   static constexpr bool guardAllocations =
@@ -118,6 +126,20 @@ private:
       return headerSize() + size;
     }
 
+    /// Clear the fake metadata pointer. Call before freeing so that leftover
+    /// heap garbage doesn't have slab metadata pointers in it.
+    void clearMetadata() {
+      // Use memset_s on Apple platforms. Fall back to a plain
+      // assignment on other platforms. This is not necessary for
+      // correctness, just as an aid to analysis tools, so it's OK if
+      // the fallback gets optimized out.
+#if defined(__APPLE__)
+      memset_s(&metadata, sizeof(metadata), 0, sizeof(metadata));
+#else
+      metadata = 0;
+#endif
+    }
+
     /// Return the payload buffer address at \p atOffset.
     ///
     /// Note: it's valid to call this function on a not-yet-constructed slab.
@@ -149,7 +171,7 @@ private:
       assert(llvm::isAligned(llvm::Align(alignment), alignedSize));
       assert(canAllocate(alignedSize));
       void *buffer = getAddr(currentOffset);
-      auto *allocation = new (buffer) Allocation(lastAllocation, this);
+      auto *allocation = ::new (buffer) Allocation(lastAllocation, this);
       currentOffset += Allocation::includingHeader(alignedSize);
       if (guardAllocations) {
         uintptr_t *endOfCurrentAllocation = (uintptr_t *)getAddr(currentOffset);
@@ -230,7 +252,7 @@ private:
     size_t capacity = std::max(SlabCapacity,
                                Allocation::includingHeader(size));
     void *slabBuffer = malloc(Slab::includingHeader(capacity));
-    Slab *newSlab = new (slabBuffer) Slab(capacity);
+    Slab *newSlab = ::new (slabBuffer) Slab(capacity);
     if (slab)
       slab->next = newSlab;
     else
@@ -247,6 +269,7 @@ private:
     while (slab) {
       Slab *next = slab->next;
       freedCapacity += slab->capacity;
+      slab->clearMetadata();
       free(slab);
       numAllocatedSlabs--;
       slab = next;
@@ -256,22 +279,30 @@ private:
 
 public:
   /// Construct a StackAllocator without a pre-allocated first slab.
-  StackAllocator() : firstSlab(nullptr), firstSlabIsPreallocated(false) { }
+  StackAllocator()
+      : firstSlab(nullptr), firstSlabIsPreallocated(false),
+        numAllocatedSlabs(0) {}
 
   /// Construct a StackAllocator with a pre-allocated first slab.
-  StackAllocator(void *firstSlabBuffer, size_t bufferCapacity) {
+  StackAllocator(void *firstSlabBuffer, size_t bufferCapacity) : StackAllocator() {
+    // If the pre-allocated buffer can't hold a slab header, ignore it.
+    if (bufferCapacity <= Slab::headerSize())
+      return;
     char *start = (char *)llvm::alignAddr(firstSlabBuffer,
                                           llvm::Align(alignment));
     char *end = (char *)firstSlabBuffer + bufferCapacity;
     assert(start + Slab::headerSize() <= end &&
            "buffer for first slab too small");
-    firstSlab = new (start) Slab(end - start - Slab::headerSize());
+    firstSlab = ::new (start) Slab(end - start - Slab::headerSize());
     firstSlabIsPreallocated = true;
+    numAllocatedSlabs = 0;
   }
 
   ~StackAllocator() {
     if (lastAllocation)
       SWIFT_FATAL_ERROR(0, "not all allocations are deallocated");
+    if (firstSlabIsPreallocated)
+      firstSlab->clearMetadata();
     (void)freeAllSlabs(firstSlabIsPreallocated ? firstSlab->next : firstSlab);
     assert(getNumAllocatedSlabs() == 0);
   }

@@ -10,6 +10,12 @@
 #
 #===----------------------------------------------------------------------===#
 
+if(SWIFT_STDLIB_ENABLE_VECTOR_TYPES)
+set(swiftDifferentiationSIMDFiles SIMDDifferentiation.swift.gyb)
+else()
+set(swiftDifferentiationSIMDFiles)
+endif()
+
 add_swift_target_library(swift_Differentiation ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   Differentiable.swift
   DifferentialOperators.swift
@@ -23,7 +29,7 @@ add_swift_target_library(swift_Differentiation ${SWIFT_STDLIB_LIBRARY_BUILD_TYPE
   GYB_SOURCES
     FloatingPointDifferentiation.swift.gyb
     TgmathDerivatives.swift.gyb
-    SIMDDifferentiation.swift.gyb
+    ${swiftDifferentiationSIMDFiles}
 
   SWIFT_MODULE_DEPENDS_OSX Darwin
   SWIFT_MODULE_DEPENDS_IOS Darwin

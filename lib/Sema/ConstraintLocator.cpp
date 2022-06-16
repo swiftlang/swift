@@ -93,9 +93,10 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::PlaceholderType:
   case ConstraintLocator::ImplicitConversion:
   case ConstraintLocator::ImplicitDynamicMemberSubscript:
-  case ConstraintLocator::ClosureBodyElement:
+  case ConstraintLocator::SyntacticElement:
   case ConstraintLocator::PackType:
   case ConstraintLocator::PackElement:
+  case ConstraintLocator::PatternBindingElement:
     return 0;
 
   case ConstraintLocator::FunctionArgument:
@@ -553,10 +554,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
       out << "placeholder type";
       break;
 
-    case ConstraintLocator::ClosureBodyElement:
+    case ConstraintLocator::SyntacticElement:
       // TODO: Would be great to print a kind of element this is e.g.
       //       "if", "for each", "switch" etc.
-      out << "closure body element";
+      out << "syntactic element";
       break;
 
     case ConstraintLocator::ImplicitDynamicMemberSubscript:
@@ -576,6 +577,14 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
     case PackElement: {
       auto packElt = elt.castTo<LocatorPathElt::PackElement>();
       out << "pack element #" << llvm::utostr(packElt.getIndex());
+      break;
+    }
+
+    case PatternBindingElement: {
+      auto patternBindingElt =
+          elt.castTo<LocatorPathElt::PatternBindingElement>();
+      out << "pattern binding element #"
+          << llvm::utostr(patternBindingElt.getIndex());
       break;
     }
     }

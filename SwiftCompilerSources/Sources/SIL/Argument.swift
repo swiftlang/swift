@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Basic
 import SILBridging
 
 /// A basic block argument.
@@ -17,6 +18,7 @@ import SILBridging
 /// Maps to both, SILPhiArgument and SILFunctionArgument.
 public class Argument : Value, Equatable {
   public var definingInstruction: Instruction? { nil }
+  public var definingBlock: BasicBlock { block }
 
   public var block: BasicBlock {
     return SILArgument_getParent(bridged).block
@@ -34,31 +36,49 @@ public class Argument : Value, Equatable {
 }
 
 final public class FunctionArgument : Argument {
+  public var isExclusiveIndirectParameter: Bool {
+    SILArgument_isExclusiveIndirectParameter(bridged) != 0
+  }
 }
 
 final public class BlockArgument : Argument {
-  /// Note: critical edges are not supported, i.e. this is false if there is
-  /// a cond_br in the predecessors.
   public var isPhiArgument: Bool {
-    block.predecessors.allSatisfy { $0.terminator is BranchInst }
+    block.predecessors.allSatisfy {
+      let term = $0.terminator
+      return term is BranchInst || term is CondBranchInst
+    }
   }
 
   public var incomingPhiOperands: LazyMapSequence<PredecessorList, Operand> {
     assert(isPhiArgument)
     let idx = index
-    return block.predecessors.lazy.map { $0.terminator.operands[idx] }
+    return block.predecessors.lazy.map {
+      switch $0.terminator {
+        case let br as BranchInst:
+          return br.operands[idx]
+        case let condBr as CondBranchInst:
+          if condBr.trueBlock == self.block {
+            assert(condBr.falseBlock != self.block)
+            return condBr.trueOperands[idx]
+          } else {
+            assert(condBr.falseBlock == self.block)
+            return condBr.falseOperands[idx]
+          }
+        default:
+          fatalError("wrong terminator for phi-argument")
+      }
+    }
   }
 
-  public var incomingPhiValues: LazyMapSequence<PredecessorList, Value> {
-    assert(isPhiArgument)
-    let idx = index
-    return block.predecessors.lazy.map { $0.terminator.operands[idx].value }
+  public var incomingPhiValues: LazyMapSequence<LazyMapSequence<PredecessorList, Operand>, Value> {
+    incomingPhiOperands.lazy.map { $0.value }
   }
 }
 
 // Bridging utilities
 
 extension BridgedArgument {
-  var argument: Argument { obj.getAs(Argument.self) }
-  var functionArgument: FunctionArgument { obj.getAs(FunctionArgument.self) }
+  public var argument: Argument { obj.getAs(Argument.self) }
+  public var blockArgument: BlockArgument { obj.getAs(BlockArgument.self) }
+  public var functionArgument: FunctionArgument { obj.getAs(FunctionArgument.self) }
 }

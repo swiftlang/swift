@@ -904,7 +904,7 @@ specializeApplySite(SILOptFunctionBuilder &FuncBuilder, ApplySite Apply,
 
   IsSerialized_t Serialized = IsNotSerialized;
   if (Apply.getFunction()->isSerialized())
-    Serialized = IsSerializable;
+    Serialized = IsSerialized;
 
   std::string ClonedName =
     getClonedName(F, Serialized, PromotedCalleeArgIndices);

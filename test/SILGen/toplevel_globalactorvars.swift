@@ -1,113 +1,127 @@
-// RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle -enable-experimental-async-top-level %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle -disable-availability-checking -enable-experimental-async-top-level %s | %FileCheck %s
 
 // a
 // CHECK-LABEL: sil_global hidden @$s24toplevel_globalactorvars1aSivp : $Int
-// b
-// CHECK-LABEL: sil_global hidden @$s24toplevel_globalactorvars1bSivp : $Int
 
 // CHECK-LABEL: sil hidden [ossa] @async_Main
 // CHECK: bb0:
-// CHECK-NEXT: alloc_global @$s24toplevel_globalactorvars1aSivp
-// CHECK-NEXT: [[AREF:%[0-9]+]] = global_addr @$s24toplevel_globalactorvars1aSivp : $*Int
+// CHECK-NEXT: // function_ref
+// CHECK-NEXT: [[GET_MAIN:%.*]] = function_ref @swift_task_getMainExecutor
+// CHECK-NEXT: [[MAIN:%.*]] = apply [[GET_MAIN]]()
+// CHECK-NEXT: [[MAIN_OPTIONAL:%[0-9]+]] = enum $Optional<Builtin.Executor>, #Optional.some!enumelt, [[MAIN]]
 
-@available(SwiftStdlib 5.1, *)
 actor MyActorImpl {}
 
-@available(SwiftStdlib 5.1, *)
 @globalActor
 struct MyActor {
     static let shared = MyActorImpl()
 }
 
-@MyActor
 var a = 10
 
+// a initialization
+// CHECK: alloc_global @$s24toplevel_globalactorvars1aSivp
+// CHECK: [[AREF:%[0-9]+]] = global_addr @$s24toplevel_globalactorvars1aSivp
+// CHECK: [[TEN_LIT:%[0-9]+]] = integer_literal $Builtin.IntLiteral, 10
+// CHECK: [[INT_TYPE:%[0-9]+]] = metatype $@thin Int.Type
+// CHECK: [[INT_INIT:%[0-9]+]] = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC
+// CHECK: [[TEN:%[0-9]+]] = apply [[INT_INIT]]([[TEN_LIT]], [[INT_TYPE]])
+// CHECK: store [[TEN]] to [trivial] [[AREF]]
+
 @MyActor
-func incrementA() {
-    a += 1
+func printFromMyActor(value : Int) {
+    print(value)
 }
 
-await print(a)
+print(a)
 
-// CHECK: [[ACTORREF:%[0-9]+]] = begin_borrow {{%[0-9]+}} : $MyActorImpl
-// CHECK: [[OLDACTOR:%[0-9]+]] = builtin "getCurrentExecutor"() : $Optional<Builtin.Executor>
-// CHECK: hop_to_executor [[ACTORREF]] : $MyActorImpl
-// CHECK: [[AACCESS:%[0-9]+]] = begin_access [read] [dynamic] [[AREF]] : $*Int
-// CHECK: [[AGLOBAL:%[0-9]+]] = load [trivial] [[AACCESS]] : $*Int
-// CHECK: end_access [[AACCESS]]
-// CHECK: hop_to_executor [[OLDACTOR]]
-// CHECK: end_borrow [[ACTORREF]]
-
-await incrementA()
-
-// CHECK: [[INCREMENTA:%[0-9]+]] = function_ref @$s24toplevel_globalactorvars10incrementAyyF
-// CHECK: [[ACTORREF:%[0-9]+]] = begin_borrow {{%[0-9]+}} : $MyActorImpl
-// CHECK: [[OLDACTOR:%[0-9]+]] = builtin "getCurrentExecutor"() : $Optional<Builtin.Executor>
-// CHECK: hop_to_executor [[ACTORREF]] : $MyActorImpl
-// CHECK: {{%[0-9]+}} = apply [[INCREMENTA]]()
-// CHECK: hop_to_executor [[OLDACTOR]]
-// CHECK: end_borrow [[ACTORREF]]
-
-await print(a)
-
-// CHECK: [[ACTORREF:%[0-9]+]] = begin_borrow {{%[0-9]+}} : $MyActorImpl
-// CHECK: [[OLDACTOR:%[0-9]+]] = builtin "getCurrentExecutor"() : $Optional<Builtin.Executor>
-// CHECK: hop_to_executor [[ACTORREF]] : $MyActorImpl
-// CHECK: [[AACCESS:%[0-9]+]] = begin_access [read] [dynamic] [[AREF]] : $*Int
-// CHECK: [[AGLOBAL:%[0-9]+]] = load [trivial] [[AACCESS]] : $*Int
-// CHECK: end_access [[AACCESS]]
-// CHECK: hop_to_executor [[OLDACTOR]]
-// CHECK: end_borrow [[ACTORREF]]
-
-var b = 11
-
-// CHECK: alloc_global @$s24toplevel_globalactorvars1bSivp
-// CHECK: [[BGLOBAL_ADDR:%[0-9]+]] = global_addr @$s24toplevel_globalactorvars1bSivp
-// Int.init(_builtinIntegerLiteral:)
-// CHECK: [[INT_INIT_FUNC:%[0-9]+]] = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC
-// CHECK: [[INITD_INT:%[0-9]+]] = apply [[INT_INIT_FUNC]]({{%[0-9]+}}, {{%[0-9]+}})
-// CHECK: store [[INITD_INT]] to [trivial] [[BGLOBAL_ADDR]]
-
-b += 1
-
+// print
 // CHECK-NOT: hop_to_executor
-// CHECK: [[BACCESS:%[0-9]+]] = begin_access [modify] [dynamic] [[BGLOBAL_ADDR]]
+
+// CHECK: [[AACCESS:%[0-9]+]] = begin_access [read] [dynamic] [[AREF]] : $*Int
+// CHECK: [[AGLOBAL:%[0-9]+]] = load [trivial] [[AACCESS]] : $*Int
+// CHECK: end_access [[AACCESS]]
+// CHECK-NOT: hop_to_executor
+
+a += 1
+
+// CHECK: [[ONE_LIT:%[0-9]+]] = integer_literal $Builtin.IntLiteral, 1
+// CHECK: [[INT_TYPE:%[0-9]+]] = metatype $@thin Int.Type
+// CHECK: [[INT_INIT:%[0-9]+]] = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC
+// CHECK: [[ONE:%[0-9]+]] = apply [[INT_INIT]]([[ONE_LIT]], [[INT_TYPE]])
+// CHECK-NOT: hop_to_executor
+// CHECK: [[AACCESS:%[0-9]+]] = begin_access [modify] [dynamic] [[AREF]] : $*Int
 // static Int.+= infix(_:_:)
 // CHECK: [[PE_INT_FUNC:%[0-9]+]] = function_ref @$sSi2peoiyySiz_SitFZ
-// CHECK: [[INCREMENTED:%[0-9]+]] = apply [[PE_INT_FUNC]]([[BACCESS]], {{%[0-9]+}}, {{%[0-9]+}})
-// CHECK: end_access [[BACCESS]]
+// CHECK: [[INCREMENTED:%[0-9]+]] = apply [[PE_INT_FUNC]]([[AACCESS]], [[ONE]], {{%[0-9]+}})
+// CHECK: end_access [[AACCESS]]
+// CHECK-NOT: hop_to_executor
 
 
+await printFromMyActor(value: a)
+
+// CHECK: [[AACCESS:%[0-9]+]] = begin_access [read] [dynamic] [[AREF]] : $*Int
+// CHECK: [[AGLOBAL:%[0-9]+]] = load [trivial] [[AACCESS]] : $*Int
+// CHECK: end_access [[AACCESS]]
+
+// CHECK: [[PRINTFROMMYACTOR_FUNC:%[0-9]+]] = function_ref @$s24toplevel_globalactorvars16printFromMyActor5valueySi_tF
+// CHECK: [[ACTORREF:%[0-9]+]] = begin_borrow {{%[0-9]+}} : $MyActorImpl
+// CHECK: hop_to_executor [[ACTORREF]] : $MyActorImpl
+// CHECK: {{%[0-9]+}} = apply [[PRINTFROMMYACTOR_FUNC]]([[AGLOBAL]])
+// CHECK: hop_to_executor [[MAIN_OPTIONAL]]
+// CHECK: end_borrow [[ACTORREF]]
+
+if a < 10 {
+// CHECK: [[AACCESS:%[0-9]+]] = begin_access [read] [dynamic] [[AREF]] : $*Int
+// CHECK: [[AGLOBAL:%[0-9]+]] = load [trivial] [[AACCESS]] : $*Int
+// CHECK: end_access [[AACCESS]]
+
+// CHECK: [[TEN_LIT:%[0-9]+]] = integer_literal $Builtin.IntLiteral, 10
+// CHECK: [[INT_TYPE:%[0-9]+]] = metatype $@thin Int.Type
+// CHECK: [[INT_INIT:%[0-9]+]] = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC
+// CHECK: [[TEN:%[0-9]+]] = apply [[INT_INIT]]([[TEN_LIT]], [[INT_TYPE]])
+// function_ref static Swift.Int.< infix(Swift.Int, Swift.Int) -> Swift.Bool
+// CHECK: [[LESS_FUNC:%[0-9]+]] = function_ref @$sSi1loiySbSi_SitFZ
+// CHECK: [[WRAPPED_COND:%[0-9]+]] = apply [[LESS_FUNC]]([[AGLOBAL]], [[TEN]], {{%[0-9]+}})
+// CHECK: [[COND:%[0-9]+]] = struct_extract [[WRAPPED_COND]]
+// CHECK: cond_br [[COND]], bb1, bb2
 // CHECK: bb1:
-if #available(SwiftStdlib 5.1, *) {
-    await print(a)
 
-    // CHECK: [[ACTORREF:%[0-9]+]] = begin_borrow {{%[0-9]+}} : $MyActorImpl
-    // CHECK: [[OLDACTOR:%[0-9]+]] = builtin "getCurrentExecutor"() : $Optional<Builtin.Executor>
-    // CHECK: hop_to_executor [[ACTORREF]] : $MyActorImpl
+    print(a)
+
+    // print
+    // CHECK-NOT: hop_to_executor
+
     // CHECK: [[AACCESS:%[0-9]+]] = begin_access [read] [dynamic] [[AREF]] : $*Int
     // CHECK: [[AGLOBAL:%[0-9]+]] = load [trivial] [[AACCESS]] : $*Int
     // CHECK: end_access [[AACCESS]]
-    // CHECK: hop_to_executor [[OLDACTOR]]
-    // CHECK: end_borrow [[ACTORREF]]
-
-    await incrementA()
-
-    // CHECK: [[INCREMENTA:%[0-9]+]] = function_ref @$s24toplevel_globalactorvars10incrementAyyF
-    // CHECK: [[ACTORREF:%[0-9]+]] = begin_borrow {{%[0-9]+}} : $MyActorImpl
-    // CHECK: [[OLDACTOR:%[0-9]+]] = builtin "getCurrentExecutor"() : $Optional<Builtin.Executor>
-    // CHECK: hop_to_executor [[ACTORREF]] : $MyActorImpl
-    // CHECK: {{%[0-9]+}} = apply [[INCREMENTA]]()
-    // CHECK: hop_to_executor [[OLDACTOR]]
-    // CHECK: end_borrow [[ACTORREF]]
-
-
-    b += 1
-
     // CHECK-NOT: hop_to_executor
-    // CHECK: [[BACCESS:%[0-9]+]] = begin_access [modify] [dynamic] [[BGLOBAL_ADDR]]
+
+    a += 1
+
+    // CHECK: [[ONE_LIT:%[0-9]+]] = integer_literal $Builtin.IntLiteral, 1
+    // CHECK: [[INT_TYPE:%[0-9]+]] = metatype $@thin Int.Type
+    // CHECK: [[INT_INIT:%[0-9]+]] = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC
+    // CHECK: [[ONE:%[0-9]+]] = apply [[INT_INIT]]([[ONE_LIT]], [[INT_TYPE]])
+    // CHECK-NOT: hop_to_executor
+    // CHECK: [[AACCESS:%[0-9]+]] = begin_access [modify] [dynamic] [[AREF]] : $*Int
     // static Int.+= infix(_:_:)
     // CHECK: [[PE_INT_FUNC:%[0-9]+]] = function_ref @$sSi2peoiyySiz_SitFZ
-    // CHECK: [[INCREMENTED:%[0-9]+]] = apply [[PE_INT_FUNC]]([[BACCESS]], {{%[0-9]+}}, {{%[0-9]+}})
-    // CHECK: end_access [[BACCESS]]
+    // CHECK: [[INCREMENTED:%[0-9]+]] = apply [[PE_INT_FUNC]]([[AACCESS]], [[ONE]], {{%[0-9]+}})
+    // CHECK: end_access [[AACCESS]]
+    // CHECK-NOT: hop_to_executor
+
+
+    await printFromMyActor(value: a)
+
+    // CHECK: [[AACCESS:%[0-9]+]] = begin_access [read] [dynamic] [[AREF]] : $*Int
+    // CHECK: [[AGLOBAL:%[0-9]+]] = load [trivial] [[AACCESS]] : $*Int
+    // CHECK: end_access [[AACCESS]]
+
+    // CHECK: [[PRINTFROMMYACTOR_FUNC:%[0-9]+]] = function_ref @$s24toplevel_globalactorvars16printFromMyActor5valueySi_tF
+    // CHECK: [[ACTORREF:%[0-9]+]] = begin_borrow {{%[0-9]+}} : $MyActorImpl
+    // CHECK: hop_to_executor [[ACTORREF]] : $MyActorImpl
+    // CHECK: {{%[0-9]+}} = apply [[PRINTFROMMYACTOR_FUNC]]([[AGLOBAL]])
+    // CHECK: hop_to_executor [[MAIN_OPTIONAL]]
+    // CHECK: end_borrow [[ACTORREF]]
 }

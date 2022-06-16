@@ -749,6 +749,8 @@ namespace {
 
     virtual bool isLoadingPure() const override { return true; }
 
+    VarDecl *getField() const { return Field; }
+
     ManagedValue project(SILGenFunction &SGF, SILLocation loc,
                          ManagedValue base) && override {
       assert(base.getType().hasReferenceSemantics() &&
@@ -4505,6 +4507,18 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc, RValue &&src,
   emitAssignToLValue(loc, ArgumentSource(loc, std::move(src)), std::move(dest));
 }
 
+namespace {
+
+} // end anonymous namespace
+
+/// Checks if the last component of the LValue refers to the given var decl.
+static bool referencesVar(PathComponent const& comp, VarDecl *var) {
+  if (comp.getKind() != PathComponent::RefElementKind)
+    return false;
+
+  return static_cast<RefElementComponent const&>(comp).getField() == var;
+}
+
 void SILGenFunction::emitAssignToLValue(SILLocation loc,
                                         ArgumentSource &&src,
                                         LValue &&dest) {
@@ -4513,6 +4527,12 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc,
   // cleanup of materialized LValues immediately, before evaluating the next
   // LValue. For example: (x[i], x[j]) = a, b
   ArgumentScope argScope(*this, loc);
+
+  // If this is an assignment to a distributed actor's actorSystem, push
+  // a clean-up to also initialize its id.
+  if (LLVM_UNLIKELY(DistActorCtorContext) &&
+      referencesVar(**(dest.end()-1), DistActorCtorContext->getSystemVar()))
+    Cleanups.pushCleanup<InitializeDistActorIdentity>(*DistActorCtorContext);
 
   // If the last component is a getter/setter component, use a special
   // generation pattern that allows us to peephole the emission of the RHS.
@@ -4604,6 +4624,13 @@ void SILGenFunction::emitAssignLValueToLValue(SILLocation loc, LValue &&src,
     emitAssignToLValue(loc, std::move(loaded), std::move(dest));
     return;
   }
+
+  // If this is an assignment to a distributed actor's actorSystem, push
+  // a clean-up to also initialize its id.
+  // FIXME: in what situations does this lvalue to lvalue assign happen?
+  if (LLVM_UNLIKELY(DistActorCtorContext) &&
+      referencesVar(**(dest.end()-1), DistActorCtorContext->getSystemVar()))
+    Cleanups.pushCleanup<InitializeDistActorIdentity>(*DistActorCtorContext);
 
   auto &rvalueTL = getTypeLowering(src.getTypeOfRValue());
 

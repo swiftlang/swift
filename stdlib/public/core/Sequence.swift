@@ -330,6 +330,12 @@ public protocol Sequence {
   /// encapsulates its iteration state.
   associatedtype Iterator: IteratorProtocol where Iterator.Element == Element
 
+  // FIXME: <rdar://problem/34142121>
+  // This typealias should be removed as it predates the source compatibility
+  // guarantees of Swift 3, but it cannot due to a bug.
+  @available(*, unavailable, renamed: "Iterator")
+  typealias Generator = Iterator
+
   /// A type that represents a subsequence of some of the sequence's elements.
   // associatedtype SubSequence: Sequence = AnySequence<Element>
   //   where Element == SubSequence.Element,
@@ -1158,24 +1164,24 @@ extension Sequence {
   @inlinable
   public __consuming func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Element>
-  ) -> (Iterator,UnsafeMutableBufferPointer<Element>.Index) {
+  ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
     return _copySequenceContents(initializing: buffer)
   }
 
   @_alwaysEmitIntoClient
   internal __consuming func _copySequenceContents(
     initializing buffer: UnsafeMutableBufferPointer<Element>
-  ) -> (Iterator,UnsafeMutableBufferPointer<Element>.Index) {
+  ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
     var it = self.makeIterator()
-    guard var ptr = buffer.baseAddress else { return (it,buffer.startIndex) }
-    for idx in buffer.startIndex..<buffer.count {
+    guard var ptr = buffer.baseAddress else { return (it, buffer.startIndex) }
+    for idx in buffer.indices {
       guard let x = it.next() else {
         return (it, idx)
       }
       ptr.initialize(to: x)
       ptr += 1
     }
-    return (it,buffer.endIndex)
+    return (it, buffer.endIndex)
   }
     
   @inlinable

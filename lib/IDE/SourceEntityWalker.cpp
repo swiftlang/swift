@@ -54,6 +54,11 @@ private:
   bool shouldWalkIntoGenericParams() override {
     return SEWalker.shouldWalkIntoGenericParams();
   }
+
+  bool shouldWalkSerializedTopLevelInternalDecls() override {
+    return false;
+  }
+
   bool walkToDeclPre(Decl *D) override;
   bool walkToDeclPreProper(Decl *D);
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override;
@@ -174,6 +179,21 @@ bool SemaAnnotator::walkToDeclPreProper(Decl *D) {
       auto ParamList = getParameterList(VD);
       if (!ReportParamList(ParamList))
         return false;
+    }
+
+    if (auto proto = dyn_cast<ProtocolDecl>(VD)) {
+      // Report a primary associated type as a references to the associated type
+      // declaration.
+      for (auto parsedName : proto->getPrimaryAssociatedTypeNames()) {
+        Identifier name = parsedName.first;
+        SourceLoc loc = parsedName.second;
+        if (auto assocTypeDecl = proto->getAssociatedType(name)) {
+          passReference(assocTypeDecl,
+                        assocTypeDecl->getDeclaredInterfaceType(),
+                        DeclNameLoc(loc),
+                        ReferenceMetaData(SemaReferenceKind::TypeRef, None));
+        }
+      }
     }
   } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
     SourceRange SR = SourceRange();

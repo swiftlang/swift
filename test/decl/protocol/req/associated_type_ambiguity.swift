@@ -1,27 +1,35 @@
-// RUN: %target-typecheck-verify-swift
-
-// References to associated type from 'where' clause should be
-// ambiguous when there's a typealias with the same name in another
-// unrelated protocol.
+// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
 protocol P1 {
-  typealias T = Int // expected-note 3{{found this candidate}}
+  typealias T = Int
 }
 
 protocol P2 {
-  associatedtype T // expected-note 3{{found this candidate}}
+  associatedtype T
 }
 
-extension P1 where Self : P2, T == Int { // expected-error {{'T' is ambiguous for type lookup in this context}}
-  func takeT11(_: T) {} // expected-error {{'T' is ambiguous for type lookup in this context}}
+// Note: the warnings should probably be emitted.
+
+// CHECK: ExtensionDecl line={{.*}} base=P1
+// CHECK-NEXT: Generic signature: <Self where Self : P1, Self : P2, Self.[P2]T == Int>
+extension P1 where Self : P2, T == Int { // expected-warning {{redundant same-type constraint 'Self.T' == 'Int'}}
+  func takeT11(_: T) {}
   func takeT12(_: Self.T) {}
 }
 
-extension P1 where Self : P2 {
-  // FIXME: This doesn't make sense -- either both should
-  // succeed, or both should be ambiguous.
-  func takeT21(_: T) {} // expected-error {{'T' is ambiguous for type lookup in this context}}
+// CHECK: ExtensionDecl line={{.*}} base=P1
+// CHECK-NEXT: Generic signature: <Self where Self : P1, Self : P2, Self.[P2]T == Int>
+extension P1 where Self : P2, Self.T == Int { // expected-warning {{redundant same-type constraint 'Self.T' == 'Int'}}
+  func takeT21(_: T) {}
   func takeT22(_: Self.T) {}
+}
+
+// CHECK: ExtensionDecl line={{.*}} base=P1
+// CHECK-NEXT: Generic signature: <Self where Self : P1, Self : P2, Self.[P2]T == Int>
+extension P1 where Self : P2 {
+  func takeT31(_: T) {}
+  func takeT32(_: Self.T) {}
 }
 
 // Same as above, but now we have two visible associated types with the same
@@ -30,17 +38,19 @@ protocol P3 {
   associatedtype T
 }
 
+// CHECK: ExtensionDecl line={{.*}} base=P2
+// CHECK-NEXT: Generic signature: <Self where Self : P2, Self : P3, Self.[P2]T == Int>
 extension P2 where Self : P3, T == Int {
-  func takeT31(_: T) {}
-  func takeT32(_: Self.T) {}
+  func takeT41(_: T) {}
+  func takeT52(_: Self.T) {}
 }
 
 extension P2 where Self : P3 {
-  func takeT41(_: T) {}
-  func takeT42(_: Self.T) {}
+  func takeT61(_: T) {}
+  func takeT62(_: Self.T) {}
 }
 
 protocol P4 : P2, P3 {
-  func takeT51(_: T)
-  func takeT52(_: Self.T)
+  func takeT71(_: T)
+  func takeT72(_: Self.T)
 }

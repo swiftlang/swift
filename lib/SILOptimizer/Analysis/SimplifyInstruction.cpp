@@ -66,8 +66,6 @@ namespace {
     SILValue
     visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI);
     SILValue visitEndCOWMutationInst(EndCOWMutationInst *ECM);
-    SILValue visitThinFunctionToPointerInst(ThinFunctionToPointerInst *TFTPI);
-    SILValue visitPointerToThinFunctionInst(PointerToThinFunctionInst *PTTFI);
     SILValue visitBeginAccessInst(BeginAccessInst *BAI);
     SILValue visitMetatypeInst(MetatypeInst *MTI);
     SILValue visitConvertFunctionInst(ConvertFunctionInst *cfi);
@@ -460,24 +458,6 @@ visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
   if (auto *Op = dyn_cast<UncheckedBitwiseCastInst>(UBCI->getOperand()))
     if (Op->getOperand()->getType() == UBCI->getType())
       return Op->getOperand();
-
-  return SILValue();
-}
-
-SILValue InstSimplifier::visitThinFunctionToPointerInst(ThinFunctionToPointerInst *TFTPI) {
-  // (thin_function_to_pointer (pointer_to_thin_function x)) -> x
-  if (auto *PTTFI = dyn_cast<PointerToThinFunctionInst>(TFTPI->getOperand()))
-    if (PTTFI->getOperand()->getType() == TFTPI->getType())
-      return PTTFI->getOperand();
-
-  return SILValue();
-}
-
-SILValue InstSimplifier::visitPointerToThinFunctionInst(PointerToThinFunctionInst *PTTFI) {
-  // (pointer_to_thin_function (thin_function_to_pointer x)) -> x
-  if (auto *TFTPI = dyn_cast<ThinFunctionToPointerInst>(PTTFI->getOperand()))
-    if (TFTPI->getOperand()->getType() == PTTFI->getType())
-      return TFTPI->getOperand();
 
   return SILValue();
 }

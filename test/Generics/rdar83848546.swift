@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -debug-generic-signatures -requirement-machine-protocol-signatures=on 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -debug-generic-signatures 2>&1 | %FileCheck %s
 
 // CHECK: 83848546.(file).Reporter@
 // CHECK-NEXT: Requirement signature: <Self where Self.[Reporter]SubReporterType : SubReporter>

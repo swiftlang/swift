@@ -59,7 +59,7 @@ let simplifyStrongReleasePass = InstructionPass<StrongReleaseInst>(
   // release of the class, squish the conversion.
   if let ier = op as? InitExistentialRefInst {
     if ier.uses.isSingleUse {
-      context.setOperand(of: release, at: 0, to: ier.operand)
+      release.setOperand(at: 0, to: ier.operand, context)
       context.erase(instruction: ier)
       return
     }
@@ -76,18 +76,18 @@ private func isNotReferenceCounted(value: Value, context: PassContext) -> Bool {
       return isNotReferenceCounted(value: uci.operand, context: context)
     case let urc as UncheckedRefCastInst:
       return isNotReferenceCounted(value: urc.operand, context: context)
-    case is GlobalValueInst:
+    case let gvi as GlobalValueInst:
       // Since Swift 5.1, statically allocated objects have "immortal" reference
-      // counts. Therefore we can safely eliminate unbalaced retains and
+      // counts. Therefore we can safely eliminate unbalanced retains and
       // releases, because they are no-ops on immortal objects.
       // Note that the `simplifyGlobalValuePass` pass is deleting balanced
       // retains/releases, which doesn't require a Swift 5.1 minimum deployment
-      // targert.
-      return context.isSwift51RuntimeAvailable
+      // target.
+      return gvi.function.isSwift51RuntimeAvailable
     case let rptr as RawPointerToRefInst:
       // Like `global_value` but for the empty collection singletons from the
       // stdlib, e.g. the empty Array singleton.
-      if context.isSwift51RuntimeAvailable {
+      if rptr.function.isSwift51RuntimeAvailable {
         // The pattern generated for empty collection singletons is:
         //     %0 = global_addr @_swiftEmptyArrayStorage
         //     %1 = address_to_pointer %0

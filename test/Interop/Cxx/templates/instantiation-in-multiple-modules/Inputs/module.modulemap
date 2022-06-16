@@ -1,0 +1,17 @@
+module Wrapper {
+  header "wrapper.h"
+  export *
+  requires cplusplus
+}
+
+module A {
+  header "a.h"
+  export *
+  requires cplusplus
+}
+
+module B {
+  header "b.h"
+  export *
+  requires cplusplus
+}

@@ -27,6 +27,7 @@
 #include "swift/AST/TBDGenRequests.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Dwarf.h"
+#include "swift/Basic/MD5Stream.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/Version.h"
@@ -69,7 +70,6 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormattedStream.h"
-#include "llvm/Support/MD5.h"
 #include "llvm/Support/Mutex.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Target/TargetMachine.h"
@@ -144,6 +144,11 @@ static void addAddressSanitizerPasses(const PassManagerBuilder &Builder,
 static void addThreadSanitizerPass(const PassManagerBuilder &Builder,
                                    legacy::PassManagerBase &PM) {
   PM.add(createThreadSanitizerLegacyPassPass());
+}
+
+static void addSwiftDbgAddrBlockSplitterPass(const PassManagerBuilder &Builder,
+                                             legacy::PassManagerBase &PM) {
+  PM.add(createSwiftDbgAddrBlockSplitter());
 }
 
 static void addSanitizerCoveragePass(const PassManagerBuilder &Builder,
@@ -289,6 +294,13 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
       });
   }
 
+  if (RunSwiftSpecificLLVMOptzns) {
+    PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
+                           addSwiftDbgAddrBlockSplitterPass);
+    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
+                           addSwiftDbgAddrBlockSplitterPass);
+  }
+
   // Configure the function passes.
   legacy::FunctionPassManager FunctionPasses(Module);
   FunctionPasses.add(createTargetTransformInfoWrapperPass(
@@ -352,7 +364,8 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
   // rely on any other LLVM ARC transformations, but we do need ARC
   // contraction to add the objc_retainAutoreleasedReturnValue
   // assembly markers and remove clang.arc.used.
-  if (Opts.shouldOptimize() && !DisableObjCARCContract)
+  if (Opts.shouldOptimize() && !DisableObjCARCContract &&
+      !Opts.DisableLLVMOptzns)
     ModulePasses.add(createObjCARCContractPass());
 
   // Do it.
@@ -375,30 +388,6 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
     }
   }
 }
-
-namespace {
-/// An output stream which calculates the MD5 hash of the streamed data.
-class MD5Stream : public llvm::raw_ostream {
-private:
-
-  uint64_t Pos = 0;
-  llvm::MD5 Hash;
-
-  void write_impl(const char *Ptr, size_t Size) override {
-    Hash.update(ArrayRef<uint8_t>(reinterpret_cast<const uint8_t *>(Ptr), Size));
-    Pos += Size;
-  }
-
-  uint64_t current_pos() const override { return Pos; }
-
-public:
-
-  void final(MD5::MD5Result &Result) {
-    flush();
-    Hash.final(Result);
-  }
-};
-} // end anonymous namespace
 
 /// Computes the MD5 hash of the llvm \p Module including the compiler version
 /// and options which influence the compilation.
@@ -771,6 +760,18 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
   opts.AsyncContextExtendedFrameEntry = PointerAuthSchema(
       dataKey, /*address*/ true, Discrimination::Constant,
       SpecialPointerAuthDiscriminators::SwiftAsyncContextExtendedFrameEntry);
+
+  opts.ExtendedExistentialTypeShape =
+      PointerAuthSchema(dataKey, /*address*/ false,
+                        Discrimination::Constant,
+                        SpecialPointerAuthDiscriminators
+                          ::ExtendedExistentialTypeShape);
+
+  opts.NonUniqueExtendedExistentialTypeShape =
+      PointerAuthSchema(dataKey, /*address*/ false,
+                        Discrimination::Constant,
+                        SpecialPointerAuthDiscriminators
+                          ::NonUniqueExtendedExistentialTypeShape);
 }
 
 std::unique_ptr<llvm::TargetMachine>
@@ -961,9 +962,8 @@ static void initLLVMModule(const IRGenModule &IGM, SILModule &SIL) {
 std::pair<IRGenerator *, IRGenModule *>
 swift::irgen::createIRGenModule(SILModule *SILMod, StringRef OutputFilename,
                                 StringRef MainInputFilenameForDebugInfo,
-                                StringRef PrivateDiscriminator) {
-
-  IRGenOptions Opts;
+                                StringRef PrivateDiscriminator,
+                                IRGenOptions &Opts) {
   IRGenerator *irgen = new IRGenerator(Opts, *SILMod);
   auto targetMachine = irgen->createTargetMachine();
   if (!targetMachine)
@@ -1032,7 +1032,6 @@ getSymbolSourcesToEmit(const IRGenDescriptor &desc) {
       irEntitiesToEmit.push_back(source->getIRLinkEntity());
       break;
     case SymbolSource::Kind::LinkerDirective:
-    case SymbolSource::Kind::CrossModuleOptimization:
     case SymbolSource::Kind::Unknown:
       llvm_unreachable("Not supported");
     }
@@ -1097,8 +1096,9 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
     for (auto *file : filesToEmit) {
       if (auto *nextSF = dyn_cast<SourceFile>(file)) {
         IGM.emitSourceFile(*nextSF);
-      } else if (auto *nextSFU = dyn_cast<SynthesizedFileUnit>(file)) {
-        IGM.emitSynthesizedFileUnit(*nextSFU);
+        if (auto *synthSFU = file->getSynthesizedFile()) {
+          IGM.emitSynthesizedFileUnit(*synthSFU);
+        }
       } else {
         file->collectLinkLibraries([&IGM](LinkLibrary LinkLib) {
           IGM.addLinkLibrary(LinkLib);
@@ -1340,11 +1340,15 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
 
   for (auto *File : M->getFiles()) {
     if (auto *SF = dyn_cast<SourceFile>(File)) {
-      CurrentIGMPtr IGM = irgen.getGenModule(SF);
-      IGM->emitSourceFile(*SF);
-    } else if (auto *nextSFU = dyn_cast<SynthesizedFileUnit>(File)) {
-      CurrentIGMPtr IGM = irgen.getGenModule(nextSFU);
-      IGM->emitSynthesizedFileUnit(*nextSFU);
+      {
+        CurrentIGMPtr IGM = irgen.getGenModule(SF);
+        IGM->emitSourceFile(*SF);
+      }
+      
+      if (auto *synthSFU = File->getSynthesizedFile()) {
+        CurrentIGMPtr IGM = irgen.getGenModule(synthSFU);
+        IGM->emitSynthesizedFileUnit(*synthSFU);
+      }
     } else {
       File->collectLinkLibraries([&](LinkLibrary LinkLib) {
         irgen.getPrimaryIGM()->addLinkLibrary(LinkLib);
@@ -1486,7 +1490,8 @@ GeneratedModule swift::performIRGeneration(
       outModuleHash);
 
   if (Opts.shouldPerformIRGenerationInParallel() &&
-      !parallelOutputFilenames.empty()) {
+      !parallelOutputFilenames.empty() &&
+      !Opts.UseSingleModuleLLVMEmission) {
     ::performParallelIRGeneration(desc);
     // TODO: Parallel LLVM compilation cannot be used if a (single) module is
     // needed as return value.

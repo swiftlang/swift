@@ -58,6 +58,12 @@ SILBasicBlock *SILGenFunction::createBasicBlock() {
   }
 }
 
+SILBasicBlock *SILGenFunction::createBasicBlock(llvm::StringRef debugName) {
+  auto block = createBasicBlock();
+  block->setDebugName(debugName);
+  return block;
+}
+
 SILBasicBlock *SILGenFunction::createBasicBlock(FunctionSection section) {
   switch (section) {
   case FunctionSection::Ordinary: {
@@ -182,8 +188,6 @@ namespace {
     StmtEmitter(SILGenFunction &sgf) : SGF(sgf) {}
 #define STMT(ID, BASE) void visit##ID##Stmt(ID##Stmt *S);
 #include "swift/AST/StmtNodes.def"
-
-    void visitAsyncForEachStmt(ForEachStmt *S);
 
     ASTContext &getASTContext() { return SGF.getASTContext(); }
 
@@ -1014,267 +1018,12 @@ void StmtEmitter::visitRepeatWhileStmt(RepeatWhileStmt *S) {
   SGF.BreakContinueDestStack.pop_back();
 }
 
-void StmtEmitter::visitAsyncForEachStmt(ForEachStmt *S) {
-
-  // Dig out information about the sequence conformance.
-  auto sequenceConformance = S->getSequenceConformance();
-  Type sequenceType = S->getSequence()->getType();
-  
-  auto asyncSequenceProto =
-      SGF.getASTContext().getProtocol(KnownProtocolKind::AsyncSequence);
-  auto sequenceSubs = SubstitutionMap::getProtocolSubstitutions(
-      asyncSequenceProto, sequenceType, sequenceConformance);
-
-  // Emit the 'generator' variable that we'll be using for iteration.
-  LexicalScope OuterForScope(SGF, CleanupLocation(S));
-  {
-    auto initialization =
-        SGF.emitInitializationForVarDecl(S->getIteratorVar(), false);
-    SILLocation loc = SILLocation(S->getSequence());
-
-    // Compute the reference to the AsyncSequence's makeAsyncSequence().
-    FuncDecl *makeGeneratorReq = 
-      SGF.getASTContext().getAsyncSequenceMakeAsyncIterator();
-    ConcreteDeclRef makeGeneratorRef(makeGeneratorReq, sequenceSubs);
-
-    // Call makeAsyncSequence().
-    RValue result = SGF.emitApplyMethod(
-        loc, makeGeneratorRef, ArgumentSource(S->getSequence()),
-        PreparedArguments(ArrayRef<AnyFunctionType::Param>({})),
-        SGFContext(initialization.get()));
-    if (!result.isInContext()) {
-      ArgumentSource(SILLocation(S->getSequence()),
-                     std::move(result).ensurePlusOne(SGF, loc))
-          .forwardInto(SGF, initialization.get());
-    }
-  }
-
-  // If we ever reach an unreachable point, stop emitting statements.
-  // This will need revision if we ever add goto.
-  if (!SGF.B.hasValidInsertionPoint()) return;
-  
-  // If generator's optional result is address-only, create a stack allocation
-  // to hold the results.  This will be initialized on every entry into the loop
-  // header and consumed by the loop body. On loop exit, the terminating value
-  // will be in the buffer.
-  CanType optTy;
-  if (S->getConvertElementExpr()) {
-    optTy = S->getConvertElementExpr()->getType()->getCanonicalType();
-  } else {
-    optTy = OptionalType::get(S->getSequenceConformance().getTypeWitnessByName(
-                                  S->getSequence()->getType(),
-                                  SGF.getASTContext().Id_Element))
-                ->getCanonicalType();
-  }
-  auto &optTL = SGF.getTypeLowering(optTy);
-  SILValue addrOnlyBuf;
-  ManagedValue nextBufOrValue;
-
-  if (optTL.isAddressOnly() && SGF.silConv.useLoweredAddresses())
-    addrOnlyBuf = SGF.emitTemporaryAllocation(S, optTL.getLoweredType());
-
-  // Create a new basic block and jump into it.
-  JumpDest loopDest = createJumpDest(S->getBody());
-  SGF.B.emitBlock(loopDest.getBlock(), S);
-
-  // Compute the reference to the the generator's next() && cancel().
-  auto generatorProto =
-      SGF.getASTContext().getProtocol(KnownProtocolKind::AsyncIteratorProtocol);
-  ValueDecl *generatorNextReq = generatorProto->getSingleRequirement(
-      DeclName(SGF.getASTContext(), SGF.getASTContext().Id_next,
-               ArrayRef<Identifier>()));
-  auto generatorAssocType =
-      asyncSequenceProto->getAssociatedType(SGF.getASTContext().Id_AsyncIterator);
-  auto generatorMemberRef = DependentMemberType::get(
-      asyncSequenceProto->getSelfInterfaceType(), generatorAssocType);
-  auto generatorType = sequenceConformance.getAssociatedType(
-      sequenceType, generatorMemberRef);
-  auto generatorConformance = sequenceConformance.getAssociatedConformance(
-      sequenceType, generatorMemberRef, generatorProto);
-  auto generatorSubs = SubstitutionMap::getProtocolSubstitutions(
-      generatorProto, generatorType, generatorConformance);
-  ConcreteDeclRef generatorNextRef(generatorNextReq, generatorSubs);
-
-  // Set the destinations for 'break' and 'continue'.
-  JumpDest endDest = createJumpDest(S->getBody());
-  SGF.BreakContinueDestStack.push_back({ S, endDest, loopDest });
-  
-
-  auto buildArgumentSource = [&]() {
-    if (cast<FuncDecl>(generatorNextRef.getDecl())->getSelfAccessKind() ==
-        SelfAccessKind::Mutating) {
-      LValue lv =
-          SGF.emitLValue(S->getIteratorVarRef(), SGFAccessKind::ReadWrite);
-      return ArgumentSource(S, std::move(lv));
-    }
-    LValue lv =
-        SGF.emitLValue(S->getIteratorVarRef(), SGFAccessKind::OwnedObjectRead);
-    return ArgumentSource(
-        S, SGF.emitLoadOfLValue(S->getIteratorVarRef(), std::move(lv),
-                                SGFContext().withFollowingSideEffects()));
-  };
-
-  auto buildElementRValue = [&](SILLocation loc, SGFContext ctx) {
-    RValue result;
-    result = SGF.emitApplyMethod(
-        loc, generatorNextRef, buildArgumentSource(),
-        PreparedArguments(ArrayRef<AnyFunctionType::Param>({})),
-        S->getElementExpr() ? SGFContext() : ctx);
-    if (S->getElementExpr()) {
-      SILGenFunction::OpaqueValueRAII pushOpaqueValue(
-          SGF, S->getElementExpr(),
-          std::move(result).getAsSingleValue(SGF, loc));
-      result = SGF.emitRValue(S->getConvertElementExpr(), ctx);
-    }
-    return result;
-  };
-
-  // Then emit the loop destination block.
-  //
-  // Advance the generator.  Use a scope to ensure that any temporary stack
-  // allocations in the subexpression are immediately released.
-  if (optTL.isAddressOnly() && SGF.silConv.useLoweredAddresses()) {
-    // Create the initialization outside of the innerForScope so that the
-    // innerForScope doesn't clean it up.
-    auto nextInit = SGF.useBufferAsTemporary(addrOnlyBuf, optTL);
-    {
-      ArgumentScope innerForScope(SGF, SILLocation(S));
-      SILLocation loc = SILLocation(S);
-      RValue result = buildElementRValue(loc, SGFContext(nextInit.get()));
-      if (!result.isInContext()) {
-        ArgumentSource(SILLocation(S->getSequence()),
-                       std::move(result).ensurePlusOne(SGF, loc))
-            .forwardInto(SGF, nextInit.get());
-      }
-      innerForScope.pop();
-    }
-    nextBufOrValue = nextInit->getManagedAddress();
-  } else {
-    ArgumentScope innerForScope(SGF, SILLocation(S));
-    nextBufOrValue = innerForScope.popPreservingValue(
-        buildElementRValue(SILLocation(S), SGFContext())
-            .getAsSingleValue(SGF, SILLocation(S)));
-  }
-
-  SILBasicBlock *failExitingBlock = createBasicBlock();
-  SwitchEnumBuilder switchEnumBuilder(SGF.B, S, nextBufOrValue);
-
-  switchEnumBuilder.addOptionalSomeCase(
-      createBasicBlock(), loopDest.getBlock(),
-      [&](ManagedValue inputValue, SwitchCaseFullExpr &&scope) {
-        SGF.emitProfilerIncrement(S->getBody());
-
-        // Emit the loop body.
-        // The declared variable(s) for the current element are destroyed
-        // at the end of each loop iteration.
-        {
-          Scope innerForScope(SGF.Cleanups, CleanupLocation(S->getBody()));
-          // Emit the initialization for the pattern.  If any of the bound
-          // patterns
-          // fail (because this is a 'for case' pattern with a refutable
-          // pattern,
-          // the code should jump to the continue block.
-          InitializationPtr initLoopVars =
-              SGF.emitPatternBindingInitialization(S->getPattern(), loopDest);
-
-          // If we had a loadable "next" generator value, we know it is present.
-          // Get the value out of the optional, and wrap it up with a cleanup so
-          // that any exits out of this scope properly clean it up.
-          //
-          // *NOTE* If we do not have an address only value, then inputValue is
-          // *already properly unwrapped.
-          if (optTL.isAddressOnly() && SGF.silConv.useLoweredAddresses()) {
-            inputValue = SGF.emitUncheckedGetOptionalValueFrom(
-                S, inputValue, optTL, SGFContext(initLoopVars.get()));
-          }
-
-          if (!inputValue.isInContext())
-            RValue(SGF, S, optTy.getOptionalObjectType(), inputValue)
-                .forwardInto(SGF, S, initLoopVars.get());
-
-          // Now that the pattern has been initialized, check any where
-          // condition.
-          // If it fails, loop around as if 'continue' happened.
-          if (auto *Where = S->getWhere()) {
-            auto cond = SGF.emitCondition(Where, /*invert*/ true);
-            // If self is null, branch to the epilog.
-            cond.enterTrue(SGF);
-            SGF.Cleanups.emitBranchAndCleanups(loopDest, Where, {});
-            cond.exitTrue(SGF);
-            cond.complete(SGF);
-          }
-
-          visit(S->getBody());
-        }
-
-        // If we emitted an unreachable in the body, we will not have a valid
-        // insertion point. Just return early.
-        if (!SGF.B.hasValidInsertionPoint()) {
-          scope.unreachableExit();
-          return;
-        }
-
-        // Otherwise, associate the loop body's closing brace with this branch.
-        RegularLocation L(S->getBody());
-        L.pointToEnd();
-        scope.exitAndBranch(L);
-      },
-      SGF.loadProfilerCount(S->getBody()));
-
-  // We add loop fail block, just to be defensive about intermediate
-  // transformations performing cleanups at scope.exit(). We still jump to the
-  // contBlock.
-  switchEnumBuilder.addOptionalNoneCase(
-      createBasicBlock(), failExitingBlock,
-      [&](ManagedValue inputValue, SwitchCaseFullExpr &&scope) {
-        assert(!inputValue && "None should not be passed an argument!");
-        scope.exitAndBranch(S);
-      },
-      SGF.loadProfilerCount(S));
-
-  std::move(switchEnumBuilder).emit();
-
-  SGF.B.emitBlock(failExitingBlock);
-  emitOrDeleteBlock(SGF, endDest, S);
-  SGF.BreakContinueDestStack.pop_back();
-}
-
 void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
-  if (S->getAwaitLoc().isValid()) {
-    visitAsyncForEachStmt(S);
-    return;
-  }
-
-  // Dig out information about the sequence conformance.
-  auto sequenceConformance = S->getSequenceConformance();
-  Type sequenceType = S->getSequence()->getType();
-  
-  auto sequenceProto =
-      SGF.getASTContext().getProtocol(KnownProtocolKind::Sequence);
-  auto sequenceSubs = SubstitutionMap::getProtocolSubstitutions(
-      sequenceProto, sequenceType, sequenceConformance);
-
   // Emit the 'iterator' variable that we'll be using for iteration.
   LexicalScope OuterForScope(SGF, CleanupLocation(S));
   {
-    auto initialization =
-        SGF.emitInitializationForVarDecl(S->getIteratorVar(), false);
-    SILLocation loc = SILLocation(S->getSequence());
-
-    // Compute the reference to the Sequence's makeIterator().
-    FuncDecl *makeIteratorReq = SGF.getASTContext().getSequenceMakeIterator();
-    ConcreteDeclRef makeIteratorRef(makeIteratorReq, sequenceSubs);
-
-    // Call makeIterator().
-    RValue result = SGF.emitApplyMethod(
-        loc, makeIteratorRef, ArgumentSource(S->getSequence()),
-        PreparedArguments(ArrayRef<AnyFunctionType::Param>({})),
-        SGFContext(initialization.get()));
-    if (!result.isInContext()) {
-      ArgumentSource(SILLocation(S->getSequence()),
-                     std::move(result).ensurePlusOne(SGF, loc))
-          .forwardInto(SGF, initialization.get());
-    }
+    SGF.emitPatternBinding(S->getIteratorVar(),
+                           /*index=*/0);
   }
 
   // If we ever reach an unreachable point, stop emitting statements.
@@ -1285,11 +1034,7 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   // to hold the results.  This will be initialized on every entry into the loop
   // header and consumed by the loop body. On loop exit, the terminating value
   // will be in the buffer.
-  CanType optTy =
-      OptionalType::get(
-          S->getSequenceConformance().getTypeWitnessByName(
-              S->getSequence()->getType(), SGF.getASTContext().Id_Element))
-          ->getCanonicalType();
+  CanType optTy = S->getNextCall()->getType()->getCanonicalType();
   auto &optTL = SGF.getTypeLowering(optTy);
 
   SILValue addrOnlyBuf;
@@ -1307,45 +1052,11 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   JumpDest endDest = createJumpDest(S->getBody());
   SGF.BreakContinueDestStack.push_back({ S, endDest, loopDest });
 
-  // Compute the reference to the the iterator's next().
-  auto iteratorProto =
-      SGF.getASTContext().getProtocol(KnownProtocolKind::IteratorProtocol);
-  ValueDecl *iteratorNextReq = iteratorProto->getSingleRequirement(
-      DeclName(SGF.getASTContext(), SGF.getASTContext().Id_next,
-               ArrayRef<Identifier>()));
-  auto iteratorAssocType =
-      sequenceProto->getAssociatedType(SGF.getASTContext().Id_Iterator);
-  auto iteratorMemberRef = DependentMemberType::get(
-      sequenceProto->getSelfInterfaceType(), iteratorAssocType);
-  auto iteratorType = sequenceConformance.getAssociatedType(
-      sequenceType, iteratorMemberRef);
-  auto iteratorConformance = sequenceConformance.getAssociatedConformance(
-      sequenceType, iteratorMemberRef, iteratorProto);
-  auto iteratorSubs = SubstitutionMap::getProtocolSubstitutions(
-      iteratorProto, iteratorType, iteratorConformance);
-  ConcreteDeclRef iteratorNextRef(iteratorNextReq, iteratorSubs);
-
-  auto buildArgumentSource = [&]() {
-    if (cast<FuncDecl>(iteratorNextRef.getDecl())->getSelfAccessKind() ==
-        SelfAccessKind::Mutating) {
-      LValue lv =
-          SGF.emitLValue(S->getIteratorVarRef(), SGFAccessKind::ReadWrite);
-      return ArgumentSource(S, std::move(lv));
-    }
-    LValue lv =
-        SGF.emitLValue(S->getIteratorVarRef(), SGFAccessKind::OwnedObjectRead);
-    return ArgumentSource(
-        S, SGF.emitLoadOfLValue(S->getIteratorVarRef(), std::move(lv),
-                                SGFContext().withFollowingSideEffects()));
-  };
-
   bool hasElementConversion = S->getElementExpr();
-  auto buildElementRValue = [&](SILLocation loc, SGFContext ctx) {
+  auto buildElementRValue = [&](SGFContext ctx) {
     RValue result;
-    result = SGF.emitApplyMethod(
-        loc, iteratorNextRef, buildArgumentSource(),
-        PreparedArguments(ArrayRef<AnyFunctionType::Param>({})),
-        hasElementConversion ? SGFContext() : ctx);
+    result = SGF.emitRValue(S->getNextCall(),
+                            hasElementConversion ? SGFContext() : ctx);
     return result;
   };
 
@@ -1361,9 +1072,9 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
     {
       ArgumentScope innerForScope(SGF, SILLocation(S));
       SILLocation loc = SILLocation(S);
-      RValue result = buildElementRValue(loc, SGFContext(nextInit.get()));
+      RValue result = buildElementRValue(SGFContext(nextInit.get()));
       if (!result.isInContext()) {
-        ArgumentSource(SILLocation(S->getSequence()),
+        ArgumentSource(SILLocation(S->getTypeCheckedSequence()),
                        std::move(result).ensurePlusOne(SGF, loc))
             .forwardInto(SGF, nextInit.get());
       }
@@ -1373,7 +1084,7 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   } else {
     ArgumentScope innerForScope(SGF, SILLocation(S));
     nextBufOrElement = innerForScope.popPreservingValue(
-        buildElementRValue(SILLocation(S), SGFContext())
+        buildElementRValue(SGFContext())
             .getAsSingleValue(SGF, SILLocation(S)));
   }
 

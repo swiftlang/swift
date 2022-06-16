@@ -25,6 +25,7 @@ toolchain as a one-off, there are a couple of differences:
 - [Editing code](#editing-code)
   - [Setting up your fork](#setting-up-your-fork)
   - [First time Xcode setup](#first-time-xcode-setup)
+  - [Other IDEs setup](#other-ides-setup)
   - [Editing](#editing)
   - [Incremental builds with Ninja](#incremental-builds-with-ninja)
   - [Incremental builds with Xcode](#incremental-builds-with-xcode)
@@ -118,7 +119,7 @@ Double-check that running `pwd` prints a path ending with `swift`.
 - If `update-checkout` failed, double-check that the absolute path to your
   working directory does not have non-ASCII characters.
 - If `update-checkout` failed and the absolute path to your working directory
-  had spaces in it, please [file a bug report][Swift JIRA] and change the path
+  had spaces in it, please [file a bug report][Swift Issues] and change the path
   to work around it.
 - Before running `update-checkout`, double-check that `swift` is the only
   repository inside the `swift-project` directory. Otherwise,
@@ -127,8 +128,6 @@ Double-check that running `pwd` prints a path ending with `swift`.
 ## Installing dependencies
 
 ### macOS
-
-⚠️ Since version 0.2.14, `sccache` no longer caches compile commands issued by `build-script` because of [sccache PR 898](https://github.com/mozilla/sccache/pull/898), since `build-script` adds the `-arch x86_64` argument twice. The instructions below may install `sccache` 0.2.14 or newer. You may want to instead download and install an older release from their [Releases page](https://github.com/mozilla/sccache/releases) until this issue is resolved.
 
 1. Install [Xcode 13 beta 4][Xcode] or newer:
    The required version of Xcode changes frequently and is often a beta release.
@@ -156,7 +155,6 @@ Double-check that running `pwd` prints a path ending with `swift`.
 1. The latest Linux dependencies are listed in the respective Dockerfiles:
    * [Ubuntu 20.04](https://github.com/apple/swift-docker/blob/main/swift-ci/master/ubuntu/20.04/Dockerfile)
    * [CentOS 7](https://github.com/apple/swift-docker/blob/main/swift-ci/master/centos/7/Dockerfile)
-   * [CentOS 8](https://github.com/apple/swift-docker/blob/main/swift-ci/master/centos/8/Dockerfile)
    * [Amazon Linux 2](https://github.com/apple/swift-docker/blob/main/swift-ci/master/amazon-linux/2/Dockerfile)
 
 2. To install sccache (optional):
@@ -284,6 +282,8 @@ The additional flexibility comes with two issues: (1) consuming much more disk
 space and (2) you need to maintain the two builds in sync, which needs extra
 care when moving across branches.
 
+It is even possible to integrate the Ninja build into Xcode. For details on how to set this up see [Using Ninja with Xcode in DevelopmentTips.md](/docs/DevelopmentTips.md#using-ninja-with-xcode).
+
 ### Troubleshooting build issues
 
 - Double-check that all projects are checked out at the right branches.
@@ -295,9 +295,8 @@ care when moving across branches.
   [meet the minimum required versions](#spot-check-dependencies).
 - Check if there are spaces in the paths being used by `build-script` in
   the log. While `build-script` should work with paths containing spaces,
-  sometimes bugs do slip through, such as
-  [SR-13441](https://bugs.swift.org/browse/SR-13441).
-  If this is the case, please [file a bug report][Swift JIRA] and change the path
+  sometimes bugs do slip through, such as [#55883](https://github.com/apple/swift/issues/55883).
+  If this is the case, please [file a bug report][Swift Issues] and change the path
   to work around it.
 - Check that your `build-script` invocation doesn't have typos. You can compare
   the flags you passed against the supported flags listed by
@@ -307,7 +306,7 @@ care when moving across branches.
   and looking at the first error may be more helpful than simply looking
   at the last error.
 - Check if others have encountered the same issue on the Swift forums or on
-  [Swift JIRA][].
+  [Swift repository 'Issues' tab][Swift Issues].
 - Create a new Swift forums thread in the Development category. Include
   information about your configuration and the errors you are seeing.
   - You can [create a gist](https://gist.github.com) with the entire build
@@ -315,7 +314,7 @@ care when moving across branches.
     build log in the post.
   - Include the output of `utils/update-checkout --dump-hashes`.
 
-[Swift JIRA]: https://bugs.swift.org
+[Swift Issues]: https://github.com/apple/swift/issues
 
 ## Editing code
 
@@ -357,6 +356,29 @@ select the following schemes:
   on the commandline for more fine-grained control over which exact tests are
   run.
 <!-- TODO: Insert SourceKit/stdlib specific instructions? -->
+
+### Other IDEs setup
+
+You can also use other editors and IDEs to work on Swift.
+
+#### IntelliJ CLion
+
+CLion supports CMake and Ninja. In order to configure it properly, build the swift project first using the `build-script`, then open the `swift` directory with CLion and proceed to project settings (`cmd + ,`).
+
+In project settings, locate `Build, Execution, Deployment > CMake`. You will need to create a new profile named `RelWithDebInfoAssert` (or `Debug` if going to point it at the debug build). Enter the following information:
+
+- Name: mirror the name of the build configuration here, e.g. `RelWithDebInfoAssert` or `Debug`
+- Build type: This corresponds to `CMAKE_BUILD_TYPE` so should be e.g. `RelWithDebInfoAssert` or `Debug`
+    - latest versions of the IDE suggest valid values here. Generally `RelWithDebInfoAssert` is a good one to work with
+- Toolchain: Default should be fine
+- Generator: Ninja
+- CMake options:
+    - `-D SWIFT_PATH_TO_CMARK_BUILD=SOME_PATH/swift-project/build/Ninja-RelWithDebInfoAssert/cmark-macosx-arm64 -D LLVM_DIR=SOME_PATH/swift-project/build/Ninja-RelWithDebInfoAssert/llvm-macosx-arm64/lib/cmake/llvm -D Clang_DIR=SOME_PATH/swift-project/build/Ninja-RelWithDebInfoAssert/llvm-macosx-arm64/lib/cmake/clang -D CMAKE_BUILD_TYPE=RelWithDebInfoAssert -G Ninja -S .`
+    - replace the `SOME_PATH` to the path where your `swift-project` directory is
+    - the CMAKE_BUILD_TYPE should match the build configuration name, so if you named this profile `RelWithDebInfo` the CMAKE_BUILD_TYPE should also be `RelWithDebInfo`
+    - **Note**: If you're using an intel machine to build swift, you'll need to replace the architecture in the options. (ex: `arm64` with `x86_64`)
+
+With this done, CLion should be able to successfully import the project and have full autocomplete and code navigation powers.
 
 ### Editing
 
@@ -601,4 +623,4 @@ Make sure you check out the following resources:
 If you see mistakes in the documentation (including typos, not just major
 errors) or identify gaps that you could potentially improve the contributing
 experience, please start a discussion on the forums, submit a pull request
-or file a bug report on [Swift JIRA][]. Thanks!
+or file a bug report on [Swift repository 'Issues' tab][Swift Issues]. Thanks!

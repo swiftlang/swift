@@ -1,0 +1,175 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s | %FileCheck %s
+
+// Test that the LoadBorrowImmutabilityChecker accepts these cases.
+// The verification should not bail-out on these, but there's no way
+// to check that.
+
+// RUN: %target-sil-opt -enable-sil-verify-all %s -global-opt | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+private var testGlobal: Int64
+
+sil_global private @globalinit_33_00F4D2139E6BDDFEC71E5005B67B5674_token0 : $Builtin.Word
+
+sil_global private @$s4test10testGlobalSivp : $Int64
+
+sil private @globalinit_33_00F4D2139E6BDDFEC71E5005B67B5674_func0 : $@convention(c) () -> () {
+bb0:
+  alloc_global @$s4test10testGlobalSivp
+  %1 = global_addr @$s4test10testGlobalSivp : $*Int64
+  %2 = integer_literal $Builtin.Int64, 27
+  %3 = struct $Int64 (%2 : $Builtin.Int64)
+  store %3 to %1 : $*Int64
+  %5 = tuple ()
+  return %5 : $()
+}
+
+sil hidden [global_init] @$s4test10testGlobalSivau : $@convention(thin) () -> Builtin.RawPointer {
+bb0:
+  %0 = global_addr @globalinit_33_00F4D2139E6BDDFEC71E5005B67B5674_token0 : $*Builtin.Word
+  %1 = address_to_pointer %0 : $*Builtin.Word to $Builtin.RawPointer
+  %2 = function_ref @globalinit_33_00F4D2139E6BDDFEC71E5005B67B5674_func0 : $@convention(c) () -> ()
+  %3 = builtin "once"(%1 : $Builtin.RawPointer, %2 : $@convention(c) () -> ()) : $()
+  %4 = global_addr @$s4test10testGlobalSivp : $*Int64
+  %5 = address_to_pointer %4 : $*Int64 to $Builtin.RawPointer
+  return %5 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil @dont_propagate_global_with_multiple_writes
+// CHECK:   [[V:%[0-9]+]] = load
+// CHECK:   return [[V]]
+// CHECK: } // end sil function 'dont_propagate_global_with_multiple_writes'
+sil @dont_propagate_global_with_multiple_writes : $@convention(thin) (Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %2 = function_ref @$s4test10testGlobalSivau : $@convention(thin) () -> Builtin.RawPointer
+  %3 = apply %2() : $@convention(thin) () -> Builtin.RawPointer
+  %4 = pointer_to_address %3 : $Builtin.RawPointer to [strict] $*Int64
+  %5 = integer_literal $Builtin.Int64, 42
+  %6 = struct $Int64 (%5 : $Builtin.Int64)
+  %7 = begin_access [modify] [dynamic] [no_nested_conflict] %4 : $*Int64
+  store %6 to %7 : $*Int64
+  end_access %7 : $*Int64
+  %33 = begin_access [read] [dynamic] [no_nested_conflict] %4 : $*Int64
+  %35 = load %33 : $*Int64
+  end_access %33 : $*Int64
+  return %35 : $Int64
+}
+
+// CHECK-LABEL: sil [ossa] @test_borrow_init_enum_addr : $@convention(thin) (@owned AnyObject) -> () {
+// CHECK: bb0(%0 : @owned $AnyObject):
+// CHECK: [[ALLOC:%.*]] = alloc_stack $Optional<AnyObject>
+// CHECK: init_enum_data_addr [[ALLOC]] : $*Optional<AnyObject>, #Optional.some!enumelt
+// CHECK: load_borrow [[ALLOC]] : $*Optional<AnyObject>
+// CHECK-LABEL: } // end sil function 'test_borrow_init_enum_addr'
+sil [ossa] @test_borrow_init_enum_addr : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : @owned $AnyObject):
+  %1 = alloc_stack $Optional<AnyObject>
+  %2 = init_enum_data_addr %1 : $*Optional<AnyObject>, #Optional.some!enumelt
+  store %0 to [init] %2 : $*AnyObject
+  inject_enum_addr %1 : $*Optional<AnyObject>, #Optional.some!enumelt
+  %5 = load_borrow %1 : $*Optional<AnyObject>
+  end_borrow %5 : $Optional<AnyObject>
+  destroy_addr %1 : $*Optional<AnyObject>
+  dealloc_stack %1 : $*Optional<AnyObject>
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// unchecked_ownership_conversion should not be considered a write to memory.
+class ObjectWrapper {
+  var object: AnyObject
+}
+
+// CHECK-LABEL: sil [ossa] @unchecked_ownership_conversion_test : $@convention(thin) (@guaranteed ObjectWrapper) -> @owned ObjectWrapper {
+// CHECK: bb0(%0 : @guaranteed $ObjectWrapper):
+// CHECK:   load_borrow
+// CHECK:   unchecked_ownership_conversion %0 : $ObjectWrapper, @guaranteed to @owned
+// CHECK:   end_borrow
+// CHECK-LABEL: } // end sil function 'unchecked_ownership_conversion_test'
+sil [ossa] @unchecked_ownership_conversion_test : $@convention(thin) (@guaranteed ObjectWrapper) -> @owned ObjectWrapper {
+bb0(%0 : @guaranteed $ObjectWrapper):
+  %1 = ref_element_addr %0 : $ObjectWrapper, #ObjectWrapper.object
+  %2 = load_borrow %1 : $*AnyObject
+  %3 = unchecked_ownership_conversion %0 : $ObjectWrapper, @guaranteed to @owned
+  end_borrow %2 : $AnyObject
+  return %3 : $ObjectWrapper
+}
+
+final class B { }
+
+final class K {
+  @_hasStorage public var x: B { get }
+  init()
+}
+
+sil [ossa] @test_dealloc_ref : $@convention(thin) (@owned K) -> () {
+bb0(%0 : @owned $K):
+  %1 = begin_borrow %0 : $K
+  %2 = ref_element_addr %1 : $K, #K.x
+  %3 = begin_access [read] [dynamic] %2 : $*B
+  %4 = load_borrow %3 : $*B
+  end_borrow %4 : $B
+  end_access %3 : $*B
+  end_borrow %1 : $K
+  dealloc_ref %0 : $K
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [ossa] @test_dealloc_partial_ref : $@convention(thin) (@owned K) -> () {
+bb0(%0 : @owned $K):
+  %1 = begin_borrow %0 : $K
+  %2 = ref_element_addr %1 : $K, #K.x
+  %3 = begin_access [read] [dynamic] %2 : $*B
+  %4 = load_borrow %3 : $*B
+  end_borrow %4 : $B
+  end_access %3 : $*B
+  end_borrow %1 : $K
+  %8 = metatype $@thick K.Type
+  dealloc_partial_ref %0 : $K, %8 : $@thick K.Type
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [ossa] @test_end_lifetime : $@convention(thin) (@owned K) -> () {
+bb0(%0 : @owned $K):
+  %1 = begin_borrow %0 : $K
+  %2 = ref_element_addr %1 : $K, #K.x
+  %3 = begin_access [read] [dynamic] %2 : $*B
+  %4 = load_borrow %3 : $*B
+  end_borrow %4 : $B
+  end_access %3 : $*B
+  %cast = unchecked_ref_cast %1 : $K to $Builtin.NativeObject
+  %conv1 = unchecked_ownership_conversion %cast : $Builtin.NativeObject, @guaranteed to @owned
+  end_borrow %1 : $K
+  end_lifetime %0 : $K
+  %conv2 = unchecked_ref_cast %conv1 : $Builtin.NativeObject to $K
+  dealloc_ref %conv2 : $K
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @use_guaranteed : $@convention(thin) (@guaranteed K) -> ()
+
+sil [ossa] @test_write_reborrow : $@convention(thin) (@owned K, @owned K) -> () {
+bb0(%0 : @owned $K, %1 : @owned $K):
+  %stk = alloc_stack [lexical] $K
+  store %0 to [init] %stk : $*K
+  %ld1 = load_borrow %stk : $*K
+  br bb2(%ld1 : $K)
+
+bb2(%ld : @guaranteed $K):
+  %3 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed K) -> ()
+  %4 = apply %3(%ld) : $@convention(thin) (@guaranteed K) -> ()
+  end_borrow %ld : $K
+  store %1 to [assign] %stk : $*K
+  destroy_addr %stk : $*K
+  dealloc_stack %stk : $*K
+  %6 = tuple ()
+  return %6 : $()
+}
+

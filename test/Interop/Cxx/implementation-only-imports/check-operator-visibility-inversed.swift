@@ -8,7 +8,6 @@
 // that the operator decl can be found when at least one of the
 // modules is not `@_implementationOnly`.
 
-
 import UserA
 @_implementationOnly import UserB
 

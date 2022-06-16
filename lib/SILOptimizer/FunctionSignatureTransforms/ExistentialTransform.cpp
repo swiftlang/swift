@@ -123,7 +123,7 @@ collectExistentialConformances(ModuleDecl *M, CanType openedType,
 
   SmallVector<ProtocolConformanceRef, 4> conformances;
   for (auto proto : protocols) {
-    auto conformance = M->lookupConformance(openedType, proto->getDecl());
+    auto conformance = M->lookupConformance(openedType, proto);
     assert(conformance);
     conformances.push_back(conformance);
   }
@@ -447,7 +447,9 @@ void ExistentialTransform::populateThunkBody() {
       auto OrigOperand = ThunkBody->getArgument(ArgDesc.Index);
       auto SwiftType = ArgDesc.Arg->getType().getASTType();
       auto OpenedType =
-          SwiftType->openAnyExistentialType(Opened)->getCanonicalType();
+          SwiftType
+              ->openAnyExistentialType(Opened, F->getGenericSignature())
+              ->getCanonicalType();
       auto OpenedSILType = NewF->getLoweredType(OpenedType);
       SILValue archetypeValue;
       auto ExistentialRepr =

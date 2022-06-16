@@ -317,6 +317,15 @@ public:
     return { Files.begin(), Files.size() };
   }
 
+  /// Add the given file to this module.
+  ///
+  /// FIXME: Remove this function from public view. Modules never need to add
+  /// files once they are created.
+  ///
+  /// \warning There are very few safe points to call this function once a
+  /// \c ModuleDecl has been created. If you find yourself needing to insert
+  /// a file in the middle of e.g. semantic analysis, use a \c
+  /// SynthesizedFileUnit instead.
   void addFile(FileUnit &newFile);
 
   /// Creates a map from \c #filePath strings to corresponding \c #fileID
@@ -780,7 +789,7 @@ public:
   /// shadowed clang module. It does not force synthesized top-level decls that
   /// should be printed to be added; use \c swift::getTopLevelDeclsForDisplay()
   /// for that.
-  void getDisplayDecls(SmallVectorImpl<Decl*> &results) const;
+  void getDisplayDecls(SmallVectorImpl<Decl*> &results, bool recursive = false) const;
 
   using LinkLibraryCallback = llvm::function_ref<void(LinkLibrary)>;
 
@@ -938,6 +947,9 @@ inline bool DeclContext::isModuleScopeContext() const {
 inline SourceLoc extractNearestSourceLoc(const ModuleDecl *mod) {
   return extractNearestSourceLoc(static_cast<const Decl *>(mod));
 }
+
+/// Collects modules that this module imports via `@_exported import`.
+void collectParsedExportedImports(const ModuleDecl *M, SmallPtrSetImpl<ModuleDecl *> &Imports);
 
 } // end namespace swift
 

@@ -67,6 +67,14 @@ int SILBasicBlock::getDebugID() const {
   llvm_unreachable("block not in function's block list");
 }
 
+void SILBasicBlock::setDebugName(llvm::StringRef name) {
+  getModule().setBasicBlockName(this, name);
+}
+
+Optional<llvm::StringRef> SILBasicBlock::getDebugName() const {
+  return getModule().getBasicBlockName(this);
+}
+
 SILModule &SILBasicBlock::getModule() const {
   return getParent()->getModule();
 }
@@ -385,6 +393,15 @@ bool SILBasicBlock::isTrampoline() const {
 
 bool SILBasicBlock::isLegalToHoistInto() const {
   return true;
+}
+
+bool SILBasicBlock::hasPhi() const {
+  if (getArguments().size() == 0)
+    return false;
+  // It is sufficient to check whether the first argument is a phi.  A block
+  // can't have both phis and terminator results.
+  auto *argument = getArguments()[0];
+  return argument->isPhi();
 }
 
 const SILDebugScope *SILBasicBlock::getScopeOfFirstNonMetaInstruction() {

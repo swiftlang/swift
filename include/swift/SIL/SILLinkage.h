@@ -38,33 +38,51 @@ enum class SILLinkage : uint8_t {
   /// This object definition is visible to multiple Swift modules (and
   /// thus potentially across linkage-unit boundaries).  There are no
   /// other object definitions with this name in the program.
+  ///
+  /// Public functions must be definitions, i.e. must have a body, except the
+  /// body is emitted by clang.
   Public,
 
   /// This is a special linkage used for symbols which are treated
   /// as public for the purposes of SIL serialization and optimization,
   /// but do not have public entry points in the generated binary.
   ///
+  /// This linkage is used for @_alwaysEmitIntoClient functions.
+  ///
   /// There is no external variant of this linkage, because from other
   /// translation units in the same module, this behaves identically
   /// to the HiddenExternal linkage.
   ///
   /// When deserialized, such declarations receive Shared linkage.
+  ///
+  /// PublicNonABI functions must be definitions.
   PublicNonABI,
 
   /// This object definition is visible only to the current Swift
   /// module (and thus should not be visible across linkage-unit
   /// boundaries).  There are no other object definitions with this
   /// name in the module.
+  ///
+  /// Hidden functions must be definitions, i.e. must have a body, except the
+  /// body is emitted by clang.
   Hidden,
 
   /// This object definition is visible only within a single Swift
   /// module.  There may be other object definitions with this name in
   /// the module; those definitions are all guaranteed to be
   /// semantically equivalent to this one.
+  ///
+  /// This linkage is used e.g. for thunks and for specialized functions.
+  ///
+  /// Public functions must be definitions, i.e. must have a body, except the
+  /// body is emitted by clang.
   Shared,
 
   /// This object definition is visible only within a single Swift
   /// file.
+  ///
+  /// Private functions must be definitions, i.e. must have a body, except the
+  /// body is emitted by clang.
   Private,
 
   /// A Public definition with the same name as this object will be
@@ -74,16 +92,11 @@ enum class SILLinkage : uint8_t {
   PublicExternal,
 
   /// A Public or Hidden definition with the same name as this object
-  /// will be defined by the current Swift module at runtime.  If this
-  /// object is a definition, it is semantically equivalent to that
-  /// definition.
+  /// will be defined by the current Swift module at runtime.
+  ///
+  /// This linkage is only used for non-whole-module compilations to refer to
+  /// functions in other files of the same module.
   HiddenExternal,
-
-  /// This Shared definition was imported from another module. It is not
-  /// necessary to serialize it since it can be deserialized from the original
-  /// module. Besides that caveat this should be treated exactly the same as
-  /// shared.
-  SharedExternal,
 
   /// The default linkage for a definition.
   DefaultForDefinition = Public,
@@ -97,14 +110,40 @@ enum {
   NumSILLinkageBits = 4
 };
 
-/// Related to linkage: flag if a function or global variable is serialized,
-/// either unconditionally, or if referenced from another serialized function.
+/// Related to linkage: flag if a function, global variable, vtable or witness
+/// table is serialized.
+///
+/// Used, e.g. for @inlinable functions.
+///
+/// This flag serves for two purposes:
+/// * Imposes restrictions for optimizations. For example, non-serialized functions
+///   cannot be inlined into serialized functions, because that could expose
+///   internal types/functions to client modules.
+/// * Tells the serializer which functions (and tables) need to be serialized:
+///   - all public functions with the IsSerialized flag and
+///   - all IsSerialized shared functions which are referenced from such functions.
+///
+/// After the swiftmodule file is written, the IsSerialized flag is cleared from
+/// all functions. This means that optimizations after the serialization point
+/// are not limited anymore regarding serialized functions.
 enum IsSerialized_t : unsigned char {
-  // Never serialized.
+
+  /// The function is not inlinable and will not be serialized.
   IsNotSerialized,
-  // Serialized if referenced from another serialized function.
-  IsSerializable,
-  // Always serialized.
+
+  /// The function (or table) will be serialized.
+  ///
+  /// This flag is only valid for Public, PublicNonABI, PublicExternal,
+  /// HiddenExternal and Shared functions.
+  /// Functions with external linkage (PublicExternal, HiddenExternal) will not
+  /// be serialized, because they are available in a different module (from which
+  /// they were de-serialized).
+  ///
+  /// Functions with Shared linkage will only be serialized if they are referenced
+  /// from another serialized function (or table).
+  ///
+  /// This flag is removed from all functions after the serialization point in
+  /// the optimizer pipeline.
   IsSerialized
 };
 
@@ -131,8 +170,6 @@ inline SILLinkage stripExternalFromLinkage(SILLinkage linkage) {
     return SILLinkage::Public;
   if (linkage == SILLinkage::HiddenExternal)
     return SILLinkage::Hidden;
-  if (linkage == SILLinkage::SharedExternal)
-    return SILLinkage::Shared;
   return linkage;
 }
 
@@ -146,13 +183,11 @@ inline SILLinkage addExternalToLinkage(SILLinkage linkage) {
     // if the function was emitted in another translation unit of the
     // same Swift module, so we treat it as hidden here.
     return SILLinkage::HiddenExternal;
-  case SILLinkage::Shared:
-    return SILLinkage::SharedExternal;
   case SILLinkage::Hidden:
     return SILLinkage::HiddenExternal;
+  case SILLinkage::Shared:
   case SILLinkage::Private:
   case SILLinkage::PublicExternal:
-  case SILLinkage::SharedExternal:
   case SILLinkage::HiddenExternal:
     return linkage;
   }
@@ -186,7 +221,6 @@ inline bool hasPublicVisibility(SILLinkage linkage) {
     return true;
   case SILLinkage::Hidden:
   case SILLinkage::Shared:
-  case SILLinkage::SharedExternal:
   case SILLinkage::Private:
   case SILLinkage::HiddenExternal:
     return false;
@@ -198,7 +232,6 @@ inline bool hasPublicVisibility(SILLinkage linkage) {
 inline bool hasSharedVisibility(SILLinkage linkage) {
   switch (linkage) {
   case SILLinkage::Shared:
-  case SILLinkage::SharedExternal:
     return true;
   case SILLinkage::Public:
   case SILLinkage::PublicExternal:
@@ -222,7 +255,6 @@ inline bool hasPrivateVisibility(SILLinkage linkage) {
   case SILLinkage::Hidden:
   case SILLinkage::HiddenExternal:
   case SILLinkage::Shared:
-  case SILLinkage::SharedExternal:
     return false;
   }
 

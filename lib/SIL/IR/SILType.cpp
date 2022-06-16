@@ -34,14 +34,14 @@ using namespace swift::Lowering;
 /// recursively check any children of this type, because
 /// this is the task of the type visitor invoking it.
 /// \returns The found archetype or empty type otherwise.
-CanArchetypeType swift::getOpenedArchetypeOf(CanType Ty) {
+CanOpenedArchetypeType swift::getOpenedArchetypeOf(CanType Ty) {
   if (!Ty)
-    return CanArchetypeType();
+    return CanOpenedArchetypeType();
   while (auto MetaTy = dyn_cast<AnyMetatypeType>(Ty))
     Ty = MetaTy.getInstanceType();
   if (Ty->isOpenedExistential())
-    return cast<ArchetypeType>(Ty);
-  return CanArchetypeType();
+    return cast<OpenedArchetypeType>(Ty);
+  return CanOpenedArchetypeType();
 }
 
 SILType SILType::getExceptionType(const ASTContext &C) {
@@ -88,10 +88,9 @@ SILType SILType::getBuiltinWordType(const ASTContext &C) {
 }
 
 SILType SILType::getOptionalType(SILType type) {
-  auto &ctx = type.getASTContext();
-  auto optType = BoundGenericEnumType::get(ctx.getOptionalDecl(), Type(),
-                                           { type.getASTType() });
-  return getPrimitiveType(CanType(optType), type.getCategory());
+  return getPrimitiveType(type.getASTType().wrapInOptionalType(),
+                          type.getCategory())
+      .copyingMoveOnlyWrapper(type);
 }
 
 SILType SILType::getEmptyTupleType(const ASTContext &C) {
@@ -108,7 +107,23 @@ bool SILType::isTrivial(const SILFunction &F) const {
   return F.getTypeLowering(contextType).isTrivial();
 }
 
+bool SILType::isOrContainsRawPointer(const SILFunction &F) const {
+  auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
+  return F.getTypeLowering(contextType).isOrContainsRawPointer();
+}
+
+bool SILType::isNonTrivialOrContainsRawPointer(const SILFunction &F) const {
+  auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
+  const TypeLowering &tyLowering = F.getTypeLowering(contextType);
+  return !tyLowering.isTrivial() || tyLowering.isOrContainsRawPointer();
+}
+
 bool SILType::isEmpty(const SILFunction &F) const {
+  // Infinite types are never empty.
+  if (F.getTypeLowering(*this).getRecursiveProperties().isInfinite()) {
+    return false;
+  }
+  
   if (auto tupleTy = getAs<TupleType>()) {
     // A tuple is empty if it either has no elements or if all elements are
     // empty.
@@ -147,8 +162,8 @@ bool SILType::isNoReturnFunction(SILModule &M,
 }
 
 std::string SILType::getMangledName() const {
-  Mangle::ASTMangler mangler(false/*use dwarf mangling*/);
-  return mangler.mangleTypeWithoutPrefix(getASTType());
+  Mangle::ASTMangler mangler;
+  return mangler.mangleTypeWithoutPrefix(getRawASTType());
 }
 
 std::string SILType::getAsString() const {
@@ -158,7 +173,8 @@ std::string SILType::getAsString() const {
   return OS.str();
 }
 
-bool SILType::isPointerSizeAndAligned() {
+bool SILType::isPointerSizeAndAligned(SILModule &M,
+                                      ResilienceExpansion expansion) const {
   auto &C = getASTContext();
   if (isHeapObjectReferenceType()
       || getASTType()->isEqual(C.TheRawPointerType)) {
@@ -167,7 +183,84 @@ bool SILType::isPointerSizeAndAligned() {
   if (auto intTy = dyn_cast<BuiltinIntegerType>(getASTType()))
     return intTy->getWidth().isPointerWidth();
 
+  if (auto underlyingField = getSingletonAggregateFieldType(M, expansion)) {
+    return underlyingField.isPointerSizeAndAligned(M, expansion);
+  }
+  
   return false;
+}
+
+static bool isSingleSwiftRefcounted(SILModule &M,
+                                    SILType SILTy,
+                                    ResilienceExpansion expansion,
+                                    bool didUnwrapOptional) {
+  auto &C = M.getASTContext();
+  
+  // Unwrap one layer of optionality.
+  // TODO: Or more generally, any fragile enum with a single payload and single
+  // no-payload case.
+  if (!didUnwrapOptional) {
+    if (auto objectTy = SILTy.getOptionalObjectType()) {
+      return ::isSingleSwiftRefcounted(M, objectTy, expansion, true);
+    }
+  }
+
+  // Unwrap singleton aggregates.
+  if (auto underlyingField = SILTy.getSingletonAggregateFieldType(M, expansion)) {
+    return ::isSingleSwiftRefcounted(M, underlyingField, expansion,
+                                     didUnwrapOptional);
+  }
+  
+  auto Ty = SILTy.getASTType();
+  
+  // Easy cases: Builtin.NativeObject and boxes are always Swift-refcounted.
+  if (Ty == C.TheNativeObjectType)
+    return true;
+  if (isa<SILBoxType>(Ty))
+    return true;
+  
+  // Is the type a Swift-refcounted class?
+  // For a generic type, consider its superclass constraint, if any.
+  auto ClassTy = Ty;
+  if (auto archety = dyn_cast<ArchetypeType>(Ty)) {
+    if (auto superclass = Ty->getSuperclass()) {
+      ClassTy = superclass->getCanonicalType();
+    }
+  }
+  // For an existential type, consider its superclass constraint, if it carries
+  // no witness tables.
+  if (Ty->isAnyExistentialType()) {
+    auto layout = Ty->getExistentialLayout();
+    // Must be no protocol constraints that aren't @objc or @_marker.
+    if (layout.containsNonObjCProtocol) {
+      for (auto proto : layout.getProtocols()) {
+        if (!proto->isObjC() && !proto->isMarkerProtocol()) {
+          return false;
+        }
+      }
+    }
+    
+    // The Error existential has its own special layout.
+    if (layout.isErrorExistential()) {
+      return false;
+    }
+    
+    // We can look at the superclass constraint, if any, to see if it's
+    // Swift-refcounted.
+    if (!layout.getSuperclass()) {
+      return false;
+    }
+    ClassTy = layout.getSuperclass()->getCanonicalType();
+  }
+  
+  // TODO: Does the base class we found have fully native Swift ancestry,
+  // so we can use Swift native refcounting on it?
+  return false;
+}
+
+bool SILType::isSingleSwiftRefcounted(SILModule &M,
+                                      ResilienceExpansion expansion) const {
+  return ::isSingleSwiftRefcounted(M, *this, expansion, false);
 }
 
 // Reference cast from representations with single pointer low bits.
@@ -193,11 +286,17 @@ SILType SILType::getFieldType(VarDecl *field, TypeConverter &TC,
     substFieldTy = origFieldTy.getType();
   } else {
     substFieldTy =
-      getASTType()->getTypeOfMember(&TC.M, field)->getCanonicalType();
+        getASTType()->getTypeOfMember(&TC.M, field)->getCanonicalType();
   }
 
   auto loweredTy =
       TC.getLoweredRValueType(context, origFieldTy, substFieldTy);
+
+  // If this type is not a class type, then we propagate "move only"-ness to the
+  // field. Example:
+  if (!getClassOrBoundGenericClass() && isMoveOnlyWrapped())
+    loweredTy = SILMoveOnlyType::get(loweredTy);
+
   if (isAddress() || getClassOrBoundGenericClass() != nullptr) {
     return SILType::getPrimitiveAddressType(loweredTy);
   } else {
@@ -217,7 +316,7 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt, TypeConverter &TC,
 
   if (auto objectType = getASTType().getOptionalObjectType()) {
     assert(elt == TC.Context.getOptionalSomeDecl());
-    return SILType(objectType, getCategory());
+    return SILType(objectType, getCategory()).copyingMoveOnlyWrapper(*this);
   }
 
   // If the case is indirect, then the payload is boxed.
@@ -227,13 +326,12 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt, TypeConverter &TC,
                    getCategory());
   }
 
-  auto substEltTy =
-    getASTType()->getTypeOfMember(&TC.M, elt,
-                                  elt->getArgumentInterfaceType());
+  auto substEltTy = getASTType()->getTypeOfMember(
+      &TC.M, elt, elt->getArgumentInterfaceType());
   auto loweredTy = TC.getLoweredRValueType(
       context, TC.getAbstractionPattern(elt), substEltTy);
 
-  return SILType(loweredTy, getCategory());
+  return SILType(loweredTy, getCategory()).copyingMoveOnlyWrapper(*this);
 }
 
 SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M,
@@ -338,15 +436,15 @@ bool SILType::aggregateHasUnreferenceableStorage() const {
 
 SILType SILType::getOptionalObjectType() const {
   if (auto objectTy = getASTType().getOptionalObjectType()) {
-    return SILType(objectTy, getCategory());
+    return SILType(objectTy, getCategory()).copyingMoveOnlyWrapper(*this);
   }
 
   return SILType();
 }
 
 SILType SILType::unwrapOptionalType() const {
-  if (auto objectTy = getOptionalObjectType()) {
-    return objectTy;
+  if (auto objectTy = removingMoveOnlyWrapper().getOptionalObjectType()) {
+    return objectTy.copyingMoveOnlyWrapper(*this);
   }
 
   return *this;
@@ -501,10 +599,7 @@ SILResultInfo::getOwnershipKind(SILFunction &F,
 }
 
 SILModuleConventions::SILModuleConventions(SILModule &M)
-    : M(&M),
-      loweredAddresses(!M.getASTContext().LangOpts.EnableSILOpaqueValues
-                       || M.getStage() == SILStage::Lowered)
-{}
+    : M(&M), loweredAddresses(M.useLoweredAddresses()) {}
 
 bool SILModuleConventions::isReturnedIndirectlyInSIL(SILType type,
                                                      SILModule &M) {
@@ -752,4 +847,80 @@ SILType SILType::getSILBoxFieldType(const SILFunction *f, unsigned field) {
     return SILType();
   return ::getSILBoxFieldType(f->getTypeExpansionContext(), boxTy,
                               f->getModule().Types, field);
+}
+
+SILType
+SILType::getSingletonAggregateFieldType(SILModule &M,
+                                        ResilienceExpansion expansion) const {
+  if (auto tuple = getAs<TupleType>()) {
+    if (tuple->getNumElements() == 1) {
+      return getTupleElementType(0);
+    }
+  }
+
+  if (auto structDecl = getStructOrBoundGenericStruct()) {
+    // If the struct has to be accessed resiliently from this resilience domain,
+    // we can't assume anything about its layout.
+    if (structDecl->isResilient(M.getSwiftModule(), expansion)) {
+      return SILType();
+    }
+
+    // C ABI wackiness may cause a single-field struct to have different layout
+    // from its field.
+    if (structDecl->hasUnreferenceableStorage()
+        || structDecl->hasClangNode()) {
+      return SILType();
+    }
+
+    // A single-field struct with custom alignment has different layout from its
+    // field.
+    if (structDecl->getAttrs().hasAttribute<AlignmentAttr>()) {
+      return SILType();
+    }
+
+    // If there's only one stored property, we have the layout of its field.
+    auto allFields = structDecl->getStoredProperties();
+    
+    if (allFields.size() == 1) {
+      auto fieldTy = getFieldType(
+          allFields[0], M,
+          TypeExpansionContext(expansion, M.getSwiftModule(),
+                               M.isWholeModule()));
+      if (!M.isTypeABIAccessible(fieldTy,
+                       TypeExpansionContext::maximalResilienceExpansionOnly())){
+        return SILType();
+      }
+      return fieldTy;
+    }
+
+    return SILType();
+  }
+
+  if (auto enumDecl = getEnumOrBoundGenericEnum()) {
+    // If the enum has to be accessed resiliently from this resilience domain,
+    // we can't assume anything about its layout.
+    if (enumDecl->isResilient(M.getSwiftModule(), expansion)) {
+      return SILType();
+    }
+
+    auto allCases = enumDecl->getAllElements();
+    
+    auto theCase = allCases.begin();
+    if (!allCases.empty() && std::next(theCase) == allCases.end()
+        && (*theCase)->hasAssociatedValues()) {
+      auto enumEltTy = getEnumElementType(
+          *theCase, M,
+          TypeExpansionContext(expansion, M.getSwiftModule(),
+                               M.isWholeModule()));
+      if (!M.isTypeABIAccessible(enumEltTy,
+                       TypeExpansionContext::maximalResilienceExpansionOnly())){
+        return SILType();
+      }
+      return enumEltTy;
+    }
+
+    return SILType();
+  }
+
+  return SILType();
 }

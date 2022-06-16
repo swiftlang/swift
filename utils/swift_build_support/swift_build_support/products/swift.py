@@ -65,6 +65,9 @@ class Swift(product.Product):
 
         self.cmake_options.extend(self._enable_stdlib_unicode_data)
 
+        self.cmake_options.extend(
+            self._swift_tools_ld64_lto_codegen_only_for_supporting_targets)
+
     @classmethod
     def is_build_script_impl_product(cls):
         """is_build_script_impl_product -> bool
@@ -183,6 +186,11 @@ updated without updating swift.py?")
     def _build_swift_private_stdlib(self):
         return [('SWIFT_STDLIB_BUILD_PRIVATE:BOOL',
                  self.args.build_swift_private_stdlib)]
+
+    @property
+    def _swift_tools_ld64_lto_codegen_only_for_supporting_targets(self):
+        return [('SWIFT_TOOLS_LD64_LTO_CODEGEN_ONLY_FOR_SUPPORTING_TARGETS:BOOL',
+                 self.args.swift_tools_ld64_lto_codegen_only_for_supporting_targets)]
 
     @classmethod
     def get_dependencies(cls):

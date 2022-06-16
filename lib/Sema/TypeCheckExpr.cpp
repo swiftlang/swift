@@ -179,7 +179,7 @@ TypeChecker::lookupPrecedenceGroupForInfixOperator(DeclContext *DC, Expr *E) {
   return nullptr;
 }
 
-/// Find LHS as if we append binary operator to existing pre-folded expresion.
+/// Find LHS as if we append binary operator to existing pre-folded expression.
 /// Returns found expression, or \c nullptr if the operator is not applicable.
 ///
 /// For example, given '(== R (* A B))':

@@ -15,6 +15,8 @@
 //
 // Runtime functions that read from object arguments cannot be marked
 // ReadNone. Otherwise the objects may be freed before the runtime call.
+// Runtime functions that instantiate metadata cannot be marked ReadNone
+// or else they could be moved out of blocks controlled by a availability check.
 //
 //===----------------------------------------------------------------------===//
 
@@ -1074,6 +1076,36 @@ FUNCTION(GetExistentialMetadata,
          ARGS(Int1Ty, TypeMetadataPtrTy, SizeTy,
               ProtocolDescriptorRefTy->getPointerTo()),
          ATTRS(NoUnwind, ReadOnly, WillReturn),
+         EFFECT(MetaData)) // ?
+
+// const ExtendedExistentialTypeShape *
+// swift_getExtendedExistentialTypeShape(
+//             const NonUniqueExtendedExistentialTypeShape *nonUnique);
+FUNCTION(GetExtendedExistentialTypeShape,
+         swift_getExtendedExistentialTypeShape, C_CC, AlwaysAvailable,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(Int8PtrTy, Int8PtrPtrTy),
+         ATTRS(NoUnwind, ArgMemOnly, WillReturn),
+         EFFECT(MetaData)) // ?
+
+// Metadata *swift_getExtendedExistentialTypeMetadata(
+//             const NonUniqueExtendedExistentialTypeShape *shape,
+//             const void * const *generalizationArgs);
+FUNCTION(GetExtendedExistentialTypeMetadata,
+         swift_getExtendedExistentialTypeMetadata, C_CC, AlwaysAvailable,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(Int8PtrTy, Int8PtrPtrTy),
+         ATTRS(NoUnwind, ArgMemOnly, WillReturn),
+         EFFECT(MetaData)) // ?
+
+// Metadata *swift_getExtendedExistentialTypeMetadata_unique(
+//             const ExtendedExistentialTypeShape *shape,
+//             const void * const *generalizationArgs);
+FUNCTION(GetExtendedExistentialTypeMetadataUnique,
+         swift_getExtendedExistentialTypeMetadata_unique, C_CC, AlwaysAvailable,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(Int8PtrTy, Int8PtrPtrTy),
+         ATTRS(NoUnwind, ArgMemOnly, WillReturn),
          EFFECT(MetaData)) // ?
 
 // Metadata *swift_relocateClassMetadata(TypeContextDescriptor *descriptor,

@@ -8,6 +8,7 @@
  }
 
 func neverReturn() -> Never { fatalError("quit!") }
+func arbitraryAsync() async {}
 
 actor BoringActor {
 
@@ -32,8 +33,16 @@ actor BoringActor {
         print("done!")
     }
 
+    // CHECK-LABEL: sil hidden @$s4test11BoringActorC04mainC0ACyt_tYacfc : $@convention(method) @async (@owned BoringActor) -> @owned BoringActor {
+    // CHECK:         hop_to_executor {{%[0-9]+}} : $MainActor
+    // CHECK:         builtin "initializeDefaultActor"
+    // CHECK:         [[FN:%[0-9]+]] = function_ref @$s4test14arbitraryAsyncyyYaF : $@convention(thin) @async () -> ()
+    // CHECK:         = apply [[FN]]() : $@convention(thin) @async () -> ()
+    // CHECK-NEXT:    hop_to_executor {{%[0-9]+}} : $MainActor
     @MainActor
-    init(mainActor: Void) async {}
+    init(mainActor: Void) async {
+      await arbitraryAsync()
+    }
 
     // CHECK-LABEL: sil hidden @$s4test11BoringActorC6crashyACSgyt_tYacfc : $@convention(method) @async (@owned BoringActor) -> @owned Optional<BoringActor> {
     // CHECK:   bb0([[SELF:%[0-9]+]] : $BoringActor):
@@ -54,6 +63,10 @@ actor BoringActor {
 
  actor SingleVarActor {
     var myVar: Int
+
+   init(sync: Void) {
+     myVar = 0
+   }
 
     // CHECK-LABEL: sil hidden @$s4test14SingleVarActorCACyYacfc : $@convention(method) @async (@owned SingleVarActor) -> @owned SingleVarActor {
     // CHECK:    bb0([[SELF:%[0-9]+]] : $SingleVarActor):
@@ -122,6 +135,31 @@ actor BoringActor {
    init?(failable_async cond: Bool) async {
      guard cond else { return nil }
      myVar = 1
+   }
+
+
+   // FIXME: the convenience init below is missing a hop after the call to arbitraryAsync (rdar://87485045)
+
+   // CHECK-LABEL: sil hidden @$s4test14SingleVarActorC10delegatingACSb_tYacfC : $@convention(method) @async (Bool, @thick SingleVarActor.Type) -> @owned SingleVarActor {
+   // CHECK:         [[SELF_ALLOC:%[0-9]+]] = alloc_stack [lexical] $SingleVarActor, let, name "self", implicit
+   //           ** first hop is after the call to the synchronous init, right after initializing the allocation.
+   // CHECK:         [[SYNC_FN:%[0-9]+]] = function_ref @$s4test14SingleVarActorC4syncACyt_tcfC : $@convention(method) (@thick SingleVarActor.Type) -> @owned SingleVarActor
+   // CHECK:         [[INIT1:%[0-9]+]] = apply [[SYNC_FN]]({{%[0-9]+}}) : $@convention(method) (@thick SingleVarActor.Type) -> @owned SingleVarActor
+   // CHECK:         store [[INIT1]] to [[SELF_ALLOC]] : $*SingleVarActor
+   // CHECK-NEXT:    hop_to_executor [[INIT1]] : $SingleVarActor
+   //           ** second hop is after the call to async init
+   // CHECK:         [[ASYNC_FN:%[0-9]+]] = function_ref @$s4test14SingleVarActorCACyYacfC : $@convention(method) @async (@thick SingleVarActor.Type) -> @owned SingleVarActor
+   // CHECK:         [[INIT2:%[0-9]+]] = apply [[ASYNC_FN]]({{%[0-9]+}}) : $@convention(method) @async (@thick SingleVarActor.Type) -> @owned SingleVarActor
+   // CHECK:         store [[INIT2]] to [[SELF_ALLOC]] : $*SingleVarActor
+   // CHECK-NEXT:    hop_to_executor [[INIT2]] : $SingleVarActor
+   // CHECK:       } // end sil function '$s4test14SingleVarActorC10delegatingACSb_tYacfC'
+   convenience init(delegating c: Bool) async {
+     if c {
+       self.init(sync: ())
+     } else {
+       await self.init()
+     }
+     await arbitraryAsync()
    }
 
  }
@@ -264,7 +302,10 @@ actor Ahmad {
   var x: Int = 0
   
   // CHECK-LABEL: sil hidden @$s4test5AhmadCACyYacfc : $@convention(method) @async (@owned Ahmad) -> @owned Ahmad {
+  // CHECK:         bb0{{.*}}:
+  // CHECK-NEXT:      [[GENERIC:%[0-9]+]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+  // CHECK-NEXT:      hop_to_executor [[GENERIC]]
   // CHECK:           store {{%[0-9]+}} to {{%[0-9]+}} : $*Int
   // CHECK: } // end sil function '$s4test5AhmadCACyYacfc'
-  nonisolated init() async {} // no hop should appear here because of explicit nonisolated marking.
+  nonisolated init() async {}
 }

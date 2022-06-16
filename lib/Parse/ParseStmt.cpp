@@ -94,7 +94,7 @@ bool Parser::isStartOfStmt() {
     consumeToken(tok::identifier);
     consumeToken(tok::colon);
 
-    // We treating IDENTIIFIER: { as start of statement to provide missed 'do'
+    // We treating IDENTIFIER: { as start of statement to provide missed 'do'
     // diagnostics. This case will be handled in parseStmt().
     if (Tok.is(tok::l_brace)) {
       return true;
@@ -494,13 +494,12 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
     if (NeedParseErrorRecovery) {
       SyntaxParsingContext TokenListCtxt(SyntaxContext,
                                          SyntaxKind::NonEmptyTokenList);
-      // If we had a parse error, skip to the start of the next stmt, decl or
-      // '{'.
+      // If we had a parse error, skip to the start of the next stmt or decl.
       //
       // It would be ideal to stop at the start of the next expression (e.g.
       // "X = 4"), but distinguishing the start of an expression from the middle
       // of one is "hard".
-      skipUntilDeclStmtRBrace(tok::l_brace);
+      skipUntilDeclStmtRBrace();
 
       // If we have to recover, pretend that we had a semicolon; it's less
       // noisy that way.
@@ -1274,7 +1273,7 @@ ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable() {
     isUnavailability = true;
   }
 
-  SyntaxParsingContext ConditonCtxt(SyntaxContext, Kind);
+  SyntaxParsingContext ConditionCtxt(SyntaxContext, Kind);
   SourceLoc PoundLoc;
 
   PoundLoc = consumeToken(MainToken);
@@ -1563,6 +1562,10 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
     // In our recursive parse, remember that we're in a matching pattern.
     llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
       T(InVarOrLetPattern, IVOLP_InMatchingPattern);
+
+    // Reset async attribute in parser context.
+    llvm::SaveAndRestore<bool> AsyncAttr(InPatternWithAsyncAttribute, false);
+
     ThePattern = parseMatchingPattern(/*isExprBasic*/ true);
   } else if (Tok.is(tok::kw_case)) {
     ConditionCtxt.setCreateSyntax(SyntaxKind::Unknown);
@@ -1581,7 +1584,10 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
     // In our recursive parse, remember that we're in a var/let pattern.
     llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
       T(InVarOrLetPattern, wasLet ? IVOLP_InLet : IVOLP_InVar);
-    
+
+    // Reset async attribute in parser context.
+    llvm::SaveAndRestore<bool> AsyncAttr(InPatternWithAsyncAttribute, false);
+
     ThePattern = parseMatchingPattern(/*isExprBasic*/ true);
     
     if (ThePattern.isNonNull()) {
@@ -1590,6 +1596,13 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
       ThePattern = makeParserResult(Status, P);
     }
 
+  } else if (Tok.is(tok::code_complete)) {
+    if (CodeCompletion) {
+      CodeCompletion->completeOptionalBinding();
+    }
+    ThePattern = makeParserResult(new (Context) AnyPattern(Tok.getLoc()));
+    ThePattern.setHasCodeCompletionAndIsError();
+    consumeToken(tok::code_complete);
   } else {
     ConditionCtxt.setCreateSyntax(SyntaxKind::OptionalBindingCondition);
     // Otherwise, this is an implicit optional binding "if let".
@@ -1618,12 +1631,32 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
     ThePattern = makeParserResult(AP);
   }
 
-  // Conditional bindings must have an initializer.
+  // Conditional bindings can have the format:
+  //  `let newBinding = <expr>`, or
+  //  `let newBinding`, which is shorthand for `let newBinding = newBinding`
   ParserResult<Expr> Init;
   if (Tok.is(tok::equal)) {
     SyntaxParsingContext InitCtxt(SyntaxContext, SyntaxKind::InitializerClause);
     consumeToken();
     Init = parseExprBasic(diag::expected_expr_conditional_var);
+  } else if (!ThePattern.getPtrOrNull()->getBoundName().empty()) {
+    auto bindingName = DeclNameRef(ThePattern.getPtrOrNull()->getBoundName());
+    auto loc = DeclNameLoc(ThePattern.getPtrOrNull()->getEndLoc());
+    auto declRefExpr = new (Context) UnresolvedDeclRefExpr(bindingName,
+                                                           DeclRefKind::Ordinary,
+                                                           loc);
+    
+    declRefExpr->setImplicit();
+    Init = makeParserResult(declRefExpr);
+  } else if (BindingKindStr != "case") {
+    // If the pattern is present but isn't an identifier, the user wrote
+    // something invalid like `let foo.bar`. Emit a special diagnostic for this,
+    // with a fix-it prepending "<#identifier#> = "
+    //  - We don't emit this fix-it if the user wrote `case let` (etc),
+    //    since the shorthand syntax isn't available for pattern matching
+    auto diagLoc = ThePattern.get()->getSemanticsProvidingPattern()->getStartLoc();
+    diagnose(diagLoc, diag::conditional_var_valid_identifiers_only)
+      .fixItInsert(diagLoc, "<#identifier#> = ");
   } else {
     diagnose(Tok, diag::conditional_var_initializer_required);
   }
@@ -1807,18 +1840,13 @@ ParserResult<Stmt> Parser::parseStmtIf(LabeledStmtInfo LabelInfo,
       ElseBody = parseStmtIf(LabeledStmtInfo(), implicitlyInsertIf);
     } else if (Tok.is(tok::code_complete)) {
       if (CodeCompletion)
-        CodeCompletion->completeAfterIfStmt(/*hasElse*/true);
+        CodeCompletion->completeAfterIfStmtElse();
       Status.setHasCodeCompletionAndIsError();
       consumeToken(tok::code_complete);
     } else {
       ElseBody = parseBraceItemList(diag::expected_lbrace_or_if_after_else);
     }
     Status |= ElseBody;
-  } else if (Tok.is(tok::code_complete)) {
-    if (CodeCompletion)
-      CodeCompletion->completeAfterIfStmt(/*hasElse*/false);
-    Status.setHasCodeCompletionAndIsError();
-    consumeToken(tok::code_complete);
   }
 
   return makeParserResult(
@@ -1853,7 +1881,7 @@ ParserResult<Stmt> Parser::parseStmtGuard() {
             BraceStmt::create(Context, EndLoc, {}, EndLoc, /*implicit=*/true)));
   };
 
-  if (Tok.is(tok::l_brace)) {
+  if (Tok.isAny(tok::l_brace, tok::kw_else)) {
     SourceLoc LBraceLoc = Tok.getLoc();
     diagnose(GuardLoc, diag::missing_condition_after_guard)
       .highlight(SourceRange(GuardLoc, LBraceLoc));
@@ -2213,6 +2241,10 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
   if (consumeIf(tok::kw_case)) {
     llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
       T(InVarOrLetPattern, Parser::IVOLP_InMatchingPattern);
+
+    // Reset async attribute in parser context.
+    llvm::SaveAndRestore<bool> AsyncAttr(InPatternWithAsyncAttribute, false);
+
     pattern = parseMatchingPattern(/*isExprBasic*/true);
     pattern = parseOptionalPatternTypeAnnotation(pattern);
   } else if (!IsCStyleFor || Tok.is(tok::kw_var)) {
@@ -2687,7 +2719,7 @@ ParserResult<Stmt> Parser::parseStmtPoundAssert() {
 
   // We check this after consuming everything, so that the SyntaxContext
   // understands this statement even when the feature is disabled.
-  if (!Context.LangOpts.EnableExperimentalStaticAssert) {
+  if (!Context.LangOpts.hasFeature(Feature::StaticAssert)) {
     diagnose(startLoc, diag::pound_assert_disabled);
     return makeParserError();
   }

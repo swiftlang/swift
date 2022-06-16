@@ -22,6 +22,7 @@
 namespace swift {
 class AsyncLet;
 class AsyncTask;
+class ContinuationAsyncContext;
 class ExecutorRef;
 struct HeapObject;
 class Job;
@@ -43,10 +44,13 @@ void actor_enqueue(HeapObject *actor, Job *job);
 
 void actor_dequeue(HeapObject *actor, Job *job);
 
-// The `flags` parameter is the raw values of the actor's
-// DefaultActorImpl::State::Flags.
+// State values are:
+// Idle = 0, Scheduled = 1, Running = 2, Zombie_ReadyForDeallocation = 3,
+// invalid/unknown = 255
 void actor_state_changed(HeapObject *actor, Job *firstJob,
-                         bool needsPreprocessing, uintptr_t flags);
+                         bool needsPreprocessing, uint8_t state,
+                         bool isDistributedRemote, bool isPriorityEscalated,
+                         uint8_t maxPriority);
 
 void actor_note_job_queue(HeapObject *actor, Job *first,
                           Job *(*getNext)(Job *));
@@ -54,20 +58,32 @@ void actor_note_job_queue(HeapObject *actor, Job *first,
 // Task trace calls.
 
 void task_create(AsyncTask *task, AsyncTask *parent, TaskGroup *group,
-                 AsyncLet *asyncLet);
+                 AsyncLet *asyncLet, uint8_t jobPriority, bool isChildTask,
+                 bool isFuture, bool isGroupChildTask, bool isAsyncLetTask);
 
 void task_destroy(AsyncTask *task);
 
-// The `flags` parameter is the raw value of the ActiveTaskStatus::Flags field
-// in the task.
-void task_status_changed(AsyncTask *task, uintptr_t flags);
+void task_status_changed(AsyncTask *task, uint8_t maxPriority, bool isCancelled,
+                         bool isEscalated, bool isRunning, bool isEnqueued);
 
-// The `flags` parameter is the raw value of Job::Flags.
-void task_flags_changed(AsyncTask *task, uint32_t flags);
+void task_flags_changed(AsyncTask *task, uint8_t jobPriority, bool isChildTask,
+                        bool isFuture, bool isGroupChildTask,
+                        bool isAsyncLetTask);
 
 // The `status` parameter is the value of the corresponding
 // FutureFragment::Status.
 void task_wait(AsyncTask *task, AsyncTask *waitingOn, uintptr_t status);
+
+void task_resume(AsyncTask *task);
+
+// The context parameter is the context pointer used to create the continuation.
+// This same pointer will be passed to the corresponding call to
+// task_continuation_await and task_continuation_resume.
+void task_continuation_init(AsyncTask *task, ContinuationAsyncContext *context);
+
+void task_continuation_await(ContinuationAsyncContext *context);
+
+void task_continuation_resume(ContinuationAsyncContext *context, bool error);
 
 void job_enqueue_global(Job *job);
 
@@ -75,17 +91,28 @@ void job_enqueue_global_with_delay(unsigned long long delay, Job *job);
 
 void job_enqueue_main_executor(Job *job);
 
-// This returns a handle that must be passed to the corresponding call to
-// task_run_end.
-uint64_t job_run_begin(Job *job, ExecutorRef *executor);
+struct job_run_info {
+  /// The ID of the task that started running.
+  uint64_t taskId;
 
-void job_run_end(Job *job, ExecutorRef *executor, uint64_t beginHandle);
+  /// The signpost ID for this task execution, or OS_SIGNPOST_ID_INVALID
+  /// if the job was not a task.
+  uint64_t handle;
+};
+
+// This returns information that must be passed to the corresponding
+// call to task_run_end.  Any information we want to log must be
+// extracted from the job when we start to run it because execution
+// will invalidate the job.
+job_run_info job_run_begin(Job *job);
+
+void job_run_end(job_run_info info);
 
 } // namespace trace
 } // namespace concurrency
 } // namespace swift
 
-#if __has_include(<os/signpost.h>)
+#if SWIFT_STDLIB_CONCURRENCY_TRACING
 #include "TracingSignpost.h"
 #else
 #include "TracingStubs.h"

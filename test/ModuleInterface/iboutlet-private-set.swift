@@ -1,9 +1,9 @@
 // REQUIRES: objc_interop
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -typecheck -enable-library-evolution -disable-objc-attr-requires-foundation-module -module-name Foo -emit-module-interface-path %t/Foo.swiftinterface %s
-// RUN: %FileCheck %s -input-file %t/Foo.swiftinterface
-// RUN: %target-swift-frontend -compile-module-from-interface %t/Foo.swiftinterface -o %t/Foo.swiftmodule -module-name Foo
+// RUN: %target-swift-emit-module-interface(%t/Foo.swiftinterface) %s -disable-objc-attr-requires-foundation-module -module-name Foo
+// RUN: %FileCheck %s < %t/Foo.swiftinterface
+// RUN: %target-swift-typecheck-module-from-interface(%t/Foo.swiftinterface) -module-name Foo
 
 // Test the interface we generate for @IBOutlet private(set) properties is
 // consumable.

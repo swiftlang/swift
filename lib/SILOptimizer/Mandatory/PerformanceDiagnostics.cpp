@@ -90,6 +90,9 @@ static bool isEffectFreeArraySemanticCall(SILInstruction *inst) {
 bool PerformanceDiagnostics::visitFunction(SILFunction *function,
                                               PerformanceConstraints perfConstr,
                                               LocWithParent *parentLoc) {
+  if (!function->isDefinition())
+    return false;
+
   ReachingReturnBlocks rrBlocks(function);
   NonErrorHandlingBlocks neBlocks(function);
                                        
@@ -154,6 +157,26 @@ bool PerformanceDiagnostics::visitCallee(FullApplySite as,
   return false;
 }
 
+static bool metatypeUsesAreNotRelevant(MetatypeInst *mt) {
+  for (Operand *use : mt->getUses()) {
+    if (auto  *bi = dyn_cast<BuiltinInst>(use->getUser())) {
+      switch (bi->getBuiltinInfo().ID) {
+        case BuiltinValueKind::Sizeof:
+        case BuiltinValueKind::Strideof:
+        case BuiltinValueKind::Alignof:
+        case BuiltinValueKind::IsPOD:
+        case BuiltinValueKind::IsConcrete:
+        case BuiltinValueKind::IsBitwiseTakable:
+          continue;
+        default:
+          break;
+      }
+    }
+    return false;
+  }
+  return true;
+}
+
 bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
                                           PerformanceConstraints perfConstr,
                                           LocWithParent *parentLoc) {
@@ -191,6 +214,10 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
       diagnose(loc, diag::performance_metadata, "generic function calls");
       break;
     }
+    case SILInstructionKind::MetatypeInst:
+      if (metatypeUsesAreNotRelevant(cast<MetatypeInst>(inst)))
+        break;
+      LLVM_FALLTHROUGH;
     default:
       // We didn't recognize the instruction, so try to give an error message
       // based on the involved type.

@@ -35,9 +35,10 @@ using namespace swift;
 
 void
 swift::getTopLevelDeclsForDisplay(ModuleDecl *M,
-                                  SmallVectorImpl<Decl*> &Results) {
+                                  SmallVectorImpl<Decl*> &Results,
+                                  bool Recursive) {
   auto startingSize = Results.size();
-  M->getDisplayDecls(Results);
+  M->getDisplayDecls(Results, Recursive);
 
   // Force Sendable on all types, which might synthesize some extensions.
   // FIXME: We can remove this if @_nonSendable stops creating extensions.
@@ -49,7 +50,7 @@ swift::getTopLevelDeclsForDisplay(ModuleDecl *M,
   // Remove what we fetched and fetch again, possibly now with additional
   // extensions.
   Results.resize(startingSize);
-  M->getDisplayDecls(Results);
+  M->getDisplayDecls(Results, Recursive);
 }
 
 static bool shouldPrintAsFavorable(const Decl *D, const PrintOptions &Options) {
@@ -904,4 +905,62 @@ Type swift::getResultTypeOfKeypathDynamicMember(SubscriptDecl *SD) {
   return evaluateOrDefault(SD->getASTContext().evaluator,
     RootAndResultTypeOfKeypathDynamicMemberRequest{SD}, TypePair()).
       SecondTy;
+}
+
+SmallVector<std::pair<ValueDecl *, ValueDecl *>, 1>
+swift::getShorthandShadows(CaptureListExpr *CaptureList) {
+  SmallVector<std::pair<ValueDecl *, ValueDecl *>, 1> Result;
+  for (auto Capture : CaptureList->getCaptureList()) {
+    if (Capture.PBD->getPatternList().size() != 1) {
+      continue;
+    }
+    auto *DRE = dyn_cast_or_null<DeclRefExpr>(Capture.PBD->getInit(0));
+    if (!DRE) {
+      continue;
+    }
+
+    auto DeclaredVar = Capture.getVar();
+    if (DeclaredVar->getLoc() != DRE->getLoc()) {
+      // We have a capture like `[foo]` if the declared var and the
+      // reference share the same location.
+      continue;
+    }
+
+    auto *ReferencedVar = dyn_cast_or_null<VarDecl>(DRE->getDecl());
+    if (!ReferencedVar) {
+      continue;
+    }
+
+    assert(DeclaredVar->getName() == ReferencedVar->getName());
+
+    Result.emplace_back(std::make_pair(DeclaredVar, ReferencedVar));
+  }
+  return Result;
+}
+
+SmallVector<std::pair<ValueDecl *, ValueDecl *>, 1>
+swift::getShorthandShadows(LabeledConditionalStmt *CondStmt) {
+  SmallVector<std::pair<ValueDecl *, ValueDecl *>, 1> Result;
+  for (const StmtConditionElement &Cond : CondStmt->getCond()) {
+    if (Cond.getKind() != StmtConditionElement::CK_PatternBinding) {
+      continue;
+    }
+    auto Init = dyn_cast<DeclRefExpr>(Cond.getInitializer());
+    if (!Init) {
+      continue;
+    }
+    auto ReferencedVar = dyn_cast_or_null<VarDecl>(Init->getDecl());
+    if (!ReferencedVar) {
+      continue;
+    }
+
+    Cond.getPattern()->forEachVariable([&](VarDecl *DeclaredVar) {
+      if (DeclaredVar->getLoc() != Init->getLoc()) {
+        return;
+      }
+      assert(DeclaredVar->getName() == ReferencedVar->getName());
+      Result.emplace_back(std::make_pair(DeclaredVar, ReferencedVar));
+    });
+  }
+  return Result;
 }

@@ -14,20 +14,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if __has_include(<os/signpost.h>)
+#if SWIFT_STDLIB_CONCURRENCY_TRACING
 
 #include "TracingSignpost.h"
 #include <stdio.h>
 
-// Temporary until we work out what categories we should really use.
-#ifndef OS_LOG_CATEGORY_DYNAMIC_STACK_TRACING
-#define OS_LOG_CATEGORY_DYNAMIC_STACK_TRACING "DynamicStackTracing"
-#endif
-
-#define SWIFT_LOG_CONCURRENCY_ACTOR_SUBSYSTEM "com.apple.swift.actor"
-#define SWIFT_LOG_CONCURRENCY_TASK_SUBSYSTEM "com.apple.swift.task"
-#define SWIFT_LOG_ACTOR_CATEGORY OS_LOG_CATEGORY_DYNAMIC_STACK_TRACING
-#define SWIFT_LOG_TASK_CATEGORY OS_LOG_CATEGORY_DYNAMIC_STACK_TRACING
+#define SWIFT_LOG_CONCURRENCY_SUBSYSTEM "com.apple.swift.concurrency"
+#define SWIFT_LOG_ACTOR_CATEGORY "Actor"
+#define SWIFT_LOG_TASK_CATEGORY "Task"
 
 namespace swift {
 namespace concurrency {
@@ -35,12 +29,12 @@ namespace trace {
 
 os_log_t ActorLog;
 os_log_t TaskLog;
-OnceToken_t LogsToken;
+swift::once_t LogsToken;
 
 void setupLogs(void *unused) {
-  ActorLog = os_log_create(SWIFT_LOG_CONCURRENCY_ACTOR_SUBSYSTEM,
+  ActorLog = os_log_create(SWIFT_LOG_CONCURRENCY_SUBSYSTEM,
                            SWIFT_LOG_ACTOR_CATEGORY);
-  TaskLog = os_log_create(SWIFT_LOG_CONCURRENCY_TASK_SUBSYSTEM,
+  TaskLog = os_log_create(SWIFT_LOG_CONCURRENCY_SUBSYSTEM,
                           SWIFT_LOG_TASK_CATEGORY);
 }
 

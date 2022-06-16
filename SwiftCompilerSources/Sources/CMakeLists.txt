@@ -6,8 +6,13 @@
 # See http://swift.org/LICENSE.txt for license information
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
-if(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
-  add_subdirectory(ExperimentalRegex)
+# NOTE: Subdirectories must be added in dependency order.
+
+if(SWIFT_BUILD_REGEX_PARSER_IN_COMPILER)
+  add_subdirectory(_RegexParser)
 endif()
+add_subdirectory(Basic)
+add_subdirectory(AST)
+add_subdirectory(Parse)
 add_subdirectory(SIL)
 add_subdirectory(Optimizer)

@@ -71,6 +71,22 @@ struct SectionInfo {
 SWIFT_RUNTIME_EXPORT
 void swift_addNewDSOImage(struct swift::MetadataSections *sections);
 
+/// Enumerate all metadata sections in the current process that are known to the
+/// Swift runtime.
+///
+/// \param body A function to invoke once per metadata sections structure.
+///   If this function returns \c false, enumeration is stopped.
+/// \param context An additional context pointer to pass to \a body.
+///
+/// On Mach-O-based platforms (i.e. Apple platforms), this function is
+/// unavailable. On those platforms, use dyld API to enumerate loaded images and
+/// their corresponding metadata sections.
+SWIFT_RUNTIME_EXPORT SWIFT_WEAK_IMPORT
+void swift_enumerateAllMetadataSections(
+  bool (* body)(const swift::MetadataSections *sections, void *context),
+  void *context
+);
+
 #ifndef NDEBUG
 
 SWIFT_RUNTIME_EXPORT

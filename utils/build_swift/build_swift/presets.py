@@ -12,14 +12,10 @@ Swift preset parsing and handling functionality.
 """
 
 
-from __future__ import absolute_import, unicode_literals
-
+import configparser
 import functools
 import io
 from collections import OrderedDict, namedtuple
-
-from six import StringIO
-from six.moves import configparser
 
 from . import class_utils
 
@@ -313,14 +309,9 @@ class PresetParser(object):
         """Reads and parses a string containing preset definintions.
         """
 
-        fp = StringIO(string)
+        fp = io.StringIO(string)
 
-        # ConfigParser changes drastically from Python 2 to 3
-        if hasattr(self._parser, 'read_file'):
-            self._parser.read_file(fp)
-        else:
-            self._parser.readfp(fp)
-
+        self._parser.read_file(fp)
         self._parse_raw_presets()
 
     # -------------------------------------------------------------------------

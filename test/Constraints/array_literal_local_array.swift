@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift
 
-// SR-9611: Array type locally interfers with array literals.
+// SR-9611: Array type locally interferes with array literals.
 struct Array { }
 
 func foo() {

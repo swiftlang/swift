@@ -281,12 +281,14 @@ bool ArrayAllocation::replaceAppendContentOf() {
     return false;
 
   auto Mangled = SILDeclRef(AppendFnDecl, SILDeclRef::Kind::Func).mangle();
-  SILFunction *AppendFn = M.findFunction(Mangled, SILLinkage::PublicExternal);
+  SILFunction *AppendFn = M.loadFunction(Mangled,
+                                         SILModule::LinkingMode::LinkAll);
   if (!AppendFn)
     return false;
 
   Mangled = SILDeclRef(ReserveFnDecl, SILDeclRef::Kind::Func).mangle();
-  SILFunction *ReserveFn = M.findFunction(Mangled, SILLinkage::PublicExternal);
+  SILFunction *ReserveFn = M.loadFunction(Mangled,
+                                          SILModule::LinkingMode::LinkAll);
   if (!ReserveFn)
     return false;
 

@@ -17,11 +17,6 @@
 // REQUIRES: executable_test
 // REQUIRES: CPU=x86_64
 
-// See rdar://problem/65251059
-// UNSUPPORTED: windows
-// rdar://problem/65015626
-// XFAIL: asserts
-
 import StdlibUnittest
 #if canImport(Darwin)
   import Darwin

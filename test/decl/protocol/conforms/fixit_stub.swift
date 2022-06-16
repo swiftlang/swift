@@ -162,17 +162,18 @@ protocol ProtocolChain2 : ProtocolChain1 {
 class Adopter15 : ProtocolChain2 {} //expected-error {{type 'Adopter15' does not conform to protocol 'ProtocolChain2'}} expected-error {{type 'Adopter15' does not conform to protocol 'ProtocolChain1'}}
 
 protocol ProtocolParallel1 {
-  associatedtype Foo1 // expected-note {{protocol requires nested type 'Foo1'; do you want to add it?}}{{57-57=\n    typealias Foo1 = <#type#>\n\n    typealias Foo2 = <#type#>\n\n    typealias Foo3 = <#type#>\n\n    typealias Bar1 = <#type#>\n\n    typealias Bar2 = <#type#>\n\n    typealias Bar3 = <#type#>\n}}
-  associatedtype Foo2 // expected-note {{protocol requires nested type 'Foo2'; do you want to add it?}}{{57-57=\n    typealias Foo1 = <#type#>\n\n    typealias Foo2 = <#type#>\n\n    typealias Foo3 = <#type#>\n\n    typealias Bar1 = <#type#>\n\n    typealias Bar2 = <#type#>\n\n    typealias Bar3 = <#type#>\n}}
-  associatedtype Foo3 // expected-note {{protocol requires nested type 'Foo3'; do you want to add it?}}{{57-57=\n    typealias Foo1 = <#type#>\n\n    typealias Foo2 = <#type#>\n\n    typealias Foo3 = <#type#>\n\n    typealias Bar1 = <#type#>\n\n    typealias Bar2 = <#type#>\n\n    typealias Bar3 = <#type#>\n}}
-  func Foo4()
+  associatedtype Foo1 // expected-note {{protocol requires nested type 'Foo1'; do you want to add it?}}{{57-57=\n    typealias Foo1 = <#type#>\n\n    typealias Foo2 = <#type#>\n\n    typealias Foo3 = <#type#>\n\n    func Foo4() {\n        <#code#>\n    \}\n\n    typealias Bar1 = <#type#>\n\n    typealias Bar2 = <#type#>\n\n    typealias Bar3 = <#type#>\n}}
+  associatedtype Foo2 // expected-note {{protocol requires nested type 'Foo2'; do you want to add it?}}{{57-57=\n    typealias Foo1 = <#type#>\n\n    typealias Foo2 = <#type#>\n\n    typealias Foo3 = <#type#>\n\n    func Foo4() {\n        <#code#>\n    \}\n\n    typealias Bar1 = <#type#>\n\n    typealias Bar2 = <#type#>\n\n    typealias Bar3 = <#type#>\n}}
+  associatedtype Foo3 // expected-note {{protocol requires nested type 'Foo3'; do you want to add it?}}{{57-57=\n    typealias Foo1 = <#type#>\n\n    typealias Foo2 = <#type#>\n\n    typealias Foo3 = <#type#>\n\n    func Foo4() {\n        <#code#>\n    \}\n\n    typealias Bar1 = <#type#>\n\n    typealias Bar2 = <#type#>\n\n    typealias Bar3 = <#type#>\n}}
+  // FIXME: Why do we add stubs for all missing requirements when the note implies a single one?
+  func Foo4() // expected-note {{protocol requires function 'Foo4()' with type '() -> ()'; do you want to add a stub?}}{{57-57=\n    typealias Foo1 = <#type#>\n\n    typealias Foo2 = <#type#>\n\n    typealias Foo3 = <#type#>\n\n    func Foo4() {\n        <#code#>\n    \}\n\n    typealias Bar1 = <#type#>\n\n    typealias Bar2 = <#type#>\n\n    typealias Bar3 = <#type#>\n}}
 }
 
 protocol ProtocolParallel2 {
-  associatedtype Bar1 // expected-note {{protocol requires nested type 'Bar1'; do you want to add it?}}{{57-57=\n    typealias Foo1 = <#type#>\n\n    typealias Foo2 = <#type#>\n\n    typealias Foo3 = <#type#>\n\n    typealias Bar1 = <#type#>\n\n    typealias Bar2 = <#type#>\n\n    typealias Bar3 = <#type#>\n}}
-  associatedtype Bar2 // expected-note {{protocol requires nested type 'Bar2'; do you want to add it?}}{{57-57=\n    typealias Foo1 = <#type#>\n\n    typealias Foo2 = <#type#>\n\n    typealias Foo3 = <#type#>\n\n    typealias Bar1 = <#type#>\n\n    typealias Bar2 = <#type#>\n\n    typealias Bar3 = <#type#>\n}}
-  associatedtype Bar3 // expected-note {{protocol requires nested type 'Bar3'; do you want to add it?}}{{57-57=\n    typealias Foo1 = <#type#>\n\n    typealias Foo2 = <#type#>\n\n    typealias Foo3 = <#type#>\n\n    typealias Bar1 = <#type#>\n\n    typealias Bar2 = <#type#>\n\n    typealias Bar3 = <#type#>\n}}
-  func Bar4()
+  associatedtype Bar1 // expected-note {{protocol requires nested type 'Bar1'; do you want to add it?}}{{57-57=\n    typealias Foo1 = <#type#>\n\n    typealias Foo2 = <#type#>\n\n    typealias Foo3 = <#type#>\n\n    func Foo4() {\n        <#code#>\n    \}\n\n    typealias Bar1 = <#type#>\n\n    typealias Bar2 = <#type#>\n\n    typealias Bar3 = <#type#>\n}}
+  associatedtype Bar2 // expected-note {{protocol requires nested type 'Bar2'; do you want to add it?}}{{57-57=\n    typealias Foo1 = <#type#>\n\n    typealias Foo2 = <#type#>\n\n    typealias Foo3 = <#type#>\n\n    func Foo4() {\n        <#code#>\n    \}\n\n    typealias Bar1 = <#type#>\n\n    typealias Bar2 = <#type#>\n\n    typealias Bar3 = <#type#>\n}}
+  associatedtype Bar3 // expected-note {{protocol requires nested type 'Bar3'; do you want to add it?}}{{57-57=\n    typealias Foo1 = <#type#>\n\n    typealias Foo2 = <#type#>\n\n    typealias Foo3 = <#type#>\n\n    func Foo4() {\n        <#code#>\n    \}\n\n    typealias Bar1 = <#type#>\n\n    typealias Bar2 = <#type#>\n\n    typealias Bar3 = <#type#>\n}}
+  func Bar4() // expected-note {{protocol requires function 'Bar4()' with type '() -> ()'; do you want to add a stub?}}{{57-57=\n    func Bar4() {\n        <#code#>\n    \}\n}}
 }
 
 class Adopter16 : ProtocolParallel1, ProtocolParallel2 {} // expected-error {{type 'Adopter16' does not conform to protocol 'ProtocolParallel1'}} expected-error {{type 'Adopter16' does not conform to protocol 'ProtocolParallel2'}}

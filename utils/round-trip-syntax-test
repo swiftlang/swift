@@ -1,6 +1,4 @@
-#!/usr/bin/env python
-
-from __future__ import print_function, unicode_literals
+#!/usr/bin/env python3
 
 import argparse
 import difflib
@@ -14,21 +12,12 @@ from functools import reduce
 logging.basicConfig(format='%(message)s', level=logging.INFO)
 
 
-# Python 2 `unicode` was renamed `str` in Python 3.  To consistently support
-# both, define `unicode` to be `str` when using Python 3.  Once we can drop
-# Python 2 support, delete this and change all uses of `unicode` to `str`.
-# (Currently, this is only here to avoid a python_lint failure from unicode
-# references below.)
-if sys.version_info[0] >= 3:
-    unicode = str
-
-
 class RoundTripTask(object):
     def __init__(self, input_filename, action, swift_syntax_test,
                  skip_bad_syntax):
         assert action == '-round-trip-parse' or action == '-round-trip-lex'
         if sys.version_info[0] < 3:
-            assert type(input_filename) == unicode
+            assert type(input_filename) == str
         assert type(swift_syntax_test) == str
 
         assert os.path.isfile(input_filename), \
@@ -81,8 +70,8 @@ class RoundTripTask(object):
                 logging.error('---===ERROR===--- Lex/parse had error'
                               ' diagnostics, so not diffing.')
                 logging.error(' '.join(command))
-                logging.error(self.stdout)
-                logging.error(self.stderr)
+                logging.error(self.stdout.decode('utf-8', errors='replace'))
+                logging.error(self.stderr.decode('utf-8', errors='replace'))
                 raise RuntimeError()
 
         contents = ''.join(map(lambda l: l.decode('utf-8', errors='replace'),

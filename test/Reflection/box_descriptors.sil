@@ -3,10 +3,10 @@
 // RUN: %target-swift-reflection-dump -binary-filename %t/capture_descriptors%{target-shared-library-suffix} | %FileCheck %s
 
 // SR-10758
-// UNSUPPORTED: linux
+// UNSUPPORTED: OS=linux-gnu, OS=linux-android, OS=linux-androideabi
 
 // SR-12893
-// XFAIL: openbsd
+// XFAIL: OS=openbsd
 
 sil_stage canonical
 

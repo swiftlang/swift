@@ -1,0 +1,281 @@
+// RUN: %target-swift-frontend %s -emit-sil | %FileCheck %s
+
+// REQUIRES: concurrency
+// REQUIRES: objc_interop
+
+// CHECK-LABEL: sil private @$s3bug7trigger1pyAA9PresenterC_tYaFytSgyYaXEfU_ : $@convention(thin) @async (@guaranteed Presenter) -> Optional<()>
+// CHECK:         bb2:
+// CHECK:           hop_to_executor {{%.+}} : $MainActor
+
+sil_stage raw
+
+import Builtin
+import Swift
+import SwiftShims
+import _Concurrency
+
+func trigger(p: Presenter) async
+
+final class Presenter {
+  @MainActor @_hasStorage @_hasInitialValue final var view: Vista? { get set }
+  @objc deinit
+  init()
+}
+
+class Vista {
+  @MainActor func doSmthOnMain()
+  @objc deinit
+  init()
+}
+
+@MainActor @_hasStorage @_hasInitialValue var x: Int { get set }
+
+// x
+sil_global hidden @$s3bug1xSivp : $Int
+
+// main
+sil [ossa] @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+  alloc_global @$s3bug1xSivp                      // id: %2
+  %3 = global_addr @$s3bug1xSivp : $*Int          // user: %8
+  %4 = integer_literal $Builtin.IntLiteral, 0     // user: %7
+  %5 = metatype $@thin Int.Type                   // user: %7
+  // function_ref Int.init(_builtinIntegerLiteral:)
+  %6 = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int // user: %7
+  %7 = apply %6(%4, %5) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int // user: %8
+  store %7 to [trivial] %3 : $*Int                // id: %8
+  %9 = integer_literal $Builtin.Int32, 0          // user: %10
+  %10 = struct $Int32 (%9 : $Builtin.Int32)       // user: %11
+  return %10 : $Int32                             // id: %11
+} // end sil function 'main'
+
+// trigger(p:)
+sil hidden [ossa] @$s3bug7trigger1pyAA9PresenterC_tYaF : $@convention(thin) @async (@guaranteed Presenter) -> () {
+// %0 "p"                                         // users: %3, %1
+bb0(%0 : @guaranteed $Presenter):
+  debug_value %0 : $Presenter, let, name "p", argno 1 // id: %1
+  // function_ref closure #1 in trigger(p:)
+  %2 = function_ref @$s3bug7trigger1pyAA9PresenterC_tYaFytSgyYaXEfU_ : $@convention(thin) @async (@guaranteed Presenter) -> Optional<()> // user: %3
+  %3 = apply %2(%0) : $@convention(thin) @async (@guaranteed Presenter) -> Optional<()>
+  %4 = tuple ()                                   // user: %5
+  return %4 : $()                                 // id: %5
+} // end sil function '$s3bug7trigger1pyAA9PresenterC_tYaF'
+
+// closure #1 in trigger(p:)
+sil private [ossa] @$s3bug7trigger1pyAA9PresenterC_tYaFytSgyYaXEfU_ : $@convention(thin) @async (@guaranteed Presenter) -> Optional<()> {
+// %0 "p"                                         // users: %2, %1
+bb0(%0 : @guaranteed $Presenter):
+  debug_value %0 : $Presenter, let, name "p", argno 1 // id: %1
+  %2 = ref_element_addr %0 : $Presenter, #Presenter.view // user: %9
+  %3 = metatype $@thick MainActor.Type            // user: %5
+  // function_ref static MainActor.shared.getter
+  %4 = function_ref @$sScM6sharedScMvgZ : $@convention(method) (@thick MainActor.Type) -> @owned MainActor // user: %5
+  %5 = apply %4(%3) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor // users: %36, %17, %6
+  %6 = begin_borrow %5 : $MainActor               // users: %23, %16, %8
+  %7 = builtin "getCurrentExecutor"() : $Optional<Builtin.Executor> // users: %22, %15
+  hop_to_executor %6 : $MainActor                 // id: %8
+  %9 = begin_access [read] [dynamic] %2 : $*Optional<Vista> // users: %21, %19, %14, %12
+  %10 = integer_literal $Builtin.Int1, -1         // user: %12
+  %11 = integer_literal $Builtin.Int1, 0          // user: %12
+  %12 = select_enum_addr %9 : $*Optional<Vista>, case #Optional.some!enumelt: %10, default %11 : $Builtin.Int1 // user: %13
+  cond_br %12, bb2, bb1                           // id: %13
+
+bb1:                                              // Preds: bb0
+  end_access %9 : $*Optional<Vista>               // id: %14
+  hop_to_executor %7 : $Optional<Builtin.Executor> // id: %15
+  end_borrow %6 : $MainActor                      // id: %16
+  destroy_value %5 : $MainActor                   // id: %17
+  br bb4                                          // id: %18
+
+bb2:                                              // Preds: bb0
+  %19 = unchecked_take_enum_data_addr %9 : $*Optional<Vista>, #Optional.some!enumelt // user: %20
+  %20 = load [copy] %19 : $*Vista                 // users: %35, %31, %24
+  end_access %9 : $*Optional<Vista>               // id: %21
+  hop_to_executor %7 : $Optional<Builtin.Executor> // id: %22
+  end_borrow %6 : $MainActor                      // id: %23
+  %24 = class_method %20 : $Vista, #Vista.doSmthOnMain : (Vista) -> () -> (), $@convention(method) (@guaranteed Vista) -> () // user: %31
+  %25 = metatype $@thick MainActor.Type           // user: %27
+  // function_ref static MainActor.shared.getter
+  %26 = function_ref @$sScM6sharedScMvgZ : $@convention(method) (@thick MainActor.Type) -> @owned MainActor // user: %27
+  %27 = apply %26(%25) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor // users: %34, %28
+  %28 = begin_borrow %27 : $MainActor             // users: %33, %30
+  %29 = builtin "getCurrentExecutor"() : $Optional<Builtin.Executor> // user: %32
+  hop_to_executor %28 : $MainActor                // id: %30
+  %31 = apply %24(%20) : $@convention(method) (@guaranteed Vista) -> ()
+  hop_to_executor %29 : $Optional<Builtin.Executor> // id: %32
+  end_borrow %28 : $MainActor                     // id: %33
+  destroy_value %27 : $MainActor                  // id: %34
+  destroy_value %20 : $Vista                      // id: %35
+  destroy_value %5 : $MainActor                   // id: %36
+  %37 = tuple ()                                  // user: %38
+  %38 = enum $Optional<()>, #Optional.some!enumelt, %37 : $() // user: %39
+  br bb3(%38 : $Optional<()>)                     // id: %39
+
+// %40                                            // user: %41
+bb3(%40 : $Optional<()>):                         // Preds: bb4 bb2
+  return %40 : $Optional<()>                      // id: %41
+
+bb4:                                              // Preds: bb1
+  %42 = enum $Optional<()>, #Optional.none!enumelt // user: %43
+  br bb3(%42 : $Optional<()>)                     // id: %43
+} // end sil function '$s3bug7trigger1pyAA9PresenterC_tYaFytSgyYaXEfU_'
+
+// static MainActor.shared.getter
+sil [available 12.0.0] @$sScM6sharedScMvgZ : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
+
+// variable initialization expression of Presenter.view
+sil hidden [transparent] [ossa] @$s3bug9PresenterC4viewAA5VistaCSgvpfi : $@convention(thin) () -> @owned Optional<Vista> {
+bb0:
+  %0 = metatype $@thick Vista.Type                // user: %2
+  // function_ref Vista.__allocating_init()
+  %1 = function_ref @$s3bug5VistaCACycfC : $@convention(method) (@thick Vista.Type) -> @owned Vista // user: %2
+  %2 = apply %1(%0) : $@convention(method) (@thick Vista.Type) -> @owned Vista // user: %3
+  %3 = enum $Optional<Vista>, #Optional.some!enumelt, %2 : $Vista // user: %4
+  return %3 : $Optional<Vista>                    // id: %4
+} // end sil function '$s3bug9PresenterC4viewAA5VistaCSgvpfi'
+
+// Vista.__allocating_init()
+sil hidden [exact_self_class] [ossa] @$s3bug5VistaCACycfC : $@convention(method) (@thick Vista.Type) -> @owned Vista {
+// %0 "$metatype"
+bb0(%0 : $@thick Vista.Type):
+  %1 = alloc_ref $Vista                           // user: %3
+  // function_ref Vista.init()
+  %2 = function_ref @$s3bug5VistaCACycfc : $@convention(method) (@owned Vista) -> @owned Vista // user: %3
+  %3 = apply %2(%1) : $@convention(method) (@owned Vista) -> @owned Vista // user: %4
+  return %3 : $Vista                              // id: %4
+} // end sil function '$s3bug5VistaCACycfC'
+
+// Presenter.deinit
+sil hidden [ossa] @$s3bug9PresenterCfd : $@convention(method) (@guaranteed Presenter) -> @owned Builtin.NativeObject {
+// %0 "self"                                      // users: %6, %2, %1
+bb0(%0 : @guaranteed $Presenter):
+  debug_value %0 : $Presenter, let, name "self", argno 1, implicit // id: %1
+  %2 = ref_element_addr %0 : $Presenter, #Presenter.view // user: %3
+  %3 = begin_access [deinit] [static] %2 : $*Optional<Vista> // users: %5, %4
+  destroy_addr %3 : $*Optional<Vista>             // id: %4
+  end_access %3 : $*Optional<Vista>               // id: %5
+  %6 = unchecked_ref_cast %0 : $Presenter to $Builtin.NativeObject // user: %7
+  %7 = unchecked_ownership_conversion %6 : $Builtin.NativeObject, @guaranteed to @owned // user: %8
+  return %7 : $Builtin.NativeObject               // id: %8
+} // end sil function '$s3bug9PresenterCfd'
+
+// Presenter.__deallocating_deinit
+sil hidden [ossa] @$s3bug9PresenterCfD : $@convention(method) (@owned Presenter) -> () {
+// %0 "self"                                      // users: %6, %3, %1
+bb0(%0 : @owned $Presenter):
+  debug_value %0 : $Presenter, let, name "self", argno 1, implicit // id: %1
+  // function_ref Presenter.deinit
+  %2 = function_ref @$s3bug9PresenterCfd : $@convention(method) (@guaranteed Presenter) -> @owned Builtin.NativeObject // user: %4
+  %3 = begin_borrow %0 : $Presenter               // users: %5, %4
+  %4 = apply %2(%3) : $@convention(method) (@guaranteed Presenter) -> @owned Builtin.NativeObject // user: %7
+  end_borrow %3 : $Presenter                      // id: %5
+  end_lifetime %0 : $Presenter                    // id: %6
+  %7 = unchecked_ref_cast %4 : $Builtin.NativeObject to $Presenter // user: %8
+  dealloc_ref %7 : $Presenter                     // id: %8
+  %9 = tuple ()                                   // user: %10
+  return %9 : $()                                 // id: %10
+} // end sil function '$s3bug9PresenterCfD'
+
+// Presenter.__allocating_init()
+sil hidden [exact_self_class] [ossa] @$s3bug9PresenterCACycfC : $@convention(method) (@thick Presenter.Type) -> @owned Presenter {
+// %0 "$metatype"
+bb0(%0 : $@thick Presenter.Type):
+  %1 = alloc_ref $Presenter                       // user: %3
+  // function_ref Presenter.init()
+  %2 = function_ref @$s3bug9PresenterCACycfc : $@convention(method) (@owned Presenter) -> @owned Presenter // user: %3
+  %3 = apply %2(%1) : $@convention(method) (@owned Presenter) -> @owned Presenter // user: %4
+  return %3 : $Presenter                          // id: %4
+} // end sil function '$s3bug9PresenterCACycfC'
+
+// Presenter.init()
+sil hidden [ossa] @$s3bug9PresenterCACycfc : $@convention(method) (@owned Presenter) -> @owned Presenter {
+// %0 "self"                                      // users: %2, %1
+bb0(%0 : @owned $Presenter):
+  debug_value %0 : $Presenter, let, name "self", argno 1, implicit // id: %1
+  %2 = mark_uninitialized [rootself] %0 : $Presenter // users: %10, %9, %3
+  %3 = begin_borrow %2 : $Presenter               // users: %8, %4
+  %4 = ref_element_addr %3 : $Presenter, #Presenter.view // user: %7
+  // function_ref variable initialization expression of Presenter.view
+  %5 = function_ref @$s3bug9PresenterC4viewAA5VistaCSgvpfi : $@convention(thin) () -> @owned Optional<Vista> // user: %6
+  %6 = apply %5() : $@convention(thin) () -> @owned Optional<Vista> // user: %7
+  store %6 to [init] %4 : $*Optional<Vista>       // id: %7
+  end_borrow %3 : $Presenter                      // id: %8
+  %9 = copy_value %2 : $Presenter                 // user: %11
+  destroy_value %2 : $Presenter                   // id: %10
+  return %9 : $Presenter                          // id: %11
+} // end sil function '$s3bug9PresenterCACycfc'
+
+// Vista.doSmthOnMain()
+sil hidden [ossa] @$s3bug5VistaC12doSmthOnMainyyF : $@convention(method) (@guaranteed Vista) -> () {
+// %0 "self"                                      // user: %2
+bb0(%0 : @guaranteed $Vista):
+  %1 = global_addr @$s3bug1xSivp : $*Int          // user: %7
+  debug_value %0 : $Vista, let, name "self", argno 1, implicit // id: %2
+  %3 = integer_literal $Builtin.IntLiteral, 1     // user: %6
+  %4 = metatype $@thin Int.Type                   // user: %6
+  // function_ref Int.init(_builtinIntegerLiteral:)
+  %5 = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int // user: %6
+  %6 = apply %5(%3, %4) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int // user: %8
+  %7 = begin_access [modify] [dynamic] %1 : $*Int // users: %9, %8
+  assign %6 to %7 : $*Int                         // id: %8
+  end_access %7 : $*Int                           // id: %9
+  %10 = tuple ()                                  // user: %11
+  return %10 : $()                                // id: %11
+} // end sil function '$s3bug5VistaC12doSmthOnMainyyF'
+
+// Int.init(_builtinIntegerLiteral:)
+sil [transparent] [serialized] @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+
+// Vista.deinit
+sil hidden [ossa] @$s3bug5VistaCfd : $@convention(method) (@guaranteed Vista) -> @owned Builtin.NativeObject {
+// %0 "self"                                      // users: %2, %1
+bb0(%0 : @guaranteed $Vista):
+  debug_value %0 : $Vista, let, name "self", argno 1, implicit // id: %1
+  %2 = unchecked_ref_cast %0 : $Vista to $Builtin.NativeObject // user: %3
+  %3 = unchecked_ownership_conversion %2 : $Builtin.NativeObject, @guaranteed to @owned // user: %4
+  return %3 : $Builtin.NativeObject               // id: %4
+} // end sil function '$s3bug5VistaCfd'
+
+// Vista.__deallocating_deinit
+sil hidden [ossa] @$s3bug5VistaCfD : $@convention(method) (@owned Vista) -> () {
+// %0 "self"                                      // users: %6, %3, %1
+bb0(%0 : @owned $Vista):
+  debug_value %0 : $Vista, let, name "self", argno 1, implicit // id: %1
+  // function_ref Vista.deinit
+  %2 = function_ref @$s3bug5VistaCfd : $@convention(method) (@guaranteed Vista) -> @owned Builtin.NativeObject // user: %4
+  %3 = begin_borrow %0 : $Vista                   // users: %5, %4
+  %4 = apply %2(%3) : $@convention(method) (@guaranteed Vista) -> @owned Builtin.NativeObject // user: %7
+  end_borrow %3 : $Vista                          // id: %5
+  end_lifetime %0 : $Vista                        // id: %6
+  %7 = unchecked_ref_cast %4 : $Builtin.NativeObject to $Vista // user: %8
+  dealloc_ref %7 : $Vista                         // id: %8
+  %9 = tuple ()                                   // user: %10
+  return %9 : $()                                 // id: %10
+} // end sil function '$s3bug5VistaCfD'
+
+// Vista.init()
+sil hidden [ossa] @$s3bug5VistaCACycfc : $@convention(method) (@owned Vista) -> @owned Vista {
+// %0 "self"                                      // users: %2, %1
+bb0(%0 : @owned $Vista):
+  debug_value %0 : $Vista, let, name "self", argno 1, implicit // id: %1
+  %2 = mark_uninitialized [rootself] %0 : $Vista  // users: %4, %3
+  %3 = copy_value %2 : $Vista                     // user: %5
+  destroy_value %2 : $Vista                       // id: %4
+  return %3 : $Vista                              // id: %5
+} // end sil function '$s3bug5VistaCACycfc'
+
+sil_vtable Presenter {
+  #Presenter.init!allocator: (Presenter.Type) -> () -> Presenter : @$s3bug9PresenterCACycfC  // Presenter.__allocating_init()
+  #Presenter.deinit!deallocator: @$s3bug9PresenterCfD  // Presenter.__deallocating_deinit
+}
+
+sil_vtable Vista {
+  #Vista.doSmthOnMain: (Vista) -> () -> () : @$s3bug5VistaC12doSmthOnMainyyF  // Vista.doSmthOnMain()
+  #Vista.init!allocator: (Vista.Type) -> () -> Vista : @$s3bug5VistaCACycfC  // Vista.__allocating_init()
+  #Vista.deinit!deallocator: @$s3bug5VistaCfD  // Vista.__deallocating_deinit
+}
+
+
+
+// Mappings from '#fileID' to '#filePath':
+//   'bug/explore.swift' => 'explore.swift'

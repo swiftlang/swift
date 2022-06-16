@@ -381,11 +381,10 @@ SwiftInterfaceGenContext::create(StringRef DocumentName,
   ASTContext &Ctx = CI.getASTContext();
   CloseClangModuleFiles scopedCloseFiles(*Ctx.getClangModuleLoader());
 
-  // Load standard library so that Clang importer can use it.
-  auto *Stdlib = Ctx.getModuleByIdentifier(Ctx.StdlibModuleName);
-  if (!Stdlib) {
-    ErrMsg = "Could not load the stdlib module";
-    return nullptr;
+  // Load implict imports so that Clang importer can use them.
+  for (auto unloadedImport :
+       CI.getMainModule()->getImplicitImportInfo().AdditionalUnloadedImports) {
+    (void)Ctx.getModule(unloadedImport.module.getModulePath());
   }
 
   if (IsModule) {

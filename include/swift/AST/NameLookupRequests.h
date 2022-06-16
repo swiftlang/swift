@@ -270,6 +270,22 @@ private:
            llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *>) const;
 };
 
+/// Request the nominal types that occur as the right-hand side of "Self: Foo"
+/// constraints in the generic signature of a protocol extension.
+class SelfBoundsFromGenericSignatureRequest
+    : public SimpleRequest<SelfBoundsFromGenericSignatureRequest,
+                           SelfBounds(const ExtensionDecl *),
+                           RequestFlags::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  SelfBounds evaluate(Evaluator &evaluator, const ExtensionDecl *extDecl) const;
+};
+
 /// Request all type aliases and nominal types that appear in the "where"
 /// clause of an extension.
 class TypeDeclsFromWhereClauseRequest :

@@ -288,9 +288,11 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
     // Stores *to* the allocation are writes.
     if (auto *si = dyn_cast<StoreInst>(User)) {
       if (UI->getOperandNumber() == StoreInst::Dest) {
-        if (PointeeType.is<TupleType>()) {
-          UsesToScalarize.push_back(User);
-          continue;
+        if (auto tupleType = PointeeType.getAs<TupleType>()) {
+          if (!tupleType->isEqual(Module.getASTContext().TheEmptyTupleType)) {
+            UsesToScalarize.push_back(User);
+            continue;
+          }
         }
 
         auto kind = ([&]() -> PMOUseKind {
@@ -322,9 +324,11 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
     if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
       // If this is a copy of a tuple, we should scalarize it so that we don't
       // have an access that crosses elements.
-      if (PointeeType.is<TupleType>()) {
-        UsesToScalarize.push_back(CAI);
-        continue;
+      if (auto tupleType = PointeeType.getAs<TupleType>()) {
+        if (!tupleType->isEqual(Module.getASTContext().TheEmptyTupleType)) {
+          UsesToScalarize.push_back(CAI);
+          continue;
+        }
       }
 
       // If this is the source of the copy_addr, then this is a load.  If it is

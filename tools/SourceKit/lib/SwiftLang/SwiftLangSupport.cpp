@@ -25,7 +25,6 @@
 #include "swift/AST/USRGeneration.h"
 #include "swift/Config.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
-#include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CodeCompletionCache.h"
 #include "swift/IDE/CompletionInstance.h"
 #include "swift/IDE/SyntaxModel.h"
@@ -273,6 +272,7 @@ configureCompletionInstance(std::shared_ptr<CompletionInstance> CompletionInst,
 
 SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
     : NotificationCtr(SKCtx.getNotificationCenter()),
+      SwiftExecutablePath(SKCtx.getSwiftExecutablePath()),
       ReqTracker(SKCtx.getRequestTracker()), CCCache(new SwiftCompletionCache),
       CompileManager(RuntimeResourcePath, DiagnosticDocumentationPath) {
   llvm::SmallString<128> LibPath(SKCtx.getRuntimeLibPath());
@@ -284,7 +284,7 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
   EditorDocuments = std::make_shared<SwiftEditorDocumentFileMap>();
   ASTMgr = std::make_shared<SwiftASTManager>(
       EditorDocuments, SKCtx.getGlobalConfiguration(), Stats, ReqTracker,
-      RuntimeResourcePath, DiagnosticDocumentationPath);
+      SwiftExecutablePath, RuntimeResourcePath, DiagnosticDocumentationPath);
 
   CompletionInst = std::make_shared<CompletionInstance>();
 
@@ -390,6 +390,7 @@ UIdent SwiftLangSupport::getUIDForCodeCompletionDeclKind(
     switch (Kind) {
     case CodeCompletionDeclKind::Module: return KindRefModule;
     case CodeCompletionDeclKind::Class: return KindRefClass;
+    case CodeCompletionDeclKind::Actor: return KindRefActor;
     case CodeCompletionDeclKind::Struct: return KindRefStruct;
     case CodeCompletionDeclKind::Enum: return KindRefEnum;
     case CodeCompletionDeclKind::EnumElement: return KindRefEnumElement;
@@ -417,6 +418,7 @@ UIdent SwiftLangSupport::getUIDForCodeCompletionDeclKind(
   switch (Kind) {
   case CodeCompletionDeclKind::Module: return KindDeclModule;
   case CodeCompletionDeclKind::Class: return KindDeclClass;
+  case CodeCompletionDeclKind::Actor: return KindDeclActor;
   case CodeCompletionDeclKind::Struct: return KindDeclStruct;
   case CodeCompletionDeclKind::Enum: return KindDeclEnum;
   case CodeCompletionDeclKind::EnumElement: return KindDeclEnumElement;
@@ -720,9 +722,12 @@ UIdent SwiftLangSupport::getUIDForSymbol(SymbolInfo sym, bool isRef) {
   case SymbolKind::Module:
     return KindRefModule;
 
+  case SymbolKind::CommentTag:
+    return KindCommentTag;
+
   default:
     // TODO: reconsider whether having a default case is a good idea.
-    return UIdent();
+    llvm_unreachable("unhandled symbol kind Swift doesn't use");
   }
 
 #undef SIMPLE_CASE

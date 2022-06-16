@@ -27,6 +27,7 @@
 
 import Test
 
+// CHECK-SIL: sil_global public_external [serialized] @_swiftEmptySetSingleton : $_SwiftEmptySetSingleton
 
 func testNestedTypes() {
   let c = Container()
@@ -132,6 +133,9 @@ func testMisc() {
 
   // CHECK-OUTPUT: 27
   print(classWithPublicProperty(33))
+
+  // CHECK-OUTPUT: []
+  print(getEmptySet())
 }
 
 // CHECK-SIL2-LABEL: sil hidden [noinline] @$s4Main10testGlobalyyF

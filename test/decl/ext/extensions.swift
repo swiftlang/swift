@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
 
 extension extension_for_invalid_type_1 { // expected-error {{cannot find type 'extension_for_invalid_type_1' in scope}}
   func f() { }
@@ -10,7 +10,7 @@ extension extension_for_invalid_type_3 { // expected-error {{cannot find type 'e
   init() {}
 }
 extension extension_for_invalid_type_4 { // expected-error {{cannot find type 'extension_for_invalid_type_4' in scope}}
-  deinit {} // expected-error {{deinitializers may only be declared within a class}}
+  deinit {} // expected-error {{deinitializers may only be declared within a class or actor}}
 }
 extension extension_for_invalid_type_5 { // expected-error {{cannot find type 'extension_for_invalid_type_5' in scope}}
   typealias X = Int

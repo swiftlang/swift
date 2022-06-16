@@ -1,4 +1,7 @@
-// RUN: %target-run-simple-swift(-Onone -Xfrontend -g -Xfrontend -enable-experimental-distributed -Xfrontend -disable-availability-checking -parse-as-library) | %FileCheck %s --dump-input=always
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/../Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-build-swift -module-name main  -Xfrontend -disable-availability-checking -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
+// RUN: %target-run %t/a.out | %FileCheck %s --color
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -8,7 +11,8 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-import _Distributed
+import Distributed
+import FakeDistributedActorSystems
 
 distributed actor SomeSpecificDistributedActor {
   distributed func hello() async throws -> String {
@@ -16,107 +20,15 @@ distributed actor SomeSpecificDistributedActor {
   }
 }
 
-extension SomeSpecificDistributedActor {
-
-  @_dynamicReplacement(for: _remote_hello())
-  nonisolated func _remote_impl_hello() async throws -> String {
-    return "remote impl (address: \(self.id))"
-  }
-}
-
-// ==== Fake Transport ---------------------------------------------------------
-
-struct FakeActorID: Sendable, Hashable, Codable {
-  let id: UInt64
-}
-
-enum FakeActorSystemError: DistributedActorSystemError {
-  case unsupportedActorIdentity(Any)
-}
-
-struct ActorAddress: Sendable, Hashable, Codable {
-  let address: String
-  init(parse address : String) {
-    self.address = address
-  }
-}
-
-struct FakeActorSystem: DistributedActorSystem {
-  typealias ActorID = ActorAddress
-  typealias InvocationDecoder = FakeInvocation
-  typealias InvocationEncoder = FakeInvocation
-  typealias SerializationRequirement = Codable
-
-  func resolve<Act>(id: ActorID, as actorType: Act.Type) throws -> Act?
-      where Act: DistributedActor,
-            Act.ID == ActorID  {
-    return nil
-  }
-
-  func assignID<Act>(_ actorType: Act.Type) -> ActorID
-      where Act: DistributedActor {
-    let id = ActorAddress(parse: "xxx")
-    print("assignID type:\(actorType), id:\(id)")
-    return id
-  }
-
-  func actorReady<Act>(_ actor: Act)
-      where Act: DistributedActor,
-      Act.ID == ActorID {
-    print("actorReady actor:\(actor), id:\(actor.id)")
-  }
-
-  func resignID(_ id: ActorID) {
-    print("assignID id:\(id)")
-  }
-
-  func makeInvocationEncoder() -> InvocationDecoder {
-    .init()
-  }
-}
-
-struct FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvocationDecoder {
-  typealias SerializationRequirement = Codable
-
-  mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
-  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {}
-  mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
-  mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
-  mutating func doneRecording() throws {}
-
-  // === Receiving / decoding -------------------------------------------------
-
-  func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
-  mutating func decodeNextArgument<Argument>(
-    _ argumentType: Argument.Type,
-    into pointer: UnsafeMutablePointer<Argument> // pointer to our hbuffer
-  ) throws { /* ... */ }
-  func decodeReturnType() throws -> Any.Type? { nil }
-  func decodeErrorType() throws -> Any.Type? { nil }
-
-  struct FakeArgumentDecoder: DistributedTargetInvocationArgumentDecoder {
-    typealias SerializationRequirement = Codable
-  }
-}
-
 typealias DefaultDistributedActorSystem = FakeActorSystem
-
-// ==== Execute ----------------------------------------------------------------
-
-@_silgen_name("swift_distributed_actor_is_remote")
-func __isRemoteActor(_ actor: AnyObject) -> Bool
-
-func __isLocalActor(_ actor: AnyObject) -> Bool {
-  return !__isRemoteActor(actor)
-}
 
 // ==== Execute ----------------------------------------------------------------
 
 func test_remote() async {
   let address = ActorAddress(parse: "sact://127.0.0.1/example#1234")
-  let system = FakeActorSystem()
+  let system = DefaultDistributedActorSystem()
 
-  let local = SomeSpecificDistributedActor(system: system)
+  let local = SomeSpecificDistributedActor(actorSystem: system)
   assert(__isLocalActor(local) == true, "should be local")
   assert(__isRemoteActor(local) == false, "should be local")
   print("isRemote(local) = \(__isRemoteActor(local))") // CHECK: isRemote(local) = false

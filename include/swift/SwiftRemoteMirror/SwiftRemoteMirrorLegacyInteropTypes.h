@@ -22,7 +22,7 @@
 
 #include "SwiftRemoteMirror.h"
 
-/// The remote representation of a Swift metada pointer as returned by
+/// The remote representation of a Swift metadata pointer as returned by
 /// interop wrappers.
 typedef struct swift_metadata_interop {
   uintptr_t Metadata;

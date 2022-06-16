@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -debug-generic-signatures -requirement-machine-protocol-signatures=on 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -debug-generic-signatures 2>&1 | %FileCheck %s
 
 // CHECK: sr12736.(file).ColorModel@
 // CHECK-NEXT: Requirement signature: <Self where Self == Self.[ColorModel]Float32Components.[ColorComponents]Model, Self.[ColorModel]Float32Components : ColorComponents>

@@ -113,6 +113,7 @@ public:
 static bool
 extractLinkerFlagsFromObjectFile(const llvm::object::ObjectFile *ObjectFile,
                                  std::vector<std::string> &LinkerFlags,
+                                 std::unordered_map<std::string, bool> &SwiftRuntimeLibraries,
                                  CompilerInstance &Instance) {
   // Search for the section we hold autolink entries in
   for (auto &Section : ObjectFile->sections()) {
@@ -140,8 +141,13 @@ extractLinkerFlagsFromObjectFile(const llvm::object::ObjectFile *ObjectFile,
       llvm::SmallVector<llvm::StringRef, 4> SplitFlags;
       SectionData->split(SplitFlags, llvm::StringRef("\0", 1), -1,
                          /*KeepEmpty=*/false);
-      for (const auto &Flag : SplitFlags)
-        LinkerFlags.push_back(Flag.str());
+      for (const auto &Flag : SplitFlags) {
+        auto RuntimeLibEntry = SwiftRuntimeLibraries.find(Flag.str());
+        if (RuntimeLibEntry == SwiftRuntimeLibraries.end())
+          LinkerFlags.emplace_back(Flag.str());
+        else
+          RuntimeLibEntry->second = true;
+      }
     }
   }
   return false;
@@ -153,6 +159,7 @@ extractLinkerFlagsFromObjectFile(const llvm::object::ObjectFile *ObjectFile,
 static bool
 extractLinkerFlagsFromObjectFile(const llvm::object::WasmObjectFile *ObjectFile,
                                  std::vector<std::string> &LinkerFlags,
+                                 std::unordered_map<std::string, bool> &SwiftRuntimeLibraries,
                                  CompilerInstance &Instance) {
   // Search for the data segment we hold autolink entries in
   for (const llvm::object::WasmSegment &Segment : ObjectFile->dataSegments()) {
@@ -164,8 +171,13 @@ extractLinkerFlagsFromObjectFile(const llvm::object::WasmObjectFile *ObjectFile,
       llvm::SmallVector<llvm::StringRef, 4> SplitFlags;
       SegmentData.split(SplitFlags, llvm::StringRef("\0", 1), -1,
                         /*KeepEmpty=*/false);
-      for (const auto &Flag : SplitFlags)
-        LinkerFlags.push_back(Flag.str());
+      for (const auto &Flag : SplitFlags) {
+        auto RuntimeLibEntry = SwiftRuntimeLibraries.find(Flag.str());
+        if (RuntimeLibEntry == SwiftRuntimeLibraries.end())
+          LinkerFlags.emplace_back(Flag.str());
+        else
+          RuntimeLibEntry->second = true;
+      }
     }
   }
   return false;
@@ -178,12 +190,13 @@ extractLinkerFlagsFromObjectFile(const llvm::object::WasmObjectFile *ObjectFile,
 static bool extractLinkerFlags(const llvm::object::Binary *Bin,
                                CompilerInstance &Instance,
                                StringRef BinaryFileName,
-                               std::vector<std::string> &LinkerFlags) {
+                               std::vector<std::string> &LinkerFlags,
+                               std::unordered_map<std::string, bool> &SwiftRuntimeLibraries) {
   if (auto *ObjectFile = llvm::dyn_cast<llvm::object::ELFObjectFileBase>(Bin)) {
-    return extractLinkerFlagsFromObjectFile(ObjectFile, LinkerFlags, Instance);
+    return extractLinkerFlagsFromObjectFile(ObjectFile, LinkerFlags, SwiftRuntimeLibraries, Instance);
   } else if (auto *ObjectFile =
                  llvm::dyn_cast<llvm::object::WasmObjectFile>(Bin)) {
-    return extractLinkerFlagsFromObjectFile(ObjectFile, LinkerFlags, Instance);
+    return extractLinkerFlagsFromObjectFile(ObjectFile, LinkerFlags, SwiftRuntimeLibraries, Instance);
   } else if (auto *Archive = llvm::dyn_cast<llvm::object::Archive>(Bin)) {
     llvm::Error Error = llvm::Error::success();
     for (const auto &Child : Archive->children(Error)) {
@@ -197,7 +210,7 @@ static bool extractLinkerFlags(const llvm::object::Binary *Bin,
         return true;
       }
       if (extractLinkerFlags(ChildBinary->get(), Instance, BinaryFileName,
-                             LinkerFlags)) {
+                             LinkerFlags, SwiftRuntimeLibraries)) {
         return true;
       }
     }
@@ -229,6 +242,15 @@ int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
 
   std::vector<std::string> LinkerFlags;
 
+  // Keep track of whether we've already added the common
+  // Swift libraries that ususally have autolink directives
+  // in most object fiels
+  std::unordered_map<std::string, bool> SwiftRuntimeLibraries = {
+      {"-lswiftSwiftOnoneSupport", false},
+      {"-lswiftCore", false},
+      {"-lswift_Concurrency", false},
+  };
+
   // Extract the linker flags from the objects.
   for (const auto &BinaryFileName : Invocation.getInputFilenames()) {
     auto BinaryOwner = llvm::object::createBinary(BinaryFileName);
@@ -245,7 +267,7 @@ int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
     }
 
     if (extractLinkerFlags(BinaryOwner->getBinary(), Instance, BinaryFileName,
-                           LinkerFlags)) {
+                           LinkerFlags, SwiftRuntimeLibraries)) {
       return 1;
     }
   }
@@ -263,6 +285,12 @@ int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
   for (auto &Flag : LinkerFlags) {
     OutOS << Flag << '\n';
   }
+
+  for (const auto &RuntimeLib : SwiftRuntimeLibraries) {
+    if (RuntimeLib.second)
+      OutOS << RuntimeLib.first << '\n';
+  }
+
 
   return 0;
 }

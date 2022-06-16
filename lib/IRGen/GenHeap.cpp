@@ -534,6 +534,9 @@ llvm::Value *IRGenFunction::emitUnmanagedAlloc(const HeapLayout &layout,
                                                const llvm::Twine &name,
                                            llvm::Constant *captureDescriptor,
                                            const HeapNonFixedOffsets *offsets) {
+  if (layout.isKnownEmpty())
+    return IGM.RefCountedNull;
+
   llvm::Value *metadata = layout.getPrivateMetadata(IGM, captureDescriptor);
   llvm::Value *size, *alignMask;
   if (offsets) {
@@ -1505,7 +1508,10 @@ class FixedBoxTypeInfoBase : public BoxTypeInfo {
 public:
   FixedBoxTypeInfoBase(IRGenModule &IGM, HeapLayout &&layout)
     : BoxTypeInfo(IGM), layout(std::move(layout))
-  {}
+  {
+    // Empty layouts should always use EmptyBoxTypeInfo instead
+    assert(!layout.isKnownEmpty());
+  }
 
   OwnedAddress
   allocate(IRGenFunction &IGF, SILType boxedType, GenericEnvironment *env,
@@ -1792,6 +1798,7 @@ llvm::Value *IRGenFunction::getDynamicSelfMetadata() {
     SelfValue = emitDynamicTypeOfHeapObject(*this, SelfValue,
                                 MetatypeRepresentation::Thick,
                                 SILType::getPrimitiveObjectType(SelfType),
+                                GenericSignature(),
                                 /*allow artificial*/ false);
     SelfKind = SwiftMetatype;
     break;
@@ -1893,12 +1900,15 @@ static llvm::Value *emitLoadOfHeapMetadataRef(IRGenFunction &IGF,
 llvm::Value *irgen::emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
                                                      llvm::Value *object,
                                                      CanType objectType,
+                                                     GenericSignature sig,
                                                      bool suppressCast) {
   ClassDecl *theClass = objectType.getClassOrBoundGenericClass();
-  if (theClass && isKnownNotTaggedPointer(IGF.IGM, theClass))
+  if (theClass && isKnownNotTaggedPointer(IGF.IGM, theClass)) {
+    auto isaEncoding = getIsaEncodingForType(IGF.IGM, objectType, sig);
     return emitLoadOfHeapMetadataRef(IGF, object,
-                                     getIsaEncodingForType(IGF.IGM, objectType),
+                                     isaEncoding,
                                      suppressCast);
+  }
 
   // OK, ask the runtime for the class pointer of this potentially-ObjC object.
   return emitHeapMetadataRefForUnknownHeapObject(IGF, object);
@@ -1907,9 +1917,11 @@ llvm::Value *irgen::emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
 llvm::Value *irgen::emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
                                                      llvm::Value *object,
                                                      SILType objectType,
+                                                     GenericSignature sig,
                                                      bool suppressCast) {
   return emitHeapMetadataRefForHeapObject(IGF, object,
                                           objectType.getASTType(),
+                                          sig,
                                           suppressCast);
 }
 
@@ -1976,9 +1988,10 @@ llvm::Value *irgen::emitDynamicTypeOfHeapObject(IRGenFunction &IGF,
                                                 llvm::Value *object,
                                                 MetatypeRepresentation repr,
                                                 SILType objectType,
+                                                GenericSignature sig,
                                                 bool allowArtificialSubclasses){
   switch (auto isaEncoding =
-            getIsaEncodingForType(IGF.IGM, objectType.getASTType())) {
+            getIsaEncodingForType(IGF.IGM, objectType.getASTType(), sig)) {
   case IsaEncoding::Pointer:
     // Directly load the isa pointer from a pure Swift class.
     return emitLoadOfHeapMetadataRef(IGF, object, isaEncoding,
@@ -2005,7 +2018,8 @@ llvm::Value *irgen::emitDynamicTypeOfHeapObject(IRGenFunction &IGF,
 
 /// What isa encoding mechanism does a type have?
 IsaEncoding irgen::getIsaEncodingForType(IRGenModule &IGM,
-                                         CanType type) {
+                                         CanType type,
+                                         GenericSignature outerSignature) {
   if (!IGM.ObjCInterop) return IsaEncoding::Pointer;
 
   // This needs to be kept up-to-date with hasKnownSwiftMetadata.
@@ -2020,13 +2034,16 @@ IsaEncoding irgen::getIsaEncodingForType(IRGenModule &IGM,
   
   // Existentials use the encoding of the enclosed dynamic type.
   if (type->isAnyExistentialType()) {
-    return getIsaEncodingForType(IGM, OpenedArchetypeType::getAny(type));
+    return getIsaEncodingForType(
+        IGM, OpenedArchetypeType::getAny(type, outerSignature),
+        outerSignature);
   }
 
   if (auto archetype = dyn_cast<ArchetypeType>(type)) {
     // If we have a concrete superclass constraint, just recurse.
     if (auto superclass = archetype->getSuperclass()) {
-      return getIsaEncodingForType(IGM, superclass->getCanonicalType());
+      return getIsaEncodingForType(IGM, superclass->getCanonicalType(),
+                                   outerSignature);
     }
 
     // Otherwise, we must just have a class constraint.  Use the

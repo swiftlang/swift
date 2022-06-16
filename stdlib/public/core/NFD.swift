@@ -11,12 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 extension Unicode {
-  internal struct _NFD<S: StringProtocol> {
-    let base: S
+  internal struct _InternalNFD<S: StringProtocol> {
+    let base: S.UnicodeScalarView
   }
 }
 
-extension Unicode._NFD {
+extension Unicode._InternalNFD {
   internal struct Iterator {
     var buffer = Unicode._NormDataBuffer()
 
@@ -28,7 +28,7 @@ extension Unicode._NFD {
   }
 }
 
-extension Unicode._NFD.Iterator: IteratorProtocol {
+extension Unicode._InternalNFD.Iterator: IteratorProtocol {
   internal mutating func decompose(
     _ scalar: Unicode.Scalar,
     with normData: Unicode._NormData
@@ -165,17 +165,17 @@ extension Unicode._NFD.Iterator: IteratorProtocol {
   }
 }
 
-extension Unicode._NFD: Sequence {
+extension Unicode._InternalNFD: Sequence {
   internal func makeIterator() -> Iterator {
     Iterator(
-      index: base.unicodeScalars.startIndex,
-      unicodeScalars: base.unicodeScalars
+      index: base.startIndex,
+      unicodeScalars: base
     )
   }
 }
 
 extension StringProtocol {
-  internal var _nfd: Unicode._NFD<Self> {
-    Unicode._NFD(base: self)
+  internal var _internalNFD: Unicode._InternalNFD<Self> {
+    Unicode._InternalNFD(base: unicodeScalars)
   }
 }

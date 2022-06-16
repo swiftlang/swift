@@ -64,7 +64,7 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
       ${EXECINFO_LIBRARY}
       )
   elseif(SWIFT_HOST_VARIANT STREQUAL windows)
-    list(APPEND PLATFORM_TARGET_LINK_LIBRARIES DbgHelp)
+    list(APPEND PLATFORM_TARGET_LINK_LIBRARIES DbgHelp;Synchronization)
   endif()
 
   if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
@@ -84,16 +84,12 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     endif()
   endif()
 
-  if(NOT SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
-    list(APPEND PLATFORM_SOURCES Mutex.cpp)
-  endif()
-
   if(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
 #    list(APPEND PLATFORM_SOURCES
 #      DistributedActor.cpp
 #      )
     list(APPEND PLATFORM_TARGET_LINK_LIBRARIES
-      swift_Distributed${SWIFT_PRIMARY_VARIANT_SUFFIX}
+      swiftDistributed${SWIFT_PRIMARY_VARIANT_SUFFIX}
       )
   endif()
 
@@ -102,8 +98,7 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     weak.mm
     Refcounting.mm
     Actor.cpp
-    TaskStatus.cpp
-    Mutex.cpp)
+    TaskStatus.cpp)
 
   add_swift_unittest(SwiftRuntimeTests
     Array.cpp
@@ -112,6 +107,7 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     Concurrent.cpp
     Metadata.cpp
     Enum.cpp
+    ExtendedExistential.cpp
     Refcounting.cpp
     Stdlib.cpp
     StackAllocator.cpp
@@ -126,7 +122,7 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     )
 
   # The local stdlib implementation provides definitions of the swiftCore
-  # interfaes to avoid pulling in swiftCore itself.  Build the SwiftRuntimeTests
+  # interfaces to avoid pulling in swiftCore itself.  Build the SwiftRuntimeTests
   # with swiftCore_EXPORTS to permit exporting the stdlib interfaces.
   target_compile_definitions(SwiftRuntimeTests
                              PRIVATE
@@ -147,6 +143,7 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
   target_link_libraries(SwiftRuntimeTests
     PRIVATE
     swiftCore${SWIFT_PRIMARY_VARIANT_SUFFIX}
+    swiftThreading${SWIFT_PRIMARY_VARIANT_SUFFIX}
     ${PLATFORM_TARGET_LINK_LIBRARIES}
     )
 endif()

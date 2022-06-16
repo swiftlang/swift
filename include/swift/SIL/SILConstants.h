@@ -53,7 +53,7 @@ public:
 
   /// Allocate storage for a given number of elements of a specific type
   /// provided as a template parameter. Precondition: \c T must have an
-  /// accesible zero argument constructor.
+  /// accessible zero argument constructor.
   /// \param numElts number of elements of the type to allocate.
   template <typename T> T *allocate(unsigned numElts) {
     T *res = (T *)allocate(sizeof(T) * numElts, alignof(T));
@@ -695,7 +695,7 @@ private:
   // known.
   bool hasNonConstantCaptures = true;
 
-  // A substitution map that partially maps the generic paramters of the
+  // A substitution map that partially maps the generic parameters of the
   // applied function to the generic arguments of passed to the call.
   SubstitutionMap substitutionMap;
 

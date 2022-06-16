@@ -7,7 +7,8 @@
 // Should pass with -enable-cross-import-overlays
 //
 
-// RUN: %target-swift-frontend -enable-cross-import-overlays -I %t/lib/swift -typecheck -emit-module-interface-path %t.swiftinterface %s -module-name ClientLibrary -swift-version 5 -enable-library-evolution
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -enable-cross-import-overlays -I %t/lib/swift -module-name ClientLibrary
+// RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -enable-cross-import-overlays -I %t/lib/swift -module-name ClientLibrary
 // RUN: %FileCheck %s < %t.swiftinterface
 // RUN: %FileCheck -check-prefix NEGATIVE %s < %t.swiftinterface
 
@@ -15,13 +16,13 @@
 // Should fail with -disable-cross-import-overlays
 //
 
-// RUN: not %target-swift-frontend -disable-cross-import-overlays -I %t/lib/swift -typecheck -emit-module-interface-path %t.swiftinterface %s -module-name ClientLibrary -swift-version 5 -enable-library-evolution 2>/dev/null
+// RUN: not %target-swift-emit-module-interface(%t.swiftinterface) %s -disable-cross-import-overlays -I %t/lib/swift -module-name ClientLibrary 2>/dev/null
 
 //
 // Should fail by default
 //
 
-// RUN: not %target-swift-frontend -I %t/lib/swift -typecheck -emit-module-interface-path %t.swiftinterface %s -module-name ClientLibrary -swift-version 5 -enable-library-evolution 2>/dev/null
+// RUN: not %target-swift-emit-module-interface(%t.swiftinterface) %s -I %t/lib/swift -module-name ClientLibrary -swift-version 5 2>/dev/null
 
 
 import DeclaringLibrary

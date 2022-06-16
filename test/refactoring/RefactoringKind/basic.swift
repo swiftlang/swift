@@ -400,15 +400,15 @@ extension TestAddEquatableStructConforming: Equatable {
 // RUN: %refactor -pos=139:3 -end-pos=139:4 -source-filename %s | %FileCheck %s -check-prefix=CHECK-NONE
 // RUN: %refactor -pos=140:13 -end-pos=140:15 -source-filename %s | %FileCheck %s -check-prefix=CHECK2
 
-// RUN: %refactor -pos=144:1 -end-pos=148:4 -source-filename %s | %FileCheck %s -check-prefix=CHECK-EXTRCT-METHOD
-// RUN: %refactor -pos=158:1 -end-pos=162:4 -source-filename %s | %FileCheck %s -check-prefix=CHECK-EXTRCT-METHOD
+// RUN: %refactor -pos=144:1 -end-pos=148:4 -source-filename %s | %FileCheck %s -check-prefix=CHECK-EXTRACT-METHOD
+// RUN: %refactor -pos=158:1 -end-pos=162:4 -source-filename %s | %FileCheck %s -check-prefix=CHECK-EXTRACT-METHOD
 // RUN: %refactor -pos=152:1 -end-pos=154:4 -source-filename %s | %FileCheck %s -check-prefix=CHECK-NONE
 // RUN: %refactor -pos=166:1 -end-pos=168:4 -source-filename %s | %FileCheck %s -check-prefix=CHECK-NONE
 
 // RUN: %refactor -source-filename %s -pos=173:12 | %FileCheck %s -check-prefix=CHECK-NONE
 // RUN: %refactor -source-filename %s -pos=174:12 | %FileCheck %s -check-prefix=CHECK-LOCALIZE-STRING
 
-// RUN: %refactor -source-filename %s -pos=173:3 -end-pos=173:27| %FileCheck %s -check-prefix=CHECK-EXTRCT-METHOD
+// RUN: %refactor -source-filename %s -pos=173:3 -end-pos=173:27| %FileCheck %s -check-prefix=CHECK-EXTRACT-METHOD
 
 // RUN: %refactor -source-filename %s -pos=179:3 | %FileCheck %s -check-prefix=CHECK-COLLAPSE-NESTED-IF
 // RUN: %refactor -source-filename %s -pos=186:3 | %FileCheck %s -check-prefix=CHECK-COLLAPSE-NESTED-IF
@@ -477,9 +477,9 @@ extension TestAddEquatableStructConforming: Equatable {
 // CHECK-EXPAND-DEFAULT-NEXT: Expand Default
 // CHECK-EXPAND-DEFAULT-NEXT: Action ends
 
-// CHECK-EXTRCT-METHOD: Action begins
-// CHECK-EXTRCT-METHOD-NEXT: Extract Method
-// CHECK-EXTRCT-METHOD-NEXT: Action ends
+// CHECK-EXTRACT-METHOD: Action begins
+// CHECK-EXTRACT-METHOD-NEXT: Extract Method
+// CHECK-EXTRACT-METHOD-NEXT: Action ends
 
 // CHECK-LOCALIZE-STRING: Localize String
 

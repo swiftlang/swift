@@ -1,4 +1,4 @@
-//===---- AcceesibleFunction.h - Runtime accessible functions ---*- C++ -*-===//
+//===---- AccessibleFunction.h - Runtime accessible functions ---*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

@@ -189,7 +189,7 @@ bool CrossModuleOptimization::canSerializeFunction(
       return false;
   }
 
-  if (function->isSerialized() == IsSerialized)
+  if (function->isSerialized())
     return true;
 
   if (!function->isDefinition() || function->isAvailableExternally())
@@ -207,7 +207,9 @@ bool CrossModuleOptimization::canSerializeFunction(
   // Do the same check for the specializations of such functions.
   if (function->isSpecialization()) {
     const SILFunction *parent = function->getSpecializationInfo()->getParent();
-    if (!parent->getSpecializeAttrs().empty())
+    // Don't serialize exported (public) specializations.
+    if (!parent->getSpecializeAttrs().empty() &&
+        function->getLinkage() == SILLinkage::Public)
       return false;
   }
 
@@ -248,6 +250,15 @@ bool CrossModuleOptimization::canSerializeInstruction(SILInstruction *inst,
     if (!callee)
       return false;
 
+    // In conservative mode we don't want to turn non-public functions into
+    // public functions, because that can increase code size. E.g. if the
+    // function is completely inlined afterwards.
+    // Also, when emitting TBD files, we cannot introduce a new public symbol.
+    if ((conservative || M.getOptions().emitTBD) &&
+        !hasPublicVisibility(callee->getLinkage())) {
+      return false;
+    }
+
     // Recursivly walk down the call graph.
     if (canSerializeFunction(callee, canSerializeFlags, maxDepth - 1))
       return true;
@@ -260,12 +271,14 @@ bool CrossModuleOptimization::canSerializeInstruction(SILInstruction *inst,
     if (!canUseFromInline(callee))
       return false;
   
-    // In conservative mode we don't want to turn non-public functions into
-    // public functions, because that can increase code size. E.g. if the
-    // function is completely inlined afterwards.
-    if (conservative && callee->getLinkage() != SILLinkage::Public)
+    return true;
+  }
+  if (auto *GAI = dyn_cast<GlobalAddrInst>(inst)) {
+    SILGlobalVariable *global = GAI->getReferencedGlobal();
+    if ((conservative || M.getOptions().emitTBD) &&
+        !hasPublicVisibility(global->getLinkage())) {
       return false;
-
+    }
     return true;
   }
   if (auto *KPI = dyn_cast<KeyPathInst>(inst)) {
@@ -332,19 +345,46 @@ bool CrossModuleOptimization::canSerializeType(SILType type) {
   return success;
 }
 
+/// Returns true if the function in \p funcCtxt could be linked statically to
+/// this module.
+static bool couldBeLinkedStatically(DeclContext *funcCtxt, SILModule &module) {
+  if (!funcCtxt)
+    return true;
+  ModuleDecl *funcModule = funcCtxt->getParentModule();
+  // If the function is in the same module, it's not in another module which
+  // could be linked statically.
+  if (module.getSwiftModule() == funcModule)
+    return false;
+    
+  // The stdlib module is always linked dynamically.
+  if (funcModule == module.getASTContext().getStdlibModule())
+    return false;
+    
+  // Conservatively assume the function is in a statically linked module.
+  return true;
+}
+
 /// Returns true if the function \p func can be used from a serialized function.
 bool CrossModuleOptimization::canUseFromInline(SILFunction *function) {
-  if (DeclContext *funcCtxt = function->getDeclContext()) {
-    if (!M.getSwiftModule()->canBeUsedForCrossModuleOptimization(funcCtxt))
-      return false;
-  }
+  DeclContext *funcCtxt = function->getDeclContext();
+  if (funcCtxt && !M.getSwiftModule()->canBeUsedForCrossModuleOptimization(funcCtxt))
+    return false;
+
+  /// If we are emitting a TBD file, the TBD file only contains public symbols
+  /// of this module. But not public symbols of imported modules which are
+  /// statically linked to the current binary.
+  /// This prevents referencing public symbols from other modules which could
+  /// (potentially) linked statically. Unfortunately there is no way to find out
+  /// if another module is linked statically or dynamically, so we have to be
+  /// conservative here.
+  if (conservative && M.getOptions().emitTBD && couldBeLinkedStatically(funcCtxt, M))
+    return false;
 
   switch (function->getLinkage()) {
   case SILLinkage::PublicNonABI:
-  case SILLinkage::Shared:
   case SILLinkage::HiddenExternal:
     return false;
-  case SILLinkage::SharedExternal:
+  case SILLinkage::Shared:
     // static inline C functions
     if (!function->isDefinition() && function->hasClangNode())
       return true;
@@ -361,7 +401,7 @@ bool CrossModuleOptimization::canUseFromInline(SILFunction *function) {
 /// Decide whether to serialize a function.
 bool CrossModuleOptimization::shouldSerialize(SILFunction *function) {
   // Check if we already handled this function before.
-  if (function->isSerialized() == IsSerialized)
+  if (function->isSerialized())
     return false;
 
   if (function->hasSemanticsAttr("optimize.no.crossmodule"))
@@ -397,7 +437,7 @@ bool CrossModuleOptimization::shouldSerialize(SILFunction *function) {
 /// marked in \p canSerializeFlags.
 void CrossModuleOptimization::serializeFunction(SILFunction *function,
                                        const FunctionFlags &canSerializeFlags) {
-  if (function->isSerialized() == IsSerialized)
+  if (function->isSerialized())
     return;
   
   if (!canSerializeFlags.lookup(function))
@@ -448,8 +488,7 @@ void CrossModuleOptimization::serializeInstruction(SILInstruction *inst,
       }
     }
     serializeFunction(callee, canSerializeFlags);
-    assert(callee->isSerialized() == IsSerialized ||
-           callee->getLinkage() == SILLinkage::Public);
+    assert(callee->isSerialized() || callee->getLinkage() == SILLinkage::Public);
     return;
   }
   if (auto *GAI = dyn_cast<GlobalAddrInst>(inst)) {
@@ -457,9 +496,8 @@ void CrossModuleOptimization::serializeInstruction(SILInstruction *inst,
     if (canSerializeGlobal(global)) {
       serializeGlobal(global);
     }
-    if (global->getLinkage() != SILLinkage::Public) {
+    if (!hasPublicVisibility(global->getLinkage())) {
       global->setLinkage(SILLinkage::Public);
-      M.addPublicCMOSymbol(global->getName());
     }
     return;
   }
@@ -502,13 +540,16 @@ void CrossModuleOptimization::makeFunctionUsableFromInline(SILFunction *function
   if (!isAvailableExternally(function->getLinkage()) &&
       function->getLinkage() != SILLinkage::Public) {
     function->setLinkage(SILLinkage::Public);
-    M.addPublicCMOSymbol(function->getName());
   }
 }
 
 /// Make a nominal type, including it's context, usable from inline.
 void CrossModuleOptimization::makeDeclUsableFromInline(ValueDecl *decl) {
   if (decl->getEffectiveAccess() >= AccessLevel::Public)
+    return;
+
+  // We must not modify decls which are defined in other modules.
+  if (M.getSwiftModule() != decl->getDeclContext()->getParentModule())
     return;
 
   if (decl->getFormalAccess() < AccessLevel::Public &&
@@ -574,9 +615,20 @@ class CrossModuleOptimizationPass: public SILModuleTransform {
       return;
     if (!M.isWholeModule())
       return;
+      
+    bool conservative = false;
+    switch (M.getOptions().CMOMode) {
+      case swift::CrossModuleOptimizationMode::Off:
+        return;
+      case swift::CrossModuleOptimizationMode::Default:
+        conservative = true;
+        break;
+      case swift::CrossModuleOptimizationMode::Aggressive:
+        conservative = false;
+        break;
+    }
 
-    CrossModuleOptimization CMO(M,
-      /*conservative*/ !M.getOptions().CrossModuleOptimization);
+    CrossModuleOptimization CMO(M, conservative);
     CMO.serializeFunctionsInModule();
   }
 };

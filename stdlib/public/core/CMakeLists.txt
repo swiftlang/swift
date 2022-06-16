@@ -157,6 +157,7 @@ set(SWIFTLIB_ESSENTIAL
   StringProtocol.swift
   StringIndex.swift
   StringIndexConversions.swift
+  StringIndexValidation.swift
   StringInterpolation.swift
   StringLegacy.swift
   StringNormalization.swift
@@ -182,6 +183,7 @@ set(SWIFTLIB_ESSENTIAL
   UnicodeParser.swift
   UnicodeScalarProperties.swift
   CharacterProperties.swift # ORDER DEPENDENCY: UnicodeScalarProperties.swift
+  UnicodeSPI.swift
   Unmanaged.swift
   UnmanagedOpaqueString.swift
   UnmanagedString.swift
@@ -215,12 +217,14 @@ set(SWIFTLIB_SOURCES
   CollectionDifference.swift
   CollectionOfOne.swift
   Diffing.swift
+  Duration.swift
+  DurationProtocol.swift
   FloatingPointRandom.swift
+  Instant.swift
   Mirror.swift
   PlaygroundDisplay.swift
   CommandLine.swift
   SliceBuffer.swift
-  SIMDVector.swift
   UnfoldSequence.swift
   VarArgs.swift
   Zip.swift
@@ -229,10 +233,15 @@ set(SWIFTLIB_SOURCES
 
 set(SWIFTLIB_GYB_SOURCES
   ${SWIFTLIB_ESSENTIAL_GYB_SOURCES}
-  SIMDConcreteOperations.swift.gyb
-  SIMDVectorTypes.swift.gyb
+  Int128.swift.gyb
   Tuple.swift.gyb
   )
+
+if(SWIFT_STDLIB_ENABLE_VECTOR_TYPES)
+  list(APPEND SWIFTLIB_SOURCES SIMDVector.swift)
+  list(APPEND SWIFTLIB_GYB_SOURCES SIMDConcreteOperations.swift.gyb SIMDVectorTypes.swift.gyb)
+endif()
+
 set(GROUP_INFO_JSON_FILE ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json)
 set(swift_core_link_flags "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}")
 set(swift_core_framework_depends)
@@ -251,7 +260,7 @@ elseif(SWIFT_PRIMARY_VARIANT_SDK STREQUAL LINUX)
     list(APPEND swift_core_private_link_libraries)
   endif()
 elseif(SWIFT_PRIMARY_VARIANT_SDK STREQUAL WINDOWS)
-  list(APPEND swift_core_private_link_libraries shell32;DbgHelp)
+  list(APPEND swift_core_private_link_libraries shell32;DbgHelp;Synchronization)
 endif()
 
 option(SWIFT_CHECK_ESSENTIAL_STDLIB
@@ -264,6 +273,9 @@ if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "MinSizeRel")
 endif()
 if(SWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING)
   list(APPEND swift_stdlib_compile_flags "-enforce-exclusivity=checked")
+endif()
+if(SWIFT_STDLIB_ENABLE_DEBUG_PRECONDITIONS_IN_RELEASE)
+  list(APPEND swift_stdlib_compile_flags "-DSWIFT_STDLIB_ENABLE_DEBUG_PRECONDITIONS_IN_RELEASE")
 endif()
 set(compile_flags_for_final_build)
 if(SWIFT_ENABLE_ARRAY_COW_CHECKS)
@@ -287,6 +299,7 @@ list(APPEND swift_core_incorporate_object_libraries swiftRuntime)
 list(APPEND swift_core_incorporate_object_libraries swiftLLVMSupport)
 list(APPEND swift_core_incorporate_object_libraries swiftDemangling)
 list(APPEND swift_core_incorporate_object_libraries swiftStdlibStubs)
+list(APPEND swift_core_incorporate_object_libraries swiftThreading)
 if(SWIFT_STDLIB_HAS_COMMANDLINE)
   list(APPEND swift_core_incorporate_object_libraries swiftCommandLineSupport)
 endif()

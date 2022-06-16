@@ -338,6 +338,17 @@ code for the target that is not the build machine:
 * ``%target-swift-autolink-extract``: run ``swift-autolink-extract`` for the
   target to extract its autolink flags on platforms that support them (when the
   autolink-extract feature flag is set)
+  
+* ``%target-swift-emit-module-interface(`` *swift interface path* ``)``
+  *other arguments*: run ``swift-frontend`` for the target, emitting a
+  swiftinterface to the given path and passing additional default flags
+  appropriate for resilient frameworks.
+
+* ``%target-swift-typecheck-module-from-interface(`` *swift interface path*
+  ``)`` *other arguments*: run ``swift-frontend`` for the target, verifying
+  the swiftinterface at the given path and passing additional default flags
+  appropriate for resilient frameworks. Designed to be used in combination with
+  ``%target-swift-emit-module-interface()``.
 
 * ``%target-clang``: run the system's ``clang++`` for the target.
 

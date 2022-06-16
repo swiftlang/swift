@@ -17,7 +17,7 @@
 // RUN: mkdir -p %t/SDK/Frameworks/HighLevel.framework/Modules/HighLevel.swiftmodule
 // RUN: %target-build-swift-dylib(%t/SDK/Frameworks/HighLevel.framework/HighLevel) -module-name HighLevel -emit-module \
 // RUN:		-emit-module-path %t/SDK/Frameworks/HighLevel.framework/Modules/HighLevel.swiftmodule/%module-target-triple.swiftmodule \
-// RUN:     %S/Inputs/SymbolMove/HighLevelOriginal.swift -Xlinker -install_name -Xlinker @rpath/HighLevel.framework/HighLevel -enable-library-evolution
+// RUN:     %S/Inputs/SymbolMove/HighlevelOriginal.swift -Xlinker -install_name -Xlinker @rpath/HighLevel.framework/HighLevel -enable-library-evolution
 
 // --- Build an executable using the original high level framework
 // RUN: %target-build-swift -emit-executable %s -g -o %t/HighlevelRunner -F %t/SDK/Frameworks/ -framework HighLevel \

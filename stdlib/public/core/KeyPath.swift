@@ -874,6 +874,7 @@ internal enum KeyPathComputedIDKind {
 
 internal enum KeyPathComputedIDResolution {
   case resolved
+  case resolvedAbsolute
   case indirectPointer
   case functionCall
 }
@@ -1108,6 +1109,9 @@ internal struct RawKeyPathComponent {
     internal static var computedIDResolved: UInt32 {
       return _SwiftKeyPathComponentHeader_ComputedIDResolved
     }
+    internal static var computedIDResolvedAbsolute: UInt32 {
+      return _SwiftKeyPathComponentHeader_ComputedIDResolvedAbsolute
+    }
     internal static var computedIDUnresolvedIndirectPointer: UInt32 {
       return _SwiftKeyPathComponentHeader_ComputedIDUnresolvedIndirectPointer
     }
@@ -1118,6 +1122,8 @@ internal struct RawKeyPathComponent {
       switch payload & Header.computedIDResolutionMask {
       case Header.computedIDResolved:
         return .resolved
+      case Header.computedIDResolvedAbsolute:
+        return .resolvedAbsolute
       case Header.computedIDUnresolvedIndirectPointer:
         return .indirectPointer
       case Header.computedIDUnresolvedFunctionCall:
@@ -1764,7 +1770,7 @@ internal struct KeyPathBuffer {
     internal mutating func pushRaw(size: Int, alignment: Int)
         -> UnsafeMutableRawBufferPointer {
       var baseAddress = buffer.baseAddress.unsafelyUnwrapped
-      var misalign = Int(bitPattern: baseAddress) % alignment
+      var misalign = Int(bitPattern: baseAddress) & (alignment - 1)
       if misalign != 0 {
         misalign = alignment - misalign
         baseAddress = baseAddress.advanced(by: misalign)
@@ -2615,7 +2621,7 @@ internal func _resolveKeyPathGenericArgReference(
     var offset: Int32 = 0
     _memcpy(dest: &offset, src: pointerReference, size: 4)
 
-    let accessorPtrRaw = _resolveRelativeAddress(pointerReference, offset)
+    let accessorPtrRaw = _resolveCompactFunctionPointer(pointerReference, offset)
     let accessorPtrSigned =
       _PtrAuth.sign(pointer: accessorPtrRaw,
               key: .processIndependentCode,
@@ -2714,6 +2720,16 @@ internal func _resolveRelativeIndirectableAddress(_ base: UnsafeRawPointer,
   }
   return _resolveRelativeAddress(base, offset)
 }
+
+internal func _resolveCompactFunctionPointer(_ base: UnsafeRawPointer, _ offset: Int32)
+    -> UnsafeRawPointer {
+#if SWIFT_COMPACT_ABSOLUTE_FUNCTION_POINTER
+  return UnsafeRawPointer(bitPattern: Int(offset)).unsafelyUnwrapped
+#else
+  return _resolveRelativeAddress(base, offset)
+#endif
+}
+
 internal func _loadRelativeAddress<T>(at: UnsafeRawPointer,
                                       fromByteOffset: Int = 0,
                                       as: T.Type) -> T {
@@ -2780,12 +2796,12 @@ internal func _walkKeyPathPattern<W: KeyPathPatternVisitor>(
     let idValue = _pop(from: &componentBuffer, as: Int32.self)
     let getterBase = componentBuffer.baseAddress.unsafelyUnwrapped
     let getterRef = _pop(from: &componentBuffer, as: Int32.self)
-    let getter = _resolveRelativeAddress(getterBase, getterRef)
+    let getter = _resolveCompactFunctionPointer(getterBase, getterRef)
     let setter: UnsafeRawPointer?
     if header.isComputedSettable {
       let setterBase = componentBuffer.baseAddress.unsafelyUnwrapped
       let setterRef = _pop(from: &componentBuffer, as: Int32.self)
-      setter = _resolveRelativeAddress(setterBase, setterRef)
+      setter = _resolveCompactFunctionPointer(setterBase, setterRef)
     } else {
       setter = nil
     }
@@ -2799,7 +2815,7 @@ internal func _walkKeyPathPattern<W: KeyPathPatternVisitor>(
     if header.hasComputedArguments {
       let getLayoutBase = componentBuffer.baseAddress.unsafelyUnwrapped
       let getLayoutRef = _pop(from: &componentBuffer, as: Int32.self)
-      let getLayoutRaw = _resolveRelativeAddress(getLayoutBase, getLayoutRef)
+      let getLayoutRaw = _resolveCompactFunctionPointer(getLayoutBase, getLayoutRef)
       let getLayoutSigned = _PtrAuth.sign(pointer: getLayoutRaw,
         key: .processIndependentCode,
         discriminator: _PtrAuth.discriminator(for: KeyPathComputedArgumentLayoutFn.self))
@@ -2817,8 +2833,8 @@ internal func _walkKeyPathPattern<W: KeyPathPatternVisitor>(
 
       let initializerBase = componentBuffer.baseAddress.unsafelyUnwrapped
       let initializerRef = _pop(from: &componentBuffer, as: Int32.self)
-      let initializerRaw = _resolveRelativeAddress(initializerBase,
-                                                   initializerRef)
+      let initializerRaw = _resolveCompactFunctionPointer(initializerBase,
+                                                          initializerRef)
       let initializerSigned = _PtrAuth.sign(pointer: initializerRaw,
         key: .processIndependentCode,
         discriminator: _PtrAuth.discriminator(for: KeyPathComputedArgumentInitializerFn.self))
@@ -3242,7 +3258,7 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
   ) {
     let alignment = MemoryLayout<T>.alignment
     var baseAddress = destData.baseAddress.unsafelyUnwrapped
-    var misalign = Int(bitPattern: baseAddress) % alignment
+    var misalign = Int(bitPattern: baseAddress) & (alignment - 1)
     if misalign != 0 {
       misalign = alignment - misalign
       baseAddress = baseAddress.advanced(by: misalign)
@@ -3371,35 +3387,39 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
       resolvedID = UnsafeRawPointer(bitPattern: value)
 
     case .pointer:
-      // Resolve the sign-extended relative reference.
-      var absoluteID: UnsafeRawPointer? = _resolveRelativeAddress(idValueBase, idValue)
-
       // If the pointer ID is unresolved, then it needs work to get to
       // the final value.
       switch idResolution {
       case .resolved:
+        resolvedID = _resolveRelativeAddress(idValueBase, idValue)
+        break
+
+      case .resolvedAbsolute:
+        let value = UInt(UInt32(bitPattern: idValue))
+        resolvedID = UnsafeRawPointer(bitPattern: value)
         break
 
       case .indirectPointer:
         // The pointer in the pattern is an indirect pointer to the real
         // identifier pointer.
-        absoluteID = absoluteID.unsafelyUnwrapped
+        let absoluteID = _resolveRelativeAddress(idValueBase, idValue)
+        resolvedID = absoluteID
           .load(as: UnsafeRawPointer?.self)
 
       case .functionCall:
         // The pointer in the pattern is to a function that generates the
         // identifier pointer.
         typealias Resolver = @convention(c) (UnsafeRawPointer?) -> UnsafeRawPointer?
+        let absoluteID = _resolveCompactFunctionPointer(idValueBase, idValue)
         let resolverSigned = _PtrAuth.sign(
-          pointer: absoluteID.unsafelyUnwrapped,
+          pointer: absoluteID,
           key: .processIndependentCode,
           discriminator: _PtrAuth.discriminator(for: Resolver.self))
         let resolverFn = unsafeBitCast(resolverSigned,
                                        to: Resolver.self)
 
-        absoluteID = resolverFn(patternArgs)
+        resolvedID = resolverFn(patternArgs)
       }
-      resolvedID = absoluteID
     }
 
     // Bring over the header, getter, and setter.

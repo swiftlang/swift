@@ -258,6 +258,40 @@ MetadataDependency MetadataDependencyCollector::finish(IRGenFunction &IGF) {
   return result;
 }
 
+static bool usesExtendedExistentialMetadata(CanType type) {
+  auto layout = type.getExistentialLayout();
+  // If there are parameterized protocol types that we want to
+  // treat as equal to unparameterized protocol types (maybe
+  // something like `P<some Any>`?), then AST type canonicalization
+  // should turn them into unparameterized protocol types.  If the
+  // structure makes it to IRGen, we have to honor that decision that
+  // they represent different types.
+  return layout.containsParameterized;
+}
+
+static Optional<std::pair<CanExistentialType, /*depth*/ unsigned>>
+usesExtendedExistentialMetadata(CanExistentialMetatypeType type) {
+  unsigned depth = 1;
+  auto cur = type.getInstanceType();
+  while (auto metatype = dyn_cast<ExistentialMetatypeType>(cur)) {
+    cur = metatype.getInstanceType();
+    depth++;
+  }
+
+  // The only existential types that don't currently use ExistentialType
+  // are Any and AnyObject, which don't use extended metadata.
+  if (usesExtendedExistentialMetadata(cur)) {
+    // HACK: The AST for an existential metatype of a (parameterized) protocol
+    // still directly wraps the existential type as its instance, which means
+    // we need to reconstitute the enclosing ExistentialType.
+    assert(cur->isExistentialType());
+    if (!cur->is<ExistentialType>()) {
+      cur = ExistentialType::get(cur)->getCanonicalType();
+    }
+    return std::make_pair(cast<ExistentialType>(cur), depth);
+  }
+  return None;
+}
 
 llvm::Constant *IRGenModule::getAddrOfStringForMetadataRef(
     StringRef symbolName,
@@ -334,6 +368,10 @@ llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(
     // The 0xFF prefix identifies a default associated type witness.
     S.addInt(Int8Ty,
              ProtocolRequirementFlags::AssociatedTypeInProtocolContextByte);
+    break;
+
+  case MangledTypeRefRole::FlatUnique:
+    assert(mangling.SymbolicReferences.empty());
     break;
 
   case MangledTypeRefRole::Metadata:
@@ -1232,6 +1270,36 @@ static MetadataResponse emitTupleTypeMetadataRef(IRGenFunction &IGF,
   }
 }
 
+static Address createGenericArgumentsArray(IRGenFunction &IGF,
+                                           ArrayRef<llvm::Value *> args) {
+  // Allocate an array to pass the arguments.
+  auto argsBufferTy = llvm::ArrayType::get(IGF.IGM.Int8PtrTy, args.size());
+  auto argsBuffer =
+    IGF.createAlloca(argsBufferTy, IGF.IGM.getPointerAlignment());
+
+  // Mark the beginning of the array lifetime.
+  IGF.Builder.CreateLifetimeStart(argsBuffer,
+                                  IGF.IGM.getPointerSize() * args.size());
+
+  // Fill in the buffer.
+  for (unsigned i : indices(args)) {
+    Address elt = IGF.Builder.CreateStructGEP(argsBuffer, i,
+                                              IGF.IGM.getPointerSize() * i);
+    auto *arg =
+      IGF.Builder.CreateBitCast(args[i], elt.getType()->getPointerElementType());
+    IGF.Builder.CreateStore(arg, elt);
+  }
+
+  return argsBuffer;
+}
+
+static void destroyGenericArgumentsArray(IRGenFunction &IGF,
+                                         Address argsBuffer,
+                                         ArrayRef<llvm::Value *> args) {
+  IGF.Builder.CreateLifetimeEnd(argsBuffer,
+                                IGF.IGM.getPointerSize() * args.size());
+}
+
 namespace {
   /// A visitor class for emitting a reference to a metatype object.
   /// This implements a "raw" access, useful for implementing cache
@@ -1622,8 +1690,8 @@ namespace {
       }
     }
 
-    MetadataResponse visitAnyMetatypeType(CanAnyMetatypeType type,
-                                          DynamicMetadataRequest request) {
+    MetadataResponse visitMetatypeType(CanMetatypeType type,
+                                       DynamicMetadataRequest request) {
       // FIXME: We shouldn't accept a lowered metatype here, but we need to
       // represent Optional<@objc_metatype T.Type> as an AST type for ABI
       // reasons.
@@ -1637,9 +1705,35 @@ namespace {
 
       auto instMetadata =
         IGF.emitAbstractTypeMetadataRef(type.getInstanceType());
-      auto fn = isa<MetatypeType>(type)
-                  ? IGF.IGM.getGetMetatypeMetadataFn()
-                  : IGF.IGM.getGetExistentialMetatypeMetadataFn();
+
+      auto fn = IGF.IGM.getGetMetatypeMetadataFn();
+      auto call = IGF.Builder.CreateCall(fn, instMetadata);
+      call->setDoesNotThrow();
+
+      return setLocal(type, MetadataResponse::forComplete(call));
+    }
+
+    MetadataResponse
+    visitExistentialMetatypeType(CanExistentialMetatypeType type,
+                                 DynamicMetadataRequest request) {
+      if (auto metatype = tryGetLocal(type, request))
+        return metatype;
+
+      // Existential metatypes for extended existentials don't use
+      // ExistentialMetatypeMetadata.
+      if (auto typeAndDepth = usesExtendedExistentialMetadata(type)) {
+        CanExistentialType existential = typeAndDepth->first;
+        unsigned depth = typeAndDepth->second;
+        auto metadata = emitExtendedExistentialTypeMetadata(existential, depth);
+        return setLocal(type, MetadataResponse::forComplete(metadata));
+      }
+
+      // Otherwise, emit the instance type metadata and wrap it in an
+      // ExistentialMetatypeMetadata.
+      auto instMetadata =
+        IGF.emitAbstractTypeMetadataRef(type.getExistentialInstanceType());
+
+      auto fn = IGF.IGM.getGetExistentialMetatypeMetadataFn();
       auto call = IGF.Builder.CreateCall(fn, instMetadata);
       call->setDoesNotThrow();
 
@@ -1657,10 +1751,22 @@ namespace {
       return MetadataResponse::forComplete(IGF.getDynamicSelfMetadata());
     }
       
-    MetadataResponse emitExistentialTypeMetadata(CanType type,
+    MetadataResponse visitExistentialType(CanExistentialType type,
                                           DynamicMetadataRequest request) {
-      if (auto metatype = tryGetLocal(type, request))
-        return metatype;
+      if (auto metadata = tryGetLocal(type, request))
+        return metadata;
+
+      // These currently aren't wrapped in ExistentialType, but we
+      // can future-proof against them ending up in this path.
+      if (type->isAny() || type->isAnyObject())
+        return emitSingletonExistentialTypeMetadata(type);
+
+      auto metadata = emitExistentialTypeMetadata(type);
+      return setLocal(type, MetadataResponse::forComplete(metadata));
+    }
+
+    MetadataResponse emitSingletonExistentialTypeMetadata(CanType type) {
+      assert(type->isAny() || type->isAnyObject());
 
       // Any and AnyObject have singleton metadata in the runtime.
       llvm::Constant *singletonMetadata = nullptr;
@@ -1669,20 +1775,28 @@ namespace {
       if (type->isAnyObject())
         singletonMetadata = IGF.IGM.getAnyObjectExistentialMetadata();
       
-      if (singletonMetadata) {
-        llvm::Constant *indices[] = {
-          llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0),
-          llvm::ConstantInt::get(IGF.IGM.Int32Ty, 1)
-        };
-        return MetadataResponse::forComplete(
-          llvm::ConstantExpr::getInBoundsGetElementPtr(
-            singletonMetadata->getType()->getPointerElementType(),
-            singletonMetadata, indices));
+      llvm::Constant *indices[] = {
+        llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0),
+        llvm::ConstantInt::get(IGF.IGM.Int32Ty, 1)
+      };
+      return MetadataResponse::forComplete(
+        llvm::ConstantExpr::getInBoundsGetElementPtr(
+          singletonMetadata->getType()->getPointerElementType(),
+          singletonMetadata, indices));
+    }
+
+    llvm::Value *emitExistentialTypeMetadata(CanExistentialType type) {
+      auto layout = type.getExistentialLayout();
+
+      if (layout.containsParameterized) {
+        return emitExtendedExistentialTypeMetadata(type, /*metatype depth*/ 0);
       }
 
-      auto layout = type.getExistentialLayout();
-      
-      auto protocols = layout.getProtocols();
+      SmallVector<ProtocolDecl *, 4> protocols;
+      for (auto proto : layout.getProtocols()) {
+        if (!proto->isMarkerProtocol())
+          protocols.push_back(proto);
+      }
 
       // Collect references to the protocol descriptors.
       auto descriptorArrayTy
@@ -1697,8 +1811,7 @@ namespace {
                                IGF.IGM.ProtocolDescriptorRefTy->getPointerTo());
       
       unsigned index = 0;
-      for (auto *protoTy : protocols) {
-        auto *protoDecl = protoTy->getDecl();
+      for (auto *protoDecl : protocols) {
         llvm::Value *ref = emitProtocolDescriptorRef(IGF, protoDecl);
 
         Address slot = IGF.Builder.CreateConstArrayGEP(descriptorArray,
@@ -1726,24 +1839,92 @@ namespace {
       call->setDoesNotThrow();
       IGF.Builder.CreateLifetimeEnd(descriptorArray,
                                    IGF.IGM.getPointerSize() * protocols.size());
-      return setLocal(type, MetadataResponse::forComplete(call));
+      return call;
+    }
+
+    llvm::Value *emitExtendedExistentialTypeMetadata(CanExistentialType type,
+                                                     unsigned metatypeDepth) {
+      auto shapeInfo = ExistentialTypeGeneralization::get(type);
+      auto shapeAndIsUnique =
+        emitExtendedExistentialTypeShape(IGF.IGM, shapeInfo, metatypeDepth);
+      llvm::Constant *shape = shapeAndIsUnique.first;
+      bool shapeIsUnique = shapeAndIsUnique.second;
+
+      // Emit a reference to the extended existential shape,
+      // signed appropriately.
+      shape = llvm::ConstantExpr::getBitCast(shape, IGF.IGM.Int8PtrTy);
+      if (auto &schema = shapeIsUnique
+            ? IGF.getOptions().PointerAuth.ExtendedExistentialTypeShape
+            : IGF.getOptions().PointerAuth.NonUniqueExtendedExistentialTypeShape) {
+        shape = IGF.IGM.getConstantSignedPointer(shape, schema,
+                                                 PointerAuthEntity(),
+                                                 /*address*/ nullptr);
+      }
+
+      // Emit the generalization arguments.
+      GenericArguments genericArgs;
+      Address argsBuffer;
+      llvm::Value *argsPointer;
+      if (shapeInfo.Generalization.empty()) {
+        argsPointer = llvm::UndefValue::get(IGF.IGM.Int8PtrPtrTy);
+      } else {
+        genericArgs.collect(IGF, shapeInfo.Generalization);
+        argsBuffer = createGenericArgumentsArray(IGF, genericArgs.Values);
+        argsPointer =
+          IGF.Builder.CreateBitCast(argsBuffer.getAddress(),
+                                    IGF.IGM.Int8PtrPtrTy);
+      }
+
+      // Call the metadata access function in the runtime.
+      auto call = IGF.Builder.CreateCall(shapeIsUnique
+                    ? IGF.IGM.getGetExtendedExistentialTypeMetadataUniqueFn()
+                    : IGF.IGM.getGetExtendedExistentialTypeMetadataFn(),
+                    {shape, argsPointer});
+      call->setDoesNotThrow();
+
+      // Destroy the generalization arguments array, if we made one.
+      if (!shapeInfo.Generalization.empty())
+        destroyGenericArgumentsArray(IGF, argsBuffer, genericArgs.Values);
+
+      return call;
     }
 
     MetadataResponse visitProtocolType(CanProtocolType type,
                                        DynamicMetadataRequest request) {
-      return emitExistentialTypeMetadata(type, request);
-    }
-      
-    MetadataResponse
-    visitProtocolCompositionType(CanProtocolCompositionType type,
-                                 DynamicMetadataRequest request) {
-      return emitExistentialTypeMetadata(type, request);
+      assert(false && "constraint type should be wrapped in existential type");
+
+      CanExistentialType existential(
+          ExistentialType::get(type)->castTo<ExistentialType>());
+
+      if (auto metatype = tryGetLocal(existential, request))
+        return metatype;
+
+      auto metadata = emitExistentialTypeMetadata(existential);
+      return setLocal(type, MetadataResponse::forComplete(metadata));
     }
 
     MetadataResponse
-    visitExistentialType(CanExistentialType type,
-                         DynamicMetadataRequest request) {
-      return emitExistentialTypeMetadata(type, request);
+    visitProtocolCompositionType(CanProtocolCompositionType type,
+                                 DynamicMetadataRequest request) {
+      if (type->isAny() || type->isAnyObject())
+        return emitSingletonExistentialTypeMetadata(type);
+
+      assert(false && "constraint type should be wrapped in existential type");
+
+      CanExistentialType existential(
+          ExistentialType::get(type)->castTo<ExistentialType>());
+
+      if (auto metatype = tryGetLocal(existential, request))
+        return metatype;
+
+      auto metadata = emitExistentialTypeMetadata(existential);
+      return setLocal(type, MetadataResponse::forComplete(metadata));
+    }
+
+    MetadataResponse
+    visitParameterizedProtocolType(CanParameterizedProtocolType type,
+                                   DynamicMetadataRequest request) {
+      llvm_unreachable("constraint type should be wrapped in existential type");
     }
 
     MetadataResponse visitReferenceStorageType(CanReferenceStorageType type,
@@ -1760,7 +1941,10 @@ namespace {
                                           DynamicMetadataRequest request) {
       llvm_unreachable("should not be asking for metadata of a SILToken type");
     }
-
+    MetadataResponse visitSILMoveOnlyType(CanSILMoveOnlyType type,
+                                          DynamicMetadataRequest request) {
+      llvm_unreachable("should not be asking for metadata of a move only type");
+    }
     MetadataResponse visitArchetypeType(CanArchetypeType type,
                                         DynamicMetadataRequest request) {
       return emitArchetypeTypeMetadataRef(IGF, type, request);
@@ -1950,7 +2134,7 @@ void irgen::emitCacheAccessFunction(IRGenModule &IGM,
   // Emit a branch around the caching code if we're working with responses
   // and the fetched result is not complete.  We can avoid doing this if
   // the response is statically known to be complete, and we don't need to
-  // do it if this is an in-place initiazation cache because the store
+  // do it if this is an in-place initialization cache because the store
   // is done within the runtime.
   llvm::BasicBlock *completionCheckBB = nullptr;
   llvm::Value *directState = nullptr;
@@ -2039,23 +2223,8 @@ IRGenFunction::emitGenericTypeMetadataAccessFunctionCall(
   Address argsBuffer;
   bool allocatedArgsBuffer = false;
   if (args.size() > NumDirectGenericTypeMetadataAccessFunctionArgs) {
-    // Allocate an array to pass the arguments.
-    auto argsBufferTy = llvm::ArrayType::get(IGM.Int8PtrTy, args.size());
-    argsBuffer = createAlloca(argsBufferTy, IGM.getPointerAlignment());
-
-    // Mark the beginning of the array lifetime.
-    Builder.CreateLifetimeStart(argsBuffer,
-                                IGM.getPointerSize() * args.size());
+    argsBuffer = createGenericArgumentsArray(*this, args);
     allocatedArgsBuffer = true;
-
-    // Fill in the buffer.
-    for (unsigned i : indices(args)) {
-      Address elt = Builder.CreateStructGEP(argsBuffer, i,
-                                            IGM.getPointerSize() * i);
-      auto *arg =
-        Builder.CreateBitCast(args[i], elt.getType()->getPointerElementType());
-      Builder.CreateStore(arg, elt);
-    }
 
     // Add the buffer to the call arguments.
     callArgs.push_back(
@@ -2073,7 +2242,7 @@ IRGenFunction::emitGenericTypeMetadataAccessFunctionCall(
 
   // If we allocated a buffer for the arguments, end its lifetime.
   if (allocatedArgsBuffer)
-    Builder.CreateLifetimeEnd(argsBuffer, IGM.getPointerSize() * args.size());
+    destroyGenericArgumentsArray(*this, argsBuffer, args);
 
   return MetadataResponse::handle(*this, request, call);
 }
@@ -2136,7 +2305,8 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
     // materialize the nominal type descriptor and call this thunk.
     auto generateThunkFn = [&IGM,
                             checkPrespecialized](IRGenFunction &subIGF) {
-      subIGF.CurFn->setDoesNotAccessMemory();
+      subIGF.CurFn->setOnlyReadsMemory();
+      subIGF.CurFn->setWillReturn();
       subIGF.CurFn->setCallingConv(IGM.SwiftCC);
       IGM.setHasNoFramePointer(subIGF.CurFn);
 
@@ -2621,6 +2791,12 @@ static bool shouldAccessByMangledName(IRGenModule &IGM, CanType type) {
     }
     
     void visitExistentialMetatypeType(CanExistentialMetatypeType meta) {
+      // Extended existential metatypes just emit a different shape
+      // and don't do any wrapping.
+      if (auto typeAndDepth = usesExtendedExistentialMetadata(meta)) {
+        return visit(typeAndDepth.first);
+      }
+
       // The number of accesses turns out the same as the instance type,
       // but instead of getExistentialTypeMetadata, we call
       // getExistentialMetatypeMetadata
@@ -2671,9 +2847,16 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
   unsigned mangledStringSize;
   std::tie(mangledString, mangledStringSize) =
     IGM.getTypeRef(type, CanGenericSignature(), MangledTypeRefRole::Metadata);
-  
-  assert(mangledStringSize < 0x80000000u
-         && "2GB of mangled name ought to be enough for anyone");
+
+  // Android AArch64 reserves the top byte of the address for memory tagging
+  // since Android 11, so only use the bottom 23 bits to store this size
+  // and the 24th bit to signal that there is a size.
+  if (IGM.Triple.isAndroid() && IGM.Triple.getArch() == llvm::Triple::aarch64)
+    assert(mangledStringSize < 0x00800001u &&
+           "8MB of mangled name ought to be enough for Android AArch64");
+  else
+    assert(mangledStringSize < 0x80000000u &&
+           "2GB of mangled name ought to be enough for anyone");
   
   // Get or create the cache variable if necessary.
   auto cache = IGM.getAddrOfTypeMetadataDemanglingCacheVariable(type,
@@ -2704,7 +2887,8 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
           ? "__swift_instantiateConcreteTypeFromMangledNameAbstract"
           : "__swift_instantiateConcreteTypeFromMangledName";
   auto generateInstantiationFn = [&IGM, request](IRGenFunction &subIGF) {
-    subIGF.CurFn->setDoesNotAccessMemory();
+    subIGF.CurFn->setOnlyReadsMemory();
+    subIGF.CurFn->setWillReturn();
     IGM.setHasNoFramePointer(subIGF.CurFn);
 
     auto params = subIGF.collectParameters();
@@ -2743,6 +2927,21 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
     auto contBB = subIGF.createBasicBlock("");
     llvm::Value *comparison = subIGF.Builder.CreateICmpSLT(load,
                                       llvm::ConstantInt::get(IGM.Int64Ty, 0));
+
+    // Check if the 24th bit is set on Android AArch64 and only instantiate the
+    // type metadata if it is, as otherwise it might be negative only because
+    // of the memory tag on Android.
+    if (IGM.Triple.isAndroid() &&
+        IGM.Triple.getArch() == llvm::Triple::aarch64) {
+
+      auto getBitAfterAndroidTag = subIGF.Builder.CreateAnd(
+        load, llvm::ConstantInt::get(IGM.Int64Ty, 0x0080000000000000));
+      auto checkNotAndroidTag = subIGF.Builder.CreateICmpNE(
+        getBitAfterAndroidTag, llvm::ConstantInt::get(IGM.Int64Ty, 0));
+
+      comparison = subIGF.Builder.CreateAnd(comparison, checkNotAndroidTag);
+    }
+
     comparison = subIGF.Builder.CreateExpect(comparison,
                                        llvm::ConstantInt::get(IGM.Int1Ty, 0));
     subIGF.Builder.CreateCondBr(comparison, isUnfilledBB, contBB);
@@ -2792,10 +2991,10 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
            llvm::ConstantPointerNull::get(IGM.Int8PtrPtrTy)});
     }
     call->setDoesNotThrow();
-    call->setDoesNotAccessMemory();
+    call->setOnlyReadsMemory();
     call->setCallingConv(IGM.SwiftCC);
 
-    // Store the result back to the cache. Metadata instantatiation should
+    // Store the result back to the cache. Metadata instantiation should
     // already have emitted the necessary barriers to publish the instantiated
     // metadata to other threads, so we only need to expose the pointer.
     // Worst case, another thread might race with us and reinstantiate the
@@ -2827,7 +3026,7 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
   
   auto call = IGF.Builder.CreateCall(instantiationFn, cache);
   call->setDoesNotThrow();
-  call->setDoesNotAccessMemory();
+  call->setOnlyReadsMemory();
   
   auto response = MetadataResponse::forComplete(call);
   

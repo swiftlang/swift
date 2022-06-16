@@ -1,103 +1,32 @@
-// RUN:  %target-swift-emit-silgen %s -enable-experimental-distributed -disable-availability-checking | %FileCheck %s --dump-input=fail
+// RUN:  %target-swift-emit-silgen %s -enable-experimental-distributed -disable-availability-checking | %FileCheck %s 
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
-import _Distributed
+import Distributed
 
 distributed actor DA {
-  typealias ActorSystem = FakeActorSystem
+  typealias ActorSystem = LocalTestingDistributedActorSystem
 }
 
 extension DA {
-  // CHECK-LABEL: sil hidden [thunk] [distributed] [ossa] @$s17distributed_thunk2DAC1fyyFTE : $@convention(method) @async (@guaranteed DA) -> @error Error
+  // CHECK-LABEL: sil hidden [thunk] [distributed] [ref_adhoc_requirement_witness "$s11Distributed29LocalTestingInvocationDecoderC18decodeNextArgumentxyKSeRzSERzlF"] [ossa] @$s17distributed_thunk2DAC1fyyYaKFTE : $@convention(method) @async (@guaranteed DA) -> @error Error {
   // CHECK: function_ref @swift_distributed_actor_is_remote
 
   // Call the actor function
   // CHECK: function_ref @$s17distributed_thunk2DAC1fyyF : $@convention(method) (@guaranteed DA) -> ()
 
-  // ... or the remote thunk
-  // CHECK: dynamic_function_ref @$s17distributed_thunk2DAC9_remote_fyyYaKF : $@convention(method) @async (@guaranteed DA) -> @error Error
   distributed func f() { }
 }
 
-// ==== ----------------------------------------------------------------------------------------------------------------
-// ==== Fake Address -----------------------------------------------------------
-
-public struct ActorAddress: Hashable, Sendable, Codable {
-  public let address: String
-  public init(parse address : String) {
-    self.address = address
-  }
-
-  public init(from decoder: Decoder) throws {
-    let container = try decoder.singleValueContainer()
-    self.address = try container.decode(String.self)
-  }
-
-  public func encode(to encoder: Encoder) throws {
-    var container = encoder.singleValueContainer()
-    try container.encode(self.address)
-  }
+protocol ServerProto {
+  func doSomething() async throws
 }
 
-// ==== Fake Transport ---------------------------------------------------------
-
-public struct FakeActorSystem: DistributedActorSystem {
-  public typealias ActorID = ActorAddress
-  public typealias InvocationDecoder = FakeInvocation
-  public typealias InvocationEncoder = FakeInvocation
-  public typealias SerializationRequirement = Codable
-
-  init() {
-    print("Initialized new FakeActorSystem")
-  }
-
-  public func resolve<Act>(id: ActorID, as actorType: Act.Type) throws -> Act?
-      where Act: DistributedActor,
-      Act.ID == ActorID  {
-    nil
-  }
-
-  public func assignID<Act>(_ actorType: Act.Type) -> ActorID
-      where Act: DistributedActor,
-      Act.ID == ActorID {
-    ActorAddress(parse: "xxx")
-  }
-
-  public func actorReady<Act>(_ actor: Act)
-      where Act: DistributedActor,
-      Act.ID == ActorID {
-  }
-
-  public func resignID(_ id: ActorID) {
-  }
-
-  public func makeInvocationEncoder() -> InvocationDecoder {
-    .init()
-  }
+extension DA: ServerProto {
+  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s17distributed_thunk2DACAA11ServerProtoA2aDP11doSomethingyyYaKFTW : $@convention(witness_method: ServerProto) @async (@in_guaranteed DA) -> @error Error
+  // CHECK-NOT: hop_to_executor
+  // CHECK-NOT: return
+  // CHECK: function_ref @$s17distributed_thunk2DAC11doSomethingyyFTE
+  // CHECK: return
+  distributed func doSomething() { }
 }
-
-public struct FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvocationDecoder {
-  public typealias SerializationRequirement = Codable
-
-  public mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
-  public mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {}
-  public mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
-  public mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
-  public mutating func doneRecording() throws {}
-
-  // === Receiving / decoding -------------------------------------------------
-
-  public func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
-  public mutating func decodeNextArgument<Argument>(
-    _ argumentType: Argument.Type,
-    into pointer: UnsafeMutablePointer<Argument> // pointer to our hbuffer
-  ) throws { /* ... */ }
-  public func decodeReturnType() throws -> Any.Type? { nil }
-  public func decodeErrorType() throws -> Any.Type? { nil }
-
-  public struct FakeArgumentDecoder: DistributedTargetInvocationArgumentDecoder {
-    public typealias SerializationRequirement = Codable
-  }
-}
-

@@ -77,10 +77,6 @@ func testInterpolationWithMultipleArguments() {
     // CHECK: tail call swiftcc i1 @"${{.*}}isLoggingEnabled{{.*}}"()
     // CHECK-NEXT: br i1 {{%.*}}, label %[[ENABLED:[0-9]+]], label %[[NOT_ENABLED:[0-9]+]]
 
-    // CHECK: [[NOT_ENABLED]]:
-    // CHECK-NEXT: tail call void @swift_release
-    // CHECK-NEXT: ret void
-
     // CHECK: [[ENABLED]]:
     //
     // Header bytes.
@@ -125,6 +121,10 @@ func testInterpolationWithMultipleArguments() {
     // CHECK-NEXT: tail call swiftcc void @"${{.*}}_os_log_impl_test{{.*}}"({{.*}}, {{.*}}, {{.*}}, {{.*}}, i8* getelementptr inbounds ([106 x i8], [106 x i8]* @{{.*}}, i{{.*}} 0, i{{.*}} 0), i8* {{(nonnull )?}}[[BUFFER]], i32 20)
     // CHECK-NEXT: tail call void @swift_slowDealloc(i8* {{(nonnull )?}}[[BUFFER]]
     // CHECK-NEXT: br label %[[NOT_ENABLED]]
+
+    // CHECK: [[NOT_ENABLED]]:
+    // CHECK-NEXT: tail call void @swift_release
+    // CHECK-NEXT: ret void
 }
 
 // CHECK-LABEL: define hidden swiftcc void @"${{.*}}testNSObjectInterpolation
@@ -231,10 +231,6 @@ func testDynamicPrecisionAndAlignment() {
     // CHECK: tail call swiftcc i1 @"${{.*}}isLoggingEnabled{{.*}}"()
     // CHECK-NEXT: br i1 {{%.*}}, label %[[ENABLED:[0-9]+]], label %[[NOT_ENABLED:[0-9]+]]
 
-    // CHECK: [[NOT_ENABLED]]:
-    // CHECK-NEXT: tail call void @swift_release
-    // CHECK-NEXT: ret void
-
     // CHECK: [[ENABLED]]:
     //
     // Header bytes.
@@ -279,6 +275,10 @@ func testDynamicPrecisionAndAlignment() {
     // CHECK-NEXT: tail call swiftcc void @"${{.*}}_os_log_impl_test{{.*}}"({{.*}}, {{.*}}, {{.*}}, {{.*}}, i8* getelementptr inbounds ([28 x i8], [28 x i8]* @{{.*}}, i{{.*}} 0, i{{.*}} 0), i8* {{(nonnull )?}}[[BUFFER]], i32 20)
     // CHECK-NEXT: tail call void @swift_slowDealloc(i8* {{(nonnull )?}}[[BUFFER]]
     // CHECK-NEXT: br label %[[NOT_ENABLED]]
+
+    // CHECK: [[NOT_ENABLED]]:
+    // CHECK-NEXT: tail call void @swift_release
+    // CHECK-NEXT: ret void
 }
 
 // CHECK-LABEL: define hidden swiftcc void @"${{.*}}testStringInterpolation

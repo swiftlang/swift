@@ -36,6 +36,7 @@ namespace swift {
 
 namespace irgen {
   using Lowering::AbstractionPattern;
+  class ConstantInitBuilder;
   using clang::CodeGen::ConstantInitFuture;
   class IRGenFunction;
 
@@ -166,48 +167,85 @@ enum class SymbolReferenceKind : uint8_t {
   Far_Relative_Indirectable,
 };
 
+/// A lazy constant initializer.
+struct LazyConstantInitializer {
+  llvm::Type *DefaultType;
+  llvm::function_ref<ConstantInitFuture(ConstantInitBuilder &)> Build;
+  llvm::function_ref<void(llvm::GlobalVariable *)> Create;
+};
+
 /// An initial value for a definition of an llvm::GlobalVariable.
 class ConstantInit {
-  llvm::PointerUnion<ConstantInitFuture, llvm::Type*> Data;
+  union {
+    ConstantInitFuture Future;
+    const LazyConstantInitializer *Lazy;
+    llvm::Type *Delayed;
+  };
+  enum class Kind {
+    None, Future, Lazy, Delayed
+  } TheKind;
+
 public:
   /// No initializer is given.  When this is used as an argument to
   /// a getAddrOf... API, it means that only a declaration is being
   /// requested.
-  ConstantInit() {}
+  ConstantInit() : TheKind(Kind::None) {}
 
   /// Use a concrete value as a concrete initializer.
   ConstantInit(llvm::Constant *initializer)
-    : Data(ConstantInitFuture(initializer)) {}
+    : Future(ConstantInitFuture(initializer)), TheKind(Kind::Future) {}
 
   /// Use a ConstantInitBuilder future as a concrete initializer.
-  /*implicit*/ ConstantInit(ConstantInitFuture future) : Data(future) {
+  /*implicit*/ ConstantInit(ConstantInitFuture future)
+    : Future(future), TheKind(Kind::Future) {
     assert(future && "don't pass around null futures");
+  }
+
+  static ConstantInit getLazy(const LazyConstantInitializer *initializer) {
+    assert(initializer && "null lazy initializer");
+    auto result = ConstantInit();
+    result.TheKind = Kind::Lazy;
+    result.Lazy = initializer;
+    return result;
   }
 
   /// There will be a definition (with the given type), but we don't
   /// have it yet.
   static ConstantInit getDelayed(llvm::Type *type) {
     auto result = ConstantInit();
-    result.Data = type;
+    result.TheKind = Kind::Delayed;
+    result.Delayed = type;
     return result;
   }
 
-  explicit operator bool() const { return bool(Data); }
+  explicit operator bool() const { return TheKind != Kind::None; }
 
   inline llvm::Type *getType() const {
-    assert(Data && "not a definition");
-    if (auto type = Data.dyn_cast<llvm::Type*>()) {
-      return type;
+    assert(TheKind != Kind::None && "not a definition");
+    if (TheKind == Kind::Delayed) {
+      return Delayed;
+    } else if (TheKind == Kind::Lazy) {
+      return Lazy->DefaultType;
     } else {
-      return Data.get<ConstantInitFuture>().getType();
+      assert(TheKind == Kind::Future);
+      return Future.getType();
     }
   }
 
+  bool isLazy() const {
+    return TheKind == Kind::Lazy;
+  }
+  const LazyConstantInitializer *getLazy() const {
+    assert(isLazy());
+    return Lazy;
+  }
+
   bool hasInit() const {
-    return Data.is<ConstantInitFuture>();
+    return TheKind == Kind::Future;
   }
   ConstantInitFuture getInit() const {
-    return Data.get<ConstantInitFuture>();
+    assert(hasInit());
+    return Future;
   }
 };
 

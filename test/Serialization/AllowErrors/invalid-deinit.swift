@@ -12,7 +12,7 @@
 struct Foo {}
 
 @discardableResult // expected-error{{'@discardableResult' attribute cannot be applied to this declaration}}
-deinit {} // expected-error{{deinitializers may only be declared within a class}}
+deinit {} // expected-error{{deinitializers may only be declared within a class or actor}}
 
 func foo() -> Foo { return Foo() }
 

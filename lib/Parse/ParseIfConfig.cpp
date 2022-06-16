@@ -153,7 +153,7 @@ class ValidateIfConfigCondition :
     return UDRE->getName().getBaseIdentifier().str();
   }
 
-  /// True for expressions represeting either top level modules
+  /// True for expressions representing either top level modules
   /// or nested submodules.
   bool isModulePath(Expr *E) {
     auto UDE = dyn_cast<UnresolvedDotExpr>(E);
@@ -283,30 +283,26 @@ public:
     }
     // '_compiler_version' '(' string-literal ')'
     if (*KindName == "_compiler_version") {
-      auto SLE = dyn_cast<StringLiteralExpr>(Arg);
-      if (!SLE) {
-        D.diagnose(Arg->getLoc(),
-                   diag::unsupported_platform_condition_argument,
-                   "string literal");
-        return nullptr;
-      }
+      if (auto SLE = dyn_cast<StringLiteralExpr>(Arg)) {
+        auto ValStr = SLE->getValue();
+        if (ValStr.empty()) {
+          D.diagnose(SLE->getLoc(), diag::empty_version_string);
+          return nullptr;
+        }
 
-      auto ValStr = SLE->getValue();
-      if (ValStr.empty()) {
-        D.diagnose(SLE->getLoc(), diag::empty_version_string);
-        return nullptr;
+        auto Val = version::Version::parseCompilerVersionString(
+            SLE->getValue(), SLE->getLoc(), &D);
+        if (!Val.hasValue())
+          return nullptr;
+        return E;
       }
-
-      auto Val = version::Version::parseCompilerVersionString(
-          SLE->getValue(), SLE->getLoc(), &D);
-      if (!Val.hasValue())
-        return nullptr;
-      return E;
     }
 
     // 'swift' '(' ('>=' | '<') float-literal ( '.' integer-literal )* ')'
     // 'compiler' '(' ('>=' | '<') float-literal ( '.' integer-literal )* ')'
-    if (*KindName == "swift" || *KindName == "compiler") {
+    // '_compiler_version' '(' ('>=' | '<') float-literal ( '.' integer-literal )* ')'
+    if (*KindName == "swift" || *KindName == "compiler" ||
+        *KindName == "_compiler_version") {
       auto PUE = dyn_cast<PrefixUnaryExpr>(Arg);
       Optional<StringRef> PrefixName =
           PUE ? getDeclRefStr(PUE->getFn(), DeclRefKind::PrefixOperator) : None;
@@ -500,28 +496,30 @@ public:
   bool visitCallExpr(CallExpr *E) {
     auto KindName = getDeclRefStr(E->getFn());
     auto *Arg = getSingleSubExp(E->getArgs(), KindName, nullptr);
-    if (KindName == "_compiler_version") {
+    if (KindName == "_compiler_version" && isa<StringLiteralExpr>(Arg)) {
       auto Str = cast<StringLiteralExpr>(Arg)->getValue();
       auto Val = version::Version::parseCompilerVersionString(
           Str, SourceLoc(), nullptr).getValue();
       auto thisVersion = version::Version::getCurrentCompilerVersion();
       return thisVersion >= Val;
-    } else if ((KindName == "swift") || (KindName == "compiler")) {
+    } else if ((KindName == "swift") || (KindName == "compiler") ||
+               (KindName == "_compiler_version")) {
       auto PUE = cast<PrefixUnaryExpr>(Arg);
       auto PrefixName = getDeclRefStr(PUE->getFn());
       auto Str = extractExprSource(Ctx.SourceMgr, PUE->getOperand());
       auto Val = version::Version::parseVersionString(
           Str, SourceLoc(), nullptr).getValue();
+      version::Version thisVersion;
       if (KindName == "swift") {
-        return isValidVersion(Ctx.LangOpts.EffectiveLanguageVersion, Val,
-                              PrefixName);
+        thisVersion = Ctx.LangOpts.EffectiveLanguageVersion;
       } else if (KindName == "compiler") {
-        auto currentLanguageVersion =
-            version::Version::getCurrentLanguageVersion();
-        return isValidVersion(currentLanguageVersion, Val, PrefixName);
+        thisVersion = version::Version::getCurrentLanguageVersion();
+      } else if (KindName == "_compiler_version") {
+        thisVersion = version::Version::getCurrentCompilerVersion();
       } else {
         llvm_unreachable("unsupported version conditional");
       }
+      return isValidVersion(thisVersion, Val, PrefixName);
     } else if (KindName == "canImport") {
       auto Str = extractExprSource(Ctx.SourceMgr, Arg);
       bool underlyingModule = false;
@@ -807,8 +805,8 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
       // We shouldn't skip code if we are building syntax tree.
       // The parser will keep running and we just discard the AST part.
       DiagnosticSuppression suppression(Context.Diags);
-      SmallVector<ASTNode, 16> dropedElements;
-      parseElements(dropedElements, false);
+      SmallVector<ASTNode, 16> droppedElements;
+      parseElements(droppedElements, false);
     } else {
       DiagnosticTransaction DT(Diags);
       skipUntilConditionalBlockClose();

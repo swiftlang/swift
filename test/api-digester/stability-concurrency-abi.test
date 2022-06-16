@@ -50,7 +50,20 @@
 // UNSUPPORTED: swift_evolve
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
+Func AsyncSequence.compactMap(_:) is now with @preconcurrency
+Func AsyncSequence.drop(while:) is now with @preconcurrency
+Func AsyncSequence.filter(_:) is now with @preconcurrency
+Func AsyncSequence.flatMap(_:) is now with @preconcurrency
+Func AsyncSequence.map(_:) is now with @preconcurrency
+Func AsyncSequence.prefix(while:) is now with @preconcurrency
 Func MainActor.run(resultType:body:) has generic signature change from <T where T : Swift.Sendable> to <T>
 Func MainActor.run(resultType:body:) has mangled name changing from 'static Swift.MainActor.run<A where A: Swift.Sendable>(resultType: A.Type, body: @Swift.MainActor @Sendable () throws -> A) async throws -> A' to 'static Swift.MainActor.run<A>(resultType: A.Type, body: @Swift.MainActor @Sendable () throws -> A) async throws -> A'
+Func _runAsyncMain(_:) is now with @preconcurrency
+Func _asyncLet_get(_:_:) has mangled name changing from '_Concurrency._asyncLet_get(Builtin.RawPointer, Builtin.RawPointer) async -> Builtin.RawPointer' to '_Concurrency._asyncLet_get(Builtin.RawPointer, Builtin.RawPointer) async -> ()'
+Func _asyncLet_get(_:_:) has return type change from Builtin.RawPointer to ()
+Func _asyncLet_get_throwing(_:_:) has mangled name changing from '_Concurrency._asyncLet_get_throwing(Builtin.RawPointer, Builtin.RawPointer) async throws -> Builtin.RawPointer' to '_Concurrency._asyncLet_get_throwing(Builtin.RawPointer, Builtin.RawPointer) async throws -> ()'
+Func _asyncLet_get_throwing(_:_:) has return type change from Builtin.RawPointer to ()
+Protocol Actor has added inherited protocol AnyActor
+Protocol Actor has generic signature change from <Self : AnyObject, Self : Swift.Sendable> to <Self : _Concurrency.AnyActor>
 Struct CheckedContinuation has removed conformance to UnsafeSendable
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)

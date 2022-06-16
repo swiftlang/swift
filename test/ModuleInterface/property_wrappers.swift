@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -typecheck -swift-version 5 -module-name TestResilient -emit-module-interface-path %t/TestResilient.swiftinterface -enable-library-evolution %s
+// RUN: %target-swift-emit-module-interface(%t/TestResilient.swiftinterface) %s -module-name TestResilient
+// RUN: %target-swift-typecheck-module-from-interface(%t/TestResilient.swiftinterface) -module-name TestResilient
 // RUN: %FileCheck %s < %t/TestResilient.swiftinterface
 
 // RUN: %target-swift-frontend -compile-module-from-interface -swift-version 5 %t/TestResilient.swiftinterface -o %t/TestResilient.swiftmodule

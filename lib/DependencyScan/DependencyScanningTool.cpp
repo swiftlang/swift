@@ -27,8 +27,8 @@ namespace swift {
 namespace dependencies {
 
 llvm::ErrorOr<swiftscan_string_ref_t> getTargetInfo(ArrayRef<const char *> Command) {
-  // We must reset option occurences because we are handling an unrelated
-  // command-line to those possibly parsed parsed before using the same tool.
+  // We must reset option occurrences because we are handling an unrelated
+  // command-line to those possibly parsed before using the same tool.
   // We must do so because LLVM options parsing is done using a managed
   // static `GlobalParser`.
   llvm::cl::ResetAllOptionOccurrences();
@@ -53,7 +53,7 @@ llvm::ErrorOr<swiftscan_string_ref_t> getTargetInfo(ArrayRef<const char *> Comma
   std::string ResultStr;
   llvm::raw_string_ostream StrOS(ResultStr);
   swift::targetinfo::printTargetInfo(Invocation, StrOS);
-  return create_clone(ResultStr.c_str());
+  return c_string_utils::create_clone(ResultStr.c_str());
 }
 
 DependencyScanningTool::DependencyScanningTool()
@@ -74,7 +74,7 @@ DependencyScanningTool::getDependencies(
 
   // Local scan cache instance, wrapping the shared global cache.
   ModuleDependenciesCache cache(*SharedCache);
-  // Execute the scanning action, retreiving the in-memory result
+  // Execute the scanning action, retrieving the in-memory result
   auto DependenciesOrErr = performModuleScan(*Instance.get(), cache);
   if (DependenciesOrErr.getError())
     return std::make_error_code(std::errc::not_supported);
@@ -91,7 +91,7 @@ DependencyScanningTool::getImports(ArrayRef<const char *> Command) {
     return EC;
   auto Instance = std::move(*InstanceOrErr);
 
-  // Execute the scanning action, retreiving the in-memory result
+  // Execute the scanning action, retrieving the in-memory result
   auto DependenciesOrErr = performModulePrescan(*Instance.get());
   if (DependenciesOrErr.getError())
     return std::make_error_code(std::errc::not_supported);
@@ -138,7 +138,7 @@ bool DependencyScanningTool::loadCache(llvm::StringRef path) {
       module_dependency_cache_serialization::readInterModuleDependenciesCache(
           path, *SharedCache);
   if (readFailed) {
-    Diags.diagnose(SourceLoc(), diag::warn_scaner_deserialize_failed, path);
+    Diags.diagnose(SourceLoc(), diag::warn_scanner_deserialize_failed, path);
   }
   return readFailed;
 }
@@ -175,8 +175,8 @@ DependencyScanningTool::initCompilerInstanceForScan(
   SmallString<128> WorkingDirectory;
   llvm::sys::fs::current_path(WorkingDirectory);
 
-  // We must reset option occurences because we are handling an unrelated
-  // command-line to those possibly parsed parsed before using the same tool.
+  // We must reset option occurrences because we are handling an unrelated
+  // command-line to those possibly parsed before using the same tool.
   // We must do so because LLVM options parsing is done using a managed
   // static `GlobalParser`.
   llvm::cl::ResetAllOptionOccurrences();

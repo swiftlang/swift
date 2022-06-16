@@ -199,14 +199,14 @@ OpaqueSyntaxNode SyntaxTreeCreator::makeDeferredLayout(
 
 OpaqueSyntaxNode
 SyntaxTreeCreator::recordDeferredToken(OpaqueSyntaxNode deferred) {
-  // We don't diffirentiate between deferred and recorded nodes. See comment in
+  // We don't differentiate between deferred and recorded nodes. See comment in
   // makeDeferredToken.
   return deferred;
 }
 
 OpaqueSyntaxNode
 SyntaxTreeCreator::recordDeferredLayout(OpaqueSyntaxNode deferred) {
-  // We don't diffirentiate between deferred and recorded nodes. See comment in
+  // We don't differentiate between deferred and recorded nodes. See comment in
   // makeDeferredToken.
   return deferred;
 }

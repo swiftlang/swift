@@ -8,7 +8,7 @@ import _Concurrency
 func suspend() async {}
 
 // Builtin.hopToActor should generate a mandatory hop_to_executor
-// before releaseing the actor and reaching a suspend.
+// before releasing the actor and reaching a suspend.
 //
 // CHECK-LABEL: sil private @$s14builtin_silgen11runDetachedyyFyyYaYbcfU_ : $@convention(thin) @Sendable @async @substituted <τ_0_0> () -> @out τ_0_0 for <()>
 // CHECK:   [[ACTOR:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor

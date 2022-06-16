@@ -15,6 +15,8 @@
 
 #include "swift/Basic/ThreadSafeRefCounted.h"
 #include "swift/IDE/CodeCompletion.h"
+#include "swift/IDE/CodeCompletionResult.h"
+#include "swift/IDE/CodeCompletionString.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/Support/Chrono.h"
@@ -61,8 +63,18 @@ public:
   };
 
   struct Value : public llvm::ThreadSafeRefCountedBase<Value> {
+    /// The allocator used to allocate the results stored in this cache.
+    std::shared_ptr<llvm::BumpPtrAllocator> Allocator;
+
     llvm::sys::TimePoint<> ModuleModificationTime;
-    CodeCompletionResultSink Sink;
+
+    std::vector<const ContextFreeCodeCompletionResult *> Results;
+
+    /// The arena that contains the \c USRBasedTypes of the
+    /// \c ContextFreeCodeCompletionResult in this cache value.
+    USRBasedTypeArena USRTypeArena;
+
+    Value() : Allocator(std::make_shared<llvm::BumpPtrAllocator>()) {}
   };
   using ValueRefCntPtr = llvm::IntrusiveRefCntPtr<Value>;
 

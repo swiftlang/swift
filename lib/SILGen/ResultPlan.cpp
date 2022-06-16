@@ -83,38 +83,56 @@ public:
 };
 
 /// Map a type expressed in terms of opened archetypes into a context-free
-/// dependent type, returning the type, a generic signature with parameters
-/// corresponding to each opened type,
-static std::tuple<CanType, CanGenericSignature, SubstitutionMap>
+/// dependent type, and return a substitution map with generic parameters
+/// corresponding to each distinct root opened archetype.
+static std::pair<CanType, SubstitutionMap>
 mapTypeOutOfOpenedExistentialContext(CanType t) {
+  auto &ctx = t->getASTContext();
+
   SmallVector<OpenedArchetypeType *, 4> openedTypes;
-  t->getOpenedExistentials(openedTypes);
+  t->getRootOpenedExistentials(openedTypes);
 
-  ArrayRef<Type> openedTypesAsTypes(
-    reinterpret_cast<const Type *>(openedTypes.data()),
-    openedTypes.size());
+  SmallVector<GenericTypeParamType *, 2> params;
+  SmallVector<Requirement, 2> requirements;
+  for (const unsigned i : indices(openedTypes)) {
+    auto *param = GenericTypeParamType::get(
+        /*type sequence*/ false, /*depth*/ 0, /*index*/ i, ctx);
+    params.push_back(param);
 
-  SmallVector<GenericTypeParamType *, 4> params;
-  for (unsigned i : indices(openedTypes)) {
-    params.push_back(GenericTypeParamType::get(/*type sequence*/ false,
-                                               /*depth*/ 0, /*index*/ i,
-                                               t->getASTContext()));
+    Type constraintTy = openedTypes[i]->getExistentialType();
+    if (auto existentialTy = constraintTy->getAs<ExistentialType>())
+      constraintTy = existentialTy->getConstraintType();
+
+    requirements.emplace_back(RequirementKind::Conformance, param,
+                              constraintTy);
   }
-  
-  auto mappedSig = GenericSignature::get(params, {});
-  auto mappedSubs = SubstitutionMap::get(mappedSig, openedTypesAsTypes, {});
 
-  auto mappedTy = t.subst(
-    [&](SubstitutableType *t) -> Type {
-      auto index = std::find(openedTypes.begin(), openedTypes.end(), t)
-        - openedTypes.begin();
-      assert(index != openedTypes.end() - openedTypes.begin());
-      return params[index];
-    },
-    MakeAbstractConformanceForGenericType());
+  const auto mappedSubs = SubstitutionMap::get(
+      swift::buildGenericSignature(ctx, nullptr, params, requirements),
+      [&](SubstitutableType *t) -> Type {
+        return openedTypes[cast<GenericTypeParamType>(t)->getIndex()];
+      },
+      MakeAbstractConformanceForGenericType());
 
-  return std::make_tuple(mappedTy->getCanonicalType(mappedSig),
-                         mappedSig.getCanonicalSignature(), mappedSubs);
+  const auto mappedTy = t.subst(
+      [&](SubstitutableType *t) -> Type {
+        auto *archTy = cast<ArchetypeType>(t);
+        const auto index = std::find(openedTypes.begin(), openedTypes.end(),
+                                     archTy->getRoot()) -
+                           openedTypes.begin();
+        assert(index != openedTypes.end() - openedTypes.begin());
+
+        if (auto *dmt =
+                archTy->getInterfaceType()->getAs<DependentMemberType>()) {
+          return dmt->substRootParam(params[index],
+                                     MakeAbstractConformanceForGenericType());
+        }
+
+        return params[index];
+      },
+      MakeAbstractConformanceForGenericType());
+
+  return std::make_pair(mappedTy->getCanonicalType(), mappedSubs);
 }
 
 /// A result plan for an indirectly-returned opened existential value.
@@ -153,14 +171,16 @@ public:
 
     auto resultTy = SGF.getLoweredType(origType, substType).getASTType();
     CanType layoutTy;
-    CanGenericSignature layoutSig;
     SubstitutionMap layoutSubs;
-    std::tie(layoutTy, layoutSig, layoutSubs)
-      = mapTypeOutOfOpenedExistentialContext(resultTy);
+    std::tie(layoutTy, layoutSubs) =
+        mapTypeOutOfOpenedExistentialContext(resultTy);
 
+    CanGenericSignature layoutSig =
+        layoutSubs.getGenericSignature().getCanonicalSignature();
     auto boxLayout =
-        SILLayout::get(SGF.getASTContext(), layoutSig.getCanonicalSignature(),
-                       SILField(layoutTy->getCanonicalType(layoutSig), true));
+        SILLayout::get(SGF.getASTContext(), layoutSig,
+                       SILField(layoutTy->getCanonicalType(layoutSig), true),
+                       /*captures generics*/ false);
 
     resultBox = SGF.B.createAllocBox(loc,
       SILBoxType::get(SGF.getASTContext(),
@@ -479,6 +499,7 @@ class ForeignAsyncInitializationPlan final : public ResultPlan {
   SILType opaqueResumeType;
   SILValue resumeBuf;
   SILValue continuation;
+  ExecutorBreadcrumb breadcrumb;
   
 public:
   ForeignAsyncInitializationPlan(SILGenFunction &SGF, SILLocation loc,
@@ -487,9 +508,8 @@ public:
   {
     // Allocate space to receive the resume value when the continuation is
     // resumed.
-    opaqueResumeType =
-        SGF.getLoweredType(AbstractionPattern(calleeTypeInfo.substResultType),
-                           calleeTypeInfo.substResultType);
+    opaqueResumeType = SGF.getLoweredType(AbstractionPattern::getOpaque(),
+                                          calleeTypeInfo.substResultType);
     resumeBuf = SGF.emitTemporaryAllocation(loc, opaqueResumeType);
   }
   
@@ -576,6 +596,11 @@ public:
     // know we won't escape it locally so the callee can be responsible for
     // _Block_copy-ing it.
     return ManagedValue::forUnmanaged(block);
+  }
+
+  void deferExecutorBreadcrumb(ExecutorBreadcrumb &&crumb) override {
+    assert(!breadcrumb.needsEmit() && "overwriting an existing breadcrumb?");
+    breadcrumb = std::move(crumb);
   }
 
   RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
@@ -673,6 +698,7 @@ public:
     // Propagate an error if we have one.
     if (errorBlock) {
       SGF.B.emitBlock(errorBlock);
+      breadcrumb.emit(SGF, loc);
       
       Scope errorScope(SGF, loc);
 
@@ -684,18 +710,17 @@ public:
     }
     
     SGF.B.emitBlock(resumeBlock);
+    breadcrumb.emit(SGF, loc);
     
     // The incoming value is the maximally-abstracted result type of the
     // continuation. Move it out of the resume buffer and reabstract it if
     // necessary.
-    auto resumeResult = SGF.emitLoad(loc, resumeBuf,
-      calleeTypeInfo.origResultType
-         ? *calleeTypeInfo.origResultType
-         : AbstractionPattern(calleeTypeInfo.substResultType),
-                 calleeTypeInfo.substResultType,
-                 SGF.getTypeLowering(calleeTypeInfo.substResultType),
-                 SGFContext(), IsTake);
-    
+    auto resumeResult =
+        SGF.emitLoad(loc, resumeBuf, AbstractionPattern::getOpaque(),
+                     calleeTypeInfo.substResultType,
+                     SGF.getTypeLowering(calleeTypeInfo.substResultType),
+                     SGFContext(), IsTake);
+
     return RValue(SGF, loc, calleeTypeInfo.substResultType, resumeResult);
   }
 };
@@ -733,6 +758,23 @@ public:
 
     auto errorType =
         CanType(unwrappedPtrType->getAnyPointerElementType(ptrKind));
+
+    // In cases when from swift, we call objc imported methods written like so:
+    //
+    // (1) - (BOOL)submit:(NSError *_Nonnull __autoreleasing *_Nullable)errorOut;
+    //
+    // the clang importer will successfully import the given method as having a
+    // non-null NSError. This doesn't follow the normal convention where we
+    // expect the NSError to be Optional<NSError>. In order to preserve source
+    // compatibility, we want to allow SILGen to handle this behavior. Luckily
+    // in this case, NSError and Optional<NSError> are layout compatible, so we
+    // can just pass in the Optional<NSError> and everything works.
+    if (auto nsErrorTy = SGF.getASTContext().getNSErrorType()->getCanonicalType()) {
+      if (errorType == nsErrorTy) {
+        errorType = errorType.wrapInOptionalType();
+      }
+    }
+
     auto &errorTL = SGF.getTypeLowering(errorType);
 
     // Allocate a temporary.
@@ -753,6 +795,10 @@ public:
                                 ManagedValue::forLValue(errorTemp),
                                 /*TODO: enforcement*/ None,
                                 AbstractionPattern(errorType), errorType);
+  }
+
+  void deferExecutorBreadcrumb(ExecutorBreadcrumb &&breadcrumb) override {
+    subPlan->deferExecutorBreadcrumb(std::move(breadcrumb));
   }
 
   RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,

@@ -18,6 +18,7 @@
 #ifndef SWIFT_REMOTE_MIRROR_TYPES_H
 #define SWIFT_REMOTE_MIRROR_TYPES_H
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -91,6 +92,8 @@ typedef struct swift_reflection_mapping_info {
   swift_reflection_section_mapping_t capture;
   swift_reflection_section_mapping_t type_references;
   swift_reflection_section_mapping_t reflection_strings;
+  // New fields cannot be added here without breaking ABI.
+  // Use swift_reflection_addImage instead.
 } swift_reflection_mapping_info_t;
 
 /// The layout kind of a Swift type.
@@ -224,6 +227,58 @@ typedef struct swift_async_task_slab_allocations_return {
   /// A pointer to the chunks, if no error occurred.
   swift_async_task_allocation_chunk_t *Chunks;
 } swift_async_task_slab_allocations_return_t;
+
+typedef struct swift_async_task_info {
+  /// On failure, a pointer to a string describing the error. On success, NULL.
+  /// This pointer remains valid until the next
+  /// swift_reflection call on the given context.
+  const char *Error;
+
+  unsigned Kind;
+  unsigned EnqueuePriority;
+  bool IsChildTask;
+  bool IsFuture;
+  bool IsGroupChildTask;
+  bool IsAsyncLetTask;
+
+  unsigned MaxPriority;
+  bool IsCancelled;
+  bool IsStatusRecordLocked;
+  bool IsEscalated;
+  bool HasIsRunning; // If false, the IsRunning flag is not valid.
+  bool IsRunning;
+  bool IsEnqueued;
+
+  bool HasThreadPort;
+  uint32_t ThreadPort;
+
+  uint64_t Id;
+  swift_reflection_ptr_t RunJob;
+  swift_reflection_ptr_t AllocatorSlabPtr;
+
+  unsigned ChildTaskCount;
+  swift_reflection_ptr_t *ChildTasks;
+
+  unsigned AsyncBacktraceFramesCount;
+  swift_reflection_ptr_t *AsyncBacktraceFrames;
+} swift_async_task_info_t;
+
+typedef struct swift_actor_info {
+  /// On failure, a pointer to a string describing the error. On success, NULL.
+  /// This pointer remains valid until the next
+  /// swift_reflection call on the given context.
+  const char *Error;
+
+  uint8_t State;
+  bool IsDistributedRemote;
+  bool IsPriorityEscalated;
+  uint8_t MaxPriority;
+
+  swift_reflection_ptr_t FirstJob;
+
+  bool HasThreadPort;
+  uint32_t ThreadPort;
+} swift_actor_info_t;
 
 /// An opaque pointer to a context which maintains state and
 /// caching of reflection structure for heap instances.

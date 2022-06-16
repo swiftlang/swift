@@ -96,7 +96,7 @@ public struct UnsafeValue<Element: AnyObject> {
   // CANONICAL:  apply [[CLOSURE]]([[RESULT]], [[GUARANTEED_REF_DEP_ON_BASE]])
   // CANONICAL: } // end sil function '$s11unsafevalue11UnsafeValueV20withGuaranteeingBase4base_qd_0_qd___qd_0_xXEtr0_lF'
   //
-  // OPT-LABEL: sil [transparent] @$s11unsafevalue11UnsafeValueV20withGuaranteeingBase4base_qd_0_qd___qd_0_xXEtr0_lF :
+  // OPT-LABEL: sil [transparent] {{.*}}@$s11unsafevalue11UnsafeValueV20withGuaranteeingBase4base_qd_0_qd___qd_0_xXEtr0_lF :
   // OPT: bb0([[RESULT:%.*]] : $*Result, [[BASE:%.*]] : $*Base, [[CLOSURE:%.*]] : $@noescape @callee_guaranteed {{.*}}, [[UNSAFE_VALUE:%.*]] : $UnsafeValue<Element>):
   // OPT:  [[UNMANAGED_VALUE:%.*]] = struct_extract [[UNSAFE_VALUE]]
   // OPT:  [[UNOWNED_REF:%.*]] = unmanaged_to_ref [[UNMANAGED_VALUE]]

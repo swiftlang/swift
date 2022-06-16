@@ -381,7 +381,7 @@ func testCondFail(_ b: Bool, c: Bool) {
 // CHECK:         call void @swift_once([[WORD]]* [[PRED_PTR]], i8* %1, i8* undef)
 // CHECK-objc:    br label %[[DONE]]
 
-func testOnce(_ p: Builtin.RawPointer, f: @escaping @convention(c) () -> ()) {
+func testOnce(_ p: Builtin.RawPointer, f: @escaping @convention(c) (Builtin.RawPointer) -> ()) {
   Builtin.once(p, f)
 }
 

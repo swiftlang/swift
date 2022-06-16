@@ -67,7 +67,7 @@ struct OtherGlobalActor {
 }
 
 @GA1 struct X {
-  @GA1 var member: Int
+  @GA1 var member: Int // expected-warning {{stored property 'member' within struct cannot have a global actor; this is an error in Swift 6}}
 }
 
 struct Y {

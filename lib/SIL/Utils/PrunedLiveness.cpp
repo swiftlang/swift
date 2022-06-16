@@ -79,6 +79,11 @@ void PrunedLiveness::updateForUse(SILInstruction *user, bool lifetimeEnding) {
   auto useBlockLive = liveBlocks.updateForUse(user);
   // Record all uses of blocks on the liveness boundary. For blocks marked
   // LiveWithin, the boundary is considered to be the last use in the block.
+  //
+  // FIXME: Why is nonLifetimeEndingUsesInLiveOut inside PrunedLiveness, and
+  // what does it mean? Blocks may transition to LiveOut later. Or they may
+  // already be LiveOut from a previous use. After computing liveness, clients
+  // should check uses that are in PrunedLivenessBoundary.
   if (!lifetimeEnding && useBlockLive == PrunedLiveBlocks::LiveOut) {
     if (nonLifetimeEndingUsesInLiveOut)
       nonLifetimeEndingUsesInLiveOut->insert(user);
@@ -162,6 +167,20 @@ bool PrunedLiveness::areUsesWithinBoundary(ArrayRef<Operand *> uses,
   for (auto *use : uses) {
     auto *user = use->getUser();
     if (!isWithinBoundary(user) && !checkDeadEnd(user))
+      return false;
+  }
+  return true;
+}
+
+bool PrunedLiveness::areUsesOutsideBoundary(
+    ArrayRef<Operand *> uses, DeadEndBlocks *deadEndBlocks) const {
+  auto checkDeadEnd = [deadEndBlocks](SILInstruction *inst) {
+    return deadEndBlocks && deadEndBlocks->isDeadEnd(inst->getParent());
+  };
+
+  for (auto *use : uses) {
+    auto *user = use->getUser();
+    if (isWithinBoundary(user) || checkDeadEnd(user))
       return false;
   }
   return true;
@@ -260,7 +279,7 @@ void PrunedLivenessBoundary::compute(const PrunedLiveness &liveness,
     switch (liveness.getBlockLiveness(bb)) {
     case PrunedLiveBlocks::LiveOut:
       // A lifetimeEndBlock may be determined to be LiveOut after analyzing the
-      // extended liveness. It is irrelevent for finding the boundary.
+      // extended liveness. It is irrelevant for finding the boundary.
       break;
     case PrunedLiveBlocks::LiveWithin: {
       // The liveness boundary is inside this block. Insert a final destroy

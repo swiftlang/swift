@@ -723,7 +723,7 @@ public:
 
 } // end namespace detail
 
-/// zip iterator for two or more iteratable types.
+/// zip iterator for two or more iterable types.
 template <typename T, typename U, typename... Args>
 detail::zippy<detail::zip_shortest, T, U, Args...> zip(T &&t, U &&u,
                                                        Args &&... args) {
@@ -1949,7 +1949,7 @@ private:
 
 } // end namespace detail
 
-/// Given an input range, returns a new range whose values are are pair (A,B)
+/// Given an input range, returns a new range whose values are pair (A,B)
 /// such that A is the 0-based index of the item in the sequence, and B is
 /// the value from the original sequence.  Example:
 ///

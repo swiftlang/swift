@@ -71,3 +71,12 @@ class ConstFanClassWrong4: ConstFan {
 	static func giveMeString() -> String { return "" }
 	static _const let v: String = giveMeString() // expected-error {{_const let should be initialized with a compile-time literal}}
 }
+
+_const let globalConst = 3
+
+class ConstFanClassWrong5 {
+	func foo() -> Int {
+		_const let localConst = 3
+		return globalConst + localConst
+	}
+}

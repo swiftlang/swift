@@ -31,6 +31,13 @@
 #define ABSTRACT_TYPEREPR(Id, Parent)
 #endif
 
+/// SPECIFIER_TYPEREPR(Id, Parent)
+///
+/// A specific TypeRepr that's a child of SpecifierTypeRepr.
+#ifndef SPECIFIER_TYPEREPR
+#define SPECIFIER_TYPEREPR TYPEREPR
+#endif
+
 #ifndef LAST_TYPEREPR
 #define LAST_TYPEREPR(Id)
 #endif
@@ -58,15 +65,16 @@ TYPEREPR(NamedOpaqueReturn, TypeRepr)
 TYPEREPR(Existential, TypeRepr)
 TYPEREPR(Placeholder, TypeRepr)
 ABSTRACT_TYPEREPR(Specifier, TypeRepr)
-  TYPEREPR(InOut, SpecifierTypeRepr)
-  TYPEREPR(Shared, SpecifierTypeRepr)
-  TYPEREPR(Owned, SpecifierTypeRepr)
-  TYPEREPR(Isolated, SpecifierTypeRepr)
-  TYPEREPR(CompileTimeConst, SpecifierTypeRepr)
+  SPECIFIER_TYPEREPR(InOut, SpecifierTypeRepr)
+  SPECIFIER_TYPEREPR(Shared, SpecifierTypeRepr)
+  SPECIFIER_TYPEREPR(Owned, SpecifierTypeRepr)
+  SPECIFIER_TYPEREPR(Isolated, SpecifierTypeRepr)
+  SPECIFIER_TYPEREPR(CompileTimeConst, SpecifierTypeRepr)
 TYPEREPR(Fixed, TypeRepr)
 TYPEREPR(SILBox, TypeRepr)
 LAST_TYPEREPR(SILBox)
 
+#undef SPECIFIER_TYPEREPR
 #undef ABSTRACT_TYPEREPR
 #undef TYPEREPR
 #undef LAST_TYPEREPR

@@ -1,4 +1,4 @@
-//===- llvm/Support/type_traits.h - Simplfied type traits -------*- C++ -*-===//
+//===- llvm/Support/type_traits.h - Simplified type traits -------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.

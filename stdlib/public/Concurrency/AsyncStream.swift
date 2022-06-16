@@ -68,30 +68,32 @@ import Swift
 /// calls `stopMonitoring()` on the monitor.
 /// 4. Calls `startMonitoring` on the `QuakeMonitor`.
 ///
-///     extension QuakeMonitor {
+/// ```
+/// extension QuakeMonitor {
 ///
-///         static var quakes: AsyncStream<Quake> {
-///             AsyncStream { continuation in
-///                 let monitor = QuakeMonitor()
-///                 monitor.quakeHandler = { quake in
-///                     continuation.yield(quake)
-///                 }
-///                 continuation.onTermination = { @Sendable _ in
-///                     monitor.stopMonitoring()
-///                 }
-///                 monitor.startMonitoring()
+///     static var quakes: AsyncStream<Quake> {
+///         AsyncStream { continuation in
+///             let monitor = QuakeMonitor()
+///             monitor.quakeHandler = { quake in
+///                 continuation.yield(quake)
 ///             }
+///             continuation.onTermination = { @Sendable _ in
+///                  monitor.stopMonitoring()
+///             }
+///             monitor.startMonitoring()
 ///         }
 ///     }
+/// }
+/// ```
 ///
 /// Because the stream is an `AsyncSequence`, the call point can use the
 /// `for`-`await`-`in` syntax to process each `Quake` instance as the stream
 /// produces it:
 ///
 ///     for await quake in QuakeMonitor.quakes {
-///         print ("Quake: \(quake.date)")
+///         print("Quake: \(quake.date)")
 ///     }
-///     print ("Stream finished.")
+///     print("Stream finished.")
 ///
 @available(SwiftStdlib 5.1, *)
 public struct AsyncStream<Element> {
@@ -177,7 +179,7 @@ public struct AsyncStream<Element> {
     let storage: _Storage
 
     /// Resume the task awaiting the next iteration point by having it return
-    /// nomally from its suspension point with a given element.
+    /// normally from its suspension point with a given element.
     ///
     /// - Parameter value: The value to yield from the continuation.
     /// - Returns: A `YieldResult` that indicates the success or failure of the
@@ -265,23 +267,23 @@ public struct AsyncStream<Element> {
   /// The following example shows an `AsyncStream` created with this
   /// initializer that produces 100 random numbers on a one-second interval,
   /// calling `yield(_:)` to deliver each element to the awaiting call point.
-  /// When the `for` loop exits and the stream finishes by calling the
+  /// When the `for` loop exits, the stream finishes by calling the
   /// continuation's `finish()` method.
   ///
   ///     let stream = AsyncStream<Int>(Int.self,
   ///                                   bufferingPolicy: .bufferingNewest(5)) { continuation in
-  ///             Task.detached {
-  ///                 for _ in 0..<100 {
-  ///                     await Task.sleep(1 * 1_000_000_000)
-  ///                     continuation.yield(Int.random(in: 1...10))
-  ///                 }
-  ///                 continuation.finish()
+  ///         Task.detached {
+  ///             for _ in 0..<100 {
+  ///                 await Task.sleep(1 * 1_000_000_000)
+  ///                 continuation.yield(Int.random(in: 1...10))
   ///             }
+  ///             continuation.finish()
   ///         }
+  ///     }
   ///
   ///     // Call point:
   ///     for await random in stream {
-  ///         print ("\(random)")
+  ///         print(random)
   ///     }
   ///
   public init(
@@ -303,7 +305,7 @@ public struct AsyncStream<Element> {
   ///     stream.
   ///   - onCancel: A closure to execute when canceling the stream's task.
   ///
-  /// Use this convenience initializer when you have an asychronous function
+  /// Use this convenience initializer when you have an asynchronous function
   /// that can produce elements for the stream, and don't want to invoke
   /// a continuation manually. This initializer "unfolds" your closure into
   /// an asynchronous stream. The created stream handles conformance
@@ -317,15 +319,13 @@ public struct AsyncStream<Element> {
   /// the `unfolding` parameter label.
   ///
   ///     let stream = AsyncStream<Int> {
-  ///             await Task.sleep(1 * 1_000_000_000)
-  ///             return Int.random(in: 1...10)
-  ///         }
-  ///         onCancel: { @Sendable () in print ("Canceled.") }
-  ///     )
+  ///         await Task.sleep(1 * 1_000_000_000)
+  ///         return Int.random(in: 1...10)
+  ///     } onCancel: { @Sendable () in print("Canceled.") }
   ///
   ///     // Call point:
   ///     for await random in stream {
-  ///         print ("\(random)")
+  ///         print(random)
   ///     }
   ///
   ///
@@ -426,3 +426,6 @@ extension AsyncStream.Continuation {
     return storage.yield(())
   }
 }
+
+@available(SwiftStdlib 5.1, *)
+extension AsyncStream: @unchecked Sendable where Element: Sendable { }

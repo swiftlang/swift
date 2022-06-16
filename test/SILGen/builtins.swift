@@ -224,7 +224,7 @@ func class_archetype_to_native_object<T : C>(_ t: T) -> Builtin.NativeObject {
 // CHECK-NEXT:   [[PTR:%[0-9]+]] = unchecked_ref_cast [[REF]] : $@opened({{.*}}) ClassProto to $Builtin.NativeObject
 // CHECK-NEXT:   return [[PTR]]
 func class_existential_to_native_object(_ t:ClassProto) -> Builtin.NativeObject {
-  return Builtin.unsafeCastToNativeObject(t)
+  return Builtin.unsafeCastToNativeObject(t as ClassProto)
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins24class_from_native_object{{[_0-9a-zA-Z]*}}F
@@ -718,7 +718,7 @@ func refcast_class_any(_ o: A) -> AnyObject {
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins20refcast_punknown_any{{[_0-9a-zA-Z]*}}F
 // CHECK: unchecked_ref_cast_addr PUnknown in %{{.*}} : $*PUnknown to AnyObject in %{{.*}} : $*AnyObject
 func refcast_punknown_any(_ o: PUnknown) -> AnyObject {
-  return Builtin.castReference(o)
+  return Builtin.castReference(o as PUnknown)
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins18refcast_pclass_anyyyXlAA6PClass_pF :
@@ -728,7 +728,7 @@ func refcast_punknown_any(_ o: PUnknown) -> AnyObject {
 // CHECK:   return [[ARG_CAST]]
 // CHECK: } // end sil function '$s8builtins18refcast_pclass_anyyyXlAA6PClass_pF'
 func refcast_pclass_any(_ o: PClass) -> AnyObject {
-  return Builtin.castReference(o)
+  return Builtin.castReference(o as PClass)
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins20refcast_any_punknown{{[_0-9a-zA-Z]*}}F
@@ -859,11 +859,11 @@ func release(ptr: Builtin.NativeObject) {
 // Other Operations
 //===----------------------------------------------------------------------===//
 
-func once_helper() {}
+func once_helper(_ context: Builtin.RawPointer) {}
 
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins4once7controlyBp_tF
-// CHECK:      [[T0:%.*]] = function_ref @$s8builtins11once_helperyyFTo : $@convention(c) () -> ()
-// CHECK-NEXT: builtin "once"(%0 : $Builtin.RawPointer, [[T0]] : $@convention(c) () -> ())
+// CHECK:      [[T0:%.*]] = function_ref @$s8builtins11once_helperyyBpFTo : $@convention(c) (Builtin.RawPointer) -> ()
+// CHECK-NEXT: builtin "once"(%0 : $Builtin.RawPointer, [[T0]] : $@convention(c) (Builtin.RawPointer) -> ())
 func once(control: Builtin.RawPointer) {
   Builtin.once(control, once_helper)
 }

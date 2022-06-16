@@ -563,6 +563,42 @@ public:
   }
 };
 
+class ParameterizedProtocolTypeRef final : public TypeRef {
+  const ProtocolCompositionTypeRef *Base;
+  std::vector<const TypeRef *> Args;
+
+  static TypeRefID Profile(const ProtocolCompositionTypeRef *Protocol,
+                           std::vector<const TypeRef *> Args) {
+    TypeRefID ID;
+    ID.addPointer(Protocol);
+    for (auto Arg : Args) {
+      ID.addPointer(Arg);
+    }
+    return ID;
+  }
+
+public:
+  ParameterizedProtocolTypeRef(const ProtocolCompositionTypeRef *Protocol,
+                               std::vector<const TypeRef *> Args)
+      : TypeRef(TypeRefKind::ParameterizedProtocol), Base(Protocol),
+        Args(Args) {}
+
+  template <typename Allocator>
+  static const ParameterizedProtocolTypeRef *
+  create(Allocator &A, const ProtocolCompositionTypeRef *Protocol,
+         std::vector<const TypeRef *> Args) {
+    FIND_OR_CREATE_TYPEREF(A, ParameterizedProtocolTypeRef, Protocol, Args);
+  }
+
+  const ProtocolCompositionTypeRef *getBase() const { return Base; }
+
+  const std::vector<const TypeRef *> &getArgs() const { return Args; }
+
+  static bool classof(const TypeRef *TR) {
+    return TR->getKind() == TypeRefKind::ParameterizedProtocol;
+  }
+};
+
 class MetatypeTypeRef final : public TypeRef {
   const TypeRef *InstanceType;
   bool WasAbstract;
@@ -702,6 +738,37 @@ public:
 
   static bool classof(const TypeRef *TR) {
     return TR->getKind() == TypeRefKind::DependentMember;
+  }
+};
+
+/// A representation of a dynamically-constructed generic signature.
+///
+/// \note This class is not a \c TypeRef.
+class GenericSignatureRef final {
+  std::vector<const GenericTypeParameterTypeRef *> Params;
+  std::vector<TypeRefRequirement> Requirements;
+
+public:
+  GenericSignatureRef(
+      llvm::ArrayRef<const GenericTypeParameterTypeRef *> Params,
+      llvm::ArrayRef<TypeRefRequirement> Requirements)
+      : Params(Params.begin(), Params.end()),
+        Requirements(Requirements.begin(), Requirements.end()) {}
+
+  template <typename Allocator>
+  static const GenericSignatureRef *
+  create(Allocator &A,
+         llvm::ArrayRef<const GenericTypeParameterTypeRef *> Params,
+         llvm::ArrayRef<TypeRefRequirement> Requirements) {
+    return A.makeGenericSignatureRef(Params, Requirements);
+  }
+
+  const llvm::ArrayRef<const GenericTypeParameterTypeRef *> getParams() const {
+    return Params;
+  }
+
+  const llvm::ArrayRef<TypeRefRequirement> getRequirements() const {
+    return Requirements;
   }
 };
 

@@ -102,7 +102,7 @@ namespace llvm {
 
       /// A Pointer and Length representation. Used for std::string_view,
       /// StringRef, and SmallString.  Can't use a StringRef here
-      /// because they are not trivally constructible.
+      /// because they are not trivially constructible.
       PtrAndLengthKind,
 
       /// A pointer to a formatv_object_base instance.

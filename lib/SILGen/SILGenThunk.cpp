@@ -60,7 +60,7 @@ SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
   SILGenFunctionBuilder builder(*this);
   auto F = builder.getOrCreateFunction(
       constant.getDecl(), name, SILLinkage::Shared, constantTy, IsBare,
-      IsTransparent, IsSerializable, IsNotDynamic, IsNotDistributed,
+      IsTransparent, IsSerialized, IsNotDynamic, IsNotDistributed,
       ProfileCounter(), IsThunk);
 
   if (F->empty()) {
@@ -109,6 +109,12 @@ void SILGenModule::emitNativeToForeignThunk(SILDeclRef thunk) {
 void SILGenModule::emitDistributedThunk(SILDeclRef thunk) {
   // Thunks are always emitted by need, so don't need delayed emission.
   assert(thunk.isDistributedThunk() && "distributed thunks only");
+  emitFunctionDefinition(thunk, getFunction(thunk, ForDefinition));
+}
+
+void SILGenModule::emitBackDeploymentThunk(SILDeclRef thunk) {
+  // Thunks are always emitted by need, so don't need delayed emission.
+  assert(thunk.isBackDeploymentThunk() && "back deployment thunks only");
   emitFunctionDefinition(thunk, getFunction(thunk, ForDefinition));
 }
 
@@ -211,6 +217,17 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
     }
     return maybeCompletionHandlerOrigTy.getValue();
   }();
+  
+  // Bridge the block type, so that if it is formally expressed in terms of
+  // bridged Swift types, we still lower the parameters to their ultimate
+  // ObjC types.
+  completionHandlerOrigTy = Types
+    .getBridgedFunctionType(AbstractionPattern(origFormalType.getGenericSignatureOrNull(),
+                                               completionHandlerOrigTy),
+                            completionHandlerOrigTy,
+                            Bridgeability::Full,
+                            SILFunctionTypeRepresentation::Block);
+
   auto blockParams = completionHandlerOrigTy.getParams();
 
   // Build up the implementation function type, which matches the
@@ -255,7 +272,7 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
   
   SILGenFunctionBuilder builder(*this);
   auto F = builder.getOrCreateSharedFunction(loc, name, implTy,
-                                           IsBare, IsTransparent, IsSerializable,
+                                           IsBare, IsTransparent, IsSerialized,
                                            ProfileCounter(),
                                            IsThunk,
                                            IsNotDynamic,
@@ -508,11 +525,11 @@ getOrCreateReabstractionThunk(CanSILFunctionType thunkType,
   
   // The thunk that converts an actor-constrained, non-async function to an
   // async function is not serializable if the actor's visibility precludes it.
-  auto serializable = IsSerializable;
+  auto serializable = IsSerialized;
   if (fromGlobalActorBound) {
     auto globalActorLinkage = getTypeLinkage(fromGlobalActorBound);
     serializable = globalActorLinkage >= FormalLinkage::PublicNonUnique
-      ? IsSerializable : IsNotSerialized;
+      ? IsSerialized : IsNotSerialized;
   }
 
   SILGenFunctionBuilder builder(*this);

@@ -26,7 +26,7 @@ struct HasDefaultedDestructor {
 };
 
 // For the following objects with virtual bases / destructors, make sure that
-// any exectuable user of these objects disable rtti and exceptions. Otherwise,
+// any executable user of these objects disable rtti and exceptions. Otherwise,
 // the linker will error because of undefined vtables.
 // FIXME: Once we can link with libc++ we can enable RTTI.
 

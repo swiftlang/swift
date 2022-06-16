@@ -26,7 +26,7 @@
 #pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
 
 // Does the runtime use a cooperative global executor?
-#if defined(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
+#if defined(SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY)
 #define SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR 1
 #else
 #define SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR 0
@@ -40,6 +40,17 @@
 #define SWIFT_CONCURRENCY_ENABLE_DISPATCH 1
 #endif
 #endif
+
+// Does the runtime provide priority escalation support?
+#ifndef SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+#if SWIFT_CONCURRENCY_ENABLE_DISPATCH && \
+    __has_include(<dispatch/swift_concurrency_private.h>) && __APPLE__ && \
+    (defined(__arm64__) || defined(__x86_64__))
+#define SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION 1
+#else
+#define SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION 0
+#endif
+#endif /* SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION */
 
 namespace swift {
 class DefaultActor;
@@ -205,7 +216,7 @@ void swift_taskGroup_destroy(TaskGroup *group);
 /// more 'pending' child to account for.
 ///
 /// This function SHOULD be called from the AsyncTask running the task group,
-/// however is generally thread-safe as it only only works with the group status.
+/// however is generally thread-safe as it only works with the group status.
 ///
 /// Its Swift signature is
 ///
@@ -616,6 +627,17 @@ void swift_task_switch(SWIFT_ASYNC_CONTEXT AsyncContext *resumeToContext,
                        TaskContinuationFunction *resumeFunction,
                        ExecutorRef newExecutor);
 
+/// Mark a task for enqueue on a new executor and then enqueue it.
+///
+/// The resumption function pointer and continuation should be set
+/// appropriately in the task.
+///
+/// Generally you should call swift_task_switch to switch execution
+/// synchronously when possible.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void
+swift_task_enqueueTaskOnExecutor(AsyncTask *task, ExecutorRef executor);
+
 /// Enqueue the given job to run asynchronously on the given executor.
 ///
 /// The resumption function pointer and continuation should be set
@@ -643,6 +665,10 @@ using JobDelay = unsigned long long;
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_enqueueGlobalWithDelay(JobDelay delay, Job *job);
 
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_enqueueGlobalWithDeadline(long long sec, long long nsec,
+    long long tsec, long long tnsec, int clock, Job *job);
+
 /// Enqueue the given job on the main executor.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_enqueueMainExecutor(Job *job);
@@ -668,6 +694,21 @@ SWIFT_EXPORT_FROM(swift_Concurrency)
 SWIFT_CC(swift) void (*swift_task_enqueueGlobalWithDelay_hook)(
     unsigned long long delay, Job *job,
     swift_task_enqueueGlobalWithDelay_original original);
+
+typedef SWIFT_CC(swift) void (*swift_task_enqueueGlobalWithDeadline_original)(
+    long long sec,
+    long long nsec,
+    long long tsec,
+    long long tnsec,
+    int clock, Job *job);
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift) void (*swift_task_enqueueGlobalWithDeadline_hook)(
+    long long sec,
+    long long nsec,
+    long long tsec,
+    long long tnsec,
+    int clock, Job *job,
+    swift_task_enqueueGlobalWithDeadline_original original);
 
 /// A hook to take over main executor enqueueing.
 typedef SWIFT_CC(swift) void (*swift_task_enqueueMainExecutor_original)(
@@ -802,6 +843,21 @@ void swift_task_donateThreadToGlobalExecutorUntil(bool (*condition)(void*),
                                                   void *context);
 
 #endif
+
+enum swift_clock_id : int {
+  swift_clock_id_continuous = 1,
+  swift_clock_id_suspending = 2
+};
+
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_get_time(long long *seconds,
+                    long long *nanoseconds,
+                    swift_clock_id clock_id);
+
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_get_clock_res(long long *seconds,
+                         long long *nanoseconds,
+                         swift_clock_id clock_id);
 
 #ifdef __APPLE__
 /// A magic symbol whose address is the mask to apply to a frame pointer to

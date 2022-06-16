@@ -103,6 +103,22 @@ void COWOptsPass::run() {
   }
 }
 
+static SILValue skipStructAndExtract(SILValue value) {
+  while (true) {
+    if (auto *si = dyn_cast<StructInst>(value)) {
+      if (si->getNumOperands() != 1)
+        return value;
+      value = si->getOperand(0);
+      continue;
+    }
+    if (auto *sei = dyn_cast<StructExtractInst>(value)) {
+      value = sei->getOperand();
+      continue;
+    }
+    return value;
+  }
+}
+
 bool COWOptsPass::optimizeBeginCOW(BeginCOWMutationInst *BCM) {
   VoidPointerSet handled;
   SmallVector<SILValue, 8> workList;
@@ -112,7 +128,7 @@ bool COWOptsPass::optimizeBeginCOW(BeginCOWMutationInst *BCM) {
   // looking through block phi-arguments.
   workList.push_back(BCM->getOperand());
   while (!workList.empty()) {
-    SILValue v = workList.pop_back_val();
+    SILValue v = skipStructAndExtract(workList.pop_back_val());
     if (SILPhiArgument *arg = dyn_cast<SILPhiArgument>(v)) {
       if (handled.insert(arg).second) {
         SmallVector<SILValue, 4> incomingVals;
@@ -241,7 +257,9 @@ void COWOptsPass::collectEscapePoints(SILValue v,
                             escapePoints, handled);
         break;
       case SILInstructionKind::StructInst:
+      case SILInstructionKind::StructExtractInst:
       case SILInstructionKind::TupleInst:
+      case SILInstructionKind::TupleExtractInst:
       case SILInstructionKind::UncheckedRefCastInst:
         collectEscapePoints(cast<SingleValueInstruction>(user),
                             escapePoints, handled);

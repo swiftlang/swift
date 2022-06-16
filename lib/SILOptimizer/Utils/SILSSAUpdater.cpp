@@ -229,7 +229,7 @@ SILValue SILSSAUpdater::getValueInMiddleOfBlock(SILBasicBlock *block) {
   }
 
   // Create a new phi node.
-  SILPhiArgument *phiArg = block->createPhiArgument(type, OwnershipKind::Owned);
+  SILPhiArgument *phiArg = block->createPhiArgument(type, ownershipKind);
   for (auto &pair : predVals) {
     addNewEdgeValueToBranch(pair.first->getTerminator(), block, pair.second,
                             deleter);
@@ -341,6 +341,7 @@ public:
     auto *phiBlock = phi->getParent();
     size_t phiArgIndex = phi->getIndex();
     auto *ti = predBlock->getTerminator();
+
     changeEdgeValue(ti, phiBlock, phiArgIndex, value);
   }
 

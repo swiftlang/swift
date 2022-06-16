@@ -80,6 +80,13 @@ static std::string getRuntimeLibPath() {
   return libPath.str().str();
 }
 
+static std::string getSwiftExecutablePath() {
+  llvm::SmallString<128> path;
+  getToolchainPrefixPath(path);
+  llvm::sys::path::append(path, "bin", "swift-frontend");
+  return path.str().str();
+}
+
 static std::string getDiagnosticDocumentationPath() {
   llvm::SmallString<128> docPath;
   getToolchainPrefixPath(docPath);
@@ -90,7 +97,7 @@ static std::string getDiagnosticDocumentationPath() {
 void sourcekitd_initialize(void) {
   if (sourcekitd::initializeClient()) {
     LOG_INFO_FUNC(High, "initializing");
-    sourcekitd::initializeService(getRuntimeLibPath(),
+    sourcekitd::initializeService(getSwiftExecutablePath(), getRuntimeLibPath(),
                                   getDiagnosticDocumentationPath(),
                                   postNotification);
   }

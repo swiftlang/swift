@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=FreeFunctions -I %S/Inputs -source-filename=x -enable-cxx-interop | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=FreeFunctions -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
 
 // CHECK:      enum FunctionsNS1 {
 // CHECK-NEXT:   static func basicFunctionTopLevel() -> UnsafePointer<CChar>!

@@ -5,7 +5,7 @@
 // rdar://76038845
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
-// UNSUPPORTED: single_threaded_runtime
+// UNSUPPORTED: single_threaded_concurrency
 
 // for sleep
 #if canImport(Darwin)

@@ -369,7 +369,7 @@ public protocol RangeReplaceableCollection: Collection
 
   // FIXME: Associated type inference requires these.
   @_borrowed
-  override subscript(bounds: Index) -> Element { get }
+  override subscript(position: Index) -> Element { get }
   override subscript(bounds: Range<Index>) -> SubSequence { get }
 }
 

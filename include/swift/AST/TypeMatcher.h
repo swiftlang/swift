@@ -181,9 +181,8 @@ class TypeMatcher {
 
     bool visitReferenceStorageType(CanReferenceStorageType firstStorage,
                                    Type secondType, Type sugaredFirstType) {
-      auto _secondStorage = secondType->getCanonicalType();
-      if (firstStorage->getKind() == _secondStorage->getKind()) {
-        auto secondStorage = cast<ReferenceStorageType>(_secondStorage);
+      if (firstStorage->getKind() == secondType->getDesugaredType()->getKind()) {
+        auto secondStorage = secondType->castTo<ReferenceStorageType>();
         return this->visit(firstStorage.getReferentType(),
                            secondStorage->getReferentType(),
                            sugaredFirstType->castTo<ReferenceStorageType>()
@@ -195,9 +194,8 @@ class TypeMatcher {
 
     bool visitNominalType(CanNominalType firstNominal,
                           Type secondType, Type sugaredFirstType) {
-      auto _secondNominal = secondType->getCanonicalType();
-      if (firstNominal->getKind() == _secondNominal->getKind()) {
-        auto secondNominal = cast<NominalType>(_secondNominal);
+      if (firstNominal->getKind() == secondType->getDesugaredType()->getKind()) {
+        auto secondNominal = secondType->castTo<NominalType>();
         if (firstNominal->getDecl() != secondNominal->getDecl())
           return mismatch(firstNominal.getPointer(), secondNominal,
                           sugaredFirstType);
@@ -216,9 +214,8 @@ class TypeMatcher {
 
     bool visitAnyMetatypeType(CanAnyMetatypeType firstMeta,
                               Type secondType, Type sugaredFirstType) {
-      auto _secondMeta = secondType->getCanonicalType();
-      if (firstMeta->getKind() == _secondMeta->getKind()) {
-        auto secondMeta = cast<AnyMetatypeType>(_secondMeta);
+      if (firstMeta->getKind() == secondType->getDesugaredType()->getKind()) {
+        auto secondMeta = secondType->castTo<AnyMetatypeType>();
         return this->visit(firstMeta.getInstanceType(),
                            secondMeta->getInstanceType(),
                            sugaredFirstType->castTo<AnyMetatypeType>()
@@ -229,8 +226,60 @@ class TypeMatcher {
     }
 
     TRIVIAL_CASE(ModuleType)
-    TRIVIAL_CASE(DynamicSelfType)
-    TRIVIAL_CASE(ArchetypeType)
+
+    bool visitArchetypeType(CanArchetypeType firstArchetype,
+                            Type secondType,
+                            Type sugaredFirstType) {
+      if (auto firstOpaqueArchetype = dyn_cast<OpaqueTypeArchetypeType>(firstArchetype)) {
+        if (auto secondOpaqueArchetype = secondType->getAs<OpaqueTypeArchetypeType>()) {
+          if (firstOpaqueArchetype->getDecl() == secondOpaqueArchetype->getDecl()) {
+            auto firstSubMap = firstOpaqueArchetype->getSubstitutions();
+            auto secondSubMap = secondOpaqueArchetype->getSubstitutions();
+            assert(firstSubMap.getReplacementTypes().size() ==
+                   secondSubMap.getReplacementTypes().size());
+
+            for (unsigned i : indices(firstSubMap.getReplacementTypes())) {
+              auto firstSubstType = firstSubMap.getReplacementTypes()[i];
+              auto secondSubstType = secondSubMap.getReplacementTypes()[i];
+
+              if (!this->visit(firstSubstType->getCanonicalType(),
+                               secondSubstType, firstSubstType))
+                return false;
+            }
+
+            return true;
+          }
+        }
+      }
+
+      // FIXME: Once OpenedArchetypeType stores substitutions, do something
+      // similar to the above.
+
+      if (firstArchetype->isEqual(secondType))
+        return true;
+
+
+      return mismatch(firstArchetype.getPointer(), secondType, sugaredFirstType);
+    }
+
+    bool visitDynamicSelfType(CanDynamicSelfType firstDynamicSelf,
+                              Type secondType,
+                              Type sugaredFirstType) {
+      if (auto secondDynamicSelf = secondType->getAs<DynamicSelfType>()) {
+        auto firstBase = firstDynamicSelf->getSelfType();
+        auto secondBase = secondDynamicSelf->getSelfType();
+        auto firstSugaredBase = sugaredFirstType->getAs<DynamicSelfType>()
+            ->getSelfType();
+
+        if (!this->visit(CanType(firstBase), secondBase, firstSugaredBase))
+          return false;
+
+        return true;
+      }
+
+      return mismatch(firstDynamicSelf.getPointer(), secondType,
+                      sugaredFirstType);
+    }
 
     bool visitDependentMemberType(CanDependentMemberType firstType,
                                    Type secondType,
@@ -303,7 +352,64 @@ class TypeMatcher {
     TRIVIAL_CASE(SILFunctionType)
     TRIVIAL_CASE(SILBlockStorageType)
     TRIVIAL_CASE(SILBoxType)
-    TRIVIAL_CASE(ProtocolCompositionType)
+    TRIVIAL_CASE(SILMoveOnlyType)
+
+    bool visitProtocolCompositionType(CanProtocolCompositionType firstProtocolComposition,
+                                      Type secondType,
+                                      Type sugaredFirstType) {
+      if (auto secondProtocolComposition = secondType->getAs<ProtocolCompositionType>()) {
+        auto firstMembers = firstProtocolComposition->getMembers();
+        auto secondMembers = secondProtocolComposition->getMembers();
+
+        if (firstMembers.size() == secondMembers.size()) {
+          for (unsigned i : indices(firstMembers)) {
+            auto firstMember = firstMembers[i];
+            auto secondMember = secondMembers[i];
+
+            // FIXME: We lose sugar here, because the sugared type might have a different
+            // number of members, or the members might appear in a different order.
+            if (!this->visit(CanType(firstMember), secondMember, firstMember)) {
+              return false;
+            }
+          }
+
+          return true;
+        }
+      }
+
+      return mismatch(firstProtocolComposition.getPointer(), secondType,
+                      sugaredFirstType);
+    }
+
+    bool visitParameterizedProtocolType(CanParameterizedProtocolType firstParametrizedProto,
+                                        Type secondType,
+                                        Type sugaredFirstType) {
+      if (auto secondParametrizedProto = secondType->getAs<ParameterizedProtocolType>()) {
+        if (!this->visit(firstParametrizedProto.getBaseType(),
+                         secondParametrizedProto->getBaseType(),
+                         sugaredFirstType->castTo<ParameterizedProtocolType>()
+                             ->getBaseType())) {
+          return false;
+        }
+
+        auto firstArgs = firstParametrizedProto->getArgs();
+        auto secondArgs = secondParametrizedProto->getArgs();
+
+        if (firstArgs.size() == secondArgs.size()) {
+          for (unsigned i : indices(firstArgs)) {
+            return this->visit(CanType(firstArgs[i]),
+                               secondArgs[i],
+                               sugaredFirstType->castTo<ParameterizedProtocolType>()
+                                   ->getArgs()[i]);
+          }
+
+          return true;
+        }
+      }
+
+      return mismatch(firstParametrizedProto.getPointer(), secondType,
+                      sugaredFirstType);
+    }
 
     bool visitExistentialType(CanExistentialType firstExistential,
                               Type secondType,
@@ -345,9 +451,8 @@ class TypeMatcher {
 
     bool visitBoundGenericType(CanBoundGenericType firstBGT,
                                Type secondType, Type sugaredFirstType) {
-      auto _secondBGT = secondType->getCanonicalType();
-      if (firstBGT->getKind() == _secondBGT->getKind()) {
-        auto secondBGT = cast<BoundGenericType>(_secondBGT);
+      if (firstBGT->getKind() == secondType->getDesugaredType()->getKind()) {
+        auto secondBGT = secondType->castTo<BoundGenericType>();
         if (firstBGT->getDecl() != secondBGT->getDecl())
           return mismatch(firstBGT.getPointer(), secondBGT, sugaredFirstType);
 

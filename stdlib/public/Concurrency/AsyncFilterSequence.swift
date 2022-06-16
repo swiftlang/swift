@@ -24,18 +24,19 @@ extension AsyncSequence {
   ///     let stream = Counter(howHigh: 10)
   ///         .filter { $0 % 2 == 0 }
   ///     for await number in stream {
-  ///         print("\(number) ", terminator: " ")
+  ///         print(number, terminator: " ")
   ///     }
-  ///     // Prints: 2  4  6  8  10
+  ///     // Prints "2 4 6 8 10"
   ///
   /// - Parameter isIncluded: A closure that takes an element of the
   ///   asynchronous sequence as its argument and returns a Boolean value
   ///   that indicates whether to include the element in the filtered sequence.
   /// - Returns: An asynchronous sequence that contains, in order, the elements
   ///   of the base sequence that satisfy the given predicate.
+  @preconcurrency 
   @inlinable
   public __consuming func filter(
-    _ isIncluded: @escaping (Element) async -> Bool
+    _ isIncluded: @Sendable @escaping (Element) async -> Bool
   ) -> AsyncFilterSequence<Self> {
     return AsyncFilterSequence(self, isIncluded: isIncluded)
   }
@@ -113,3 +114,13 @@ extension AsyncFilterSequence: AsyncSequence {
     return Iterator(base.makeAsyncIterator(), isIncluded: isIncluded)
   }
 }
+
+@available(SwiftStdlib 5.1, *)
+extension AsyncFilterSequence: @unchecked Sendable 
+  where Base: Sendable, 
+        Base.Element: Sendable { }
+
+@available(SwiftStdlib 5.1, *)
+extension AsyncFilterSequence.Iterator: @unchecked Sendable 
+  where Base.AsyncIterator: Sendable, 
+        Base.Element: Sendable { }

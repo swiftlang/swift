@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -string-optimization -sil-combine | %FileCheck %s
+// RUN: %target-sil-opt %s -parse-serialized-sil -string-optimization -sil-combine | %FileCheck %s
 
 sil_stage canonical
 

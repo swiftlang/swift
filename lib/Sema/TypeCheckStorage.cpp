@@ -150,6 +150,59 @@ static void computeLoweredStoredProperties(NominalTypeDecl *decl) {
   }
 }
 
+/// Enumerate both the stored properties and missing members,
+/// in a deterministic order.
+static void enumerateStoredPropertiesAndMissing(
+    NominalTypeDecl *decl,
+    llvm::function_ref<void(VarDecl *)> addStoredProperty,
+    llvm::function_ref<void(MissingMemberDecl *)> addMissing) {
+  // If we have a distributed actor, find the id and actorSystem
+  // properties. We always want them first, and in a specific
+  // order.
+  VarDecl *distributedActorId = nullptr;
+  VarDecl *distributedActorSystem = nullptr;
+  if (decl->isDistributedActor()) {
+    ASTContext &ctx = decl->getASTContext();
+    for (auto *member : decl->getMembers()) {
+      if (auto *var = dyn_cast<VarDecl>(member)) {
+        if (!var->isStatic() && var->hasStorage()) {
+          if (var->getName() == ctx.Id_id) {
+            distributedActorId = var;
+          } else if (var->getName() == ctx.Id_actorSystem) {
+            distributedActorSystem = var;
+          }
+        }
+
+        if (distributedActorId && distributedActorSystem)
+          break;
+      }
+    }
+
+    if (distributedActorId)
+      addStoredProperty(distributedActorId);
+    if (distributedActorSystem)
+      addStoredProperty(distributedActorSystem);
+  }
+
+  for (auto *member : decl->getMembers()) {
+    if (auto *var = dyn_cast<VarDecl>(member)) {
+      if (!var->isStatic() && var->hasStorage()) {
+        // Skip any properties that we already emitted explicitly
+        if (var == distributedActorId)
+          continue;
+        if (var == distributedActorSystem)
+          continue;
+
+        addStoredProperty(var);
+      }
+    }
+
+    if (auto missing = dyn_cast<MissingMemberDecl>(member))
+      if (missing->getNumberOfFieldOffsetVectorEntries() > 0)
+        addMissing(missing);
+  }
+}
+
 ArrayRef<VarDecl *>
 StoredPropertiesRequest::evaluate(Evaluator &evaluator,
                                   NominalTypeDecl *decl) const {
@@ -163,12 +216,11 @@ StoredPropertiesRequest::evaluate(Evaluator &evaluator,
   if (isa<SourceFile>(decl->getModuleScopeContext()))
     computeLoweredStoredProperties(decl);
 
-  for (auto *member : decl->getMembers()) {
-    if (auto *var = dyn_cast<VarDecl>(member))
-      if (!var->isStatic() && var->hasStorage()) {
-        results.push_back(var);
-      }
-  }
+  enumerateStoredPropertiesAndMissing(decl,
+    [&](VarDecl *var) {
+      results.push_back(var);
+    },
+    [](MissingMemberDecl *missing) { });
 
   return decl->getASTContext().AllocateCopy(results);
 }
@@ -186,24 +238,21 @@ StoredPropertiesAndMissingMembersRequest::evaluate(Evaluator &evaluator,
   if (isa<SourceFile>(decl->getModuleScopeContext()))
     computeLoweredStoredProperties(decl);
 
-  for (auto *member : decl->getMembers()) {
-    if (auto *var = dyn_cast<VarDecl>(member))
-      if (!var->isStatic() && var->hasStorage())
-        results.push_back(var);
-
-    if (auto missing = dyn_cast<MissingMemberDecl>(member))
-      if (missing->getNumberOfFieldOffsetVectorEntries() > 0)
-        results.push_back(missing);
-  }
+  enumerateStoredPropertiesAndMissing(decl,
+    [&](VarDecl *var) {
+      results.push_back(var);
+    },
+    [&](MissingMemberDecl *missing) {
+      results.push_back(missing);
+    });
 
   return decl->getASTContext().AllocateCopy(results);
 }
 
 /// Validate the \c entryNumber'th entry in \c binding.
-const PatternBindingEntry *
-PatternBindingEntryRequest::evaluate(Evaluator &eval,
-                                     PatternBindingDecl *binding,
-                                     unsigned entryNumber) const {
+const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
+    Evaluator &eval, PatternBindingDecl *binding, unsigned entryNumber,
+    bool LeaveClosureBodiesUnchecked) const {
   const auto &pbe = binding->getPatternList()[entryNumber];
   auto &Context = binding->getASTContext();
 
@@ -257,8 +306,10 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
   llvm::SmallVector<VarDecl *, 2> vars;
   binding->getPattern(entryNumber)->collectVariables(vars);
   bool isReq = false;
+  bool shouldRequireStatic = false;
   if (auto *d = binding->getDeclContext()->getAsDecl()) {
     isReq = isa<ProtocolDecl>(d);
+    shouldRequireStatic = isa<NominalTypeDecl>(d);
   }
   for (auto *sv: vars) {
     bool hasConst = sv->getAttrs().getAttribute<CompileTimeConstAttr>();
@@ -266,7 +317,7 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
       continue;
     bool hasStatic = StaticSpelling != StaticSpellingKind::None;
     // only static _const let/var is supported
-    if (!hasStatic) {
+    if (shouldRequireStatic && !hasStatic) {
       binding->diagnose(diag::require_static_for_const);
       continue;
     }
@@ -311,8 +362,12 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
   if (patternType->hasUnresolvedType() ||
       patternType->hasPlaceholder() ||
       patternType->hasUnboundGenericType()) {
-    if (TypeChecker::typeCheckPatternBinding(binding, entryNumber,
-                                             patternType)) {
+    TypeCheckExprOptions options;
+    if (LeaveClosureBodiesUnchecked) {
+      options |= TypeCheckExprFlags::LeaveClosureBodyUnchecked;
+    }
+    if (TypeChecker::typeCheckPatternBinding(binding, entryNumber, patternType,
+                                             options)) {
       binding->setInvalid();
       return &pbe;
     }
@@ -630,7 +685,7 @@ namespace  {
   /// Describes the information needed to perform property wrapper access via
   /// the enclosing self.
   struct EnclosingSelfPropertyWrapperAccess {
-    /// The (genreric) subscript that will be used to perform the access.
+    /// The (generic) subscript that will be used to perform the access.
     SubscriptDecl *subscript;
 
     /// The property being accessed.
@@ -2363,7 +2418,7 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
     if (classDecl->checkAncestry(AncestryFlags::ObjC))
       return false;
 
-  // Accessors synthesized on-demand are never transaprent.
+  // Accessors synthesized on-demand are never transparent.
   if (accessor->hasForcedStaticDispatch())
     return false;
 
@@ -2412,6 +2467,7 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
           break;
         }
       }
+
       if (auto subscript = dyn_cast<SubscriptDecl>(storage)) {
         break;
       }
@@ -3231,7 +3287,7 @@ static void finishStorageImplInfo(AbstractStorageDecl *storage,
 ///   - Stored, if the decl is a 'var'.
 ///   - StoredWithObservers, if the decl has a setter
 ///     - This indicates that the original decl had a 'didSet' and/or 'willSet'
-///   - InheritedWithObservers, if the decl has a setter and is an overridde.
+///   - InheritedWithObservers, if the decl has a setter and is an override.
 ///   - Immutable, if the decl is a 'let' or it does not have a setter.
 /// ReadWrite:
 ///   - Stored, if the decl has no accessors listed.

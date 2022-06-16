@@ -249,11 +249,13 @@ public:
   static ArgumentList *
   createImplicit(ASTContext &ctx, SourceLoc lParenLoc, ArrayRef<Argument> args,
                  SourceLoc rParenLoc,
+                 Optional<unsigned> firstTrailingClosureIndex = None,
                  AllocationArena arena = AllocationArena::Permanent);
 
   /// Create a new implicit ArgumentList with a set of \p args.
   static ArgumentList *
   createImplicit(ASTContext &ctx, ArrayRef<Argument> args,
+                 Optional<unsigned> firstTrailingClosureIndex = None,
                  AllocationArena arena = AllocationArena::Permanent);
 
   /// Create a new implicit ArgumentList with a single labeled argument

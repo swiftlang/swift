@@ -10,6 +10,6 @@ _ = "\(y: &x)"
 // expected-note@-3 {{remove 'y' label to keep current behavior}}
 
 _ = "\(x, y: &x)"
-// expected-error@-1 {{use of extraneous '&'}}
+// expected-error@-1 {{'&' may only be used to pass an argument to inout parameter}}
 // expected-warning@-2 {{interpolating multiple values will not form a tuple in Swift 5}}
 // expected-note@-3 {{insert parentheses to keep current behavior}}

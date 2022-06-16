@@ -28,13 +28,17 @@
 /// `Collection` protocol.
 ///
 /// Indices that are moved forward and backward in a bidirectional collection
-/// move by the same amount in each direction. That is, for any index `i` into
-/// a bidirectional collection `c`:
+/// move by the same amount in each direction. That is, for any valid index `i`
+/// into a bidirectional collection `c`:
 ///
-/// - If `i >= c.startIndex && i < c.endIndex`,
+/// - If `i >= c.startIndex && i < c.endIndex`, then
 ///   `c.index(before: c.index(after: i)) == i`.
-/// - If `i > c.startIndex && i <= c.endIndex`
+/// - If `i > c.startIndex && i <= c.endIndex`, then
 ///   `c.index(after: c.index(before: i)) == i`.
+///
+/// Valid indices are exactly those indices that are reachable from the
+/// collection's `startIndex` by repeated applications of `index(after:)`, up
+/// to, and including, the `endIndex`.
 public protocol BidirectionalCollection: Collection
 where SubSequence: BidirectionalCollection, Indices: BidirectionalCollection {
   // FIXME: Only needed for associated type inference.

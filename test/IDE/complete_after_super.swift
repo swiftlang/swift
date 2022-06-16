@@ -107,11 +107,11 @@ extension SuperBaseA {
 // COMMON_BASE_A_DOT: End completions
 
 // COMMON_BASE_A_DOT_CONTEXT: Begin completions
-// COMMON_BASE_A_DOT_CONTEXT-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]: baseInstanceVar[#Int#]{{; name=.+$}}
-// COMMON_BASE_A_DOT_CONTEXT-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]: baseProp[#Int#]{{; name=.+$}}
+// COMMON_BASE_A_DOT_CONTEXT-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]: baseInstanceVar[#Int#]{{; name=.+$}}
+// COMMON_BASE_A_DOT_CONTEXT-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]: baseProp[#Int#]{{; name=.+$}}
 // COMMON_BASE_A_DOT_CONTEXT-DAG: Decl[InstanceMethod]/CurrNominal: baseFunc0()[#Void#]{{; name=.+$}}
 // COMMON_BASE_A_DOT_CONTEXT-DAG: Decl[InstanceMethod]/CurrNominal: baseFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
-// COMMON_BASE_A_DOT_CONTEXT-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]: baseExtProp[#Int#]{{; name=.+$}}
+// COMMON_BASE_A_DOT_CONTEXT-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]: baseExtProp[#Int#]{{; name=.+$}}
 // COMMON_BASE_A_DOT_CONTEXT-DAG: Decl[InstanceMethod]/CurrNominal: baseExtFunc0()[#Void#]{{; name=.+$}}
 // COMMON_BASE_A_DOT_CONTEXT: End completions
 

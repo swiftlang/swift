@@ -8,20 +8,20 @@ public func foo() {}
 
 /// Build Lib as a resilient and non-resilient swiftmodule
 // RUN: %target-swift-frontend -emit-module %t/Lib.swift -swift-version 5 -o %t/build -parse-stdlib -module-cache-path %t/cache -module-name ResilientLib -enable-library-evolution
-// RUN: %target-swift-frontend -emit-module %t/Lib.swift -swift-version 5 -o %t/build -parse-stdlib -module-cache-path %t/cache -module-name NonresilientLib
+// RUN: %target-swift-frontend -emit-module %t/Lib.swift -swift-version 5 -o %t/build -parse-stdlib -module-cache-path %t/cache -module-name NonResilientLib
 // RUN: env SWIFT_DEBUG_FORCE_SWIFTMODULE_REVISION=my-revision \
 // RUN:   %target-swift-frontend -emit-module %t/Lib.swift -swift-version 5 -o %t/build -parse-stdlib -module-cache-path %t/cache -module-name TaggedLib -enable-library-evolution
 
 
 /// 2. Test importing the non-resilient untagged library
-// BEGIN NonresilientClient.swift
-import NonresilientLib
+// BEGIN NonResilientClient.swift
+import NonResilientLib
 foo()
 
-/// Building a NonresilientLib client should always succeed
-// RUN: %target-swift-frontend -typecheck %t/NonresilientClient.swift -swift-version 5 -I %t/build -parse-stdlib -module-cache-path %t/cache
+/// Building a NonResilientLib client should reject the import for a tagged compiler
 // RUN: env SWIFT_DEBUG_FORCE_SWIFTMODULE_REVISION=my-revision \
-// RUN:   %target-swift-frontend -typecheck %t/NonresilientClient.swift -swift-version 5 -I %t/build -parse-stdlib -module-cache-path %t/cache
+// RUN:   not %target-swift-frontend -typecheck %t/NonResilientClient.swift -swift-version 5 -I %t/build -parse-stdlib -module-cache-path %t/cache 2>&1 | %FileCheck -check-prefix=CHECK-NON-RESILIENT %s
+// CHECK-NON-RESILIENT: compiled module was created by a different version of the compiler; rebuild 'NonResilientLib' and try again: {{.*}}NonResilientLib.swiftmodule
 
 
 /// 3. Test importing the resilient untagged library
@@ -47,7 +47,7 @@ foo()
 import TaggedLib
 foo()
 
-/// Importing TaggedLib should success with the same tag or a dev compiler
+/// Importing TaggedLib should succeed with the same tag or a dev compiler
 // RUN: env SWIFT_DEBUG_FORCE_SWIFTMODULE_REVISION=my-revision \
 // RUN:   %target-swift-frontend -typecheck %t/TaggedClient.swift -swift-version 5 -I %t/build -parse-stdlib -module-cache-path %t/cache
 // RUN: %target-swift-frontend -typecheck %t/TaggedClient.swift -swift-version 5 -I %t/build -parse-stdlib -module-cache-path %t/cache

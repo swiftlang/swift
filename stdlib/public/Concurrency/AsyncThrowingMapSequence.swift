@@ -31,7 +31,7 @@ extension AsyncSequence {
   /// receiving this value from `Counter` ends the modified sequence with an
   /// error.
   ///
-  ///     let romanNumeralDict: [Int : String] =
+  ///     let romanNumeralDict: [Int: String] =
   ///         [1: "I", 2: "II", 3: "III", 5: "V"]
   ///
   ///     do {
@@ -43,12 +43,12 @@ extension AsyncSequence {
   ///                 return roman
   ///             }
   ///         for try await numeral in stream {
-  ///             print("\(numeral) ", terminator: " ")
+  ///             print(numeral, terminator: " ")
   ///         }
   ///     } catch {
-  ///         print ("Error: \(error)")
+  ///         print("Error: \(error)")
   ///     }
-  ///     // Prints: I  II  III  Error: MyError()
+  ///     // Prints "I II III Error: MyError()"
   ///
   /// - Parameter transform: A mapping closure. `transform` accepts an element
   ///   of this sequence as its parameter and returns a transformed value of the
@@ -56,9 +56,10 @@ extension AsyncSequence {
   ///   ends the transformed sequence.
   /// - Returns: An asynchronous sequence that contains, in order, the elements
   ///   produced by the `transform` closure.
+  @preconcurrency
   @inlinable
   public __consuming func map<Transformed>(
-    _ transform: @escaping (Element) async throws -> Transformed
+    _ transform: @Sendable @escaping (Element) async throws -> Transformed
   ) -> AsyncThrowingMapSequence<Self, Transformed> {
     return AsyncThrowingMapSequence(self, transform: transform)
   }
@@ -140,3 +141,15 @@ extension AsyncThrowingMapSequence: AsyncSequence {
     return Iterator(base.makeAsyncIterator(), transform: transform)
   }
 }
+
+@available(SwiftStdlib 5.1, *)
+extension AsyncThrowingMapSequence: @unchecked Sendable 
+  where Base: Sendable, 
+        Base.Element: Sendable, 
+        Transformed: Sendable { }
+
+@available(SwiftStdlib 5.1, *)
+extension AsyncThrowingMapSequence.Iterator: @unchecked Sendable 
+  where Base.AsyncIterator: Sendable, 
+        Base.Element: Sendable, 
+        Transformed: Sendable { }

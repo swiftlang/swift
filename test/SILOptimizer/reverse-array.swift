@@ -26,7 +26,7 @@ public func reverseArray(_ a: [Int]) -> [Int] {
 }
 
 
-// CHECK-LABEL: sil [noinline] @$s4test12reverseArrayySaySiGACF
+// CHECK-LABEL: sil [noinline] {{.*}}@$s4test12reverseArrayySaySiGACF
 
 // There must not be more than two begin_cow_mutation - end_cow_mutation pairs:
 // * the first one for the initial reserveCapacity

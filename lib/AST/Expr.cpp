@@ -198,39 +198,83 @@ Expr *Expr::getSemanticsProvidingExpr() {
   return this;
 }
 
-bool Expr::isSemanticallyConstExpr() const {
-  auto E = getSemanticsProvidingExpr();
-  if (!E) {
-    return false;
-  }
-  switch(E->getKind()) {
-  case ExprKind::IntegerLiteral:
-  case ExprKind::NilLiteral:
-  case ExprKind::BooleanLiteral:
-  case ExprKind::FloatLiteral:
-  case ExprKind::StringLiteral:
+bool Expr::printConstExprValue(llvm::raw_ostream *OS,
+                        llvm::function_ref<bool(Expr*)> additionalCheck) const {
+  auto print = [&](StringRef text) {
+    if (OS) {
+      *OS << text;
+    }
+  };
+  auto *E = getSemanticsProvidingExpr();
+  assert(E);
+  switch(getKind()) {
+  case ExprKind::BooleanLiteral: {
+    auto isTrue = cast<BooleanLiteralExpr>(E)->getValue();
+    print(isTrue ? "true" : "false");
     return true;
+  }
+  case ExprKind::IntegerLiteral:
+  case ExprKind::FloatLiteral:  {
+    auto digits = cast<NumberLiteralExpr>(E)->getDigitsText();
+    assert(!digits.empty());
+    print(digits);
+    return true;
+  }
+  case ExprKind::NilLiteral: {
+    print("nil");
+    return true;
+  }
+  case ExprKind::StringLiteral: {
+    auto *LE = cast<StringLiteralExpr>(E);
+    print("\"");
+    print(LE->getValue());
+    print("\"");
+    return true;
+  }
+  case ExprKind::KeyPath: {
+    // FIXME: print keypath
+    print("\\.<NOT_IMPLEMENTED>");
+    return true;
+  }
   case ExprKind::Array:
   case ExprKind::Dictionary: {
+    print("[");
     auto *CE = cast<CollectionExpr>(E);
-    for (auto *EL: CE->getElements()) {
-      if (!EL->isSemanticallyConstExpr())
+    for (unsigned N = CE->getNumElements(), I = 0; I != N; I ++) {
+      auto Ele = CE->getElement(I);
+      auto needComma = I + 1 != N;
+      if (!Ele->printConstExprValue(OS, additionalCheck)) {
         return false;
+      }
+      if (needComma)
+        print(", ");
     }
+    print("]");
     return true;
   }
   case ExprKind::Tuple: {
+    print("(");
     auto *TE = cast<TupleExpr>(E);
-    for (auto *EL: TE->getElements()) {
-      if (!EL->isSemanticallyConstExpr()) {
+    for (unsigned N = TE->getNumElements(), I = 0; I != N; I ++) {
+      auto Ele = TE->getElement(I);
+      auto needComma = I + 1 != N;
+      if (!Ele->printConstExprValue(OS, additionalCheck)) {
         return false;
       }
+      if (needComma)
+        print(", ");
     }
+    print(")");
     return true;
   }
   default:
-    return false;
+    return additionalCheck && additionalCheck(const_cast<Expr*>(this));
   }
+}
+
+bool Expr::isSemanticallyConstExpr(
+    llvm::function_ref<bool(Expr*)> additionalCheck) const {
+  return printConstExprValue(nullptr, additionalCheck);
 }
 
 Expr *Expr::getValueProvidingExpr() {
@@ -1136,14 +1180,16 @@ SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {
   assert(elements.size() & 1 && "even number of elements in sequence");
   size_t bytes = totalSizeToAlloc<Expr *>(elements.size());
   void *Buffer = ctx.Allocate(bytes, alignof(SequenceExpr));
-  return ::new(Buffer) SequenceExpr(elements);
+  return ::new (Buffer) SequenceExpr(elements);
 }
 
 ErasureExpr *ErasureExpr::create(ASTContext &ctx, Expr *subExpr, Type type,
-                                 ArrayRef<ProtocolConformanceRef> conformances){
-  auto size = totalSizeToAlloc<ProtocolConformanceRef>(conformances.size());
+                                 ArrayRef<ProtocolConformanceRef> conformances,
+                                 ArrayRef<ConversionPair> argConversions) {
+  auto size = totalSizeToAlloc<ProtocolConformanceRef, ConversionPair>(conformances.size(),
+                                                                       argConversions.size());
   auto mem = ctx.Allocate(size, alignof(ErasureExpr));
-  return ::new(mem) ErasureExpr(subExpr, type, conformances);
+  return ::new (mem) ErasureExpr(subExpr, type, conformances, argConversions);
 }
 
 UnresolvedSpecializeExpr *UnresolvedSpecializeExpr::create(ASTContext &ctx,
@@ -1152,8 +1198,8 @@ UnresolvedSpecializeExpr *UnresolvedSpecializeExpr::create(ASTContext &ctx,
                                              SourceLoc RAngleLoc) {
   auto size = totalSizeToAlloc<TypeRepr *>(UnresolvedParams.size());
   auto mem = ctx.Allocate(size, alignof(UnresolvedSpecializeExpr));
-  return ::new(mem) UnresolvedSpecializeExpr(SubExpr, LAngleLoc,
-                                             UnresolvedParams, RAngleLoc);
+  return ::new (mem) UnresolvedSpecializeExpr(SubExpr, LAngleLoc,
+                                              UnresolvedParams, RAngleLoc);
 }
 
 CaptureListEntry::CaptureListEntry(PatternBindingDecl *PBD) : PBD(PBD) {
@@ -1860,6 +1906,12 @@ Expr *AutoClosureExpr::getUnwrappedCurryThunkExpr() const {
     return expr;
   };
 
+  auto maybeUnwrapConversions = [](Expr *expr) {
+    if (auto *covariantReturn = dyn_cast<CovariantReturnConversionExpr>(expr))
+      expr = covariantReturn->getSubExpr();
+    return expr;
+  };
+
   switch (getThunkKind()) {
   case AutoClosureExpr::Kind::None:
   case AutoClosureExpr::Kind::AsyncLet:
@@ -1870,6 +1922,7 @@ Expr *AutoClosureExpr::getUnwrappedCurryThunkExpr() const {
     body = body->getSemanticsProvidingExpr();
     body = maybeUnwrapOpenExistential(body);
     body = maybeUnwrapOptionalEval(body);
+    body = maybeUnwrapConversions(body);
 
     if (auto *outerCall = dyn_cast<ApplyExpr>(body)) {
       return outerCall->getFn();
@@ -1888,6 +1941,7 @@ Expr *AutoClosureExpr::getUnwrappedCurryThunkExpr() const {
       innerBody = innerBody->getSemanticsProvidingExpr();
       innerBody = maybeUnwrapOpenExistential(innerBody);
       innerBody = maybeUnwrapOptionalEval(innerBody);
+      innerBody = maybeUnwrapConversions(innerBody);
 
       if (auto *outerCall = dyn_cast<ApplyExpr>(innerBody)) {
         if (auto *innerCall = dyn_cast<ApplyExpr>(outerCall->getFn())) {

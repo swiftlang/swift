@@ -1,6 +1,6 @@
 // RUN: %target-sil-opt -enable-sil-opaque-values -enable-sil-verify-all -generic-specializer %s | %FileCheck %s
 
-sil_stage canonical
+sil_stage raw
 
 import Builtin
 

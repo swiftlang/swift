@@ -30,7 +30,9 @@ SwiftStdlib 5.2:macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4
 SwiftStdlib 5.3:macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0
 SwiftStdlib 5.4:macOS 11.3, iOS 14.5, watchOS 7.4, tvOS 14.5
 SwiftStdlib 5.5:macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0
-SwiftStdlib 5.6:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999
+SwiftStdlib 5.6:macOS 12.3, iOS 15.4, watchOS 8.5, tvOS 15.4
+SwiftStdlib 5.7:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999
+SwiftStdlib 5.8:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999
 
 # Local Variables:
 # mode: conf-unix

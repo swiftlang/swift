@@ -1,7 +1,7 @@
-// RUN: %target-typecheck-verify-swift  -disable-availability-checking -warn-concurrency
+// RUN: %target-typecheck-verify-swift  -disable-availability-checking -warn-concurrency -parse-as-library
 // REQUIRES: concurrency
 
-class NotConcurrent { } // expected-note 26{{class 'NotConcurrent' does not conform to the 'Sendable' protocol}}
+class NotConcurrent { } // expected-note 27{{class 'NotConcurrent' does not conform to the 'Sendable' protocol}}
 
 // ----------------------------------------------------------------------
 // Sendable restriction on actor operations
@@ -13,6 +13,7 @@ actor A1 {
   func asynchronous(_: NotConcurrent?) async { }
 }
 
+// Actor initializers and Sendable
 actor A2 {
   var localVar: NotConcurrent
 
@@ -20,22 +21,53 @@ actor A2 {
     self.localVar = value
   }
 
+  convenience init(forwardSync value: NotConcurrent) {
+    self.init(value: value)
+  }
+
+  convenience init(delegatingSync value: NotConcurrent) {
+    self.init(forwardSync: value)
+  }
+
   init(valueAsync value: NotConcurrent) async {
     self.localVar = value
   }
 
-  convenience init(delegatingSync value: NotConcurrent) {
-    self.init(value: value) // expected-warning{{non-sendable type 'NotConcurrent' passed in call to nonisolated initializer 'init(value:)' cannot cross actor boundary}}
+  convenience init(forwardAsync value: NotConcurrent) async {
+    await self.init(valueAsync: value)
   }
 
-  convenience init(delegatingAsync value: NotConcurrent) async {
-    await self.init(valueAsync: value) // expected-warning{{non-sendable type 'NotConcurrent' passed in call to actor-isolated initializer 'init(valueAsync:)' cannot cross actor boundary}}
+  nonisolated convenience init(nonisoAsync value: NotConcurrent, _ c: Int) async {
+    if c == 0 {
+      await self.init(valueAsync: value)
+    } else {
+      self.init(value: value)
+    }
+  }
+
+  convenience init(delegatingAsync value: NotConcurrent, _ c: Int) async {
+    if c == 0 {
+      await self.init(valueAsync: value)
+    } else if c == 1 {
+      self.init(value: value)
+    } else if c == 2 {
+      await self.init(forwardAsync: value)
+    } else {
+      self.init(delegatingSync: value)
+    }
   }
 }
 
 func testActorCreation(value: NotConcurrent) async {
   _ = A2(value: value) // expected-warning{{non-sendable type 'NotConcurrent' passed in call to nonisolated initializer 'init(value:)' cannot cross actor boundary}}
+
   _ = await A2(valueAsync: value) // expected-warning{{non-sendable type 'NotConcurrent' passed in call to actor-isolated initializer 'init(valueAsync:)' cannot cross actor boundary}}
+
+  _ = A2(delegatingSync: value) // expected-warning{{non-sendable type 'NotConcurrent' passed in call to nonisolated initializer 'init(delegatingSync:)' cannot cross actor boundary}}
+
+  _ = await A2(delegatingAsync: value, 9) // expected-warning{{non-sendable type 'NotConcurrent' passed in call to actor-isolated initializer 'init(delegatingAsync:_:)' cannot cross actor boundary}}
+
+  _ = await A2(nonisoAsync: value, 3) // expected-warning{{non-sendable type 'NotConcurrent' passed in call to nonisolated initializer 'init(nonisoAsync:_:)' cannot cross actor boundary}}
 }
 
 extension A1 {
@@ -137,12 +169,12 @@ func testConcurrency() {
   }
 }
 
-@_predatesConcurrency func acceptUnsafeSendable(_ fn: @Sendable () -> Void) { }
+@preconcurrency func acceptUnsafeSendable(_ fn: @Sendable () -> Void) { }
 
 func testUnsafeSendableNothing() {
   var x = 5
   acceptUnsafeSendable {
-    x = 17
+    x = 17 // expected-error{{mutation of captured var 'x' in concurrently-executing code}}
   }
   print(x)
 }
@@ -191,7 +223,7 @@ protocol AsyncProto {
 }
 
 extension A1: AsyncProto {
-  func asyncMethod(_: NotConcurrent) async { } // expected-warning{{non-sendable type 'NotConcurrent' in parameter of actor-isolated instance method 'asyncMethod' satisfying non-isolated protocol requirement cannot cross actor boundary}}
+  func asyncMethod(_: NotConcurrent) async { } // expected-warning{{non-sendable type 'NotConcurrent' in parameter of actor-isolated instance method 'asyncMethod' satisfying protocol requirement cannot cross actor boundary}}
 }
 
 protocol MainActorProto {
@@ -200,7 +232,7 @@ protocol MainActorProto {
 
 class SomeClass: MainActorProto {
   @SomeGlobalActor
-  func asyncMainMethod(_: NotConcurrent) async { } // expected-warning{{non-sendable type 'NotConcurrent' in parameter of global actor 'SomeGlobalActor'-isolated instance method 'asyncMainMethod' satisfying non-isolated protocol requirement cannot cross actor boundary}}
+  func asyncMainMethod(_: NotConcurrent) async { } // expected-warning{{non-sendable type 'NotConcurrent' in parameter of global actor 'SomeGlobalActor'-isolated instance method 'asyncMainMethod' satisfying protocol requirement cannot cross actor boundary}}
 }
 
 // ----------------------------------------------------------------------
@@ -223,7 +255,7 @@ var concurrentFuncVar: (@Sendable (NotConcurrent) -> Void)? = nil
 // ----------------------------------------------------------------------
 func acceptConcurrentUnary<T>(_: @Sendable (T) -> T) { }
 
-func concurrentClosures<T>(_: T) {
+func concurrentClosures<T>(_: T) { // expected-note{{consider making generic parameter 'T' conform to the 'Sendable' protocol}} {{26-26=: Sendable}}
   acceptConcurrentUnary { (x: T) in
     _ = x // ok
     acceptConcurrentUnary { _ in x } // expected-warning{{capture of 'x' with non-sendable type 'T' in a `@Sendable` closure}}
@@ -237,7 +269,7 @@ struct S1: Sendable {
   var nc: NotConcurrent // expected-warning{{stored property 'nc' of 'Sendable'-conforming struct 'S1' has non-sendable type 'NotConcurrent'}}
 }
 
-struct S2<T>: Sendable {
+struct S2<T>: Sendable { // expected-note{{consider making generic parameter 'T' conform to the 'Sendable' protocol}} {{12-12=: Sendable}}
   var nc: T // expected-warning{{stored property 'nc' of 'Sendable'-conforming generic struct 'S2' has non-sendable type 'T'}}
 }
 

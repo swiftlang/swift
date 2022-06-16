@@ -54,6 +54,8 @@ CURSOR_REFACTORING(MemberwiseInitLocalRefactoring, "Generate Memberwise Initiali
 
 CURSOR_REFACTORING(AddEquatableConformance, "Add Equatable Conformance", add.equatable.conformance)
 
+CURSOR_REFACTORING(AddExplicitCodableImplementation, "Add Explicit Codable Implementation", add.explicit-codable-implementation)
+
 CURSOR_REFACTORING(ConvertCallToAsyncAlternative, "Convert Call to Async Alternative", convert.call-to-async)
 
 CURSOR_REFACTORING(ConvertToAsync, "Convert Function to Async", convert.func-to-async)

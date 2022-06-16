@@ -169,7 +169,7 @@ public:
   }
 
   /// Returns the initializer if the memory use is 'self' and appears in an
-  /// actor's designated initializer. Otherwise, returns nullptr.
+  /// actor's initializer. Otherwise, returns nullptr.
   ConstructorDecl *getActorInitSelf() const;
 
   /// True if this memory object is the 'self' of a derived class initializer.
@@ -273,6 +273,10 @@ enum DIUseKind {
 
   /// The instruction is a store to a member of a larger struct value.
   PartialStore,
+
+  /// This instruction is an init, assignment, or store to a
+  /// @_compilerInitialized field that was _not_ automatically generated
+  BadExplicitStore,
 
   /// An 'inout' argument of a function application.
   InOutArgument,

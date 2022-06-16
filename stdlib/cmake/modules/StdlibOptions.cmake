@@ -1,8 +1,23 @@
 include_guard(GLOBAL)
 
 include(${CMAKE_CURRENT_LIST_DIR}/../../../cmake/modules/SwiftUtils.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/../../../cmake/modules/Threading.cmake)
+
 precondition(SWIFT_HOST_VARIANT_SDK)
 precondition(SWIFT_DARWIN_PLATFORMS)
+
+# +----------------------------------------------------------------------+
+# |                                                                      |
+# |  NOTE: It makes no sense setting defaults here on the basis of       |
+# |        SWIFT_HOST_VARIANT_SDK, because the stdlib is a *TARGET*      |
+# |        library, not a host library.                                  |
+# |                                                                      |
+# |        Rather, if you have a default to set, you need to do that     |
+# |        in AddSwiftStdlib.cmake, in an appropriate place,             |
+# |        likely on the basis of CFLAGS_SDK, SWIFTLIB_SINGLE_SDK or     |
+# |        similar.                                                      |
+# |                                                                      |
+# +----------------------------------------------------------------------+
 
 if("${SWIFT_HOST_VARIANT_SDK}" MATCHES "CYGWIN")
   set(SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING_default FALSE)
@@ -73,6 +88,10 @@ option(SWIFT_STDLIB_STABLE_ABI
        "Should stdlib be built with stable ABI (library evolution, resilience)."
        "${SWIFT_STDLIB_STABLE_ABI_default}")
 
+option(SWIFT_STDLIB_COMPACT_ABSOLUTE_FUNCTION_POINTER
+       "Force compact function pointer to always be absolute mainly for WebAssembly"
+       FALSE)
+
 option(SWIFT_ENABLE_MODULE_INTERFACES
        "Generate .swiftinterface files alongside .swiftmodule files"
        "${SWIFT_STDLIB_STABLE_ABI}")
@@ -101,9 +120,16 @@ option(SWIFT_STDLIB_SHORT_MANGLING_LOOKUPS
        "Build stdlib with fast-path context descriptor lookups based on well-known short manglings."
        TRUE)
 
+option(SWIFT_STDLIB_ENABLE_VECTOR_TYPES
+       "Build stdlib with support for SIMD and vector types"
+       TRUE)
+
 option(SWIFT_STDLIB_HAS_TYPE_PRINTING
        "Build stdlib with support for printing user-friendly type name as strings at runtime"
        TRUE)
+
+set(SWIFT_STDLIB_TRAP_FUNCTION "" CACHE STRING
+  "Name of function to call instead of emitting a trap instruction in the stdlib")
 
 option(SWIFT_STDLIB_BUILD_PRIVATE
        "Build private part of the Standard Library."
@@ -135,6 +161,10 @@ option(SWIFT_STDLIB_PASSTHROUGH_METADATA_ALLOCATOR
        "Build stdlib without a custom implementation of MetadataAllocator, relying on malloc+free instead."
        FALSE)
 
+option(SWIFT_STDLIB_DISABLE_INSTANTIATION_CACHES
+       "Build stdlib with -disable-preallocated-instantiation-caches"
+       FALSE)
+
 option(SWIFT_STDLIB_HAS_COMMANDLINE
        "Build stdlib with the CommandLine enum and support for argv/argc."
        TRUE)
@@ -151,15 +181,25 @@ option(SWIFT_STDLIB_HAS_ENVIRON
        "Build stdlib assuming the platform supports environment variables."
        TRUE)
 
-option(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+option(SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY
        "Build the standard libraries assuming that they will be used in an environment with only a single thread."
        FALSE)
 
-if(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
+if(SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY)
   set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default "singlethreaded")
 else()
   set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default "dispatch")
 endif()
+
+include(Threading)
+
+threading_package_default("${SWIFT_HOST_VARIANT_SDK}"
+  SWIFT_THREADING_PACKAGE_default)
+
+set(SWIFT_THREADING_PACKAGE "${SWIFT_THREADING_PACKAGE_default}"
+    CACHE STRING
+    "The threading package to use.  Must be one of 'none', 'pthreads',
+    'darwin', 'linux', 'win32', 'c11'.")
 
 set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR
     "${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default}" CACHE STRING
@@ -175,3 +215,14 @@ option(SWIFT_FREESTANDING_FLAVOR
 set(SWIFT_STDLIB_ENABLE_LTO OFF CACHE STRING "Build Swift stdlib with LTO. One
     must specify the form of LTO by setting this to one of: 'full', 'thin'. This
     option only affects the standard library and runtime, not tools.")
+
+if("${SWIFT_HOST_VARIANT_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
+  set(SWIFT_STDLIB_CONCURRENCY_TRACING_default TRUE)
+else()
+  set(SWIFT_STDLIB_CONCURRENCY_TRACING_default FALSE)
+endif()
+
+option(SWIFT_STDLIB_CONCURRENCY_TRACING
+  "Enable concurrency tracing in the runtime; assumes the presence of os_log(3)
+   and the os_signpost(3) API."
+  "${SWIFT_STDLIB_CONCURRENCY_TRACING_default}")

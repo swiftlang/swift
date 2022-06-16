@@ -19,7 +19,7 @@
                       "layout": [
                         {
                           "tokenKind": {
-                            "kind": "identifier",
+                            "kind": "contextual_keyword",
                             "text": "distributed"
                           },
                           "leadingTrivia": "\/\/ RUN: %swift-syntax-test -input-source-filename %s -serialize-raw-tree > %t\n\/\/ RUN: diff %t %S\/Inputs\/serialize_distributed_actor.json -u\n\n",
@@ -85,7 +85,7 @@
                                       "layout": [
                                         {
                                           "tokenKind": {
-                                            "kind": "identifier",
+                                            "kind": "contextual_keyword",
                                             "text": "distributed"
                                           },
                                           "leadingTrivia": "\n    ",

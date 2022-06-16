@@ -1545,7 +1545,23 @@ swift::getDisallowedOriginKind(const Decl *decl,
     }
     // Implementation-only imported, cannot be reexported.
     return DisallowedOriginKind::ImplementationOnly;
-  } else if (decl->isSPI() && !where.isSPI()) {
+  } else if ((decl->isSPI() || decl->isAvailableAsSPI()) && !where.isSPI()) {
+    if (decl->isAvailableAsSPI() && !decl->isSPI()) {
+      // Allowing unavailable context to use @_spi_available decls.
+      // Decls with @_spi_available aren't hidden entirely from public interfaces,
+      // thus public interfaces may still refer them. Be forgiving here so public
+      // interfaces can compile.
+      if (where.getUnavailablePlatformKind().hasValue())
+        return DisallowedOriginKind::None;
+      // We should only diagnose SPI_AVAILABLE usage when the library level is API.
+      // Using SPI_AVAILABLE symbols in private frameworks or executable targets
+      // should be allowed.
+      if (auto *mod = where.getDeclContext()->getParentModule()) {
+        if (mod->getLibraryLevel() != LibraryLevel::API) {
+          return DisallowedOriginKind::None;
+        }
+      }
+    }
     // SPI can only be exported in SPI.
     return where.getDeclContext()->getParentModule() == M ?
       DisallowedOriginKind::SPILocal :
@@ -1563,22 +1579,15 @@ class DeclAvailabilityChecker : public DeclVisitor<DeclAvailabilityChecker> {
 
   void checkType(Type type, const TypeRepr *typeRepr, const Decl *context,
                  ExportabilityReason reason=ExportabilityReason::General,
-                 bool allowUnavailableProtocol=false) {
+                 DeclAvailabilityFlags flags=None) {
     // Don't bother checking errors.
     if (type && type->hasError())
       return;
-
-    DeclAvailabilityFlags flags = None;
-
-    // We allow a type to conform to a protocol that is less available than
-    // the type itself. This enables a type to retroactively model or directly
-    // conform to a protocol only available on newer OSes and yet still be used on
-    // older OSes.
-    //
-    // To support this, inside inheritance clauses we allow references to
-    // protocols that are unavailable in the current type refinement context.
-    if (allowUnavailableProtocol)
-      flags |= DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol;
+    
+    // If the decl which references this type is unavailable on the current
+    // platform, don't diagnose the availability of the type.
+    if (AvailableAttr::isUnavailable(context))
+      return;
 
     diagnoseTypeAvailability(typeRepr, type, context->getLoc(),
                              Where.withReason(reason), flags);
@@ -1737,20 +1746,29 @@ public:
   void visitNominalTypeDecl(const NominalTypeDecl *nominal) {
     checkGenericParams(nominal, nominal);
 
-    llvm::for_each(nominal->getInherited(),
-                   [&](TypeLoc inherited) {
-      checkType(inherited.getType(), inherited.getTypeRepr(),
-                nominal, ExportabilityReason::General,
-                /*allowUnavailableProtocol=*/true);
+    DeclAvailabilityFlags flags =
+        DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol;
+
+    // As a concession to source compatibility for API libraries, downgrade
+    // diagnostics about inheritance from a less available type when the
+    // following conditions are met:
+    // 1. The inherited type is only potentially unavailable before the
+    //    deployment target.
+    // 2. The inheriting type is `@usableFromInline`.
+    if (nominal->getAttrs().hasAttribute<UsableFromInlineAttr>())
+      flags |= DeclAvailabilityFlag::
+          WarnForPotentialUnavailabilityBeforeDeploymentTarget;
+
+    llvm::for_each(nominal->getInherited(), [&](TypeLoc inherited) {
+      checkType(inherited.getType(), inherited.getTypeRepr(), nominal,
+                ExportabilityReason::General, flags);
     });
   }
 
   void visitProtocolDecl(ProtocolDecl *proto) {
-    llvm::for_each(proto->getInherited(),
-                  [&](TypeLoc requirement) {
+    llvm::for_each(proto->getInherited(), [&](TypeLoc requirement) {
       checkType(requirement.getType(), requirement.getTypeRepr(), proto,
-                ExportabilityReason::General,
-                /*allowUnavailableProtocol=*/false);
+                ExportabilityReason::General);
     });
 
     if (proto->getTrailingWhereClause()) {
@@ -1825,11 +1843,10 @@ public:
     //
     // 1) If the extension defines conformances, the conformed-to protocols
     // must be exported.
-    llvm::for_each(ED->getInherited(),
-                   [&](TypeLoc inherited) {
-      checkType(inherited.getType(), inherited.getTypeRepr(),
-                ED, ExportabilityReason::General,
-                /*allowUnavailableProtocol=*/true);
+    llvm::for_each(ED->getInherited(), [&](TypeLoc inherited) {
+      checkType(inherited.getType(), inherited.getTypeRepr(), ED,
+                ExportabilityReason::General,
+                DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol);
     });
 
     auto wasWhere = Where;
@@ -1858,7 +1875,7 @@ public:
   void checkPrecedenceGroup(const PrecedenceGroupDecl *PGD,
                             const Decl *refDecl, SourceLoc diagLoc,
                             SourceRange refRange) {
-    // Bail on invalid predence groups. This can happen when the user spells a
+    // Bail on invalid precedence groups. This can happen when the user spells a
     // relation element that doesn't actually exist.
     if (!PGD) {
       return;

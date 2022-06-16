@@ -264,7 +264,7 @@ public:
   }
 
   void visitStorageCast(SingleValueInstruction *projectedAddr,
-                        Operand *parentAddr) {
+                        Operand *parentAddr, AccessStorageCast cast) {
     return next(parentAddr->get());
   }
 

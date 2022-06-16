@@ -550,9 +550,9 @@ UnboundImport::UnboundImport(ImportDecl *ID)
   }
   import.spiGroups = ID->getASTContext().AllocateCopy(spiGroups);
 
-  if (auto attr = ID->getAttrs().getAttribute<PredatesConcurrencyAttr>()) {
-    import.options |= ImportFlags::PredatesConcurrency;
-    import.predatesConcurrencyRange = attr->getRangeWithAt();
+  if (auto attr = ID->getAttrs().getAttribute<PreconcurrencyAttr>()) {
+    import.options |= ImportFlags::Preconcurrency;
+    import.preconcurrencyRange = attr->getRangeWithAt();
   }
 }
 

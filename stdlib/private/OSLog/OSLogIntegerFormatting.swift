@@ -373,7 +373,7 @@ extension OSLogIntegerFormatting {
       specification += "-"
     }
 
-    // 2. Minimumn field width
+    // 2. Minimum field width
     // IEEE: When field width is prefixed by `0`, leading zeros (following any
     // indication of sign or base) are used to pad to the field width rather
     // than performing space padding. If the '0' and '-' flags both appear,

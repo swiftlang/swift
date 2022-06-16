@@ -26,6 +26,7 @@
 #include "swift/AST/Module.h"
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Basic/BridgingUtils.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
@@ -149,8 +150,9 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
                          IsDynamicallyReplaceable_t isDynamic,
                          IsExactSelfClass_t isExactSelfClass,
                          IsDistributed_t isDistributed)
-    : SwiftObjectHeader(functionMetatype),
-      Module(Module), Availability(AvailabilityContext::alwaysAvailable())  {
+    : SwiftObjectHeader(functionMetatype), Module(Module),
+      index(Module.getNewFunctionIndex()),
+      Availability(AvailabilityContext::alwaysAvailable()) {
   init(Linkage, Name, LoweredType, genericEnv, Loc, isBareSILFunction, isTrans,
        isSerialized, entryCount, isThunk, classSubclassScope, inlineStrategy,
        E, DebugScope, isDynamic, isExactSelfClass, isDistributed);
@@ -256,6 +258,10 @@ const SILFunction *SILFunction::getOriginOfSpecialization() const {
     p = p->getSpecializationInfo()->getParent();
   }
   return p;
+}
+
+GenericSignature SILFunction::getGenericSignature() const {
+  return GenericEnv ? GenericEnv->getGenericSignature() : GenericSignature();
 }
 
 void SILFunction::numberValues(llvm::DenseMap<const SILNode*, unsigned> &
@@ -594,9 +600,6 @@ struct DOTGraphTraits<SILFunction *> : public DefaultDOTGraphTraits {
       return (Succ == DMBI->getHasMethodBB()) ? "T" : "F";
 
     if (auto *CCBI = dyn_cast<CheckedCastBranchInst>(Term))
-      return (Succ == CCBI->getSuccessBB()) ? "T" : "F";
-
-    if (auto *CCBI = dyn_cast<CheckedCastValueBranchInst>(Term))
       return (Succ == CCBI->getSuccessBB()) ? "T" : "F";
 
     if (auto *CCBI = dyn_cast<CheckedCastAddrBranchInst>(Term))

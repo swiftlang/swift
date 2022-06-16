@@ -1,0 +1,4 @@
+module InheritedObjCInits {
+  header "InheritedObjCInits.h"
+  export *
+}

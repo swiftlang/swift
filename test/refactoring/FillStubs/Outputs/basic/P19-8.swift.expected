@@ -19,10 +19,6 @@ class C4 : P2 {}
 class C5 : P2 {
     typealias T2 = <#type#>
 
-    func foo1() {
-        <#code#>
-    }
-
   typealias T1 = Int
   func foo1() {}
 }

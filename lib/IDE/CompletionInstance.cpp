@@ -12,6 +12,7 @@
 
 #include "swift/IDE/CompletionInstance.h"
 
+#include "DependencyChecking.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
@@ -26,6 +27,7 @@
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/IDE/CodeCompletion.h"
+#include "swift/IDE/CodeCompletionConsumer.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
@@ -170,120 +172,12 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
   return newDC;
 }
 
-/// For each dependency file in \p CI, run \p callback until the callback
-/// returns \c true. Returns \c true if any callback call returns \c true, \c
-/// false otherwise.
-static bool
-forEachDependencyUntilTrue(CompilerInstance &CI, unsigned excludeBufferID,
-                           llvm::function_ref<bool(StringRef)> callback) {
-  // Check files in the current module.
-  for (FileUnit *file : CI.getMainModule()->getFiles()) {
-    StringRef filename;
-    if (auto SF = dyn_cast<SourceFile>(file)) {
-      if (SF->getBufferID() == excludeBufferID)
-        continue;
-      filename = SF->getFilename();
-    } else if (auto LF = dyn_cast<LoadedFile>(file))
-      filename = LF->getFilename();
-    else
-      continue;
-
-    // Ignore synthesized files.
-    if (filename.empty() || filename.front() == '<')
-      continue;
-
-    if (callback(filename))
-      return true;
-  }
-
-  // Check other non-system depenencies (e.g. modules, headers).
-  for (auto &dep : CI.getDependencyTracker()->getDependencies()) {
-    if (callback(dep))
-      return true;
-  }
-  for (auto dep : CI.getDependencyTracker()->getIncrementalDependencyPaths()) {
-    if (callback(dep))
-      return true;
-  }
-
-  return false;
-}
-
-/// Collect hash codes of the dependencies into \c Map.
-static void cacheDependencyHashIfNeeded(CompilerInstance &CI,
-                                        unsigned excludeBufferID,
-                                        llvm::StringMap<llvm::hash_code> &Map) {
-  auto &FS = CI.getFileSystem();
-  forEachDependencyUntilTrue(
-      CI, excludeBufferID, [&](StringRef filename) {
-        if (Map.count(filename))
-          return false;
-
-        auto stat = FS.status(filename);
-        if (!stat)
-          return false;
-
-        // We will check the hash only if the modification time of the dependecy
-        // is zero. See 'areAnyDependentFilesInvalidated() below'.
-        if (stat->getLastModificationTime() != llvm::sys::TimePoint<>())
-          return false;
-
-        auto buf = FS.getBufferForFile(filename);
-        Map[filename] = llvm::hash_value(buf.get()->getBuffer());
-        return false;
-      });
-}
-
-/// Check if any dependent files are modified since \p timestamp.
-static bool areAnyDependentFilesInvalidated(
-    CompilerInstance &CI, llvm::vfs::FileSystem &FS,
-    unsigned excludeBufferID, llvm::sys::TimePoint<> timestamp,
-    llvm::StringMap<llvm::hash_code> &Map) {
-
-  return forEachDependencyUntilTrue(
-      CI, excludeBufferID, [&](StringRef filePath) {
-        auto stat = FS.status(filePath);
-        if (!stat)
-          // Missing.
-          return true;
-
-        auto lastModTime = stat->getLastModificationTime();
-        if (lastModTime > timestamp)
-          // Modified.
-          return true;
-
-        // If the last modification time is zero, this file is probably from a
-        // virtual file system. We need to check the content.
-        if (lastModTime == llvm::sys::TimePoint<>()) {
-          // Get the hash code of the last content.
-          auto oldHashEntry = Map.find(filePath);
-          if (oldHashEntry == Map.end())
-            // Unreachable? Not virtual in old filesystem, but virtual in new
-            // one.
-            return true;
-          auto oldHash = oldHashEntry->second;
-
-          // Calculate the hash code of the current content.
-          auto newContent = FS.getBufferForFile(filePath);
-          if (!newContent)
-            // Unreachable? stat succeeded, but coundn't get the content.
-            return true;
-
-          auto newHash = llvm::hash_value(newContent.get()->getBuffer());
-
-          if (oldHash != newHash)
-            return true;
-        }
-
-        return false;
-      });
-}
-
 } // namespace
 
 bool CompletionInstance::performCachedOperationIfPossible(
     llvm::hash_code ArgsHash,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    const SearchPathOptions &SearchPathOpts,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
     DiagnosticConsumer *DiagC,
     std::shared_ptr<std::atomic<bool>> CancellationFlag,
@@ -317,6 +211,16 @@ bool CompletionInstance::performCachedOperationIfPossible(
     return false;
 
   if (shouldCheckDependencies()) {
+    // The passed in FileSystem does not have any overlays resolved. Make sure
+    // to do so before checking dependencies (otherwise we might decide we need
+    // to run the slow path due to a missing/different file).
+    auto ExpectedOverlay = SearchPathOpts.makeOverlayFileSystem(FileSystem);
+    if (ExpectedOverlay) {
+      FileSystem = std::move(ExpectedOverlay.get());
+    } else {
+      llvm::consumeError(ExpectedOverlay.takeError());
+    }
+
     if (areAnyDependentFilesInvalidated(
             CI, *FileSystem, *oldSF->getBufferID(),
             DependencyCheckedTimestamp, InMemoryDependencyHash))
@@ -650,9 +554,10 @@ void swift::ide::CompletionInstance::performOperation(
   // the cached completion instance.
   std::lock_guard<std::mutex> lock(mtx);
 
-  if (performCachedOperationIfPossible(ArgsHash, FileSystem, completionBuffer,
-                                       Offset, DiagC, CancellationFlag,
-                                       Callback)) {
+  if (performCachedOperationIfPossible(ArgsHash, FileSystem,
+                                       Invocation.getSearchPathOptions(),
+                                       completionBuffer, Offset, DiagC,
+                                       CancellationFlag, Callback)) {
     // We were able to reuse a cached AST. Callback has already been invoked
     // and we don't need to build a new AST. We are done.
     return;
@@ -685,14 +590,17 @@ void swift::ide::CompletionInstance::codeComplete(
   struct ConsumerToCallbackAdapter
       : public SimpleCachingCodeCompletionConsumer {
     SwiftCompletionInfo SwiftContext;
+    ImportDepth ImportDep;
     std::shared_ptr<std::atomic<bool>> CancellationFlag;
     llvm::function_ref<void(ResultType)> Callback;
     bool HandleResultsCalled = false;
 
     ConsumerToCallbackAdapter(
+        ImportDepth ImportDep,
         std::shared_ptr<std::atomic<bool>> CancellationFlag,
         llvm::function_ref<void(ResultType)> Callback)
-        : CancellationFlag(CancellationFlag), Callback(Callback) {}
+        : ImportDep(ImportDep), CancellationFlag(CancellationFlag),
+          Callback(Callback) {}
 
     void setContext(swift::ASTContext *context,
                     const swift::CompilerInvocation *invocation,
@@ -710,7 +618,7 @@ void swift::ide::CompletionInstance::codeComplete(
         Callback(ResultType::cancelled());
       } else {
         assert(SwiftContext.swiftASTContext);
-        Callback(ResultType::success({context.getResultSink(), SwiftContext}));
+        Callback(ResultType::success({context.getResultSink(), SwiftContext, ImportDep}));
       }
     }
   };
@@ -724,7 +632,9 @@ void swift::ide::CompletionInstance::codeComplete(
                                                     auto DeliverTransformed) {
               CompletionContext.ReusingASTContext = Result.DidReuseAST;
               CompilerInstance &CI = Result.CI;
-              ConsumerToCallbackAdapter Consumer(CancellationFlag,
+              ImportDepth ImportDep{CI.getASTContext(),
+                                    CI.getInvocation().getFrontendOptions()};
+              ConsumerToCallbackAdapter Consumer(ImportDep, CancellationFlag,
                                                  DeliverTransformed);
 
               std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
@@ -736,7 +646,7 @@ void swift::ide::CompletionInstance::codeComplete(
                                          &CI.getInvocation(),
                                          &CompletionContext};
                 CodeCompletionResultSink ResultSink;
-                DeliverTransformed(ResultType::success({ResultSink, Info}));
+                DeliverTransformed(ResultType::success({ResultSink, Info, ImportDep}));
                 return;
               }
 
@@ -754,7 +664,7 @@ void swift::ide::CompletionInstance::codeComplete(
                                          &CI.getInvocation(),
                                          &CompletionContext};
                 CodeCompletionResultSink ResultSink;
-                DeliverTransformed(ResultType::success({ResultSink, Info}));
+                DeliverTransformed(ResultType::success({ResultSink, Info, ImportDep}));
               }
             },
             Callback);

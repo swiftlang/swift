@@ -20,7 +20,8 @@ extension Task where Success == Never, Failure == Never {
   ///
   /// This function doesn't block the underlying thread.
   public static func sleep(_ duration: UInt64) async {
-    return await Builtin.withUnsafeContinuation { (continuation: Builtin.RawUnsafeContinuation) -> Void in
+    return await Builtin.withUnsafeContinuation {
+      (continuation: Builtin.RawUnsafeContinuation) -> Void in
       let job = _taskCreateNullaryContinuationJob(
           priority: Int(Task.currentPriority.rawValue),
           continuation: continuation)
@@ -30,10 +31,10 @@ extension Task where Success == Never, Failure == Never {
 
   /// The type of continuation used in the implementation of
   /// sleep(nanoseconds:).
-  private typealias SleepContinuation = UnsafeContinuation<(), Error>
+  typealias SleepContinuation = UnsafeContinuation<(), Error>
 
   /// Describes the state of a sleep() operation.
-  private enum SleepState {
+  enum SleepState {
     /// The sleep continuation has not yet begun.
     case notStarted
 
@@ -105,7 +106,7 @@ extension Task where Success == Never, Failure == Never {
 
   /// Called when the sleep(nanoseconds:) operation woke up without being
   /// canceled.
-  private static func onSleepWake(
+  static func onSleepWake(
       _ wordPtr: UnsafeMutablePointer<Builtin.Word>
   ) {
     while true {
@@ -149,7 +150,7 @@ extension Task where Success == Never, Failure == Never {
 
   /// Called when the sleep(nanoseconds:) operation has been canceled before
   /// the sleep completed.
-  private static func onSleepCancel(
+  static func onSleepCancel(
       _ wordPtr: UnsafeMutablePointer<Builtin.Word>
   ) {
     while true {

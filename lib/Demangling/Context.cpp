@@ -53,6 +53,8 @@ NodePointer Context::demangleTypeAsNode(llvm::StringRef MangledName) {
   return D->demangleType(MangledName);
 }
 
+#if SWIFT_STDLIB_HAS_TYPE_PRINTING
+
 std::string Context::demangleSymbolAsString(llvm::StringRef MangledName,
                                             const DemangleOptions &Options) {
   NodePointer root = demangleSymbolAsNode(MangledName);
@@ -74,6 +76,8 @@ std::string Context::demangleTypeAsString(llvm::StringRef MangledName,
     return MangledName.str();
   return demangling;
 }
+
+#endif
 
 // Removes a '.<n>' suffix from \p Name. <n> is either a number or a combination of
 // '.<other-text>.<n>'.
@@ -243,6 +247,8 @@ std::string Context::getModuleName(llvm::StringRef mangledName) {
 // Public utility functions     //
 //////////////////////////////////
 
+#if SWIFT_STDLIB_HAS_TYPE_PRINTING
+
 std::string demangleSymbolAsString(const char *MangledName,
                                    size_t MangledNameLength,
                                    const DemangleOptions &Options) {
@@ -258,6 +264,8 @@ std::string demangleTypeAsString(const char *MangledName,
   return Ctx.demangleTypeAsString(StringRef(MangledName, MangledNameLength),
                                   Options);
 }
+
+#endif
 
 SWIFT_END_INLINE_NAMESPACE
 } // namespace Demangle

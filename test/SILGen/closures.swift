@@ -206,7 +206,7 @@ func small_closure_capture(_ x: Int) -> Int {
 func small_closure_capture_with_argument(_ x: Int) -> (_ y: Int) -> Int {
   var x = x
   // CHECK: [[XBOX:%[0-9]+]] = alloc_box ${ var Int }
-  // CHEKC: [[XLIFETIME:%[0-9]+]] = begin_borrow [lexical] [[XBOX]]
+  // CHECK: [[XLIFETIME:%[0-9]+]] = begin_borrow [lexical] [[XBOX]]
 
   return { x + $0 }
   // -- func expression

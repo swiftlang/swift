@@ -26,6 +26,13 @@
 #include <thread>
 #include "swift/Basic/ListMerger.h"
 
+#if __has_include(<time.h>)
+# include <time.h>
+#endif
+#ifndef NSEC_PER_SEC
+# define NSEC_PER_SEC 1000000000ull
+#endif
+
 namespace {
 
 struct JobQueueTraits {
@@ -108,17 +115,7 @@ static void swift_task_enqueueMainExecutorImpl(Job *job) {
   swift_task_enqueueGlobalImpl(job);
 }
 
-/// Insert a job into the cooperative global queue with a delay.
-SWIFT_CC(swift)
-static void swift_task_enqueueGlobalWithDelayImpl(JobDelay delay,
-                                                  Job *newJob) {
-  assert(newJob && "no job provided");
-
-  auto deadline = std::chrono::steady_clock::now()
-                + std::chrono::duration_cast<JobDeadline::duration>(
-                    std::chrono::nanoseconds(delay));
-  JobDeadlineStorage<>::set(newJob, deadline);
-
+static void insertDelayedJob(Job *newJob, JobDeadline deadline) {
   Job **position = &DelayedJobQueue;
   while (auto cur = *position) {
     // If we find a job with a later deadline, insert here.
@@ -134,6 +131,42 @@ static void swift_task_enqueueGlobalWithDelayImpl(JobDelay delay,
   }
   JobQueueTraits::setNext(newJob, nullptr);
   *position = newJob;
+}
+
+/// Insert a job into the cooperative global queue with a delay.
+SWIFT_CC(swift)
+static void swift_task_enqueueGlobalWithDelayImpl(JobDelay delay,
+                                                  Job *newJob) {
+  assert(newJob && "no job provided");
+
+  auto deadline = std::chrono::steady_clock::now()
+                + std::chrono::duration_cast<JobDeadline::duration>(
+                    std::chrono::nanoseconds(delay));
+  JobDeadlineStorage<>::set(newJob, deadline);
+
+  insertDelayedJob(newJob, deadline);
+}
+
+SWIFT_CC(swift)
+static void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
+                                                     long long nsec,
+                                                     long long tsec,
+                                                     long long tnsec,
+                                                     int clock, Job *newJob) {
+  assert(newJob && "no job provided");
+
+  long long nowSec;
+  long long nowNsec;
+  swift_get_time(&nowSec, &nowNsec, (swift_clock_id)clock);
+
+  uint64_t delta = (sec - nowSec) * NSEC_PER_SEC + nsec - nowNsec;
+
+  auto deadline = std::chrono::steady_clock::now()
+                + std::chrono::duration_cast<JobDeadline::duration>(
+                    std::chrono::nanoseconds(delta));
+  JobDeadlineStorage<>::set(newJob, deadline);
+
+  insertDelayedJob(newJob, deadline);
 }
 
 /// Recognize jobs in the delayed-jobs queue that are ready to execute

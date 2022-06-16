@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # check-incremental - Check if incremental compilation works -*- python -*-
 #
 # This source file is part of the Swift.org open source project
@@ -18,8 +18,6 @@ The main purpose of the check is to ensure that the compiler is
 deterministic.
 """
 
-from __future__ import print_function
-
 import os
 import subprocess
 import sys
@@ -37,7 +35,8 @@ def compile_and_stat(compile_args, output_file):
     """
     subprocess.check_call(compile_args)
 
-    md5 = subprocess.check_output(["md5", "-q", output_file])
+    md5 = subprocess.check_output(["md5", "-q", output_file],
+                                  universal_newlines=True)
     mtime = time.ctime(os.path.getmtime(output_file))
 
     if VERBOSE:

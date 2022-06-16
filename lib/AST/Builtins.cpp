@@ -234,9 +234,9 @@ static GenericTypeParamDecl*
 createGenericParam(ASTContext &ctx, const char *name, unsigned index) {
   ModuleDecl *M = ctx.TheBuiltinModule;
   Identifier ident = ctx.getIdentifier(name);
-  auto genericParam = new (ctx) GenericTypeParamDecl(
+  auto genericParam = GenericTypeParamDecl::create(
       &M->getMainFile(FileUnitKind::Builtin), ident, SourceLoc(),
-      /*type sequence*/ false, 0, index);
+      /*type sequence*/ false, 0, index, /*opaque type=*/false, nullptr);
   return genericParam;
 }
 
@@ -1834,17 +1834,14 @@ static ValueDecl *getUnreachableOperation(ASTContext &Context,
 static ValueDecl *getOnceOperation(ASTContext &Context,
                                    Identifier Id,
                                    bool withContext) {
-  // (RawPointer, @convention(c) ([Context]) -> ()[, Context]) -> ()
+  // (RawPointer, @convention(c) (Context) -> ()[, Context]) -> ()
   
   auto HandleTy = Context.TheRawPointerType;
   auto VoidTy = Context.TheEmptyTupleType;
   SmallVector<AnyFunctionType::Param, 1> CFuncParams;
-  swift::CanType ContextTy;
-  if (withContext) {
-    ContextTy = Context.TheRawPointerType;
-    auto ContextArg = FunctionType::Param(ContextTy);
-    CFuncParams.push_back(ContextArg);
-  }
+  swift::CanType ContextTy = Context.TheRawPointerType;
+  auto ContextArg = FunctionType::Param(ContextTy);
+  CFuncParams.push_back(ContextArg);
   auto Rep = FunctionTypeRepresentation::CFunctionPointer;
   auto ClangType = Context.getClangFunctionType(CFuncParams, VoidTy, Rep);
   auto Thin =

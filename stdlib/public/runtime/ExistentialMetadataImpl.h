@@ -148,7 +148,7 @@ struct SWIFT_LIBRARY_VISIBILITY OpaqueExistentialBoxBase
         auto *srcValue =
             reinterpret_cast<OpaqueValue *>(src->getBuffer(args...));
 
-        // Move dest value asside so we can destroy it later.
+        // Move dest value aside so we can destroy it later.
         destType->vw_initializeWithTake(opaqueTmpBuffer, destValue);
 
         src->copyTypeInto(dest, args...);
@@ -236,7 +236,7 @@ struct SWIFT_LIBRARY_VISIBILITY OpaqueExistentialBoxBase
         auto *srcValue =
             reinterpret_cast<OpaqueValue *>(src->getBuffer(args...));
 
-        // Move dest value asside.
+        // Move dest value aside.
         destType->vw_initializeWithTake(opaqueTmpBuffer, destValue);
 
         src->copyTypeInto(dest, args...);

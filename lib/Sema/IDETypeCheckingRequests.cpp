@@ -64,7 +64,7 @@ void swift::registerIDETypeCheckRequestFunctions(Evaluator &evaluator) {
 /// We want to consider the extension applied in the first case but not the
 /// second case. In the first case the constraint `T: FontStyle` from the
 /// definition of `foo` should be considered an 'at-least' constraint and any
-/// additional constraints on `T` (like `T == FonstStyleOne`) can be
+/// additional constraints on `T` (like `T == FontStyleOne`) can be
 /// fulfilled by picking a more specialized version of `T`.
 /// However, in the second case, `T: FontStyle` should be considered an
 /// 'at-most' constraint and we can't make the assumption that `x` has a more
@@ -134,9 +134,10 @@ static bool isExtensionAppliedInternal(const DeclContext *DC, Type BaseTy,
   auto *module = DC->getParentModule();
   SubstitutionMap substMap = BaseTy->getContextSubstitutionMap(
       module, ED->getExtendedNominal());
-  return TypeChecker::checkGenericArguments(
-      module, genericSig.getRequirements(),
-      QuerySubstitutionMap{substMap}) == RequirementCheckResult::Success;
+  return TypeChecker::checkGenericArguments(module,
+                                            genericSig.getRequirements(),
+                                            QuerySubstitutionMap{substMap}) ==
+         CheckGenericArgumentsResult::Success;
 }
 
 static bool isMemberDeclAppliedInternal(const DeclContext *DC, Type BaseTy,
@@ -170,9 +171,10 @@ static bool isMemberDeclAppliedInternal(const DeclContext *DC, Type BaseTy,
 
   // Note: we treat substitution failure as success, to avoid tripping
   // up over generic parameters introduced by the declaration itself.
-  return TypeChecker::checkGenericArguments(
-      module, genericSig.getRequirements(),
-      QuerySubstitutionMap{substMap}) != RequirementCheckResult::Failure;
+  return TypeChecker::checkGenericArguments(module,
+                                            genericSig.getRequirements(),
+                                            QuerySubstitutionMap{substMap}) !=
+         CheckGenericArgumentsResult::RequirementFailure;
 }
 
 bool

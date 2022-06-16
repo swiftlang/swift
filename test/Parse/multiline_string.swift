@@ -119,7 +119,7 @@ _ = """
   """
 // CHECK: "newline elided"
 
-// contains trailing whitepsace
+// contains trailing whitespace
 _ = """
   trailing \
   \("""
@@ -129,14 +129,14 @@ _ = """
       substring3
       """)
     """) \
-  whitepsace
+  whitespace
   """
 // CHECK: "trailing "
 // CHECK: "substring1 "
 // CHECK: "substring2 substring3"
-// CHECK: " whitepsace"
+// CHECK: " whitespace"
 
-// contains trailing whitepsace
+// contains trailing whitespace
 _ = """
     foo\ 
 
@@ -144,7 +144,7 @@ _ = """
     """
 // CHECK: "foo\nbar"
 
-// contains trailing whitepsace
+// contains trailing whitespace
 _ = """
     foo\ 
     

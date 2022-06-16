@@ -240,7 +240,7 @@ SILValue swift::stripBorrow(SILValue V) {
 // All instructions handled here must propagate their first operand into their
 // single result.
 //
-// This is guaranteed to handle all function-type converstions: ThinToThick,
+// This is guaranteed to handle all function-type conversions: ThinToThick,
 // ConvertFunction, and ConvertEscapeToNoEscapeInst.
 SingleValueInstruction *swift::getSingleValueCopyOrCast(SILInstruction *I) {
   if (auto *convert = dyn_cast<ConversionInst>(I))
@@ -412,8 +412,6 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
 #undef LOADABLE_REF_STORAGE_HELPER
   case SILInstructionKind::ConvertFunctionInst:
   case SILInstructionKind::ConvertEscapeToNoEscapeInst:
-  case SILInstructionKind::ThinFunctionToPointerInst:
-  case SILInstructionKind::PointerToThinFunctionInst:
   case SILInstructionKind::RefToBridgeObjectInst:
   case SILInstructionKind::BridgeObjectToRefInst:
   case SILInstructionKind::BridgeObjectToWordInst:
@@ -425,6 +423,9 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::ValueToBridgeObjectInst:
   case SILInstructionKind::MarkDependenceInst:
   case SILInstructionKind::MoveValueInst:
+  case SILInstructionKind::MarkMustCheckInst:
+  case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
+  case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:
   case SILInstructionKind::UncheckedOwnershipConversionInst:
   case SILInstructionKind::LoadInst:
   case SILInstructionKind::LoadBorrowInst:
@@ -485,7 +486,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     return RuntimeEffect::NoEffect;
 
   case SILInstructionKind::DebugValueInst:
-    // Ignore runtime calls of debug_vlaue
+    // Ignore runtime calls of debug_value
     return RuntimeEffect::NoEffect;
 
   case SILInstructionKind::GetAsyncContinuationInst:
@@ -568,7 +569,6 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     //return RuntimeEffect::NoEffect;
   }
 
-  case SILInstructionKind::UnconditionalCheckedCastValueInst:
   case SILInstructionKind::UnconditionalCheckedCastInst:
     impactType = inst->getOperand(0)->getType();
     return RuntimeEffect::Casting | metadataEffect(impactType) |
@@ -583,10 +583,6 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     impactType = inst->getOperand(0)->getType();
     return RuntimeEffect::Casting | metadataEffect(impactType) |
       metadataEffect(cast<CheckedCastBranchInst>(inst)->getTargetLoweredType());
-  case SILInstructionKind::CheckedCastValueBranchInst:
-    impactType = inst->getOperand(0)->getType();
-    return RuntimeEffect::Casting | metadataEffect(impactType) |
-      metadataEffect(cast<CheckedCastValueBranchInst>(inst)->getTargetLoweredType());
 
   case SILInstructionKind::AllocStackInst:
   case SILInstructionKind::ProjectBoxInst:
@@ -632,7 +628,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
       return RuntimeEffect::MetaData | RuntimeEffect::RefCounting;
     return RuntimeEffect::MetaData;
   }
-  // Equialent to a copy_addr [init]
+  // Equivalent to a copy_addr [init]
   case SILInstructionKind::MarkUnresolvedMoveAddrInst: {
     return RuntimeEffect::MetaData | RuntimeEffect::RefCounting;
   }
@@ -666,10 +662,9 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
       if (auto selfType = instTy->getAs<DynamicSelfType>())
         instTy = selfType->getSelfType();
       auto *cl = instTy->getClassOrBoundGenericClass();
-      bool isForeign =
-          cl->getObjectModel() == ReferenceCounting::ObjC ||
-          cl->isForeign();
-      if ((cl && isForeign) || instTy->isAnyObject())
+      bool isForeign = cl && (cl->getObjectModel() == ReferenceCounting::ObjC ||
+                              cl->isForeign());
+      if (isForeign || instTy->isAnyObject())
         return RuntimeEffect::MetaData | RuntimeEffect::ObjectiveC;
       return RuntimeEffect::MetaData;
     }

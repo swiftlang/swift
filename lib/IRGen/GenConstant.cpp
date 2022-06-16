@@ -23,8 +23,10 @@
 #include "TypeInfo.h"
 #include "StructLayout.h"
 #include "Callee.h"
+#include "ConstantBuilder.h"
 #include "swift/Basic/Range.h"
 #include "swift/SIL/SILModule.h"
+#include "llvm/Support/BLAKE3.h"
 
 using namespace swift;
 using namespace irgen;
@@ -281,4 +283,12 @@ llvm::Constant *irgen::emitConstantObject(IRGenModule &IGM, ObjectInst *OI,
   elts[0] = llvm::Constant::getNullValue(ObjectHeaderTy);
   insertPadding(elts, sTy);
   return llvm::ConstantStruct::get(sTy, elts);
+}
+
+void ConstantAggregateBuilderBase::addUniqueHash(StringRef data) {
+  llvm::BLAKE3 hasher;
+  hasher.update(data);
+  auto rawHash = hasher.final();
+  auto truncHash = llvm::makeArrayRef(rawHash).slice(0, NumBytes_UniqueHash);
+  add(llvm::ConstantDataArray::get(IGM().getLLVMContext(), truncHash));
 }

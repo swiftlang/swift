@@ -165,11 +165,14 @@ public:
   using BuiltTypeDecl = typename BuilderType::BuiltTypeDecl;
   using BuiltProtocolDecl = typename BuilderType::BuiltProtocolDecl;
   using BuiltRequirement = typename BuilderType::BuiltRequirement;
+  using BuiltSubstitution = typename BuilderType::BuiltSubstitution;
+  using BuiltSubstitutionMap = typename BuilderType::BuiltSubstitutionMap;
+  using BuiltGenericTypeParam = typename BuilderType::BuiltGenericTypeParam;
+  using BuiltGenericSignature = typename BuilderType::BuiltGenericSignature;
   using StoredPointer = typename Runtime::StoredPointer;
   using StoredSignedPointer = typename Runtime::StoredSignedPointer;
   using StoredSize = typename Runtime::StoredSize;
-  using TargetClassMetadata =
-      typename Runtime::template TargetClassMetadata<Runtime>;
+  using TargetClassMetadata = TargetClassMetadataType<Runtime>;
 
 private:
   /// The maximum number of bytes to read when reading metadata. Anything larger
@@ -190,6 +193,10 @@ private:
   using ContextDescriptorRef =
       RemoteRef<const TargetContextDescriptor<Runtime>>;
   using OwnedContextDescriptorRef = MemoryReader::ReadBytesResult;
+
+  using ShapeRef =
+      RemoteRef<const TargetExtendedExistentialTypeShape<Runtime>>;
+  using OwnedShapeRef = MemoryReader::ReadBytesResult;
 
   /// A reference to a context descriptor that may be in an unloaded image.
   class ParentContextDescriptorRef {
@@ -260,6 +267,7 @@ private:
       return !isResolved() || getResolved();
     }
   };
+
   /// A cache of read nominal type descriptors, keyed by the address of the
   /// nominal type descriptor.
   std::unordered_map<StoredPointer, OwnedContextDescriptorRef>
@@ -267,6 +275,10 @@ private:
 
   using OwnedProtocolDescriptorRef =
     std::unique_ptr<const TargetProtocolDescriptor<Runtime>, delete_with_free>;
+  /// A cache of read extended existential shape metadata, keyed by the
+  /// address of the shape metadata.
+  std::unordered_map<StoredPointer, OwnedShapeRef>
+    ShapeCache;
 
   enum class IsaEncodingKind {
     /// We haven't checked yet.
@@ -420,7 +432,7 @@ public:
           return nullptr;
         }
       } else {
-        resolved = RemoteAbsolutePointer("", remoteAddress);
+        resolved = Reader->getSymbol(RemoteAddress(remoteAddress));
       }
 
       switch (kind) {
@@ -654,7 +666,7 @@ public:
         isBridged);
   }
 
-  /// Given a known-opaque existential, attemp to discover the pointer to its
+  /// Given a known-opaque existential, attempt to discover the pointer to its
   /// metadata address and its value.
   llvm::Optional<RemoteExistential>
   readMetadataAndValueOpaqueExistential(RemoteAddress ExistentialAddress) {
@@ -917,6 +929,85 @@ public:
       TypeCache[MetadataAddress] = BuiltExist;
       return BuiltExist;
     }
+    case MetadataKind::ExtendedExistential: {
+      auto Exist = cast<TargetExtendedExistentialTypeMetadata<Runtime>>(Meta);
+
+      // Read the shape for this existential.
+      StoredPointer shapeAddress = stripSignedPointer(Exist->Shape);
+      ShapeRef Shape = readShape(shapeAddress);
+      if (!Shape)
+        return BuiltType();
+
+      const unsigned shapeArgumentCount
+          = Shape->getGenSigArgumentLayoutSizeInWords();
+      // Pull out the arguments to the generalization signature.
+      assert(Shape->hasGeneralizationSignature());
+      std::vector<BuiltType> builtArgs;
+      for (unsigned i = 0; i < shapeArgumentCount; ++i) {
+        auto remoteArg = Exist->getGeneralizationArguments()[i];
+        auto builtArg = readTypeFromMetadata(remoteArg);
+        if (!builtArg)
+          return BuiltType();
+        builtArgs.push_back(builtArg);
+      }
+
+      // Pull out the existential type from the mangled type name.
+      Demangler dem;
+      auto mangledExistentialAddr =
+          resolveRelativeField(Shape, Shape->ExistentialType);
+      auto node = readMangledName(RemoteAddress(mangledExistentialAddr),
+                                  MangledNameKind::Type, dem);
+      if (!node)
+        return BuiltType();
+
+      BuiltType builtProto = decodeMangledType(node).getType();
+      if (!builtProto)
+        return BuiltType();
+
+      // Build up a substitution map for the generalized signature.
+      BuiltGenericSignature sig =
+          decodeRuntimeGenericSignature(Shape,
+                                        Shape->getGeneralizationSignature())
+              .getType();
+      if (!sig)
+        return BuiltType();
+
+      BuiltSubstitutionMap subst =
+          Builder.createSubstitutionMap(sig, builtArgs);
+      if (subst.empty())
+        return BuiltType();
+
+      builtProto = Builder.subst(builtProto, subst);
+      if (!builtProto)
+        return BuiltType();
+
+      // Read the type expression to build up any remaining layers of
+      // existential metatype.
+      if (Shape->Flags.hasTypeExpression()) {
+        Demangler dem;
+
+        // Read the mangled name.
+        auto mangledContextName = Shape->getTypeExpression();
+        auto mangledNameAddress =
+            resolveRelativeField(Shape, mangledContextName->name);
+        auto node = readMangledName(RemoteAddress(mangledNameAddress),
+                                    MangledNameKind::Type, dem);
+        if (!node)
+          return BuiltType();
+
+        while (node->getKind() == Demangle::Node::Kind::Type &&
+               node->getNumChildren() &&
+               node->getChild(0)->getKind() == Demangle::Node::Kind::Metatype &&
+               node->getChild(0)->getNumChildren()) {
+          builtProto = Builder.createExistentialMetatypeType(builtProto);
+          node = node->getChild(0)->getChild(0);
+        }
+      }
+
+      TypeCache[MetadataAddress] = builtProto;
+      return builtProto;
+    }
+
     case MetadataKind::Metatype: {
       auto Metatype = cast<TargetMetatypeMetadata<Runtime>>(Meta);
       auto Instance = readTypeFromMetadata(Metatype->InstanceType);
@@ -984,6 +1075,119 @@ public:
     swift_unreachable("Unhandled MetadataKind in switch");
   }
 
+  TypeLookupErrorOr<typename BuilderType::BuiltGenericSignature>
+  decodeRuntimeGenericSignature(ShapeRef contextRef,
+                                const RuntimeGenericSignature<Runtime> &Sig) {
+    std::vector<BuiltType> params;
+    for (unsigned sigIdx : indices(Sig.getParams())) {
+      auto param =
+          Builder.createGenericTypeParameterType(/*depth*/ 0, /*index*/ sigIdx);
+      if (!param)
+        return TypeLookupError("Failed to read generic parameter type in "
+                               "runtime generic signature.");
+      params.push_back(param);
+    }
+
+    std::vector<BuiltRequirement> reqs;
+    for (auto &req : Sig.getRequirements()) {
+      if (!req.hasKnownKind()) {
+        return TypeLookupError("unknown kind");
+      }
+
+      Demangler ldem;
+      auto lhsTypeNode = ldem.demangleType(req.getParam());
+      if (!lhsTypeNode) {
+        return TypeLookupError("Failed to read subject type in requirement of "
+                               "runtime generic signature.");
+      }
+
+      BuiltType subjectType = decodeMangledType(lhsTypeNode).getType();
+      if (!subjectType)
+        return TypeLookupError("Failed to read subject type in requirement of "
+                               "runtime generic signature.");
+
+      switch (req.Flags.getKind()) {
+      case GenericRequirementKind::SameType: {
+        Demangler rdem;
+        auto demangledConstraint =
+            demangle(RemoteRef<char>(req.getMangledTypeName().data(),
+                                     req.getMangledTypeName().data()),
+                     MangledNameKind::Type, rdem);
+        auto constraintType = decodeMangledType(demangledConstraint);
+        if (auto *error = constraintType.getError()) {
+          return *error;
+        }
+
+        reqs.push_back(BuiltRequirement(RequirementKind::SameType, subjectType,
+                                        constraintType.getType()));
+        break;
+      }
+      case GenericRequirementKind::Protocol: {
+        /// Resolver to turn a protocol reference into an existential type.
+        struct ProtocolReferenceResolver {
+          using Result = BuiltType;
+
+          BuilderType &builder;
+
+          BuiltType failure() const { return BuiltType(); }
+
+          BuiltType swiftProtocol(Demangle::Node *node) {
+            auto decl = builder.createProtocolDecl(node);
+            if (!decl)
+              return failure();
+            return builder.createProtocolTypeFromDecl(decl);
+          }
+
+#if SWIFT_OBJC_INTEROP
+          BuiltType objcProtocol(StringRef name) {
+            auto decl = builder.createObjCProtocolDecl(name.str());
+            if (!decl)
+              return failure();
+            return builder.createProtocolTypeFromDecl(decl);
+          }
+#endif
+        } resolver{Builder};
+
+        Demangler dem;
+        auto protocolAddress =
+            resolveRelativeIndirectProtocol(contextRef, req.Protocol);
+        auto protocol = readProtocol(protocolAddress, dem, resolver);
+        if (!protocol) {
+          return TypeLookupError("Failed to read protocol type in conformance "
+                                 "requirement of runtime generic signature.");
+        }
+
+        reqs.push_back(BuiltRequirement(RequirementKind::Conformance,
+                                        subjectType, protocol));
+        break;
+      }
+      case GenericRequirementKind::BaseClass: {
+        Demangler rdem;
+        auto demangledConstraint =
+            demangle(RemoteRef<char>(req.getMangledTypeName().data(),
+                                     req.getMangledTypeName().data()),
+                     MangledNameKind::Type, rdem);
+        auto constraintType = decodeMangledType(demangledConstraint);
+        if (auto *error = constraintType.getError()) {
+          return *error;
+        }
+
+        reqs.push_back(BuiltRequirement(RequirementKind::Superclass,
+                                        subjectType, constraintType.getType()));
+        break;
+      }
+      case GenericRequirementKind::SameConformance:
+        return TypeLookupError("Unexpected same conformance requirement in "
+                               "runtime generic signature");
+      case GenericRequirementKind::Layout:
+        return TypeLookupError(
+            "Unexpected layout requirement in runtime generic signature");
+      }
+    }
+
+    return Builder.createGenericSignature(params, reqs);
+  }
+
   TypeLookupErrorOr<typename BuilderType::BuiltType>
   readTypeFromMangledName(const char *MangledTypeName, size_t Length) {
     Demangle::Demangler Dem;
@@ -1008,7 +1212,62 @@ public:
     return ParentContextDescriptorRef(
           readContextDescriptor(address.getResolvedAddress().getAddressData()));
   }
-  
+
+  ShapeRef
+  readShape(StoredPointer address) {
+    if (address == 0)
+      return nullptr;
+
+    auto cached = ShapeCache.find(address);
+    if (cached != ShapeCache.end())
+      return ShapeRef(address,
+        reinterpret_cast<const TargetExtendedExistentialTypeShape<Runtime> *>(
+            cached->second.get()));
+
+    ExtendedExistentialTypeShapeFlags flags;
+    if (!Reader->readBytes(RemoteAddress(address), (uint8_t*)&flags,
+                           sizeof(flags)))
+      return nullptr;
+
+    // Read the size of the requirement signature.
+    uint64_t reqSigGenericSize = 0;
+    uint64_t genericHeaderSize = sizeof(GenericContextDescriptorHeader);
+    {
+      GenericContextDescriptorHeader header;
+      auto headerAddr = address + sizeof(flags);
+
+      if (!Reader->readBytes(RemoteAddress(headerAddr),
+                             (uint8_t*)&header, sizeof(header)))
+        return nullptr;
+
+      reqSigGenericSize = reqSigGenericSize
+        + (header.NumParams + 3u & ~3u)
+        + header.NumRequirements
+          * sizeof(TargetGenericRequirementDescriptor<Runtime>);
+    }
+    uint64_t typeExprSize = flags.hasTypeExpression() ? sizeof(StoredPointer) : 0;
+    uint64_t suggestedVWSize = flags.hasSuggestedValueWitnesses() ? sizeof(StoredPointer) : 0;
+
+    uint64_t size = sizeof(ExtendedExistentialTypeShapeFlags) +
+                    sizeof(TargetRelativeDirectPointer<Runtime, const char,
+                                                       /*nullable*/ false>) +
+                    genericHeaderSize + typeExprSize + suggestedVWSize +
+                    reqSigGenericSize;
+    if (size > MaxMetadataSize)
+      return nullptr;
+    auto readResult = Reader->readBytes(RemoteAddress(address), size);
+    if (!readResult)
+      return nullptr;
+
+    auto descriptor =
+        reinterpret_cast<const TargetExtendedExistentialTypeShape<Runtime> *>(
+            readResult.get());
+
+    ShapeCache.insert(
+        std::make_pair(address, std::move(readResult)));
+    return ShapeRef(address, descriptor);
+  }
+
   /// Given the address of a context descriptor, attempt to read it.
   ContextDescriptorRef
   readContextDescriptor(StoredPointer address) {
@@ -1663,10 +1922,6 @@ protected:
     return Reader->readString(RemoteAddress(namePtr), className);
   }
 
-  template <typename T>
-  using TargetClassMetadataT =
-      typename Runtime::template TargetClassMetadata<T>;
-
   MetadataRef readMetadata(StoredPointer address) {
     auto cached = MetadataCache.find(address);
     if (cached != MetadataCache.end())
@@ -1681,7 +1936,7 @@ protected:
     switch (getEnumeratedMetadataKind(KindValue)) {
       case MetadataKind::Class:
 
-        return _readMetadata<TargetClassMetadataT>(address);
+        return _readMetadata<TargetClassMetadataType>(address);
 
       case MetadataKind::Enum:
         return _readMetadata<TargetEnumMetadata>(address);
@@ -1719,6 +1974,8 @@ protected:
       }
       case MetadataKind::ExistentialMetatype:
         return _readMetadata<TargetExistentialMetatypeMetadata>(address);
+      case MetadataKind::ExtendedExistential:
+        return _readMetadata<TargetExtendedExistentialTypeMetadata>(address);
       case MetadataKind::ForeignClass:
         return _readMetadata<TargetForeignClassMetadata>(address);
       case MetadataKind::Function: {
@@ -2138,8 +2395,9 @@ private:
   /// Resolve a relative target protocol descriptor pointer, which uses
   /// the lowest bit to indicate an indirect vs. direct relative reference and
   /// the second lowest bit to indicate whether it is an Objective-C protocol.
+  template<typename Base>
   StoredPointer resolveRelativeIndirectProtocol(
-      ContextDescriptorRef descriptor,
+      RemoteRef<Base> descriptor,
       const RelativeTargetProtocolDescriptorPointer<Runtime> &protocol) {
     // Map the offset from within our local buffer to the remote address.
     auto distance = (intptr_t)&protocol - (intptr_t)descriptor.getLocalBuffer();

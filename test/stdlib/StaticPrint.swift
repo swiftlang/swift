@@ -18,14 +18,14 @@ let PrintTests = TestSuite("StaticPrint")
 // CHECK: string_literal utf8 ", world"
 // CHECK: string_literal utf8 "hello, world 5"
 PrintTests.test("StringInterpolation") {
-  constant_vprintf("")
-  constant_vprintf("hello")
-  constant_vprintf("\(5)")
+  print("")
+  print("hello")
+  print("\(5)")
   let x = 5
-  constant_vprintf("\(x)")
+  print("\(x)")
   let y = ", world"
-  constant_vprintf("\(y)")
-  constant_vprintf("hello \(y)\(x)")
+  print("\(y)")
+  print("hello \(y)\(x)")
 }
 
 runAllTests()

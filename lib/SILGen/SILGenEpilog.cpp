@@ -29,10 +29,12 @@ void SILGenFunction::prepareEpilog(Optional<Type> directResultType,
     // Set NeedsReturn for indirect or direct results. This ensures that SILGen
     // emits unreachable if there is no source level return.
     NeedsReturn = !(*directResultType)->isEqual(TupleType::getEmpty(getASTContext()));
-    for (auto directResult : fnConv.getDirectSILResults()) {
-      SILType resultType = F.getLoweredType(F.mapTypeIntoContext(
-          fnConv.getSILType(directResult, getTypeExpansionContext())));
-      epilogBB->createPhiArgument(resultType, OwnershipKind::Owned);
+    if (NeedsReturn) {
+      for (auto directResult : fnConv.getDirectSILResults()) {
+        SILType resultType = F.getLoweredType(F.mapTypeIntoContext(
+            fnConv.getSILType(directResult, getTypeExpansionContext())));
+        epilogBB->createPhiArgument(resultType, OwnershipKind::Owned);
+      }
     }
   }
 

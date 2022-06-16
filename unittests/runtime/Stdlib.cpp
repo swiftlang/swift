@@ -229,7 +229,7 @@ const long long $sSGMp[1] = {0};
 SWIFT_RUNTIME_STDLIB_INTERNAL
 const long long $sSiMn[1] = {0};
 
-// DefaultIndicis
+// DefaultIndices
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 const long long $sSIMn[1] = {0};

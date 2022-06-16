@@ -95,7 +95,7 @@ func foo<T : P1>(_ t: T) -> P2 {
 }
 
 func foo2(_ p1: P1) -> P2 {
-  return p1 // expected-error{{return expression of type 'P1' does not conform to 'P2'}}
+  return p1 // expected-error{{return expression of type 'any P1' does not conform to 'P2'}}
 }
 
 // <rdar://problem/14005696>
@@ -188,7 +188,7 @@ func r22459135() {
 
 // <rdar://problem/19710848> QoI: Friendlier error message for "[] as Set"
 // <rdar://problem/22326930> QoI: "argument for generic parameter 'Element' could not be inferred" lacks context
-_ = [] as Set  // expected-error {{protocol 'Any' as a type cannot conform to 'Hashable'}} expected-note {{only concrete types such as structs, enums and classes can conform to protocols}}
+_ = [] as Set  // expected-error {{type 'Any' cannot conform to 'Hashable'}} expected-note {{only concrete types such as structs, enums and classes can conform to protocols}}
 // expected-note@-1 {{required by generic struct 'Set' where 'Element' = 'Any'}}
 
 
@@ -719,7 +719,7 @@ struct SR10694 {
     // expected-error@-1 {{initializing from a metatype value must reference 'init' explicitly}}
 
     Q.self(x) // expected-error {{initializer 'init(_:)' requires that 'T' conform to 'P'}}
-    // expected-error@-1 {{protocol type 'Q' cannot be instantiated}}
+    // expected-error@-1 {{type 'any Q' cannot be instantiated}}
 
     type(of: q)(x)  // expected-error {{initializer 'init(_:)' requires that 'T' conform to 'P'}}
     // expected-error@-1 {{initializing from a metatype value must reference 'init' explicitly}}
@@ -902,11 +902,12 @@ func rdar78781552() {
     // expected-error@-1 {{generic struct 'Test' requires that '(((Int) throws -> Bool) throws -> [Int])?' conform to 'RandomAccessCollection'}}
     // expected-error@-2 {{generic parameter 'Content' could not be inferred}} expected-note@-2 {{explicitly specify the generic arguments to fix this issue}}
     // expected-error@-3 {{cannot convert value of type '(((Int) throws -> Bool) throws -> [Int])?' to expected argument type '[(((Int) throws -> Bool) throws -> [Int])?]'}}
-    // expected-error@-4 {{missing argument for parameter 'filter' in call}}
+    // expected-error@-4 {{missing argument label 'data:' in call}}
+    // expected-error@-5 {{missing argument for parameter 'filter' in call}}
   }
 }
 
-// rdar://79757320 - failured to produce a diagnostic when unresolved dependent member is used in function result position
+// rdar://79757320 - failed to produce a diagnostic when unresolved dependent member is used in function result position
 
 protocol R_79757320 {
   associatedtype In

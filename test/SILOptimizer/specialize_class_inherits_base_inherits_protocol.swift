@@ -5,7 +5,7 @@ protocol Q: P { }
 
 @inline(never) func sink<T>(_ x: T) {}
 
-func p<T: Q>(_ x: T) { sink(x.p()) }
+func p<T: Q>(_ x: T) { sink(x.p() as Any.Type) }
 
 class Foo<T>: Q { func p() -> Any.Type { return T.self } }
 class Bar<T>: Foo<T> {}

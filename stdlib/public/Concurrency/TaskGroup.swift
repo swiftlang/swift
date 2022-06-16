@@ -44,7 +44,7 @@ import Swift
 /// =======================
 ///
 /// You can cancel a task group and all of its child tasks
-/// by calling the `cancellAll()` method on the task group,
+/// by calling the `cancelAll()` method on the task group,
 /// or by canceling the task in which the group is running.
 ///
 /// If you call `async(priority:operation:)` to create a new task in a canceled group,
@@ -118,7 +118,7 @@ public func withTaskGroup<ChildTaskResult, GroupResult>(
 /// =======================
 ///
 /// You can cancel a task group and all of its child tasks
-/// by calling the `cancellAll()` method on the task group,
+/// by calling the `cancelAll()` method on the task group,
 /// or by canceling the task in which the group is running.
 ///
 /// If you call `async(priority:operation:)` to create a new task in a canceled group,
@@ -574,7 +574,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   ///     return collected
   ///
   /// Awaiting on an empty group
-  /// immediate returns `nil` without suspending.
+  /// immediately returns `nil` without suspending.
   ///
   /// You can also use a `for`-`await`-`in` loop to collect results of a task group:
   ///
@@ -802,7 +802,7 @@ extension ThrowingTaskGroup: AsyncSequence {
   /// it's valid to make a new iterator for the task group,
   /// which you can use to iterate over the results of new tasks you add to the group.
   /// You can also make a new iterator to resume iteration
-  /// after a child task thows an error.
+  /// after a child task throws an error.
   /// For example:
   ///
   ///     group.addTask { 1 }

@@ -14,30 +14,32 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "../CompatibilityOverride/CompatibilityOverride.h"
+#include "ImageInspection.h"
+#include "Private.h"
+#include "swift/ABI/TypeIdentity.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/TypeDecoder.h"
 #include "swift/Reflection/Records.h"
-#include "swift/ABI/TypeIdentity.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
-#include "swift/Runtime/Mutex.h"
 #include "swift/Strings.h"
+#include "swift/Threading/Mutex.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/StringExtras.h"
-#include "Private.h"
-#include "../CompatibilityOverride/CompatibilityOverride.h"
-#include "ImageInspection.h"
+#include <cstring>
 #include <functional>
-#include <vector>
 #include <list>
+#include <new>
+#include <vector>
 
 using namespace swift;
 using namespace Demangle;
@@ -76,7 +78,16 @@ static uintptr_t resolveSymbolicReferenceOffset(SymbolicReferenceKind kind,
                                                 Directness isIndirect,
                                                 int32_t offset,
                                                 const void *base) {
-  auto ptr = detail::applyRelativeOffset(base, offset);
+  uintptr_t ptr;
+  // Function references may be resolved differently than other data references.
+  switch (kind) {
+  case SymbolicReferenceKind::AccessorFunctionReference:
+    ptr = (uintptr_t)TargetCompactFunctionPointer<InProcess, void>::resolve(base, offset);
+    break;
+  default:
+    ptr = detail::applyRelativeOffset(base, offset);
+    break;
+  }
 
   // Indirect references may be authenticated in a way appropriate for the
   // referent.
@@ -462,6 +473,16 @@ static bool sameObjCTypeManglings(Demangle::NodePointer node1,
 }
 #endif
 
+/// Optimization for the case where we need to compare a StringRef and a null terminated C string
+/// Not converting s2 to a StringRef avoids the need to call both strlen and memcmp when non-matching
+/// but equal length
+static bool stringRefEqualsCString(StringRef s1, const char *s2) {
+  size_t length = s1.size();
+  // It may be possible for s1 to contain embedded NULL characters
+  // so additionally validate that the lengths match
+  return strncmp(s1.data(), s2, length) == 0 && strlen(s2) == length;
+}
+
 bool
 swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
                                          Demangle::NodePointer node) {
@@ -486,7 +507,7 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
       // Match to a mangled module name.
       if (node->getKind() != Demangle::Node::Kind::Module)
         return false;
-      if (!node->getText().equals(module->Name.get()))
+      if (!stringRefEqualsCString(node->getText(), module->Name.get()))
         return false;
       
       node = nullptr;
@@ -558,7 +579,7 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
         auto nameNode = node->getChild(1);
         if (nameNode->getKind() != Demangle::Node::Kind::Identifier)
           return false;
-        if (nameNode->getText() == proto->Name.get()) {
+        if (stringRefEqualsCString(nameNode->getText(), proto->Name.get())) {
           node = node->getChild(0);
           break;
         }
@@ -765,7 +786,7 @@ _findContextDescriptor(Demangle::NodePointer node,
                                                     *entry,
                                                 bool created) {
       if (created)
-        new (entry) NominalTypeDescriptorCacheEntry{mangledName, foundContext};
+        ::new (entry) NominalTypeDescriptorCacheEntry{mangledName, foundContext};
       return true;
     });
 
@@ -922,7 +943,7 @@ _findProtocolDescriptor(NodePointer node,
                                                      *entry,
                                                  bool created) {
       if (created)
-        new (entry) ProtocolDescriptorCacheEntry{mangledName, foundProtocol};
+        ::new (entry) ProtocolDescriptorCacheEntry{mangledName, foundProtocol};
       return true;
     });
   }
@@ -1313,6 +1334,10 @@ public:
   using BuiltType = const Metadata *;
   using BuiltTypeDecl = const ContextDescriptor *;
   using BuiltProtocolDecl = ProtocolDescriptorRef;
+  using BuiltGenericSignature = const Metadata *;
+  using BuiltSubstitution = std::pair<BuiltType, BuiltType>;
+  using BuiltSubstitutionMap = llvm::ArrayRef<BuiltSubstitution>;
+  using BuiltGenericTypeParam = const Metadata *;
 
   BuiltType decodeMangledType(NodePointer node,
                               bool forRequirement = true) {
@@ -1461,6 +1486,9 @@ public:
 #define BUILTIN_TYPE(Symbol, _) \
     if (mangledName.equals(#Symbol)) \
       return &METADATA_SYM(Symbol).base;
+#if !SWIFT_STDLIB_ENABLE_VECTOR_TYPES
+#define BUILTIN_VECTOR_TYPE(ElementSymbol, ElementName, Width)
+#endif
 #include "swift/Runtime/BuiltinTypes.def"
     return BuiltType();
   }
@@ -1502,6 +1530,13 @@ public:
 
     return swift_getExistentialTypeMetadata(classConstraint, superclass,
                                             protocols.size(), protocols.data());
+  }
+
+  TypeLookupErrorOr<BuiltType>
+  createParameterizedProtocolType(BuiltType base,
+                                  llvm::ArrayRef<BuiltType> args) const {
+    // FIXME: Runtime plumbing.
+    return BuiltType();
   }
 
   TypeLookupErrorOr<BuiltType> createDynamicSelfType(BuiltType selfType) const {
@@ -1626,7 +1661,6 @@ public:
   }
 
   using BuiltSILBoxField = llvm::PointerIntPair<BuiltType, 1>;
-  using BuiltSubstitution = std::pair<BuiltType, BuiltType>;
   struct BuiltLayoutConstraint {
     bool operator==(BuiltLayoutConstraint rhs) const { return true; }
     operator bool() const { return true; }
@@ -1896,7 +1930,7 @@ swift_stdlib_getTypeByMangledNameUntrusted(const char *typeNameStart,
     if (c >= '\x01' && c <= '\x1F')
       return nullptr;
   }
-  
+
   return swift_getTypeByMangledName(MetadataState::Complete, typeName, nullptr,
                                     {}, {}).getType().getMetadata();
 }
@@ -1956,7 +1990,7 @@ static NodePointer getParameterList(NodePointer funcType) {
       funcType->findByKind(Node::Kind::ArgumentTuple, /*maxDepth=*/1);
   assert(parameterContainer->getNumChildren() > 0);
 
-  // This is a type that convers entire parameter list.
+  // This is a type that covers entire parameter list.
   auto parameterList = parameterContainer->getFirstChild();
   assert(parameterList->getKind() == Node::Kind::Type);
 
@@ -1965,6 +1999,22 @@ static NodePointer getParameterList(NodePointer funcType) {
     return parameters;
 
   return parameterContainer;
+}
+
+static const Metadata *decodeType(TypeDecoder<DecodedMetadataBuilder> &decoder,
+                                  NodePointer type) {
+  assert(type->getKind() == Node::Kind::Type);
+
+  auto builtTypeOrError = decoder.decodeMangledType(type);
+
+  if (builtTypeOrError.isError()) {
+    auto err = builtTypeOrError.getError();
+    char *errStr = err->copyErrorString();
+    err->freeErrorString(errStr);
+    return nullptr;
+  }
+
+  return builtTypeOrError.getType();
 }
 
 SWIFT_CC(swift)
@@ -1984,7 +2034,9 @@ unsigned swift_func_getParameterCount(const char *typeNameStart,
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
 const Metadata *_Nullable
-swift_func_getReturnTypeInfo(const char *typeNameStart, size_t typeNameLength) {
+swift_func_getReturnTypeInfo(const char *typeNameStart, size_t typeNameLength,
+                             GenericEnvironmentDescriptor *genericEnv,
+                             const void * const *genericArguments) {
   StackAllocatedDemangler<1024> demangler;
 
   auto *funcType =
@@ -1998,30 +2050,30 @@ swift_func_getReturnTypeInfo(const char *typeNameStart, size_t typeNameLength) {
 
   assert(resultType->getKind() == Node::Kind::ReturnType);
 
+  SubstGenericParametersFromMetadata substFn(genericEnv, genericArguments);
+
   DecodedMetadataBuilder builder(
       demangler,
       /*substGenericParam=*/
-      [](unsigned, unsigned) { return nullptr; },
+      [&substFn](unsigned depth, unsigned index) {
+        return substFn.getMetadata(depth, index);
+      },
       /*SubstDependentWitnessTableFn=*/
-      [](const Metadata *, unsigned) { return nullptr; });
+      [&substFn](const Metadata *type, unsigned index) {
+        return substFn.getWitnessTable(type, index);
+      });
 
   TypeDecoder<DecodedMetadataBuilder> decoder(builder);
-  auto builtTypeOrError =
-      decoder.decodeMangledType(resultType->getFirstChild());
-  if (builtTypeOrError.isError()) {
-    auto err = builtTypeOrError.getError();
-    char *errStr = err->copyErrorString();
-    err->freeErrorString(errStr);
-    return nullptr;
-  }
 
-  return builtTypeOrError.getType();
+  return decodeType(decoder, resultType->getFirstChild());
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
 unsigned
 swift_func_getParameterTypeInfo(
     const char *typeNameStart, size_t typeNameLength,
+    GenericEnvironmentDescriptor *genericEnv,
+    const void * const *genericArguments,
     Metadata const **types, unsigned typesLength) {
   if (typesLength < 0) return -1;
 
@@ -2039,17 +2091,24 @@ swift_func_getParameterTypeInfo(
   if (!(parameterList && parameterList->getNumChildren() == typesLength))
     return -2;
 
+  SubstGenericParametersFromMetadata substFn(genericEnv, genericArguments);
+
   DecodedMetadataBuilder builder(
       demangler,
       /*substGenericParam=*/
-      [](unsigned, unsigned) { return nullptr; },
+      [&substFn](unsigned depth, unsigned index) {
+        return substFn.getMetadata(depth, index);
+      },
       /*SubstDependentWitnessTableFn=*/
-      [](const Metadata *, unsigned) { return nullptr; });
+      [&substFn](const Metadata *type, unsigned index) {
+        return substFn.getWitnessTable(type, index);
+      });
   TypeDecoder<DecodedMetadataBuilder> decoder(builder);
 
-  auto typeIdx = 0;
   // for each parameter (TupleElement), store it into the provided buffer
-  for (auto *parameter : *parameterList) {
+  for (unsigned index = 0; index != typesLength; ++index) {
+    auto *parameter = parameterList->getChild(index);
+
     if (parameter->getKind() == Node::Kind::TupleElement) {
       assert(parameter->getNumChildren() == 1);
       parameter = parameter->getFirstChild();
@@ -2057,20 +2116,48 @@ swift_func_getParameterTypeInfo(
 
     assert(parameter->getKind() == Node::Kind::Type);
 
-    auto builtTypeOrError = decoder.decodeMangledType(parameter);
-    if (builtTypeOrError.isError()) {
-      auto err = builtTypeOrError.getError();
-      char *errStr = err->copyErrorString();
-      err->freeErrorString(errStr);
-      typeIdx += 1;
-      continue;
-    }
+    auto type = decodeType(decoder, parameter);
+    if (!type)
+      return -3; // Failed to decode a type.
 
-    types[typeIdx] = builtTypeOrError.getType();
-    ++typeIdx;
+    types[index] = type;
   } // end foreach parameter
 
   return typesLength;
+}
+
+SWIFT_CC(swift)
+SWIFT_RUNTIME_STDLIB_SPI
+BufferAndSize
+swift_distributed_getWitnessTables(GenericEnvironmentDescriptor *genericEnv,
+                                   const void *const *genericArguments) {
+  assert(genericEnv);
+  assert(genericArguments);
+
+  llvm::SmallVector<const void *, 4> witnessTables;
+  SubstGenericParametersFromMetadata substFn(genericEnv, genericArguments);
+
+  auto error = _checkGenericRequirements(
+      genericEnv->getGenericRequirements(), witnessTables,
+      [&substFn](unsigned depth, unsigned index) {
+        return substFn.getMetadata(depth, index);
+      },
+      [&substFn](const Metadata *type, unsigned index) {
+        return substFn.getWitnessTable(type, index);
+      });
+
+  if (error) {
+    return {/*ptr=*/nullptr, -1};
+  }
+
+  if (witnessTables.empty())
+    return {/*ptr=*/nullptr, 0};
+
+  void **tables = (void **)malloc(witnessTables.size() * sizeof(void *));
+  for (unsigned i = 0, n = witnessTables.size(); i != n; ++i)
+    tables[i] = const_cast<void *>(witnessTables[i]);
+
+  return {tables, static_cast<intptr_t>(witnessTables.size())};
 }
 
 // ==== End of Function metadata functions ---------------------------------------
@@ -2110,6 +2197,23 @@ swift_getOpaqueTypeConformance(const void * const *arguments,
 // Return the ObjC class for the given type name.
 // This gets installed as a callback from libobjc.
 
+static bool validateObjCMangledName(const char *_Nonnull typeName) {
+  // Accept names with a mangling prefix.
+  if (getManglingPrefixLength(typeName))
+    return true;
+
+  // Accept names that start with a digit (unprefixed mangled names).
+  if (isdigit(typeName[0]))
+    return true;
+
+  // Accept names that contain a dot.
+  if (strchr(typeName, '.'))
+    return true;
+
+  // Reject anything else.
+  return false;
+}
+
 // FIXME: delete this #if and dlsym once we don't
 // need to build with older libobjc headers
 #if !OBJC_GETCLASSHOOK_DEFINED
@@ -2145,8 +2249,9 @@ getObjCClassByMangledName(const char * _Nonnull typeName,
       [&](const Metadata *type, unsigned index) { return nullptr; }
     ).getType().getMetadata();
   } else {
-    metadata = swift_stdlib_getTypeByMangledNameUntrusted(typeStr.data(),
-                                                          typeStr.size());
+    if (validateObjCMangledName(typeName))
+      metadata = swift_stdlib_getTypeByMangledNameUntrusted(typeStr.data(),
+                                                            typeStr.size());
   }
   if (metadata) {
     auto objcClass =
@@ -2175,7 +2280,7 @@ static void installGetClassHook() {
 unsigned SubstGenericParametersFromMetadata::
 buildDescriptorPath(const ContextDescriptor *context,
                     Demangler &borrowFrom) const {
-  assert(sourceIsMetadata);
+  assert(sourceKind == SourceKind::Metadata);
 
   // Terminating condition: we don't have a context.
   if (!context)
@@ -2266,19 +2371,58 @@ buildEnvironmentPath(
   return totalKeyParamCount;
 }
 
+unsigned SubstGenericParametersFromMetadata::buildShapePath(
+    const TargetExtendedExistentialTypeShape<InProcess> *shape) const {
+  unsigned totalParamCount = 0;
+
+  auto genSig = shape->getGeneralizationSignature();
+  if (!genSig.getParams().empty()) {
+    totalParamCount += genSig.getParams().size();
+    descriptorPath.push_back(PathElement{genSig.getParams(),
+                                         totalParamCount,
+                                         /*numKeyGenericParamsInParent*/ 0,
+                                         (unsigned)genSig.getParams().size(),
+                                         /*hasNonKeyGenericParams*/ false});
+  }
+
+  const unsigned genSigParamCount = genSig.getParams().size();
+  auto reqSig = shape->getRequirementSignature();
+  assert(reqSig.getParams().size() > genSig.getParams().size());
+  {
+    auto remainingParams = reqSig.getParams().drop_front(genSig.getParams().size());
+    totalParamCount += remainingParams.size();
+    descriptorPath.push_back(PathElement{remainingParams,
+                                         totalParamCount,
+                                         genSigParamCount,
+                                         (unsigned)remainingParams.size(),
+                                         /*hasNonKeyGenericParams*/ false});
+  }
+
+  // All parameters in this signature are key parameters.
+  return totalParamCount;
+}
+
 void SubstGenericParametersFromMetadata::setup() const {
   if (!descriptorPath.empty())
     return;
 
-  if (sourceIsMetadata && baseContext) {
+  switch (sourceKind) {
+  case SourceKind::Metadata: {
+    assert(baseContext);
     DemanglerForRuntimeTypeResolution<StackAllocatedDemangler<2048>> demangler;
     numKeyGenericParameters = buildDescriptorPath(baseContext, demangler);
     return;
   }
-
-  if (!sourceIsMetadata && environment) {
+  case SourceKind::Environment: {
+    assert(environment);
     numKeyGenericParameters = buildEnvironmentPath(environment);
     return;
+  }
+  case SourceKind::Shape: {
+    assert(shape);
+    numKeyGenericParameters = buildShapePath(shape);
+    return;
+  }
   }
 }
 
@@ -2537,10 +2681,10 @@ void DynamicReplacementDescriptor::enableReplacement() const {
 
   // Link the replacement entry.
   chainRoot->next = chainEntry.get();
-  // chainRoot->implementationFunction = replacementFunction.get();
+  // chainRoot->implementationFunction = getReplacementFunction();
   swift_ptrauth_init_code_or_data(
       reinterpret_cast<void **>(&chainRoot->implementationFunction),
-      reinterpret_cast<void *>(replacementFunction.get()),
+      reinterpret_cast<void *>(getReplacementFunction()),
       replacedFunctionKey->getExtraDiscriminator(),
       !replacedFunctionKey->isAsync());
 }
@@ -2570,7 +2714,7 @@ void DynamicReplacementDescriptor::disableReplacement() const {
       !replacedFunctionKey->isAsync(), /*allowNull*/ false);
 }
 
-/// An automatic dymamic replacement entry.
+/// An automatic dynamic replacement entry.
 namespace {
 class AutomaticDynamicReplacementEntry {
   RelativeDirectPointer<DynamicReplacementScope, false> replacementScope;

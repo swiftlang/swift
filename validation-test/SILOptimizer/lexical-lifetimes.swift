@@ -101,7 +101,7 @@ func test_localVar_keepsObjectAliveBeyondCallToClassWithWeakReference() {
   var d = D()
   let c = C(d)
   // Reenable with rdar://86271875
-  // HECK: cWillFoo{{.*}} test_localVar_keepsObjectAliveBeyondCallToClassWithWeakReference
+  // CHECK: cWillFoo{{.*}} test_localVar_keepsObjectAliveBeyondCallToClassWithWeakReference
   c.foo(#function)
 }
 
@@ -210,8 +210,7 @@ func test_repeatedLoadWeakSelf() -> Task<Void, Never> {
 @main struct Main {
   static func main() async {
     test_localLet_keepsObjectAliveBeyondCallToClassWithWeakReference()
-    // Reenable with rdar://86271875
-    // test_localVar_keepsObjectAliveBeyondCallToClassWithWeakReference()
+    test_localVar_keepsObjectAliveBeyondCallToClassWithWeakReference()
     test_localLet_keepsObjectAliveBeyondCallToClassWithPointer()
     test_localVar_keepsObjectAliveBeyondCallToClassWithPointer()
     test_localLet_keepsObjectAliveBeyondCallToSynchronizationPointFunction()

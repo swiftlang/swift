@@ -23,6 +23,7 @@
 #include "swift/Runtime/Metadata.h"
 
 #include <cstdint>
+#include <new>
 
 using namespace swift;
 
@@ -30,7 +31,10 @@ using namespace swift;
 namespace {
 
 struct AccessibleFunctionsSection {
-  const AccessibleFunctionRecord *Begin, *End;
+  const AccessibleFunctionRecord *__ptrauth_swift_accessible_function_record
+      Begin;
+  const AccessibleFunctionRecord *__ptrauth_swift_accessible_function_record
+      End;
 
   AccessibleFunctionsSection(const AccessibleFunctionRecord *begin,
                              const AccessibleFunctionRecord *end)
@@ -51,12 +55,12 @@ private:
   const char *Name;
   size_t NameLength;
 
-  const AccessibleFunctionRecord *Func;
+  const AccessibleFunctionRecord *__ptrauth_swift_accessible_function_record R;
 
 public:
   AccessibleFunctionCacheEntry(llvm::StringRef name,
-                               const AccessibleFunctionRecord *func)
-      : Func(func) {
+                               const AccessibleFunctionRecord *record)
+      : R(record) {
     char *Name = reinterpret_cast<char *>(malloc(name.size()));
     memcpy(Name, name.data(), name.size());
 
@@ -64,7 +68,7 @@ public:
     this->NameLength = name.size();
   }
 
-  const AccessibleFunctionRecord *getFunction() const { return Func; }
+  const AccessibleFunctionRecord *getRecord() const { return R; }
 
   bool matchesKey(llvm::StringRef name) {
     return name == llvm::StringRef{Name, NameLength};
@@ -139,21 +143,21 @@ swift::runtime::swift_findAccessibleFunction(const char *targetNameStart,
   {
     auto snapshot = S.Cache.snapshot();
     if (auto E = snapshot.find(name))
-      return E->getFunction();
+      return E->getRecord();
   }
 
   // If entry doesn't exist (either record doesn't exist, hasn't been loaded, or
   // requested yet), let's try to find it and add to the cache.
 
-  auto *function = _searchForFunctionRecord(S, name);
-  if (function) {
+  auto *record = _searchForFunctionRecord(S, name);
+  if (record) {
     S.Cache.getOrInsert(
         name, [&](AccessibleFunctionCacheEntry *entry, bool created) {
           if (created)
-            new (entry) AccessibleFunctionCacheEntry{name, function};
+            ::new (entry) AccessibleFunctionCacheEntry{name, record};
           return true;
         });
   }
 
-  return function;
+  return record;
 }

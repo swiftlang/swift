@@ -533,7 +533,7 @@ public:
 
     // Check if we already have a declaration or definition for this witness
     // table.
-    if (auto *wt = SGM.M.lookUpWitnessTable(Conformance, false)) {
+    if (auto *wt = SGM.M.lookUpWitnessTable(Conformance)) {
       // If we have a definition already, just return it.
       //
       // FIXME: I am not sure if this is possible, if it is not change this to an
@@ -812,7 +812,8 @@ SILFunction *SILGenModule::emitProtocolWitness(
 
   SGF.emitProtocolWitness(AbstractionPattern(reqtOrigTy), reqtSubstTy,
                           requirement, reqtSubMap, witnessRef,
-                          witnessSubs, isFree, /*isSelfConformance*/ false);
+                          witnessSubs, isFree, /*isSelfConformance*/ false,
+                          witness.getEnterIsolation());
 
   emitLazyConformancesForFunction(f);
   return f;
@@ -843,7 +844,7 @@ static SILFunction *emitSelfConformanceWitness(SILGenModule &SGM,
 
   // Open the protocol type.
   auto openedType = OpenedArchetypeType::get(
-      protocol->getExistentialType()->getCanonicalType());
+      protocol->getExistentialType()->getCanonicalType(), GenericSignature());
 
   // Form the substitutions for calling the witness.
   auto witnessSubs = SubstitutionMap::getProtocolSubstitutions(protocol,
@@ -884,7 +885,8 @@ static SILFunction *emitSelfConformanceWitness(SILGenModule &SGM,
 
   SGF.emitProtocolWitness(AbstractionPattern(reqtOrigTy), reqtSubstTy,
                           requirement, reqtSubs, requirement,
-                          witnessSubs, isFree, /*isSelfConformance*/ true);
+                          witnessSubs, isFree, /*isSelfConformance*/ true,
+                          None);
 
   SGM.emitLazyConformancesForFunction(f);
 

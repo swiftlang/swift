@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
 
 // Tests for typealias inside protocols
 
@@ -143,14 +143,18 @@ protocol P3 {
 }
 
 // Test for not crashing on recursive aliases
+// FIXME: Nonsense redundant requirement warnings
 protocol Circular {
   typealias Y = Self.Y // expected-error {{type alias 'Y' references itself}} expected-note {{while resolving type 'Self.Y'}}
+  // expected-warning@-1 {{redundant same-type constraint 'Self.Y' == 'Self.Y'}}
 
   typealias Y2 = Y2 // expected-error {{type alias 'Y2' references itself}} expected-note {{while resolving type 'Y2'}}
+  // expected-warning@-1 {{redundant same-type constraint 'Self.Y2' == 'Self.Y2'}}
 
   typealias Y3 = Y4 // expected-error {{type alias 'Y3' references itself}} expected-note {{while resolving type 'Y4'}}
 
   typealias Y4 = Y3 // expected-note {{through reference here}} expected-note {{while resolving type 'Y3'}}
+  // expected-warning@-1 {{redundant same-type constraint 'Self.Y4' == 'Self.Y3'}}
 }
 
 // Qualified and unqualified references to protocol typealiases from concrete type
@@ -250,8 +254,8 @@ protocol P9 {
   typealias A = Int
 }
 
-func testT9a<T: P9, U>(_: T, _: U) where T.A == U { } // expected-error {{same-type requirement makes generic parameter 'U' non-generic}}
-func testT9b<T: P9>(_: T) where T.A == Float { } // expected-error{{generic signature requires types 'T.A' (aka 'Int') and 'Float' to be the same}}
+func testT9a<T: P9, U>(_: T, _: U) where T.A == U { } // expected-warning {{same-type requirement makes generic parameter 'U' non-generic}}
+func testT9b<T: P9>(_: T) where T.A == Float { } // expected-error{{no type for 'T.A' can satisfy both 'T.A == Int' and 'T.A == Float'}}
 
 
 struct X<T> { }
@@ -262,13 +266,13 @@ protocol P10 {
 
   @available(*, deprecated, message: "just use Int, silly")
   typealias V = Int
-}
 
-extension P10 {
+  // FIXME: This used to be in a protocol extension, but the Requirement Machine does
+  // not permit `where` clauses to reference typealiases in protocol extensions.
   typealias U = Float
 }
 
-extension P10 where T == Int { } // expected-warning{{neither type in same-type constraint ('Int' or 'Int') refers to a generic parameter or associated type}}
+extension P10 where T == Int { } // expected-warning{{redundant same-type constraint 'Self.T' == 'Int'}}
 
 extension P10 where A == X<T> { }
 
@@ -277,7 +281,7 @@ extension P10 where A == X<U> { }
 extension P10 where A == X<Self.U> { }
 
 extension P10 where V == Int { } // expected-warning {{'V' is deprecated: just use Int, silly}}
-// expected-warning@-1{{neither type in same-type constraint ('Int' or 'Int') refers to a generic parameter or associated type}}
+// expected-warning@-1{{redundant same-type constraint 'Self.V' == 'Int'}}
 
 // rdar://problem/36003312
 protocol P11 {

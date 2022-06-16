@@ -35,6 +35,7 @@
 #define UTF8_STRING u8"Swift 🏃"
 #define OBJC_STRING @"Unicode! ✨"
 #define CF_STRING CFSTR("Swift")
+#define INVALID_UTF8_STRING "\xFF\xFF\xFF\xFF\xFF\xFF"
 
 #define INVALID_INTEGER_LITERAL_1 10_9
 #define INVALID_INTEGER_LITERAL_2 10abc
@@ -168,7 +169,7 @@ typedef unsigned okay_t;
 #define FUNC_LIKE_MACRO_2(PARAM) PARAM
 
 // Unsupported binary arithmetic
-#define INVALID_ARITHMETIC_1 5 + INVALID_INTERGER_LITERAL_1
+#define INVALID_ARITHMETIC_1 5 + INVALID_INTEGER_LITERAL_1
 #define INVALID_ARITHMETIC_2 INVALID_INTEGER_LITERAL_1 + ADD_TWO
 #define INVALID_ARITHMETIC_3 ADD_TWO + INVALID_INTEGER_LITERAL_1
 #define INVALID_ARITHMETIC_4                                                   \

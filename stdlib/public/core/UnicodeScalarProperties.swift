@@ -153,7 +153,7 @@ extension Unicode.Scalar.Properties {
   }
 
   /// A Boolean value indicating whether the scalar is a format control
-  /// character that has a specific function in the Unicode Bidrectional
+  /// character that has a specific function in the Unicode Bidirectional
   /// Algorithm.
   ///
   /// This property corresponds to the "Bidi_Control" property in the
@@ -1184,10 +1184,10 @@ extension Unicode.Scalar.Properties {
   }
 
   // Used to potentially return a name who can either be represented in a large
-  // range or algorithmetically. A good example are the Hangul names. Instead of
+  // range or algorithmically. A good example are the Hangul names. Instead of
   // storing those names, we can define an algorithm to generate the name.
   internal func _fastScalarName() -> String? {
-    // Define a couple algorithmetic names below.
+    // Define a couple algorithmic names below.
 
     let scalarName = String(_scalar.value, radix: 16, uppercase: true)
 
@@ -1263,8 +1263,8 @@ extension Unicode.Scalar.Properties {
   /// The name of a scalar is immutable and never changed in future versions of
   /// the Unicode Standard. The `nameAlias` property is provided to issue
   /// corrections if a name was issued erroneously. For example, the `name` of
-  /// U+FE18 is "PRESENTATION FORM FOR VERTICAL RIGHT WHITE LENTICULAR BRACKET"
-  /// (note that "BRACKET" is misspelled). The `nameAlias` property then
+  /// U+FE18 is "PRESENTATION FORM FOR VERTICAL RIGHT WHITE LENTICULAR BRAKCET"
+  /// (note that "BRAKCET" is misspelled). The `nameAlias` property then
   /// contains the corrected name.
   ///
   /// If a scalar has no alias, this property is `nil`.

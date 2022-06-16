@@ -517,7 +517,7 @@ struct StructWithDelegatingInit {
   init() { self.init(x: 0); self.x = 22 } // expected-error {{'let' property 'x' may not be initialized directly; use "self.init(...)" or "self = ..." instead}}
 }
 
-// <rdar://problem/16792027> compiler infinite loops on a really really mutating function
+// <rdar://problem/16792027> compiler infinite loops on a really mutating function
 struct F {
   mutating mutating mutating f() { // expected-error 2 {{duplicate modifier}}
                                    // expected-note@-1 2 {{modifier already specified here}}

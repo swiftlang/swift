@@ -136,11 +136,11 @@ public struct CC2<T : PP> {
 
 // CHECK-LABEL: sil [_specialize exported: false, kind: full, where T == Klass1, U == FakeString] [_specialize exported: false, kind: full, where T == Int, U == Float] [ossa] @$s15specialize_attr0A4This_1uyx_q_tr0_lF : $@convention(thin) <T, U> (@in_guaranteed T, @in_guaranteed U) -> () {
 
-// CHECK-OPT-DAG: sil shared [noinline] @$s15specialize_attr2CCC3foo_1gqd___AA2GGVyxGtqd___AHtAA2QQRd__lFAA12RRNonTrivialV_AA05SSNonH0VTg5 : $@convention(method) (@guaranteed SSNonTrivial, @guaranteed GG<RRNonTrivial>, @guaranteed CC<RRNonTrivial>) -> (@owned SSNonTrivial, @out GG<RRNonTrivial>) {
+// CHECK-OPT-DAG: sil shared [noinline] {{.*}}@$s15specialize_attr2CCC3foo_1gqd___AA2GGVyxGtqd___AHtAA2QQRd__lFAA12RRNonTrivialV_AA05SSNonH0VTg5 : $@convention(method) (@guaranteed SSNonTrivial, @guaranteed GG<RRNonTrivial>, @guaranteed CC<RRNonTrivial>) -> (@owned SSNonTrivial, @out GG<RRNonTrivial>) {
 
-// CHECK-OPT-DAG: sil shared [noinline] @$s15specialize_attr2CCC4foo2_1gqd___AA2GGVyxGtqd__n_AHntAA2QQRd__lFAA2RRV_AA2SSVTg5 : $@convention(method) (SS, GG<RR>, @guaranteed CC<RR>) -> (SS, @out GG<RR>) {
+// CHECK-OPT-DAG: sil shared [noinline] {{.*}}@$s15specialize_attr2CCC4foo2_1gqd___AA2GGVyxGtqd__n_AHntAA2QQRd__lFAA2RRV_AA2SSVTg5 : $@convention(method) (SS, GG<RR>, @guaranteed CC<RR>) -> (SS, @out GG<RR>) {
 
-// CHECK-OPT-DAG: sil [noinline] @$s15specialize_attr2CCC4foo2_1gqd___AA2GGVyxGtqd__n_AHntAA2QQRd__lF : $@convention(method) <T where T : PP><U where U : QQ> (@in U, @in GG<T>, @guaranteed CC<T>) -> (@out U, @out GG<T>) {
+// CHECK-OPT-DAG: sil [noinline] {{.*}}@$s15specialize_attr2CCC4foo2_1gqd___AA2GGVyxGtqd__n_AHntAA2QQRd__lF : $@convention(method) <T where T : PP><U where U : QQ> (@in U, @in GG<T>, @guaranteed CC<T>) -> (@out U, @out GG<T>) {
 
 // CHECK-LABEL: sil [noinline] [_specialize exported: false, kind: full, where T == RRNonTrivial, U == SSNonTrivial] [_specialize exported: false, kind: full, where T == RR, U == SS] [ossa] @$s15specialize_attr2CCC3foo_1gqd___AA2GGVyxGtqd___AHtAA2QQRd__lF : $@convention(method) <T where T : PP><U where U : QQ> (@in_guaranteed U, @in_guaranteed GG<T>, @guaranteed CC<T>) -> (@out U, @out GG<T>) {
 
@@ -279,7 +279,7 @@ extension InternalThing2 {
   public var specializeComputedX : T {
 
     // CHECK-LABEL: sil [_specialize exported: true, kind: full, target: "$s1A14InternalThing2V9computedXxvg", where T == Klass1] [ossa] @$s1A14InternalThing2V15specialize_attrE0C9ComputedXxvg : $@convention(method) <T> (@in_guaranteed InternalThing2<T>) -> @out T {
-    // CHECK-OPT-DAG: sil @$s1A14InternalThing2V9computedXxvg15specialize_attr6Klass1C_Ts5 : $@convention(method) (@guaranteed InternalThing2<Klass1>) -> @owned Klass1 {
+    // CHECK-OPT-DAG: sil {{.*}}@$s1A14InternalThing2V9computedXxvg15specialize_attr6Klass1C_Ts5 : $@convention(method) (@guaranteed InternalThing2<Klass1>) -> @owned Klass1 {
 
     @_specialize(exported: true, target: computedX, where T == Klass1)
     get {
@@ -290,7 +290,7 @@ extension InternalThing2 {
   public var specializeComputedY : T {
 
     // CHECK-LABEL: sil [_specialize exported: true, kind: full, target: "$s1A14InternalThing2V9computedYxvg", where T == Klass1] [ossa] @$s1A14InternalThing2V15specialize_attrE0C9ComputedYxvg : $@convention(method) <T> (@in_guaranteed InternalThing2<T>) -> @out T {
-    // CHECK-OPT-DAG: sil @$s1A14InternalThing2V9computedYxvg15specialize_attr6Klass1C_Ts5 : $@convention(method) (@guaranteed InternalThing2<Klass1>) -> @owned Klass1 {
+    // CHECK-OPT-DAG: sil {{.*}}@$s1A14InternalThing2V9computedYxvg15specialize_attr6Klass1C_Ts5 : $@convention(method) (@guaranteed InternalThing2<Klass1>) -> @owned Klass1 {
 
     @_specialize(exported: true, target: computedY, where T == Klass1)
     get {
@@ -298,7 +298,7 @@ extension InternalThing2 {
     }
 
     // CHECK-LABEL: sil [_specialize exported: true, kind: full, target: "$s1A14InternalThing2V9computedYxvs", where T == Klass1] [ossa] @$s1A14InternalThing2V15specialize_attrE0C9ComputedYxvs : $@convention(method) <T> (@in T, @inout InternalThing2<T>) -> () {
-    // CHECK-OPT-DAG: sil @$s1A14InternalThing2V9computedYxvs15specialize_attr6Klass1C_Ts5 : $@convention(method) (@owned Klass1, @inout InternalThing2<Klass1>) -> () {
+    // CHECK-OPT-DAG: sil {{.*}}@$s1A14InternalThing2V9computedYxvs15specialize_attr6Klass1C_Ts5 : $@convention(method) (@owned Klass1, @inout InternalThing2<Klass1>) -> () {
 
     @_specialize(exported: true, target: computedY, where T == Klass1)
     set {}
@@ -326,7 +326,7 @@ extension InternalThing2 {
   public subscript(specialized i: Int) -> T {
 
     // CHECK-LABEL: sil [_specialize exported: true, kind: full, target: "$s1A14InternalThing2VyxSicig", where T == Klass1] [ossa] @$s1A14InternalThing2V15specialize_attrE11specializedxSi_tcig : $@convention(method) <T> (Int, @in_guaranteed InternalThing2<T>) -> @out T {
-    // CHECK-OPT-DAG: sil @$s1A14InternalThing2VyxSicig15specialize_attr6Klass1C_Ts5 : $@convention(method) (Int, @guaranteed InternalThing2<Klass1>) -> @owned Klass1 {
+    // CHECK-OPT-DAG: sil {{.*}}@$s1A14InternalThing2VyxSicig15specialize_attr6Klass1C_Ts5 : $@convention(method) (Int, @guaranteed InternalThing2<Klass1>) -> @owned Klass1 {
 
     @_specialize(exported: true, target: subscript(_:), where T == Klass1)
     get {
@@ -334,7 +334,7 @@ extension InternalThing2 {
     }
 
     // CHECK-LABEL: sil [_specialize exported: true, kind: full, target: "$s1A14InternalThing2VyxSicis", where T == Klass1] [ossa] @$s1A14InternalThing2V15specialize_attrE11specializedxSi_tcis : $@convention(method) <T> (@in T, Int, @inout InternalThing2<T>) -> () {
-    // CHECK-OPT-DAG: sil @$s1A14InternalThing2VyxSicis15specialize_attr6Klass1C_Ts5 : $@convention(method) (@owned Klass1, Int, @inout InternalThing2<Klass1>) -> () {
+    // CHECK-OPT-DAG: sil {{.*}}@$s1A14InternalThing2VyxSicis15specialize_attr6Klass1C_Ts5 : $@convention(method) (@owned Klass1, Int, @inout InternalThing2<Klass1>) -> () {
 
     @_specialize(exported: true, target: subscript(_:), where T == Klass1)
     set {

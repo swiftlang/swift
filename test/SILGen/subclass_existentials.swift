@@ -2,9 +2,6 @@
 // RUN: %target-swift-emit-silgen -module-name subclass_existentials -Xllvm -sil-full-demangle -parse-as-library -primary-file %s -verify | %FileCheck %s
 // RUN: %target-swift-emit-ir -module-name subclass_existentials -parse-as-library -primary-file %s
 
-// RUN: %target-swift-emit-silgen -module-name subclass_existentials -Xllvm -sil-full-demangle -parse-as-library -enable-explicit-existential-types -primary-file %s -verify | %FileCheck %s
-// RUN: %target-swift-emit-ir -module-name subclass_existentials -parse-as-library -enable-explicit-existential-types -primary-file %s
-
 // Note: we pass -verify above to ensure there are no spurious
 // compiler warnings relating to casts.
 
@@ -180,6 +177,36 @@ func methodCalls(
 
   // CHECK:      return
   // CHECK-NEXT: }
+}
+
+
+// CHECK-LABEL: sil hidden [ossa] @$s21subclass_existentials29methodCallsOnProtocolMetatypeyyF : $@convention(thin) () -> () {
+// CHECK: metatype $@thin (Base<Int> & P).Protocol
+// CHECK: function_ref @$[[THUNK1_NAME:[_a-zA-Z0-9]+]]
+// CHECK: } // end sil function '$s21subclass_existentials29methodCallsOnProtocolMetatypeyyF'
+//
+// CHECK: sil private [ossa] @$[[THUNK1_NAME]] : $@convention(thin) (@guaranteed Base<Int> & P) -> @owned @callee_guaranteed () -> @owned Base<Int> & P {
+// CHECK: bb0(%0 : @guaranteed $Base<Int> & P):
+// CHECK:   [[THUNK2:%[0-9]+]] = function_ref @$[[THUNK2_NAME:[_a-zA-Z0-9]+]]
+// CHECK:   [[SELF_COPY:%[0-9]+]] = copy_value %0
+// CHECK:   [[RESULT:%[0-9]+]] = partial_apply [callee_guaranteed] [[THUNK2]]([[SELF_COPY]])
+// CHECK:  return [[RESULT]]
+// CHECK: } // end sil function '$[[THUNK1_NAME]]'
+//
+// CHECK: sil private [ossa] @$[[THUNK2_NAME]] : $@convention(thin) (@guaranteed Base<Int> & P) -> @owned Base<Int> & P {
+// CHECK: bb0(%0 : @guaranteed $Base<Int> & P):
+// CHECK:  [[OPENED:%[0-9]+]] = open_existential_ref %0 : $Base<Int> & P to $[[OPENED_TY:@opened\("[-A-F0-9]+"\) Base<Int> & P]]
+// CHECK:  [[OPENED_COPY:%[0-9]+]] = copy_value [[OPENED]]
+// CHECK:  [[CLASS:%[0-9]+]] = upcast [[OPENED_COPY]] : $[[OPENED_TY]] to $Base<Int>
+// CHECK:  [[METHOD:%[0-9]+]] = class_method [[CLASS]] : $Base<Int>, #Base.classSelfReturn
+// CHECK:  [[RESULT:%[0-9]+]] = apply [[METHOD]]<Int>([[CLASS]]) : $@convention(method) <τ_0_0> (@guaranteed Base<τ_0_0>) -> @owned Base<τ_0_0>
+// CHECK:  destroy_value [[CLASS]]
+// CHECK:  [[TO_OPENED:%[0-9]+]] = unchecked_ref_cast [[RESULT]] : $Base<Int> to $[[OPENED_TY]]
+// CHECK:  [[ERASED:%[0-9]+]] = init_existential_ref [[TO_OPENED]] : $[[OPENED_TY]]
+// CHECK:  return [[ERASED]]
+// CHECK: } // end sil function '$[[THUNK2_NAME]]'
+func methodCallsOnProtocolMetatype() {
+  let _ = (Base<Int> & P).classSelfReturn
 }
 
 protocol PropertyP {

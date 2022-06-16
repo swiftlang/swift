@@ -20,17 +20,17 @@ func returnsInt() -> Int {}
 
 // WITH_GLOBAL_DECLS: Begin completions
 // WITH_GLOBAL_DECLS-DAG: Decl[Struct]/CurrModule:       FooStruct[#FooStruct#]{{; name=.+$}}
-// WITH_GLOBAL_DECLS-DAG: Decl[FreeFunction]/CurrModule{{(/TypeRelation\[Identical\])?}}: returnsInt()[#Int#]{{; name=.+$}}
+// WITH_GLOBAL_DECLS-DAG: Decl[FreeFunction]/CurrModule{{(/TypeRelation\[Convertible\])?}}: returnsInt()[#Int#]{{; name=.+$}}
 // WITH_GLOBAL_DECLS: End completions
 
 // WITH_GLOBAL_DECLS1: Begin completions
 // WITH_GLOBAL_DECLS1-DAG: Decl[Struct]/CurrModule:       FooStruct[#FooStruct#]{{; name=.+$}}
-// WITH_GLOBAL_DECLS1-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Identical]: returnsInt()[#Int#]{{; name=.+$}}
+// WITH_GLOBAL_DECLS1-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Convertible]: returnsInt()[#Int#]{{; name=.+$}}
 // WITH_GLOBAL_DECLS1: End completions
 
 // WITH_MEMBER_DECLS: Begin completions
 // WITH_MEMBER_DECLS-DAG: Decl[Struct]/CurrModule:          FooStruct[#FooStruct#]{{; name=.+$}}
-// WITH_MEMBER_DECLS-DAG: Decl[FreeFunction]/CurrModule{{(/TypeRelation\[Identical\])?}}:    returnsInt()[#Int#]{{; name=.+$}}
+// WITH_MEMBER_DECLS-DAG: Decl[FreeFunction]/CurrModule{{(/TypeRelation\[Convertible\])?}}:    returnsInt()[#Int#]{{; name=.+$}}
 // WITH_MEMBER_DECLS-DAG: Decl[LocalVar]/Local:             self[#MemberAccessors#]{{; name=.+$}}
 // WITH_MEMBER_DECLS-DAG: Decl[InstanceVar]/CurrNominal:    instanceVar[#Double#]{{; name=.+$}}
 // WITH_MEMBER_DECLS-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc({#(a): Int#})[#Float#]{{; name=.+$}}
@@ -38,7 +38,7 @@ func returnsInt() -> Int {}
 
 // WITH_MEMBER_DECLS_INIT: Begin completions
 // WITH_MEMBER_DECLS_INIT-DAG: Decl[Struct]/CurrModule:          FooStruct[#FooStruct#]{{; name=.+$}}
-// WITH_MEMBER_DECLS_INIT-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Identical]: returnsInt()[#Int#]{{; name=.+$}}
+// WITH_MEMBER_DECLS_INIT-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Convertible]: returnsInt()[#Int#]{{; name=.+$}}
 // WITH_MEMBER_DECLS_INIT-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc({#(self): MemberAccessors#})[#(Int) -> Float#]{{; name=.+$}}
 // WITH_MEMBER_DECLS_INIT: End completions
 
@@ -47,15 +47,15 @@ func returnsInt() -> Int {}
 
 // WITH_LOCAL_DECLS: Begin completions
 // WITH_LOCAL_DECLS-DAG: Decl[Struct]/CurrModule:          FooStruct[#FooStruct#]{{; name=.+$}}
-// WITH_LOCAL_DECLS-DAG: Decl[FreeFunction]/CurrModule{{(/TypeRelation\[Identical\])?}}:    returnsInt()[#Int#]{{; name=.+$}}
-// WITH_LOCAL_DECLS-DAG: Decl[LocalVar]/Local{{(/TypeRelation\[Identical\])?}}:             functionParam[#Int#]{{; name=.+$}}
+// WITH_LOCAL_DECLS-DAG: Decl[FreeFunction]/CurrModule{{(/TypeRelation\[Convertible\])?}}:    returnsInt()[#Int#]{{; name=.+$}}
+// WITH_LOCAL_DECLS-DAG: Decl[LocalVar]/Local{{(/TypeRelation\[Convertible\])?}}:             functionParam[#Int#]{{; name=.+$}}
 // WITH_LOCAL_DECLS-DAG: Decl[FreeFunction]/Local:         localFunc({#(a): Int#})[#Float#]{{; name=.+$}}
 // WITH_LOCAL_DECLS: End completions
 
 // WITH_LOCAL_DECLS1: Begin completions
 // WITH_LOCAL_DECLS1-DAG: Decl[Struct]/CurrModule:          FooStruct[#FooStruct#]{{; name=.+$}}
-// WITH_LOCAL_DECLS1-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Identical]:    returnsInt()[#Int#]{{; name=.+$}}
-// WITH_LOCAL_DECLS1-DAG: Decl[LocalVar]/Local/TypeRelation[Identical]: functionParam[#Int#]{{; name=.+$}}
+// WITH_LOCAL_DECLS1-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Convertible]:    returnsInt()[#Int#]{{; name=.+$}}
+// WITH_LOCAL_DECLS1-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: functionParam[#Int#]{{; name=.+$}}
 // WITH_LOCAL_DECLS1-DAG: Decl[FreeFunction]/Local:         localFunc({#(a): Int#})[#Float#]{{; name=.+$}}
 // WITH_LOCAL_DECLS1: End completions
 
@@ -337,16 +337,16 @@ func accessorsInFunction(_ functionParam: Int) {
 
 // ACCESSORS_IN_MEMBER_FUNC_1: Begin completions
 // ACCESSORS_IN_MEMBER_FUNC_1-DAG: Decl[LocalVar]/Local:             self[#AccessorsInMemberFunction#]
-// ACCESSORS_IN_MEMBER_FUNC_1-DAG: Decl[LocalVar]/Local/TypeRelation[Identical]:             functionParam[#Int#]
+// ACCESSORS_IN_MEMBER_FUNC_1-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]:             functionParam[#Int#]
 // ACCESSORS_IN_MEMBER_FUNC_1-DAG: Decl[InstanceVar]/CurrNominal:    instanceVar[#Double#]
 // ACCESSORS_IN_MEMBER_FUNC_1-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc({#(a): Int#})[#Float#]
 // ACCESSORS_IN_MEMBER_FUNC_1: End completions
 
 // ACCESSORS_IN_MEMBER_FUNC_2: Begin completions
 // ACCESSORS_IN_MEMBER_FUNC_2-DAG: Decl[LocalVar]/Local:            self[#AccessorsInMemberFunction#]
-// ACCESSORS_IN_MEMBER_FUNC_2-DAG: Decl[LocalVar]/Local{{(/TypeRelation\[Identical\])?}}:            functionParam[#Int#]
-// ACCESSORS_IN_MEMBER_FUNC_2-DAG: Decl[InstanceVar]/OutNominal:    instanceVar[#Double#]
-// ACCESSORS_IN_MEMBER_FUNC_2-DAG: Decl[InstanceMethod]/OutNominal: instanceFunc({#(a): Int#})[#Float#]
+// ACCESSORS_IN_MEMBER_FUNC_2-DAG: Decl[LocalVar]/Local{{(/TypeRelation\[Convertible\])?}}:            functionParam[#Int#]
+// ACCESSORS_IN_MEMBER_FUNC_2-DAG: Decl[InstanceVar]/CurrNominal:    instanceVar[#Double#]
+// ACCESSORS_IN_MEMBER_FUNC_2-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc({#(a): Int#})[#Float#]
 // ACCESSORS_IN_MEMBER_FUNC_2: End completions
 
 struct AccessorsInMemberFunction {

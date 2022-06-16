@@ -69,4 +69,7 @@ VARIABLE(SWIFT_DEBUG_RUNTIME_EXCLUSIVITY_LOGGING, bool, false,
 
 #endif
 
+VARIABLE(SWIFT_BINARY_COMPATIBILITY_VERSION, uint32_t, 0,
+        "Set the binary compatibility level of the Swift Standard Library")
+
 #undef VARIABLE

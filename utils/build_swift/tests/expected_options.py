@@ -7,8 +7,6 @@
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 
-from __future__ import absolute_import, unicode_literals
-
 import multiprocessing
 
 from build_swift import argparse
@@ -66,11 +64,15 @@ EXPECTED_DEFAULTS = {
     'build_jobs': multiprocessing.cpu_count(),
     'build_libdispatch': False,
     'build_libicu': False,
+    'build_libxml2': False,
+    'build_zlib': False,
+    'build_curl': False,
     'build_linux': True,
     'build_llbuild': False,
     'build_lldb': False,
     'build_libcxx': False,
     'build_ninja': False,
+    'build_lld': False,
     'build_osx': True,
     'build_playgroundsupport': False,
     'build_runtime_with_host_compiler': False,
@@ -181,6 +183,9 @@ EXPECTED_DEFAULTS = {
     'legacy_impl': False,
     'libdispatch_build_variant': 'Debug',
     'libicu_build_variant': 'Debug',
+    'libxml2_build_variant': 'Debug',
+    'zlib_build_variant': 'Debug',
+    'curl_build_variant': 'Debug',
     'bootstrapping_mode': None,
     'lit_args': '-sv',
     'llbuild_assertions': True,
@@ -220,6 +225,7 @@ EXPECTED_DEFAULTS = {
     'swift_freestanding_is_darwin': False,
     'swift_stdlib_assertions': True,
     'swift_stdlib_build_variant': 'Debug',
+    'swift_tools_ld64_lto_codegen_only_for_supporting_targets': False,
     'swift_tools_max_parallel_lto_link_jobs':
         defaults.SWIFT_MAX_PARALLEL_LTO_LINK_JOBS,
     'swift_user_visible_version': defaults.SWIFT_USER_VISIBLE_VERSION,
@@ -239,7 +245,7 @@ EXPECTED_DEFAULTS = {
     'test_freebsd': False,
     'test_ios': False,
     'test_ios_32bit_simulator': False,
-    'test_watchos_32bit_simulator': True,
+    'test_watchos_32bit_simulator': False,
     'test_ios_host': False,
     'test_ios_simulator': False,
     'test_linux': False,
@@ -428,6 +434,9 @@ EXPECTED_OPTIONS = [
     SetOption('--debug-libdispatch',
               dest='libdispatch_build_variant', value='Debug'),
     SetOption('--debug-libicu', dest='libicu_build_variant', value='Debug'),
+    SetOption('--debug-libxml2', dest='libxml2_build_variant', value='Debug'),
+    SetOption('--debug-zlib', dest='zlib_build_variant', value='Debug'),
+    SetOption('--debug-curl', dest='curl_build_variant', value='Debug'),
     SetOption('--debug-lldb', dest='lldb_build_variant', value='Debug'),
     SetOption('--lldb-build-with-xcode', dest='lldb_build_with_xcode',
               value='1'),
@@ -530,6 +539,7 @@ EXPECTED_OPTIONS = [
     EnableOption('--android'),
     EnableOption('--build-external-benchmarks'),
     EnableOption('--build-ninja'),
+    EnableOption('--build-lld'),
     EnableOption('--build-runtime-with-host-compiler'),
     EnableOption('--build-swift-dynamic-sdk-overlay'),
     EnableOption('--build-swift-dynamic-stdlib'),
@@ -559,6 +569,9 @@ EXPECTED_OPTIONS = [
     EnableOption('--only-non-executable-test'),
     EnableOption('--libdispatch', dest='build_libdispatch'),
     EnableOption('--libicu', dest='build_libicu'),
+    EnableOption('--static-libxml2', dest='build_libxml2'),
+    EnableOption('--static-zlib', dest='build_zlib'),
+    EnableOption('--static-curl', dest='build_curl'),
     EnableOption('--indexstore-db', dest='build_indexstoredb'),
     EnableOption('--test-indexstore-db-sanitize-all',
                  dest='test_indexstoredb_sanitize_all'),
@@ -662,6 +675,9 @@ EXPECTED_OPTIONS = [
                   dest='test_swift_inspect'),
     DisableOption('--skip-build-clang-tools-extra',
                   dest='build_clang_tools_extra'),
+    DisableOption('--skip-build-libxml2', dest='build_libxml2'),
+    DisableOption('--skip-build-zlib', dest='build_zlib'),
+    DisableOption('--skip-build-curl', dest='build_curl'),
 
     ChoicesOption('--compiler-vendor',
                   choices=['none', 'apple']),
@@ -714,6 +730,7 @@ EXPECTED_OPTIONS = [
     IntOption('--jobs', dest='build_jobs'),
     IntOption('--llvm-max-parallel-lto-link-jobs'),
     IntOption('--swift-tools-max-parallel-lto-link-jobs'),
+    EnableOption('--swift-tools-ld64-lto-codegen-only-for-supporting-targets'),
     IntOption('-j', dest='build_jobs'),
     IntOption('--dsymutil-jobs', dest='dsymutil_jobs'),
 

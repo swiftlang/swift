@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # This source file is part of the Swift.org open source project
 #
@@ -48,7 +48,7 @@ common_expected_dependencies = [
     "_malloc_size", "_memchr", "_memcmp", "_memcpy", "_memmove", "_memset",
     "_posix_memalign", "_putc", "_read", "_realloc", "_snprintf", "_strchr",
     "_strcmp", "_strdup", "_strlen", "_strncmp", "_strtod", "_strtof",
-    "_strtol", "_strtold", "_vsnprintf", "_write",
+    "_strtol", "_strtold", "_vprintf", "_vsnprintf", "_write",
 ] + cxx_dependencies + math_dependencies
 vendor_apple_specific_dependencies = [
     "___stack_chk_fail", "___stack_chk_guard",

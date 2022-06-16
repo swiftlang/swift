@@ -120,7 +120,7 @@ public func run_SIMDReduceInt32x4_init(_ n: Int) {
 @inline(never)
 public func run_SIMDReduceInt32x4_cast(_ n: Int) {
   // Morally it seems like we "should" be able to use withMemoryRebound
-  // to SIMD4<Int32>, but that function requries that the sizes match in
+  // to SIMD4<Int32>, but that function requires that the sizes match in
   // debug builds, so this is pretty ugly. The following "works" for now,
   // but is probably in violation of the formal model (the exact rules
   // for "assumingMemoryBound" are not clearly documented). We need a
