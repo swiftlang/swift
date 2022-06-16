@@ -1762,9 +1762,7 @@ namespace {
     ///
     /// and we reach up to mark the CallExpr.
     void markNearestCallAsImplicitly(
-        Optional<ImplicitActorHopTarget> setAsync,
-        bool setThrows = false,
-        bool setDistributedThunk = false) {
+        Optional<ImplicitActorHopTarget> setAsync) {
       assert(applyStack.size() > 0 && "not contained within an Apply?");
 
       const auto End = applyStack.rend();
@@ -1772,14 +1770,6 @@ namespace {
         if (auto call = dyn_cast<CallExpr>(*I)) {
           if (setAsync) {
             call->setImplicitlyAsync(*setAsync);
-          }
-          if (setThrows) {
-            call->setImplicitlyThrows(true);
-          }else {
-            call->setImplicitlyThrows(false);
-          }
-          if (setDistributedThunk) {
-            call->setUsesDistributedThunk(true);
           }
           return;
         }
@@ -2290,19 +2280,14 @@ namespace {
     /// isolated to a distributed actor from a location that is potentially not
     /// local to this process.
     ///
-    /// \returns the (setThrows, isDistributedThunk) bits to implicitly
-    /// mark the access/call with on success, or emits an error and returns
-    /// \c None.
-    Optional<std::pair<bool, bool>>
-    checkDistributedAccess(SourceLoc declLoc, ValueDecl *decl,
-                           Expr *context) {
+    /// \returns true if the access is from outside of actors isolation
+    /// context and false otherwise.
+    bool isDistributedAccess(SourceLoc declLoc, ValueDecl *decl,
+                             Expr *context) {
       // If base of the call is 'local' we permit skip distributed checks.
       if (auto baseSelf = findReferencedBaseSelf(context)) {
-        if (baseSelf->getAttrs().hasAttribute<KnownToBeLocalAttr>()) {
-        return std::make_pair(
-            /*setThrows=*/false,
-            /*isDistributedThunk=*/false);
-        }
+        if (baseSelf->getAttrs().hasAttribute<KnownToBeLocalAttr>())
+          return false;
       }
 
       // Cannot reference subscripts, or stored properties.
@@ -2310,22 +2295,15 @@ namespace {
       if (isa<SubscriptDecl>(decl) || var) {
         // But computed distributed properties are okay,
         // and treated the same as a distributed func.
-        if (var && var->isDistributed()) {
-          bool explicitlyThrowing = false;
-          if (auto getter = var->getAccessor(swift::AccessorKind::Get)) {
-            explicitlyThrowing = getter->hasThrows();
-          }
-          return std::make_pair(
-              /*setThrows*/!explicitlyThrowing,
-              /*isDistributedThunk=*/true);
-        }
+        if (var && var->isDistributed())
+          return true;
 
         // otherwise, it was a normal property or subscript and therefore illegal
         ctx.Diags.diagnose(
             declLoc, diag::distributed_actor_isolated_non_self_reference,
             decl->getDescriptiveKind(), decl->getName());
         noteIsolatedActorMember(decl, context);
-        return None;
+        return false;
       }
 
       // Check that we have a distributed function or computed property.
@@ -2336,15 +2314,13 @@ namespace {
               .fixItInsert(decl->getAttributeInsertionLoc(true), "distributed ");
 
           noteIsolatedActorMember(decl, context);
-          return None;
+          return false;
         }
 
-        return std::make_pair(
-            /*setThrows=*/!afd->hasThrows(),
-            /*isDistributedThunk=*/true);
+        return true;
       }
 
-      return std::make_pair(/*setThrows=*/false, /*distributedThunk=*/false);
+      return false;
     }
 
     /// Attempts to identify and mark a valid cross-actor use of a synchronous
@@ -2362,13 +2338,8 @@ namespace {
       if (isPropOrSubscript(decl)) {
         // Cannot reference properties or subscripts of distributed actors.
         if (isDistributed) {
-          bool setThrows = false;
-          bool usesDistributedThunk = false;
-          if (auto access = checkDistributedAccess(declLoc, decl, context)) {
-            std::tie(setThrows, usesDistributedThunk) = *access;
-          } else {
+          if (!isDistributedAccess(declLoc, decl, context))
             return AsyncMarkingResult::NotDistributed;
-          }
         }
 
         if (auto declRef = dyn_cast_or_null<DeclRefExpr>(context)) {
@@ -2424,20 +2395,13 @@ namespace {
       if (isAsyncCall) {
         // If we're calling to a distributed actor, make sure the function
         // is actually 'distributed'.
-        bool setThrows = false;
-        bool usesDistributedThunk = false;
         if (isDistributed) {
-          if (auto access = checkDistributedAccess(declLoc, decl, context)) {
-            std::tie(setThrows, usesDistributedThunk) = *access;
-          } else {
+          if (!isDistributedAccess(declLoc, decl, context))
             return AsyncMarkingResult::NotDistributed;
-          }
         }
 
-        // Mark call as implicitly 'async', and also potentially as
-        // throwing and using a distributed thunk.
-        markNearestCallAsImplicitly(
-            /*setAsync=*/target, setThrows, usesDistributedThunk);
+        // Mark call as implicitly 'async'.
+        markNearestCallAsImplicitly(/*setAsync=*/target);
         result = AsyncMarkingResult::FoundAsync;
       }
 
