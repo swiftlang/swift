@@ -752,16 +752,6 @@ StoreInst *StackAllocationPromoter::promoteAllocationInBlock(
       continue;
     }
 
-    if (auto *dvi = dyn_cast<DestroyValueInst>(inst)) {
-      if (runningVals &&
-          dvi->getOperand() == runningVals->value.replacement(asi, dvi)) {
-        // Reset LastStore.
-        // So that we don't end up passing dead values as phi args in
-        // StackAllocationPromoter::fixBranchesAndUses
-        lastStoreInst = llvm::None;
-      }
-    }
-
     // Stop on deallocation.
     if (auto *dsi = dyn_cast<DeallocStackInst>(inst)) {
       if (dsi->getOperand() == asi)
