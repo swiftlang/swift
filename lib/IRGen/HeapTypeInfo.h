@@ -74,8 +74,6 @@ enum class IsaEncoding : uint8_t {
   Unknown = ObjC,
 };
 
-class ClassTypeInfo;
-
 /// HeapTypeInfo - A type designed for use implementing a type
 /// which consists solely of something reference-counted.
 ///
@@ -134,20 +132,9 @@ public:
 
   // Emit the copy/destroy operations required by SingleScalarTypeInfo
   // using strong reference counting.
-  void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value,
+  virtual void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value,
                          Atomicity atomicity) const {
-    if (asDerived().getReferenceCounting() == ReferenceCounting::CxxCustom) {
-      if constexpr (__is_same(Impl, ClassTypeInfo)) {
-        auto releaseFn = findForeignReferenceTypeRefCountingOperation(
-            asDerived().getClass(),
-            ForeignReferenceTypeRefCountingOperation::release);
-        IGF.emitForeignReferenceTypeLifetimeOperation(releaseFn, value);
-        return;
-      } else {
-        llvm_unreachable("");
-      }
-    }
-
+    assert(asDerived().getReferenceCounting() != ReferenceCounting::CxxCustom);
     IGF.emitStrongRelease(value, asDerived().getReferenceCounting(), atomicity);
   }
 
@@ -155,20 +142,9 @@ public:
     return IGF.emitFixLifetime(value);
   }
 
-  void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value,
+  virtual void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value,
                         Atomicity atomicity) const {
-    if (asDerived().getReferenceCounting() == ReferenceCounting::CxxCustom) {
-      if constexpr (__is_same(Impl, ClassTypeInfo)) {
-        auto releaseFn = findForeignReferenceTypeRefCountingOperation(
-            asDerived().getClass(),
-            ForeignReferenceTypeRefCountingOperation::retain);
-        IGF.emitForeignReferenceTypeLifetimeOperation(releaseFn, value);
-        return;
-      } else {
-        llvm_unreachable("");
-      }
-    }
-
+    assert(asDerived().getReferenceCounting() != ReferenceCounting::CxxCustom);
     IGF.emitStrongRetain(value, asDerived().getReferenceCounting(), atomicity);
   }
 
@@ -176,39 +152,15 @@ public:
   // using basic reference counting.
   void strongRetain(IRGenFunction &IGF, Explosion &e,
                     Atomicity atomicity) const override {
+    assert(asDerived().getReferenceCounting() != ReferenceCounting::CxxCustom);
     llvm::Value *value = e.claimNext();
-
-    if (asDerived().getReferenceCounting() == ReferenceCounting::CxxCustom) {
-      if constexpr (__is_same(Impl, ClassTypeInfo)) {
-        auto releaseFn = findForeignReferenceTypeRefCountingOperation(
-            asDerived().getClass(),
-            ForeignReferenceTypeRefCountingOperation::retain);
-        IGF.emitForeignReferenceTypeLifetimeOperation(releaseFn, value);
-        return;
-      } else {
-        llvm_unreachable("");
-      }
-    }
-
     asDerived().emitScalarRetain(IGF, value, atomicity);
   }
 
   void strongRelease(IRGenFunction &IGF, Explosion &e,
                      Atomicity atomicity) const override {
+    assert(asDerived().getReferenceCounting() != ReferenceCounting::CxxCustom);
     llvm::Value *value = e.claimNext();
-
-    if (asDerived().getReferenceCounting() == ReferenceCounting::CxxCustom) {
-      if constexpr (__is_same(Impl, ClassTypeInfo)) {
-        auto releaseFn = findForeignReferenceTypeRefCountingOperation(
-            asDerived().getClass(),
-            ForeignReferenceTypeRefCountingOperation::release);
-        IGF.emitForeignReferenceTypeLifetimeOperation(releaseFn, value);
-        return;
-      } else {
-        llvm_unreachable("");
-      }
-    }
-
     asDerived().emitScalarRelease(IGF, value, atomicity);
   }
 

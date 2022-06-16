@@ -58,6 +58,58 @@ public:
 
   StructLayout *createLayoutWithTailElems(IRGenModule &IGM, SILType classType,
                                           ArrayRef<SILType> tailTypes) const;
+
+  void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value,
+                         Atomicity atomicity) const override {
+    if (getReferenceCounting() == ReferenceCounting::CxxCustom) {
+      auto releaseFn = findForeignReferenceTypeRefCountingOperation(getClass(),
+          ForeignReferenceTypeRefCountingOperation::release);
+      IGF.emitForeignReferenceTypeLifetimeOperation(releaseFn, value);
+      return;
+    }
+
+    HeapTypeInfo::emitScalarRelease(IGF, value, atomicity);
+  }
+
+  void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value,
+                        Atomicity atomicity) const override {
+    if (getReferenceCounting() == ReferenceCounting::CxxCustom) {
+      auto releaseFn = findForeignReferenceTypeRefCountingOperation(getClass(),
+          ForeignReferenceTypeRefCountingOperation::retain);
+      IGF.emitForeignReferenceTypeLifetimeOperation(releaseFn, value);
+      return;
+    }
+
+    HeapTypeInfo::emitScalarRetain(IGF, value, atomicity);
+  }
+
+  // Implement the primary retain/release operations of ReferenceTypeInfo
+  // using basic reference counting.
+  void strongRetain(IRGenFunction &IGF, Explosion &e,
+                    Atomicity atomicity) const override {
+    if (getReferenceCounting() == ReferenceCounting::CxxCustom) {
+      llvm::Value *value = e.claimNext();
+      auto releaseFn = findForeignReferenceTypeRefCountingOperation(getClass(),
+          ForeignReferenceTypeRefCountingOperation::retain);
+      IGF.emitForeignReferenceTypeLifetimeOperation(releaseFn, value);
+      return;
+    }
+
+    HeapTypeInfo::strongRetain(IGF, e, atomicity);
+  }
+
+  void strongRelease(IRGenFunction &IGF, Explosion &e,
+                     Atomicity atomicity) const override {
+    if (getReferenceCounting() == ReferenceCounting::CxxCustom) {
+      llvm::Value *value = e.claimNext();
+      auto releaseFn = findForeignReferenceTypeRefCountingOperation(getClass(),
+          ForeignReferenceTypeRefCountingOperation::release);
+      IGF.emitForeignReferenceTypeLifetimeOperation(releaseFn, value);
+      return;
+    }
+
+    HeapTypeInfo::strongRelease(IGF, e, atomicity);
+  }
 };
 
 } // namespace irgen
