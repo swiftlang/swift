@@ -617,9 +617,82 @@ int reflectEnumValue(SwiftReflectionContextRef RC,
   int parens = 0;
   while (EnumTypeRef != 0) {
     swift_typeinfo_t EnumTypeInfo = swift_reflection_infoForTypeRef(RC, EnumTypeRef);
-    if (EnumTypeInfo.Kind != SWIFT_NO_PAYLOAD_ENUM
-        && EnumTypeInfo.Kind != SWIFT_SINGLE_PAYLOAD_ENUM
-        && EnumTypeInfo.Kind != SWIFT_MULTI_PAYLOAD_ENUM) {
+    switch (EnumTypeInfo.Kind) {
+    case SWIFT_NO_PAYLOAD_ENUM:
+    case SWIFT_SINGLE_PAYLOAD_ENUM:
+    case SWIFT_MULTI_PAYLOAD_ENUM:
+    {
+      int CaseIndex;
+      if (!swift_reflection_projectEnumValue(RC, EnumInstance, EnumTypeRef, &CaseIndex)) {
+        printf("swift_reflection_projectEnumValue failed.\n\n");
+        PipeMemoryReader_sendDoneMessage(&Pipe);
+        return 1; // <<< Test cases rely on detecting this, so must "succeed"
+      }
+      if ((unsigned)CaseIndex > EnumTypeInfo.NumFields) {
+        printf("swift_reflection_projectEnumValue returned invalid case.\n\n");
+        PipeMemoryReader_sendDoneMessage(&Pipe);
+        return 0;
+      }
+
+      swift_childinfo_t CaseInfo
+        = swift_reflection_childOfTypeRef(RC, EnumTypeRef, CaseIndex);
+      printf(".%s", CaseInfo.Name);
+      EnumTypeRef = CaseInfo.TR;
+      if (EnumTypeRef != 0) {
+        printf("(");
+        parens += 1;
+      }
+      break;
+    }
+    case SWIFT_STRONG_REFERENCE: // Might be an indirect enum...
+    {
+      // Get the pointer value from the target
+      void *outFreeContext = NULL;
+      const void *rawPtr = PipeMemoryReader_readBytes(&Pipe, EnumInstance, 8, &outFreeContext);
+      uintptr_t instance = *(uintptr_t *)rawPtr;
+
+      swift_typeinfo_t TI = swift_reflection_infoForInstance(RC, instance);
+      if (TI.Kind == SWIFT_CLOSURE_CONTEXT) {
+        printf("********** FOUND Closure Context **************\n");
+        swift_typeref_t TR = swift_reflection_typeRefForInstance(RC, instance);
+        printf("Type reference for instance: ");
+        swift_reflection_dumpTypeRef(TR);
+        printf("\n");
+
+        swift_typeinfo_t TI1 = swift_reflection_infoForTypeRef(RC, TR);
+        printf("Type info for type ref: Kind: %d NumFields: %d\n", TI1.Kind, TI1.NumFields);
+
+        swift_typeinfo_t TI = swift_reflection_infoForInstance(RC, instance);
+        printf("Type info for instance: Kind: %d NumFields: %d\n", TI.Kind, TI.NumFields);
+
+        printf("Type info for instance:\n");
+        swift_reflection_dumpInfoForInstance(RC, instance);
+        printf("\n");
+
+        // XXX FIXME THIS BREAKS?!  What is the right way to reflect a closure context?
+        swift_childinfo_t CaseInfo
+          = swift_reflection_childOfTypeRef(RC, TR, 0);
+
+        if (CaseInfo.TR != 0) {
+          printf("******** Read Case 0 *************\n");
+          swift_typeinfo_t maybeEnumTI = swift_reflection_infoForTypeRef(RC, CaseInfo.TR);
+          if (maybeEnumTI.Kind == SWIFT_NO_PAYLOAD_ENUM
+              || maybeEnumTI.Kind == SWIFT_SINGLE_PAYLOAD_ENUM
+              || maybeEnumTI.Kind == SWIFT_MULTI_PAYLOAD_ENUM) {
+            printf("******** FOUND INDIRECT ENUM *************\n");
+            EnumTypeRef = 0; // REMOVE ME
+            break;
+          }
+        } else {
+          printf("!!!!!!!!! Case 0 has no TR\n");
+        }
+      } else {
+        printf("!!!!!!!!!! Not a closure context\n");
+      }
+    }
+    default:
+    {
+      EnumTypeRef = 0;
       if (parens == 0) {
         printf(".??"); // Enum was optimized away, print "something"
       } else {
@@ -627,27 +700,8 @@ int reflectEnumValue(SwiftReflectionContextRef RC,
       }
       break;
     }
-
-    int CaseIndex;
-    if (!swift_reflection_projectEnumValue(RC, EnumInstance, EnumTypeRef, &CaseIndex)) {
-      printf("swift_reflection_projectEnumValue failed.\n\n");
-      PipeMemoryReader_sendDoneMessage(&Pipe);
-      return 1; // <<< Test cases rely on detecting this, so must "succeed"
-    }
-    if ((unsigned)CaseIndex > EnumTypeInfo.NumFields) {
-      printf("swift_reflection_projectEnumValue returned invalid case.\n\n");
-      PipeMemoryReader_sendDoneMessage(&Pipe);
-      return 0;
     }
 
-    swift_childinfo_t CaseInfo
-      = swift_reflection_childOfTypeRef(RC, EnumTypeRef, CaseIndex);
-    printf(".%s", CaseInfo.Name);
-    EnumTypeRef = CaseInfo.TR;
-    if (EnumTypeRef != 0) {
-      printf("(");
-      parens += 1;
-    }
   }
   for (int i = 0; i < parens; ++i) {
     printf(")");
@@ -724,6 +778,10 @@ int doDumpHeapInstance(const char *BinaryFilename) {
       exit(status);
     }
     default: { // Parent
+      for (int i = 5; i > 1; i--) {
+	fprintf(stderr, "%d\n", i);
+	sleep(1);
+      }
       close(PipeMemoryReader_getChildReadFD(&Pipe));
       close(PipeMemoryReader_getChildWriteFD(&Pipe));
       SwiftReflectionContextRef RC =
