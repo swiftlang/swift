@@ -81,13 +81,12 @@ func testTopLevel() {
 // TOP_LEVEL_0-DAG: Decl[Constructor]/CurrModule:    E({#x: A#})[#E#]{{; name=.+}}
 // TOP_LEVEL_0-DAG: Decl[Constructor]/CurrModule:    F({#x: A#})[#F#]{{; name=.+}}
 // TOP_LEVEL_0-DAG: Decl[Constructor]/CurrModule:    F()[#F#]{{; name=.+}}
-// TOP_LEVEL_0-DAG: Decl[Constructor]/CurrModule:    G({#x: A#})[#G#]{{; name=.+}}
 // TOP_LEVEL_0-DAG: Decl[Constructor]/CurrModule:    H({#x: A#})[#H#]{{; name=.+}}
-// TOP_LEVEL_0-DAG: Decl[Constructor]/CurrModule:    I({#x: A#})[#I#]{{; name=.+}}
-// TOP_LEVEL_0-DAG: Decl[Constructor]/CurrModule:    I({#y: A#})[#I#]{{; name=.+}}
 // TOP_LEVEL_0-DAG: Decl[Constructor]/CurrModule:    J()[#A#]{{; name=.+}}
 // TOP_LEVEL_0: End completions
 // NEGATIVE_TOP_LEVEL_0-NOT: Decl[Constructor]/CurrModule:    E()
+// NEGATIVE_TOP_LEVEL_0-NOT: Decl[Constructor]/CurrModule:    G(
+// NEGATIVE_TOP_LEVEL_0-NOT: Decl[Constructor]/CurrModule:    I(
 
 func testQualified0() {
   K.#^K_QUALIFIED_0^#
