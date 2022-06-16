@@ -1193,8 +1193,13 @@ private:
     if (!rewritten)
       return {};
 
-    if (auto *stmt = getAsStmt(rewritten))
+    if (auto *stmt = getAsStmt(rewritten)) {
+      auto &ctx = context.getAsDeclContext()->getASTContext();
+      DiagnosticTransaction transaction(ctx.Diags);
+      transaction.limitBehavior(DiagnosticBehavior::Warning);
+
       performStmtDiagnostics(stmt, context.getAsDeclContext());
+    }
 
     return rewritten;
   }

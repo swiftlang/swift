@@ -1230,6 +1230,8 @@ namespace swift {
     /// Whether this transaction is currently open.
     bool IsOpen = true;
 
+    Optional<DiagnosticBehavior> BehaviorLimit = None;
+
   public:
     DiagnosticTransaction(const DiagnosticTransaction &) = delete;
     DiagnosticTransaction &operator=(const DiagnosticTransaction &) = delete;
@@ -1255,11 +1257,7 @@ namespace swift {
     }
 
     bool hasErrors() const {
-      ArrayRef<Diagnostic> diagnostics(Engine.TentativeDiagnostics.begin() +
-                                           PrevDiagnostics,
-                                       Engine.TentativeDiagnostics.end());
-
-      for (auto &diagnostic : diagnostics) {
+      for (auto &diagnostic : getTentativeDiagnostics()) {
         auto behavior = Engine.state.determineBehavior(diagnostic);
         if (behavior == DiagnosticBehavior::Fatal ||
             behavior == DiagnosticBehavior::Error)
@@ -1267,6 +1265,11 @@ namespace swift {
       }
 
       return false;
+    }
+
+    void limitBehavior(DiagnosticBehavior limit) {
+      assert(!BehaviorLimit);
+      BehaviorLimit.emplace(limit);
     }
 
     /// Abort and close this transaction and erase all diagnostics
@@ -1282,6 +1285,12 @@ namespace swift {
     /// transaction, emit any diagnostics that were recorded while it was open.
     void commit() {
       close();
+
+      if (BehaviorLimit) {
+        for (auto &diagnostic : getTentativeDiagnostics())
+          diagnostic.setBehaviorLimit(*BehaviorLimit);
+      }
+
       if (Depth == 0) {
         assert(PrevDiagnostics == 0);
         Engine.emitTentativeDiagnostics();
@@ -1289,6 +1298,11 @@ namespace swift {
     }
 
   private:
+    MutableArrayRef<Diagnostic> getTentativeDiagnostics() const {
+      return {Engine.TentativeDiagnostics.begin() + PrevDiagnostics,
+              Engine.TentativeDiagnostics.end()};
+    }
+
     void close() {
       assert(IsOpen && "only open transactions may be closed");
       IsOpen = false;
