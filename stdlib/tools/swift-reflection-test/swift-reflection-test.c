@@ -648,24 +648,26 @@ int reflectEnumValue(SwiftReflectionContextRef RC,
     {
       // Get the pointer value from the target
       void *outFreeContext = NULL;
-      const void *rawPtr = PipeMemoryReader_readBytes((void *)&Pipe, EnumInstance, 8, &outFreeContext);
+      const void *rawPtr
+        = PipeMemoryReader_readBytes((void *)&Pipe, EnumInstance, 8, &outFreeContext);
       uintptr_t instance = *(uintptr_t *)rawPtr;
+      PipeMemoryReader_freeBytes((void *)&Pipe, rawPtr, outFreeContext);
 
       // Indirect enum is stored as the first field of a closure context...
       swift_typeinfo_t TI = swift_reflection_infoForInstance(RC, instance);
       if (TI.Kind == SWIFT_CLOSURE_CONTEXT) {
         swift_childinfo_t CaseInfo
           = swift_reflection_childOfInstance(RC, instance, 0);
-        if (CaseInfo.TR != 0) {
-          if (CaseInfo.Kind == SWIFT_NO_PAYLOAD_ENUM
-              || CaseInfo.Kind == SWIFT_SINGLE_PAYLOAD_ENUM
-              || CaseInfo.Kind == SWIFT_MULTI_PAYLOAD_ENUM) {
-            EnumTypeRef = CaseInfo.TR;
-            EnumInstance = instance + CaseInfo.Offset;
-            break;
-          }
+        if (CaseInfo.Kind == SWIFT_NO_PAYLOAD_ENUM
+            || CaseInfo.Kind == SWIFT_SINGLE_PAYLOAD_ENUM
+            || CaseInfo.Kind == SWIFT_MULTI_PAYLOAD_ENUM) {
+          // Found the indirect enum storage, loop to print it out.
+          EnumTypeRef = CaseInfo.TR;
+          EnumInstance = instance + CaseInfo.Offset;
+          break;
         }
       }
+      // Not an indirect enum, fall through...
       __attribute__((fallthrough));
     }
     default:
@@ -679,7 +681,6 @@ int reflectEnumValue(SwiftReflectionContextRef RC,
       break;
     }
     }
-
   }
   for (int i = 0; i < parens; ++i) {
     printf(")");
