@@ -1164,6 +1164,16 @@ struct TargetForeignClassMetadata : public TargetForeignTypeMetadata<Runtime> {
 };
 using ForeignClassMetadata = TargetForeignClassMetadata<InProcess>;
 
+/// The structure of metadata objects for foreign reference types.
+/// A foreign reference type is a non-Swift, non-Objective-C foreign type with
+/// reference semantics. Foreign reference types are pointers/reference to
+/// value types marked with the "import_as_ref" attribute.
+///
+/// Foreign reference types may have *custom* reference counting operations, or
+/// they may be immortal (and therefore trivial).
+///
+/// We assume for now that foreign reference types are entirely opaque
+/// to Swift introspection.
 template <typename Runtime>
 struct TargetForeignReferenceTypeMetadata : public TargetForeignTypeMetadata<Runtime> {
   using StoredPointer = typename Runtime::StoredPointer;

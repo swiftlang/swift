@@ -1787,8 +1787,7 @@ namespace {
       // is a foreign class.
       if ((IGM.IRGen.Opts.ReflectionMetadata !=
            ReflectionMetadataMode::Runtime) ||
-          getType()->isForeign() ||
-          getType()->isForeignReferenceType()) {
+          getType()->isForeign()) {
         B.addInt32(0);
         return;
       }
@@ -5430,6 +5429,9 @@ namespace {
     ForeignClassMetadataBuilder(IRGenModule &IGM, ClassDecl *target,
                                 ConstantStructBuilder &B)
         : ForeignMetadataBuilderBase(IGM, target, B) {
+      assert(!getTargetType()->isForeignReferenceType() &&
+             "foreign reference type metadata must be built with the ForeignReferenceTypeMetadataBuilder");
+
       if (IGM.getOptions().LazyInitializeClassMetadata)
         CanBeConstant = false;
     }
@@ -5559,11 +5561,6 @@ namespace {
     }
 
     void addSuperclass() {
-      // Always leave the superclass pointer unfilled.  We'll have to
-      // unique it during initialization anyway, so we might as well spare
-      // ourselves the load-time work.
-      B.addNullPointer(IGM.TypeMetadataPtrTy);
-
       assert(!Target->hasSuperclass() &&
              "foreign reference types should not have superclasses.");
     }
