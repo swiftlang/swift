@@ -29,6 +29,7 @@
 // CHECK-NEXT:  #include <cstddef>
 // CHECK-NEXT:  #include <cstdbool>
 // CHECK-NEXT:  #include <cstring>
+// CHECK-NEXT:  #include <cstdlib>
 // CHECK-NEXT:  #else
 // CHECK-NEXT:  #include <stdint.h>
 // CHECK-NEXT:  #include <stddef.h>

@@ -118,20 +118,40 @@ static void printTypeMetadataResponseType(SwiftToClangInteropContext &ctx,
                  funcSig.parameterTypes[0]);
 }
 
+static void printOpaqueAllocFee(raw_ostream &os) {
+  os << R"text(inline void * _Nonnull opaqueAlloc(size_t size, size_t align) {
+  if (align < sizeof(void *)) align = sizeof(void *);
+  void *r = nullptr;
+  int res = posix_memalign(&r, align, size);
+  (void)res;
+  return r;
+}
+inline void opaqueFree(void * _Nonnull p) {
+  free(p);
+}
+)text";
+}
+
 static void printSwiftResilientStorageClass(raw_ostream &os) {
-  // FIXME: alignment.
+  // FIXME: mark noexcept.
   auto name = cxx_synthesis::getCxxOpaqueStorageClassName();
+  static_assert(TargetValueWitnessFlags<uint64_t>::AlignmentMask ==
+                    TargetValueWitnessFlags<uint32_t>::AlignmentMask,
+                "alignment mask doesn't match");
   os << "/// Container for an opaque Swift value, like resilient struct.\n";
   os << "class " << name << " {\n";
   os << "public:\n";
   os << "  inline " << name << "() : storage(nullptr) { }\n";
   os << "  inline " << name
-     << "(ValueWitnessTable * _Nonnull vwTable) : storage(new "
-        "char[vwTable->size]) { }\n";
+     << "(ValueWitnessTable * _Nonnull vwTable) : storage("
+        "reinterpret_cast<char *>(opaqueAlloc(vwTable->size, (vwTable->flags &"
+     << TargetValueWitnessFlags<uint64_t>::AlignmentMask << ") + 1))) { }\n";
   os << "  inline " << name << "(" << name
      << "&& other) : storage(other.storage) { other.storage = nullptr; }\n";
   os << "  inline " << name << "(const " << name << "&) = delete;\n";
-  os << "  inline ~" << name << "() { if (storage) { delete[] storage; } }\n";
+  os << "  inline ~" << name
+     << "() { if (storage) { opaqueFree(static_cast<char "
+        "* _Nonnull>(storage)); } }\n";
   os << "  void operator =(" << name
      << "&& other) { auto temp = storage; storage = other.storage; "
         "other.storage = temp; }\n";
@@ -157,6 +177,8 @@ void swift::printSwiftToClangCoreScaffold(SwiftToClangInteropContext &ctx,
             os << "\n";
             printValueWitnessTable(os);
           });
+          os << "\n";
+          printOpaqueAllocFee(os);
           os << "\n";
           printSwiftResilientStorageClass(os);
         });
