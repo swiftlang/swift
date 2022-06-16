@@ -23,6 +23,7 @@
 namespace swift {
 
 class AbstractFunctionDecl;
+class AccessorDecl;
 class FuncDecl;
 class NominalTypeDecl;
 class ParamDecl;
@@ -57,11 +58,20 @@ public:
     Type type;
   };
 
+  /// Optional modifiers that can be applied to function signature.
+  struct FunctionSignatureModifiers {
+    /// Additional qualifier to add before the function's name.
+    const NominalTypeDecl *qualifierContext;
+
+    FunctionSignatureModifiers() : qualifierContext(nullptr) {}
+  };
+
   /// Print the C function declaration or the C++ function thunk that
   /// corresponds to the given function declaration.
-  void printFunctionSignature(AbstractFunctionDecl *FD, StringRef name,
+  void printFunctionSignature(const AbstractFunctionDecl *FD, StringRef name,
                               Type resultTy, FunctionSignatureKind kind,
-                              ArrayRef<AdditionalParam> additionalParams = {});
+                              ArrayRef<AdditionalParam> additionalParams = {},
+                              FunctionSignatureModifiers modifiers = {});
 
   /// Print the use of the C++ function thunk parameter as it's passed to the C
   /// function declaration.
@@ -73,9 +83,14 @@ public:
                          const ParameterList *params,
                          ArrayRef<AdditionalParam> additionalParams = {});
 
+  /// Print the Swift method as C++ method declaration/definition.
+  void printCxxMethod(const NominalTypeDecl *typeDeclContext,
+                      const AbstractFunctionDecl *FD, StringRef swiftSymbolName,
+                      Type resultTy, bool isDefinition);
+
   /// Print the C++ getter/setter method signature.
   void printCxxPropertyAccessorMethod(const NominalTypeDecl *typeDeclContext,
-                                      const AbstractFunctionDecl *FD,
+                                      const AccessorDecl *accessor,
                                       StringRef swiftSymbolName, Type resultTy,
                                       bool isDefinition);
 

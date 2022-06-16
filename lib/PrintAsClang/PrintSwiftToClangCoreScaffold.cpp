@@ -66,9 +66,9 @@ static void printValueWitnessTableFunctionType(raw_ostream &os, StringRef name,
                                                StringRef returnType,
                                                std::string paramTypes,
                                                uint16_t ptrauthDisc) {
-  os << "using ValueWitness" << name << "Ty = " << returnType << "(*)("
-     << paramTypes << ") __ptrauth_swift_value_witness_function_pointer("
-     << ptrauthDisc << ");\n";
+  os << "using ValueWitness" << name << "Ty = " << returnType
+     << "(* __ptrauth_swift_value_witness_function_pointer(" << ptrauthDisc
+     << "))(" << paramTypes << ");\n";
 }
 
 static std::string makeParams(const char *arg) { return arg; }
