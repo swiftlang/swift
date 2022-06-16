@@ -22,8 +22,11 @@ public class SomeClass {
 
 // PUBLIC-NOT: precise:{{.*}}_ProtocolShouldntAppear
 // PUBLIC-NOT: precise:{{.*}}PublicProtocol
+// PUBLIC-NOT: precise:{{.*}}someHiddenVar
 @_show_in_interface
-public protocol _ProtocolShouldntAppear {}
+public protocol _ProtocolShouldntAppear {
+  static var someHiddenVar: String { get }
+}
 
 // PUBLIC-NOT: _ShouldntAppear
 // INTERNAL-DAG: _ShouldntAppear
@@ -46,11 +49,18 @@ public struct _ShouldntAppear: PublicProtocol, _ProtocolShouldntAppear {
   // INTERNAL-DAG: InnerInnerShouldntAppear
   public struct InnerInnerShouldntAppear {}
   }
+
+  // INTERNAL-DAG: "precise": "s:21SkipsPublicUnderscore15_ShouldntAppearV13someHiddenVarSSvpZ"
+  public static var someHiddenVar: String { "someHiddenVar" }
 }
 
 // A public type's relationship to an "internal" protocol
 // shouldn't cause it to be included.
-public struct ShouldAppear: _ProtocolShouldntAppear {}
+public struct ShouldAppear {}
+
+extension ShouldAppear: _ProtocolShouldntAppear {
+  public static var someHiddenVar: String { "someHiddenVar" }
+}
 
 public struct PublicOuter {
   // Nor should an "internal" type's relationship to a "public" protocol.
