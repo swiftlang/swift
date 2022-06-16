@@ -7933,12 +7933,16 @@ bool ExprRewriter::requiresDistributedThunk(Expr *base, SourceLoc memberLoc,
   auto *memberDecl = memberRef.getDecl();
   assert(memberDecl);
 
-  if (auto *FD = dyn_cast<AbstractFunctionDecl>(memberDecl)) {
+  if (auto *FD = dyn_cast<FuncDecl>(memberDecl)) {
     if (!(FD->isInstanceMember() && FD->isDistributed()))
       return false;
   } else if (auto *VD = dyn_cast<VarDecl>(memberDecl)) {
     if (!VD->isDistributed())
       return false;
+  } else {
+    // On 'distributed' methods and computed properties could ever
+    // require access via a distributed thunk.
+    return false;
   }
 
   auto *actor = getReferencedParamOrCapture(
@@ -7950,8 +7954,12 @@ bool ExprRewriter::requiresDistributedThunk(Expr *base, SourceLoc memberLoc,
         return nullptr;
       });
 
+  // If the base is not a parameter/variable reference or a capture
+  // it means that it's a result of some expression which cannot
+  // possibly be isolated, so referencing a distributed member on
+  // such base always requires a thunk.
   if (!actor)
-    return false;
+    return true;
 
   // If this is a method reference on an potentially isolated
   // actor then it cannot be a remote thunk.
