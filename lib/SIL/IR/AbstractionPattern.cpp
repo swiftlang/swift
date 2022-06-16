@@ -401,7 +401,7 @@ AbstractionPattern::getTupleElementType(unsigned index) const {
   llvm_unreachable("bad kind");
 }
 
-AbstractionPattern AbstractionPattern::withoutMoveOnly() const {
+AbstractionPattern AbstractionPattern::removingMoveOnlyWrapper() const {
   switch (getKind()) {
   case Kind::Invalid:
     llvm_unreachable("querying invalid abstraction pattern!");
@@ -435,7 +435,7 @@ AbstractionPattern AbstractionPattern::withoutMoveOnly() const {
   llvm_unreachable("bad kind");
 }
 
-AbstractionPattern AbstractionPattern::withMoveOnly() const {
+AbstractionPattern AbstractionPattern::addingMoveOnlyWrapper() const {
   switch (getKind()) {
   case Kind::Invalid:
     llvm_unreachable("querying invalid abstraction pattern!");

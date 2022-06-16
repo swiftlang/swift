@@ -296,7 +296,7 @@ public:
     IsInfiniteType_t isInfinite() const {
       return IsInfiniteType_t((Flags & InfiniteFlag) != 0);
     }
-    IsMoveOnly_t isMoveOnly() const {
+    IsMoveOnly_t isMoveOnlyWrapped() const {
       return IsMoveOnly_t((Flags & MoveOnlyFlag) != 0);
     }
 
