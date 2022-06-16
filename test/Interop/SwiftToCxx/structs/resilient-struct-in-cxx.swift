@@ -29,7 +29,7 @@ public struct FirstSmallStruct {
 // CHECK-NEXT:   vwTable->initializeWithCopy(_getOpaquePointer(), const_cast<char *>(other._getOpaquePointer()), metadata._0);
 // CHECK-NEXT: }
 // CHECK: private:
-// CHECK-NEXT:  inline FirstSmallStruct(swift::_impl::ValueWitnessTable *vwTable) : _storage(vwTable) {}
+// CHECK-NEXT:  inline FirstSmallStruct(swift::_impl::ValueWitnessTable * _Nonnull vwTable) : _storage(vwTable) {}
 // CHECK-NEXT:  static inline FirstSmallStruct _make() {
 // CHECK-NEXT:    auto metadata = _impl::$s7Structs16FirstSmallStructVMa(0);
 // CHECK-NEXT:    return FirstSmallStruct(*(reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1));
@@ -70,7 +70,7 @@ public struct LargeStruct {
 // CHECK-NEXT:   vwTable->initializeWithCopy(_getOpaquePointer(), const_cast<char *>(other._getOpaquePointer()), metadata._0);
 // CHECK-NEXT: }
 // CHECK: private:
-// CHECK-NEXT:  inline LargeStruct(swift::_impl::ValueWitnessTable *vwTable) : _storage(vwTable) {}
+// CHECK-NEXT:  inline LargeStruct(swift::_impl::ValueWitnessTable * _Nonnull vwTable) : _storage(vwTable) {}
 // CHECK-NEXT:  static inline LargeStruct _make() {
 // CHECK-NEXT:    auto metadata = _impl::$s7Structs11LargeStructVMa(0);
 // CHECK-NEXT:    return LargeStruct(*(reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1));
@@ -118,7 +118,7 @@ public struct StructWithRefCountStoredProp {
     }
 }
 
-// CHECK: inline StructWithRefCountStoredProp(swift::_impl::ValueWitnessTable *vwTable) : _storage(vwTable) {}
+// CHECK: inline StructWithRefCountStoredProp(swift::_impl::ValueWitnessTable * _Nonnull vwTable) : _storage(vwTable) {}
 // CHECK:      inline void StructWithRefCountStoredProp::dump() const {
 // CHECK-NEXT:   return _impl::$s7Structs28StructWithRefCountStoredPropV4dumpyyF(_getOpaquePointer());
 // CHECK-NEXT: }

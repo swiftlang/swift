@@ -166,7 +166,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
   if (isOpaqueLayout) {
     os << "(";
     printer.printSwiftImplQualifier();
-    os << "ValueWitnessTable *vwTable) : _storage(vwTable) {}\n";
+    os << "ValueWitnessTable * _Nonnull vwTable) : _storage(vwTable) {}\n";
   } else {
     os << "() {}\n";
   }
