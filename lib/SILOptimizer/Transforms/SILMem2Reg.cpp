@@ -732,21 +732,22 @@ StoreInst *StackAllocationPromoter::promoteAllocationInBlock(
 
     // Replace destroys with a release of the value.
     if (auto *dai = dyn_cast<DestroyAddrInst>(inst)) {
-      if (dai->getOperand() == asi) {
-        if (runningVals) {
-          replaceDestroy(dai, runningVals->value.replacement(asi, dai), ctx,
-                         deleter, instructionsToDelete);
-          if (shouldAddLexicalLifetime(asi)) {
-            endLexicalLifetimeBeforeInst(asi, /*beforeInstruction=*/dai, ctx,
-                                         runningVals->value);
-          }
-          runningVals->isStorageValid = false;
-          if (lastStoreInst)
-            lastStoreInst->isStorageValid = false;
-        } else {
-          assert(!deinitializationPoints[blockPromotingWithin]);
-          deinitializationPoints[blockPromotingWithin] = dai;
+      if (dai->getOperand() != asi) {
+        continue;
+      }
+      if (runningVals) {
+        replaceDestroy(dai, runningVals->value.replacement(asi, dai), ctx,
+                       deleter, instructionsToDelete);
+        if (shouldAddLexicalLifetime(asi)) {
+          endLexicalLifetimeBeforeInst(asi, /*beforeInstruction=*/dai, ctx,
+                                       runningVals->value);
         }
+        runningVals->isStorageValid = false;
+        if (lastStoreInst)
+          lastStoreInst->isStorageValid = false;
+      } else {
+        assert(!deinitializationPoints[blockPromotingWithin]);
+        deinitializationPoints[blockPromotingWithin] = dai;
       }
       continue;
     }
@@ -1636,26 +1637,27 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
     // Remove stores and record the value that we are saving as the running
     // value.
     if (auto *si = dyn_cast<StoreInst>(inst)) {
-      if (si->getDest() == asi) {
-        if (si->getOwnershipQualifier() == StoreOwnershipQualifier::Assign) {
-          assert(runningVals && runningVals->isStorageValid);
-          SILBuilderWithScope(si, ctx).createDestroyValue(
-              si->getLoc(), runningVals->value.replacement(asi, si));
-        }
-        auto oldRunningVals = runningVals;
-        runningVals = {LiveValues::toReplace(asi, /*replacement=*/si->getSrc()),
-                       /*isStorageValid=*/true};
-        if (shouldAddLexicalLifetime(asi)) {
-          if (oldRunningVals && oldRunningVals->isStorageValid) {
-            endLexicalLifetimeBeforeInst(asi, /*beforeInstruction=*/si, ctx,
-                                         oldRunningVals->value);
-          }
-          runningVals = beginLexicalLifetimeAfterStore(asi, si);
-        }
-        deleter.forceDelete(inst);
-        ++NumInstRemoved;
+      if (si->getDest() != asi) {
         continue;
       }
+      if (si->getOwnershipQualifier() == StoreOwnershipQualifier::Assign) {
+        assert(runningVals && runningVals->isStorageValid);
+        SILBuilderWithScope(si, ctx).createDestroyValue(
+            si->getLoc(), runningVals->value.replacement(asi, si));
+      }
+      auto oldRunningVals = runningVals;
+      runningVals = {LiveValues::toReplace(asi, /*replacement=*/si->getSrc()),
+                     /*isStorageValid=*/true};
+      if (shouldAddLexicalLifetime(asi)) {
+        if (oldRunningVals && oldRunningVals->isStorageValid) {
+          endLexicalLifetimeBeforeInst(asi, /*beforeInstruction=*/si, ctx,
+                                       oldRunningVals->value);
+        }
+        runningVals = beginLexicalLifetimeAfterStore(asi, si);
+      }
+      deleter.forceDelete(inst);
+      ++NumInstRemoved;
+      continue;
     }
 
     // Replace debug_value w/ address value with debug_value of
