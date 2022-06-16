@@ -5410,21 +5410,21 @@ namespace {
     }
   };
 
-  template<class Impl>
+  class ForeignClassMetadataBuilder;
   class ForeignClassMetadataBuilderBase :
-      public ForeignClassMetadataVisitor<Impl> {
+      public ForeignClassMetadataVisitor<ForeignClassMetadataBuilder> {
   protected:
     ConstantStructBuilder &B;
 
     ForeignClassMetadataBuilderBase(IRGenModule &IGM, ClassDecl *target,
                                     ConstantStructBuilder &B)
-      : ForeignClassMetadataVisitor<Impl>(IGM, target), B(B) {}
+      : ForeignClassMetadataVisitor(IGM, target), B(B) {}
   };
 
   /// A builder for ForeignClassMetadata.
   class ForeignClassMetadataBuilder :
       public ForeignMetadataBuilderBase<ForeignClassMetadataBuilder,
-                                        ForeignClassMetadataBuilderBase<ForeignClassMetadataBuilder>> {
+                                        ForeignClassMetadataBuilderBase> {
   public:
     ForeignClassMetadataBuilder(IRGenModule &IGM, ClassDecl *target,
                                 ConstantStructBuilder &B)
@@ -5521,10 +5521,21 @@ namespace {
     }
   };
 
+  class ForeignReferenceTypeMetadataBuilder;
+  class ForeignReferenceTypeMetadataBuilderBase :
+      public ForeignReferenceTypeMetadataVisitor<ForeignReferenceTypeMetadataBuilder> {
+  protected:
+    ConstantStructBuilder &B;
+
+    ForeignReferenceTypeMetadataBuilderBase(IRGenModule &IGM, ClassDecl *target,
+                                            ConstantStructBuilder &B)
+        : ForeignReferenceTypeMetadataVisitor(IGM, target), B(B) {}
+  };
+
   /// A builder for ForeignReferenceTypeMetadata.
   class ForeignReferenceTypeMetadataBuilder :
       public ForeignMetadataBuilderBase<ForeignReferenceTypeMetadataBuilder,
-                                        ForeignClassMetadataBuilderBase<ForeignReferenceTypeMetadataBuilder>> {
+                                        ForeignReferenceTypeMetadataBuilderBase> {
   public:
     ForeignReferenceTypeMetadataBuilder(IRGenModule &IGM, ClassDecl *target,
                                         ConstantStructBuilder &B)
@@ -5558,11 +5569,6 @@ namespace {
       B.addSignedPointer(descriptor,
                          IGM.getOptions().PointerAuth.TypeDescriptors,
                          PointerAuthEntity::Special::TypeDescriptor);
-    }
-
-    void addSuperclass() {
-      assert(!Target->hasSuperclass() &&
-             "foreign reference types should not have superclasses.");
     }
 
     void addReservedWord() {

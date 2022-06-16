@@ -71,6 +71,28 @@ private:
   }
 };
 
+template <class Impl>
+class ForeignReferenceTypeMetadataVisitor
+    : public NominalMetadataVisitor<Impl> {
+  using super = NominalMetadataVisitor<Impl>;
+protected:
+  ClassDecl *Target;
+  using super::asImpl;
+public:
+  ForeignReferenceTypeMetadataVisitor(IRGenModule &IGM, ClassDecl *target)
+      : super(IGM), Target(target) {}
+
+  void layout() {
+    super::layout();
+    asImpl().addNominalTypeDescriptor();
+    asImpl().addReservedWord();
+  }
+
+  CanType getTargetType() const {
+    return Target->getDeclaredType()->getCanonicalType();
+  }
+};
+
 } // end namespace irgen
 } // end namespace swift
 
