@@ -171,8 +171,9 @@ private:
 } // end namespace
 
 void DeclAndTypeClangFunctionPrinter::printFunctionSignature(
-    AbstractFunctionDecl *FD, StringRef name, Type resultTy,
-    FunctionSignatureKind kind, ArrayRef<AdditionalParam> additionalParams) {
+    const AbstractFunctionDecl *FD, StringRef name, Type resultTy,
+    FunctionSignatureKind kind, ArrayRef<AdditionalParam> additionalParams,
+    FunctionSignatureModifiers modifiers) {
   OutputLanguageMode outputLang = kind == FunctionSignatureKind::CFunctionProto
                                       ? OutputLanguageMode::ObjC
                                       : OutputLanguageMode::Cxx;
@@ -213,7 +214,13 @@ void DeclAndTypeClangFunctionPrinter::printFunctionSignature(
     os << "void";
   }
 
-  os << ' ' << name << '(';
+  os << ' ';
+  if (modifiers.qualifierContext) {
+    // FIXME: Full qualifiers for nested types?
+    ClangSyntaxPrinter(os).printBaseName(modifiers.qualifierContext);
+    os << "::";
+  }
+  os << name << '(';
 
   bool HasParams = false;
   // Indirect result is passed in as the first parameter.
@@ -367,16 +374,41 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
   os << ";\n";
 }
 
-void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
+void DeclAndTypeClangFunctionPrinter::printCxxMethod(
     const NominalTypeDecl *typeDeclContext, const AbstractFunctionDecl *FD,
     StringRef swiftSymbolName, Type resultTy, bool isDefinition) {
-  assert(FD->getParameters()->size() == 0);
+  os << "  inline ";
+  // FIXME: Full qualifier.
+  FunctionSignatureModifiers modifiers;
+  if (isDefinition)
+    modifiers.qualifierContext = typeDeclContext;
+  printFunctionSignature(FD, FD->getName().getBaseIdentifier().get(), resultTy,
+                         FunctionSignatureKind::CxxInlineThunk, {}, modifiers);
+
+  // FIXME: Add support for mutating methods.
+  os << " const";
+  if (!isDefinition) {
+    os << ";\n";
+    return;
+  }
+  os << " {\n";
+  // FIXME: should it be objTy for resultTy?
+  printCxxThunkBody(swiftSymbolName, resultTy, FD->getParameters(),
+                    {AdditionalParam{AdditionalParam::Role::Self,
+                                     typeDeclContext->getDeclaredType()}});
+  os << "  }\n";
+}
+
+void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
+    const NominalTypeDecl *typeDeclContext, const AccessorDecl *accessor,
+    StringRef swiftSymbolName, Type resultTy, bool isDefinition) {
+  assert(accessor->getParameters()->size() == 0);
   os << "  inline ";
 
   OptionalTypeKind retKind;
   Type objTy;
   std::tie(objTy, retKind) =
-      DeclAndTypePrinter::getObjectTypeAndOptionality(FD, resultTy);
+      DeclAndTypePrinter::getObjectTypeAndOptionality(accessor, resultTy);
   CFunctionSignatureTypePrinter typePrinter(
       os, cPrologueOS, typeMapping, OutputLanguageMode::Cxx, interopContext,
       CFunctionSignatureTypePrinterModifierDelegate(),
@@ -392,7 +424,6 @@ void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
   }
 
   StringRef name;
-  auto accessor = cast<AccessorDecl>(FD);
   // For a getter or setter, go through the variable or subscript decl.
   name = accessor->getStorage()->getBaseIdentifier().str();
 
@@ -405,7 +436,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
   }
   os << " {\n";
   // FIXME: should it be objTy for resultTy?
-  printCxxThunkBody(swiftSymbolName, resultTy, FD->getParameters(),
+  printCxxThunkBody(swiftSymbolName, resultTy, accessor->getParameters(),
                     {AdditionalParam{AdditionalParam::Role::Self,
                                      typeDeclContext->getDeclaredType()}});
   os << "  }\n";

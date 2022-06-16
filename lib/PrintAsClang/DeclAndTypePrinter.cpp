@@ -230,7 +230,8 @@ private:
         os << (protocolMembersOptional ? "@optional\n" : "@required\n");
       }
       // Limit C++ decls for now.
-      if (outputLang == OutputLanguageMode::Cxx && !isa<VarDecl>(VD))
+      if (outputLang == OutputLanguageMode::Cxx &&
+          !(isa<VarDecl>(VD) || isa<FuncDecl>(VD)))
         continue;
       ASTVisitor::visit(const_cast<ValueDecl*>(VD));
     }
@@ -534,6 +535,10 @@ private:
         getForeignResultType(AFD, methodTy, asyncConvention, errorConvention);
 
     if (outputLang == OutputLanguageMode::Cxx) {
+      // FIXME: Support static methods.
+      if (isClassMethod)
+        return;
+      assert(!AFD->isStatic());
       auto *typeDeclContext = cast<NominalTypeDecl>(AFD->getParent());
 
       std::string cFuncDecl;
@@ -547,18 +552,33 @@ private:
       DeclAndTypeClangFunctionPrinter declPrinter(os, owningPrinter.prologueOS,
                                                   owningPrinter.typeMapping,
                                                   owningPrinter.interopContext);
-      declPrinter.printCxxPropertyAccessorMethod(
-          typeDeclContext, AFD, funcABI.getSymbolName(), resultTy,
-          /*isDefinition=*/false);
+      if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
+        declPrinter.printCxxPropertyAccessorMethod(
+            typeDeclContext, accessor, funcABI.getSymbolName(), resultTy,
+            /*isDefinition=*/false);
+      } else {
+        declPrinter.printCxxMethod(typeDeclContext, AFD,
+                                   funcABI.getSymbolName(), resultTy,
+                                   /*isDefinition=*/false);
+      }
 
       llvm::raw_string_ostream defOS(outOfLineDefinitions);
       DeclAndTypeClangFunctionPrinter defPrinter(
           defOS, owningPrinter.prologueOS, owningPrinter.typeMapping,
           owningPrinter.interopContext);
-      defPrinter.printCxxPropertyAccessorMethod(
-          typeDeclContext, AFD, funcABI.getSymbolName(), resultTy,
-          /*isDefinition=*/true);
 
+      if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
+
+        defPrinter.printCxxPropertyAccessorMethod(
+            typeDeclContext, accessor, funcABI.getSymbolName(), resultTy,
+            /*isDefinition=*/true);
+      } else {
+        defPrinter.printCxxMethod(typeDeclContext, AFD, funcABI.getSymbolName(),
+                                  resultTy, /*isDefinition=*/true);
+      }
+
+      // FIXME: SWIFT_WARN_UNUSED_RESULT
+      // FIXME: availability
       return;
     }
 
@@ -1155,6 +1175,9 @@ private:
           FD->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>()) {
         return;
       }
+
+      if (FD->getDeclContext()->isTypeContext())
+        return printAbstractFunctionAsMethod(FD, FD->isStatic());
 
       // Emit the underlying C signature that matches the Swift ABI
       // in the generated C++ implementation prologue for the module.
