@@ -118,6 +118,29 @@ static void printTypeMetadataResponseType(SwiftToClangInteropContext &ctx,
                  funcSig.parameterTypes[0]);
 }
 
+static void printSwiftResilientStorageClass(raw_ostream &os) {
+  // FIXME: alignment.
+  auto name = cxx_synthesis::getCxxOpaqueStorageClassName();
+  os << "/// Container for an opaque Swift value, like resilient struct.\n";
+  os << "class " << name << " {\n";
+  os << "public:\n";
+  os << "  inline " << name << "() : storage(nullptr) { }\n";
+  os << "  inline " << name
+     << "(ValueWitnessTable * _Nonnull vwTable) : storage(new "
+        "char[vwTable->size]) { }\n";
+  os << "  inline " << name << "(" << name
+     << "&& other) : storage(other.storage) { other.storage = nullptr; }\n";
+  os << "  inline " << name << "(const " << name << "&) = delete;\n";
+  os << "  inline ~" << name << "() { if (storage) { delete[] storage; } }\n";
+  os << "  inline char * _Nonnull getOpaquePointer() { return static_cast<char "
+        "* _Nonnull>(storage); }\n";
+  os << "  inline const char * _Nonnull getOpaquePointer() const { return "
+        "static_cast<char * _Nonnull>(storage); }\n";
+  os << "private:\n";
+  os << "  char * _Nullable storage;\n";
+  os << "};\n";
+}
+
 void swift::printSwiftToClangCoreScaffold(SwiftToClangInteropContext &ctx,
                                           PrimitiveTypeMapping &typeMapping,
                                           raw_ostream &os) {
@@ -130,6 +153,8 @@ void swift::printSwiftToClangCoreScaffold(SwiftToClangInteropContext &ctx,
             os << "\n";
             printValueWitnessTable(os);
           });
+          os << "\n";
+          printSwiftResilientStorageClass(os);
         });
   });
 }

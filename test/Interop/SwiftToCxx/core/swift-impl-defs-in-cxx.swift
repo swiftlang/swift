@@ -51,6 +51,20 @@
 // CHECK-NEXT: }
 // CHECK-NEXT: #endif
 // CHECK-EMPTY:
+// CHECK-NEXT: /// Container for an opaque Swift value, like resilient struct.
+// CHECK-NEXT: class OpaqueStorage {
+// CHECK-NEXT: public:
+// CHECK-NEXT:   inline OpaqueStorage() : storage(nullptr) { }
+// CHECK-NEXT:   inline OpaqueStorage(ValueWitnessTable * _Nonnull vwTable) : storage(new char[vwTable->size]) { }
+// CHECK-NEXT:   inline OpaqueStorage(OpaqueStorage&& other) : storage(other.storage) { other.storage = nullptr; }
+// CHECK-NEXT:   inline OpaqueStorage(const OpaqueStorage&) = delete;
+// CHECK-NEXT:   inline ~OpaqueStorage() { if (storage) { delete[] storage; } }
+// CHECK-NEXT:   inline char * _Nonnull getOpaquePointer() { return static_cast<char * _Nonnull>(storage); }
+// CHECK-NEXT:   inline const char * _Nonnull getOpaquePointer() const { return static_cast<char * _Nonnull>(storage); }
+// CHECK-NEXT: private:
+// CHECK-NEXT:   char * _Nullable storage;
+// CHECK-NEXT: };
+// CHECK-EMPTY:
 // CHECK-NEXT: } // namespace _impl
 // CHECK-EMPTY:
 // CHECK-EMPTY:
