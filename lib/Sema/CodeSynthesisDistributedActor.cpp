@@ -646,6 +646,10 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
       func->getResultInterfaceType(), DC);
   thunk->setSynthesized(true);
   thunk->getAttrs().add(new (C) NonisolatedAttr(/*isImplicit=*/true));
+
+  if (isa<ClassDecl>(DC))
+    thunk->getAttrs().add(new (C) FinalAttr(/*isImplicit=*/true));
+
   thunk->setGenericSignature(baseSignature);
   thunk->copyFormalAccessFrom(func, /*sourceIsParentContext=*/false);
   thunk->setBodySynthesizer(deriveBodyDistributed_thunk, func);
