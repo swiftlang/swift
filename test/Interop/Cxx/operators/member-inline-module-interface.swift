@@ -190,3 +190,21 @@
 // CHECK:   subscript(x: Int32) -> NonTrivial { get }
 // CHECK:   mutating func __operatorSubscriptConst(_ x: Int32) -> NonTrivial
 // CHECK: }
+
+// CHECK: struct Iterator {
+// CHECK:   var pointee: Int32 { mutating get }
+// CHECK:   @available(*, unavailable, message: "use .pointee property")
+// CHECK:   mutating func __operatorStar() -> UnsafeMutablePointer<Int32>
+// CHECK: }
+
+// CHECK: struct ConstIterator {
+// CHECK:   var pointee: Int32 { get }
+// CHECK:   @available(*, unavailable, message: "use .pointee property")
+// CHECK:   func __operatorStar() -> UnsafePointer<Int32>
+// CHECK: }
+
+// CHECK: struct ConstIteratorByVal {
+// CHECK:   var pointee: Int32 { get }
+// CHECK:   @available(*, unavailable, message: "use .pointee property")
+// CHECK:   func __operatorStar() -> Int32
+// CHECK: }
