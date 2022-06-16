@@ -1670,7 +1670,7 @@ namespace {
         if (isa<VarDecl>(decl)) {
           auto *thunkCall = CallExpr::createImplicitEmpty(context, thunkApply);
           thunkCall->setType(solution.simplifyType(openedType));
-          thunkCall->setShouldApplyDistributedThunk(true);
+          thunkCall->setUsesDistributedThunk(true);
           cs.cacheType(thunkCall);
           return thunkCall;
         }
@@ -7797,7 +7797,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
         apply->setImplicitlyThrows(true);
       if (!FD->hasAsync())
         apply->setImplicitlyAsync(ImplicitActorHopTarget::forInstanceSelf());
-      apply->setShouldApplyDistributedThunk(true);
+      apply->setUsesDistributedThunk(true);
     }
 
     solution.setExprTypes(apply);

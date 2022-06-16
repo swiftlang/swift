@@ -1125,7 +1125,7 @@ public:
     SILDeclRef constant = SILDeclRef(e->getDecl());
 
     /// Some special handling may be necessary for thunks:
-    if (callSite && callSite->shouldApplyDistributedThunk()) {
+    if (callSite && callSite->usesDistributedThunk()) {
       constant = SILDeclRef(e->getDecl()).asDistributed();
     } else if (afd->isBackDeployed()) {
       // If we're calling a back deployed function then we need to call a

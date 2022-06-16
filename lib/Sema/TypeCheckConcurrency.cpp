@@ -1779,7 +1779,7 @@ namespace {
             call->setImplicitlyThrows(false);
           }
           if (setDistributedThunk) {
-            call->setShouldApplyDistributedThunk(true);
+            call->setUsesDistributedThunk(true);
           }
           return;
         }
