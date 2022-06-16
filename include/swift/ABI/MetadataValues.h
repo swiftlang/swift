@@ -899,6 +899,7 @@ public:
   SpecialKind getSpecialKind() const {
     return SpecialKind((Data & SpecialKindMask) >> SpecialKindShift);
   }
+  bool isOpaque() const { return getSpecialKind() == SpecialKind::None; }
   bool isClassConstrained() const {
     return getSpecialKind() == SpecialKind::Class;
   }
