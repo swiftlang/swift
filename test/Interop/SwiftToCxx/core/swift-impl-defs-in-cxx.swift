@@ -65,15 +65,15 @@
 // CHECK-NEXT: /// Container for an opaque Swift value, like resilient struct.
 // CHECK-NEXT: class OpaqueStorage {
 // CHECK-NEXT: public:
-// CHECK-NEXT:   inline OpaqueStorage() : storage(nullptr) { }
-// CHECK-NEXT:   inline OpaqueStorage(ValueWitnessTable * _Nonnull vwTable) : storage(reinterpret_cast<char *>(opaqueAlloc(vwTable->size, (vwTable->flags &255) + 1))) { }
-// CHECK-NEXT:   inline OpaqueStorage(OpaqueStorage&& other) : storage(other.storage) { other.storage = nullptr; }
-// CHECK-NEXT:   inline OpaqueStorage(const OpaqueStorage&) = delete;
-// CHECK-NEXT:   inline ~OpaqueStorage() { if (storage) { opaqueFree(static_cast<char * _Nonnull>(storage)); } }
-// CHECK-NEXT:   void operator =(OpaqueStorage&& other) { auto temp = storage; storage = other.storage; other.storage = temp; }
-// CHECK-NEXT:   void operator =(const OpaqueStorage&) = delete;
-// CHECK-NEXT:   inline char * _Nonnull getOpaquePointer() { return static_cast<char * _Nonnull>(storage); }
-// CHECK-NEXT:   inline const char * _Nonnull getOpaquePointer() const { return static_cast<char * _Nonnull>(storage); }
+// CHECK-NEXT:   inline OpaqueStorage() noexcept : storage(nullptr) { }
+// CHECK-NEXT:   inline OpaqueStorage(ValueWitnessTable * _Nonnull vwTable) noexcept : storage(reinterpret_cast<char *>(opaqueAlloc(vwTable->size, (vwTable->flags &255) + 1))) { }
+// CHECK-NEXT:   inline OpaqueStorage(OpaqueStorage&& other) noexcept : storage(other.storage) { other.storage = nullptr; }
+// CHECK-NEXT:   inline OpaqueStorage(const OpaqueStorage&) noexcept = delete;
+// CHECK-NEXT:   inline ~OpaqueStorage() noexcept { if (storage) { opaqueFree(static_cast<char * _Nonnull>(storage)); } }
+// CHECK-NEXT:   void operator =(OpaqueStorage&& other) noexcept { auto temp = storage; storage = other.storage; other.storage = temp; }
+// CHECK-NEXT:   void operator =(const OpaqueStorage&) noexcept = delete;
+// CHECK-NEXT:   inline char * _Nonnull getOpaquePointer() noexcept { return static_cast<char * _Nonnull>(storage); }
+// CHECK-NEXT:   inline const char * _Nonnull getOpaquePointer() const noexcept { return static_cast<char * _Nonnull>(storage); }
 // CHECK-NEXT: private:
 // CHECK-NEXT:   char * _Nullable storage;
 // CHECK-NEXT: };

@@ -133,7 +133,6 @@ inline void opaqueFree(void * _Nonnull p) {
 }
 
 static void printSwiftResilientStorageClass(raw_ostream &os) {
-  // FIXME: mark noexcept.
   auto name = cxx_synthesis::getCxxOpaqueStorageClassName();
   static_assert(TargetValueWitnessFlags<uint64_t>::AlignmentMask ==
                     TargetValueWitnessFlags<uint32_t>::AlignmentMask,
@@ -141,24 +140,27 @@ static void printSwiftResilientStorageClass(raw_ostream &os) {
   os << "/// Container for an opaque Swift value, like resilient struct.\n";
   os << "class " << name << " {\n";
   os << "public:\n";
-  os << "  inline " << name << "() : storage(nullptr) { }\n";
+  os << "  inline " << name << "() noexcept : storage(nullptr) { }\n";
   os << "  inline " << name
-     << "(ValueWitnessTable * _Nonnull vwTable) : storage("
+     << "(ValueWitnessTable * _Nonnull vwTable) noexcept : storage("
         "reinterpret_cast<char *>(opaqueAlloc(vwTable->size, (vwTable->flags &"
      << TargetValueWitnessFlags<uint64_t>::AlignmentMask << ") + 1))) { }\n";
   os << "  inline " << name << "(" << name
-     << "&& other) : storage(other.storage) { other.storage = nullptr; }\n";
-  os << "  inline " << name << "(const " << name << "&) = delete;\n";
+     << "&& other) noexcept : storage(other.storage) { other.storage = "
+        "nullptr; }\n";
+  os << "  inline " << name << "(const " << name << "&) noexcept = delete;\n";
   os << "  inline ~" << name
-     << "() { if (storage) { opaqueFree(static_cast<char "
+     << "() noexcept { if (storage) { opaqueFree(static_cast<char "
         "* _Nonnull>(storage)); } }\n";
   os << "  void operator =(" << name
-     << "&& other) { auto temp = storage; storage = other.storage; "
+     << "&& other) noexcept { auto temp = storage; storage = other.storage; "
         "other.storage = temp; }\n";
-  os << "  void operator =(const " << name << "&) = delete;\n";
-  os << "  inline char * _Nonnull getOpaquePointer() { return static_cast<char "
+  os << "  void operator =(const " << name << "&) noexcept = delete;\n";
+  os << "  inline char * _Nonnull getOpaquePointer() noexcept { return "
+        "static_cast<char "
         "* _Nonnull>(storage); }\n";
-  os << "  inline const char * _Nonnull getOpaquePointer() const { return "
+  os << "  inline const char * _Nonnull getOpaquePointer() const noexcept { "
+        "return "
         "static_cast<char * _Nonnull>(storage); }\n";
   os << "private:\n";
   os << "  char * _Nullable storage;\n";
