@@ -6224,7 +6224,7 @@ public:
     // interfaces. Verifying that the underlying type of a
     // protocol typealias is a constriant type is fundamentally
     // circular, so the desugared type should be written in source.
-    if (Options.DesugarExistentialConstraint) {
+    if (Options.DesugarExistentialConstraint && !T->isAnyObject()) {
       visit(T->getConstraintType()->getDesugaredType());
     } else {
       visit(T->getConstraintType());
