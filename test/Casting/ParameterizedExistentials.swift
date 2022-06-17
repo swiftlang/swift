@@ -1,4 +1,4 @@
-// ParameterizedExistentials.swift - Tests for class constant casts w/ Obj-C
+// ParameterizedExistentials.swift - Casting tests for generalized existentials
 //
 // This source file is part of the Swift.org open source project
 //
@@ -82,9 +82,7 @@ tests.test("Parameterized existential casting basics work") {
   expectNil(d)
 }
 
-tests.test("Metatype existential casting basics work")
-  .xfail(.custom({ true }, reason: "IRGen peepholes these casts"))
-  .code {
+tests.test("Metatype existential casting basics work") {
   let a = GenericHolder<Int>.self as any Holder<Int>.Type
   let b = GenericHolder<Int>.self as! any Holder<Int>.Type
   expectTrue(a == b)

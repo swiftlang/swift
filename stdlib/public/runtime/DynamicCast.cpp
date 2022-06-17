@@ -1743,7 +1743,7 @@ static DynamicCastResult tryCastUnwrappingExtendedExistentialSource(
   srcFailureType = srcInnerType;
   return tryCast(destLocation, destType, srcInnerValue, srcInnerType,
                  destFailureType, srcFailureType,
-                 takeOnSuccess & (srcInnerValue == srcValue), mayDeferChecks);
+                 takeOnSuccess && (srcInnerValue == srcValue), mayDeferChecks);
 }
 
 static DynamicCastResult
@@ -1765,7 +1765,7 @@ tryCastUnwrappingExistentialMetatypeSource(
   return tryCast(destLocation, destType,
                  srcInnerValue, srcInnerType,
                  destFailureType, srcFailureType,
-                 takeOnSuccess & (srcInnerValue == srcValue),
+                 takeOnSuccess && (srcInnerValue == srcValue),
                  mayDeferChecks);
 }
 
@@ -1781,6 +1781,37 @@ static DynamicCastResult tryCastToExtendedExistential(
   auto *destExistentialShape = destExistentialType->Shape;
   const unsigned shapeArgumentCount =
       destExistentialShape->getGenSigArgumentLayoutSizeInWords();
+  const Metadata *selfType = srcType;
+
+  // If we have a type expression to look into, unwrap as much metatype
+  // structure as possible so we can reach the type metadata for the 'Self'
+  // parameter.
+  if (destExistentialShape->Flags.hasTypeExpression()) {
+    Demangler dem;
+    auto *node = dem.demangleType(destExistentialShape->getTypeExpression()->name.get());
+    if (!node)
+      return DynamicCastResult::Failure;
+
+    while (node->getKind() == Demangle::Node::Kind::Type &&
+           node->getNumChildren() &&
+           node->getChild(0)->getKind() == Demangle::Node::Kind::Metatype &&
+           node->getChild(0)->getNumChildren()) {
+      auto *metatypeMetadata = dyn_cast<MetatypeMetadata>(selfType);
+      if (!metatypeMetadata)
+        return DynamicCastResult::Failure;
+
+      selfType = metatypeMetadata->InstanceType;
+      node = node->getChild(0)->getChild(0);
+    }
+
+    // Make sure the thing we've pulled out at the end is a dependent
+    // generic parameter.
+    if (!(node->getKind() == Demangle::Node::Kind::Type &&
+          node->getNumChildren() &&
+          node->getChild(0)->getKind() ==
+              Demangle::Node::Kind::DependentGenericParamType))
+      return DynamicCastResult::Failure;
+  }
 
   llvm::SmallVector<const void *, 8> allGenericArgsVec;
   unsigned witnessesMark = 0;
@@ -1789,7 +1820,7 @@ static DynamicCastResult tryCastToExtendedExistential(
     auto genArgs = destExistentialType->getGeneralizationArguments();
     allGenericArgsVec.append(genArgs, genArgs + shapeArgumentCount);
     // Tack on the `Self` argument.
-    allGenericArgsVec.push_back((const void *)srcType);
+    allGenericArgsVec.push_back((const void *)selfType);
     // Mark the point where the generic arguments end.
     // _checkGenericRequirements is going to fill in a set of witness tables
     // after that.
