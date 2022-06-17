@@ -796,6 +796,10 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
       break;
     }
 
+    case ConstraintLocator::ResultBuilderBodyResult:
+      diagnostic = diag::cannot_convert_result_builder_result_to_return_type;
+      break;
+
     case ConstraintLocator::AutoclosureResult:
     case ConstraintLocator::ApplyArgToParam:
     case ConstraintLocator::ApplyArgument: {
