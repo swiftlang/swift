@@ -792,6 +792,20 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
         }
       }
 
+      if (purpose == CTP_ReturnStmt) {
+        if (auto *DRE = getAsExpr<DeclRefExpr>(anchor)) {
+          auto *decl = DRE->getDecl();
+          if (decl && decl->hasName()) {
+            auto baseName = DRE->getDecl()->getBaseIdentifier();
+            if (baseName.str().startswith("$__builder")) {
+              diagnostic =
+                  diag::cannot_convert_result_builder_result_to_return_type;
+              break;
+            }
+          }
+        }
+      }
+
       diagnostic = getDiagnosticFor(purpose);
       break;
     }
