@@ -1446,6 +1446,10 @@ def disable_os_checks: Flag<["-", "--"], "disable-os-checks">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
   HelpText<"Skip OS related diagnostics">;
 
+def disable_remove_deprecated_check: Flag<["-", "--"], "disable-remove-deprecated-check">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+  HelpText<"Skip diagnosing removal of deprecated symbols">;
+
 def print_module: Flag<["-", "--"], "print-module">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
   HelpText<"Print module names in diagnostics">;
