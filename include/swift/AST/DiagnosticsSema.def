@@ -288,8 +288,11 @@ FIXIT(insert_closure_return_type_placeholder,
 NOTE(use_of_anon_closure_param,none,
      "anonymous closure parameter %0 is used here", (Identifier))
 
-ERROR(incorrect_explicit_closure_result,none,
+ERROR(incorrect_explicit_closure_result_vs_contextual_type,none,
       "declared closure result %0 is incompatible with contextual type %1",
+      (Type, Type))
+ERROR(incorrect_explicit_closure_result_vs_return_type,none,
+      "declared closure result %0 is incompatible with return type %1",
       (Type, Type))
 
 ERROR(unsupported_closure_attr,none,
