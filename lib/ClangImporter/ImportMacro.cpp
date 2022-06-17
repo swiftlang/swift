@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ImporterImpl.h"
+#include "SwiftDeclSynthesizer.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/Expr.h"
@@ -73,8 +74,8 @@ createMacroConstant(ClangImporter::Implementation &Impl,
                     bool isStatic,
                     ClangNode ClangN) {
   Impl.ImportedMacroConstants[macro] = {value, type};
-  return Impl.createConstant(name, dc, type, value, convertKind, isStatic,
-                             ClangN);
+  return SwiftDeclSynthesizer(Impl).createConstant(
+      name, dc, type, value, convertKind, isStatic, ClangN);
 }
 
 static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
@@ -201,9 +202,9 @@ static ValueDecl *importStringLiteral(ClangImporter::Implementation &Impl,
   if (!unicode::isWellFormedUTF8(text))
     return nullptr;
 
-  return Impl.createConstant(name, DC, importTy, text,
-                             ConstantConvertKind::None, /*static*/ false,
-                             ClangN);
+  return SwiftDeclSynthesizer(Impl).createConstant(name, DC, importTy, text,
+                                                   ConstantConvertKind::None,
+                                                   /*static*/ false, ClangN);
 }
 
 static ValueDecl *importLiteral(ClangImporter::Implementation &Impl,
