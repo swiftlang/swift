@@ -2554,6 +2554,7 @@ void swift::ide::api::dumpModuleContent(ModuleDecl *MD, StringRef OutputFile,
   opts.AvoidToolArgs = true;
   opts.Migrator = false;
   opts.SkipOSCheck = false;
+  opts.SkipRemoveDeprecatedCheck = false;
   opts.Verbose = false;
   SDKContext ctx(opts);
   SwiftDeclCollector collector(ctx);
