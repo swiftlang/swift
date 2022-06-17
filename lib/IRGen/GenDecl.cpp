@@ -2493,7 +2493,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     return Address(addr, alignment);
   }
 
-  LinkEntity entity = LinkEntity::forSILGlobalVariable(var);
+  LinkEntity entity = LinkEntity::forSILGlobalVariable(var, *this);
   ResilienceExpansion expansion = getResilienceExpansionForLayout(var);
 
   llvm::Type *storageType;
@@ -2539,28 +2539,33 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
 
   // Check whether we've created the global variable already.
   // FIXME: We should integrate this into the LinkEntity cache more cleanly.
-  auto gvar = Module.getGlobalVariable(var->getName(), /*allowInternal*/ true);
+  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
+  auto gvar = Module.getGlobalVariable(link.getName(), /*allowInternal*/ true);
   if (gvar) {
     if (forDefinition)
       updateLinkageForDefinition(*this, gvar, entity);
   } else {
-    LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
     llvm::Type *storageTypeWithContainer = storageType;
     if (var->isInitializedObject()) {
-      // A statically initialized object must be placed into a container struct
-      // because the swift_initStaticObject needs a swift_once_t at offset -1:
-      //     struct Container {
-      //       swift_once_t token[fixedAlignment / sizeof(swift_once_t)];
-      //       HeapObject object;
-      //     };
-      std::string typeName = storageType->getStructName().str() + 'c';
-      assert(fixedAlignment >= getPointerAlignment());
-      unsigned numTokens = fixedAlignment.getValue() /
-        getPointerAlignment().getValue();
-      storageTypeWithContainer = llvm::StructType::create(getLLVMContext(),
-              {llvm::ArrayType::get(OnceTy, numTokens), storageType}, typeName);
-      gvar = createVariable(*this, link, storageTypeWithContainer,
-                            fixedAlignment);
+      if (canMakeStaticObjectsReadOnly()) {
+        gvar = createVariable(*this, link, storageType, fixedAlignment);
+        gvar->setConstant(true);
+      } else {
+        // A statically initialized object must be placed into a container struct
+        // because the swift_initStaticObject needs a swift_once_t at offset -1:
+        //     struct Container {
+        //       swift_once_t token[fixedAlignment / sizeof(swift_once_t)];
+        //       HeapObject object;
+        //     };
+        std::string typeName = storageType->getStructName().str() + 'c';
+        assert(fixedAlignment >= getPointerAlignment());
+        unsigned numTokens = fixedAlignment.getValue() /
+          getPointerAlignment().getValue();
+        storageTypeWithContainer = llvm::StructType::create(getLLVMContext(),
+                {llvm::ArrayType::get(OnceTy, numTokens), storageType}, typeName);
+        gvar = createVariable(*this, link, storageTypeWithContainer,
+                              fixedAlignment);
+      }
     } else {
       StringRef name;
       Optional<SILLocation> loc;
@@ -2585,7 +2590,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
       gvar->setComdat(nullptr);
   }
   llvm::Constant *addr = gvar;
-  if (var->isInitializedObject()) {
+  if (var->isInitializedObject() && !canMakeStaticObjectsReadOnly()) {
     // Project out the object from the container.
     llvm::Constant *Indices[2] = {
       llvm::ConstantExpr::getIntegerValue(Int32Ty, APInt(32, 0)),

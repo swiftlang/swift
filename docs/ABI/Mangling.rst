@@ -349,6 +349,7 @@ Entities
   entity-spec ::= 'fE'                       // ivar destroyer; untyped
   entity-spec ::= 'fe'                       // ivar initializer; untyped
   entity-spec ::= 'Tv' NATURAL               // outlined global variable (from context function)
+  entity-spec ::= 'Tv' NATURAL 'r'           // outlined global read-only object
   entity-spec ::= 'Te' bridge-spec           // outlined objective c method call
 
   entity-spec ::= decl-name label-list function-signature generic-signature? 'F'    // function
