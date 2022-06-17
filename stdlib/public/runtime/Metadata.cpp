@@ -4465,6 +4465,8 @@ static const TypeContextDescriptor *
 getForeignTypeDescription(Metadata *metadata) {
   if (auto foreignClass = dyn_cast<ForeignClassMetadata>(metadata))
     return foreignClass->getDescription();
+  else if (auto foreignClass = dyn_cast<ForeignReferenceTypeMetadata>(metadata))
+    return foreignClass->getDescription();
   return cast<ValueMetadata>(metadata)->getDescription();
 }
 

@@ -1495,15 +1495,6 @@ llvm::Constant *IRGenModule::getAssociatedTypeWitness(Type type,
                                                       GenericSignature sig,
                                                       bool inProtocolContext) {
   // FIXME: If we can directly reference constant type metadata, do so.
-  
-  if (type->isForeignReferenceType()) {
-    type->getASTContext().Diags.diagnose(
-        type->lookThroughAllOptionalTypes()
-            ->getClassOrBoundGenericClass()
-            ->getLoc(),
-        diag::foreign_reference_types_unsupported.ID, {});
-    exit(1);
-  }
 
   // Form a reference to the mangled name for this type.
   assert(!type->hasArchetype() && "type cannot contain archetypes");

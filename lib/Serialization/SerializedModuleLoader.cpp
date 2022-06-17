@@ -1315,7 +1315,7 @@ void SerializedModuleLoaderBase::loadExtensions(NominalTypeDecl *nominal,
 }
 
 void SerializedModuleLoaderBase::loadObjCMethods(
-       ClassDecl *classDecl,
+       NominalTypeDecl *typeDecl,
        ObjCSelector selector,
        bool isInstanceMethod,
        unsigned previousGeneration,
@@ -1323,7 +1323,7 @@ void SerializedModuleLoaderBase::loadObjCMethods(
   for (auto &modulePair : LoadedModuleFiles) {
     if (modulePair.second <= previousGeneration)
       continue;
-    modulePair.first->loadObjCMethods(classDecl, selector, isInstanceMethod,
+    modulePair.first->loadObjCMethods(typeDecl, selector, isInstanceMethod,
                                       methods);
   }
 }

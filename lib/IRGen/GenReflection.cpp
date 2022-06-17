@@ -577,8 +577,6 @@ protected:
                   CanGenericSignature sig,
                   MangledTypeRefRole role =
                       MangledTypeRefRole::Reflection) {
-    assert(!type->isForeignReferenceType());
-
     B.addRelativeAddress(IGM.getTypeRef(type, sig, role).first);
     addBuiltinTypeRefs(type);
   }

@@ -87,8 +87,11 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
       CodeCompletionDiagnosticSeverity::None;
   NullTerminatedStringRef ContextFreeDiagnosticMessage;
   if (ContextFreeNotRecReason != ContextFreeNotRecommendedReason::None) {
+    assert(AssociatedDecl != nullptr &&
+           "There should be no case where ContextFreeNotRecReason != None && "
+           "AssociatedDecl == nulptr");
     // FIXME: We should generate the message lazily.
-    if (const auto *VD = dyn_cast<ValueDecl>(AssociatedDecl)) {
+    if (const auto *VD = dyn_cast_or_null<ValueDecl>(AssociatedDecl)) {
       CodeCompletionDiagnosticSeverity severity;
       SmallString<256> message;
       llvm::raw_svector_ostream messageOS(message);
@@ -169,7 +172,16 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
     NullTerminatedStringRef ContextualDiagnosticMessage;
     if (ContextualNotRecReason != ContextualNotRecommendedReason::None) {
       // FIXME: We should generate the message lazily.
-      if (const auto *VD = dyn_cast<ValueDecl>(AssociatedDecl)) {
+      //
+      // NOTE(rdar://95306033): dyn_cast_or_null because 'nullptr' happens in
+      // cases like:
+      //
+      //   func test(fn: () async -> Void) { fn(#HERE#) }
+      //
+      // In this case, it's 'InvalidAsyncContext' but there's no associated decl
+      // because the callee is a random expression.
+      // FIXME: Emit a diagnostic even without an associated decl.
+      if (const auto *VD = dyn_cast_or_null<ValueDecl>(AssociatedDecl)) {
         CodeCompletionDiagnosticSeverity severity;
         SmallString<256> message;
         llvm::raw_svector_ostream messageOS(message);
