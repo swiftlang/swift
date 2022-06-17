@@ -7627,7 +7627,8 @@ bool AbstractFunctionDecl::hasDynamicSelfResult() const {
   return isa<ConstructorDecl>(this);
 }
 
-AbstractFunctionDecl *AbstractFunctionDecl::getAsyncAlternative() const {
+AbstractFunctionDecl *
+AbstractFunctionDecl::getAsyncAlternative(bool isKnownObjC) const {
   // Async functions can't have async alternatives
   if (hasAsync())
     return nullptr;
@@ -7651,7 +7652,8 @@ AbstractFunctionDecl *AbstractFunctionDecl::getAsyncAlternative() const {
   }
 
   auto *renamedDecl = evaluateOrDefault(
-      getASTContext().evaluator, RenamedDeclRequest{this, avAttr}, nullptr);
+      getASTContext().evaluator, RenamedDeclRequest{this, avAttr, isKnownObjC},
+      nullptr);
   auto *alternative = dyn_cast_or_null<AbstractFunctionDecl>(renamedDecl);
   if (!alternative || !alternative->hasAsync())
     return nullptr;

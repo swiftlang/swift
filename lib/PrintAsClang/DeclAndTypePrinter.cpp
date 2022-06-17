@@ -1124,7 +1124,8 @@ private:
     assert(!AvAttr->Rename.empty());
 
     auto *renamedDecl = evaluateOrDefault(
-        getASTContext().evaluator, RenamedDeclRequest{D, AvAttr}, nullptr);
+        getASTContext().evaluator, RenamedDeclRequest{D, AvAttr, false},
+        nullptr);
     if (renamedDecl) {
       assert(shouldInclude(renamedDecl) &&
              "ObjC printer logic mismatch with renamed decl");
@@ -2112,12 +2113,31 @@ auto DeclAndTypePrinter::getImpl() -> Implementation {
   return Implementation(os, *this, outputLang);
 }
 
+static bool isAsyncAlternativeOfOtherDecl(const ValueDecl *VD) {
+  auto AFD = dyn_cast<AbstractFunctionDecl>(VD);
+  if (!AFD || !AFD->isAsyncContext() || !AFD->getObjCSelector())
+    return false;
+
+  auto type = AFD->getDeclContext()->getSelfNominalTypeDecl();
+  if (!type)
+    return false;
+  auto others = type->lookupDirect(AFD->getObjCSelector(),
+                                   AFD->isInstanceMember());
+
+  for (auto other : others)
+    if (other->getAsyncAlternative() == AFD)
+      return true;
+
+  return false;
+}
+
 bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
   return !VD->isInvalid() &&
          (outputLang == OutputLanguageMode::Cxx
               ? cxx_translation::isVisibleToCxx(VD, minRequiredAccess)
               : isVisibleToObjC(VD, minRequiredAccess)) &&
-         !VD->getAttrs().hasAttribute<ImplementationOnlyAttr>();
+         !VD->getAttrs().hasAttribute<ImplementationOnlyAttr>() &&
+         !isAsyncAlternativeOfOtherDecl(VD);
 }
 
 void DeclAndTypePrinter::print(const Decl *D) {
