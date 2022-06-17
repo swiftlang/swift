@@ -18,6 +18,10 @@ using namespace cxx_synthesis;
 
 StringRef cxx_synthesis::getCxxImplNamespaceName() { return "_impl"; }
 
+StringRef cxx_synthesis::getCxxOpaqueStorageClassName() {
+  return "OpaqueStorage";
+}
+
 bool ClangSyntaxPrinter::isClangKeyword(StringRef name) {
   static const llvm::DenseSet<StringRef> keywords = [] {
     llvm::DenseSet<StringRef> set;

@@ -29,6 +29,10 @@ namespace cxx_synthesis {
 /// module in C++.
 StringRef getCxxImplNamespaceName();
 
+/// Return the name of the C++ class inside of `swift::_impl`
+/// namespace that holds an opaque value, like a resilient struct.
+StringRef getCxxOpaqueStorageClassName();
+
 } // end namespace cxx_synthesis
 
 class ClangSyntaxPrinter {
