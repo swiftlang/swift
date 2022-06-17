@@ -54,6 +54,9 @@ SIMPLE_LOCATOR_PATH_ELT(AutoclosureResult)
 /// The result of a closure.
 SIMPLE_LOCATOR_PATH_ELT(ClosureResult)
 
+/// FIXME: Misleading name: this locator is used only for single-expression
+/// closure returns.
+///
 /// The type of a closure body.
 CUSTOM_LOCATOR_PATH_ELT(ClosureBody)
 
