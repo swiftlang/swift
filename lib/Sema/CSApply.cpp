@@ -516,10 +516,6 @@ namespace {
                                   LookUpConformanceInModule(dc->getParentModule()));
     }
 
-    /// Determine whether the given reference is to a method on
-    /// a remote distributed actor in the given context.
-    bool isDistributedThunk(ConcreteDeclRef ref, Expr *context);
-
     /// Determine whether the given reference on the given
     /// base has to be replaced with a distributed thunk instead.
     bool requiresDistributedThunk(Expr *base, SourceLoc memberLoc,
@@ -1648,6 +1644,10 @@ namespace {
         }
 
         ConcreteDeclRef thunkRef{thunkDecl, memberRef.getSubstitutions()};
+
+        // Update member reference to point to the thunk.
+        CachedConcreteRefs[cs.getConstraintLocator(memberLocator)] =
+            thunkRef;
 
         auto declRefExpr = new (context) DeclRefExpr(
             thunkRef, memberLoc, Implicit, AccessSemantics::DirectToStorage);
@@ -7793,14 +7793,14 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     cs.setType(apply, fnType->getResult());
 
     // If this is a call to a distributed method thunk,
-    // let's mark the call as implicitly throwing.
-    if (isDistributedThunk(callee, apply->getFn())) {
-      auto *FD = cast<AbstractFunctionDecl>(callee.getDecl());
-      if (!FD->hasThrows())
+    // let's mark the call as implicitly throwing/async.
+    if (isa<SelfApplyExpr>(apply->getFn())) {
+      auto *FD = dyn_cast<FuncDecl>(callee.getDecl());
+      if (FD && FD->isDistributedThunk()) {
         apply->setImplicitlyThrows(true);
-      if (!FD->hasAsync())
         apply->setImplicitlyAsync(ImplicitActorHopTarget::forInstanceSelf());
-      apply->setUsesDistributedThunk(true);
+        apply->setUsesDistributedThunk(true);
+      }
     }
 
     solution.setExprTypes(apply);
@@ -7917,14 +7917,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   }
 
   return ctorCall;
-}
-
-bool ExprRewriter::isDistributedThunk(ConcreteDeclRef ref, Expr *context) {
-  if (!isa<SelfApplyExpr>(context))
-    return false;
-
-  return requiresDistributedThunk(cast<SelfApplyExpr>(context)->getBase(),
-                                  context->getLoc(), ref);
 }
 
 bool ExprRewriter::requiresDistributedThunk(Expr *base, SourceLoc memberLoc,

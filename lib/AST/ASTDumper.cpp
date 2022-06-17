@@ -874,6 +874,9 @@ namespace {
       if (D->isDistributed()) {
         PrintWithColorRAII(OS, ExprModifierColor) << " distributed";
       }
+      if (D->isDistributedThunk()) {
+        PrintWithColorRAII(OS, ExprModifierColor) << " distributed-thunk";
+      }
 
       if (auto fac = D->getForeignAsyncConvention()) {
         OS << " foreign_async=";
@@ -1335,6 +1338,10 @@ void ValueDecl::dumpRef(raw_ostream &os) const {
 
   if (getAttrs().hasAttribute<KnownToBeLocalAttr>()) {
     os << " known-to-be-local";
+  }
+
+  if (getAttrs().hasAttribute<DistributedThunkAttr>()) {
+    os << " distributed-thunk";
   }
 
   // Print location.

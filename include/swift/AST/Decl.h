@@ -6419,6 +6419,10 @@ public:
   /// Returns 'true' if the function is distributed.
   bool isDistributed() const;
 
+  /// Is this a thunk function used to access a distributed method outside
+  /// of its actor isolation context?
+  bool isDistributedThunk() const;
+
   /// For a 'distributed' target (func or computed property),
   /// get the 'thunk' responsible for performing the 'remoteCall'.
   ///
