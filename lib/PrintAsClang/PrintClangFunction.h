@@ -56,6 +56,8 @@ public:
 
     Role role;
     Type type;
+    // Should self be passed indirectly?
+    bool isIndirect = false;
   };
 
   /// Optional modifiers that can be applied to function signature.
@@ -96,7 +98,7 @@ public:
 
 private:
   void printCxxToCFunctionParameterUse(
-      Type type, StringRef name, bool isInOut,
+      Type type, StringRef name, bool isInOut, bool isIndirect = false,
       llvm::Optional<AdditionalParam::Role> paramRole = None);
 
   raw_ostream &os;
