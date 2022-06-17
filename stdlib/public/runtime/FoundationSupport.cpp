@@ -31,6 +31,7 @@ swift::_swift_isObjCTypeNameSerializable(Class theClass) {
   switch (type->getKind()) {
   case MetadataKind::ObjCClassWrapper:
   case MetadataKind::ForeignClass:
+  case MetadataKind::ForeignReferenceType:
     return true;
   case MetadataKind::Class: {
     // Pure ObjC classes always have stable names.
