@@ -79,17 +79,6 @@ SourceLoc SILLocation::getSourceLocForDebugging() const {
   if (isSILFile())
     return storage.sourceLoc;
 
-  if (auto *expr = getPrimaryASTNode().dyn_cast<Expr*>()) {
-    // Code that has an autoclosure as location should not show up in
-    // the line table (rdar://problem/14627460). Note also that the
-    // closure function still has a valid DW_AT_decl_line.  Depending
-    // on how we decide to resolve rdar://problem/14627460, we may
-    // want to use the regular getLoc instead and rather use the
-    // column info.
-    if (isa<AutoClosureExpr>(expr))
-      return SourceLoc();
-  }
-
   if (hasASTNodeForDebugging())
     return getSourceLoc(storage.extendedASTNodeLoc->forDebugging);
 
