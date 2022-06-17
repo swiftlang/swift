@@ -908,7 +908,9 @@ private:
     if (selfTypeDeclContext) {
       additionalParams.push_back(
           {DeclAndTypeClangFunctionPrinter::AdditionalParam::Role::Self,
-           (*selfTypeDeclContext)->getDeclaredType()});
+           (*selfTypeDeclContext)->getDeclaredType(),
+           /*isIndirect=*/
+           isa<FuncDecl>(FD) ? cast<FuncDecl>(FD)->isMutating() : false});
     }
     funcPrinter.printFunctionSignature(
         FD, funcABI.getSymbolName(), resultTy,
