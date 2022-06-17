@@ -1,4 +1,4 @@
-// ParameterizedExistentials.swift - Tests for class constant casts w/ Obj-C
+// ParameterizedExistentials.swift - Casting tests for generalized existentials
 //
 // This source file is part of the Swift.org open source project
 //
