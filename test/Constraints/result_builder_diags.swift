@@ -525,12 +525,13 @@ func testCaseMutabilityMismatches(e: E3) {
 
 // Check for type equivalence among different case variables with the same name.
 func testCaseVarTypes(e: E3) {
-    // FIXME: Terrible diagnostic
-    tuplify(true) { c in  // expected-error{{type of expression is ambiguous without more context}}
+    tuplify(true) { c in
     "testSwitch"
     switch e {
     case .a(let x, let y),
          .c(let x, let y):
+         // expected-error@-1 {{pattern variable bound to type 'String', expected type 'Int'}}
+         // expected-error@-2 {{pattern variable bound to type 'Int', expected type 'String'}}
       x
       y + "a"
     }

@@ -94,7 +94,7 @@ tuplify(true) { b in
   for x in [b] where unavailableFunc(x) { // expected-error {{'unavailableFunc' is unavailable}}
     ""
     Option.best // expected-error{{'best' is only available in macOS 10.15.4 or newer}}
-    // FIXME: There supposed to be a fix-it here but `overApproximateAvailabilityAtLocation` doesn't produce correct version range
+    // expected-note@-1{{add 'if #available' version check}}
   }
 }
 
