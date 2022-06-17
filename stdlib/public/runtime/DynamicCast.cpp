@@ -1743,7 +1743,7 @@ static DynamicCastResult tryCastUnwrappingExtendedExistentialSource(
   srcFailureType = srcInnerType;
   return tryCast(destLocation, destType, srcInnerValue, srcInnerType,
                  destFailureType, srcFailureType,
-                 takeOnSuccess & (srcInnerValue == srcValue), mayDeferChecks);
+                 takeOnSuccess && (srcInnerValue == srcValue), mayDeferChecks);
 }
 
 static DynamicCastResult
@@ -1765,7 +1765,7 @@ tryCastUnwrappingExistentialMetatypeSource(
   return tryCast(destLocation, destType,
                  srcInnerValue, srcInnerType,
                  destFailureType, srcFailureType,
-                 takeOnSuccess & (srcInnerValue == srcValue),
+                 takeOnSuccess && (srcInnerValue == srcValue),
                  mayDeferChecks);
 }
 
