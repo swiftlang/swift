@@ -1045,8 +1045,6 @@ bool SILDeclRef::requiresNewVTableEntry() const {
       return true;
   if (!hasDecl())
     return false;
-  if (isDistributedThunk())
-    return false;
   if (isBackDeploymentThunk())
     return false;
   auto fnDecl = dyn_cast<AbstractFunctionDecl>(getDecl());
