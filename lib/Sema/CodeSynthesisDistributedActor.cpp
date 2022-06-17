@@ -259,10 +259,6 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
 
     auto var = accessor->getStorage();
 
-    auto varRef = UnresolvedDeclRefExpr::createImplicit(C, var->getName());
-    auto funcDeclRef =
-        UnresolvedDotExpr::createImplicit(C, selfRefExpr, var->getBaseName());
-
     Expr *localPropertyAccess = new (C) MemberRefExpr(
         selfRefExpr, sloc, ConcreteDeclRef(var), dloc, implicit);
     localPropertyAccess =
