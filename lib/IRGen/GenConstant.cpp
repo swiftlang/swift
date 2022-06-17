@@ -278,9 +278,27 @@ llvm::Constant *irgen::emitConstantObject(IRGenModule &IGM, ObjectInst *OI,
     }
   }
   // Construct the object header.
-  llvm::Type *ObjectHeaderTy = sTy->getElementType(0);
-  assert(ObjectHeaderTy->isStructTy());
-  elts[0] = llvm::Constant::getNullValue(ObjectHeaderTy);
+  llvm::StructType *ObjectHeaderTy = cast<llvm::StructType>(sTy->getElementType(0));
+
+  if (IGM.canMakeStaticObjectsReadOnly()) {
+    if (!IGM.swiftImmortalRefCount) {
+      auto *var = new llvm::GlobalVariable(IGM.Module, IGM.Int8Ty,
+                                        /*constant*/ true, llvm::GlobalValue::ExternalLinkage,
+                                        /*initializer*/ nullptr, "_swiftImmortalRefCount");
+      IGM.swiftImmortalRefCount = var;
+    }
+    if (!IGM.swiftStaticArrayMetadata) {
+      auto *var = new llvm::GlobalVariable(IGM.Module, IGM.TypeMetadataStructTy,
+                                        /*constant*/ true, llvm::GlobalValue::ExternalLinkage,
+                                        /*initializer*/ nullptr, "_swiftStaticArrayMetadata");
+      IGM.swiftStaticArrayMetadata = var;
+    }
+    elts[0] = llvm::ConstantStruct::get(ObjectHeaderTy, {
+      IGM.swiftStaticArrayMetadata,
+      llvm::ConstantExpr::getPtrToInt(IGM.swiftImmortalRefCount, IGM.IntPtrTy)});
+  } else {
+    elts[0] = llvm::Constant::getNullValue(ObjectHeaderTy);
+  }
   insertPadding(elts, sTy);
   return llvm::ConstantStruct::get(sTy, elts);
 }
