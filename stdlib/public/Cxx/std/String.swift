@@ -12,16 +12,19 @@
 
 extension std.string {
   public init(_ string: String) {
-    self.init()
-    for char in string.utf8 {
-      self.push_back(value_type(char))
+    let count = string.count
+    self.init(count, value_type(0))
+    var string = string
+    string.withUTF8 {
+      memcpy(UnsafeMutableRawPointer(mutating: UnsafeRawPointer(__dataUnsafe()!)),
+             UnsafeMutableRawPointer(mutating: $0.baseAddress), count)
     }
   }
 }
 
 extension String {
   public init(cxxString: std.string) {
-    self.init(cString: cxxString.c_str())
+    self.init(cString: cxxString.__c_strUnsafe())
     withExtendedLifetime(cxxString) {}
   }
 }

@@ -4,7 +4,7 @@
 #include "classes.h"
 
 struct ClassesNS1::ClassesNS2::DefinedInDefs {
-  const char *basicMember() {
+  const char *basicMember() __attribute__((swift_attr("import_unsafe"))) {
     return "ClassesNS1::ClassesNS2::DefinedInDefs::basicMember";
   }
 };

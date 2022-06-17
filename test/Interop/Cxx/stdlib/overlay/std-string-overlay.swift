@@ -1,7 +1,9 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none)
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none -g)
 //
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx || OS=linux-gnu
+//
+// XFAIL: *
 
 import StdlibUnittest
 import std
@@ -24,10 +26,10 @@ extension std.string.const_iterator: UnsafeCxxInputIterator {
                         rhs: std.string.const_iterator) -> Bool {
 #if os(Linux)
     // In libstdc++, `base()` returns UnsafePointer<Optional<UnsafePointer<CChar>>>.
-    return lhs.base().pointee == rhs.base().pointee
+    return lhs.__baseUnsafe().pointee == rhs.__baseUnsafe().pointee
 #else
     // In libc++, `base()` returns UnsafePointer<CChar>.
-    return lhs.base() == rhs.base()
+    return lhs.__baseUnsafe() == rhs.__baseUnsafe()
 #endif
   }
 }

@@ -1947,31 +1947,14 @@ namespace {
       return result;
     }
 
-    static bool hasImportAsRefAttr(const clang::RecordDecl *decl) {
-      return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
-               if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
-                 return swiftAttr->getAttribute() == "import_as_ref";
-               return false;
-             });
-    }
-
-    bool isCxxRecordImportable(const clang::CXXRecordDecl *decl) {
-      if (hasImportAsRefAttr(decl))
-        return true;
-
-      if (auto dtor = decl->getDestructor()) {
-        if (dtor->isDeleted() || dtor->getAccess() != clang::AS_public) {
-          return false;
-        }
+    bool recordHasReferenceSemantics(const clang::RecordDecl *decl) {
+      if (auto cxxRecord = dyn_cast<clang::CXXRecordDecl>(decl)) {
+        auto semanticsKind = evaluateOrDefault(
+            Impl.SwiftContext.evaluator, CxxRecordSemantics({cxxRecord}), {});
+        return semanticsKind == CxxRecordSemanticsKind::Reference;
       }
 
-      // If we have no way of copying the type we can't import the class
-      // at all because we cannot express the correct semantics as a swift
-      // struct.
-      return llvm::none_of(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
-        return ctor->isCopyConstructor() &&
-               (ctor->isDeleted() || ctor->getAccess() != clang::AS_public);
-      });
+      return false;
     }
 
     Decl *VisitRecordDecl(const clang::RecordDecl *decl) {
@@ -2064,7 +2047,7 @@ namespace {
         return alreadyImportedResult->second;
 
       auto loc = Impl.importSourceLoc(decl->getLocation());
-      if (hasImportAsRefAttr(decl))
+      if (recordHasReferenceSemantics(decl))
         result = Impl.createDeclWithClangNode<ClassDecl>(
             decl, AccessLevel::Public, loc, name, loc,
             ArrayRef<InheritedEntry>{}, nullptr, dc, false);
@@ -2470,7 +2453,9 @@ namespace {
 
       // It is import that we bail on an unimportable record *before* we import
       // any of its members or cache the decl.
-      if (!isCxxRecordImportable(decl))
+      auto semanticsKind = evaluateOrDefault(Impl.SwiftContext.evaluator,
+                                             CxxRecordSemantics({decl}), {});
+      if (semanticsKind == CxxRecordSemanticsKind::UnsafeLifetimeOperation)
         return nullptr;
 
       return VisitRecordDecl(decl);
@@ -2646,10 +2631,13 @@ namespace {
       // If we encounter an IndirectFieldDecl, ensure that its parent is
       // importable before attempting to import it because they are dependent
       // when it comes to getter/setter generation.
-      if (auto parent =
-              dyn_cast<clang::CXXRecordDecl>(decl->getAnonField()->getParent()))
-        if (!isCxxRecordImportable(parent))
+      if (auto parent = dyn_cast<clang::CXXRecordDecl>(
+              decl->getAnonField()->getParent())) {
+        auto semanticsKind = evaluateOrDefault(
+            Impl.SwiftContext.evaluator, CxxRecordSemantics({parent}), {});
+        if (semanticsKind == CxxRecordSemanticsKind::UnsafeLifetimeOperation)
           return nullptr;
+      }
 
       auto importedType =
           Impl.importType(decl->getType(), ImportTypeKind::Variable,
@@ -2722,13 +2710,12 @@ namespace {
     VarDecl *getImplicitProperty(ImportedName importedName,
                                  const clang::FunctionDecl *accessor);
 
-    static bool
-    foreignReferenceTypePassedByRef(const clang::FunctionDecl *decl) {
+    bool foreignReferenceTypePassedByRef(const clang::FunctionDecl *decl) {
       bool anyParamPassesByVal =
-          llvm::any_of(decl->parameters(), [](auto *param) {
+          llvm::any_of(decl->parameters(), [this](auto *param) {
             if (auto recordType = dyn_cast<clang::RecordType>(
                     param->getType().getCanonicalType()))
-              return hasImportAsRefAttr(recordType->getDecl());
+              return recordHasReferenceSemantics(recordType->getDecl());
             return false;
           });
 
@@ -2737,7 +2724,7 @@ namespace {
 
       if (auto recordType = dyn_cast<clang::RecordType>(
               decl->getReturnType().getCanonicalType()))
-        return hasImportAsRefAttr(recordType->getDecl());
+        return recordHasReferenceSemantics(recordType->getDecl());
 
       return false;
     }
@@ -3104,6 +3091,14 @@ namespace {
       recordObjCOverride(result);
     }
 
+    static bool hasUnsafeAPIAttr(const clang::Decl *decl) {
+      return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
+               if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
+                 return swiftAttr->getAttribute() == "import_unsafe";
+               return false;
+             });
+    }
+
     Decl *VisitCXXMethodDecl(const clang::CXXMethodDecl *decl) {
       auto method = VisitFunctionDecl(decl);
 
@@ -3149,7 +3144,7 @@ namespace {
       // Types that are marked as foreign references cannot be stored by value.
       if (auto recordType =
               dyn_cast<clang::RecordType>(decl->getType().getCanonicalType())) {
-        if (hasImportAsRefAttr(recordType->getDecl()))
+        if (recordHasReferenceSemantics(recordType->getDecl()))
           return nullptr;
       }
 

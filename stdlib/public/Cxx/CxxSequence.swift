@@ -73,10 +73,10 @@ public protocol CxxSequence: Sequence {
   // methods _have_ to be mutating.
 
   /// Do not implement this function manually in Swift.
-  mutating func begin() -> RawIterator
+  mutating func __beginUnsafe() -> RawIterator
 
   /// Do not implement this function manually in Swift.
-  mutating func end() -> RawIterator
+  mutating func __endUnsafe() -> RawIterator
 }
 
 public class CxxIterator<T>: IteratorProtocol where T: CxxSequence {
@@ -90,8 +90,8 @@ public class CxxIterator<T>: IteratorProtocol where T: CxxSequence {
 
   public init(sequence: T) {
     self.sequence = sequence
-    self.rawIterator = self.sequence.begin()
-    self.endIterator = self.sequence.end()
+    self.rawIterator = self.sequence.__beginUnsafe()
+    self.endIterator = self.sequence.__endUnsafe()
   }
 
   public func next() -> Element? {

@@ -17,7 +17,7 @@ _Tp &&move(_Tp &t) {
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
-struct __attribute__((swift_attr("import_as_ref"))) MoveOnly {
+struct __attribute__((swift_attr("import_reference"))) MoveOnly {
   MoveOnly() = default;
   MoveOnly(const MoveOnly &) = delete;
   MoveOnly(MoveOnly &&) = default;
@@ -32,7 +32,7 @@ struct __attribute__((swift_attr("import_as_ref"))) MoveOnly {
 
 MoveOnly moveIntoResult(MoveOnly &x) { return move(x); }
 
-struct __attribute__((swift_attr("import_as_ref"))) NoCopyMove {
+struct __attribute__((swift_attr("import_reference"))) NoCopyMove {
   NoCopyMove() = default;
   NoCopyMove(const NoCopyMove &) = delete;
   NoCopyMove(NoCopyMove &&) = delete;
@@ -45,7 +45,7 @@ struct __attribute__((swift_attr("import_as_ref"))) NoCopyMove {
   }
 };
 
-struct __attribute__((swift_attr("import_as_ref"))) HasMoveOnlyChild {
+struct __attribute__((swift_attr("import_reference"))) HasMoveOnlyChild {
   MoveOnly child;
 
   static HasMoveOnlyChild *create() {
@@ -55,7 +55,7 @@ struct __attribute__((swift_attr("import_as_ref"))) HasMoveOnlyChild {
 
 HasMoveOnlyChild moveIntoResult(HasMoveOnlyChild &x) { return move(x); }
 
-struct __attribute__((swift_attr("import_as_ref"))) PrivateCopyCtor {
+struct __attribute__((swift_attr("import_reference"))) PrivateCopyCtor {
   PrivateCopyCtor() = default;
   PrivateCopyCtor(PrivateCopyCtor &&) = default;
 
@@ -72,7 +72,7 @@ private:
 
 PrivateCopyCtor moveIntoResult(PrivateCopyCtor &x) { return move(x); }
 
-struct __attribute__((swift_attr("import_as_ref"))) BadCopyCtor {
+struct __attribute__((swift_attr("import_reference"))) BadCopyCtor {
   BadCopyCtor() = default;
   BadCopyCtor(BadCopyCtor &&) = default;
   BadCopyCtor(const BadCopyCtor &) { __builtin_trap(); }
