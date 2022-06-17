@@ -31,6 +31,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/IDE/CommentConversion.h"
+#include "swift/IRGen/Linking.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
 
@@ -229,10 +230,6 @@ private:
         protocolMembersOptional = !protocolMembersOptional;
         os << (protocolMembersOptional ? "@optional\n" : "@required\n");
       }
-      // Limit C++ decls for now.
-      if (outputLang == OutputLanguageMode::Cxx &&
-          !(isa<VarDecl>(VD) || isa<FuncDecl>(VD)))
-        continue;
       ASTVisitor::visit(const_cast<ValueDecl*>(VD));
     }
   }
@@ -855,11 +852,10 @@ private:
   }
 
   struct FuncionSwiftABIInformation {
-    FuncionSwiftABIInformation(AbstractFunctionDecl *FD,
-                               Mangle::ASTMangler &mangler) {
+    FuncionSwiftABIInformation(AbstractFunctionDecl *FD) {
       isCDecl = FD->getAttrs().hasAttribute<CDeclAttr>();
       if (!isCDecl) {
-        auto mangledName = mangler.mangleAnyDecl(FD, /*prefix=*/true);
+        auto mangledName = SILDeclRef(FD).mangle();
         symbolName = FD->getASTContext().AllocateCopy(mangledName);
       } else {
         symbolName = FD->getAttrs().getAttribute<CDeclAttr>()->Name;
@@ -895,8 +891,7 @@ private:
     auto resultTy =
         getForeignResultType(FD, funcTy, asyncConvention, errorConvention);
 
-    Mangle::ASTMangler mangler;
-    FuncionSwiftABIInformation funcABI(FD, mangler);
+    FuncionSwiftABIInformation funcABI(FD);
 
     os << "SWIFT_EXTERN ";
 
@@ -905,7 +900,7 @@ private:
                                                 owningPrinter.interopContext);
     llvm::SmallVector<DeclAndTypeClangFunctionPrinter::AdditionalParam, 1>
         additionalParams;
-    if (selfTypeDeclContext) {
+    if (selfTypeDeclContext && !isa<ConstructorDecl>(FD)) {
       additionalParams.push_back(
           {DeclAndTypeClangFunctionPrinter::AdditionalParam::Role::Self,
            (*selfTypeDeclContext)->getDeclaredType(),

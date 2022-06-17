@@ -397,17 +397,22 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
 void DeclAndTypeClangFunctionPrinter::printCxxMethod(
     const NominalTypeDecl *typeDeclContext, const AbstractFunctionDecl *FD,
     StringRef swiftSymbolName, Type resultTy, bool isDefinition) {
-  os << "  inline ";
+  bool isConstructor = isa<ConstructorDecl>(FD);
+  os << "  ";
+  if (isConstructor && !isDefinition)
+    os << "static ";
+  os << "inline ";
   // FIXME: Full qualifier.
   FunctionSignatureModifiers modifiers;
   if (isDefinition)
     modifiers.qualifierContext = typeDeclContext;
-  printFunctionSignature(FD, FD->getName().getBaseIdentifier().get(), resultTy,
-                         FunctionSignatureKind::CxxInlineThunk, {}, modifiers);
+  printFunctionSignature(
+      FD, isConstructor ? "init" : FD->getName().getBaseIdentifier().get(),
+      resultTy, FunctionSignatureKind::CxxInlineThunk, {}, modifiers);
   bool isMutating = false;
   if (auto *funcDecl = dyn_cast<FuncDecl>(FD))
     isMutating = funcDecl->isMutating();
-  if (!isMutating)
+  if (!isMutating && !isConstructor)
     os << " const";
   if (!isDefinition) {
     os << ";\n";
@@ -416,12 +421,15 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
 
   os << " {\n";
   // FIXME: should it be objTy for resultTy?
+  SmallVector<AdditionalParam, 2> additionalParams;
+  if (!isConstructor)
+    additionalParams.push_back(AdditionalParam{
+        AdditionalParam::Role::Self,
+        typeDeclContext->getDeclaredType(),
+        /*isIndirect=*/isMutating,
+    });
   printCxxThunkBody(swiftSymbolName, resultTy, FD->getParameters(),
-                    {AdditionalParam{
-                        AdditionalParam::Role::Self,
-                        typeDeclContext->getDeclaredType(),
-                        /*isIndirect=*/isMutating,
-                    }});
+                    additionalParams);
   os << "  }\n";
 }
 
