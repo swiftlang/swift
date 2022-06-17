@@ -2467,6 +2467,11 @@ ManglingError Remangler::mangleOutlinedVariable(Node *node, unsigned depth) {
   return mangleSingleChildNode(node, depth + 1);
 }
 
+ManglingError Remangler::mangleOutlinedReadOnlyObject(Node *node, unsigned depth) {
+  Buffer << "Tv" << node->getIndex() << 'r';
+  return mangleSingleChildNode(node, depth + 1);
+}
+
 ManglingError Remangler::mangleOutlinedBridgedMethod(Node *node,
                                                      unsigned depth) {
   Buffer << "Te" << node->getText();

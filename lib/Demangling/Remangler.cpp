@@ -1628,6 +1628,7 @@ ManglingError Remangler::mangleGlobal(Node *node, unsigned depth) {
       case Node::Kind::GenericPartialSpecializationNotReAbstracted:
       case Node::Kind::OutlinedBridgedMethod:
       case Node::Kind::OutlinedVariable:
+      case Node::Kind::OutlinedReadOnlyObject:
       case Node::Kind::ObjCAttribute:
       case Node::Kind::NonObjCAttribute:
       case Node::Kind::DynamicAttribute:
@@ -3150,6 +3151,13 @@ ManglingError Remangler::mangleOutlinedDestroy(Node *node, unsigned depth) {
 ManglingError Remangler::mangleOutlinedVariable(Node *node, unsigned depth) {
   Buffer << "Tv";
   mangleIndex(node->getIndex());
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleOutlinedReadOnlyObject(Node *node, unsigned depth) {
+  Buffer << "Tv";
+  mangleIndex(node->getIndex());
+  Buffer << 'r';
   return ManglingError::Success;
 }
 

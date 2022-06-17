@@ -131,6 +131,7 @@ bool swift::Demangle::isFunctionAttr(Node::Kind kind) {
     case Node::Kind::PartialApplyForwarder:
     case Node::Kind::PartialApplyObjCForwarder:
     case Node::Kind::OutlinedVariable:
+    case Node::Kind::OutlinedReadOnlyObject:
     case Node::Kind::OutlinedBridgedMethod:
     case Node::Kind::MergedFunction:
     case Node::Kind::DistributedThunk:
@@ -2615,6 +2616,8 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
       int Idx = demangleIndex();
       if (Idx < 0)
         return nullptr;
+      if (nextChar() == 'r')
+        return createNode(Node::Kind::OutlinedReadOnlyObject, Idx);
       return createNode(Node::Kind::OutlinedVariable, Idx);
     }
     case 'e': {
