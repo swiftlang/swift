@@ -444,7 +444,11 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     return proto_list;
   }
   case MetadataKind::ExtendedExistential: {
-    swift_unreachable("Extended existentials not supported");
+    // FIXME: Implement this by demangling the extended existential and
+    // substituting the generalization arguments into the demangle tree.
+    // For now, unconditional casts will report '<<< invalid type >>>' when
+    // they fail.
+    return nullptr;
   }
   case MetadataKind::ExistentialMetatype: {
     auto metatype = static_cast<const ExistentialMetatypeMetadata *>(type);
