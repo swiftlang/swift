@@ -76,16 +76,18 @@ void printCTypeMetadataTypeFunction(raw_ostream &os,
 void ClangValueTypePrinter::printValueTypeDecl(
     const NominalTypeDecl *typeDecl,
     llvm::function_ref<void(void)> bodyPrinter) {
-  auto typeSizeAlign =
-      interopContext.getIrABIDetails().getTypeSizeAlignment(typeDecl);
-  if (!typeSizeAlign) {
-    // FIXME: handle non-fixed layout structs.
-    return;
+  llvm::Optional<IRABIDetailsProvider::SizeAndAlignment> typeSizeAlign;
+  if (!typeDecl->isResilient()) {
+
+    typeSizeAlign =
+        interopContext.getIrABIDetails().getTypeSizeAlignment(typeDecl);
+    assert(typeSizeAlign && "unknown layout for non-resilient type!");
+    if (typeSizeAlign->size == 0) {
+      // FIXME: How to represent 0 sized structs?
+      return;
+    }
   }
-  if (typeSizeAlign->size == 0) {
-    // FIXME: How to represent 0 sized structs?
-    return;
-  }
+  bool isOpaqueLayout = !typeSizeAlign.hasValue();
 
   ClangSyntaxPrinter printer(os);
 
@@ -138,6 +140,11 @@ void ClangValueTypePrinter::printValueTypeDecl(
   os << "    auto *vwTable = ";
   printer.printValueWitnessTableAccessFromTypeMetadata("metadata");
   os << ";\n";
+  if (isOpaqueLayout) {
+    os << "    _storage = ";
+    printer.printSwiftImplQualifier();
+    os << cxx_synthesis::getCxxOpaqueStorageClassName() << "(vwTable);\n";
+  }
   os << "    vwTable->initializeWithCopy(_getOpaquePointer(), const_cast<char "
         "*>(other._getOpaquePointer()), metadata._0);\n";
   os << "  }\n";
@@ -156,23 +163,55 @@ void ClangValueTypePrinter::printValueTypeDecl(
   // Print out private default constructor.
   os << "  inline ";
   printer.printBaseName(typeDecl);
-  os << "() {}\n";
+  if (isOpaqueLayout) {
+    os << "(";
+    printer.printSwiftImplQualifier();
+    os << "ValueWitnessTable * _Nonnull vwTable) : _storage(vwTable) {}\n";
+  } else {
+    os << "() {}\n";
+  }
   // Print out '_make' function which returns an unitialized instance for
   // passing to Swift.
   os << "  static inline ";
   printer.printBaseName(typeDecl);
-  os << " _make() { return ";
-  printer.printBaseName(typeDecl);
-  os << "(); }\n";
+  os << " _make() {";
+  if (isOpaqueLayout) {
+    os << "\n";
+    os << "    auto metadata = " << cxx_synthesis::getCxxImplNamespaceName()
+       << "::";
+    printer.printSwiftTypeMetadataAccessFunctionCall(typeMetadataFuncName);
+    os << ";\n";
+    os << "    return ";
+    printer.printBaseName(typeDecl);
+    os << "(";
+    printer.printValueWitnessTableAccessFromTypeMetadata("metadata");
+    os << ");\n  }\n";
+  } else {
+    os << " return ";
+    printer.printBaseName(typeDecl);
+    os << "(); }\n";
+  }
   // Print out the private accessors to the underlying Swift value storage.
   os << "  inline const char * _Nonnull _getOpaquePointer() const { return "
-        "_storage; }\n";
-  os << "  inline char * _Nonnull _getOpaquePointer() { return _storage; }\n";
+        "_storage";
+  if (isOpaqueLayout)
+    os << ".getOpaquePointer()";
+  os << "; }\n";
+  os << "  inline char * _Nonnull _getOpaquePointer() { return _storage";
+  if (isOpaqueLayout)
+    os << ".getOpaquePointer()";
+  os << "; }\n";
   os << "\n";
 
   // Print out the storage for the value type.
-  os << "  alignas(" << typeSizeAlign->alignment << ") ";
-  os << "char _storage[" << typeSizeAlign->size << "];\n";
+  os << "  ";
+  if (isOpaqueLayout) {
+    printer.printSwiftImplQualifier();
+    os << cxx_synthesis::getCxxOpaqueStorageClassName() << " _storage;\n";
+  } else {
+    os << "alignas(" << typeSizeAlign->alignment << ") ";
+    os << "char _storage[" << typeSizeAlign->size << "];\n";
+  }
   // Wrap up the value type.
   os << "  friend class " << cxx_synthesis::getCxxImplNamespaceName() << "::";
   printCxxImplClassName(os, typeDecl);
@@ -209,7 +248,8 @@ void ClangValueTypePrinter::printValueTypeDecl(
         os << "};\n";
       });
 
-  printCValueTypeStorageStruct(cPrologueOS, typeDecl, *typeSizeAlign);
+  if (!isOpaqueLayout)
+    printCValueTypeStorageStruct(cPrologueOS, typeDecl, *typeSizeAlign);
 }
 
 /// Print the name of the C stub struct for passing/returning a value type
