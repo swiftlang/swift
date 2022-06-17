@@ -763,9 +763,6 @@ public:
 
   llvm::GlobalVariable *TheTrivialPropertyDescriptor = nullptr;
 
-  llvm::GlobalVariable *swiftImmortalRefCount = nullptr;
-  llvm::GlobalVariable *swiftStaticArrayMetadata = nullptr;
-
   /// Used to create unique names for class layout types with tail allocated
   /// elements.
   unsigned TailElemTypeID = 0;
@@ -888,8 +885,6 @@ public:
   bool useDllStorage();
 
   bool shouldPrespecializeGenericMetadata();
-  
-  bool canMakeStaticObjectsReadOnly();
   
   Size getAtomicBoolSize() const { return AtomicBoolSize; }
   Alignment getAtomicBoolAlignment() const { return AtomicBoolAlign; }
