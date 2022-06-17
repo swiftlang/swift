@@ -4121,15 +4121,18 @@ static unsigned skipUntilMatchingRBrace(Parser &P,
                                         bool &HasPoundDirective,
                                         bool &HasOperatorDeclarations,
                                         bool &HasNestedClassDeclarations,
-                                        bool &HasNestedTypeDeclarations) {
+                                        bool &HasNestedTypeDeclarations,
+                                        bool &HasPotentialRegexLiteral) {
   HasPoundDirective = false;
   HasOperatorDeclarations = false;
   HasNestedClassDeclarations = false;
   HasNestedTypeDeclarations = false;
+  HasPotentialRegexLiteral = false;
 
   unsigned OpenBraces = 1;
 
   bool LastTokenWasFunc = false;
+  const bool BareSlashRegexLiterals = P.Context.LangOpts.EnableBareSlashRegexLiterals;
 
   while (OpenBraces != 0 && P.Tok.isNot(tok::eof)) {
     // Detect 'func' followed by an operator identifier.
@@ -4147,6 +4150,15 @@ static unsigned skipUntilMatchingRBrace(Parser &P,
 
     HasNestedTypeDeclarations |= P.Tok.isAny(tok::kw_class, tok::kw_struct,
                                              tok::kw_enum);
+
+
+    HasPotentialRegexLiteral |= (BareSlashRegexLiterals &&
+                                 P.Tok.isAnyOperator() &&
+                                 P.Tok.getText().contains('/'));
+
+    // Bail if 'HasPotentialRegexLiteral'.
+    if (HasPotentialRegexLiteral)
+      return OpenBraces;
 
     if (P.consumeIf(tok::l_brace)) {
       ++OpenBraces;
@@ -5456,12 +5468,14 @@ bool Parser::canDelayMemberDeclParsing(bool &HasOperatorDeclarations,
   CancellableBacktrackingScope BackTrack(*this);
   bool HasPoundDirective;
   bool HasNestedTypeDeclarations;
+  bool HasPotentialRegexLiteral;
   skipUntilMatchingRBrace(*this,
                           HasPoundDirective,
                           HasOperatorDeclarations,
                           HasNestedClassDeclarations,
-                          HasNestedTypeDeclarations);
-  if (!HasPoundDirective)
+                          HasNestedTypeDeclarations,
+                          HasPotentialRegexLiteral);
+  if (!HasPoundDirective && !HasPotentialRegexLiteral)
     BackTrack.cancelBacktrack();
   return !BackTrack.willBacktrack();
 }
@@ -6137,25 +6151,34 @@ static ParameterList *parseOptionalAccessorArgument(SourceLoc SpecifierLoc,
   return ParameterList::create(P.Context, StartLoc, param, EndLoc);
 }
 
-bool Parser::skipBracedBlock(bool &HasNestedTypeDeclarations) {
+bool Parser::canDelayFunctionBodyParsing(bool &HasNestedTypeDeclarations) {
+  // If explicitly disabled, respect the flag.
+  if (!isDelayedParsingEnabled() && !isCodeCompletionFirstPass())
+    return false;
+
   SyntaxParsingContext disabled(SyntaxContext);
   SyntaxContext->disable();
-  consumeToken(tok::l_brace);
 
-  // We don't care if a skipped function body contained any of these, so
-  // just ignore them.
+  // Skip until the matching right curly bracket; If it has a potential regex
+  // literal, we can't skip. We don't care others, so just ignore them;
+  CancellableBacktrackingScope BackTrack(*this);
+  consumeToken(tok::l_brace);
   bool HasPoundDirectives;
   bool HasOperatorDeclarations;
   bool HasNestedClassDeclarations;
-
+  bool HasPotentialRegexLiteral;
   unsigned OpenBraces = skipUntilMatchingRBrace(*this,
                                                 HasPoundDirectives,
                                                 HasOperatorDeclarations,
                                                 HasNestedClassDeclarations,
-                                                HasNestedTypeDeclarations);
-  if (consumeIf(tok::r_brace))
-    --OpenBraces;
-  return OpenBraces != 0;
+                                                HasNestedTypeDeclarations,
+                                                HasPotentialRegexLiteral);
+  if (HasPotentialRegexLiteral)
+    return false;
+
+  BackTrack.cancelBacktrack();
+  consumeIf(tok::r_brace);
+  return true;
 }
 
 void Parser::skipSILUntilSwiftDecl() {
@@ -7145,30 +7168,6 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
   return makeResult(Status);
 }
 
-void Parser::consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
-                                         const DeclAttributes &Attrs) {
-  auto BeginParserPosition = getParserPosition();
-  SourceRange BodyRange;
-  BodyRange.Start = Tok.getLoc();
-
-  // Advance the parser to the end of the block; '{' ... '}'.
-  bool HasNestedTypeDeclarations;
-  skipBracedBlock(HasNestedTypeDeclarations);
-
-  BodyRange.End = PreviousLoc;
-
-  AFD->setBodyDelayed(BodyRange);
-  AFD->setHasNestedTypeDeclarations(HasNestedTypeDeclarations);
-
-  if (isCodeCompletionFirstPass() &&
-      SourceMgr.rangeContainsCodeCompletionLoc(BodyRange)) {
-    State->setCodeCompletionDelayedDeclState(
-        SourceMgr, L->getBufferID(),
-        CodeCompletionDelayedDeclKind::FunctionBody,
-        PD_Default, AFD, BodyRange, BeginParserPosition.PreviousLoc);
-  }
-}
-
 /// Parse a 'func' declaration, returning null on error.  The caller
 /// handles this case and does recovery as appropriate.
 ///
@@ -7481,12 +7480,41 @@ void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
   // If we can delay parsing this body, or this is the first pass of code
   // completion, skip until the end. If we encounter a code completion token
   // while skipping, we'll make a note of it.
-  if (isDelayedParsingEnabled() || isCodeCompletionFirstPass()) {
-    consumeAbstractFunctionBody(AFD, AFD->getAttrs());
+  auto BodyPreviousLoc = PreviousLoc;
+  SourceRange BodyRange(Tok.getLoc());
+  auto setCodeCompletionDelayedDeclStateIfNeeded = [&] {
+    if (!isCodeCompletionFirstPass() ||
+        !SourceMgr.rangeContainsCodeCompletionLoc(BodyRange)) {
+      return;
+    }
+    if (State->hasCodeCompletionDelayedDeclState())
+      State->takeCodeCompletionDelayedDeclState();
+    State->setCodeCompletionDelayedDeclState(
+        SourceMgr, L->getBufferID(),
+        CodeCompletionDelayedDeclKind::FunctionBody,
+        PD_Default, AFD, BodyRange, BodyPreviousLoc);
+  };
+
+  bool HasNestedTypeDeclarations;
+  if (canDelayFunctionBodyParsing(HasNestedTypeDeclarations)) {
+    BodyRange.End = PreviousLoc;
+
+    assert(SourceMgr.isBeforeInBuffer(BodyRange.Start, BodyRange.End) ||
+           BodyRange.Start == BodyRange.End &&
+           "At least '{' should be consumed");
+
+    AFD->setBodyDelayed(BodyRange);
+    AFD->setHasNestedTypeDeclarations(HasNestedTypeDeclarations);
+
+    setCodeCompletionDelayedDeclStateIfNeeded();
     return;
   }
 
   (void)parseAbstractFunctionBodyImpl(AFD);
+  assert(BodyRange.Start == AFD->getBodySourceRange().Start &&
+         "The start of the body should be the 'l_brace' token above");
+  BodyRange = AFD->getBodySourceRange();
+  setCodeCompletionDelayedDeclStateIfNeeded();
 }
 
 BodyAndFingerprint
