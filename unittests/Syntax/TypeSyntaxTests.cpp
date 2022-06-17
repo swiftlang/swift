@@ -494,7 +494,7 @@ TEST(TypeSyntaxTests, FunctionTypeMakeAPIs) {
   auto RightParen = Factory.makeRightParenToken("", " ");
   auto Int = Factory.makeTypeIdentifier("Int", "", "");
   auto IntArg = Factory.makeBlankTupleTypeElement().withType(Int);
-  auto Async = Factory.makeIdentifier("async", "", " ");
+  auto Async = Factory.makeContextualKeyword("async", "", " ");
   auto Throws = Factory.makeThrowsKeyword("", " ");
   auto Rethrows = Factory.makeRethrowsKeyword("", " ");
   auto Arrow = Factory.makeArrowToken("", " ");
