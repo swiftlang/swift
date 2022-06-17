@@ -8993,10 +8993,16 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
     result.setExpr(resultExpr);
 
     if (cs.isDebugMode()) {
+      // If target is a multi-statement closure or
+      // a tap expression, expression will not be fully
+      // type checked until these types are visited in
+      // processDelayed().
       auto &log = llvm::errs();
-      log << "---Type-checked expression---\n";
-      resultExpr->dump(log);
-      log << "\n";
+      if (!ClosuresToTypeCheck.empty() || !TapsToTypeCheck.empty()) {
+        log << "---Partially type-checked expression---\n";
+        resultExpr->dump(log);
+        log << "\n";
+      }
     }
   }
 
@@ -9057,6 +9063,13 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
     return None;
 
   rewriter.finalize();
+  
+  if (isDebugMode()) {
+    auto &log = llvm::errs();
+    log << "---Fully type-checked expression---\n";
+    resultTarget->getAsExpr()->dump(log);
+    log << "\n";
+  }
 
   return resultTarget;
 }
