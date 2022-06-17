@@ -1290,6 +1290,10 @@ bool AbstractFunctionDecl::isDistributed() const {
   return getAttrs().hasAttribute<DistributedActorAttr>();
 }
 
+bool AbstractFunctionDecl::isDistributedThunk() const {
+  return getAttrs().hasAttribute<DistributedThunkAttr>();
+}
+
 ConstructorDecl *
 NominalTypeDecl::getDistributedRemoteCallTargetInitFunction() const {
   auto mutableThis = const_cast<NominalTypeDecl *>(this);
