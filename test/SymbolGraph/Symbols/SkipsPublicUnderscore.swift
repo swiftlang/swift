@@ -50,7 +50,7 @@ public struct _ShouldntAppear: PublicProtocol, _ProtocolShouldntAppear {
   public struct InnerInnerShouldntAppear {}
   }
 
-  // INTERNAL-DAG: "precise": "s:21SkipsPublicUnderscore15_ShouldntAppearV13someHiddenVarSSvpZ"
+  // INTERNAL-DAG: someHiddenVar
   public static var someHiddenVar: String { "someHiddenVar" }
 }
 
