@@ -51,6 +51,18 @@ static void emitObjCConditional(raw_ostream &out,
   out << "#endif\n";
 }
 
+static void writePtrauthPrologue(raw_ostream &os) {
+  emitCxxConditional(os, [&]() {
+    os << "#if __has_include(<ptrauth.h>)\n";
+    os << "# include <ptrauth.h>\n";
+    os << "#else\n";
+    os << "# ifndef __ptrauth_swift_value_witness_function_pointer\n";
+    os << "#  define __ptrauth_swift_value_witness_function_pointer(x)\n";
+    os << "# endif\n";
+    os << "#endif\n";
+  });
+}
+
 static void writePrologue(raw_ostream &out, ASTContext &ctx,
                           StringRef macroGuard) {
 
@@ -91,6 +103,8 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
                "#include <cstddef>\n"
                "#include <cstdbool>\n"
                "#include <cstring>\n";
+        out << "#include <stdlib.h>\n";
+        out << "#if defined(_WIN32)\n#include <malloc.h>\n#endif\n";
       },
       [&] {
         out << "#include <stdint.h>\n"
@@ -98,6 +112,7 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
                "#include <stdbool.h>\n"
                "#include <string.h>\n";
       });
+  writePtrauthPrologue(out);
   out << "\n"
          "#if !defined(SWIFT_TYPEDEFS)\n"
          "# define SWIFT_TYPEDEFS 1\n"
@@ -304,6 +319,7 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
   };
   emitMacro("SWIFT_CALL", "__attribute__((swiftcall))");
   emitMacro("SWIFT_INDIRECT_RESULT", "__attribute__((swift_indirect_result))");
+  emitMacro("SWIFT_CONTEXT", "__attribute__((swift_context))");
   // SWIFT_NOEXCEPT applies 'noexcept' in C++ mode only.
   emitCxxConditional(
       out, [&] { emitMacro("SWIFT_NOEXCEPT", "noexcept"); },

@@ -5,9 +5,10 @@
 // RUN: %check-interop-cxx-header-in-clang(%t/structs.h)
 
 public struct StructSeveralI64 {
-    let x1, x2, x3, x4, x5: Int64
+    var x1, x2, x3, x4, x5: Int64
 }
 
+// CHECK: SWIFT_EXTERN void $s7Structs21inoutStructSeveralI64yyAA0cdE0VzF(void * _Nonnull s) SWIFT_NOEXCEPT SWIFT_CALL; // inoutStructSeveralI64(_:)
 // CHECK: class StructSeveralI64 final {
 
 public func returnNewStructSeveralI64(i: Int64) -> StructSeveralI64 {
@@ -21,6 +22,19 @@ public func passThroughStructSeveralI64(i: Int64, _ x: StructSeveralI64, j: Floa
 public func printStructSeveralI64(_ x: StructSeveralI64) {
     print("StructSeveralI64.1 = \(x.x1), .2 = \(x.x2), .3 = \(x.x3), .4 = \(x.x4), .5 = \(x.x5)")
 }
+
+public func inoutStructSeveralI64(_ s: inout StructSeveralI64) {
+    s.x1 = -1
+    s.x2 = -2
+    s.x3 = -3
+    s.x4 = -4
+    s.x5 = -5
+}
+
+// CHECK:      inline void inoutStructSeveralI64(StructSeveralI64& s) noexcept {
+// CHECK-NEXT:   return _impl::$s7Structs21inoutStructSeveralI64yyAA0cdE0VzF(_impl::_impl_StructSeveralI64::getOpaquePointer(s));
+// CHECK-NEXT: }
+
 
 // CHECK: inline StructSeveralI64 passThroughStructSeveralI64(int64_t i, const StructSeveralI64& x, float j) noexcept SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:  return _impl::_impl_StructSeveralI64::returnNewValue([&](void * _Nonnull result) {

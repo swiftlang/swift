@@ -18,6 +18,10 @@ using namespace cxx_synthesis;
 
 StringRef cxx_synthesis::getCxxImplNamespaceName() { return "_impl"; }
 
+StringRef cxx_synthesis::getCxxOpaqueStorageClassName() {
+  return "OpaqueStorage";
+}
+
 bool ClangSyntaxPrinter::isClangKeyword(StringRef name) {
   static const llvm::DenseSet<StringRef> keywords = [] {
     llvm::DenseSet<StringRef> set;
@@ -72,6 +76,21 @@ void ClangSyntaxPrinter::printNamespace(
   printNamespace([&](raw_ostream &os) { os << name; }, bodyPrinter);
 }
 
+void ClangSyntaxPrinter::printExternC(
+    llvm::function_ref<void(raw_ostream &OS)> bodyPrinter) const {
+  os << "#ifdef __cplusplus\n";
+  os << "extern \"C\" {\n";
+  os << "#endif\n\n";
+  bodyPrinter(os);
+  os << "\n#ifdef __cplusplus\n";
+  os << "}\n";
+  os << "#endif\n";
+}
+
+void ClangSyntaxPrinter::printSwiftImplQualifier() const {
+  os << "swift::" << cxx_synthesis::getCxxImplNamespaceName() << "::";
+}
+
 void ClangSyntaxPrinter::printNullability(
     Optional<OptionalTypeKind> kind, NullabilityPrintKind printKind) const {
   if (!kind)
@@ -111,4 +130,16 @@ void ClangSyntaxPrinter::printNullability(
 
   if (printKind != NullabilityPrintKind::After)
     os << ' ';
+}
+
+void ClangSyntaxPrinter::printSwiftTypeMetadataAccessFunctionCall(
+    StringRef name) {
+  os << name << "(0)";
+}
+
+void ClangSyntaxPrinter::printValueWitnessTableAccessFromTypeMetadata(
+    StringRef metadataVariable) {
+  os << "*(reinterpret_cast<";
+  printSwiftImplQualifier();
+  os << "ValueWitnessTable **>(" << metadataVariable << "._0) - 1)";
 }

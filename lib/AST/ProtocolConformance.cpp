@@ -44,9 +44,10 @@ using namespace swift;
 Witness::Witness(ValueDecl *decl, SubstitutionMap substitutions,
                  GenericEnvironment *syntheticEnv,
                  SubstitutionMap reqToSynthesizedEnvSubs,
-                 GenericSignature derivativeGenSig) {
+                 GenericSignature derivativeGenSig,
+                 Optional<ActorIsolation> enterIsolation) {
   if (!syntheticEnv && substitutions.empty() &&
-      reqToSynthesizedEnvSubs.empty()) {
+      reqToSynthesizedEnvSubs.empty() && !enterIsolation) {
     storage = decl;
     return;
   }
@@ -56,9 +57,15 @@ Witness::Witness(ValueDecl *decl, SubstitutionMap substitutions,
   auto storedMem = ctx.Allocate(sizeof(StoredWitness), alignof(StoredWitness));
   auto stored = new (storedMem) StoredWitness{declRef, syntheticEnv,
                                               reqToSynthesizedEnvSubs,
-                                              derivativeGenSig};
+                                              derivativeGenSig, enterIsolation};
 
   storage = stored;
+}
+
+Witness Witness::withEnterIsolation(ActorIsolation enterIsolation) const {
+  return Witness(getDecl(), getSubstitutions(), getSyntheticEnvironment(),
+                 getRequirementToSyntheticSubs(),
+                 getDerivativeGenericSignature(), enterIsolation);
 }
 
 void Witness::dump() const { dump(llvm::errs()); }
@@ -902,7 +909,7 @@ NormalProtocolConformance::getWitnessUncached(ValueDecl *requirement) const {
 
 Witness SelfProtocolConformance::getWitness(ValueDecl *requirement) const {
   return Witness(requirement, SubstitutionMap(), nullptr, SubstitutionMap(),
-                 GenericSignature());
+                 GenericSignature(), None);
 }
 
 ConcreteDeclRef
@@ -938,6 +945,12 @@ void NormalProtocolConformance::setWitness(ValueDecl *requirement,
           requirement->getAttrs().isUnavailable(
                                         requirement->getASTContext())) &&
          "Conformance already complete?");
+  Mapping[requirement] = witness;
+}
+
+void NormalProtocolConformance::overrideWitness(ValueDecl *requirement,
+                                                Witness witness) {
+  assert(Mapping.count(requirement) == 1 && "Witness not known");
   Mapping[requirement] = witness;
 }
 
@@ -1745,6 +1758,9 @@ SourceLoc swift::extractNearestSourceLoc(const ProtocolConformanceRef conformanc
 }
 
 bool ProtocolConformanceRef::hasUnavailableConformance() const {
+  if (isInvalid())
+    return false;
+
   // Abstract conformances are never unavailable.
   if (!isConcrete())
     return false;

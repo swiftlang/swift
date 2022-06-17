@@ -97,6 +97,7 @@ class Witness {
     /// The derivative generic signature, when the requirement is a derivative
     /// function.
     GenericSignature derivativeGenSig;
+    Optional<ActorIsolation> enterIsolation;
   };
 
   llvm::PointerUnion<ValueDecl *, StoredWitness *> storage;
@@ -125,10 +126,12 @@ public:
   ///
   /// Deserialized witnesses do not have a synthetic environment.
   static Witness forDeserialized(ValueDecl *decl,
-                                 SubstitutionMap substitutions) {
+                                 SubstitutionMap substitutions,
+                                 Optional<ActorIsolation> enterIsolation) {
     // TODO: It's probably a good idea to have a separate 'deserialized' bit.
     return Witness(
-        decl, substitutions, nullptr, SubstitutionMap(), CanGenericSignature());
+        decl, substitutions, nullptr, SubstitutionMap(), CanGenericSignature(),
+        enterIsolation);
   }
 
   /// Create a witness that requires substitutions.
@@ -145,11 +148,15 @@ public:
   ///
   /// \param derivativeGenSig The derivative generic signature, when the
   /// requirement is a derivative function.
+  ///
+  /// \param enterIsolation The actor isolation that the witness thunk will
+  /// need to hop to before calling the witness.
   Witness(ValueDecl *decl,
           SubstitutionMap substitutions,
           GenericEnvironment *syntheticEnv,
           SubstitutionMap reqToSyntheticEnvSubs,
-          GenericSignature derivativeGenSig);
+          GenericSignature derivativeGenSig,
+          Optional<ActorIsolation> enterIsolation);
 
   /// Retrieve the witness declaration reference, which includes the
   /// substitutions needed to use the witness from the synthetic environment
@@ -197,6 +204,17 @@ public:
       return storedWitness->derivativeGenSig;
     return GenericSignature();
   }
+
+  Optional<ActorIsolation> getEnterIsolation() const {
+    if (auto *storedWitness = storage.dyn_cast<StoredWitness *>())
+      return storedWitness->enterIsolation;
+
+    return None;
+  }
+
+  /// Retrieve a copy of the witness with an actor isolation that the
+  /// witness thunk will need to hop to.
+  Witness withEnterIsolation(ActorIsolation enterIsolation) const;
 
   SWIFT_DEBUG_DUMP;
 

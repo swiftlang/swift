@@ -739,20 +739,29 @@ extension _NativeSet {
   internal __consuming func intersection(
     _ other: _NativeSet<Element>
   ) -> _NativeSet<Element> {
-    // Prefer to iterate over the smaller set. However, we must be careful to
-    // only include elements from `self`, not `other`.
-    guard self.count <= other.count else {
-      return genericIntersection(other)
-    }
-    // Rather than directly creating a new set, mark common elements in a bitset
-    // first. This minimizes hashing, and ensures that we'll have an exact count
-    // for the result set, preventing rehashings during insertions.
-    return _UnsafeBitset.withTemporaryBitset(capacity: bucketCount) { bitset in
+    // Rather than directly creating a new set, mark common elements in a
+    // bitset first. This minimizes hashing, and ensures that we'll have an
+    // exact count for the result set, preventing rehashings during
+    // insertions.
+    _UnsafeBitset.withTemporaryBitset(capacity: bucketCount) { bitset in
       var count = 0
-      for bucket in hashTable {
-        if other.find(uncheckedElement(at: bucket)).found {
-          bitset.uncheckedInsert(bucket.offset)
-          count += 1
+      // Prefer to iterate over the smaller set. However, we must be careful to
+      // only include elements from `self`, not `other`.
+      if self.count > other.count {
+        for element in other {
+          let (bucket, found) = find(element)
+          if found {
+            // `other` is a `Set`, so we can assume it doesn't have duplicates.
+            bitset.uncheckedInsert(bucket.offset)
+            count += 1
+          }
+        }
+      } else {
+        for bucket in hashTable {
+          if other.find(uncheckedElement(at: bucket)).found {
+            bitset.uncheckedInsert(bucket.offset)
+            count += 1
+          }
         }
       }
       return extractSubset(using: bitset, count: count)
@@ -771,8 +780,9 @@ extension _NativeSet {
       var count = 0
       for element in other {
         let (bucket, found) = find(element)
-        if found {
-          bitset.uncheckedInsert(bucket.offset)
+        // Note: we need to be careful not to increment `count` here if the
+        // element is a duplicate item.
+        if found, bitset.uncheckedInsert(bucket.offset) {
           count += 1
         }
       }

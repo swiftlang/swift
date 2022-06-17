@@ -1406,7 +1406,13 @@ void ConstraintSystem::print(raw_ostream &out) const {
   }
 
   out << "Type Variables:\n";
-  for (auto tv : getTypeVariables()) {
+  std::vector<TypeVariableType *> typeVariables(getTypeVariables().begin(),
+                                                getTypeVariables().end());
+  llvm::sort(typeVariables,
+             [](const TypeVariableType *lhs, const TypeVariableType *rhs) {
+               return lhs->getID() < rhs->getID();
+             });
+  for (auto tv : typeVariables) {
     out.indent(2);
     Type(tv).print(out, PO);
     if (tv->getImpl().canBindToLValue())

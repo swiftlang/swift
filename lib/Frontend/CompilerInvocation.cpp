@@ -607,8 +607,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   // Determine whether string processing is enabled
   Opts.EnableExperimentalStringProcessing =
     Args.hasFlag(OPT_enable_experimental_string_processing,
-                 OPT_disable_experimental_string_processing,
-                 Args.hasArg(OPT_enable_bare_slash_regex));
+                 OPT_disable_experimental_string_processing);
 
   // Add a future feature if it is not already implied by the language version.
   auto addFutureFeatureIfNotImplied = [&](Feature feature) {
@@ -807,8 +806,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.ClangTarget = llvm::Triple(A->getValue());
   }
 
-  Opts.EnableCXXInterop |= Args.hasArg(OPT_enable_experimental_cxx_interop) ||
-                           Args.hasArg(OPT_enable_cxx_interop);
+  Opts.EnableCXXInterop |= Args.hasArg(OPT_enable_experimental_cxx_interop);
   Opts.EnableObjCInterop =
       Args.hasFlag(OPT_enable_objc_interop, OPT_disable_objc_interop,
                    Target.isOSDarwin());

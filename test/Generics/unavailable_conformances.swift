@@ -33,3 +33,20 @@ protocol Base {
 
 @available(*, unavailable)
 extension Base where T == ConcreteP {}
+
+// Hashable conformance synthesis ran into problems if the conformance was
+// unavailable (which is legal if the type is unavailable also).
+@available(*, unavailable)
+struct Foo {
+  class Bar {}
+}
+
+@available(*, unavailable)
+extension Foo.Bar: Equatable {
+    static func == (lhs: Foo.Bar, rhs: Foo.Bar) -> Bool { return false }
+}
+
+@available(*, unavailable)
+extension Foo.Bar: Hashable {
+    func hash(into hasher: inout Hasher) {}
+}

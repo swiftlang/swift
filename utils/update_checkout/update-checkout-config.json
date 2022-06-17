@@ -2,9 +2,9 @@
     "ssh-clone-pattern": "git@github.com:%s.git",
     "https-clone-pattern": "https://github.com/%s.git",
     "repos" : {
-       "swift": {
+        "swift": {
             "remote": { "id": "swiftwasm/swift" } },
-       "cmark": {
+        "cmark": {
             "remote": { "id": "apple/swift-cmark" } },
         "llbuild": {
             "remote": { "id": "apple/swift-llbuild" } },
@@ -52,7 +52,9 @@
             "remote": { "id": "KitWare/CMake" },
             "platforms": [ "Linux" ]
         },
-       "indexstore-db": {
+        "swift-cmark-gfm": {
+             "remote": { "id": "apple/swift-cmark" } },
+        "indexstore-db": {
             "remote": { "id": "apple/indexstore-db" } },
         "sourcekit-lsp": {
             "remote": { "id": "apple/sourcekit-lsp" } },
@@ -70,8 +72,6 @@
             "remote": { "id": "apple/swift-docc-symbolkit" } },
         "swift-markdown": {
             "remote": { "id": "apple/swift-markdown" } },
-        "swift-cmark-gfm": {
-            "remote": { "id": "apple/swift-cmark" } },
         "swift-nio": {
             "remote": { "id": "apple/swift-nio" } },
         "swift-nio-ssl": {
@@ -125,7 +125,7 @@
                 "swift-experimental-string-processing": "swift/main"
             }
         },
-       "main": {
+        "main": {
             "aliases": ["swift/main", "main", "stable/20211026"],
             "repos": {
                 "llvm-project": "stable/20211026",
@@ -161,7 +161,6 @@
                 "swift-docc-render-artifact": "main",
                 "swift-docc-symbolkit": "main",
                 "swift-markdown": "main",
-                "swift-cmark-gfm": "gfm",
                 "swift-nio": "2.31.2",
                 "swift-nio-ssl": "2.15.0",
                 "swift-experimental-string-processing": "swift/main"
@@ -203,7 +202,6 @@
                 "swift-docc-render-artifact": "main",
                 "swift-docc-symbolkit": "main",
                 "swift-markdown": "main",
-                "swift-cmark-gfm": "gfm",
                 "swift-nio": "2.31.2",
                 "swift-nio-ssl": "2.15.0",
                 "swift-experimental-string-processing": "swift/main"
@@ -334,7 +332,7 @@
                 "swift-nio-ssl": "2.15.0"
             }
         },
-       "release/5.5": {
+        "release/5.5": {
             "aliases": ["release/5.5", "swift/release/5.5"],
             "repos": {
                 "llvm-project": "swift/release/5.5",

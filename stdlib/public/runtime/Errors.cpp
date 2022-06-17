@@ -465,13 +465,3 @@ void swift::swift_abortDisabledUnicodeSupport() {
                     "Unicode normalization data is disabled on this platform");
 
 }
-
-/// Halt because of a problem in the threading library
-SWIFT_ATTRIBUTE_NORETURN
-SWIFT_FORMAT(1, 2)
-void swift::threading::fatal(const char *msg, ...) {
-  va_list val;
-  va_start(val, msg);
-
-  swift::fatalErrorv(0, msg, val);
-}

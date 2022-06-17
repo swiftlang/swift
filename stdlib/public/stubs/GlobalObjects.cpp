@@ -53,6 +53,46 @@ swift::_SwiftEmptyArrayStorage swift::_swiftEmptyArrayStorage = {
   }
 };
 
+// Define required symbols to be used by constant static arrays.
+// * `__swiftImmortalRefCount`:    The bit pattern for the ref-count field of
+//                                 the array buffer.
+// * `__swiftStaticArrayMetadata`: The isa-pointer for the array buffer.
+//
+// TODO: Support constant static arrays on other platforms, too.
+// This needs a bit more work because the tricks with absolute symbols and
+// symbol aliases don't work this way with other object file formats than Mach-O.
+#if defined(__APPLE__)
+
+__asm__("  .globl __swiftImmortalRefCount\n");
+
+#if __POINTER_WIDTH__ == 64
+
+  // TODO: is there a way to avoid hard coding this constant in the inline
+  //       assembly string?
+  static_assert(swift::InlineRefCountBits::immortalBits() == 0x80000004ffffffffull,
+                "immortal refcount bits changed: correct the inline asm below");
+  __asm__(".set __swiftImmortalRefCount, 0x80000004ffffffff\n");
+
+#elif __POINTER_WIDTH__ == 32
+
+  // TODO: is there a way to avoid hard coding this constant in the inline
+  //       assembly string?
+  static_assert(swift::InlineRefCountBits::immortalBits() == 0x800004fful,
+                "immortal refcount bits changed: correct the inline asm below");
+  __asm__(".set __swiftImmortalRefCount, 0x800004ff\n");
+
+#else
+  #error("unsupported pointer width")
+#endif
+
+// Static arrays can only contain trivial elements. Therefore we can reuse
+// the metadata of the empty array buffer. The important thing is that its
+// deinit is a no-op and does not actually destroy any elements.
+__asm__("  .globl __swiftStaticArrayMetadata\n");
+__asm__(".set __swiftStaticArrayMetadata, _$ss19__EmptyArrayStorageCN\n");
+
+#endif
+
 SWIFT_RUNTIME_STDLIB_API
 swift::_SwiftEmptyDictionarySingleton swift::_swiftEmptyDictionarySingleton = {
   // HeapObject header;

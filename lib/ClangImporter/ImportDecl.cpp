@@ -3595,12 +3595,24 @@ namespace {
           if (auto cxxMethod = dyn_cast<clang::CXXMethodDecl>(m)) {
             auto cxxOperatorKind = cxxMethod->getOverloadedOperator();
 
+            if (cxxOperatorKind == clang::OO_Star && cxxMethod->param_empty()) {
+              // This is a dereference operator. We synthesize a computed
+              // property called `pointee` for it.
+              VarDecl *pointeeProperty = makeDereferencedPointeeProperty(MD);
+              result->addMember(pointeeProperty);
+
+              Impl.markUnavailable(MD, "use .pointee property");
+              MD->overwriteAccess(AccessLevel::Private);
+            }
             // Check if this method _is_ an overloaded operator but is not a
-            // call / subscript. Those 2 operators do not need static versions
-            if (cxxOperatorKind != clang::OverloadedOperatorKind::OO_None &&
-                cxxOperatorKind != clang::OverloadedOperatorKind::OO_Call &&
-                cxxOperatorKind !=
-                    clang::OverloadedOperatorKind::OO_Subscript) {
+            // call / subscript / dereference. Those 3 operators do not need
+            // static versions.
+            else if (cxxOperatorKind !=
+                         clang::OverloadedOperatorKind::OO_None &&
+                     cxxOperatorKind !=
+                         clang::OverloadedOperatorKind::OO_Call &&
+                     cxxOperatorKind !=
+                         clang::OverloadedOperatorKind::OO_Subscript) {
 
               auto opFuncDecl = makeOperator(MD, cxxMethod);
 
@@ -5410,6 +5422,11 @@ namespace {
     /// \param setter function returning `UnsafeMutablePointer<T>`
     /// \return subscript declaration
     SubscriptDecl *makeSubscript(FuncDecl *getter, FuncDecl *setter);
+
+    /// Given an imported C++ dereference operator (`operator*()`), create a
+    /// `pointee` computed property.
+    VarDecl *makeDereferencedPointeeProperty(FuncDecl *dereferenceFunc);
+
     FuncDecl *makeOperator(FuncDecl *operatorMethod,
                            clang::CXXMethodDecl *clangOperator);
 
@@ -7833,16 +7850,21 @@ SwiftDeclConverter::importAccessor(const clang::ObjCMethodDecl *clangAccessor,
   return accessor;
 }
 
-/// Synthesizer callback for a subscript getter.
+/// Synthesizer callback for a subscript getter or a getter for a
+/// dereference property (`var pointee`). If the getter's implementation returns
+/// an UnsafePointer or UnsafeMutablePointer, it unwraps the pointer and returns
+/// the underlying value.
 static std::pair<BraceStmt *, bool>
-synthesizeSubscriptGetterBody(AbstractFunctionDecl *afd, void *context) {
+synthesizeUnwrappingGetterBody(AbstractFunctionDecl *afd, void *context) {
   auto getterDecl = cast<AccessorDecl>(afd);
   auto getterImpl = static_cast<FuncDecl *>(context);
 
   ASTContext &ctx = getterDecl->getASTContext();
 
   Expr *selfExpr = createSelfExpr(getterDecl);
-  DeclRefExpr *keyRefExpr = createParamRefExpr(getterDecl, 0);
+  DeclRefExpr *keyRefExpr = getterDecl->getParameters()->size() == 0
+                                ? nullptr
+                                : createParamRefExpr(getterDecl, 0);
 
   Type elementTy = getterDecl->getResultInterfaceType();
 
@@ -8048,7 +8070,7 @@ SwiftDeclConverter::makeSubscript(FuncDecl *getter, FuncDecl *setter) {
   getterDecl->setImplicit();
   getterDecl->setIsDynamic(false);
   getterDecl->setIsTransparent(true);
-  getterDecl->setBodySynthesizer(synthesizeSubscriptGetterBody, getterImpl);
+  getterDecl->setBodySynthesizer(synthesizeUnwrappingGetterBody, getterImpl);
 
   if (getterImpl->isMutating()) {
     getterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
@@ -8099,6 +8121,47 @@ SwiftDeclConverter::makeSubscript(FuncDecl *getter, FuncDecl *setter) {
                                    getterImpl->isImplicitlyUnwrappedOptional());
 
   return subscript;
+}
+
+VarDecl *
+SwiftDeclConverter::makeDereferencedPointeeProperty(FuncDecl *dereferenceFunc) {
+  auto &ctx = Impl.SwiftContext;
+  auto dc = dereferenceFunc->getDeclContext();
+
+  // Get the return type wrapped in `Unsafe(Mutable)Pointer<T>`.
+  const auto rawElementTy = dereferenceFunc->getResultInterfaceType();
+  // Unwrap `T`. Use rawElementTy for return by value.
+  const auto elementTy = rawElementTy->getAnyPointerElementType()
+                             ? rawElementTy->getAnyPointerElementType()
+                             : rawElementTy;
+
+  auto result = new (ctx)
+      VarDecl(/*isStatic*/ false, VarDecl::Introducer::Var,
+              dereferenceFunc->getStartLoc(), ctx.getIdentifier("pointee"), dc);
+  result->setInterfaceType(elementTy);
+  result->setAccess(AccessLevel::Public);
+  result->setImplInfo(StorageImplInfo::getImmutableComputed());
+
+  AccessorDecl *getterDecl = AccessorDecl::create(
+      ctx, dereferenceFunc->getLoc(), dereferenceFunc->getLoc(),
+      AccessorKind::Get, result, SourceLoc(), StaticSpellingKind::None,
+      /*async*/ false, SourceLoc(),
+      /*throws*/ false, SourceLoc(), nullptr, ParameterList::createEmpty(ctx),
+      elementTy, dc);
+  getterDecl->setAccess(AccessLevel::Public);
+  getterDecl->setImplicit();
+  getterDecl->setIsDynamic(false);
+  getterDecl->setIsTransparent(true);
+  getterDecl->setBodySynthesizer(synthesizeUnwrappingGetterBody,
+                                 dereferenceFunc);
+
+  if (dereferenceFunc->isMutating()) {
+    getterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
+    result->setIsGetterMutating(true);
+  }
+
+  makeComputed(result, getterDecl, /*setter*/ nullptr);
+  return result;
 }
 
 static std::pair<BraceStmt *, bool>
