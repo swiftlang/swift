@@ -1311,6 +1311,14 @@ bool swift::canSILUseScalarCheckedCastInstructions(SILModule &M,
 bool swift::canIRGenUseScalarCheckedCastInstructions(SILModule &M,
                                                      CanType sourceFormalType,
                                                      CanType targetFormalType) {
+  // If the cast involves any kind of generalized existential we
+  // need to use the indirect-cast path to handle checking the extra
+  // constraints there as the scalar path does not (yet) know how to do it.
+  if (sourceFormalType->hasParameterizedExistential() ||
+      targetFormalType->hasParameterizedExistential()) {
+    return false;
+  }
+
   // Look through one level of optionality on the source.
   auto objectType = sourceFormalType;
   if (auto type = objectType.getOptionalObjectType())

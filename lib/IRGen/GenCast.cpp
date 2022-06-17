@@ -848,7 +848,7 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
 /// that the actual value isn't changed in any way, thus preserving its
 /// reference identity.
 ///
-/// These restrictions are set by canUseScalarCheckedCastInstructions.
+/// These restrictions are set by \c canSILUseScalarCheckedCastInstructions.
 /// Essentially, both the source and target types must be one of:
 ///   - a (possibly generic) concrete class type,
 ///   - a class-bounded archetype,
