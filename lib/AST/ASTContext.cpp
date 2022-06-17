@@ -3336,9 +3336,9 @@ ProtocolCompositionType::build(const ASTContext &C, ArrayRef<Type> Members,
   return compTy;
 }
 
-Type ParameterizedProtocolType::get(const ASTContext &C,
-                                    ProtocolType *baseTy,
-                                    ArrayRef<Type> args) {
+ParameterizedProtocolType *ParameterizedProtocolType::get(const ASTContext &C,
+                                                          ProtocolType *baseTy,
+                                                          ArrayRef<Type> args) {
   assert(args.size() > 0);
 
   bool isCanonical = baseTy->isCanonical();
