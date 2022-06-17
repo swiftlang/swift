@@ -20,6 +20,7 @@
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DefaultArgumentKind.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -2412,7 +2413,7 @@ static bool isObjCMethodResultAudited(const clang::Decl *decl) {
           decl->hasAttr<clang::ObjCReturnsInnerPointerAttr>());
 }
 
-DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
+ArgumentAttrs ClangImporter::Implementation::inferDefaultArgument(
     clang::QualType type, OptionalTypeKind clangOptionality,
     DeclBaseName baseName, StringRef argumentLabel, bool isFirstParameter,
     bool isLastParameter, NameImporter &nameImporter) {
@@ -2457,10 +2458,29 @@ DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
       // If we've taken this branch it means we have an enum type, and it is
       // likely an integer or NSInteger that is being used by NS/CF_OPTIONS to
       // behave like a C enum in the presence of C++.
-      auto enumName = typedefType->getDecl()->getDeclName().getAsString();
+      auto enumName = typedefType->getDecl()->getName();
+      ArgumentAttrs argumentAttrs(DefaultArgumentKind::None, true, enumName);
       for (auto word : llvm::reverse(camel_case::getWords(enumName))) {
-        if (camel_case::sameWordIgnoreFirstCase(word, "options"))
-          return DefaultArgumentKind::EmptyArray;
+        if (camel_case::sameWordIgnoreFirstCase(word, "options")) {
+          argumentAttrs.argumentKind = DefaultArgumentKind::EmptyArray;
+          return argumentAttrs;
+        }
+        if (camel_case::sameWordIgnoreFirstCase(word, "units"))
+          return argumentAttrs;
+        if (camel_case::sameWordIgnoreFirstCase(word, "domain"))
+          return argumentAttrs;
+        if (camel_case::sameWordIgnoreFirstCase(word, "action"))
+          return argumentAttrs;
+        if (camel_case::sameWordIgnoreFirstCase(word, "controlevents"))
+          return argumentAttrs;
+        if (camel_case::sameWordIgnoreFirstCase(word, "state"))
+          return argumentAttrs;
+        if (camel_case::sameWordIgnoreFirstCase(word, "unit"))
+          return argumentAttrs;
+        if (camel_case::sameWordIgnoreFirstCase(word, "scrollposition"))
+          return argumentAttrs;
+        if (camel_case::sameWordIgnoreFirstCase(word, "edge"))
+          return argumentAttrs;
       }
     }
   }

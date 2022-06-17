@@ -1397,7 +1397,7 @@ public:
 
   /// Attempt to infer a default argument for a parameter with the
   /// given Clang \c type, \c baseName, and optionality.
-  static DefaultArgumentKind
+  static ArgumentAttrs
   inferDefaultArgument(clang::QualType type, OptionalTypeKind clangOptionality,
                        DeclBaseName baseName, StringRef argumentLabel,
                        bool isFirstParameter, bool isLastParameter,

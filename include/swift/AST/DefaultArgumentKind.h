@@ -17,7 +17,9 @@
 #ifndef SWIFT_DEFAULTARGUMENTKIND_H
 #define SWIFT_DEFAULTARGUMENTKIND_H
 
+#include "llvm/ADT/StringRef.h"
 #include <cstdint>
+#include <string>
 
 namespace llvm {
 class StringRef;
@@ -51,6 +53,40 @@ enum class DefaultArgumentKind : uint8_t {
 #include "swift/AST/MagicIdentifierKinds.def"
 };
 enum { NumDefaultArgumentKindBits = 4 };
+
+struct ArgumentAttrs {
+  DefaultArgumentKind argumentKind;
+  bool isUnavailableInSwift = false;
+  llvm::StringRef CXXOptionsEnumName = "";
+
+  ArgumentAttrs(DefaultArgumentKind argumentKind,
+                bool isUnavailableInSwift = false,
+                llvm::StringRef CXXOptionsEnumName = "")
+      : argumentKind(argumentKind), isUnavailableInSwift(isUnavailableInSwift),
+        CXXOptionsEnumName(CXXOptionsEnumName) {}
+
+  bool operator !=(const DefaultArgumentKind &rhs) const {
+    return argumentKind != rhs;
+  }
+
+  bool operator==(const DefaultArgumentKind &rhs) const {
+    return argumentKind == rhs;
+  }
+
+  bool hasDefaultArg() const {
+    return argumentKind != DefaultArgumentKind::None;
+  }
+
+  bool hasAlternateCXXOptionsEnumName() const {
+    return !CXXOptionsEnumName.empty() && isUnavailableInSwift;
+  }
+
+  llvm::StringRef getAlternateCXXOptionsEnumName() const {
+    assert(hasAlternateCXXOptionsEnumName() &&
+           "Expected a C++ Options type for C++-Interop but found none.");
+    return CXXOptionsEnumName;
+  }
+};
 
 } // end namespace swift
 
