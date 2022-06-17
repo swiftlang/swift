@@ -199,7 +199,7 @@ GuaranteedOwnershipExtension::checkBorrowExtension(
   assert(guaranteedLiveness.empty());
   borrow.computeLiveness(guaranteedLiveness);
 
-  if (guaranteedLiveness.areUsesWithinBoundary(newUses, &deBlocks))
+  if (guaranteedLiveness.areUsesWithinBoundary(newUses))
     return Valid; // reuse the borrow scope as-is
 
   beginBorrow = dyn_cast<BeginBorrowInst>(borrow.value);
@@ -1407,7 +1407,7 @@ OwnershipRAUWHelper::OwnershipRAUWHelper(OwnershipFixupContext &inputCtx,
     invalidate();
     return;
   }
-  if (addressOwnership.areUsesWithinLifetime(oldValueUses, ctx->deBlocks)) {
+  if (addressOwnership.areUsesWithinLifetime(oldValueUses, &ctx->deBlocks)) {
     // We do not need to copy the base value! Clear the extra info we have.
     ctx->extraAddressFixupInfo.clear();
     return;

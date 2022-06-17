@@ -575,11 +575,7 @@ struct BorrowedValue {
   /// This ignores reborrows. The assumption is that, since \p uses are
   /// dominated by this local scope, checking the extended borrow scope should
   /// not be necessary to determine they are within the scope.
-  ///
-  /// \p deadEndBlocks is optional during transition. It will be completely
-  /// removed in an upcoming commit.
-  bool areUsesWithinLocalScope(ArrayRef<Operand *> uses,
-                               DeadEndBlocks *deadEndBlocks) const;
+  bool areUsesWithinLocalScope(ArrayRef<Operand *> uses) const;
 
   /// Given a local borrow scope introducer, visit all non-forwarding consuming
   /// users. This means that this looks through guaranteed block arguments. \p
@@ -955,8 +951,10 @@ struct AddressOwnership {
   ///
   /// Precondition: all \p uses are dominated by the beginning of the address'
   /// lifetime or borrow scope.
+  ///
+  /// \p deadEndBlocks is only used for owned roots (currently Box).
   bool areUsesWithinLifetime(ArrayRef<Operand *> uses,
-                             DeadEndBlocks &deadEndBlocks) const;
+                             DeadEndBlocks *deadEndBlocks = nullptr) const;
 };
 
 class OwnedValueIntroducerKind {

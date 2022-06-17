@@ -189,8 +189,7 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
   {
     SmallVector<Operand *, 8> scratchSpace;
     if (llvm::any_of(borrowScopeIntroducers, [&](BorrowedValue borrowScope) {
-      return !borrowScope.areUsesWithinLocalScope(lr.getAllConsumingUses(),
-                                                  nullptr);
+          return !borrowScope.areUsesWithinLocalScope(lr.getAllConsumingUses());
         })) {
       return false;
     }
@@ -219,7 +218,7 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
 
       if (llvm::any_of(borrowScopeIntroducers, [&](BorrowedValue borrowScope) {
             return !borrowScope.areUsesWithinLocalScope(
-                phiArgLR.getAllConsumingUses(), nullptr);
+                phiArgLR.getAllConsumingUses());
           })) {
         return false;
       }
