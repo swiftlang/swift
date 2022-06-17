@@ -53,6 +53,9 @@ NOMINALTYPEMETADATAKIND(Optional, 2 | MetadataKindIsNonHeap)
 /// A foreign class, such as a Core Foundation class.
 METADATAKIND(ForeignClass, 3 | MetadataKindIsNonHeap)
 
+/// A non-Swift non-Objective-C class type.
+METADATAKIND(ForeignReferenceType, 4 | MetadataKindIsNonHeap)
+
 /// A type whose value is not exposed in the metadata system.
 METADATAKIND(Opaque, 0 | MetadataKindIsRuntimePrivate | MetadataKindIsNonHeap)
 

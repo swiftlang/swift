@@ -480,6 +480,34 @@ struct StructImpl : ReflectionMirrorImpl {
   }
 };
 
+struct ForeignReferenceTypeImpl : ReflectionMirrorImpl {
+  bool isReflectable() {
+    return false;
+  }
+
+  char displayStyle() override {
+    return 'f';
+  }
+
+  intptr_t count() override {
+    return 0;
+  }
+
+  intptr_t childOffset(intptr_t i) override {
+    swift::crash("Cannot find offset of FRT.");
+  }
+
+  const FieldType childMetadata(intptr_t i, const char **outName,
+                                void (**outFreeFunc)(const char *)) override {
+    swift::crash("FRT has no children.");
+  }
+
+  AnyReturn subscript(intptr_t i, const char **outName,
+                      void (**outFreeFunc)(const char *)) override {
+    swift::crash("FRT has no subscript.");
+  }
+};
+
 
 // Implementation for enums.
 struct EnumImpl : ReflectionMirrorImpl {
@@ -882,6 +910,11 @@ auto call(OpaqueValue *passedValue, const Metadata *T, const Metadata *passedTyp
       return call(&impl);
     }
 
+    case MetadataKind::ForeignReferenceType: {
+      ForeignReferenceTypeImpl impl;
+      return call(&impl);
+    }
+
     case MetadataKind::Struct: {
       StructImpl impl;
       return call(&impl);
@@ -1070,6 +1103,8 @@ const char *swift_OpaqueSummary(const Metadata *T) {
       return "(Existential Metatype)";
     case MetadataKind::ForeignClass:
       return "(Foreign Class)";
+    case MetadataKind::ForeignReferenceType:
+      return "(Foreign Reference Type)";
     case MetadataKind::HeapLocalVariable:
       return "(Heap Local Variable)";
     case MetadataKind::HeapGenericLocalVariable:
