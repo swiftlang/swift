@@ -591,7 +591,7 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::GenericParam);
       }
 
-      if (index != 0) {
+      if (index != 0 && !rule.isRHSSimplified()) {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::Protocol);
       }
     }
