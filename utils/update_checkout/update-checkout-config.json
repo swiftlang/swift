@@ -53,6 +53,8 @@
             "remote": { "id": "KitWare/CMake" },
             "platforms": [ "Linux" ]
         },
+        "swift-cmark-gfm": {
+             "remote": { "id": "apple/swift-cmark" } },
         "indexstore-db": {
             "remote": { "id": "apple/indexstore-db" } },
         "sourcekit-lsp": {
