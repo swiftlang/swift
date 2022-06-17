@@ -51,6 +51,14 @@ bool isKnownType(Type t, PrimitiveTypeMapping &typeMapping,
   return getKnownTypeInfo(typeDecl, typeMapping, languageMode) != None;
 }
 
+bool isResilientType(Type t) {
+  if (auto *typeAliasType = dyn_cast<TypeAliasType>(t.getPointer()))
+    return isResilientType(typeAliasType->getSinglyDesugaredType());
+  else if (auto *nominalType = t->getNominalOrBoundGenericNominal())
+    return nominalType->isResilient();
+  return false;
+}
+
 bool isKnownCxxType(Type t, PrimitiveTypeMapping &typeMapping) {
   return isKnownType(t, typeMapping, OutputLanguageMode::Cxx);
 }
@@ -135,7 +143,8 @@ public:
     // FIXME: Handle optional structures.
     if (typeUseKind == FunctionSignatureTypeUse::ParamType) {
       if (languageMode != OutputLanguageMode::Cxx &&
-          interopContext.getIrABIDetails().shouldPassIndirectly(ST)) {
+          (SD->isResilient() ||
+           interopContext.getIrABIDetails().shouldPassIndirectly(ST))) {
         if (modifiersDelegate.prefixIndirectParamValueTypeInC)
           (*modifiersDelegate.prefixIndirectParamValueTypeInC)(os);
         // FIXME: it would be nice to print out the C struct type here.
@@ -198,7 +207,8 @@ void DeclAndTypeClangFunctionPrinter::printFunctionSignature(
   bool isIndirectReturnType =
       kind == FunctionSignatureKind::CFunctionProto &&
       !isKnownCType(resultTy, typeMapping) &&
-      interopContext.getIrABIDetails().shouldReturnIndirectly(resultTy);
+      (isResilientType(resultTy) ||
+       interopContext.getIrABIDetails().shouldReturnIndirectly(resultTy));
   if (!isIndirectReturnType) {
     OptionalTypeKind retKind;
     Type objTy;
@@ -285,7 +295,8 @@ void DeclAndTypeClangFunctionPrinter::printCxxToCFunctionParameterUse(
     if (auto *structDecl = type->getStructOrBoundGenericStruct()) {
       ClangValueTypePrinter(os, cPrologueOS, typeMapping, interopContext)
           .printParameterCxxToCUseScaffold(
-              interopContext.getIrABIDetails().shouldPassIndirectly(type),
+              structDecl->isResilient() ||
+                  interopContext.getIrABIDetails().shouldPassIndirectly(type),
               structDecl, namePrinter, isInOut,
               /*isSelf=*/paramRole &&
                   *paramRole == AdditionalParam::Role::Self);
@@ -352,6 +363,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
   if (!isKnownCxxType(resultTy, typeMapping)) {
     if (auto *structDecl = resultTy->getStructOrBoundGenericStruct()) {
       bool isIndirect =
+          structDecl->isResilient() ||
           interopContext.getIrABIDetails().shouldReturnIndirectly(resultTy);
       ClangValueTypePrinter valueTypePrinter(os, cPrologueOS, typeMapping,
                                              interopContext);
