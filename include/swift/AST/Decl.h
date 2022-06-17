@@ -5744,6 +5744,10 @@ public:
     Bits.ParamDecl.defaultArgumentKind = static_cast<unsigned>(K);
   }
 
+  void setDefaultArgumentKind(ArgumentAttrs K) {
+    setDefaultArgumentKind(K.argumentKind);
+  }
+
   bool isNoImplicitCopy() const {
     return getAttrs().hasAttribute<NoImplicitCopyAttr>();
   }
