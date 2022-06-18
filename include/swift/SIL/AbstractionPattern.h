@@ -1287,6 +1287,10 @@ public:
   /// it.
   AbstractionPattern getReferenceStorageReferentType() const;
 
+  /// Give that the value being abstracted is an existential, return the
+  /// underlying constraint type.
+  AbstractionPattern getExistentialConstraintType() const;
+
   /// Given that the value being abstracted is a function type, return the
   /// abstraction pattern for the derivative function.
   ///
