@@ -202,10 +202,7 @@ checkPlatformCondition(PlatformConditionKind Kind, StringRef Value) const {
 
   if (Kind == PlatformConditionKind::OS && Value == "Darwin") {
     // "Darwin" is an alias for all Darwin platforms.
-    return checkPlatformCondition(Kind, "OSX") ||
-           checkPlatformCondition(Kind, "iOS") ||
-           checkPlatformCondition(Kind, "tvOS") ||
-           checkPlatformCondition(Kind, "watchOS");
+    return Target.isOSDarwin();
   }
 
   // When compiling for iOS we consider "macCatalyst" to be a
