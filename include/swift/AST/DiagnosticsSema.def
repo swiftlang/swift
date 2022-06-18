@@ -4604,6 +4604,9 @@ ERROR(distributed_actor_isolated_method,none,
 ERROR(distributed_local_cannot_be_used,none,
       "'local' cannot be used in user-defined code currently",
       ())
+ERROR(distributed_thunk_cannot_be_used,none,
+      "'distributed_thunk' cannot be used in user-defined code",
+      ())
 ERROR(distributed_actor_func_param_not_codable,none,
       "parameter '%0' of type %1 in %2 does not conform to serialization requirement '%3'",
       (StringRef, Type, DescriptiveDeclKind, StringRef))
@@ -4801,6 +4804,9 @@ ERROR(distributed_property_cannot_be_static,none,
 ERROR(distributed_property_can_only_be_computed,none,
       "%0 %1 cannot be 'distributed', only computed properties can",
       (DescriptiveDeclKind, DeclName))
+ERROR(distributed_property_accessor_only_get_can_be_distributed,none,
+      "only 'get' accessors may be 'distributed'",
+      ())
 NOTE(distributed_actor_isolated_property,none,
       "access to %0 %1 is only permitted within distributed actor %2",
       (DescriptiveDeclKind, DeclName, DeclName))
