@@ -423,7 +423,7 @@ SWIFT_REQUEST(TypeChecker, GetImplicitSendableRequest,
               ProtocolConformance *(NominalTypeDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, RenamedDeclRequest,
-              ValueDecl *(const ValueDecl *),
+              ValueDecl *(const ValueDecl *, const AvailableAttr *, bool),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ClosureEffectsRequest,
               FunctionType::ExtInfo(ClosureExpr *),

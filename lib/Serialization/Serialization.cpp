@@ -5531,10 +5531,10 @@ static void collectInterestingNestedDeclarations(
       if (isLocal)
         return;
 
-      if (auto owningClass = func->getDeclContext()->getSelfClassDecl()) {
+      if (auto owningType = func->getDeclContext()->getSelfNominalTypeDecl()) {
         if (func->isObjC()) {
           Mangle::ASTMangler mangler;
-          std::string ownerName = mangler.mangleNominalType(owningClass);
+          std::string ownerName = mangler.mangleNominalType(owningType);
           assert(!ownerName.empty() && "Mangled type came back empty!");
 
           objcMethods[func->getObjCSelector()].push_back(
