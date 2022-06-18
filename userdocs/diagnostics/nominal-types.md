@@ -1,6 +1,6 @@
 # Nominal Types
 
-In Swift, a type is considered a nominal type if it has been explicitly named by a declaration somewhere in the code. Examples of nominal types include classes, structures, and enumerations. Nominal types are an important concept in Swift because they may conform to protocols, be extended, and have values created using the initializer syntax `MyType()`.
+In Swift, a type is considered a nominal type if it has been explicitly named by a declaration somewhere in code. Examples of nominal types include classes, structures, and enumerations. Nominal types are an important concept in Swift because they may conform to protocols, be extended, and have values created using the initializer syntax `MyType()`.
 
 In contrast, non-nominal types do not have these capabilities. Many are obtained by composing other types. Examples include function types like `(Int) -> (String)`, tuple types like `(Int, String)`, metatypes like `Int.Type`, and special types like `Any` and `AnyObject`.
 
