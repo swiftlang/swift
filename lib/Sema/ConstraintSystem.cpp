@@ -4711,15 +4711,15 @@ bool ConstraintSystem::diagnoseAmbiguity(ArrayRef<Solution> solutions) {
   // overloads, depth, *reverse* of the index). N.B. - cannot be used for the
   // reversing: the score version of index == 0 should be > than that of 1, but
   // -0 == 0 < UINT_MAX == -1, whereas ~0 == UINT_MAX > UINT_MAX - 1 == ~1.
-  auto score = [](unsigned distinctOverloads, unsigned depth, unsigned index) {
-    return std::make_tuple(distinctOverloads, depth, ~index);
+  auto score = [](unsigned depth, unsigned index, unsigned distinctOverloads) {
+    return std::make_tuple(depth, ~index, distinctOverloads);
   };
-  auto bestScore = score(0, 0, std::numeric_limits<unsigned>::max());
+  auto bestScore = score(0, std::numeric_limits<unsigned>::max(), 0);
 
   // Get a map of expressions to their depths and post-order traversal indices.
   // Heuristically, all other things being equal, we should complain about the
-  // ambiguous expression that (1) has the most overloads, (2) is deepest, or
-  // (3) comes earliest in the expression.
+  // ambiguous expression that (1) is deepest, (2) comes earliest in the
+  // expression, or (3) has the most overloads.
   llvm::DenseMap<Expr *, unsigned> indexMap;
   for (auto expr : InputExprs) {
     extendPreorderIndexMap(expr, indexMap);
@@ -4780,7 +4780,7 @@ bool ConstraintSystem::diagnoseAmbiguity(ArrayRef<Solution> solutions) {
 
     // If we have more distinct overload choices for this locator than for
     // prior locators, just keep this locator.
-    auto thisScore = score(distinctOverloads, depth, index);
+    auto thisScore = score(depth, index, distinctOverloads);
     if (thisScore > bestScore) {
       bestScore = thisScore;
       bestOverload = i;
