@@ -85,7 +85,8 @@ public:
                          const ParameterList *params,
                          ArrayRef<AdditionalParam> additionalParams = {});
 
-  /// Print the Swift method as C++ method declaration/definition.
+  /// Print the Swift method as C++ method declaration/definition, including
+  /// constructors.
   void printCxxMethod(const NominalTypeDecl *typeDeclContext,
                       const AbstractFunctionDecl *FD, StringRef swiftSymbolName,
                       Type resultTy, bool isDefinition);

@@ -132,7 +132,7 @@ private class RefCountedClass {
 public struct StructWithRefCountStoredProp {
     private let storedRef: RefCountedClass
 
-    public init(x: Int) {
+    internal init(x: Int) {
         storedRef = RefCountedClass(x: x)
     }
 
