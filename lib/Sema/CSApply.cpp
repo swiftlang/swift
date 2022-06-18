@@ -516,9 +516,10 @@ namespace {
                                   LookUpConformanceInModule(dc->getParentModule()));
     }
 
-    /// Determine whether the given reference is to a method on
-    /// a remote distributed actor in the given context.
-    bool isDistributedThunk(ConcreteDeclRef ref, Expr *context);
+    /// Determine whether the given reference on the given
+    /// base has to be replaced with a distributed thunk instead.
+    bool requiresDistributedThunk(Expr *base, SourceLoc memberLoc,
+                                  ConcreteDeclRef memberRef);
 
   public:
     /// Build a reference to the given declaration.
@@ -1615,6 +1616,68 @@ namespace {
         return forceUnwrapIfExpected(ref, memberLocator);
       }
 
+      if (requiresDistributedThunk(base, memberLoc.getStartLoc(), memberRef)) {
+        auto *decl = memberRef.getDecl();
+        FuncDecl *thunkDecl = nullptr;
+        if (auto *FD = dyn_cast<FuncDecl>(decl)) {
+          thunkDecl = FD->getDistributedThunk();
+        } else {
+          thunkDecl = cast<VarDecl>(decl)->getDistributedThunk();
+        }
+
+        if (!thunkDecl)
+          return nullptr;
+
+        auto thunkType = refTy;
+        auto thunkOpenedType = openedType;
+
+        // If this is a reference to a computed property then we need to
+        // form a function type from it with unapplied Self so
+        // (Self) -> T becomes (Self) -> () -> T
+        if (isa<VarDecl>(decl)) {
+          auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
+
+          thunkOpenedType =
+              FunctionType::get(/*params=*/{}, thunkOpenedType, extInfo);
+          thunkType =
+              FunctionType::get({FunctionType::Param(selfTy)}, thunkOpenedType);
+        }
+
+        ConcreteDeclRef thunkRef{thunkDecl, memberRef.getSubstitutions()};
+
+        // Update member reference to point to the thunk.
+        CachedConcreteRefs[cs.getConstraintLocator(memberLocator)] =
+            thunkRef;
+
+        auto declRefExpr = new (context) DeclRefExpr(
+            thunkRef, memberLoc, Implicit, AccessSemantics::DirectToStorage);
+
+        declRefExpr->setFunctionRefKind(choice.getFunctionRefKind());
+        declRefExpr->setType(thunkType);
+
+        cs.cacheType(declRefExpr);
+
+        Expr *thunkApply =
+            DotSyntaxCallExpr::create(context, declRefExpr, dotLoc, base);
+        if (Implicit)
+          thunkApply->setImplicit();
+
+        thunkApply = finishApply(cast<ApplyExpr>(thunkApply), thunkOpenedType,
+                                 locator, memberLocator);
+
+        // If this is access to a computed property, that requires
+        // implicit call.
+        if (isa<VarDecl>(decl)) {
+          auto *thunkCall = CallExpr::createImplicitEmpty(context, thunkApply);
+          thunkCall->setType(solution.simplifyType(openedType));
+          thunkCall->setUsesDistributedThunk(true);
+          cs.cacheType(thunkCall);
+          return thunkCall;
+        }
+
+        return thunkApply;
+      }
+
       // For properties, build member references.
       if (auto *varDecl = dyn_cast<VarDecl>(member)) {
         if (isUnboundInstanceMember) {
@@ -1662,8 +1725,9 @@ namespace {
         refTy = refTy->replaceCovariantResultType(containerTy, 2);
 
       // Handle all other references.
-      auto declRefExpr = new (context) DeclRefExpr(memberRef, memberLoc,
-                                                   Implicit, semantics);
+      auto declRefExpr =
+          new (context) DeclRefExpr(memberRef, memberLoc, Implicit, semantics);
+
       declRefExpr->setFunctionRefKind(choice.getFunctionRefKind());
       declRefExpr->setType(refTy);
       cs.setType(declRefExpr, refTy);
@@ -7726,11 +7790,14 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     cs.setType(apply, fnType->getResult());
 
     // If this is a call to a distributed method thunk,
-    // let's mark the call as implicitly throwing.
-    if (isDistributedThunk(callee, apply->getFn())) {
-      auto *FD = cast<AbstractFunctionDecl>(callee.getDecl());
-      if (!FD->hasThrows())
+    // let's mark the call as implicitly throwing/async.
+    if (isa<SelfApplyExpr>(apply->getFn())) {
+      auto *FD = dyn_cast<FuncDecl>(callee.getDecl());
+      if (FD && FD->isDistributedThunk()) {
         apply->setImplicitlyThrows(true);
+        apply->setImplicitlyAsync(ImplicitActorHopTarget::forInstanceSelf());
+        apply->setUsesDistributedThunk(true);
+      }
     }
 
     solution.setExprTypes(apply);
@@ -7849,17 +7916,26 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   return ctorCall;
 }
 
-bool ExprRewriter::isDistributedThunk(ConcreteDeclRef ref, Expr *context) {
-  auto *FD = dyn_cast_or_null<AbstractFunctionDecl>(ref.getDecl());
-  if (!(FD && FD->isInstanceMember() && FD->isDistributed()))
-    return false;
+bool ExprRewriter::requiresDistributedThunk(Expr *base, SourceLoc memberLoc,
+                                            ConcreteDeclRef memberRef) {
 
-  if (!isa<SelfApplyExpr>(context))
+  auto *memberDecl = memberRef.getDecl();
+  assert(memberDecl);
+
+  if (auto *FD = dyn_cast<FuncDecl>(memberDecl)) {
+    if (!(FD->isInstanceMember() && FD->isDistributed()))
+      return false;
+  } else if (auto *VD = dyn_cast<VarDecl>(memberDecl)) {
+    if (!VD->isDistributed())
+      return false;
+  } else {
+    // On 'distributed' methods and computed properties could ever
+    // require access via a distributed thunk.
     return false;
+  }
 
   auto *actor = getReferencedParamOrCapture(
-      cast<SelfApplyExpr>(context)->getBase(),
-      [&](OpaqueValueExpr *opaqueValue) -> Expr * {
+      base, [&](OpaqueValueExpr *opaqueValue) -> Expr * {
         for (const auto &existential : OpenedExistentials) {
           if (existential.OpaqueValue == opaqueValue)
             return existential.ExistentialValue;
@@ -7867,8 +7943,12 @@ bool ExprRewriter::isDistributedThunk(ConcreteDeclRef ref, Expr *context) {
         return nullptr;
       });
 
+  // If the base is not a parameter/variable reference or a capture
+  // it means that it's a result of some expression which cannot
+  // possibly be isolated, so referencing a distributed member on
+  // such base always requires a thunk.
   if (!actor)
-    return false;
+    return true;
 
   // If this is a method reference on an potentially isolated
   // actor then it cannot be a remote thunk.
@@ -7918,7 +7998,7 @@ bool ExprRewriter::isDistributedThunk(ConcreteDeclRef ref, Expr *context) {
   ReferencedActor actorRef = ReferencedActor(
       actor, isPotentiallyIsolated, ReferencedActor::NonIsolatedContext);
   auto refResult = ActorReferenceResult::forReference(
-      ref, context->getLoc(), referenceDC, None, actorRef);
+      memberRef, memberLoc, referenceDC, None, actorRef);
   switch (refResult) {
   case ActorReferenceResult::ExitsActorToNonisolated:
   case ActorReferenceResult::SameConcurrencyDomain:
