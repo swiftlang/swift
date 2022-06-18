@@ -88,7 +88,7 @@ inline void lazy_mutex_unsafe_unlock(lazy_mutex_handle &handle) {
 
 // .. Once ...................................................................
 
-typedef std::atomic<int64_t> once_t;
+typedef std::atomic<intptr_t> once_t;
 
 void once_slow(once_t &predicate, void (*fn)(void *), void *context);
 
