@@ -22,7 +22,7 @@ A clear and concise description of what you expected to happen.
 **Screenshots**
 If applicable, add screenshots to help explain your problem.
 
-**Enviornment (please fill out this information)**
+**Enviornment (please fill out the following information)**
  - OS: [e.g. macOS 11.0]
  - Xcode Version/Tag/Branch:
 
