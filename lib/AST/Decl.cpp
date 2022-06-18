@@ -7781,6 +7781,10 @@ bool AbstractFunctionDecl::isSendable() const {
   return getAttrs().hasAttribute<SendableAttr>();
 }
 
+bool AbstractFunctionDecl::isNonisolated() const {
+  return getAttrs().hasAttribute<NonisolatedAttr>();
+}
+
 bool AbstractFunctionDecl::isBackDeployed() const {
   if (getAttrs().hasAttribute<BackDeployAttr>())
     return true;
