@@ -59,13 +59,13 @@ bool swift::threading_impl::thread_is_main() {
 
 void swift::threading_impl::once_slow(once_t &predicate, void (*fn)(void *),
                                       void *context) {
-  std::int64_t expected = 0;
-  if (predicate.compare_exchange_strong(expected, (std::int64_t)1,
+  intptr_t expected = 0;
+  if (predicate.compare_exchange_strong(expected, static_cast<intptr_t>(1),
                                         std::memory_order_relaxed,
                                         std::memory_order_relaxed)) {
     fn(context);
 
-    predicate.store((std::int64_t)-1, std::memory_order_release);
+    predicate.store(static_cast<intptr_t>(-1), std::memory_order_release);
 
 #if _WIN32_WINNT >= 0x0602
     // On Windows 8, use WakeByAddressAll() to wake waiters
@@ -84,7 +84,7 @@ void swift::threading_impl::once_slow(once_t &predicate, void (*fn)(void *),
 #if _WIN32_WINNT >= 0x0602
   // On Windows 8, loop waiting on the address until it changes to -1
   while (expected >= 0) {
-    WaitOnAddress(&predicate, &expected, 8, INFINITE);
+    WaitOnAddress(&predicate, &expected, sizeof(expected), INFINITE);
     expected = predicate.load(std::memory_order_acquire);
   }
 #else
