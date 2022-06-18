@@ -51,7 +51,14 @@ public:
       : ImporterImpl(Impl) {}
 
   /// Create a typedpattern(namedpattern(decl))
-  Pattern *createTypedNamedPattern(VarDecl *decl);
+  static Pattern *createTypedNamedPattern(VarDecl *decl);
+
+  /// Create a var member for this struct, along with its pattern binding, and
+  /// add it as a member.
+  static std::pair<VarDecl *, PatternBindingDecl *>
+  createVarWithPattern(DeclContext *dc, Identifier name, Type ty,
+                       VarDecl::Introducer introducer, bool isImplicit,
+                       AccessLevel access, AccessLevel setterAccess);
 
   /// Create a new named constant with the given value.
   ///
@@ -272,6 +279,10 @@ public:
   /// \return computed property declaration
   VarDecl *makeDereferencedPointeeProperty(FuncDecl *dereferenceFunc);
 
+  /// Given a C++ pre-increment operator (`operator++()`). create a non-mutating
+  /// function `successor() -> Self`.
+  FuncDecl *makeSuccessorFunc(FuncDecl *incrementFunc);
+
   FuncDecl *makeOperator(FuncDecl *operatorMethod,
                          clang::CXXMethodDecl *clangOperator);
 
@@ -280,13 +291,6 @@ public:
 
 private:
   Type getConstantLiteralType(Type type, ConstantConvertKind convertKind);
-
-  /// Create a var member for this struct, along with its pattern binding, and
-  /// add it as a member.
-  std::pair<VarDecl *, PatternBindingDecl *>
-  createVarWithPattern(DeclContext *dc, Identifier name, Type ty,
-                       VarDecl::Introducer introducer, bool isImplicit,
-                       AccessLevel access, AccessLevel setterAccess);
 };
 
 } // namespace swift
