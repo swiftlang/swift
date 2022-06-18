@@ -1641,7 +1641,7 @@ CanType TypeBase::computeCanonicalType() {
     for (Type t : PPT->getArgs())
       CanArgs.push_back(t->getCanonicalType());
     auto &C = Base->getASTContext();
-    Result = ParameterizedProtocolType::get(C, Base, CanArgs).getPointer();
+    Result = ParameterizedProtocolType::get(C, Base, CanArgs);
     break;
   }
   case TypeKind::Existential: {
@@ -3852,6 +3852,15 @@ operator()(CanType maybeOpaqueType, Type replacementType,
     }
   }
   return substRef;
+}
+
+CanExistentialType CanExistentialType::get(CanType constraint) {
+  assert(!(constraint->isAny() || constraint->isAnyObject()) &&
+         "Any(Object) may not apppear as canonical constraint type");
+  assert(!constraint->is<ExistentialMetatypeType>() &&
+         "Existential metatype may not apppear as canonical constraint type");
+  return CanExistentialType(
+      ExistentialType::get(constraint)->castTo<ExistentialType>());
 }
 
 CanPrimaryArchetypeType
