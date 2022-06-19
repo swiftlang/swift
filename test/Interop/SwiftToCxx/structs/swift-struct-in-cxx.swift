@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend %s -typecheck -module-name Structs -clang-header-expose-public-decls -emit-clang-header-path %t/structs.h
 // RUN: %FileCheck %s < %t/structs.h
 
-// RUN: %check-interop-cxx-header-in-clang(%t/structs.h -Wno-unused-private-field)
+// RUN: %check-interop-cxx-header-in-clang(%t/structs.h -Wno-unused-private-field -Wno-unused-function)
 
 // CHECK: namespace Structs {
 // CHECK: namespace _impl {
@@ -13,9 +13,19 @@
 // CHECK-EMPTY:
 // CHECK-NEXT: class _impl_StructWithIntField;
 // CHECK-EMPTY:
+// CHECK-NEXT: // Type metadata accessor for StructWithIntField
+// CHECK-NEXT: SWIFT_EXTERN swift::_impl::MetadataResponseTy $s7Structs18StructWithIntFieldVMa(swift::_impl::MetadataRequestTy) SWIFT_NOEXCEPT SWIFT_CALL;
+// CHECK-EMPTY:
+// CHECK-EMPTY:
 // CHECK-NEXT: }
 
 // CHECK:      class StructWithIntField final {
+// CHECK-NEXT: public:
+// CHECK-NEXT:   inline ~StructWithIntField() {
+// CHECK:        }
+// CHECK-NEXT:   inline StructWithIntField(const StructWithIntField &other) {
+// CHECK:        }
+// CHECK-NEXT:   inline StructWithIntField(StructWithIntField &&) = default;
 // CHECK-NEXT: private:
 // CHECK-NEXT:   inline StructWithIntField() {}
 // CHECK-NEXT:   static inline StructWithIntField _make() { return StructWithIntField(); }

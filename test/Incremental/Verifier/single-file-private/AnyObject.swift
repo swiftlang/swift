@@ -16,6 +16,7 @@ import Foundation
 // expected-provides {{NSObject}}
 // expected-provides {{Selector}}
 // expected-provides {{Bool}}
+// expected-provides {{ObjCBool}}
 // expected-provides {{==}}
 // expected-provides {{Equatable}}
 // expected-provides {{Hasher}}

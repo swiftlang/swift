@@ -75,8 +75,11 @@ function(add_swift_compiler_modules_library name)
 
   set(swift_compile_options
       "-Xfrontend" "-validate-tbd-against-ir=none"
-      "-Xfrontend" "-enable-cxx-interop"
+      "-Xfrontend" "-enable-experimental-cxx-interop"
       "-Xcc" "-UIBOutlet" "-Xcc" "-UIBAction" "-Xcc" "-UIBInspectable")
+  if (NOT BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
+    list(APPEND swift_compile_options "-Xfrontend" "-disable-implicit-string-processing-module-import")
+  endif()
 
   if(CMAKE_BUILD_TYPE STREQUAL Debug)
     list(APPEND swift_compile_options "-g")

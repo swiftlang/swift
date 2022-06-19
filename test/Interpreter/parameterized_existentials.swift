@@ -43,4 +43,11 @@ ParameterizedProtocolsTestSuite.test("metadataEquality") {
   expectEqual(typeOne, typeTwo)
 }
 
+ParameterizedProtocolsTestSuite.test("casting") {
+  let a = GenericHolder(value: 5) as any Holder<Int>
+  let b = GenericHolder(value: 5) as! any Holder<Int>
+  expectEqual(a.value, b.value)
+}
+
 runAllTests()
+

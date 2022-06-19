@@ -7,6 +7,7 @@ add_swift_host_library(swiftPrintAsClang STATIC
   PrintAsClang.cpp
   PrintClangFunction.cpp
   PrintClangValueType.cpp
+  PrintSwiftToClangCoreScaffold.cpp
   SwiftToClangInteropContext.cpp)
 target_link_libraries(swiftPrintAsClang PRIVATE
   swiftAST

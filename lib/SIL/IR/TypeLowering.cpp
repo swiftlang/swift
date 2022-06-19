@@ -697,7 +697,7 @@ namespace {
     RetTy visitSILMoveOnlyType(CanSILMoveOnlyType type,
                                AbstractionPattern origType,
                                IsTypeExpansionSensitive_t isSensitive) {
-      AbstractionPattern innerAbstraction = origType.withoutMoveOnly();
+      AbstractionPattern innerAbstraction = origType.removingMoveOnlyWrapper();
       CanType innerType = type->getInnerType();
       auto &lowering =
           TC.getTypeLowering(innerAbstraction, innerType, Expansion);
@@ -2558,7 +2558,11 @@ TypeConverter::getTypeLowering(SILType type,
                                CanGenericSignature sig) {
   // The type lowering for a type parameter relies on its context.
   assert(sig || !type.getASTType()->hasTypeParameter());
-  auto loweredType = type.getASTType();
+
+  // We use the Raw AST type to ensure that moveonlywrapped values use the move
+  // only type lowering. This ensures that trivial moveonlywrapped values are
+  // not trivial.
+  auto loweredType = type.getRawASTType();
   auto isTypeExpansionSensitive = loweredType->hasOpaqueArchetype()
                                       ? IsTypeExpansionSensitive
                                       : IsNotTypeExpansionSensitive;

@@ -3644,7 +3644,7 @@ public:
   bool isActor() const;
 
   /// Whether this nominal type qualifies as a distributed actor, meaning that
-  /// it is either a distributed actor.
+  /// it is either a distributed actor or a DistributedActor constrained protocol.
   bool isDistributedActor() const;
 
   /// Whether this nominal type qualifies as any actor (plain or distributed).
@@ -5742,6 +5742,10 @@ public:
   }
   void setDefaultArgumentKind(DefaultArgumentKind K) {
     Bits.ParamDecl.defaultArgumentKind = static_cast<unsigned>(K);
+  }
+
+  void setDefaultArgumentKind(ArgumentAttrs K) {
+    setDefaultArgumentKind(K.argumentKind);
   }
 
   bool isNoImplicitCopy() const {

@@ -1270,3 +1270,22 @@ bb0:
   dealloc_stack_ref %1 : $AX
   return %5 : $Int32
 }
+
+sil @read_emptytuple : $@convention(thin) (@in_guaranteed ()) -> ()
+
+// CHECK-LABEL: sil @emptytuple_promotion :
+// CHECK: store
+// CHECK-LABEL: } // end sil function 'emptytuple_promotion'
+sil @emptytuple_promotion : $@convention(thin) () -> () {
+bb0:
+  %stk2 = alloc_stack $()
+  store undef to %stk2 : $*()
+  br bb1
+
+bb1:
+  %ld = load %stk2 : $*()
+  dealloc_stack %stk2 : $*()
+  %r = tuple ()
+  return %r : $()
+}
+

@@ -47,5 +47,18 @@ int main() {
   auto structDoubleAndFloat = returnNewStructDoubleAndFloat(floatValue, doubleValue);
   assert(getStructDoubleAndFloat_x(structDoubleAndFloat) == doubleValue);
   assert(getStructDoubleAndFloat_y(structDoubleAndFloat) == floatValue);
+
+  // s = StructOneI16AndOneStruct(x: 0xFF, y: StructTwoI32(x: 5, y: 72))
+  auto s = returnNewStructOneI16AndOneStruct();
+  // s2 = StructTwoI32(x: 10, y: 20)
+  auto s2 = returnNewStructTwoI32(10);
+  inoutStructOneI16AndOneStruct(s, s2);
+  printStructStructTwoI32_and_OneI16AndOneStruct(s2, s);
+// CHECK-NEXT: StructTwoI32.x = 10, y = 20
+// CHECK-NEXT: StructOneI16AndOneStruct.x = 205, y.x = 10, y.y = 20
+
+  inoutStructDoubleAndFloat(structDoubleAndFloat);
+  assert(getStructDoubleAndFloat_x(structDoubleAndFloat) == doubleValue * floatValue);
+  assert(getStructDoubleAndFloat_y(structDoubleAndFloat) == floatValue / 10);
   return 0;
 }

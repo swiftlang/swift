@@ -13,8 +13,8 @@ public struct StructTwoI32 {
 }
 
 public struct StructOneI16AndOneStruct {
-    let x: Int16
-    let y: StructTwoI32
+    var x: Int16
+    var y: StructTwoI32
 }
 
 public struct StructU16AndPointer {
@@ -23,9 +23,12 @@ public struct StructU16AndPointer {
 }
 
 public struct StructDoubleAndFloat {
-    let x: Double
-    let y: Float
+    var x: Double
+    var y: Float
 }
+
+// CHECK: SWIFT_EXTERN void $s7Structs25inoutStructDoubleAndFloatyyAA0cdeF0VzF(char * _Nonnull s) SWIFT_NOEXCEPT SWIFT_CALL; // inoutStructDoubleAndFloat(_:)
+// CHECK: SWIFT_EXTERN void $s7Structs020inoutStructOneI16AnddC0yyAA0cdefdC0Vz_AA0C6TwoI32VtF(char * _Nonnull s, struct swift_interop_stub_Structs_StructTwoI32 s2) SWIFT_NOEXCEPT SWIFT_CALL; // inoutStructOneI16AndOneStruct(_:_:)
 
 // CHECK: class StructDoubleAndFloat final {
 
@@ -64,6 +67,11 @@ public func printStructStructTwoI32_and_OneI16AndOneStruct(_ y: StructTwoI32, _ 
     print("StructOneI16AndOneStruct.x = \(x.x), y.x = \(x.y.x), y.y = \(x.y.y)")
 }
 
+public func inoutStructOneI16AndOneStruct(_ s: inout StructOneI16AndOneStruct, _ s2: StructTwoI32) {
+    s.x -= 50
+    s.y = s2
+}
+
 public func returnNewStructU16AndPointer(_ x: UnsafeMutableRawPointer) -> StructU16AndPointer {
     return StructU16AndPointer(x: 55, y: x)
 }
@@ -79,6 +87,11 @@ public func returnNewStructDoubleAndFloat(_ y: Float, _ x: Double) -> StructDoub
 public func getStructDoubleAndFloat_x(_ x: StructDoubleAndFloat) -> Double { return x.x }
 
 public func getStructDoubleAndFloat_y(_ x: StructDoubleAndFloat) -> Float { return x.y }
+
+public func inoutStructDoubleAndFloat(_ s: inout StructDoubleAndFloat) {
+    s.x *= Double(s.y)
+    s.y /= 10
+}
 
 // CHECK: inline double getStructDoubleAndFloat_x(const StructDoubleAndFloat& x) noexcept SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:  return _impl::$s7Structs25getStructDoubleAndFloat_xySdAA0cdeF0VF(_impl::swift_interop_passDirect_Structs_StructDoubleAndFloat(_impl::_impl_StructDoubleAndFloat::getOpaquePointer(x)));
@@ -97,6 +110,16 @@ public func getStructDoubleAndFloat_y(_ x: StructDoubleAndFloat) -> Float { retu
 
 // CHECK: inline void * _Nonnull getStructU16AndPointer_y(const StructU16AndPointer& x) noexcept SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:  return _impl::$s7Structs24getStructU16AndPointer_yySvAA0cdeF0VF(_impl::swift_interop_passDirect_Structs_StructU16AndPointer(_impl::_impl_StructU16AndPointer::getOpaquePointer(x)));
+// CHECK-NEXT: }
+
+
+// CHECK:      inline void inoutStructDoubleAndFloat(StructDoubleAndFloat& s) noexcept {
+// CHECK-NEXT:   return _impl::$s7Structs25inoutStructDoubleAndFloatyyAA0cdeF0VzF(_impl::_impl_StructDoubleAndFloat::getOpaquePointer(s));
+// CHECK-NEXT: }
+
+
+// CHECK:      inline void inoutStructOneI16AndOneStruct(StructOneI16AndOneStruct& s, const StructTwoI32& s2) noexcept {
+// CHECK-NEXT:   return _impl::$s7Structs020inoutStructOneI16AnddC0yyAA0cdefdC0Vz_AA0C6TwoI32VtF(_impl::_impl_StructOneI16AndOneStruct::getOpaquePointer(s), _impl::swift_interop_passDirect_Structs_StructTwoI32(_impl::_impl_StructTwoI32::getOpaquePointer(s2)));
 // CHECK-NEXT: }
 
 

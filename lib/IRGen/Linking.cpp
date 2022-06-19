@@ -91,6 +91,18 @@ UniversalLinkageInfo::UniversalLinkageInfo(const llvm::Triple &triple,
       UseDLLStorage(useDllStorage(triple)), Internalize(isStaticLibrary),
       HasMultipleIGMs(hasMultipleIGMs), ForcePublicDecls(forcePublicDecls) {}
 
+LinkEntity LinkEntity::forSILGlobalVariable(SILGlobalVariable *G,
+                                            IRGenModule &IGM) {
+  LinkEntity entity;
+  entity.Pointer = G;
+  entity.SecondaryPointer = nullptr;
+  auto kind = (G->isInitializedObject() && IGM.canMakeStaticObjectsReadOnly() ?
+                Kind::ReadOnlyGlobalObject : Kind::SILGlobalVariable);
+  entity.Data = unsigned(kind) << KindShift;
+  return entity;
+}
+
+
 /// Mangle this entity into the given buffer.
 void LinkEntity::mangle(SmallVectorImpl<char> &buffer) const {
   llvm::raw_svector_ostream stream(buffer);
@@ -454,6 +466,9 @@ std::string LinkEntity::mangleAsString() const {
   case Kind::SILGlobalVariable:
     return getSILGlobalVariable()->getName().str();
 
+  case Kind::ReadOnlyGlobalObject:
+    return getSILGlobalVariable()->getName().str() + "r";
+
   case Kind::ReflectionBuiltinDescriptor:
     return mangler.mangleReflectionBuiltinDescriptor(getType());
   case Kind::ReflectionFieldDescriptor:
@@ -787,6 +802,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     return getSILLinkage(getDeclLinkage(getDecl()), forDefinition);
 
   case Kind::SILGlobalVariable:
+  case Kind::ReadOnlyGlobalObject:
     return getSILGlobalVariable()->getLinkage();
 
   case Kind::ReflectionBuiltinDescriptor:
@@ -882,6 +898,7 @@ bool LinkEntity::isContextDescriptor() const {
   case Kind::DefaultAssociatedConformanceAccessor:
   case Kind::SILFunction:
   case Kind::SILGlobalVariable:
+  case Kind::ReadOnlyGlobalObject:
   case Kind::ProtocolWitnessTable:
   case Kind::ProtocolWitnessTablePattern:
   case Kind::GenericProtocolWitnessTableInstantiationFunction:
@@ -1129,6 +1146,7 @@ Alignment LinkEntity::getAlignment(IRGenModule &IGM) const {
 bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   switch (getKind()) {
   case Kind::SILGlobalVariable:
+  case Kind::ReadOnlyGlobalObject:
     if (getSILGlobalVariable()->getDecl()) {
       return getSILGlobalVariable()->getDecl()->isWeakImported(module);
     }
@@ -1317,6 +1335,7 @@ DeclContext *LinkEntity::getDeclContextForEmission() const {
     return getSILFunction()->getDeclContext();
   
   case Kind::SILGlobalVariable:
+  case Kind::ReadOnlyGlobalObject:
     if (auto decl = getSILGlobalVariable()->getDecl())
       return decl->getDeclContext();
 

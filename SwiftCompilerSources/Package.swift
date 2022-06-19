@@ -17,7 +17,7 @@ private extension Target {
   static let defaultSwiftSettings: [SwiftSetting] = [
     .unsafeFlags([
       "-Xfrontend", "-validate-tbd-against-ir=none",
-      "-Xfrontend", "-enable-cxx-interop",
+      "-Xfrontend", "-enable-experimental-cxx-interop",
       // Bridging modules and headers
       "-Xcc", "-I", "-Xcc", "../include",
       "-cross-module-optimization"

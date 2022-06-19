@@ -29,6 +29,10 @@ namespace cxx_synthesis {
 /// module in C++.
 StringRef getCxxImplNamespaceName();
 
+/// Return the name of the C++ class inside of `swift::_impl`
+/// namespace that holds an opaque value, like a resilient struct.
+StringRef getCxxOpaqueStorageClassName();
+
 } // end namespace cxx_synthesis
 
 class ClangSyntaxPrinter {
@@ -55,6 +59,13 @@ public:
   printNamespace(StringRef name,
                  llvm::function_ref<void(raw_ostream &OS)> bodyPrinter) const;
 
+  /// Print an extern C block with given body.
+  void
+  printExternC(llvm::function_ref<void(raw_ostream &OS)> bodyPrinter) const;
+
+  /// Print the `swift::_impl::` namespace qualifier.
+  void printSwiftImplQualifier() const;
+
   /// Where nullability information should be printed.
   enum class NullabilityPrintKind {
     Before,
@@ -69,6 +80,13 @@ public:
   /// Returns true if \p name matches a keyword in any Clang language mode.
   static bool isClangKeyword(StringRef name);
   static bool isClangKeyword(Identifier name);
+
+  /// Print the call expression to the Swift type metadata access function.
+  void printSwiftTypeMetadataAccessFunctionCall(StringRef name);
+
+  /// Print the expression to access the value witness table pointer from the
+  /// given type metadata variable.
+  void printValueWitnessTableAccessFromTypeMetadata(StringRef metadataVariable);
 
 protected:
   raw_ostream &os;
