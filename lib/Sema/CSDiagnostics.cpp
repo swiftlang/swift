@@ -796,6 +796,10 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
       break;
     }
 
+    case ConstraintLocator::ResultBuilderBodyResult:
+      diagnostic = diag::cannot_convert_result_builder_result_to_return_type;
+      break;
+
     case ConstraintLocator::AutoclosureResult:
     case ConstraintLocator::ApplyArgToParam:
     case ConstraintLocator::ApplyArgument: {
@@ -8224,4 +8228,13 @@ void MissingExplicitExistentialCoercion::fixIt(
   diagnostic.fixItInsertAfter(callRange.End,
                               "as " + ErasedResultType->getString(printOpts) +
                                   (requiresParens ? ")" : ""));
+}
+
+bool ConflictingPatternVariables::diagnoseAsError() {
+  for (auto *var : Vars) {
+    emitDiagnosticAt(var->getStartLoc(),
+                     diag::type_mismatch_multiple_pattern_list, getType(var),
+                     ExpectedType);
+  }
+  return true;
 }

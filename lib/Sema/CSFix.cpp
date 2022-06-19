@@ -2449,3 +2449,21 @@ AddExplicitExistentialCoercion::create(ConstraintSystem &cs, Type resultTy,
   return new (cs.getAllocator())
       AddExplicitExistentialCoercion(cs, resultTy, locator);
 }
+
+bool RenameConflictingPatternVariables::diagnose(const Solution &solution,
+                                                 bool asNote) const {
+  ConflictingPatternVariables failure(solution, ExpectedType,
+                                      getConflictingVars(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+RenameConflictingPatternVariables *
+RenameConflictingPatternVariables::create(ConstraintSystem &cs, Type expectedTy,
+                                          ArrayRef<VarDecl *> conflicts,
+                                          ConstraintLocator *locator) {
+  unsigned size = totalSizeToAlloc<VarDecl *>(conflicts.size());
+  void *mem = cs.getAllocator().Allocate(
+      size, alignof(RenameConflictingPatternVariables));
+  return new (mem)
+      RenameConflictingPatternVariables(cs, expectedTy, conflicts, locator);
+}

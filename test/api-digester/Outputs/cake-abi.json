@@ -20,6 +20,13 @@
       },
       {
         "kind": "Import",
+        "name": "_StringProcessing",
+        "printedName": "_StringProcessing",
+        "declKind": "Import",
+        "moduleName": "cake"
+      },
+      {
+        "kind": "Import",
         "name": "cake",
         "printedName": "cake",
         "declKind": "Import",

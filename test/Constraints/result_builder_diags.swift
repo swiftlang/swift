@@ -838,3 +838,20 @@ func test_rdar89742267() {
     }
   }
 }
+
+// https://github.com/apple/swift/issues/59390
+func test_invalid_result_is_diagnosed() {
+  @resultBuilder
+  struct MyBuilder {
+    static func buildBlock<T1>(_ t1: T1) -> T1 {
+      return t1
+    }
+  }
+
+  struct S<T> {} // expected-note {{arguments to generic parameter 'T' ('Int' and 'String') are expected to be equal}}
+
+  @MyBuilder
+  func test() -> S<String> { // expected-error {{cannot convert result builder result type 'S<Int>' to return type 'S<String>}}
+    S<Int>()
+  }
+}

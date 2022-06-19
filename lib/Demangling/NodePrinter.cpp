@@ -547,6 +547,7 @@ private:
     case Node::Kind::OutlinedAssignWithCopy:
     case Node::Kind::OutlinedDestroy:
     case Node::Kind::OutlinedVariable:
+    case Node::Kind::OutlinedReadOnlyObject:
     case Node::Kind::AssocTypePath:
     case Node::Kind::ModuleDescriptor:
     case Node::Kind::AnonymousDescriptor:
@@ -1264,6 +1265,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   case Node::Kind::OutlinedVariable:
     Printer << "outlined variable #" << Node->getIndex() << " of ";
+    return nullptr;
+  case Node::Kind::OutlinedReadOnlyObject:
+    Printer << "outlined read-only object #" << Node->getIndex() << " of ";
     return nullptr;
   case Node::Kind::Directness:
     Printer << toString(Directness(Node->getIndex())) << " ";

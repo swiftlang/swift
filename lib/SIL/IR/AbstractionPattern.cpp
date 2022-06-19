@@ -401,7 +401,7 @@ AbstractionPattern::getTupleElementType(unsigned index) const {
   llvm_unreachable("bad kind");
 }
 
-AbstractionPattern AbstractionPattern::withoutMoveOnly() const {
+AbstractionPattern AbstractionPattern::removingMoveOnlyWrapper() const {
   switch (getKind()) {
   case Kind::Invalid:
     llvm_unreachable("querying invalid abstraction pattern!");
@@ -435,7 +435,7 @@ AbstractionPattern AbstractionPattern::withoutMoveOnly() const {
   llvm_unreachable("bad kind");
 }
 
-AbstractionPattern AbstractionPattern::withMoveOnly() const {
+AbstractionPattern AbstractionPattern::addingMoveOnlyWrapper() const {
   switch (getKind()) {
   case Kind::Invalid:
     llvm_unreachable("querying invalid abstraction pattern!");
@@ -938,6 +938,55 @@ AbstractionPattern AbstractionPattern::getReferenceStorageReferentType() const {
     // This is not reflected in clang types.
     return AbstractionPattern(getGenericSignature(),
                               getType().getReferenceStorageReferent(),
+                              getClangType());
+  }
+  llvm_unreachable("bad kind");
+}
+
+static CanType getExistentialConstraintType(CanType type) {
+  assert(type.isExistentialType());
+  if (auto *ET = type->getAs<ExistentialType>()) {
+    return CanType(ET->getConstraintType());
+  }
+  return type;
+}
+
+AbstractionPattern AbstractionPattern::getExistentialConstraintType() const {
+  switch (getKind()) {
+  case Kind::Invalid:
+    llvm_unreachable("querying invalid abstraction pattern!");
+  case Kind::ObjCMethodType:
+  case Kind::CurriedObjCMethodType:
+  case Kind::PartialCurriedObjCMethodType:
+  case Kind::CFunctionAsMethodType:
+  case Kind::CurriedCFunctionAsMethodType:
+  case Kind::PartialCurriedCFunctionAsMethodType:
+  case Kind::CXXMethodType:
+  case Kind::CurriedCXXMethodType:
+  case Kind::PartialCurriedCXXMethodType:
+  case Kind::Tuple:
+  case Kind::OpaqueFunction:
+  case Kind::OpaqueDerivativeFunction:
+  case Kind::ObjCCompletionHandlerArgumentsType:
+    llvm_unreachable("pattern for function or tuple cannot be for optional");
+
+  case Kind::Opaque:
+    return *this;
+
+  case Kind::Type:
+    if (isTypeParameterOrOpaqueArchetype())
+      return AbstractionPattern::getOpaque();
+    return AbstractionPattern(getGenericSignature(),
+                              ::getExistentialConstraintType(getType()));
+
+  case Kind::Discard:
+    return AbstractionPattern::getDiscard(
+        getGenericSignature(), ::getExistentialConstraintType(getType()));
+
+  case Kind::ClangType:
+    // This is not reflected in clang types.
+    return AbstractionPattern(getGenericSignature(),
+                              ::getExistentialConstraintType(getType()),
                               getClangType());
   }
   llvm_unreachable("bad kind");
@@ -1681,6 +1730,44 @@ public:
 
   CanType visitPackExpansionType(PackExpansionType *pack, AbstractionPattern pattern) {
     llvm_unreachable("Unimplemented!");
+  }
+
+  CanType visitExistentialType(ExistentialType *exist,
+                               AbstractionPattern pattern) {
+    if (auto gp = handleTypeParameterInAbstractionPattern(pattern, exist))
+      return gp;
+
+    // Avoid walking into the constraint type if we can help it.
+    if (!exist->hasTypeParameter() && !exist->hasArchetype() &&
+        !exist->hasOpaqueArchetype()) {
+      return CanType(exist);
+    }
+
+    return CanExistentialType::get(visit(
+        exist->getConstraintType(), pattern.getExistentialConstraintType()));
+  }
+
+  CanType visitParameterizedProtocolType(ParameterizedProtocolType *ppt,
+                                         AbstractionPattern pattern) {
+    if (auto gp = handleTypeParameterInAbstractionPattern(pattern, ppt))
+      return gp;
+
+    // Recurse into the arguments of the parameterized protocol.
+    SmallVector<Type, 4> substArgs;
+    auto origPPT = pattern.getAs<ParameterizedProtocolType>();
+    if (!origPPT)
+      return CanType(ppt);
+    
+    for (unsigned i = 0; i < ppt->getArgs().size(); ++i) {
+      auto argTy = ppt->getArgs()[i];
+      auto origArgTy = AbstractionPattern(pattern.getGenericSignatureOrNull(),
+                                          origPPT.getArgs()[i]);
+      auto substEltTy = visit(argTy, origArgTy);
+      substArgs.push_back(substEltTy);
+    }
+
+    return CanType(ParameterizedProtocolType::get(
+        TC.Context, ppt->getBaseType(), substArgs));
   }
 
   CanType visitTupleType(TupleType *tuple, AbstractionPattern pattern) {

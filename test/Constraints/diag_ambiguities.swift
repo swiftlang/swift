@@ -88,3 +88,24 @@ func %% (_ lhs: Float, _ rhs: Float) -> Float {
 func SR15053<T : Numeric>(_ a: T, _ b: T) {
   (a + b) %% 2 // expected-error {{cannot convert value of type 'T' to expected argument type 'Int'}}
 }
+
+// rdar://94360230 - diagnosing 'filter' instead of ambiguity in its body
+func test_diagnose_deepest_ambiguity() {
+  struct S {
+    func ambiguous(_: Int = 0) -> Bool { true }     // expected-note 2 {{found this candidate}}
+    func ambiguous(_: String = "") -> Bool { true } // expected-note 2 {{found this candidate}}
+  }
+
+  func test_single(arr: [S]) {
+    arr.filter { $0.ambiguous() } // expected-error {{ambiguous use of 'ambiguous'}}
+  }
+
+  func test_multi(arr: [S]) {
+    arr.filter {
+      if true {
+        print($0.ambiguous()) // expected-error {{ambiguous use of 'ambiguous'}}
+      }
+      return true
+    }
+  }
+}

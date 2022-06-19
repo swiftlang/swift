@@ -41,6 +41,26 @@ class IBActionWrapperTy {
   func moreMagic(_: AnyObject) -> () {} // no-warning
   @objc @IBAction
   func evenMoreMagic(_: AnyObject) -> () {} // no-warning
+
+  @available(SwiftStdlib 5.5, *)
+  @IBAction
+  func asyncIBActionNoSpace(_: AnyObject) async -> () {}
+  // expected-error@-1 {{@IBAction instance method cannot be async}}
+  // expected-note@-2 {{remove 'async' and wrap in 'Task' to use concurrency in 'asyncIBActionNoSpace'}}{{45:3-47:57=@available(SwiftStdlib 5.5, *)\n  @IBAction\n  func asyncIBActionNoSpace(_: AnyObject) -> () {\nTask { @MainActor in \}\n\}}}
+
+  @available(SwiftStdlib 5.5, *)
+  @IBAction
+  func asyncIBActionWithFullBody(_: AnyObject) async {
+      print("Hello World")
+  }
+  // expected-error@-3 {{@IBAction instance method cannot be async}}
+  // expected-note@-4 {{remove 'async' and wrap in 'Task' to use concurrency in 'asyncIBActionWithFullBody'}}{{51:3-55:4=@available(SwiftStdlib 5.5, *)\n  @IBAction\n  func asyncIBActionWithFullBody(_: AnyObject) {\nTask { @MainActor in\n      print("Hello World")\n  \}\n\}}}
+
+  @available(SwiftStdlib 5.5, *) @IBAction func asyncIBActionNoBody(_: AnyObject) async
+  // expected-error@-1 {{expected '{' in body of function declaration}}
+  // expected-error@-2 {{@IBAction instance method cannot be asynchronous}}
+  // expected-note@-3 {{remove 'async' and wrap in 'Task' to use concurrency in 'asyncIBActionNoBody}}{{3-88=@available(SwiftStdlib 5.5, *) @IBAction func asyncIBActionNoBody(_: AnyObject)}}
+
 }
 
 struct S { }

@@ -240,4 +240,22 @@ OperatorsTestSuite.test("PtrToPtr.subscript (inline)") {
 //  expectEqual(23, arr[0])
 //}
 
+OperatorsTestSuite.test("Iterator.pointee") {
+  var iter = Iterator()
+  let res = iter.pointee
+  expectEqual(123, res)
+}
+
+OperatorsTestSuite.test("ConstIterator.pointee") {
+  let iter = ConstIterator()
+  let res = iter.pointee
+  expectEqual(234, res)
+}
+
+OperatorsTestSuite.test("ConstIteratorByVal.pointee") {
+  let iter = ConstIteratorByVal()
+  let res = iter.pointee
+  expectEqual(456, res)
+}
+
 runAllTests()

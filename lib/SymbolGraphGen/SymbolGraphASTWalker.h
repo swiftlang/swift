@@ -96,6 +96,9 @@ struct SymbolGraphASTWalker : public SourceEntityWalker {
   
   /// Returns whether the given declaration comes from an `@_exported import` module.
   virtual bool isFromExportedImportedModule(const Decl *D) const;
+
+  /// Returns whether the given module is an `@_exported import` module.
+  virtual bool isExportedImportedModule(const ModuleDecl *M) const;
 };
 
 } // end namespace symbolgraphgen

@@ -157,6 +157,7 @@ struct CheckerOptions {
   bool PrintModule;
   bool SwiftOnly;
   bool SkipOSCheck;
+  bool SkipRemoveDeprecatedCheck;
   bool CompilerStyle;
   bool Migrator;
   StringRef LocationFilter;

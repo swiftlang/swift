@@ -7,6 +7,7 @@
 // CHECK: SWIFT_EXTERN void $s9Functions8inOutIntyySizF(ptrdiff_t * x) SWIFT_NOEXCEPT SWIFT_CALL; // inOutInt(_:)
 // CHECK: SWIFT_EXTERN void $s9Functions11inOutTwoIntyySiz_SiztF(ptrdiff_t * x, ptrdiff_t * y) SWIFT_NOEXCEPT SWIFT_CALL; // inOutTwoInt(_:_:)
 // CHECK: SWIFT_EXTERN void $s9Functions13inOutTwoParamyySbz_SdztF(bool * x, double * y) SWIFT_NOEXCEPT SWIFT_CALL; // inOutTwoParam(_:_:)
+// CHECK: SWIFT_EXTERN void $s9Functions24inoutTypeWithNullabilityyySVzF(void const * _Nonnull * x) SWIFT_NOEXCEPT SWIFT_CALL; // inoutTypeWithNullability(_:)
 
 // CHECK:      inline void inOutInt(swift::Int & x) noexcept {
 // CHECK-NEXT:   return _impl::$s9Functions8inOutIntyySizF(&x);
@@ -20,6 +21,11 @@
 // CHECK-NEXT:   return _impl::$s9Functions13inOutTwoParamyySbz_SdztF(&x, &y);
 // CHECK-NEXT: }
 
+// CHECK:      inline void inoutTypeWithNullability(void const * _Nonnull & x) noexcept {
+// CHECK-NEXT:   return _impl::$s9Functions24inoutTypeWithNullabilityyySVzF(&x);
+// CHECK-NEXT: }
+
+
 public func inOutInt(_ x: inout Int) { x = Int() }
 
 public func inOutTwoInt(_ x: inout Int, _ y: inout Int) {
@@ -30,4 +36,8 @@ public func inOutTwoInt(_ x: inout Int, _ y: inout Int) {
 public func inOutTwoParam(_ x: inout Bool, _ y: inout Double) {
     y = 3.14
     x = !x
+}
+
+public func inoutTypeWithNullability(_ x: inout UnsafeRawPointer) {
+    x += 1
 }

@@ -786,6 +786,10 @@ public:
   /// Break an existential down into a set of constraints.
   ExistentialLayout getExistentialLayout();
 
+  /// If this is an actor or distributed type, get the nominal type declaration
+  /// for the actor.
+  NominalTypeDecl *getAnyActor();
+
   /// Determines whether this type is an actor type.
   bool isActorType();
 
@@ -5362,8 +5366,8 @@ class ParameterizedProtocolType final : public TypeBase,
 public:
   /// Retrieve an instance of a protocol composition type with the
   /// given set of members.
-  static Type get(const ASTContext &C, ProtocolType *base,
-                  ArrayRef<Type> args);
+  static ParameterizedProtocolType *get(const ASTContext &C, ProtocolType *base,
+                                        ArrayRef<Type> args);
 
   ProtocolType *getBaseType() const {
     return Base;
@@ -5403,6 +5407,13 @@ private:
                             RecursiveTypeProperties properties);
 };
 BEGIN_CAN_TYPE_WRAPPER(ParameterizedProtocolType, Type)
+  static CanParameterizedProtocolType get(const ASTContext &C,
+                                          ProtocolType *base,
+                                          ArrayRef<Type> args) {
+    return CanParameterizedProtocolType(
+        ParameterizedProtocolType::get(C, base, args));
+  }
+
   CanProtocolType getBaseType() const {
     return CanProtocolType(getPointer()->getBaseType());
   }
@@ -5469,6 +5480,7 @@ public:
   }
 };
 BEGIN_CAN_TYPE_WRAPPER(ExistentialType, Type)
+  static CanExistentialType get(CanType constraint);
   PROXY_CAN_TYPE_SIMPLE_GETTER(getConstraintType)
 END_CAN_TYPE_WRAPPER(ExistentialType, Type)
 

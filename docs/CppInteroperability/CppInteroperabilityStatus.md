@@ -140,7 +140,31 @@ This status table describes which of the following Swift language features have 
 | **Swift Language Feature**     | **Implemented Experimental Support For Using It In C++** |
 |--------------------------------|----------------------------------------------------------|
 | Top-level `@_cdecl` functions  | Yes                                                      |
-| Top-level Swift functions      | Partially, only with C compatible types                  |
-| `inout` parameters             | No                                                       |
+| Top-level Swift functions      | Partially, only with primitive and Swift struct types    |
+| `inout` parameters             | Yes                                                      |
 | Variadic parameters            | No                                                       |
 | Multiple return values         | No                                                       |
+
+**Structs**
+
+| **Swift Language Feature**     | **Implemented Experimental Support For Using It In C++** |
+|--------------------------------|----------------------------------------------------------|
+| Fixed layout structs           | Yes                                                      |
+| Resilient / opaque structs     | Yes                                                      |
+| Copy and destroy semantics     | Yes                                                      |
+| Initializers                   | Partially, as static `init` methods. No failable support |
+
+**Methods**
+
+| **Swift Language Feature**     | **Implemented Experimental Support For Using It In C++** |
+|--------------------------------|----------------------------------------------------------|
+| Instance methods               | Yes, for structs only                                    |
+| Static methods                 | No                                                       |
+
+**Properties**
+
+| **Swift Language Feature**     | **Implemented Experimental Support For Using It In C++** |
+|--------------------------------|----------------------------------------------------------|
+| Getter accessors               | Yes, via `get<name>`. For structs only                   |
+| Setter accessors               | No                                                       |
+| Mutation accessors             | No                                                       |

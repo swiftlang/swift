@@ -317,6 +317,15 @@ public:
     return { Files.begin(), Files.size() };
   }
 
+  /// Add the given file to this module.
+  ///
+  /// FIXME: Remove this function from public view. Modules never need to add
+  /// files once they are created.
+  ///
+  /// \warning There are very few safe points to call this function once a
+  /// \c ModuleDecl has been created. If you find yourself needing to insert
+  /// a file in the middle of e.g. semantic analysis, use a \c
+  /// SynthesizedFileUnit instead.
   void addFile(FileUnit &newFile);
 
   /// Creates a map from \c #filePath strings to corresponding \c #fileID
@@ -631,18 +640,11 @@ public:
   /// might include "missing" conformances, which are synthesized for some
   /// protocols as an error recovery mechanism.
   ///
-  /// \param allowUnavailable When \c true, the resulting conformance reference
-  /// might include "unavailable" conformances, meaning that the conformance
-  /// cannot actually be used and will be diagnosed if used later. Pass
-  /// \c false here for queries that want to determine whether the conformance
-  /// is likely to be usable.
-  ///
   /// \returns The result of the conformance search, which will be
   /// None if the type does not conform to the protocol or contain a
   /// ProtocolConformanceRef if it does conform.
   ProtocolConformanceRef lookupConformance(Type type, ProtocolDecl *protocol,
-                                           bool allowMissing = false,
-                                           bool allowUnavailable = true);
+                                           bool allowMissing = false);
 
   /// Look for the conformance of the given existential type to the given
   /// protocol.

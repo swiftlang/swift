@@ -7627,7 +7627,8 @@ bool AbstractFunctionDecl::hasDynamicSelfResult() const {
   return isa<ConstructorDecl>(this);
 }
 
-AbstractFunctionDecl *AbstractFunctionDecl::getAsyncAlternative() const {
+AbstractFunctionDecl *
+AbstractFunctionDecl::getAsyncAlternative(bool isKnownObjC) const {
   // Async functions can't have async alternatives
   if (hasAsync())
     return nullptr;
@@ -7651,7 +7652,8 @@ AbstractFunctionDecl *AbstractFunctionDecl::getAsyncAlternative() const {
   }
 
   auto *renamedDecl = evaluateOrDefault(
-      getASTContext().evaluator, RenamedDeclRequest{this, avAttr}, nullptr);
+      getASTContext().evaluator, RenamedDeclRequest{this, avAttr, isKnownObjC},
+      nullptr);
   auto *alternative = dyn_cast_or_null<AbstractFunctionDecl>(renamedDecl);
   if (!alternative || !alternative->hasAsync())
     return nullptr;
@@ -7777,6 +7779,10 @@ bool AbstractFunctionDecl::argumentNameIsAPIByDefault() const {
 
 bool AbstractFunctionDecl::isSendable() const {
   return getAttrs().hasAttribute<SendableAttr>();
+}
+
+bool AbstractFunctionDecl::isNonisolated() const {
+  return getAttrs().hasAttribute<NonisolatedAttr>();
 }
 
 bool AbstractFunctionDecl::isBackDeployed() const {
@@ -9222,12 +9228,11 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
 
     case ClosureActorIsolation::ActorInstance: {
       auto selfDecl = isolation.getActorInstance();
-      auto actorClass = selfDecl->getType()->getReferenceStorageReferent()
-          ->getClassOrBoundGenericClass();
-      // FIXME: Doesn't work properly with generics
-      assert(actorClass && "Bad closure actor isolation?");
-      return ActorIsolation::forActorInstance(actorClass)
-                .withPreconcurrency(isolation.preconcurrency());
+      auto actor = selfDecl->getType()->getReferenceStorageReferent()
+          ->getAnyActor();
+      assert(actor && "Bad closure actor isolation?");
+      return ActorIsolation::forActorInstance(actor)
+        .withPreconcurrency(isolation.preconcurrency());
     }
     }
   }

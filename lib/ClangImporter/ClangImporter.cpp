@@ -902,7 +902,14 @@ getClangInvocationFileMapping(ASTContext &ctx) {
       new clang::DiagnosticOptions());
   clang::driver::Driver clangDriver(ctx.ClangImporterOpts.clangPath,
                                     triple.str(), *clangDiags);
-  llvm::opt::InputArgList clangDriverArgs;
+  // Flags passed to Swift with `-Xcc` might affect include paths.
+  unsigned unused1, unused2;
+  std::vector<const char *> clangArgs;
+  for (const auto &each : ctx.ClangImporterOpts.ExtraArgs) {
+    clangArgs.push_back(each.c_str());
+  }
+  llvm::opt::InputArgList clangDriverArgs =
+      clangDriver.getOpts().ParseArgs(clangArgs, unused1, unused2);
   // If an SDK path was explicitly passed to Swift, make sure to pass it to
   // Clang driver as well. It affects the resulting include paths.
   auto sdkPath = ctx.SearchPathOpts.getSDKPath();
@@ -3562,11 +3569,16 @@ void ClangImporter::loadExtensions(NominalTypeDecl *nominal,
 }
 
 void ClangImporter::loadObjCMethods(
-       ClassDecl *classDecl,
+       NominalTypeDecl *typeDecl,
        ObjCSelector selector,
        bool isInstanceMethod,
        unsigned previousGeneration,
        llvm::TinyPtrVector<AbstractFunctionDecl *> &methods) {
+  // TODO: We don't currently need to load methods from imported ObjC protocols.
+  auto classDecl = dyn_cast<ClassDecl>(typeDecl);
+  if (!classDecl)
+    return;
+
   const auto *objcClass =
       dyn_cast_or_null<clang::ObjCInterfaceDecl>(classDecl->getClangDecl());
   if (!objcClass)

@@ -1257,11 +1257,11 @@ public:
 
   /// Given that the value being abstracted is a move only type, return the
   /// abstraction pattern with the move only bit removed.
-  AbstractionPattern withoutMoveOnly() const;
+  AbstractionPattern removingMoveOnlyWrapper() const;
 
   /// Given that the value being abstracted is not a move only type, return the
   /// abstraction pattern with the move only bit added.
-  AbstractionPattern withMoveOnly() const;
+  AbstractionPattern addingMoveOnlyWrapper() const;
 
   /// Given that the value being abstracted is a tuple type, return
   /// the abstraction pattern for its object type.
@@ -1286,6 +1286,10 @@ public:
   /// If this pattern refers to a reference storage type, look through
   /// it.
   AbstractionPattern getReferenceStorageReferentType() const;
+
+  /// Give that the value being abstracted is an existential, return the
+  /// underlying constraint type.
+  AbstractionPattern getExistentialConstraintType() const;
 
   /// Given that the value being abstracted is a function type, return the
   /// abstraction pattern for the derivative function.
