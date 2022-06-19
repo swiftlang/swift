@@ -31,6 +31,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/IDE/CommentConversion.h"
+#include "swift/IRGen/Linking.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
 
@@ -229,10 +230,6 @@ private:
         protocolMembersOptional = !protocolMembersOptional;
         os << (protocolMembersOptional ? "@optional\n" : "@required\n");
       }
-      // Limit C++ decls for now.
-      if (outputLang == OutputLanguageMode::Cxx &&
-          !(isa<VarDecl>(VD) || isa<FuncDecl>(VD)))
-        continue;
       ASTVisitor::visit(const_cast<ValueDecl*>(VD));
     }
   }
@@ -855,11 +852,10 @@ private:
   }
 
   struct FuncionSwiftABIInformation {
-    FuncionSwiftABIInformation(AbstractFunctionDecl *FD,
-                               Mangle::ASTMangler &mangler) {
+    FuncionSwiftABIInformation(AbstractFunctionDecl *FD) {
       isCDecl = FD->getAttrs().hasAttribute<CDeclAttr>();
       if (!isCDecl) {
-        auto mangledName = mangler.mangleAnyDecl(FD, /*prefix=*/true);
+        auto mangledName = SILDeclRef(FD).mangle();
         symbolName = FD->getASTContext().AllocateCopy(mangledName);
       } else {
         symbolName = FD->getAttrs().getAttribute<CDeclAttr>()->Name;
@@ -895,8 +891,7 @@ private:
     auto resultTy =
         getForeignResultType(FD, funcTy, asyncConvention, errorConvention);
 
-    Mangle::ASTMangler mangler;
-    FuncionSwiftABIInformation funcABI(FD, mangler);
+    FuncionSwiftABIInformation funcABI(FD);
 
     os << "SWIFT_EXTERN ";
 
@@ -905,10 +900,12 @@ private:
                                                 owningPrinter.interopContext);
     llvm::SmallVector<DeclAndTypeClangFunctionPrinter::AdditionalParam, 1>
         additionalParams;
-    if (selfTypeDeclContext) {
+    if (selfTypeDeclContext && !isa<ConstructorDecl>(FD)) {
       additionalParams.push_back(
           {DeclAndTypeClangFunctionPrinter::AdditionalParam::Role::Self,
-           (*selfTypeDeclContext)->getDeclaredType()});
+           (*selfTypeDeclContext)->getDeclaredType(),
+           /*isIndirect=*/
+           isa<FuncDecl>(FD) ? cast<FuncDecl>(FD)->isMutating() : false});
     }
     funcPrinter.printFunctionSignature(
         FD, funcABI.getSymbolName(), resultTy,
@@ -1124,7 +1121,8 @@ private:
     assert(!AvAttr->Rename.empty());
 
     auto *renamedDecl = evaluateOrDefault(
-        getASTContext().evaluator, RenamedDeclRequest{D, AvAttr}, nullptr);
+        getASTContext().evaluator, RenamedDeclRequest{D, AvAttr, false},
+        nullptr);
     if (renamedDecl) {
       assert(shouldInclude(renamedDecl) &&
              "ObjC printer logic mismatch with renamed decl");
@@ -2112,12 +2110,31 @@ auto DeclAndTypePrinter::getImpl() -> Implementation {
   return Implementation(os, *this, outputLang);
 }
 
+static bool isAsyncAlternativeOfOtherDecl(const ValueDecl *VD) {
+  auto AFD = dyn_cast<AbstractFunctionDecl>(VD);
+  if (!AFD || !AFD->isAsyncContext() || !AFD->getObjCSelector())
+    return false;
+
+  auto type = AFD->getDeclContext()->getSelfNominalTypeDecl();
+  if (!type)
+    return false;
+  auto others = type->lookupDirect(AFD->getObjCSelector(),
+                                   AFD->isInstanceMember());
+
+  for (auto other : others)
+    if (other->getAsyncAlternative() == AFD)
+      return true;
+
+  return false;
+}
+
 bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
   return !VD->isInvalid() &&
          (outputLang == OutputLanguageMode::Cxx
               ? cxx_translation::isVisibleToCxx(VD, minRequiredAccess)
               : isVisibleToObjC(VD, minRequiredAccess)) &&
-         !VD->getAttrs().hasAttribute<ImplementationOnlyAttr>();
+         !VD->getAttrs().hasAttribute<ImplementationOnlyAttr>() &&
+         !isAsyncAlternativeOfOtherDecl(VD);
 }
 
 void DeclAndTypePrinter::print(const Decl *D) {

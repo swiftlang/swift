@@ -322,6 +322,8 @@ public:
   void visitKnownToBeLocalAttr(KnownToBeLocalAttr *attr);
 
   void visitSendableAttr(SendableAttr *attr);
+
+  void visitDistributedThunkAttr(DistributedThunkAttr *attr);
 };
 
 } // end anonymous namespace
@@ -5934,6 +5936,11 @@ void AttributeChecker::visitSendableAttr(SendableAttr *attr) {
   }
 }
 
+void AttributeChecker::visitDistributedThunkAttr(DistributedThunkAttr *attr) {
+  if (!D->isImplicit())
+    diagnoseAndRemoveAttr(attr, diag::distributed_thunk_cannot_be_used);
+}
+
 void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
   // 'nonisolated' can be applied to global and static/class variables
   // that do not have storage.
@@ -6294,7 +6301,8 @@ static bool parametersMatch(const AbstractFunctionDecl *a,
 
 ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
                                         const ValueDecl *attached,
-                                        const AvailableAttr *attr) const {
+                                        const AvailableAttr *attr,
+                                        bool isKnownObjC) const {
   if (!attached || !attr)
     return nullptr;
 
@@ -6325,7 +6333,7 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
   auto minAccess = AccessLevel::Private;
   if (attached->getModuleContext()->isExternallyConsumed())
     minAccess = AccessLevel::Public;
-  bool attachedIsObjcVisible =
+  bool attachedIsObjcVisible = isKnownObjC ||
       objc_translation::isVisibleToObjC(attached, minAccess);
 
   SmallVector<ValueDecl *, 4> lookupResults;

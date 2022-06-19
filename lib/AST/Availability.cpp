@@ -399,13 +399,6 @@ ASTContext::getParameterizedExistentialRuntimeAvailability() {
   return getSwift57Availability();
 }
 
-AvailabilityContext
-ASTContext::getImmortalRefCountSymbolsAvailability() {
-  // TODO: replace this with a concrete swift version once we have it.
-  // rdar://94185998
-  return getSwiftFutureAvailability();
-}
-
 AvailabilityContext ASTContext::getSwift52Availability() {
   auto target = LangOpts.Target;
 
@@ -519,7 +512,20 @@ AvailabilityContext ASTContext::getSwift56Availability() {
 }
 
 AvailabilityContext ASTContext::getSwift57Availability() {
-  return getSwiftFutureAvailability();
+  auto target = LangOpts.Target;
+
+  if (target.isMacOSX()) {
+    return AvailabilityContext(
+        VersionRange::allGTE(llvm::VersionTuple(13, 0, 0)));
+  } else if (target.isiOS()) {
+    return AvailabilityContext(
+        VersionRange::allGTE(llvm::VersionTuple(16, 0, 0)));
+  } else if (target.isWatchOS()) {
+    return AvailabilityContext(
+        VersionRange::allGTE(llvm::VersionTuple(9, 0, 0)));
+  } else {
+    return AvailabilityContext::alwaysAvailable();
+  }
 }
 
 AvailabilityContext ASTContext::getSwiftFutureAvailability() {

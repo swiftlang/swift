@@ -56,6 +56,8 @@ public:
 
     Role role;
     Type type;
+    // Should self be passed indirectly?
+    bool isIndirect = false;
   };
 
   /// Optional modifiers that can be applied to function signature.
@@ -83,7 +85,8 @@ public:
                          const ParameterList *params,
                          ArrayRef<AdditionalParam> additionalParams = {});
 
-  /// Print the Swift method as C++ method declaration/definition.
+  /// Print the Swift method as C++ method declaration/definition, including
+  /// constructors.
   void printCxxMethod(const NominalTypeDecl *typeDeclContext,
                       const AbstractFunctionDecl *FD, StringRef swiftSymbolName,
                       Type resultTy, bool isDefinition);
@@ -96,7 +99,7 @@ public:
 
 private:
   void printCxxToCFunctionParameterUse(
-      Type type, StringRef name, bool isInOut,
+      Type type, StringRef name, bool isInOut, bool isIndirect = false,
       llvm::Optional<AdditionalParam::Role> paramRole = None);
 
   raw_ostream &os;

@@ -230,7 +230,8 @@ void DeclAndTypeClangFunctionPrinter::printFunctionSignature(
     ClangSyntaxPrinter(os).printBaseName(modifiers.qualifierContext);
     os << "::";
   }
-  os << name << '(';
+  ClangSyntaxPrinter(os).printIdentifier(name);
+  os << '(';
 
   bool HasParams = false;
   // Indirect result is passed in as the first parameter.
@@ -276,8 +277,13 @@ void DeclAndTypeClangFunctionPrinter::printFunctionSignature(
       delegate.prefixIndirectParamValueTypeInC = [](raw_ostream &os) {
         os << "SWIFT_CONTEXT ";
       };
-      print(param.type, OptionalTypeKind::OTK_None, "_self", /*isInOut*/ false,
-            delegate);
+      if (param.isIndirect) {
+        (*delegate.prefixIndirectParamValueTypeInC)(os);
+        os << "void * _Nonnull _self";
+      } else {
+        print(param.type, OptionalTypeKind::OTK_None, "_self",
+              /*isInOut*/ false, delegate);
+      }
     });
   }
   if (kind == FunctionSignatureKind::CFunctionProto && !HasParams) {
@@ -288,14 +294,14 @@ void DeclAndTypeClangFunctionPrinter::printFunctionSignature(
 }
 
 void DeclAndTypeClangFunctionPrinter::printCxxToCFunctionParameterUse(
-    Type type, StringRef name, bool isInOut,
+    Type type, StringRef name, bool isInOut, bool isIndirect,
     llvm::Optional<AdditionalParam::Role> paramRole) {
   auto namePrinter = [&]() { ClangSyntaxPrinter(os).printIdentifier(name); };
   if (!isKnownCxxType(type, typeMapping)) {
     if (auto *structDecl = type->getStructOrBoundGenericStruct()) {
       ClangValueTypePrinter(os, cPrologueOS, typeMapping, interopContext)
           .printParameterCxxToCUseScaffold(
-              structDecl->isResilient() ||
+              isIndirect || structDecl->isResilient() ||
                   interopContext.getIrABIDetails().shouldPassIndirectly(type),
               structDecl, namePrinter, isInOut,
               /*isSelf=*/paramRole &&
@@ -331,6 +337,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
     if (params->size()) {
       if (hasParams)
         os << ", ";
+      hasParams = true;
       size_t index = 1;
       interleaveComma(*params, os, [&](const ParamDecl *param) {
         if (param->hasName()) {
@@ -351,6 +358,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
       interleaveComma(additionalParams, os, [&](const AdditionalParam &param) {
         assert(param.role == AdditionalParam::Role::Self);
         printCxxToCFunctionParameterUse(param.type, "*this", /*isInOut=*/false,
+                                        /*isIndirect=*/param.isIndirect,
                                         param.role);
       });
     }
@@ -389,25 +397,39 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
 void DeclAndTypeClangFunctionPrinter::printCxxMethod(
     const NominalTypeDecl *typeDeclContext, const AbstractFunctionDecl *FD,
     StringRef swiftSymbolName, Type resultTy, bool isDefinition) {
-  os << "  inline ";
+  bool isConstructor = isa<ConstructorDecl>(FD);
+  os << "  ";
+  if (isConstructor && !isDefinition)
+    os << "static ";
+  os << "inline ";
   // FIXME: Full qualifier.
   FunctionSignatureModifiers modifiers;
   if (isDefinition)
     modifiers.qualifierContext = typeDeclContext;
-  printFunctionSignature(FD, FD->getName().getBaseIdentifier().get(), resultTy,
-                         FunctionSignatureKind::CxxInlineThunk, {}, modifiers);
-
-  // FIXME: Add support for mutating methods.
-  os << " const";
+  printFunctionSignature(
+      FD, isConstructor ? "init" : FD->getName().getBaseIdentifier().get(),
+      resultTy, FunctionSignatureKind::CxxInlineThunk, {}, modifiers);
+  bool isMutating = false;
+  if (auto *funcDecl = dyn_cast<FuncDecl>(FD))
+    isMutating = funcDecl->isMutating();
+  if (!isMutating && !isConstructor)
+    os << " const";
   if (!isDefinition) {
     os << ";\n";
     return;
   }
+
   os << " {\n";
   // FIXME: should it be objTy for resultTy?
+  SmallVector<AdditionalParam, 2> additionalParams;
+  if (!isConstructor)
+    additionalParams.push_back(AdditionalParam{
+        AdditionalParam::Role::Self,
+        typeDeclContext->getDeclaredType(),
+        /*isIndirect=*/isMutating,
+    });
   printCxxThunkBody(swiftSymbolName, resultTy, FD->getParameters(),
-                    {AdditionalParam{AdditionalParam::Role::Self,
-                                     typeDeclContext->getDeclaredType()}});
+                    additionalParams);
   os << "  }\n";
 }
 
@@ -450,6 +472,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
   // FIXME: should it be objTy for resultTy?
   printCxxThunkBody(swiftSymbolName, resultTy, accessor->getParameters(),
                     {AdditionalParam{AdditionalParam::Role::Self,
-                                     typeDeclContext->getDeclaredType()}});
+                                     typeDeclContext->getDeclaredType(),
+                                     /*isIndirect=*/false}});
   os << "  }\n";
 }

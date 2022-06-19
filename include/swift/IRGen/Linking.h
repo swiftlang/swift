@@ -364,9 +364,6 @@ class LinkEntity {
     /// A SIL global variable. The pointer is a SILGlobalVariable*.
     SILGlobalVariable,
 
-    /// An outlined read-only global object. The pointer is a SILGlobalVariable*.
-    ReadOnlyGlobalObject,
-
     // These next few are protocol-conformance kinds.
 
     /// A direct protocol witness table. The secondary pointer is a
@@ -996,7 +993,13 @@ public:
     return entity;
   }
 
-  static LinkEntity forSILGlobalVariable(SILGlobalVariable *G, IRGenModule &IGM);
+  static LinkEntity forSILGlobalVariable(SILGlobalVariable *G) {
+    LinkEntity entity;
+    entity.Pointer = G;
+    entity.SecondaryPointer = nullptr;
+    entity.Data = LINKENTITY_SET_FIELD(Kind, unsigned(Kind::SILGlobalVariable));
+    return entity;
+  }
 
   static LinkEntity
   forDifferentiabilityWitness(const SILDifferentiabilityWitness *witness) {
@@ -1417,8 +1420,7 @@ public:
   }
 
   SILGlobalVariable *getSILGlobalVariable() const {
-    assert(getKind() == Kind::SILGlobalVariable ||
-           getKind() == Kind::ReadOnlyGlobalObject);
+    assert(getKind() == Kind::SILGlobalVariable);
     return reinterpret_cast<SILGlobalVariable*>(Pointer);
   }
 

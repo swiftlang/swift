@@ -4604,6 +4604,9 @@ ERROR(distributed_actor_isolated_method,none,
 ERROR(distributed_local_cannot_be_used,none,
       "'local' cannot be used in user-defined code currently",
       ())
+ERROR(distributed_thunk_cannot_be_used,none,
+      "'distributed_thunk' cannot be used in user-defined code",
+      ())
 ERROR(distributed_actor_func_param_not_codable,none,
       "parameter '%0' of type %1 in %2 does not conform to serialization requirement '%3'",
       (StringRef, Type, DescriptiveDeclKind, StringRef))
@@ -4801,6 +4804,9 @@ ERROR(distributed_property_cannot_be_static,none,
 ERROR(distributed_property_can_only_be_computed,none,
       "%0 %1 cannot be 'distributed', only computed properties can",
       (DescriptiveDeclKind, DeclName))
+ERROR(distributed_property_accessor_only_get_can_be_distributed,none,
+      "only 'get' accessors may be 'distributed'",
+      ())
 NOTE(distributed_actor_isolated_property,none,
       "access to %0 %1 is only permitted within distributed actor %2",
       (DescriptiveDeclKind, DeclName, DeclName))
@@ -6179,6 +6185,10 @@ ERROR(result_builder_requires_explicit_var_initialization,none,
 ERROR(cannot_declare_computed_var_in_result_builder,none,
       "cannot declare local %select{lazy|wrapped|computed|observed}0 variable "
       "in result builder", (unsigned))
+ERROR(cannot_convert_result_builder_result_to_return_type,none,
+      "cannot convert result builder result type %0 to return type %1",
+      (Type,Type))
+
 
 //------------------------------------------------------------------------------
 // MARK: Tuple Shuffle Diagnostics

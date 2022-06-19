@@ -1237,17 +1237,20 @@ public:
 ///
 /// The thunk is responsible for invoking 'remoteCall' when invoked on a remote
 /// 'distributed actor'.
-class GetDistributedThunkRequest :
-    public SimpleRequest<GetDistributedThunkRequest,
-                         FuncDecl *(AbstractFunctionDecl *),
-                         RequestFlags::Cached> {
+class GetDistributedThunkRequest
+    : public SimpleRequest<
+          GetDistributedThunkRequest,
+          FuncDecl *(llvm::PointerUnion<VarDecl *, AbstractFunctionDecl *>),
+          RequestFlags::Cached> {
+  using Originator = llvm::PointerUnion<VarDecl *, AbstractFunctionDecl *>;
+
 public:
   using SimpleRequest::SimpleRequest;
 
 private:
   friend SimpleRequest;
 
-  FuncDecl *evaluate(Evaluator &evaluator, AbstractFunctionDecl *distributedFunc) const;
+  FuncDecl *evaluate(Evaluator &evaluator, Originator originator) const;
 
 public:
   // Caching
@@ -3441,7 +3444,8 @@ public:
 
 class RenamedDeclRequest
     : public SimpleRequest<RenamedDeclRequest,
-                           ValueDecl *(const ValueDecl *, const AvailableAttr *),
+                           ValueDecl *(const ValueDecl *, const AvailableAttr *,
+                                       bool isKnownObjC),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3450,7 +3454,7 @@ private:
   friend SimpleRequest;
 
   ValueDecl *evaluate(Evaluator &evaluator, const ValueDecl *attached,
-                      const AvailableAttr *attr) const;
+                      const AvailableAttr *attr, bool isKnownObjC) const;
 
 public:
   bool isCached() const { return true; }

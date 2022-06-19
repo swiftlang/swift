@@ -531,6 +531,7 @@ bool swift::_conformsToProtocol(const OpaqueValue *value,
     return false;
   }
 
+  case MetadataKind::ForeignReferenceType:
   case MetadataKind::ForeignClass:
 #if SWIFT_OBJC_INTEROP
     if (value)
@@ -611,6 +612,12 @@ findDynamicValueAndType(OpaqueValue *value, const Metadata *type,
     // ObjCClassWrapper/ForeignClass when the type matches.
     outValue = value;
     outType = swift_getObjectType(*reinterpret_cast<HeapObject**>(value));
+    return;
+  }
+
+  case MetadataKind::ForeignReferenceType:  {
+    outValue = value;
+    outType = type;
     return;
   }
 
@@ -781,12 +788,18 @@ swift_dynamicCastUnknownClassImpl(const void *object,
 
   case MetadataKind::ForeignClass: {
 #if SWIFT_OBJC_INTEROP
-    auto targetClassType = static_cast<const ForeignClassMetadata*>(targetType);
+    auto targetClassType = static_cast<const ForeignClassMetadata *>(targetType);
     return swift_dynamicCastForeignClass(object, targetClassType);
 #else
     return nullptr;
 #endif
   }
+
+  // Foreign reference types don't suppport casting.
+  case MetadataKind::ForeignReferenceType: {
+    return nullptr;
+  }
+
 
   case MetadataKind::Existential: {
     return _dynamicCastUnknownClassToExistential(object,
@@ -826,6 +839,11 @@ swift_dynamicCastUnknownClassUnconditionalImpl(const void *object,
 #else
     swift_dynamicCastFailure(_swift_getClass(object), targetType);
 #endif
+  }
+
+  // Foreign reference types don't suppport casting.
+  case MetadataKind::ForeignReferenceType: {
+    return nullptr;
   }
 
   case MetadataKind::Existential: {
@@ -894,6 +912,11 @@ swift_dynamicCastMetatypeImpl(const Metadata *sourceType,
       return nullptr;
     }
 
+    // Foreign reference types don't suppport casting.
+    case MetadataKind::ForeignReferenceType: {
+      return nullptr;
+    }
+
     default:
       return nullptr;
     }
@@ -913,6 +936,9 @@ swift_dynamicCastMetatypeImpl(const Metadata *sourceType,
             (const ClassMetadata*)sourceType,
               (const ClassMetadata*)targetType))
         return origSourceType;
+      return nullptr;
+    // Foreign reference types don't suppport casting.
+    case MetadataKind::ForeignReferenceType:
       return nullptr;
     default:
       return nullptr;
@@ -998,10 +1024,19 @@ swift_dynamicCastMetatypeUnconditionalImpl(const Metadata *sourceType,
                                             file, line, column);
       // If we returned, then the cast succeeded.
       return origSourceType;
+
+    // Foreign reference types don't suppport casting.
+    case MetadataKind::ForeignReferenceType:
     default:
       swift_dynamicCastFailure(sourceType, targetType);
     }
     break;
+
+
+  // Foreign reference types don't suppport casting.
+  case MetadataKind::ForeignReferenceType: {
+    swift_dynamicCastFailure(sourceType, targetType);
+  }
 
   case MetadataKind::Existential: {
     auto targetTypeAsExistential = static_cast<const ExistentialTypeMetadata *>(targetType);

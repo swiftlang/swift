@@ -1090,6 +1090,9 @@ MetadataAccessStrategy irgen::getTypeMetadataAccessStrategy(CanType type) {
       assert(type->hasUnboundGenericType());
     }
 
+    if (type->isForeignReferenceType())
+      return MetadataAccessStrategy::PublicUniqueAccessor;
+
     if (requiresForeignTypeMetadata(nominal))
       return MetadataAccessStrategy::ForeignAccessor;
 
@@ -3083,15 +3086,6 @@ llvm::Value *IRGenFunction::emitTypeMetadataRef(CanType type) {
 MetadataResponse
 IRGenFunction::emitTypeMetadataRef(CanType type,
                                    DynamicMetadataRequest request) {
-  if (type->isForeignReferenceType()) {
-    type->getASTContext().Diags.diagnose(
-        type->lookThroughAllOptionalTypes()
-            ->getClassOrBoundGenericClass()
-            ->getLoc(),
-        diag::foreign_reference_types_unsupported.ID, {});
-    exit(1);
-  }
-
   type = IGM.getRuntimeReifiedType(type);
   // Look through any opaque types we're allowed to.
   type = IGM.substOpaqueTypesWithUnderlyingTypes(type);
