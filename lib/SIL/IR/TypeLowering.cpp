@@ -2265,6 +2265,47 @@ TypeConverter::computeLoweredRValueType(TypeExpansionContext forExpansion,
                                              MetatypeRepresentation::Thick);
     }
 
+    CanType visitExistentialType(CanExistentialType substExistType) {
+      // Try to avoid walking into the constraint type if we can help it
+      if (!substExistType->hasTypeParameter() &&
+          !substExistType->hasArchetype() &&
+          !substExistType->hasOpaqueArchetype()) {
+        return substExistType;
+      }
+
+      return CanExistentialType::get(visit(substExistType.getConstraintType()));
+    }
+
+    CanType
+    visitParameterizedProtocolType(CanParameterizedProtocolType substPPT) {
+      bool changed = false;
+      SmallVector<Type, 4> loweredSubstArgs;
+      loweredSubstArgs.reserve(substPPT.getArgs().size());
+
+      auto origConstraint = origType.getExistentialConstraintType();
+      auto origPPT = origConstraint.getAs<ParameterizedProtocolType>();
+      if (!origPPT)
+        return substPPT;
+      
+      for (auto i : indices(substPPT.getArgs())) {
+        auto origArgTy = AbstractionPattern(
+            origConstraint.getGenericSignatureOrNull(), origPPT.getArgs()[i]);
+        auto substArgType = substPPT.getArgs()[i];
+
+        CanType loweredSubstEltType =
+            TC.getLoweredRValueType(forExpansion, origArgTy, substArgType);
+        changed = changed || substArgType != loweredSubstEltType;
+
+        loweredSubstArgs.push_back(loweredSubstEltType);
+      }
+
+      if (!changed)
+        return substPPT;
+
+      return CanParameterizedProtocolType::get(
+          TC.Context, substPPT->getBaseType(), loweredSubstArgs);
+    }
+
     CanType visitPackType(CanPackType substPackType) {
       llvm_unreachable("");
     }
