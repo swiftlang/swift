@@ -35,8 +35,8 @@ struct MyView : View {
         switch (status) {
         case .complete:
           ForEach(items, id: \.self) { item in
-            if let question = item.question,
-               let answer = item.answer {
+            if let question = item.question, // expected-error {{initializer for conditional binding must have Optional type, not 'String'}}
+               let answer = item.answer {    // expected-error {{initializer for conditional binding must have Optional type, not 'Int'}}
               ItemView {
                 currItem.question = question
                 currItem.answer = answer
