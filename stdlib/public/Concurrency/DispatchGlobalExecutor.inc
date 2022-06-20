@@ -24,7 +24,9 @@
 
 #if SWIFT_CONCURRENCY_ENABLE_DISPATCH
 #include <dispatch/dispatch.h>
-#if !defined(_WIN32)
+#if defined(_WIN32)
+#include <Windows.h>
+#else
 #include <dlfcn.h>
 #endif
 #endif
