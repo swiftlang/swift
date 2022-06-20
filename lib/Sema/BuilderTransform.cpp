@@ -1370,9 +1370,9 @@ protected:
           auto *elseVarRef =
               builder.buildVarRef(elseVar.get(), elseBraceStmt->getEndLoc());
 
-          auto *builderCall = buildCallIfWanted(
-              ifStmt->getThenStmt()->getEndLoc(),
-              ctx.Id_buildLimitedAvailability, {elseVarRef}, {Identifier()});
+          auto *builderCall = buildCallIfWanted(elseBraceStmt->getStartLoc(),
+                                                ctx.Id_buildLimitedAvailability,
+                                                {elseVarRef}, {Identifier()});
 
           elseVar = captureExpr(builderCall, elseBody);
         }
