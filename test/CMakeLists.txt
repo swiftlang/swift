@@ -398,9 +398,9 @@ foreach(SDK ${SWIFT_SDKS})
         if("${SWIFT_SDK_${SDK}_THREADING_PACKAGE}")
           list(APPEND LIT_ARGS "--param" "threading=${SWIFT_SDK_${SDK}_THREADING_PACKAGE}")
         else()
-          threading_package_default("${SDK}" SWIFT_THREADING_PACKAGE)
+          threading_package_name("${SDK}" _threading_package)
           list(APPEND LIT_ARGS "--param"
-            "threading=${SWIFT_THREADING_PACKAGE}")
+            "threading=${_threading_package}")
         endif()
 
         foreach(test_subset ${TEST_SUBSETS})
