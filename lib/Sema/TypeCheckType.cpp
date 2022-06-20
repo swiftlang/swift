@@ -1951,6 +1951,9 @@ namespace {
                                           TypeResolutionOptions options);
     NeverNullType resolveCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *repr,
                                                   TypeResolutionOptions options);
+    NeverNullType
+    resolveDistributedKnownToBeLocal(DistributedKnownToBeLocalTypeRepr *repr,
+                                     TypeResolutionOptions options);
     NeverNullType resolveArrayType(ArrayTypeRepr *repr,
                                    TypeResolutionOptions options);
     NeverNullType resolveDictionaryType(DictionaryTypeRepr *repr,
@@ -2091,6 +2094,9 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
     return resolveIsolatedTypeRepr(cast<IsolatedTypeRepr>(repr), options);
   case TypeReprKind::CompileTimeConst:
       return resolveCompileTimeConstTypeRepr(cast<CompileTimeConstTypeRepr>(repr),
+                                             options);
+  case TypeReprKind::DistributedKnownToBeLocal:
+      return resolveDistributedKnownToBeLocal(cast<DistributedKnownToBeLocalTypeRepr>(repr),
                                              options);
   case TypeReprKind::SimpleIdent:
   case TypeReprKind::GenericIdent:
@@ -2921,6 +2927,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
 
     bool isolated = false;
     bool compileTimeConst = false;
+    bool distributedKnownLocal = false;
     while (true) {
       if (auto *specifierRepr = dyn_cast<SpecifierTypeRepr>(nestedRepr)) {
         switch (specifierRepr->getKind()) {
@@ -2942,6 +2949,10 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
           continue;
         case TypeReprKind::CompileTimeConst:
           compileTimeConst = true;
+          nestedRepr = specifierRepr->getBase();
+          continue;
+        case TypeReprKind::DistributedKnownToBeLocal:
+          distributedKnownLocal = true;
           nestedRepr = specifierRepr->getBase();
           continue;
         default:
@@ -2968,7 +2979,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
 
     auto paramFlags = ParameterTypeFlags::fromParameterType(
         ty, variadic, autoclosure, /*isNonEphemeral*/ false, ownership,
-        isolated, noDerivative, compileTimeConst);
+        isolated, noDerivative, compileTimeConst, distributedKnownLocal);
     elements.emplace_back(ty, Identifier(), paramFlags,
                           inputRepr->getElementName(i));
   }
@@ -3676,6 +3687,13 @@ TypeResolver::resolveCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *repr,
   return resolveType(repr->getBase(), options);
 }
 
+NeverNullType
+TypeResolver::resolveDistributedKnownToBeLocal(DistributedKnownToBeLocalTypeRepr *repr,
+                                               TypeResolutionOptions options) {
+  // TODO: more diagnostics
+  return resolveType(repr->getBase(), options);
+}
+
 NeverNullType TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
                                              TypeResolutionOptions options) {
   auto baseTy = resolveType(repr->getBase(), options.withoutContext());
@@ -4334,6 +4352,7 @@ public:
     case TypeReprKind::Isolated:
     case TypeReprKind::Placeholder:
     case TypeReprKind::CompileTimeConst:
+    case TypeReprKind::DistributedKnownToBeLocal:
       return false;
     }
   }

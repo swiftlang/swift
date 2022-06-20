@@ -277,6 +277,10 @@ bool Expr::isSemanticallyConstExpr(
   return printConstExprValue(nullptr, additionalCheck);
 }
 
+bool Expr::isDistributedKnownToBeLocal() const {
+  assert(false && "fixme: should know the attr");
+}
+
 Expr *Expr::getValueProvidingExpr() {
   Expr *E = getSemanticsProvidingExpr();
 

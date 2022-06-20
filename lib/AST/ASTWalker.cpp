@@ -1887,6 +1887,10 @@ bool Traversal::visitCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *T) {
   return doIt(T->getBase());
 }
 
+bool Traversal::visitDistributedKnownToBeLocalTypeRepr(DistributedKnownToBeLocalTypeRepr *T) {
+  return doIt(T->getBase());
+}
+
 bool Traversal::visitOpaqueReturnTypeRepr(OpaqueReturnTypeRepr *T) {
   return doIt(T->getConstraint());
 }

@@ -219,6 +219,7 @@ public:
 
   void visitFinalAttr(FinalAttr *attr);
   void visitCompileTimeConstAttr(CompileTimeConstAttr *attr) {}
+  void visitDistributedKnownToBeLocalAttr(DistributedKnownToBeLocalAttr *attr);
   void visitIBActionAttr(IBActionAttr *attr);
   void visitIBSegueActionAttr(IBSegueActionAttr *attr);
   void visitLazyAttr(LazyAttr *attr);
@@ -318,8 +319,6 @@ public:
   void visitCompilerInitializedAttr(CompilerInitializedAttr *attr);
 
   void checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs);
-
-  void visitKnownToBeLocalAttr(KnownToBeLocalAttr *attr);
 
   void visitSendableAttr(SendableAttr *attr);
 
@@ -5915,7 +5914,7 @@ void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
   }
 }
 
-void AttributeChecker::visitKnownToBeLocalAttr(KnownToBeLocalAttr *attr) {
+void AttributeChecker::visitDistributedKnownToBeLocalAttr(DistributedKnownToBeLocalAttr *attr) {
   if (!D->isImplicit()) {
     diagnoseAndRemoveAttr(attr, diag::distributed_local_cannot_be_used);
   }

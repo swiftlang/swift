@@ -3241,6 +3241,7 @@ public:
     bool isAutoClosure;
     bool isIsolated;
     bool isCompileTimeConst;
+    bool isDistributedKnownLocal;
     uint8_t rawDefaultArg;
     TypeID defaultExprType;
 
@@ -3249,6 +3250,7 @@ public:
                                          interfaceTypeID, isIUO, isVariadic,
                                          isAutoClosure, isIsolated,
                                          isCompileTimeConst,
+                                         isDistributedKnownLocal,
                                          rawDefaultArg,
                                          defaultExprType);
 
@@ -5563,13 +5565,13 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
     IdentifierID internalLabelID;
     TypeID typeID;
     bool isVariadic, isAutoClosure, isNonEphemeral, isIsolated,
-        isCompileTimeConst;
+        isCompileTimeConst, isDistributedKnownToBeLocal;
     bool isNoDerivative;
     unsigned rawOwnership;
     decls_block::FunctionParamLayout::readRecord(
         scratch, labelID, internalLabelID, typeID, isVariadic, isAutoClosure,
         isNonEphemeral, rawOwnership, isIsolated, isNoDerivative,
-        isCompileTimeConst);
+        isCompileTimeConst, isDistributedKnownToBeLocal);
 
     auto ownership =
         getActualValueOwnership((serialization::ValueOwnership)rawOwnership);
@@ -5584,7 +5586,8 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
                         ParameterTypeFlags(isVariadic, isAutoClosure,
                                            isNonEphemeral, *ownership,
                                            isIsolated, isNoDerivative,
-                                           isCompileTimeConst),
+                                           isCompileTimeConst,
+                                           isDistributedKnownToBeLocal),
                         MF.getIdentifier(internalLabelID));
   }
 

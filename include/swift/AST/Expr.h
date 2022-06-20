@@ -499,6 +499,8 @@ public:
   bool printConstExprValue(llvm::raw_ostream *OS, llvm::function_ref<bool(Expr*)> additionalCheck) const;
   bool isSemanticallyConstExpr(llvm::function_ref<bool(Expr*)> additionalCheck = nullptr) const;
 
+  bool isDistributedKnownToBeLocal() const;
+
   /// Returns false if this expression needs to be wrapped in parens when
   /// used inside of a any postfix expression, true otherwise.
   ///

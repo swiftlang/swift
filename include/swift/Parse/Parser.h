@@ -1397,6 +1397,9 @@ public:
     /// The location of the 'isolated' keyword, if present.
     SourceLoc IsolatedLoc;
 
+    /// The location of the '_local' keyword, if present.
+    SourceLoc KnownToBeLocalLoc;
+
     /// The location of the '_const' keyword, if present.
     SourceLoc CompileConstLoc;
 

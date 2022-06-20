@@ -1665,14 +1665,18 @@ namespace {
         thunkApply = finishApply(cast<ApplyExpr>(thunkApply), thunkOpenedType,
                                  locator, memberLocator);
 
-        // If this is access to a computed property, that requires
-        // implicit call.
-        if (isa<VarDecl>(decl)) {
-          auto *thunkCall = CallExpr::createImplicitEmpty(context, thunkApply);
-          thunkCall->setType(solution.simplifyType(openedType));
-          thunkCall->setUsesDistributedThunk(true);
-          cs.cacheType(thunkCall);
-          return thunkCall;
+        // If this is access to a computed property,
+        // it might require an implicit call.
+        if (auto var = dyn_cast<VarDecl>(decl)) {
+          // Prevent calling the distributed thunk if the var is known-to-be-local:
+          if (!var->isDistributedKnownToBeLocal()) {
+            auto *thunkCall =
+                CallExpr::createImplicitEmpty(context, thunkApply);
+            thunkCall->setType(solution.simplifyType(openedType));
+            thunkCall->setUsesDistributedThunk(true);
+            cs.cacheType(thunkCall);
+            return thunkCall;
+          }
         }
 
         return thunkApply;
@@ -7791,7 +7795,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 
     // If this is a call to a distributed method thunk,
     // let's mark the call as implicitly throwing/async.
-    if (isa<SelfApplyExpr>(apply->getFn())) {
+    if (auto applyExpr = dyn_cast<SelfApplyExpr>(apply->getFn())) {
       auto *FD = dyn_cast<FuncDecl>(callee.getDecl());
       if (FD && FD->isDistributedThunk()) {
         apply->setImplicitlyThrows(true);

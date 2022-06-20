@@ -3836,6 +3836,7 @@ public:
         param->isAutoClosure(),
         param->isIsolated(),
         param->isCompileTimeConst(),
+        param->isDistributedKnownToBeLocal(),
         getRawStableDefaultArgumentKind(argKind),
         S.addTypeRef(defaultExprType),
         defaultArgumentText);
@@ -4670,7 +4671,8 @@ public:
           S.addTypeRef(param.getPlainType()), paramFlags.isVariadic(),
           paramFlags.isAutoClosure(), paramFlags.isNonEphemeral(), rawOwnership,
           paramFlags.isIsolated(), paramFlags.isNoDerivative(),
-          paramFlags.isCompileTimeConst());
+          paramFlags.isCompileTimeConst(),
+          paramFlags.isDistributedKnownToBeLocal());
     }
   }
 

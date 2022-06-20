@@ -1608,11 +1608,11 @@ namespace  {
     UNINTERESTING_ATTR(CompileTimeConst)
 
     UNINTERESTING_ATTR(BackDeploy)
-    UNINTERESTING_ATTR(KnownToBeLocal)
 
     UNINTERESTING_ATTR(UnsafeInheritExecutor)
     UNINTERESTING_ATTR(CompilerInitialized)
 
+    UNINTERESTING_ATTR(DistributedKnownToBeLocal)
     UNINTERESTING_ATTR(DistributedThunk)
 #undef UNINTERESTING_ATTR
 

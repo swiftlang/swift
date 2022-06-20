@@ -962,7 +962,8 @@ public:
     return T->getKind() == TypeReprKind::InOut ||
            T->getKind() == TypeReprKind::Shared ||
            T->getKind() == TypeReprKind::Owned ||
-           T->getKind() == TypeReprKind::Isolated;
+           T->getKind() == TypeReprKind::Isolated ||
+           T->getKind() == TypeReprKind::DistributedKnownToBeLocal;
   }
   static bool classof(const SpecifierTypeRepr *T) { return true; }
   
@@ -1046,6 +1047,21 @@ public:
     return T->getKind() == TypeReprKind::CompileTimeConst;
   }
   static bool classof(const CompileTimeConstTypeRepr *T) { return true; }
+};
+
+/// A '_local' type.
+/// \code
+///   x : _local SomeDistributedActor
+/// \endcode
+class DistributedKnownToBeLocalTypeRepr : public SpecifierTypeRepr {
+public:
+  DistributedKnownToBeLocalTypeRepr(TypeRepr *Base, SourceLoc Loc)
+      : SpecifierTypeRepr(TypeReprKind::DistributedKnownToBeLocal, Base, Loc) {}
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::DistributedKnownToBeLocal;
+  }
+  static bool classof(const DistributedKnownToBeLocalTypeRepr *T) { return true; }
 };
 
 /// A TypeRepr for a known, fixed type.
@@ -1348,6 +1364,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Isolated:
   case TypeReprKind::Placeholder:
   case TypeReprKind::CompileTimeConst:
+  case TypeReprKind::DistributedKnownToBeLocal:
     return true;
   }
   llvm_unreachable("bad TypeRepr kind");

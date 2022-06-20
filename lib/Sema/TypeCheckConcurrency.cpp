@@ -2286,7 +2286,7 @@ namespace {
                              Expr *context) {
       // If base of the call is 'local' we permit skip distributed checks.
       if (auto baseSelf = findReferencedBaseSelf(context)) {
-        if (baseSelf->getAttrs().hasAttribute<KnownToBeLocalAttr>())
+        if (baseSelf->isDistributedKnownToBeLocal())
           return false;
       }
 

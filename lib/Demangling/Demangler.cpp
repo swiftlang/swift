@@ -786,6 +786,9 @@ NodePointer Demangler::demangleTypeAnnotation() {
   case 't':
     return createType(
         createWithChild(Node::Kind::CompileTimeConst, popTypeAndGetChild()));
+  case 'l':
+    return createType(
+        createWithChild(Node::Kind::DistributedKnownToBeLocal, popTypeAndGetChild()));
   default:
     return nullptr;
   }

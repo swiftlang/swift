@@ -1099,7 +1099,8 @@ namespace decls_block {
     ValueOwnershipField, // inout, shared or owned?
     BCFixed<1>,          // isolated
     BCFixed<1>,          // noDerivative?
-    BCFixed<1>           // compileTimeConst
+    BCFixed<1>,          // compileTimeConst
+    BCFixed<1>           // distributedKnownLocal
   >;
 
   TYPE_LAYOUT(MetatypeTypeLayout,
@@ -1423,6 +1424,7 @@ namespace decls_block {
     BCFixed<1>,              // isAutoClosure?
     BCFixed<1>,              // isIsolated?
     BCFixed<1>,              // isCompileTimeConst?
+    BCFixed<1>,              // isDistributedKnownToBeLocal?
     DefaultArgumentField,    // default argument kind
     TypeIDField,             // default argument type
     BCBlob                   // default argument text

@@ -753,7 +753,7 @@ namespace {
         PrintWithColorRAII(OS, DeclModifierColor) << " lazy";
       printStorageImpl(VD);
       printAccessors(VD);
-      if (VD->getAttrs().hasAttribute<KnownToBeLocalAttr>()) {
+      if (VD->isDistributedKnownToBeLocal()) {
         OS << " known-to-be-local";
       }
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
@@ -912,7 +912,7 @@ namespace {
       OS.indent(Indent);
       PrintWithColorRAII(OS, ParenthesisColor) << '(';
       PrintWithColorRAII(OS, ParameterColor) << "parameter ";
-      if (P->getAttrs().hasAttribute<KnownToBeLocalAttr>()) {
+      if (P->isDistributedKnownToBeLocal()) {
         OS << "known-to-be-local ";
       }
       printDeclName(P);
@@ -1349,7 +1349,7 @@ void ValueDecl::dumpRef(raw_ostream &os) const {
     os << moduleName;
   }
 
-  if (getAttrs().hasAttribute<KnownToBeLocalAttr>()) {
+  if (getAttrs().hasAttribute<DistributedKnownToBeLocalAttr>()) {
     os << " known-to-be-local";
   }
 
@@ -3130,6 +3130,12 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
+  void visitDistributedKnownToBeLocalTypeRepr(DistributedKnownToBeLocalTypeRepr *T) {
+    printCommon("_local") << '\n';
+    printRec(T->getBase());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
   void visitOptionalTypeRepr(OptionalTypeRepr *T) {
     printCommon("type_optional") << '\n';
     printRec(T->getBase());
@@ -3536,6 +3542,7 @@ namespace {
       printFlag(paramFlags.isAutoClosure(), "autoclosure");
       printFlag(paramFlags.isNonEphemeral(), "nonEphemeral");
       printFlag(paramFlags.isCompileTimeConst(), "compileTimeConst");
+      printFlag(paramFlags.isDistributedKnownToBeLocal(), "distributedKnownLocal");
       switch (paramFlags.getValueOwnership()) {
       case ValueOwnership::Default: break;
       case ValueOwnership::Owned: printFlag("owned"); break;

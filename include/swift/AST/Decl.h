@@ -4829,6 +4829,9 @@ public:
   }
   bool isCompileTimeConst() const;
 
+  /// Is a reference to a distributed actor that is "known to be local".
+  bool isDistributedKnownToBeLocal() const;
+
   /// \returns the way 'static'/'class' should be spelled for this declaration.
   StaticSpellingKind getCorrectStaticSpelling() const;
 
@@ -5635,9 +5638,12 @@ class ParamDecl : public VarDecl {
 
     /// Whether or not this parameter is '_const'.
     IsCompileTimeConst = 1 << 1,
+
+    /// Whether or not this parameter is a '_local DistributedActor' reference.
+    IsDistributedKnownToBeLocal = 1 << 2,
   };
 
-  llvm::PointerIntPair<Identifier, 2, OptionSet<ArgumentNameFlags>>
+  llvm::PointerIntPair<Identifier, 3, OptionSet<ArgumentNameFlags>>
       ArgumentNameAndFlags;
   SourceLoc ParameterNameLoc;
   SourceLoc ArgumentNameLoc;

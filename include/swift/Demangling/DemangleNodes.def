@@ -338,6 +338,7 @@ NODE(BackDeploymentThunk)
 NODE(BackDeploymentFallback)
 NODE(ExtendedExistentialTypeShape)
 NODE(Uniquable)
+NODE(DistributedKnownToBeLocal)
 
 #undef CONTEXT_NODE
 #undef NODE

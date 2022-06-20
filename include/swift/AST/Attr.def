@@ -728,7 +728,7 @@ DECL_ATTR(_backDeploy, BackDeploy,
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIBreakingToRemove,
   129)
 
-CONTEXTUAL_SIMPLE_DECL_ATTR(_local, KnownToBeLocal,
+CONTEXTUAL_SIMPLE_DECL_ATTR(_local, DistributedKnownToBeLocal,
   DeclModifier | OnFunc | OnParam | OnVar |
   UserInaccessible |
   ABIBreakingToAdd | ABIBreakingToRemove |
