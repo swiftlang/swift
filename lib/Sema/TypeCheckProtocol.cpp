@@ -2982,6 +2982,21 @@ Optional<ActorIsolation> ConformanceChecker::checkActorIsolation(
   auto refResult = ActorReferenceResult::forReference(
       getConcreteWitness(), witness->getLoc(), DC, None, None,
       None, requirementIsolation);
+
+  // Limit the behavior of the diagnostic based on context.
+  // If we're working with requirements imported from Clang, or with global
+  // actor isolation in general, use the default diagnostic behavior based
+  // on the conformance context.
+  DiagnosticBehavior behavior = DiagnosticBehavior::Unspecified;
+  if (requirement->hasClangNode() ||
+      refResult.isolation.isGlobalActor() ||
+      requirementIsolation.isGlobalActor()) {
+    // If the witness or requirement has global actor isolation, downgrade
+    // based on context.
+    behavior = SendableCheckContext(
+                   Conformance->getDeclContext()).defaultDiagnosticBehavior();
+  }
+
   bool sameConcurrencyDomain = false;
   switch (refResult) {
   case ActorReferenceResult::SameConcurrencyDomain:
@@ -2990,6 +3005,31 @@ Optional<ActorIsolation> ConformanceChecker::checkActorIsolation(
     if (refResult.isolation.isDistributedActor()) {
       sameConcurrencyDomain = true;
       break;
+    }
+
+    if (refResult.isolation) {
+      /// A property inside a class/actor may be unable to be witness to the
+      /// requirement, if it has a setter, since those cannot be async. Structs
+      /// are except from this since they don't need isolation.
+      auto classDecl = dyn_cast<ClassDecl>(witness->getDeclContext());
+      auto var = dyn_cast<VarDecl>(witness);
+      if (classDecl && var) {
+        // An immutable property may be as witness for
+        // an actor-isolated protocol requirement.
+        if (var->isLet() || var->getWriteImpl() == WriteImplKind::Immutable) {
+          return None;
+        }
+
+        // We're trying to witness an actor-isolated get/set requirement with an
+        // actor which is impossible since we cannot express the async setter.
+        witness
+            ->diagnose(diag::actor_isolated_mutable_property_witness,
+                       refResult.isolation, witness->getDescriptiveKind(),
+                       witness->getName())
+            .limitBehavior(behavior);
+
+        return None;
+      }
     }
 
     // Otherwise, we're done.
@@ -3087,20 +3127,6 @@ Optional<ActorIsolation> ConformanceChecker::checkActorIsolation(
       return refResult.isolation;
 
     return None;
-  }
-
-  // Limit the behavior of the diagnostic based on context.
-  // If we're working with requirements imported from Clang, or with global
-  // actor isolation in general, use the default diagnostic behavior based
-  // on the conformance context.
-  DiagnosticBehavior behavior = DiagnosticBehavior::Unspecified;
-  if (requirement->hasClangNode() ||
-      refResult.isolation.isGlobalActor() ||
-      requirementIsolation.isGlobalActor()) {
-    // If the witness or requirement has global actor isolation, downgrade
-    // based on context.
-    behavior = SendableCheckContext(
-        Conformance->getDeclContext()).defaultDiagnosticBehavior();
   }
 
   // Complain that this witness cannot conform to the requirement due to
@@ -5099,10 +5125,19 @@ void ConformanceChecker::resolveValueWitnesses() {
       // Check actor isolation. If we need to enter into the actor's
       // isolation within the witness thunk, record that.
       if (auto enteringIsolation = checkActorIsolation(requirement, witness)) {
-        Conformance->overrideWitness(
-            requirement,
-            Conformance->getWitnessUncached(requirement)
-              .withEnterIsolation(*enteringIsolation));
+
+        if (auto var = dyn_cast<VarDecl>(witness)) {
+          fprintf(stderr, "[%s:%d] (%s) NOPE\n", __FILE__, __LINE__, __FUNCTION__);
+          if (var->getWriteImpl() != WriteImplKind::Immutable) {
+          fprintf(stderr, "[%s:%d] (%s) NOPE!!!\n", __FILE__, __LINE__, __FUNCTION__);
+            Conformance->setInvalid();
+          }
+        } else {
+
+          Conformance->overrideWitness(
+              requirement, Conformance->getWitnessUncached(requirement)
+                               .withEnterIsolation(*enteringIsolation));
+        }
       }
 
       // Objective-C checking for @objc requirements.
