@@ -118,7 +118,17 @@ protocol MainCounter {
 
 struct InferredFromConformance: MainCounter {
   var counter = 0
+  var ticker: Int { // this is ok, only because this is in a struct
+    get { 1 }
+    set {}
+  }
+}
+
+class InferredFromConformanceClass: MainCounter {
+  var counter = 0
+  // expected-warning@-1{{actor-isolated property 'counter' cannot be used to satisfy settable property protocol requirement}}
   var ticker: Int {
+    // expected-warning@-1{{actor-isolated property 'ticker' cannot be used to satisfy settable property protocol requirement}}
     get { 1 }
     set {}
   }

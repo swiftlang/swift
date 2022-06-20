@@ -4682,6 +4682,9 @@ ERROR(actor_isolated_witness,none,
      "%select{|distributed }0%1 %2 %3 cannot be used to satisfy %4 protocol "
      "requirement",
      (bool, ActorIsolation, DescriptiveDeclKind, DeclName, ActorIsolation))
+ERROR(actor_isolated_mutable_property_witness,none,
+     "%0 %1 %2 cannot be used to satisfy settable property protocol requirement",
+     (ActorIsolation, DescriptiveDeclKind, DeclName))
 ERROR(actor_cannot_conform_to_global_actor_protocol,none,
       "actor %0 cannot conform to global actor isolated protocol %1",
       (Type, Type))
