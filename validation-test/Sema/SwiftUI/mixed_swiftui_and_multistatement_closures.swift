@@ -35,8 +35,9 @@ struct MyView : View {
         switch (status) {
         case .complete:
           ForEach(items, id: \.self) { item in
-            if let question = item.question,
-               let answer = item.answer {
+            // FIXME: Both of these warnings are actually errors that are staged as warnings
+            if let question = item.question, // expected-warning {{initializer for conditional binding must have Optional type, not 'String'}}
+               let answer = item.answer {    // expected-warning {{initializer for conditional binding must have Optional type, not 'Int'}}
               ItemView {
                 currItem.question = question
                 currItem.answer = answer
