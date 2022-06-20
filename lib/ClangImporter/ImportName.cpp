@@ -1854,6 +1854,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     case clang::OverloadedOperatorKind::OO_LessLess:
     case clang::OverloadedOperatorKind::OO_GreaterGreater:
     case clang::OverloadedOperatorKind::OO_EqualEqual:
+    case clang::OverloadedOperatorKind::OO_PlusPlus:
     case clang::OverloadedOperatorKind::OO_ExclaimEqual:
     case clang::OverloadedOperatorKind::OO_LessEqual:
     case clang::OverloadedOperatorKind::OO_GreaterEqual:
