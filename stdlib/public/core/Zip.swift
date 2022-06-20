@@ -24,7 +24,7 @@
 ///         print("\(word): \(number)")
 ///     }
 ///     // Prints "one: 1"
-///     // Prints "two: 2
+///     // Prints "two: 2"
 ///     // Prints "three: 3"
 ///     // Prints "four: 4"
 ///
@@ -64,7 +64,7 @@ public func zip<Sequence1, Sequence2>(
 ///         print("\(word): \(number)")
 ///     }
 ///     // Prints "one: 1"
-///     // Prints "two: 2
+///     // Prints "two: 2"
 ///     // Prints "three: 3"
 ///     // Prints "four: 4"
 @frozen // generic-performance

@@ -33,6 +33,12 @@ struct Base {
   }
 
   static const char *staticInBase() { return "Base::staticInBase"; }
+
+  int renamed(int i) __attribute__((swift_name("swiftRenamed(input:)"))) {
+    return i * 2;
+  }
+
+  void pure() const __attribute__((pure)) {}
 };
 
 struct OtherBase {

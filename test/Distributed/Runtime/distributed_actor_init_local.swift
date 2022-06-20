@@ -8,6 +8,10 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
+
+// FIXME(distributed): Seems something remains incorrect here
+// REQUIRES: rdar92952551
+
 import Distributed
 
 enum MyError: Error {

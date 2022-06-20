@@ -316,12 +316,9 @@ swift::getDistributedSerializationRequirements(
   if (existentialRequirementTy->isAny())
     return true; // we're done here, any means there are no requirements
 
-  if (auto alias = dyn_cast<TypeAliasType>(existentialRequirementTy.getPointer())) {
-    auto ty = alias->getDesugaredType();
-    if (isa<ClassType>(ty) || isa<StructType>(ty) || isa<EnumType>(ty)) {
-      // SerializationRequirement cannot be class or struct nowadays
-      return false;
-    }
+  if (!existentialRequirementTy->isExistentialType()) {
+    // SerializationRequirement must be an existential type
+    return false;
   }
 
   ExistentialType *serialReqType = existentialRequirementTy
@@ -404,6 +401,11 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
     return false;
   }
 
+  auto *func = dyn_cast<FuncDecl>(this);
+  if (!func) {
+    return false;
+  }
+
   // === Structural Checks
   // -- Must be throwing
   if (!hasThrows()) {
@@ -412,6 +414,11 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
 
   // -- Must be async
   if (!hasAsync()) {
+    return false;
+  }
+
+  // -- Must not be mutating, use classes to implement a system instead
+  if (func->isMutating()) {
     return false;
   }
 
@@ -1166,6 +1173,11 @@ AbstractFunctionDecl::isDistributedTargetInvocationResultHandlerOnReturn() const
       return false;
     }
 
+    // --- must not be mutating
+    if (func->isMutating()) {
+      return false;
+    }
+
     // === Check generics
     if (!isGeneric()) {
       return false;
@@ -1278,6 +1290,10 @@ bool AbstractFunctionDecl::isDistributed() const {
   return getAttrs().hasAttribute<DistributedActorAttr>();
 }
 
+bool AbstractFunctionDecl::isDistributedThunk() const {
+  return getAttrs().hasAttribute<DistributedThunkAttr>();
+}
+
 ConstructorDecl *
 NominalTypeDecl::getDistributedRemoteCallTargetInitFunction() const {
   auto mutableThis = const_cast<NominalTypeDecl *>(this);
@@ -1320,6 +1336,15 @@ AbstractFunctionDecl *ASTContext::getRemoteCallOnDistributedActorSystem(
 /******************************************************************************/
 /********************** Distributed Actor Properties **************************/
 /******************************************************************************/
+
+FuncDecl *VarDecl::getDistributedThunk() const {
+  if (!isDistributed())
+    return nullptr;
+
+  auto mutableThis = const_cast<VarDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           GetDistributedThunkRequest{mutableThis}, nullptr);
+}
 
 FuncDecl*
 AbstractFunctionDecl::getDistributedThunk() const {

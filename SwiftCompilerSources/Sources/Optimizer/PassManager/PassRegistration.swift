@@ -18,7 +18,7 @@ import Parse
 public func initializeSwiftModules() {
   registerSILClasses()
   registerSwiftPasses()
-  registerRegexParser()
+  initializeSwiftParseModules()
 }
 
 private func registerPass(
@@ -43,6 +43,7 @@ private func registerSwiftPasses() {
   registerPass(escapeInfoDumper, { escapeInfoDumper.run($0) })
   registerPass(addressEscapeInfoDumper, { addressEscapeInfoDumper.run($0) })
   registerPass(computeEffects, { computeEffects.run($0) })
+  registerPass(objCBridgingOptimization, { objCBridgingOptimization.run($0) })
   registerPass(stackPromotion, { stackPromotion.run($0) })
   registerPass(simplifyBeginCOWMutationPass, { simplifyBeginCOWMutationPass.run($0) })
   registerPass(simplifyGlobalValuePass, { simplifyGlobalValuePass.run($0) })

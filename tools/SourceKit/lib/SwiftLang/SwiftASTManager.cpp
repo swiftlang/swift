@@ -308,12 +308,20 @@ class ASTBuildOperation
   /// can be determined at construction time of the \c ASTBuildOperation.
   const std::vector<FileContent> FileContents;
 
+  /// Guards \c DependencyStamps. This prevents reading from \c DependencyStamps
+  /// while it is being modified. It does not provide any ordering gurantees
+  /// that \c DependencyStamps have been computed in \c buildASTUnit before they
+  /// are accessed in \c matchesSourceState but that's fine (see comment on
+  /// \c DependencyStamps).
+  llvm::sys::Mutex DependencyStampsMtx;
+
   /// \c DependencyStamps contains the stamps of all module depenecies needed
   /// for the AST build. These stamps are only known after the AST is built.
   /// Before the AST has been built, we thus assume that all dependency stamps
   /// match. This seems to be a reasonable assumption since the dependencies
   /// shouldn't change (much) in the time between an \c ASTBuildOperation is
   /// created and until it produced an AST.
+  /// Must only be accessed if \c DependencyStampsMtx has been claimed.
   SmallVector<std::pair<std::string, BufferStamp>, 8> DependencyStamps = {};
 
   /// The ASTManager from which this operation got scheduled. Used to update
@@ -544,10 +552,11 @@ struct SwiftASTManager::Implementation {
       std::shared_ptr<SwiftEditorDocumentFileMap> EditorDocs,
       std::shared_ptr<GlobalConfig> Config,
       std::shared_ptr<SwiftStatistics> Stats,
-      std::shared_ptr<RequestTracker> ReqTracker, StringRef RuntimeResourcePath,
-      StringRef DiagnosticDocumentationPath)
+      std::shared_ptr<RequestTracker> ReqTracker, StringRef SwiftExecutablePath,
+      StringRef RuntimeResourcePath, StringRef DiagnosticDocumentationPath)
       : EditorDocs(EditorDocs), Config(Config), Stats(Stats),
-        ReqTracker(ReqTracker), RuntimeResourcePath(RuntimeResourcePath),
+        ReqTracker(ReqTracker), SwiftExecutablePath(SwiftExecutablePath),
+        RuntimeResourcePath(RuntimeResourcePath),
         DiagnosticDocumentationPath(DiagnosticDocumentationPath),
         SessionTimestamp(llvm::sys::toTimeT(std::chrono::system_clock::now())) {
   }
@@ -556,6 +565,9 @@ struct SwiftASTManager::Implementation {
   std::shared_ptr<GlobalConfig> Config;
   std::shared_ptr<SwiftStatistics> Stats;
   std::shared_ptr<RequestTracker> ReqTracker;
+  /// The path of the swift-frontend executable.
+  /// Used to find clang relative to it.
+  std::string SwiftExecutablePath;
   std::string RuntimeResourcePath;
   std::string DiagnosticDocumentationPath;
   SourceManager SourceMgr;
@@ -625,10 +637,10 @@ SwiftASTManager::SwiftASTManager(
     std::shared_ptr<SwiftEditorDocumentFileMap> EditorDocs,
     std::shared_ptr<GlobalConfig> Config,
     std::shared_ptr<SwiftStatistics> Stats,
-    std::shared_ptr<RequestTracker> ReqTracker, StringRef RuntimeResourcePath,
-    StringRef DiagnosticDocumentationPath)
+    std::shared_ptr<RequestTracker> ReqTracker, StringRef SwiftExecutablePath,
+    StringRef RuntimeResourcePath, StringRef DiagnosticDocumentationPath)
     : Impl(*new Implementation(EditorDocs, Config, Stats, ReqTracker,
-                               RuntimeResourcePath,
+                               SwiftExecutablePath, RuntimeResourcePath,
                                DiagnosticDocumentationPath)) {}
 
 SwiftASTManager::~SwiftASTManager() {
@@ -665,8 +677,8 @@ bool SwiftASTManager::initCompilerInvocation(
     std::string &Error) {
   return ide::initCompilerInvocation(
       Invocation, OrigArgs, Action, Diags, UnresolvedPrimaryFile, FileSystem,
-      Impl.RuntimeResourcePath, Impl.DiagnosticDocumentationPath,
-      Impl.SessionTimestamp, Error);
+      Impl.SwiftExecutablePath, Impl.RuntimeResourcePath,
+      Impl.DiagnosticDocumentationPath, Impl.SessionTimestamp, Error);
 }
 
 bool SwiftASTManager::initCompilerInvocation(
@@ -898,6 +910,8 @@ bool ASTBuildOperation::matchesSourceState(
     }
   }
 
+  llvm::sys::ScopedLock L(DependencyStampsMtx);
+
   for (auto &Dependency : DependencyStamps) {
     if (Dependency.second !=
         ASTManager->Impl.getBufferStamp(Dependency.first, OtherFileSystem))
@@ -1070,9 +1084,12 @@ ASTUnitRef ASTBuildOperation::buildASTUnit(std::string &Error) {
   collectModuleDependencies(CompIns.getMainModule(), Visited, Filenames);
   // FIXME: There exists a small window where the module file may have been
   // modified after compilation finished and before we get its stamp.
-  for (auto &Filename : Filenames) {
-    DependencyStamps.push_back(std::make_pair(
-        Filename, ASTManager->Impl.getBufferStamp(Filename, FileSystem)));
+  {
+    llvm::sys::ScopedLock L(DependencyStampsMtx);
+    for (auto &Filename : Filenames) {
+      DependencyStamps.push_back(std::make_pair(
+          Filename, ASTManager->Impl.getBufferStamp(Filename, FileSystem)));
+    }
   }
 
   // Since we only typecheck the primary file (plus referenced constructs
@@ -1138,14 +1155,16 @@ void ASTBuildOperation::schedule(WorkQueue Queue) {
         std::string Error;
         assert(!Result && "We should only be producing a result once");
         ASTUnitRef AST = buildASTUnit(Error);
+        SmallVector<SwiftASTConsumerRef, 4> LocalConsumers;
         {
           llvm::sys::ScopedLock L(ConsumersAndResultMtx);
           bool WasCancelled = CancellationFlag->load(std::memory_order_relaxed);
           Result.emplace(AST, Error, WasCancelled);
-          for (auto &Consumer : Consumers) {
-            informConsumer(Consumer);
-          }
+          LocalConsumers = Consumers;
           Consumers = {};
+        }
+        for (auto &Consumer : LocalConsumers) {
+          informConsumer(Consumer);
         }
         DidFinishCallback();
       },
@@ -1153,23 +1172,25 @@ void ASTBuildOperation::schedule(WorkQueue Queue) {
 }
 
 bool ASTBuildOperation::addConsumer(SwiftASTConsumerRef Consumer) {
-  llvm::sys::ScopedLock L(ConsumersAndResultMtx);
-  if (isCancelled()) {
-    return false;
-  }
-  if (Result) {
-    informConsumer(Consumer);
-  } else {
+  {
+    llvm::sys::ScopedLock L(ConsumersAndResultMtx);
+    if (isCancelled()) {
+      return false;
+    }
+    if (Result) {
+      informConsumer(Consumer);
+      return true;
+    }
     assert(OperationState != State::Finished);
-    auto WeakThis = std::weak_ptr<ASTBuildOperation>(shared_from_this());
     Consumers.push_back(Consumer);
-    Consumer->setCancellationRequestCallback(
-        [WeakThis](SwiftASTConsumerRef Consumer) {
-          if (auto This = WeakThis.lock()) {
-            This->requestConsumerCancellation(Consumer);
-          }
-        });
   }
+  auto WeakThis = std::weak_ptr<ASTBuildOperation>(shared_from_this());
+  Consumer->setCancellationRequestCallback(
+      [WeakThis](SwiftASTConsumerRef Consumer) {
+        if (auto This = WeakThis.lock()) {
+          This->requestConsumerCancellation(Consumer);
+        }
+      });
   return true;
 }
 

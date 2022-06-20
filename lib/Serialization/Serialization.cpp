@@ -1088,8 +1088,11 @@ void Serializer::writeHeader(const SerializationOptions &options) {
               ++Arg;
               continue;
             }
-          } else if (arg.startswith("-fdebug-prefix-map=")) {
-            // We don't serialize the debug prefix map flags as these
+          } else if (arg.startswith("-fdebug-prefix-map=") ||
+              arg.startswith("-ffile-prefix-map=") ||
+              arg.startswith("-fcoverage-prefix-map=") ||
+              arg.startswith("-fmacro-prefix-map=")) {
+            // We don't serialize any of the prefix map flags as these flags
             // contain absolute paths that are not usable on different
             // machines. These flags are not necessary to compile the
             // clang modules again so are safe to remove.
@@ -1590,6 +1593,7 @@ void Serializer::writeLocalNormalProtocolConformance(
         subs = subs.mapReplacementTypesOutOfContext();
 
       data.push_back(addSubstitutionMapRef(subs));
+      data.push_back(witness.getEnterIsolation().hasValue() ? 1 : 0);
   });
 
   unsigned abbrCode
@@ -2780,7 +2784,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       auto abbrCode = S.DeclTypeAbbrCodes[DerivativeDeclAttrLayout::Code];
       auto *attr = cast<DerivativeAttr>(DA);
       auto &ctx = S.getASTContext();
-      assert(attr->getOriginalFunction(ctx) &&
+      assert(attr->getOriginalFunction(ctx) && attr->getOriginalDeclaration() &&
              "`@derivative` attribute should have original declaration set "
              "during construction or parsing");
       auto origDeclNameRef = attr->getOriginalFunctionName();
@@ -4717,6 +4721,11 @@ public:
         storageTy->getCaptureType());
   }
 
+  void visitSILMoveOnlyType(const SILMoveOnlyType *moveOnlyTy) {
+    using namespace decls_block;
+    serializeSimpleWrapper<SILMoveOnlyTypeLayout>(moveOnlyTy->getInnerType());
+  }
+
   void visitSILBoxType(const SILBoxType *boxTy) {
     using namespace decls_block;
     unsigned abbrCode = S.DeclTypeAbbrCodes[SILBoxTypeLayout::Code];
@@ -5530,10 +5539,10 @@ static void collectInterestingNestedDeclarations(
       if (isLocal)
         return;
 
-      if (auto owningClass = func->getDeclContext()->getSelfClassDecl()) {
+      if (auto owningType = func->getDeclContext()->getSelfNominalTypeDecl()) {
         if (func->isObjC()) {
           Mangle::ASTMangler mangler;
-          std::string ownerName = mangler.mangleNominalType(owningClass);
+          std::string ownerName = mangler.mangleNominalType(owningType);
           assert(!ownerName.empty() && "Mangled type came back empty!");
 
           objcMethods[func->getObjCSelector()].push_back(

@@ -186,11 +186,24 @@ template<class T> struct TemplatedArrayByVal {
   T ts[];
   T operator[](int i) { return ts[i]; }
 };
+
 typedef TemplatedArrayByVal<double> TemplatedDoubleArrayByVal;
 
-struct TemplatedSubscriptArrayByVal {
+template <class T>
+struct TemplatedByVal {
+  T val;
+  TemplatedByVal<T> operator+(TemplatedByVal other) {
+    return TemplatedByVal{.val = val + other.val};
+  }
+};
+
+struct TemplatedOperatorArrayByVal {
   int *ptr;
   template<class T> T operator[](T i) { return ptr[i]; }
+  template <class T>
+  T *operator+(T i) {
+    return ptr + i;
+  }
 };
 
 struct NonTrivial {
@@ -260,5 +273,26 @@ struct DerivedFromAddressOnlyIntWrapper : AddressOnlyIntWrapper {
 struct DerivedFromReadWriteIntArray : ReadWriteIntArray {};
 
 struct DerivedFromNonTrivialArrayByVal : NonTrivialArrayByVal {};
+
+struct Iterator {
+private:
+  int value = 123;
+public:
+  int &operator*() { return value; }
+};
+
+struct ConstIterator {
+private:
+  int value = 234;
+public:
+  const int &operator*() const { return value; }
+};
+
+struct ConstIteratorByVal {
+private:
+  int value = 456;
+public:
+  int operator*() const { return value; }
+};
 
 #endif

@@ -30,11 +30,12 @@
 /// a raw buffer are untyped operations. Accessing this collection's bytes
 /// does not bind the underlying memory to `UInt8`.
 ///
-/// In addition to its collection interface, an `${Self}` instance also supports
-/// the following methods provided by `UnsafeMutableRawPointer`, including
-/// bounds checks in debug mode:
+/// In addition to its collection interface, an `${Self}`
+/// instance also supports the following methods provided by
+/// `UnsafeMutableRawPointer`, including bounds checks in debug mode:
 ///
 /// - `load(fromByteOffset:as:)`
+/// - `loadUnaligned(fromByteOffset:as:)`
 /// - `storeBytes(of:toByteOffset:as:)`
 /// - `copyMemory(from:)`
 %  else:
@@ -43,9 +44,10 @@
 /// of values held in that memory. Reading from memory through a raw buffer is
 /// an untyped operation.
 ///
-/// In addition to its collection interface, an `${Self}` instance also supports
-/// the `load(fromByteOffset:as:)` method provided by `UnsafeRawPointer`,
-/// including bounds checks in debug mode.
+/// In addition to its collection interface, an `${Self}`
+/// instance also supports the `load(fromByteOffset:as:)`
+/// and `loadUnaligned(fromByteOffset:as:)` methods provided by
+/// `UnsafeRawPointer`, including bounds checks in debug mode.
 %  end
 ///
 /// To access the underlying memory through typed operations, the memory must
@@ -350,6 +352,10 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// Returns a new instance of the given type, read from the buffer pointer's
   /// raw memory at the specified byte offset.
   ///
+  /// The memory at `offset` bytes from this buffer pointer's `baseAddress`
+  /// must be properly aligned for accessing `T` and initialized to `T` or
+  /// another type that is layout compatible with `T`.
+  ///
   /// You can use this method to create new values from the buffer pointer's
   /// underlying bytes. The following example creates two new `Int32`
   /// instances from the memory referenced by the buffer pointer `someBytes`.
@@ -394,10 +400,10 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// underlying bytes. The following example creates two new `Int32`
   /// instances from the memory referenced by the buffer pointer `someBytes`.
   /// The bytes for `a` are copied from the first four bytes of `someBytes`,
-  /// and the bytes for `b` are copied from the next four bytes.
+  /// and the bytes for `b` are copied from the fourth through seventh bytes.
   ///
-  ///     let a = someBytes.load(as: Int32.self)
-  ///     let b = someBytes.load(fromByteOffset: 4, as: Int32.self)
+  ///     let a = someBytes.loadUnaligned(as: Int32.self)
+  ///     let b = someBytes.loadUnaligned(fromByteOffset: 3, as: Int32.self)
   ///
   /// The memory to read for the new instance must not extend beyond the buffer
   /// pointer's memory region---that is, `offset + MemoryLayout<T>.size` must
@@ -405,9 +411,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///
   /// - Parameters:
   ///   - offset: The offset, in bytes, into the buffer pointer's memory at
-  ///     which to begin reading data for the new instance. The buffer pointer
-  ///     plus `offset` must be properly aligned for accessing an instance of
-  ///     type `T`. The default is zero.
+  ///     which to begin reading data for the new instance. The default is zero.
   ///   - type: The type to use for the newly constructed instance. The memory
   ///     must be initialized to a value of a type that is layout compatible
   ///     with `type`.
@@ -455,9 +459,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// - Parameters:
   ///   - value: The value to store as raw bytes.
   ///   - offset: The offset in bytes into the buffer pointer's memory to begin
-  ///     reading data for the new instance. The buffer pointer plus `offset`
-  ///     must be properly aligned for accessing an instance of type `T`. The
-  ///     default is zero.
+  ///     writing bytes from the value. The default is zero.
   ///   - type: The type to use for the newly constructed instance. The memory
   ///     must be initialized to a value of a type that is layout compatible
   ///     with `type`.

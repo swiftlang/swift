@@ -1,4 +1,4 @@
-// RUN: %target-swift-remoteast-test -enable-parameterized-existential-types -disable-availability-checking %s | %FileCheck %s
+// RUN: %target-swift-remoteast-test -disable-availability-checking %s | %FileCheck %s
 
 // REQUIRES: swift-remoteast-test
 

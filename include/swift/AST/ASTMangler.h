@@ -43,7 +43,7 @@ protected:
 
   /// If enabled, non-canonical types are allowed and type alias types get a
   /// special mangling.
-  bool DWARFMangling;
+  bool DWARFMangling = false;
 
   /// If enabled, entities that ought to have names but don't get a placeholder.
   ///
@@ -71,6 +71,12 @@ protected:
   /// include concurrency features such as global actors or @Sendable
   /// function types.
   bool Preconcurrency = false;
+
+  /// If enabled, declarations annotated with @_originallyDefinedIn are mangled
+  /// as if they're part of their original module. Disabled for debug mangling,
+  /// because lldb wants to find declarations in the modules they're currently
+  /// defined in.
+  bool RespectOriginallyDefinedIn = true;
 
 public:
   using SymbolicReferent = llvm::PointerUnion<const NominalTypeDecl *,
@@ -110,8 +116,13 @@ public:
     BackDeploymentFallback,
   };
 
-  ASTMangler(bool DWARFMangling = false)
-    : DWARFMangling(DWARFMangling) {}
+  /// lldb overrides the defaulted argument to 'true'.
+  ASTMangler(bool DWARFMangling = false) {
+    if (DWARFMangling) {
+      DWARFMangling = true;
+      RespectOriginallyDefinedIn = false;
+    }
+  }
 
   void addTypeSubstitution(Type type, GenericSignature sig) {
     type = dropProtocolsFromAssociatedTypes(type, sig);
@@ -186,7 +197,7 @@ public:
                                              Type GlobalActorBound,
                                              ModuleDecl *Module);
 
-  std::string mangleDistributedThunk(const FuncDecl *thunk);
+  std::string mangleDistributedThunk(const AbstractFunctionDecl *thunk);
 
   /// Mangle a completion handler block implementation function, used for importing ObjC
   /// APIs as async.
@@ -286,7 +297,8 @@ public:
 
   std::string mangleTypeAsContextUSR(const NominalTypeDecl *type);
 
-  std::string mangleAnyDecl(const ValueDecl *Decl, bool prefix);
+  std::string mangleAnyDecl(const ValueDecl *Decl, bool prefix,
+                            bool respectOriginallyDefinedIn = false);
   std::string mangleDeclAsUSR(const ValueDecl *Decl, StringRef USRPrefix);
 
   std::string mangleAccessorEntityAsUSR(AccessorKind kind,

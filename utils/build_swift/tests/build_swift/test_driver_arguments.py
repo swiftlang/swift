@@ -278,7 +278,7 @@ class TestDriverArgumentParserMeta(type):
                 [option.option_string])
             # The argument should never show up in the namespace
             self.assertFalse(hasattr(namespace, option.dest))
-            # It should instead be forwareded to unkown_args
+            # It should instead be forwareded to unknown_args
             self.assertEqual(unknown_args, [option.option_string])
 
         return test

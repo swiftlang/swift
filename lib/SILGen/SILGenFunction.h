@@ -756,7 +756,8 @@ public:
                            SILDeclRef witness,
                            SubstitutionMap witnessSubs,
                            IsFreeFunctionWitness_t isFree,
-                           bool isSelfConformance);
+                           bool isSelfConformance,
+                           Optional<ActorIsolation> enterIsolation);
 
   /// Generates subscript arguments for keypath. This function handles lowering
   /// of all index expressions including default arguments.
@@ -1476,7 +1477,8 @@ public:
   ManagedValue emitAddressorAccessor(
       SILLocation loc, SILDeclRef addressor, SubstitutionMap substitutions,
       ArgumentSource &&optionalSelfValue, bool isSuper,
-      bool isDirectAccessorUse, PreparedArguments &&optionalSubscripts,
+      bool isDirectAccessorUse,
+      PreparedArguments &&optionalSubscripts,
       SILType addressType, bool isOnSelfParameter);
 
   CleanupHandle emitCoroutineAccessor(SILLocation loc, SILDeclRef accessor,
@@ -1678,7 +1680,6 @@ public:
                                         ConcreteDeclRef defaultArgsOwner,
                                         unsigned destIndex,
                                         CanType resultType,
-                                        AbstractionPattern origResultType,
                                         SGFContext C = SGFContext());
 
   RValue emitApplyOfStoredPropertyInitializer(

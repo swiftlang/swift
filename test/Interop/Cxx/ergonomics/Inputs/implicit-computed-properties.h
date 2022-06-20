@@ -191,4 +191,22 @@ public:
   void setValue(int i);
 };
 
+struct SnakeCaseGetterSetter {
+  int value = 42;
+  int get_foo() const { return value; };
+  void set_foo(int v) { value = v; };
+};
+
+struct SnakeCaseUTF8Str {
+  int value = 42;
+  int get_utf8_string() const { return value; };
+  void set_utf8_string(int v) { value = v; };
+};
+
+struct SnakeCaseTrailing {
+  int value = 42;
+  int get_x_() const { return value; };
+  void set_x_(int v) { value = v; } ;
+};
+
 #endif // SWIFT_IMPLICIT_COMPUTED_PROPERTIES_H

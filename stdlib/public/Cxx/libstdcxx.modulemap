@@ -20,4 +20,13 @@ module std {
   header "libstdcxx.h"
   requires cplusplus
   export *
+
+  /// C compatibility headers.
+  module compat {
+    module cassert {
+      header "cassert"
+      requires cplusplus
+      export *
+    }
+  }
 }

@@ -1552,15 +1552,16 @@ void ConstraintSystem::solveForCodeCompletion(
 
 bool ConstraintSystem::solveForCodeCompletion(
     SolutionApplicationTarget &target, SmallVectorImpl<Solution> &solutions) {
-  auto *expr = target.getAsExpr();
-  // Tell the constraint system what the contextual type is.
-  setContextualType(expr, target.getExprContextualTypeLoc(),
-                    target.getExprContextualTypePurpose());
+  if (auto *expr = target.getAsExpr()) {
+    // Tell the constraint system what the contextual type is.
+    setContextualType(expr, target.getExprContextualTypeLoc(),
+                      target.getExprContextualTypePurpose());
 
-  // Set up the expression type checker timer.
-  Timer.emplace(expr, *this);
+    // Set up the expression type checker timer.
+    Timer.emplace(expr, *this);
 
-  shrink(expr);
+    shrink(expr);
+  }
 
   if (isDebugMode()) {
     auto &log = llvm::errs();

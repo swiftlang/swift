@@ -13,6 +13,7 @@
 #include "swift/PrintAsClang/PrintAsClang.h"
 
 #include "ModuleContentsWriter.h"
+#include "SwiftToClangInteropContext.h"
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Module.h"
@@ -48,6 +49,18 @@ static void emitObjCConditional(raw_ostream &out,
     nonObjCCase();
   }
   out << "#endif\n";
+}
+
+static void writePtrauthPrologue(raw_ostream &os) {
+  emitCxxConditional(os, [&]() {
+    os << "#if __has_include(<ptrauth.h>)\n";
+    os << "# include <ptrauth.h>\n";
+    os << "#else\n";
+    os << "# ifndef __ptrauth_swift_value_witness_function_pointer\n";
+    os << "#  define __ptrauth_swift_value_witness_function_pointer(x)\n";
+    os << "# endif\n";
+    os << "#endif\n";
+  });
 }
 
 static void writePrologue(raw_ostream &out, ASTContext &ctx,
@@ -88,13 +101,18 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
       [&] {
         out << "#include <cstdint>\n"
                "#include <cstddef>\n"
-               "#include <cstdbool>\n";
+               "#include <cstdbool>\n"
+               "#include <cstring>\n";
+        out << "#include <stdlib.h>\n";
+        out << "#if defined(_WIN32)\n#include <malloc.h>\n#endif\n";
       },
       [&] {
         out << "#include <stdint.h>\n"
                "#include <stddef.h>\n"
-               "#include <stdbool.h>\n";
+               "#include <stdbool.h>\n"
+               "#include <string.h>\n";
       });
+  writePtrauthPrologue(out);
   out << "\n"
          "#if !defined(SWIFT_TYPEDEFS)\n"
          "# define SWIFT_TYPEDEFS 1\n"
@@ -300,6 +318,8 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
     out << "#endif\n";
   };
   emitMacro("SWIFT_CALL", "__attribute__((swiftcall))");
+  emitMacro("SWIFT_INDIRECT_RESULT", "__attribute__((swift_indirect_result))");
+  emitMacro("SWIFT_CONTEXT", "__attribute__((swift_context))");
   // SWIFT_NOEXCEPT applies 'noexcept' in C++ mode only.
   emitCxxConditional(
       out, [&] { emitMacro("SWIFT_NOEXCEPT", "noexcept"); },
@@ -458,23 +478,28 @@ static std::string computeMacroGuard(const ModuleDecl *M) {
   return (llvm::Twine(M->getNameStr().upper()) + "_SWIFT_H").str();
 }
 
-static std::string getModuleContentsCxxString(ModuleDecl &M) {
+static std::string
+getModuleContentsCxxString(ModuleDecl &M,
+                           SwiftToClangInteropContext &interopContext) {
   SmallPtrSet<ImportModuleTy, 8> imports;
   std::string moduleContentsBuf;
   llvm::raw_string_ostream moduleContents{moduleContentsBuf};
-  printModuleContentsAsCxx(moduleContents, imports, M);
+  printModuleContentsAsCxx(moduleContents, imports, M, interopContext);
   return moduleContents.str();
 }
 
 bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
                                StringRef bridgingHeader,
-                               bool ExposePublicDeclsInClangHeader) {
+                               bool ExposePublicDeclsInClangHeader,
+                               const IRGenOptions &irGenOpts) {
   llvm::PrettyStackTraceString trace("While generating Clang header");
+
+  SwiftToClangInteropContext interopContext(*M, irGenOpts);
 
   SmallPtrSet<ImportModuleTy, 8> imports;
   std::string objcModuleContentsBuf;
   llvm::raw_string_ostream objcModuleContents{objcModuleContentsBuf};
-  printModuleContentsAsObjC(objcModuleContents, imports, *M);
+  printModuleContentsAsObjC(objcModuleContents, imports, *M, interopContext);
   writePrologue(os, M->getASTContext(), computeMacroGuard(M));
   emitObjCConditional(os,
                       [&] { writeImports(os, imports, *M, bridgingHeader); });
@@ -483,7 +508,7 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
   emitCxxConditional(os, [&] {
     // FIXME: Expose Swift with @expose by default.
     if (ExposePublicDeclsInClangHeader) {
-      os << getModuleContentsCxxString(*M);
+      os << getModuleContentsCxxString(*M, interopContext);
     }
   });
   writeEpilogue(os);

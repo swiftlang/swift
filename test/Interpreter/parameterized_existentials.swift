@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-parameterized-existential-types -Xfrontend -disable-availability-checking)
+// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking)
 // REQUIRES: executable_test
 
 // This test requires the new existential shape metadata accessors which are 
@@ -43,4 +43,11 @@ ParameterizedProtocolsTestSuite.test("metadataEquality") {
   expectEqual(typeOne, typeTwo)
 }
 
+ParameterizedProtocolsTestSuite.test("casting") {
+  let a = GenericHolder(value: 5) as any Holder<Int>
+  let b = GenericHolder(value: 5) as! any Holder<Int>
+  expectEqual(a.value, b.value)
+}
+
 runAllTests()
+

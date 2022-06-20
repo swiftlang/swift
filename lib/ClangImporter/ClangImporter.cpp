@@ -52,6 +52,7 @@
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Basic/Version.h"
 #include "clang/CodeGen/ObjectFilePCHContainerOperations.h"
+#include "clang/Driver/Driver.h"
 #include "clang/Frontend/FrontendActions.h"
 #include "clang/Frontend/Utils.h"
 #include "clang/Index/IndexingAction.h"
@@ -71,9 +72,11 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Memory.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
 #include <algorithm>
+#include <string>
 #include <memory>
 
 using namespace swift;
@@ -84,6 +87,17 @@ using clang::CompilerInstance;
 using clang::CompilerInvocation;
 
 #pragma mark Internal data structures
+
+namespace {
+static std::string getOperatorNameForToken(std::string OperatorToken) {
+#define OVERLOADED_OPERATOR(Name, Spelling, Token, Unary, Binary, MemberOnly)  \
+  if (OperatorToken == Spelling) {                                             \
+    return #Name;                                                              \
+  };
+#include "clang/Basic/OperatorKinds.def"
+  return "None";
+}
+} // namespace
 
 namespace {
   class HeaderImportCallbacks : public clang::PPCallbacks {
@@ -649,9 +663,15 @@ importer::getNormalInvocationArguments(
     // declarations.
     auto V = version::Version::getCurrentCompilerVersion();
     if (!V.empty()) {
+      // Note: Prior to Swift 5.7, the "Y" version component was omitted and the
+      // "X" component resided in its digits.
       invocationArgStrs.insert(invocationArgStrs.end(), {
         V.preprocessorDefinition("__SWIFT_COMPILER_VERSION",
-                                 {1000000000, /*ignored*/ 0, 1000000, 1000, 1}),
+                                 {1000000000000,   // X
+                                     1000000000,   // Y
+                                        1000000,   // Z
+                                           1000,   // a
+                                              1}), // b
       });
     }
   } else {
@@ -692,14 +712,6 @@ importer::getNormalInvocationArguments(
       invocationArgStrs.push_back((Twine("-fmodule-map-file=") + *path).str());
     } else {
       // FIXME: Emit a warning of some kind.
-    }
-
-    if (EnableCXXInterop) {
-      if (auto path =
-              getLibStdCxxModuleMapPath(searchPathOpts, triple, buffer)) {
-        invocationArgStrs.push_back(
-            (Twine("-fmodule-map-file=") + *path).str());
-      }
     }
   }
 
@@ -868,6 +880,99 @@ importer::addCommonInvocationArguments(
   for (auto extraArg : importerOpts.ExtraArgs) {
     invocationArgStrs.push_back(extraArg);
   }
+}
+
+/// On Linux, some platform libraries (glibc, libstdc++) are not modularized.
+/// We inject modulemaps for those libraries into their include directories
+/// to allow using them from Swift.
+static SmallVector<std::pair<std::string, std::string>, 16>
+getClangInvocationFileMapping(ASTContext &ctx) {
+  using Path = SmallString<128>;
+
+  const llvm::Triple &triple = ctx.LangOpts.Target;
+  // We currently only need this when building for Linux.
+  if (!triple.isOSLinux())
+    return {};
+  // Android uses libc++.
+  if (triple.isAndroid())
+    return {};
+
+  // Extract the libstdc++ installation path from Clang driver.
+  auto clangDiags = clang::CompilerInstance::createDiagnostics(
+      new clang::DiagnosticOptions());
+  clang::driver::Driver clangDriver(ctx.ClangImporterOpts.clangPath,
+                                    triple.str(), *clangDiags);
+  // Flags passed to Swift with `-Xcc` might affect include paths.
+  unsigned unused1, unused2;
+  std::vector<const char *> clangArgs;
+  for (const auto &each : ctx.ClangImporterOpts.ExtraArgs) {
+    clangArgs.push_back(each.c_str());
+  }
+  llvm::opt::InputArgList clangDriverArgs =
+      clangDriver.getOpts().ParseArgs(clangArgs, unused1, unused2);
+  // If an SDK path was explicitly passed to Swift, make sure to pass it to
+  // Clang driver as well. It affects the resulting include paths.
+  auto sdkPath = ctx.SearchPathOpts.getSDKPath();
+  if (!sdkPath.empty()) {
+    unsigned argIndex = clangDriverArgs.MakeIndex("--sysroot", sdkPath);
+    clangDriverArgs.append(new llvm::opt::Arg(
+        clangDriver.getOpts().getOption(clang::driver::options::OPT__sysroot),
+        sdkPath, argIndex));
+  }
+  auto cxxStdlibDirs =
+      clangDriver.getLibStdCxxIncludePaths(clangDriverArgs, triple);
+  if (cxxStdlibDirs.empty()) {
+    ctx.Diags.diagnose(SourceLoc(), diag::libstdcxx_not_found, triple.str());
+    return {};
+  }
+  Path cxxStdlibDir(cxxStdlibDirs.front());
+  // VFS does not allow mapping paths that contain `../` or `./`.
+  llvm::sys::path::remove_dots(cxxStdlibDir, /*remove_dot_dot=*/true);
+
+  // Currently only a modulemap for libstdc++ is injected.
+  if (!ctx.LangOpts.EnableCXXInterop)
+    return {};
+
+  Path actualModuleMapPath;
+  Path buffer;
+  if (auto path = getLibStdCxxModuleMapPath(ctx.SearchPathOpts, triple, buffer))
+    actualModuleMapPath = path.getValue();
+  else
+    return {};
+
+  // Only inject the module map if it actually exists. It may not, for example
+  // if `swiftc -target x86_64-unknown-linux-gnu -emit-ir` is invoked using
+  // a Swift compiler not built for Linux targets.
+  if (!llvm::sys::fs::exists(actualModuleMapPath))
+    // FIXME: emit a warning of some kind.
+    return {};
+
+  // TODO: remove the libstdcxx.h header and reference all libstdc++ headers
+  // directly from the modulemap.
+  Path actualHeaderPath = actualModuleMapPath;
+  llvm::sys::path::remove_filename(actualHeaderPath);
+  llvm::sys::path::append(actualHeaderPath, "libstdcxx.h");
+
+  // Inject a modulemap into VFS for the libstdc++ directory.
+  // Only inject the module map if the module does not already exist at
+  // {sysroot}/usr/include/module.{map,modulemap}.
+  Path injectedModuleMapLegacyPath(cxxStdlibDir);
+  llvm::sys::path::append(injectedModuleMapLegacyPath, "module.map");
+  if (llvm::sys::fs::exists(injectedModuleMapLegacyPath))
+    return {};
+
+  Path injectedModuleMapPath(cxxStdlibDir);
+  llvm::sys::path::append(injectedModuleMapPath, "module.modulemap");
+  if (llvm::sys::fs::exists(injectedModuleMapPath))
+    return {};
+
+  Path injectedHeaderPath(cxxStdlibDir);
+  llvm::sys::path::append(injectedHeaderPath, "libstdcxx.h");
+
+  return {
+      {std::string(injectedModuleMapPath), std::string(actualModuleMapPath)},
+      {std::string(injectedHeaderPath), std::string(actualHeaderPath)},
+  };
 }
 
 bool ClangImporter::canReadPCH(StringRef PCHFilename) {
@@ -1122,9 +1227,10 @@ ClangImporter::create(ASTContext &ctx,
     }
   }
 
+  auto fileMapping = getClangInvocationFileMapping(ctx);
   // Wrap Swift's FS to allow Clang to override the working directory
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS =
-      llvm::vfs::RedirectingFileSystem::create({}, true,
+      llvm::vfs::RedirectingFileSystem::create(fileMapping, true,
                                                *ctx.SourceMgr.getFileSystem());
 
   // Create a new Clang compiler invocation.
@@ -2658,6 +2764,11 @@ ClangImporter::Implementation::lookupTypedef(clang::DeclarationName name) {
 
 static bool isDeclaredInModule(const ClangModuleUnit *ModuleFilter,
                                const Decl *VD) {
+  // Sometimes imported decls get put into the clang header module. If we
+  // found one of these decls, don't filter it out.
+  if (VD->getModuleContext()->getName().str() == CLANG_HEADER_MODULE_NAME) {
+    return true;
+  }
   auto ContainingUnit = VD->getDeclContext()->getModuleScopeContext();
   return ModuleFilter == ContainingUnit;
 }
@@ -2715,7 +2826,6 @@ static bool isVisibleFromModule(const ClangModuleUnit *ModuleFilter,
 
   const clang::Decl *D = ClangNode.castAsDecl();
   auto &ClangASTContext = ModuleFilter->getClangASTContext();
-
   // We don't handle Clang submodules; pop everything up to the top-level
   // module.
   auto OwningClangModule = getClangTopLevelOwningModule(ClangNode,
@@ -2788,7 +2898,7 @@ public:
 
   void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
                  DynamicLookupInfo dynamicLookupInfo) override {
-    if (isVisibleFromModule(ModuleFilter, VD))
+    if (!VD->hasClangNode() || isVisibleFromModule(ModuleFilter, VD))
       NextConsumer.foundDecl(VD, Reason, dynamicLookupInfo);
   }
 };
@@ -2806,11 +2916,9 @@ public:
 
   void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
                  DynamicLookupInfo dynamicLookupInfo) override {
-    if (isDeclaredInModule(ModuleFilter, VD) ||
-        // Sometimes imported decls get put into the clang header module. If we
-        // found one of these decls, don't filter it out.
-        VD->getModuleContext()->getName().str() == CLANG_HEADER_MODULE_NAME)
+    if (isDeclaredInModule(ModuleFilter, VD)) {
       NextConsumer.foundDecl(VD, Reason, dynamicLookupInfo);
+    }
   }
 };
 
@@ -3461,11 +3569,16 @@ void ClangImporter::loadExtensions(NominalTypeDecl *nominal,
 }
 
 void ClangImporter::loadObjCMethods(
-       ClassDecl *classDecl,
+       NominalTypeDecl *typeDecl,
        ObjCSelector selector,
        bool isInstanceMethod,
        unsigned previousGeneration,
        llvm::TinyPtrVector<AbstractFunctionDecl *> &methods) {
+  // TODO: We don't currently need to load methods from imported ObjC protocols.
+  auto classDecl = dyn_cast<ClassDecl>(typeDecl);
+  if (!classDecl)
+    return;
+
   const auto *objcClass =
       dyn_cast_or_null<clang::ObjCInterfaceDecl>(classDecl->getClangDecl());
   if (!objcClass)
@@ -4024,13 +4137,12 @@ bool ClangImporter::Implementation::forEachLookupTable(
 bool ClangImporter::Implementation::lookupValue(SwiftLookupTable &table,
                                                 DeclName name,
                                                 VisibleDeclConsumer &consumer) {
+
   auto &clangCtx = getClangASTContext();
   auto clangTU = clangCtx.getTranslationUnitDecl();
 
   bool declFound = false;
 
-  // For operators we have to look up static member functions in addition to the
-  // top-level function lookup below.
   if (name.isOperator()) {
     for (auto entry : table.lookupMemberOperators(name.getBaseName())) {
       if (isVisibleClangEntry(entry)) {
@@ -4038,6 +4150,41 @@ bool ClangImporter::Implementation::lookupValue(SwiftLookupTable &table,
                 importDeclReal(entry->getMostRecentDecl(), CurrentVersion))) {
           consumer.foundDecl(decl, DeclVisibilityKind::VisibleAtTopLevel);
           declFound = true;
+        }
+      }
+    }
+
+    // If CXXInterop is enabled we need to check the modified operator name as
+    // well
+    if (SwiftContext.LangOpts.EnableCXXInterop) {
+      auto funcBaseName = DeclBaseName(SwiftContext.getIdentifier(
+          "__operator" + getOperatorNameForToken(
+                             name.getBaseName().getIdentifier().str().str())));
+      for (auto entry : table.lookupMemberOperators(funcBaseName)) {
+        if (isVisibleClangEntry(entry)) {
+          if (auto func = dyn_cast_or_null<ValueDecl>(
+                  importDeclReal(entry->getMostRecentDecl(), CurrentVersion))) {
+            // `func` is not an operator, it is a regular function which has a
+            // name that starts with `__operator`. We were asked for a
+            // corresponding synthesized Swift operator, so let's retrieve it.
+
+            // The synthesized Swift operator was added as an alternative decl
+            // for `func`.
+            auto alternateDecls = getAlternateDecls(func);
+            // Did we actually synthesize an operator for `func`?
+            if (alternateDecls.empty())
+              continue;
+            // If we did, then we should have only synthesized one.
+            assert(alternateDecls.size() == 1 &&
+                   "expected only the synthesized operator as an alternative");
+
+            auto synthesizedOperator = alternateDecls.front();
+            assert(synthesizedOperator->isOperator() &&
+                   "expected the alternative to be a synthesized operator");
+
+            consumer.foundDecl(synthesizedOperator,
+                               DeclVisibilityKind::VisibleAtTopLevel);
+          }
         }
       }
     }
@@ -4784,6 +4931,51 @@ makeBaseClassMemberAccessors(DeclContext *declContext,
   return {getterDecl, setterDecl};
 }
 
+// Clone attributes that have been imported from Clang.
+DeclAttributes cloneImportedAttributes(ValueDecl *decl, ASTContext &context) {
+  auto attrs = DeclAttributes();
+  for (auto attr : decl->getAttrs()) {
+    switch (attr->getKind()) {
+    case DAK_Available: {
+      attrs.add(cast<AvailableAttr>(attr)->clone(context, true));
+      break;
+    }
+    case DAK_Custom: {
+      if (CustomAttr *cAttr = cast<CustomAttr>(attr)) {
+        attrs.add(CustomAttr::create(context, SourceLoc(), cAttr->getTypeExpr(),
+                                     cAttr->getInitContext(), cAttr->getArgs(),
+                                     true));
+      }
+      break;
+    }
+    case DAK_DiscardableResult: {
+      attrs.add(new (context) DiscardableResultAttr(true));
+      break;
+    }
+    case DAK_Effects: {
+      attrs.add(cast<EffectsAttr>(attr)->clone(context));
+      break;
+    }
+    case DAK_Final: {
+      attrs.add(new (context) FinalAttr(true));
+      break;
+    }
+    case DAK_Transparent: {
+      attrs.add(new (context) TransparentAttr(true));
+      break;
+    }
+    case DAK_WarnUnqualifiedAccess: {
+      attrs.add(new (context) WarnUnqualifiedAccessAttr(true));
+      break;
+    }
+    default:
+      break;
+    }
+  }
+
+  return attrs;
+}
+
 ValueDecl *cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
   if (auto fn = dyn_cast<FuncDecl>(decl)) {
     // TODO: function templates are specialized during type checking so to
@@ -4795,11 +4987,14 @@ ValueDecl *cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
          isa<clang::FunctionTemplateDecl>(fn->getClangDecl())))
       return nullptr;
 
+    ASTContext &context = decl->getASTContext();
     auto out = FuncDecl::createImplicit(
-        fn->getASTContext(), fn->getStaticSpelling(), fn->getName(),
+        context, fn->getStaticSpelling(), fn->getName(),
         fn->getNameLoc(), fn->hasAsync(), fn->hasThrows(),
         fn->getGenericParams(), fn->getParameters(),
         fn->getResultInterfaceType(), newContext);
+    auto inheritedAttributes = cloneImportedAttributes(decl, context);
+    out->getAttrs().add(inheritedAttributes);
     out->copyFormalAccessFrom(fn);
     out->setBodySynthesizer(synthesizeBaseClassMethodBody, fn);
     out->setSelfAccessKind(fn->getSelfAccessKind());

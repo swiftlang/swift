@@ -869,10 +869,23 @@ static void analyzeRenameScope(ValueDecl *VD, Optional<RenameRefInfo> RefInfo,
   }
 
   auto *Scope = VD->getDeclContext();
-  // If the context is a top-level code decl, there may be other sibling
-  // decls that the renamed symbol is visible from
-  if (isa<TopLevelCodeDecl>(Scope))
+  // There may be sibling decls that the renamed symbol is visible from.
+  switch (Scope->getContextKind()) {
+  case DeclContextKind::GenericTypeDecl:
+  case DeclContextKind::ExtensionDecl:
+  case DeclContextKind::TopLevelCodeDecl:
+  case DeclContextKind::SubscriptDecl:
+  case DeclContextKind::EnumElementDecl:
+  case DeclContextKind::AbstractFunctionDecl:
     Scope = Scope->getParent();
+    break;
+  case DeclContextKind::AbstractClosureExpr:
+  case DeclContextKind::Initializer:
+  case DeclContextKind::SerializedLocal:
+  case DeclContextKind::Module:
+  case DeclContextKind::FileUnit:
+    break;
+  }
 
   Scopes.push_back(Scope);
 }

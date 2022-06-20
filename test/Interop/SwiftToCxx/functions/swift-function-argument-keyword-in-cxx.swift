@@ -7,5 +7,5 @@
 // CHECK: inline void testKeywordArgument(swift::Int register_) noexcept
 // CHECK-NEXT: return _impl::$s9Functions19testKeywordArgument8registerySi_tF(register_);
 
-func testKeywordArgument(register: Int) {
+public func testKeywordArgument(register: Int) {
 }

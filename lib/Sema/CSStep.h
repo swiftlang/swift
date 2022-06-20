@@ -962,8 +962,11 @@ public:
 
     // Restore best score only if conjunction fails because
     // successful outcome should keep a score set by `restoreOuterState`.
-    if (HadFailure)
-      restoreOriginalScores();
+    if (HadFailure) {
+      auto solutionScore = Score();
+      restoreBestScore();
+      restoreCurrentScore(solutionScore);
+    }
 
     if (OuterTimeRemaining) {
       auto anchor = OuterTimeRemaining->first;
@@ -1015,16 +1018,19 @@ protected:
 
 private:
   /// Restore best and current scores as they were before conjunction.
-  void restoreOriginalScores() const {
-    CS.solverState->BestScore = BestScore;
+  void restoreCurrentScore(const Score &solutionScore) const {
     CS.CurrentScore = CurrentScore;
+    CS.increaseScore(SK_Fix, solutionScore.Data[SK_Fix]);
+    CS.increaseScore(SK_Hole, solutionScore.Data[SK_Hole]);
   }
+
+  void restoreBestScore() const { CS.solverState->BestScore = BestScore; }
 
   // Restore constraint system state before conjunction.
   //
   // Note that this doesn't include conjunction constraint
   // itself because we don't want to re-solve it.
-  void restoreOuterState() const;
+  void restoreOuterState(const Score &solutionScore) const;
 };
 
 } // end namespace constraints

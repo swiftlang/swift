@@ -169,11 +169,19 @@ enum IsInfiniteType_t : bool {
   IsInfiniteType = true,
 };
 
+/// Does this type contain a move only type that affects type lowering?
+enum IsMoveOnly_t : bool {
+  IsNotMoveOnly = false,
+  IsMoveOnly = true,
+};
+
 /// Extended type information used by SIL.
 class TypeLowering {
 public:
   class RecursiveProperties {
     // These are chosen so that bitwise-or merges the flags properly.
+    //
+    // clang-format off
     enum : unsigned {
       NonTrivialFlag             = 1 << 0,
       NonFixedABIFlag            = 1 << 1,
@@ -182,7 +190,9 @@ public:
       TypeExpansionSensitiveFlag = 1 << 4,
       InfiniteFlag               = 1 << 5,
       HasRawPointerFlag          = 1 << 6,
+      MoveOnlyFlag               = 1 << 7,
     };
+    // clang-format on
 
     uint8_t Flags;
   public:
@@ -195,13 +205,15 @@ public:
         IsAddressOnly_t isAddressOnly, IsResilient_t isResilient,
         IsTypeExpansionSensitive_t isTypeExpansionSensitive =
             IsNotTypeExpansionSensitive,
-        HasRawPointer_t hasRawPointer = DoesNotHaveRawPointer)
+        HasRawPointer_t hasRawPointer = DoesNotHaveRawPointer,
+        IsMoveOnly_t isMoveOnly = IsNotMoveOnly)
         : Flags((isTrivial ? 0U : NonTrivialFlag) |
                 (isFixedABI ? 0U : NonFixedABIFlag) |
                 (isAddressOnly ? AddressOnlyFlag : 0U) |
                 (isResilient ? ResilientFlag : 0U) |
                 (isTypeExpansionSensitive ? TypeExpansionSensitiveFlag : 0U) |
-                (hasRawPointer ? HasRawPointerFlag : 0U)) {}
+                (hasRawPointer ? HasRawPointerFlag : 0U) |
+                (isMoveOnly ? MoveOnlyFlag : 0U)) {}
 
     constexpr bool operator==(RecursiveProperties p) const {
       return Flags == p.Flags;
@@ -228,6 +240,35 @@ public:
       return {IsTrivial, IsFixedABI, IsNotAddressOnly, IsResilient};
     }
 
+    static constexpr RecursiveProperties forMoveOnlyReference() {
+      return {IsNotTrivial,
+              IsFixedABI,
+              IsNotAddressOnly,
+              IsNotResilient,
+              IsNotTypeExpansionSensitive,
+              DoesNotHaveRawPointer,
+              IsMoveOnly};
+    }
+
+    static constexpr RecursiveProperties forMoveOnlyOpaque() {
+      return {IsNotTrivial,
+              IsNotFixedABI,
+              IsAddressOnly,
+              IsNotResilient,
+              IsNotTypeExpansionSensitive,
+              DoesNotHaveRawPointer,
+              IsMoveOnly};
+    }
+
+    static constexpr RecursiveProperties forMoveOnlyResilient() {
+      return {IsTrivial,
+              IsFixedABI,
+              IsNotAddressOnly,
+              IsResilient,
+              IsNotTypeExpansionSensitive,
+              DoesNotHaveRawPointer,
+              IsMoveOnly};
+    }
 
     void addSubobject(RecursiveProperties other) {
       Flags |= other.Flags;
@@ -255,6 +296,9 @@ public:
     IsInfiniteType_t isInfinite() const {
       return IsInfiniteType_t((Flags & InfiniteFlag) != 0);
     }
+    IsMoveOnly_t isMoveOnlyWrapped() const {
+      return IsMoveOnly_t((Flags & MoveOnlyFlag) != 0);
+    }
 
     void setNonTrivial() { Flags |= NonTrivialFlag; }
     void setNonFixedABI() { Flags |= NonFixedABIFlag; }
@@ -265,6 +309,7 @@ public:
               (isTypeExpansionSensitive ? TypeExpansionSensitiveFlag : 0);
     }
     void setInfinite() { Flags |= InfiniteFlag; }
+    void setMoveOnly() { Flags |= MoveOnlyFlag; }
   };
 
 private:
@@ -776,6 +821,8 @@ class TypeConverter {
   
   llvm::DenseMap<AbstractClosureExpr *, Optional<AbstractionPattern>>
     ClosureAbstractionPatterns;
+  llvm::DenseMap<SILDeclRef, TypeExpansionContext>
+    CaptureTypeExpansionContexts;
 
   CanAnyFunctionType makeConstantInterfaceType(SILDeclRef constant);
   
@@ -1180,6 +1227,7 @@ public:
   /// the abstraction pattern is queried using this function. Once the
   /// abstraction pattern has been asked for, it may not be changed.
   Optional<AbstractionPattern> getConstantAbstractionPattern(SILDeclRef constant);
+  TypeExpansionContext getCaptureTypeExpansionContext(SILDeclRef constant);
   
   /// Set the preferred abstraction pattern for a closure.
   ///
@@ -1189,6 +1237,8 @@ public:
   void setAbstractionPattern(AbstractClosureExpr *closure,
                              AbstractionPattern pattern);
   
+  void setCaptureTypeExpansionContext(SILDeclRef constant,
+                                      SILModule &M);
 private:
   CanType computeLoweredRValueType(TypeExpansionContext context,
                                    AbstractionPattern origType,

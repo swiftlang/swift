@@ -1175,7 +1175,6 @@ bool CompilerInstance::forEachFileToTypeCheck(
       }
       if (fn(*SF))
         return true;
-      ;
     }
   } else {
     for (auto *SF : getPrimarySourceFiles()) {

@@ -42,7 +42,14 @@ public struct Type : CustomStringConvertible, CustomReflectable {
   public func getNominalFields(in function: Function) -> NominalFieldsArray {
     NominalFieldsArray(type: self, function: function)
   }
-  
+
+  public func getIndexOfEnumCase(withName name: String) -> Int? {
+    let idx = name.withBridgedStringRef {
+      SILType_getCaseIdxOfEnumType(bridged, $0)
+    }
+    return idx >= 0 ? idx : nil
+  }
+
   public var description: String { SILType_debugDescription(bridged).takeString() }
 
   public var customMirror: Mirror { Mirror(self, children: []) }

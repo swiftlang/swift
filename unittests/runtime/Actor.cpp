@@ -99,7 +99,7 @@ static SWIFT_CC(swift)
 void destroyTestActor(SWIFT_CONTEXT HeapObject *_object) {
   delete static_cast<TestActor*>(_object);
 }
-static const FullMetadata<ClassMetadata> TestActorMetadata = {
+static FullMetadata<ClassMetadata> TestActorMetadata = {
   { { &destroyTestActor }, { &VALUE_WITNESS_SYM(Bo) } },
   { { nullptr }, ClassFlags::UsesSwiftRefcounting, 0, 0, 0, 0, 0, 0 }
 };
@@ -108,6 +108,15 @@ TestActor::TestActor() : DefaultActor(&TestActorMetadata) {
 }
 
 static TestActor *createActor() {
+  static ClassDescriptor *descriptor;
+  if (!descriptor) {
+    // Install a fake descriptor pointer into the actor metadata so that
+    // swift_getTypeName will tolerate it. Otherwise we crash when trying to
+    // signpost actor creation.
+    descriptor =
+        reinterpret_cast<ClassDescriptor *>(calloc(sizeof(*descriptor), 1));
+    TestActorMetadata.setDescription(descriptor);
+  }
   return new TestActor();
 }
 

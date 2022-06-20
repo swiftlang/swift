@@ -76,8 +76,7 @@ DECL_NODES = [
     Node('FunctionSignature', kind='Syntax',
          children=[
              Child('Input', kind='ParameterClause'),
-             Child('AsyncOrReasyncKeyword', kind='IdentifierToken',
-                   classification='Keyword',
+             Child('AsyncOrReasyncKeyword', kind='ContextualKeywordToken',
                    text_choices=['async', 'reasync'], is_optional=True),
              Child('ThrowsOrRethrowsKeyword', kind='Token',
                    is_optional=True,
@@ -538,8 +537,7 @@ DECL_NODES = [
                       '_read', '_modify'
                    ]),
              Child('Parameter', kind='AccessorParameter', is_optional=True),
-             Child('AsyncKeyword', kind='IdentifierToken',
-                   classification='Keyword',
+             Child('AsyncKeyword', kind='ContextualKeywordToken',
                    text_choices=['async'], is_optional=True),
              Child('ThrowsKeyword', kind='Token',
                    is_optional=True,

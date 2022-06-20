@@ -16,14 +16,15 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Runtime/Casting.h"
-#include "../SwiftShims/RuntimeShims.h"
-#include "../SwiftShims/GlobalObjects.h"
 #include "../CompatibilityOverride/CompatibilityOverride.h"
+#include "../SwiftShims/GlobalObjects.h"
+#include "../SwiftShims/RuntimeShims.h"
 #include "ErrorObject.h"
 #include "ExistentialMetadataImpl.h"
 #include "Private.h"
 #include "SwiftHashableSupport.h"
 #include "swift/Basic/Lazy.h"
+#include "swift/Basic/Unreachable.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Debug.h"
@@ -31,13 +32,7 @@
 #include "swift/Runtime/ExistentialContainer.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
-#if defined(__wasi__)
-# define SWIFT_CASTING_SUPPORTS_MUTEX 0
-#else
-# define SWIFT_CASTING_SUPPORTS_MUTEX 1
-# include "swift/Runtime/Mutex.h"
-#endif
-#include "swift/Basic/Unreachable.h"
+#include "swift/Threading/Mutex.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerIntPair.h"
 #if SWIFT_OBJC_INTEROP
@@ -144,10 +139,8 @@ enum class TypeNameKind {
 
 using TypeNameCacheKey = llvm::PointerIntPair<const Metadata *, 2, TypeNameKind>;
 
-#if SWIFT_CASTING_SUPPORTS_MUTEX
-static StaticReadWriteLock TypeNameCacheLock;
-static StaticReadWriteLock MangledToPrettyFunctionNameCacheLock;
-#endif
+static LazyMutex TypeNameCacheLock;
+static LazyMutex MangledToPrettyFunctionNameCacheLock;
 
 /// Cache containing rendered names for Metadata.
 /// Access MUST be protected using `TypeNameCacheLock`.
@@ -166,9 +159,7 @@ swift::swift_getTypeName(const Metadata *type, bool qualified) {
 
   // Attempt read-only lookup of cache entry.
   {
-    #if SWIFT_CASTING_SUPPORTS_MUTEX
-    StaticScopedReadLock guard(TypeNameCacheLock);
-    #endif
+    LazyMutex::ScopedLock guard(TypeNameCacheLock);
 
     auto found = cache.find(key);
     if (found != cache.end()) {
@@ -179,9 +170,7 @@ swift::swift_getTypeName(const Metadata *type, bool qualified) {
 
   // Read-only lookup failed to find item, we may need to create it.
   {
-    #if SWIFT_CASTING_SUPPORTS_MUTEX
-    StaticScopedWriteLock guard(TypeNameCacheLock);
-    #endif
+    LazyMutex::ScopedLock guard(TypeNameCacheLock);
 
     // Do lookup again just to make sure it wasn't created by another
     // thread before we acquired the write lock.
@@ -212,9 +201,7 @@ swift::swift_getMangledTypeName(const Metadata *type) {
 
   // Attempt read-only lookup of cache entry.
   {
-    #if SWIFT_CASTING_SUPPORTS_MUTEX
-    StaticScopedReadLock guard(TypeNameCacheLock);
-    #endif
+    LazyMutex::ScopedLock guard(TypeNameCacheLock);
 
     auto found = cache.find(key);
     if (found != cache.end()) {
@@ -225,9 +212,7 @@ swift::swift_getMangledTypeName(const Metadata *type) {
 
   // Read-only cache lookup failed, we may need to create it.
   {
-    #if SWIFT_CASTING_SUPPORTS_MUTEX
-    StaticScopedWriteLock guard(TypeNameCacheLock);
-    #endif
+    LazyMutex::ScopedLock guard(TypeNameCacheLock);
 
     // Do lookup again just to make sure it wasn't created by another
     // thread before we acquired the write lock.
@@ -270,9 +255,7 @@ swift::swift_getFunctionFullNameFromMangledName(
   auto &cache = MangledToPrettyFunctionNameCache.get();
   // Attempt read-only lookup of cache entry.
   {
-    #if SWIFT_CASTING_SUPPORTS_MUTEX
-    StaticScopedReadLock guard(MangledToPrettyFunctionNameCacheLock);
-    #endif
+    LazyMutex::ScopedLock guard(MangledToPrettyFunctionNameCacheLock);
 
     auto found = cache.find(mangledName);
     if (found != cache.end()) {
@@ -387,9 +370,7 @@ swift::swift_getFunctionFullNameFromMangledName(
   result[size] = 0; // 0-terminated string
 
   {
-    #if SWIFT_CASTING_SUPPORTS_MUTEX
-    StaticScopedWriteLock guard(MangledToPrettyFunctionNameCacheLock);
-    #endif
+    LazyMutex::ScopedLock guard(MangledToPrettyFunctionNameCacheLock);
 
     cache.insert({mangledName, {result, size}});
     return TypeNamePair{result, size};
@@ -550,6 +531,7 @@ bool swift::_conformsToProtocol(const OpaqueValue *value,
     return false;
   }
 
+  case MetadataKind::ForeignReferenceType:
   case MetadataKind::ForeignClass:
 #if SWIFT_OBJC_INTEROP
     if (value)
@@ -630,6 +612,12 @@ findDynamicValueAndType(OpaqueValue *value, const Metadata *type,
     // ObjCClassWrapper/ForeignClass when the type matches.
     outValue = value;
     outType = swift_getObjectType(*reinterpret_cast<HeapObject**>(value));
+    return;
+  }
+
+  case MetadataKind::ForeignReferenceType:  {
+    outValue = value;
+    outType = type;
     return;
   }
 
@@ -800,12 +788,18 @@ swift_dynamicCastUnknownClassImpl(const void *object,
 
   case MetadataKind::ForeignClass: {
 #if SWIFT_OBJC_INTEROP
-    auto targetClassType = static_cast<const ForeignClassMetadata*>(targetType);
+    auto targetClassType = static_cast<const ForeignClassMetadata *>(targetType);
     return swift_dynamicCastForeignClass(object, targetClassType);
 #else
     return nullptr;
 #endif
   }
+
+  // Foreign reference types don't suppport casting.
+  case MetadataKind::ForeignReferenceType: {
+    return nullptr;
+  }
+
 
   case MetadataKind::Existential: {
     return _dynamicCastUnknownClassToExistential(object,
@@ -845,6 +839,11 @@ swift_dynamicCastUnknownClassUnconditionalImpl(const void *object,
 #else
     swift_dynamicCastFailure(_swift_getClass(object), targetType);
 #endif
+  }
+
+  // Foreign reference types don't suppport casting.
+  case MetadataKind::ForeignReferenceType: {
+    return nullptr;
   }
 
   case MetadataKind::Existential: {
@@ -913,6 +912,11 @@ swift_dynamicCastMetatypeImpl(const Metadata *sourceType,
       return nullptr;
     }
 
+    // Foreign reference types don't suppport casting.
+    case MetadataKind::ForeignReferenceType: {
+      return nullptr;
+    }
+
     default:
       return nullptr;
     }
@@ -932,6 +936,9 @@ swift_dynamicCastMetatypeImpl(const Metadata *sourceType,
             (const ClassMetadata*)sourceType,
               (const ClassMetadata*)targetType))
         return origSourceType;
+      return nullptr;
+    // Foreign reference types don't suppport casting.
+    case MetadataKind::ForeignReferenceType:
       return nullptr;
     default:
       return nullptr;
@@ -1017,10 +1024,19 @@ swift_dynamicCastMetatypeUnconditionalImpl(const Metadata *sourceType,
                                             file, line, column);
       // If we returned, then the cast succeeded.
       return origSourceType;
+
+    // Foreign reference types don't suppport casting.
+    case MetadataKind::ForeignReferenceType:
     default:
       swift_dynamicCastFailure(sourceType, targetType);
     }
     break;
+
+
+  // Foreign reference types don't suppport casting.
+  case MetadataKind::ForeignReferenceType: {
+    swift_dynamicCastFailure(sourceType, targetType);
+  }
 
   case MetadataKind::Existential: {
     auto targetTypeAsExistential = static_cast<const ExistentialTypeMetadata *>(targetType);

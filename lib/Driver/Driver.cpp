@@ -223,17 +223,16 @@ static void validateDebugInfoArgs(DiagnosticEngine &diags,
     }
   }
 
-  // Check for any -debug-prefix-map options that aren't of the form
+  // Check for any -*-prefix-map options that aren't of the form
   // 'original=remapped' (either side can be empty, however).
-  for (auto A : args.getAllArgValues(options::OPT_debug_prefix_map))
-    if (A.find('=') == StringRef::npos)
-      diags.diagnose(SourceLoc(), diag::error_invalid_debug_prefix_map, A);
-
-  // Check for any -coverage-prefix-map options that aren't of the form
-  // 'original=remapped' (either side can be empty, however).
-  for (auto A : args.getAllArgValues(options::OPT_coverage_prefix_map))
-    if (A.find('=') == StringRef::npos)
-      diags.diagnose(SourceLoc(), diag::error_invalid_coverage_prefix_map, A);
+  for (const Arg *A : args.filtered(options::OPT_debug_prefix_map,
+                                    options::OPT_coverage_prefix_map,
+                                    options::OPT_file_prefix_map)) {
+    StringRef val = A->getValue();
+    if (val.find('=') == StringRef::npos)
+      diags.diagnose(SourceLoc(), diag::error_opt_invalid_mapping,
+                     A->getOption().getPrefixedName(), val);
+  }
 }
 
 static void validateVerifyIncrementalDependencyArgs(DiagnosticEngine &diags,

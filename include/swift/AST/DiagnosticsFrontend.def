@@ -36,6 +36,10 @@ ERROR(error_unsupported_target_os, none,
 ERROR(error_unsupported_target_arch, none,
       "unsupported target architecture: '%0'", (StringRef))
 
+ERROR(error_experimental_feature_not_available, none,
+      "experimental feature '%0' cannot be enabled in a production compiler",
+      (StringRef))
+
 ERROR(error_unknown_library_level, none,
       "unknown library level '%0', "
       "expected one of 'api', 'spi' or 'other'", (StringRef))
@@ -338,12 +342,9 @@ WARNING(framework_search_path_includes_framework_extension,none,
 ERROR(error_optimization_remark_pattern, none, "%0 in '%1'",
       (StringRef, StringRef))
 
-ERROR(error_invalid_debug_prefix_map, none,
-      "values for '-debug-prefix-map' must be in the format 'original=remapped'"
-      ", but '%0' was provided", (StringRef))
-ERROR(error_invalid_coverage_prefix_map, none,
-      "values for '-coverage-prefix-map' must be in the format "
-      "'original=remapped', but '%0' was provided", (StringRef))
+ERROR(error_opt_invalid_mapping, none,
+      "values for '%0' must be in the format 'original=remapped', but '%1' was "
+      "provided", (StringRef, StringRef))
 
 ERROR(invalid_vfs_overlay_file,none,
       "invalid virtual overlay file '%0'", (StringRef))

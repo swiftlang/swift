@@ -379,7 +379,7 @@ bool swift::isAdditiveArithmeticConformanceDerivationEnabled(SourceFile &SF) {
   auto &ctx = SF.getASTContext();
   // Return true if `AdditiveArithmetic` derived conformances are explicitly
   // enabled.
-  if (ctx.LangOpts.EnableExperimentalAdditiveArithmeticDerivedConformances)
+  if (ctx.LangOpts.hasFeature(Feature::AdditiveArithmeticDerivedConformances))
     return true;
   // Otherwise, return true iff differentiable programming is enabled.
   // Differentiable programming depends on `AdditiveArithmetic` derived
@@ -490,12 +490,13 @@ void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,
                                        /*patternType=*/Type(), options);
 }
 
-bool swift::typeCheckASTNodeAtLoc(DeclContext *DC, SourceLoc TargetLoc) {
-  auto &Ctx = DC->getASTContext();
+bool swift::typeCheckASTNodeAtLoc(TypeCheckASTNodeAtLocContext TypeCheckCtx,
+                                  SourceLoc TargetLoc) {
+  auto &Ctx = TypeCheckCtx.getDeclContext()->getASTContext();
   DiagnosticSuppression suppression(Ctx.Diags);
-  return !evaluateOrDefault(Ctx.evaluator,
-                            TypeCheckASTNodeAtLocRequest{DC, TargetLoc},
-                            true);
+  return !evaluateOrDefault(
+      Ctx.evaluator, TypeCheckASTNodeAtLocRequest{TypeCheckCtx, TargetLoc},
+      true);
 }
 
 bool swift::typeCheckForCodeCompletion(

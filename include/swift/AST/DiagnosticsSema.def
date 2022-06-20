@@ -905,6 +905,8 @@ ERROR(cannot_find_in_scope,none,
 ERROR(cannot_find_in_scope_corrected,none,
       "cannot %select{find|find operator}1 %0 in scope; did you mean '%2'?",
       (DeclNameRef, bool, StringRef))
+ERROR(cannot_find_self_in_scope,none,
+      "cannot find 'self' in scope; did you mean to use it in a type or extension context?", ())
 NOTE(confusable_character,none,
       "%select{identifier|operator}0 '%1' contains possibly confused characters; "
       "did you mean to use '%2'?",
@@ -1406,8 +1408,6 @@ ERROR(transparent_in_protocols_not_supported,none,
 ERROR(transparent_in_classes_not_supported,none,
       "'@_transparent' attribute is not supported on declarations within classes", ())
 
-ERROR(invalid_iboutlet,none,
-      "only instance properties can be declared @IBOutlet", ())
 ERROR(iboutlet_nonobjc_class,none,
       "@IBOutlet property cannot %select{have|be an array of}0 "
       "non-'@objc' class type %1", (bool, Type))
@@ -1429,8 +1429,8 @@ NOTE(note_make_implicitly_unwrapped_optional,none,
 ERROR(invalid_ibdesignable_extension,none,
       "@IBDesignable can only be applied to classes and extensions "
       "of classes", ())
-ERROR(invalid_ibinspectable,none,
-      "only instance properties can be declared @%0", (StringRef))
+ERROR(attr_must_be_used_on_class_instance,none,
+      "only class instance properties can be declared @%0", (StringRef))
 ERROR(invalid_ibaction_decl,none,
       "only instance methods can be declared @%0", (StringRef))
 ERROR(invalid_ibaction_result,none,
@@ -1451,6 +1451,8 @@ NOTE(fixit_rename_in_swift,none,
      "change Swift name to %0", (DeclName))
 NOTE(fixit_rename_in_objc,none,
      "change Objective-C selector to %0", (ObjCSelector))
+NOTE(remove_async_add_task,none,
+     "remove 'async' and wrap in 'Task' to use concurrency in %0", (DeclName))
 ERROR(no_objc_tagged_pointer_not_class_protocol,none,
       "@unsafe_no_objc_tagged_pointer can only be applied to class protocols",
       ())
@@ -1464,11 +1466,12 @@ ERROR(cdecl_empty_name,none,
       "@_cdecl symbol name cannot be empty", ())
 ERROR(cdecl_throws,none,
       "raising errors from @_cdecl functions is not supported", ())
-ERROR(cdecl_async,none,
-      "@_cdecl functions cannot be asynchronous", ())
 
 ERROR(attr_methods_only,none,
       "only methods can be declared %0", (DeclAttribute))
+ERROR(attr_decl_async,none,
+      "@%0 %1 cannot be asynchronous", (StringRef, DescriptiveDeclKind))
+
 ERROR(access_control_in_protocol,none,
       "%0 modifier cannot be used in protocols", (DeclAttribute))
 NOTE(access_control_in_protocol_detail,none,
@@ -1524,6 +1527,9 @@ WARNING(access_control_non_objc_open_member,none,
 
 ERROR(invalid_decl_attribute,none,
       "'%0' attribute cannot be applied to this declaration", (DeclAttribute))
+ERROR(attr_invalid_on_decl_kind,none,
+      "'%0' attribute cannot be applied to %1 declarations",
+      (DeclAttribute, DescriptiveDeclKind))
 ERROR(invalid_decl_modifier,none,
       "%0 modifier cannot be applied to this declaration", (DeclAttribute))
 ERROR(attribute_does_not_apply_to_type,none,
@@ -1965,6 +1971,9 @@ NOTE(non_sendable_nominal,none,
 NOTE(add_nominal_sendable_conformance,none,
      "consider making %0 %1 conform to the 'Sendable' protocol",
      (DescriptiveDeclKind, DeclName))
+NOTE(add_generic_parameter_sendable_conformance,none,
+     "consider making generic parameter %0 conform to the 'Sendable' protocol",
+     (Type))
 REMARK(add_predates_concurrency_import,none,
      "add '@preconcurrency' to %select{suppress|treat}0 "
      "'Sendable'-related %select{warnings|errors}0 from module %1"
@@ -3745,8 +3754,6 @@ ERROR(protocol_declares_unknown_primary_assoc_type,none,
       (Identifier, Type))
 ERROR(protocol_declares_duplicate_primary_assoc_type,none,
       "duplicate primary associated type name %0", (Identifier))
-ERROR(parameterized_protocol_not_supported,none,
-      "protocol type with type arguments can only be used as a generic constraint", ())
 ERROR(protocol_does_not_have_primary_assoc_type,none,
       "cannot specialize protocol type %0", (Type))
 ERROR(parameterized_protocol_type_argument_count_mismatch,none,
@@ -4559,6 +4566,9 @@ ERROR(effectful_keypath_component,none,
 ERROR(local_function_executed_concurrently,none,
       "concurrently-executed %0 %1 must be marked as '@Sendable'",
       (DescriptiveDeclKind, DeclName))
+ERROR(sendable_isolated_sync_function,none,
+      "%0 synchronous %1 %2 cannot be marked as '@Sendable'",
+      (ActorIsolation, DescriptiveDeclKind, DeclName))
 ERROR(concurrent_access_of_local_capture,none,
       "%select{mutation of|reference to}0 captured %1 %2 in "
       "concurrently-executing code",
@@ -4569,6 +4579,12 @@ ERROR(concurrent_access_of_inout_param,none,
       (DeclName))
 ERROR(non_sendable_capture,none,
       "capture of %1 with non-sendable type %0 in a `@Sendable` closure",
+      (Type, DeclName))
+ERROR(implicit_async_let_non_sendable_capture,none,
+      "capture of %1 with non-sendable type %0 in 'async let' binding",
+      (Type, DeclName))
+ERROR(implicit_non_sendable_capture,none,
+      "implicit capture of %1 requires that %0 conforms to `Sendable`",
       (Type, DeclName))
 
 NOTE(actor_isolated_sync_func,none,
@@ -4587,6 +4603,9 @@ ERROR(distributed_actor_isolated_method,none,
       ())
 ERROR(distributed_local_cannot_be_used,none,
       "'local' cannot be used in user-defined code currently",
+      ())
+ERROR(distributed_thunk_cannot_be_used,none,
+      "'distributed_thunk' cannot be used in user-defined code",
       ())
 ERROR(distributed_actor_func_param_not_codable,none,
       "parameter '%0' of type %1 in %2 does not conform to serialization requirement '%3'",
@@ -4648,9 +4667,10 @@ ERROR(isolated_parameter_not_actor,none,
 
 WARNING(non_sendable_param_type,none,
         "non-sendable type %0 %select{passed in call to %4 %2 %3|"
+        "exiting %4 context in call to non-isolated %2 %3|"
         "passed in implicitly asynchronous call to %4 %2 %3|"
-        "in parameter of %4 %2 %3 satisfying non-isolated protocol "
-        "requirement|"
+        "in parameter of %4 %2 %3 satisfying protocol requirement|"
+        "in parameter of %4 overriding %2 %3|"
         "in parameter of %4 '@objc' %2 %3}1 cannot cross actor boundary",
         (Type, unsigned, DescriptiveDeclKind, DeclName, ActorIsolation))
 WARNING(non_sendable_call_param_type,none,
@@ -4659,8 +4679,10 @@ WARNING(non_sendable_call_param_type,none,
         (Type, bool, ActorIsolation))
 WARNING(non_sendable_result_type,none,
         "non-sendable type %0 returned by %select{call to %4 %2 %3|"
+        "call from %4 context to non-isolated %2 %3|"
         "implicitly asynchronous call to %4 %2 %3|"
-        "%4 %2 %3 satisfying non-isolated protocol requirement|"
+        "%4 %2 %3 satisfying protocol requirement|"
+        "%4 overriding %2 %3|"
         "%4 '@objc' %2 %3}1 cannot cross actor boundary",
         (Type, unsigned, DescriptiveDeclKind, DeclName, ActorIsolation))
 WARNING(non_sendable_call_result_type,none,
@@ -4670,8 +4692,10 @@ WARNING(non_sendable_call_result_type,none,
 WARNING(non_sendable_property_type,none,
         "non-sendable type %0 in %select{"
         "%select{asynchronous access to %5 %1 %2|"
+        "asynchronous access from %5 context to non-isolated %1 %2|"
         "implicitly asynchronous access to %5 %1 %2|"
-        "conformance of %5 %1 %2 to non-isolated protocol requirement|"
+        "conformance of %5 %1 %2 to protocol requirement|"
+        "%5 overriding %1 %2|"
         "%5 '@objc' %1 %2}4|captured local %1 %2}3 cannot "
         "cross %select{actor|task}3 boundary",
         (Type, DescriptiveDeclKind, DeclName, bool, unsigned, ActorIsolation))
@@ -4709,6 +4733,9 @@ ERROR(unchecked_not_inheritance_clause,none,
 ERROR(unchecked_not_existential,none,
       "'unchecked' attribute cannot apply to non-protocol type %0", (Type))
 
+ERROR(redundant_any_in_existential,none,
+       "redundant 'any' has no effect on existential type %0",
+       (Type))
 ERROR(any_not_existential,none,
        "'any' has no effect on %select{concrete type|type parameter}0 %1",
        (bool, Type))
@@ -4777,6 +4804,9 @@ ERROR(distributed_property_cannot_be_static,none,
 ERROR(distributed_property_can_only_be_computed,none,
       "%0 %1 cannot be 'distributed', only computed properties can",
       (DescriptiveDeclKind, DeclName))
+ERROR(distributed_property_accessor_only_get_can_be_distributed,none,
+      "only 'get' accessors may be 'distributed'",
+      ())
 NOTE(distributed_actor_isolated_property,none,
       "access to %0 %1 is only permitted within distributed actor %2",
       (DescriptiveDeclKind, DeclName, DeclName))
@@ -5473,6 +5503,9 @@ NOTE(type_eraser_init_not_accessible,none,
      "cannot have more restrictive access than protocol %1 "
      "(which is %select{private|fileprivate|internal|public|open}2)",
      (AccessLevel, Type, AccessLevel))
+NOTE(type_eraser_init_spi,none,
+     "'init(erasing:)' is SPI, but protocol %0 is not"
+     "%select{| in the same SPI groups as 'init(erasing:)'}1", (Type, bool))
 
 //------------------------------------------------------------------------------
 // MARK: @available
@@ -5547,9 +5580,15 @@ ERROR(availability_decl_only_version_newer, none,
       "%0 is only available in %1 %2 or newer",
       (DeclName, StringRef, llvm::VersionTuple))
 
-WARNING(availability_decl_only_version_newer_warn, none,
-        "%0 is only available in %1 %2 or newer",
-        (DeclName, StringRef, llvm::VersionTuple))
+ERROR(availability_decl_only_version_newer_for_clients, none,
+      "%0 is only available in %1 %2 or newer; clients of %3 may have a lower"
+      " deployment target",
+      (DeclName, StringRef, llvm::VersionTuple, ModuleDecl *))
+
+WARNING(availability_decl_only_version_newer_for_clients_warn, none,
+        "%0 is only available in %1 %2 or newer; clients of %3 may have a lower"
+        " deployment target",
+        (DeclName, StringRef, llvm::VersionTuple, ModuleDecl *))
 
 ERROR(availability_opaque_types_only_version_newer, none,
       "'some' return types are only available in %0 %1 or newer",
@@ -6146,6 +6185,10 @@ ERROR(result_builder_requires_explicit_var_initialization,none,
 ERROR(cannot_declare_computed_var_in_result_builder,none,
       "cannot declare local %select{lazy|wrapped|computed|observed}0 variable "
       "in result builder", (unsigned))
+ERROR(cannot_convert_result_builder_result_to_return_type,none,
+      "cannot convert result builder result type %0 to return type %1",
+      (Type,Type))
+
 
 //------------------------------------------------------------------------------
 // MARK: Tuple Shuffle Diagnostics
@@ -6306,6 +6349,20 @@ ERROR(cannot_convert_default_value_type_to_argument_type, none,
 ERROR(attr_incompatible_with_back_deploy,none,
       "'%0' cannot be applied to a back deployed %1",
       (DeclAttribute, DescriptiveDeclKind))
+
+//------------------------------------------------------------------------------
+// MARK: Implicit opening of existential types
+//------------------------------------------------------------------------------
+
+ERROR(result_requires_explicit_coercion,none,
+      "inferred result type %0 requires explicit coercion due to "
+      "loss of generic requirements",
+      (Type))
+
+NOTE(candidate_result_requires_explicit_coercion,none,
+     "inferred result type %0 requires explicit coercion due to "
+     "loss of generic requirements",
+     (Type))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

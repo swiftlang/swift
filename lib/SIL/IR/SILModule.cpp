@@ -667,6 +667,48 @@ bool SILModule::hasUnresolvedOpenedArchetypeDefinitions() {
   return numUnresolvedOpenedArchetypes != 0;
 }
 
+/// Get a unique index for a struct or class field in layout order.
+unsigned SILModule::getFieldIndex(NominalTypeDecl *decl, VarDecl *field) {
+
+  auto iter = fieldIndices.find({decl, field});
+  if (iter != fieldIndices.end())
+    return iter->second;
+
+  unsigned index = 0;
+  if (auto *classDecl = dyn_cast<ClassDecl>(decl)) {
+    for (auto *superDecl = classDecl->getSuperclassDecl(); superDecl != nullptr;
+         superDecl = superDecl->getSuperclassDecl()) {
+      index += superDecl->getStoredProperties().size();
+    }
+  }
+  for (VarDecl *property : decl->getStoredProperties()) {
+    if (field == property) {
+      fieldIndices[{decl, field}] = index;
+      return index;
+    }
+    ++index;
+  }
+  llvm_unreachable("The field decl for a struct_extract, struct_element_addr, "
+                   "or ref_element_addr must be an accessible stored "
+                   "property of the operand type");
+}
+
+unsigned SILModule::getCaseIndex(EnumElementDecl *enumElement) {
+  auto iter = enumCaseIndices.find(enumElement);
+  if (iter != enumCaseIndices.end())
+    return iter->second;
+
+  unsigned idx = 0;
+  for (EnumElementDecl *e : enumElement->getParentEnum()->getAllElements()) {
+    if (e == enumElement) {
+      enumCaseIndices[enumElement] = idx;
+      return idx;
+    }
+    ++idx;
+  }
+  llvm_unreachable("enum element not found in enum decl");
+}
+
 void SILModule::notifyAddedInstruction(SILInstruction *inst) {
   if (auto *svi = dyn_cast<SingleValueInstruction>(inst)) {
     if (const CanOpenedArchetypeType archeTy =

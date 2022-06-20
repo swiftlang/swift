@@ -513,7 +513,7 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   UnresolvedDeclRefExpr *Operator;
 
   // First check to see if we have the start of a regex literal `/.../`.
-  tryLexRegexLiteral(/*mustBeRegex*/ true);
+  tryLexRegexLiteral(/*forUnappliedOperator*/ false);
 
   switch (Tok.getKind()) {
   default:
@@ -880,56 +880,65 @@ UnresolvedDeclRefExpr *Parser::parseExprOperator() {
   return new (Context) UnresolvedDeclRefExpr(name, refKind, DeclNameLoc(loc));
 }
 
-void Parser::tryLexRegexLiteral(bool mustBeRegex) {
-  if (!Context.LangOpts.EnableBareSlashRegexLiterals)
+void Parser::tryLexRegexLiteral(bool forUnappliedOperator) {
+  if (!Context.LangOpts.hasFeature(Feature::BareSlashRegexLiterals) ||
+      !Context.LangOpts.EnableExperimentalStringProcessing)
     return;
 
   // Check to see if we have a regex literal `/.../`, optionally with a prefix
   // operator e.g `!/.../`.
+  bool mustBeRegex = false;
   switch (Tok.getKind()) {
   case tok::oper_prefix:
+    // Prefix operators may contain `/` characters, so this may not be a regex,
+    // and as such need to make sure we have a closing `/`.
+    break;
   case tok::oper_binary_spaced:
-  case tok::oper_binary_unspaced: {
-    // Check to see if we have an operator containing '/'.
-    auto slashIdx = Tok.getText().find("/");
-    if (slashIdx == StringRef::npos)
-      break;
-
-    CancellableBacktrackingScope backtrack(*this);
-    {
-      Optional<Lexer::ForwardSlashRegexRAII> regexScope;
-      regexScope.emplace(*L, mustBeRegex);
-
-      // Try re-lex as a `/.../` regex literal, this will split an operator if
-      // necessary.
-      L->restoreState(getParserPosition().LS, /*enableDiagnostics*/ true);
-
-      // If we didn't split a prefix operator, reset the regex lexing scope.
-      // Otherwise, we want to keep it in place for the next token.
-      auto didSplit = L->peekNextToken().getLength() == slashIdx;
-      if (!didSplit)
-        regexScope.reset();
-
-      // Discard the current token, which will be replaced by the re-lexed
-      // token, which will either be a regex literal token, a prefix operator,
-      // or the original unchanged token.
-      discardToken();
-
-      // If we split a prefix operator from the regex literal, and are not sure
-      // whether this should be a regex, backtrack if we didn't end up lexing a
-      // regex literal.
-      if (didSplit && !mustBeRegex &&
-          !L->peekNextToken().is(tok::regex_literal)) {
-        return;
-      }
-
-      // Otherwise, accept the result.
-      backtrack.cancelBacktrack();
-    }
+  case tok::oper_binary_unspaced:
+    // When re-lexing for a unary expression, binary operators are always
+    // invalid, so we can be confident in always lexing a regex literal.
+    mustBeRegex = !forUnappliedOperator;
     break;
-  }
   default:
-    break;
+    // We only re-lex regex literals for operator tokens.
+    return;
+  }
+
+  // Check to see if we have an operator containing '/'.
+  auto slashIdx = Tok.getText().find("/");
+  if (slashIdx == StringRef::npos)
+    return;
+
+  CancellableBacktrackingScope backtrack(*this);
+  {
+    Optional<Lexer::ForwardSlashRegexRAII> regexScope;
+    regexScope.emplace(*L, mustBeRegex);
+
+    // Try re-lex as a `/.../` regex literal, this will split an operator if
+    // necessary.
+    L->restoreState(getParserPosition().LS, /*enableDiagnostics*/ true);
+
+    // If we didn't split a prefix operator, reset the regex lexing scope.
+    // Otherwise, we want to keep it in place for the next token.
+    auto didSplit = L->peekNextToken().getLength() == slashIdx;
+    if (!didSplit)
+      regexScope.reset();
+
+    // Discard the current token, which will be replaced by the re-lexed
+    // token, which will either be a regex literal token, a prefix operator,
+    // or the original unchanged token.
+    discardToken();
+
+    // If we split a prefix operator from the regex literal, and are not sure
+    // whether this should be a regex, backtrack if we didn't end up lexing a
+    // regex literal.
+    if (didSplit && !mustBeRegex &&
+        !L->peekNextToken().is(tok::regex_literal)) {
+      return;
+    }
+
+    // Otherwise, accept the result.
+    backtrack.cancelBacktrack();
   }
 }
 
@@ -1106,7 +1115,7 @@ getMagicIdentifierLiteralKind(tok Kind, const LangOptions &Opts) {
   switch (Kind) {
   case tok::pound_file:
     // TODO: Enable by default at the next source break. (SR-13199)
-    return Opts.EnableConcisePoundFile
+    return Opts.hasFeature(Feature::ConciseMagicFile)
          ? MagicIdentifierLiteralExpr::FileIDSpelledAsFile
          : MagicIdentifierLiteralExpr::FilePathSpelledAsFile;
 #define MAGIC_IDENTIFIER_TOKEN(NAME, TOKEN) \
@@ -3223,17 +3232,23 @@ ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
     SourceLoc FieldNameLoc;
     parseOptionalArgumentLabel(FieldName, FieldNameLoc);
 
-    // First check to see if we have the start of a regex literal `/.../`. We
-    // need to do this before handling unapplied operator references, as e.g
-    // `(/, /)` might be a regex literal.
-    tryLexRegexLiteral(/*mustBeRegex*/ false);
-
     // See if we have an operator decl ref '(<op>)'. The operator token in
     // this case lexes as a binary operator because it neither leads nor
     // follows a proper subexpression.
+    auto isUnappliedOperator = [&]() {
+      return Tok.isBinaryOperator() && peekToken().isAny(rightTok, tok::comma);
+    };
+
+    if (isUnappliedOperator()) {
+      // Check to see if we have the start of a regex literal `/.../`. We need
+      // to do this for an unapplied operator reference, as e.g `(/, /)` might
+      // be a regex literal.
+      tryLexRegexLiteral(/*forUnappliedOperator*/ true);
+    }
+
     ParserStatus Status;
     Expr *SubExpr = nullptr;
-    if (Tok.isBinaryOperator() && peekToken().isAny(rightTok, tok::comma)) {
+    if (isUnappliedOperator()) {
       SyntaxParsingContext operatorContext(SyntaxContext,
                                            SyntaxKind::IdentifierExpr);
       DeclNameLoc Loc;

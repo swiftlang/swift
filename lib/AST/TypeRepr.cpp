@@ -537,6 +537,11 @@ void NamedOpaqueReturnTypeRepr::printImpl(ASTPrinter &Printer,
 void SpecifierTypeRepr::printImpl(ASTPrinter &Printer,
                                   const PrintOptions &Opts) const {
   switch (getKind()) {
+#define TYPEREPR(CLASS, PARENT) case TypeReprKind::CLASS:
+#define SPECIFIER_TYPEREPR(CLASS, PARENT)
+#include "swift/AST/TypeReprNodes.def"
+    llvm_unreachable("invalid repr kind");
+    break;
   case TypeReprKind::InOut:
     Printer.printKeyword("inout", Opts, " ");
     break;
@@ -546,8 +551,11 @@ void SpecifierTypeRepr::printImpl(ASTPrinter &Printer,
   case TypeReprKind::Owned:
     Printer.printKeyword("__owned", Opts, " ");
     break;
-  default:
-    llvm_unreachable("unknown specifier type repr");
+  case TypeReprKind::Isolated:
+    Printer.printKeyword("isolated", Opts, " ");
+    break;
+  case TypeReprKind::CompileTimeConst:
+    Printer.printKeyword("_const", Opts, " ");
     break;
   }
   printTypeRepr(Base, Printer, Opts);

@@ -17,6 +17,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -123,11 +124,23 @@ public:
     setInsertionPoint(I);
   }
 
-  // Used by swift bridging.
   explicit SILBuilder(SILInstruction *I, const SILDebugScope *debugScope)
       : TempContext(I->getFunction()->getModule()),
         C(TempContext), F(I->getFunction()), CurDebugScope(debugScope) {
     setInsertionPoint(I);
+  }
+
+  // Used by swift bridging.
+  explicit SILBuilder(SILInstruction *I, SILBasicBlock *BB,
+                      const SILDebugScope *debugScope)
+      : TempContext((BB ? BB->getParent() : I->getFunction())->getModule()),
+        C(TempContext), F(BB ? BB->getParent() : I->getFunction()),
+        CurDebugScope(debugScope) {
+    if (I) {
+      setInsertionPoint(I);
+    } else {
+      setInsertionPoint(BB);
+    }
   }
 
   explicit SILBuilder(SILBasicBlock::iterator I,
@@ -1275,6 +1288,27 @@ public:
                           MarkMustCheckInst::CheckKind kind) {
     return insert(new (getModule())
                       MarkMustCheckInst(getSILDebugLocation(loc), src, kind));
+  }
+
+  CopyableToMoveOnlyWrapperValueInst *
+  createCopyableToMoveOnlyWrapperValue(SILLocation loc, SILValue src) {
+    return insert(new (getModule()) CopyableToMoveOnlyWrapperValueInst(
+        getSILDebugLocation(loc), src));
+  }
+
+  MoveOnlyWrapperToCopyableValueInst *
+  createOwnedMoveOnlyWrapperToCopyableValue(SILLocation loc, SILValue src) {
+    return insert(new (getModule()) MoveOnlyWrapperToCopyableValueInst(
+        *F, getSILDebugLocation(loc), src,
+        MoveOnlyWrapperToCopyableValueInst::Owned));
+  }
+
+  MoveOnlyWrapperToCopyableValueInst *
+  createGuaranteedMoveOnlyWrapperToCopyableValue(SILLocation loc,
+                                                 SILValue src) {
+    return insert(new (getModule()) MoveOnlyWrapperToCopyableValueInst(
+        *F, getSILDebugLocation(loc), src,
+        MoveOnlyWrapperToCopyableValueInst::Guaranteed));
   }
 
   UnconditionalCheckedCastInst *

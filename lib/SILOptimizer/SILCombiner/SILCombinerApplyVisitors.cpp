@@ -920,6 +920,31 @@ static bool canReplaceCopiedArg(FullApplySite Apply, SILValue Arg,
   return true;
 }
 
+/// Determine if the result type or argument types of the given apply, except
+/// for the argument at \p SkipArgIdx, contain an opened archetype rooted
+/// on \p RootOA.
+static bool applyInvolvesOpenedArchetypeWithRoot(FullApplySite Apply,
+                                                 OpenedArchetypeType *RootOA,
+                                                 unsigned SkipArgIdx) {
+  if (Apply.getType().getASTType()->hasOpenedExistentialWithRoot(RootOA)) {
+    return true;
+  }
+
+  const auto NumApplyArgs = Apply.getNumArguments();
+  for (unsigned Idx = 0; Idx < NumApplyArgs; ++Idx) {
+    if (Idx == SkipArgIdx)
+      continue;
+    if (Apply.getArgument(Idx)
+            ->getType()
+            .getASTType()
+            ->hasOpenedExistentialWithRoot(RootOA)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 // Check the legal conditions under which a Arg parameter (specified as ArgIdx)
 // can be replaced with a concrete type. Concrete type info is passed as CEI
 // argument.
@@ -927,38 +952,24 @@ bool SILCombiner::canReplaceArg(FullApplySite Apply,
                                 const OpenedArchetypeInfo &OAI,
                                 const ConcreteExistentialInfo &CEI,
                                 unsigned ArgIdx) {
-
-  // Don't specialize apply instructions that return the callee's Arg type,
-  // because this optimization does not know how to substitute types in the
-  // users of this apply. In the function type substitution below, all
-  // references to OpenedArchetype will be substituted. So walk to type to
-  // find all possible references, such as returning Optional<Arg>.
-  if (Apply.getType().getASTType().findIf(
-          [&OAI](Type t) -> bool { return t->isEqual(OAI.OpenedArchetype); })) {
-    return false;
-  }
-  // Bail out if any other arguments or indirect result that refer to the
-  // OpenedArchetype. The following optimization substitutes all occurrences
-  // of OpenedArchetype in the function signature, but will only rewrite the
-  // Arg operand.
+  // Don't specialize apply instructions if the result type references
+  // OpenedArchetype, because this optimization does not know how to substitute
+  // types in the users of this apply. In the function type substitution below,
+  // all references to OpenedArchetype will be substituted. So walk the type to
+  // find all possible references, such as returning Optional<OpenedArchetype>.
+  // The same holds for other arguments or indirect result that refer to the
+  // OpenedArchetype, because the following optimization will rewrite only the
+  // argument at ArgIdx.
   //
   // Note that the language does not allow Self to occur in contravariant
   // position. However, SIL does allow this and it can happen as a result of
   // upstream transformations. Since this is bail-out logic, it must handle
   // all verifiable SIL.
-
-  // This bailout check is also needed for non-Self arguments [including Self].
-  unsigned NumApplyArgs = Apply.getNumArguments();
-  for (unsigned Idx = 0; Idx < NumApplyArgs; ++Idx) {
-    if (Idx == ArgIdx)
-      continue;
-    if (Apply.getArgument(Idx)->getType().getASTType().findIf(
-            [&OAI](Type t) -> bool {
-              return t->isEqual(OAI.OpenedArchetype);
-            })) {
-      return false;
-    }
+  if (applyInvolvesOpenedArchetypeWithRoot(Apply, OAI.OpenedArchetype,
+                                           ArgIdx)) {
+    return false;
   }
+
   // If the convention is mutating, then the existential must have been
   // initialized by copying the concrete value (regardless of whether
   // CEI.isConcreteValueCopied is true). Replacing the existential address with
@@ -1052,37 +1063,24 @@ SILValue SILCombiner::canCastArg(FullApplySite Apply,
       !CEI.ConcreteValue->getType().isAddress())
     return SILValue();
 
-  // Don't specialize apply instructions that return the callee's Arg type,
-  // because this optimization does not know how to substitute types in the
-  // users of this apply. In the function type substitution below, all
-  // references to OpenedArchetype will be substituted. So walk to type to
-  // find all possible references, such as returning Optional<Arg>.
-  if (Apply.getType().getASTType().findIf(
-          [&OAI](Type t) -> bool { return t->isEqual(OAI.OpenedArchetype); })) {
-    return SILValue();
-  }
-  // Bail out if any other arguments or indirect result that refer to the
-  // OpenedArchetype. The following optimization substitutes all occurrences
-  // of OpenedArchetype in the function signature, but will only rewrite the
-  // Arg operand.
+  // Don't specialize apply instructions if the result type references
+  // OpenedArchetype, because this optimization does not know how to substitute
+  // types in the users of this apply. In the function type substitution below,
+  // all references to OpenedArchetype will be substituted. So walk the type to
+  // find all possible references, such as returning Optional<OpenedArchetype>.
+  // The same holds for other arguments or indirect result that refer to the
+  // OpenedArchetype, because the following optimization will rewrite only the
+  // argument at ArgIdx.
   //
   // Note that the language does not allow Self to occur in contravariant
   // position. However, SIL does allow this and it can happen as a result of
   // upstream transformations. Since this is bail-out logic, it must handle
   // all verifiable SIL.
-
-  // This bailout check is also needed for non-Self arguments [including Self].
-  unsigned NumApplyArgs = Apply.getNumArguments();
-  for (unsigned Idx = 0; Idx < NumApplyArgs; ++Idx) {
-    if (Idx == ArgIdx)
-      continue;
-    if (Apply.getArgument(Idx)->getType().getASTType().findIf(
-            [&OAI](Type t) -> bool {
-              return t->isEqual(OAI.OpenedArchetype);
-            })) {
-      return SILValue();
-    }
+  if (applyInvolvesOpenedArchetypeWithRoot(Apply, OAI.OpenedArchetype,
+                                           ArgIdx)) {
+    return SILValue();
   }
+
   return Builder.createUncheckedAddrCast(
       Apply.getLoc(), Apply.getArgument(ArgIdx), CEI.ConcreteValue->getType());
 }
@@ -1293,10 +1291,11 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
 ///   %existential = alloc_stack $Protocol
 ///   %value = init_existential_addr %existential : $Concrete
 ///   copy_addr ... to %value
-///   %witness = witness_method $@opened
-///   apply %witness<T : Protocol>(%existential)
+///   %opened = open_existential_addr %existential
+///   %witness = witness_method $@opened(...) Protocol
+///   apply %witness<$@opened(...) Protocol>(%opened)
 ///
-/// ==> apply %witness<Concrete : Protocol>(%existential)
+/// ==> apply %witness<$Concrete>(%existential)
 SILInstruction *
 SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply,
                                                     WitnessMethodInst *WMI) {
@@ -1407,200 +1406,6 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply) {
   return createApplyWithConcreteType(Apply, COEIs, BuilderCtx);
 }
 
-/// Check that all users of the apply are retain/release ignoring one
-/// user.
-static bool
-hasOnlyRecursiveOwnershipUsers(ApplyInst *ai, SILInstruction *ignoreUser,
-                               SmallVectorImpl<SILInstruction *> &foundUsers) {
-  SmallVector<Operand *, 32> worklist(getNonDebugUses(ai));
-  while (!worklist.empty()) {
-    auto *use = worklist.pop_back_val();
-    auto *user = use->getUser();
-    if (user == ignoreUser)
-      continue;
-
-    if (!isa<RetainValueInst>(user) && !isa<ReleaseValueInst>(user) &&
-        !isa<StrongRetainInst>(user) && !isa<StrongReleaseInst>(user) &&
-        !isa<CopyValueInst>(user) && !isa<DestroyValueInst>(user) &&
-        !isa<BeginBorrowInst>(user) && !isa<EndBorrowInst>(user) &&
-        !user->isDebugInstruction())
-      return false;
-
-    if (auto *cvi = dyn_cast<CopyValueInst>(user))
-      for (auto *use : cvi->getUses())
-        worklist.push_back(use);
-    if (auto *bbi = dyn_cast<BeginBorrowInst>(user))
-      for (auto *use : bbi->getUses())
-        worklist.push_back(use);
-
-    foundUsers.push_back(user);
-  }
-  return true;
-}
-
-/// We only know how to simulate reference call effects for unary
-/// function calls that take their argument @owned or @guaranteed and return an
-/// @owned value.
-static bool knowHowToEmitReferenceCountInsts(ApplyInst *Call) {
-  if (Call->getNumArguments() != 1)
-    return false;
-
-  // FIXME: We could handle dynamic_function_ref instructions here because the
-  // code only looks at the function type.
-  FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(Call->getCallee());
-  if (!FRI)
-    return false;
-  SILFunction *F = FRI->getReferencedFunction();
-  auto FnTy = F->getLoweredFunctionType();
-
-  // Look at the result type.
-  if (FnTy->getNumResults() != 1)
-    return false;
-  auto ResultInfo = FnTy->getResults()[0];
-  if (ResultInfo.getConvention() != ResultConvention::Owned)
-    return false;
-
-  // Look at the parameter.
-  auto Params = FnTy->getParameters();
-  (void) Params;
-  assert(Params.size() == 1 && "Expect one parameter");
-  auto ParamConv = FnTy->getParameters()[0].getConvention();
-
-  return ParamConv == ParameterConvention::Direct_Owned ||
-         ParamConv == ParameterConvention::Direct_Guaranteed;
-}
-
-/// Add reference counting operations equal to the effect of the call.
-static void emitMatchingRCAdjustmentsForCall(ApplyInst *Call, SILValue OnX) {
-  FunctionRefInst *FRI = cast<FunctionRefInst>(Call->getCallee());
-  SILFunction *F = FRI->getReferencedFunction();
-  auto FnTy = F->getLoweredFunctionType();
-  assert(FnTy->getNumResults() == 1);
-  auto ResultInfo = FnTy->getResults()[0];
-  (void) ResultInfo;
-
-  assert(ResultInfo.getConvention() == ResultConvention::Owned &&
-         "Expect a @owned return");
-  assert(Call->getNumArguments() == 1 && "Expect a unary call");
-
-  // Emit a copy for the @owned return.
-  SILBuilderWithScope Builder(Call);
-  OnX = Builder.emitCopyValueOperation(Call->getLoc(), OnX);
-
-  // Emit a destroy for the @owned parameter, or none for a @guaranteed
-  // parameter.
-  auto Params = FnTy->getParameters();
-  (void) Params;
-  assert(Params.size() == 1 && "Expect one parameter");
-  auto ParamInfo = FnTy->getParameters()[0].getConvention();
-  assert(ParamInfo == ParameterConvention::Direct_Owned ||
-         ParamInfo == ParameterConvention::Direct_Guaranteed);
-
-  if (ParamInfo == ParameterConvention::Direct_Owned)
-    Builder.emitDestroyValueOperation(Call->getLoc(), OnX);
-}
-
-// Replace an application of a cast composition f_inverse(f(x)) by x.
-//
-// NOTE: The instruction we are actually folding is f_inverse.
-bool SILCombiner::optimizeIdentityCastComposition(ApplyInst *fInverseApply,
-                                                  StringRef fInverseName,
-                                                  StringRef fName) {
-  // Needs to have a known semantics.
-  if (!fInverseApply->hasSemantics(fInverseName))
-    return false;
-
-  // We need to know how to replace the call by reference counting instructions.
-  if (!knowHowToEmitReferenceCountInsts(fInverseApply))
-    return false;
-
-  // Need to have a matching 'f'.
-  auto fInverseArg0 = lookThroughOwnershipInsts(fInverseApply->getArgument(0));
-  auto *fApply = dyn_cast<ApplyInst>(fInverseArg0);
-  if (!fApply)
-    return false;
-  if (!fApply->hasSemantics(fName))
-    return false;
-  if (!knowHowToEmitReferenceCountInsts(fApply))
-    return false;
-
-  // The types must match.
-  if (fApply->getArgument(0)->getType() != fInverseApply->getType())
-    return false;
-
-  // Gather up all retain
-  SmallVector<SILInstruction *, 16> foundOwnershipUsers;
-  if (!hasOnlyRecursiveOwnershipUsers(fApply, fInverseApply /*user to ignore*/,
-                                      foundOwnershipUsers))
-    return false;
-
-  // Okay, now we know we can remove the calls.
-  auto arg0 = fApply->getArgument(0);
-
-  if (fApply->getFunction()->hasOwnership()) {
-    // First perform an ownership RAUW+erase of arg0 and inverse apply. The OSSA
-    // RAUW helper will copy arg0 if needed. We need to do this before anything
-    // else since the utility assumes OSSA is in correct form.
-    OwnershipRAUWHelper helper(ownershipFixupContext, fInverseApply, arg0);
-    if (!helper)
-      return false;
-    helper.perform();
-
-    // Now remove the apply, inserting a destroy_value if we need to it arg0.
-    if (fApply->getArgumentRef(0).isLifetimeEnding()) {
-      SILBuilderWithScope b(fApply, Builder);
-      if (arg0.getOwnershipKind() == OwnershipKind::Owned) {
-        b.emitDestroyValueOperation(fApply->getLoc(), arg0);
-      } else if (arg0.getOwnershipKind() == OwnershipKind::Guaranteed) {
-        b.emitEndBorrowOperation(fApply->getLoc(), arg0);
-      }
-    }
-    eraseInstIncludingUsers(fApply);
-
-    return true;
-  }
-
-  // Redirect f's result's retains/releases to affect x.
-  //
-  // NOTE: This part of the code is only used in non-ownership SIL since we
-  // represent ARC operations there with copy_value, destroy_value that work
-  // with all types.
-  for (auto *ownershipUser : foundOwnershipUsers) {
-    // X might not be strong_retain/release'able. Replace it by a
-    // retain/release_value on X instead.
-    if (isa<StrongRetainInst>(ownershipUser)) {
-      SILBuilderWithScope b(ownershipUser, Builder);
-      b.createRetainValue(
-          ownershipUser->getLoc(), arg0,
-          cast<StrongRetainInst>(ownershipUser)->getAtomicity());
-      eraseInstFromFunction(*ownershipUser);
-      continue;
-    }
-    if (isa<StrongReleaseInst>(ownershipUser)) {
-      SILBuilderWithScope b(ownershipUser, Builder);
-      b.createReleaseValue(
-          ownershipUser->getLoc(), arg0,
-          cast<StrongReleaseInst>(ownershipUser)->getAtomicity());
-      eraseInstFromFunction(*ownershipUser);
-      continue;
-    }
-    ownershipUser->setOperand(0, arg0);
-    // Simulate the reference count effects of the calls before removing
-    // them.
-    emitMatchingRCAdjustmentsForCall(fApply, arg0);
-    emitMatchingRCAdjustmentsForCall(fInverseApply, arg0);
-  }
-
-  // Replace users of f_inverse by x.
-  replaceInstUsesWith(*fInverseApply, arg0);
-
-  // Remove the calls.
-  eraseInstFromFunction(*fInverseApply);
-  eraseInstFromFunction(*fApply);
-
-  return true;
-}
-
 /// Should replace a call to `getContiguousArrayStorageType<A>(for:)` by the
 /// metadata constructor of the return type.
 ///  getContiguousArrayStorageType<Int>(for:)
@@ -1708,14 +1513,6 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
       return nullptr;
     }
   }
-
-  // Optimize f_inverse(f(x)) -> x.
-  if (optimizeIdentityCastComposition(AI, "convertFromObjectiveC",
-                                      "convertToObjectiveC"))
-    return nullptr;
-  if (optimizeIdentityCastComposition(AI, "convertToObjectiveC",
-                                      "convertFromObjectiveC"))
-    return nullptr;
 
   return nullptr;
 }

@@ -207,7 +207,8 @@ private extension EscapeInfo {
     var dominatingBlock = value.block
 
     _ = isEscaping(object: value, visitUse: { op, _, _ in
-        if let defBlock = op.value.definingBlock, defBlock.dominates(dominatingBlock, domTree) {
+        let defBlock = op.value.definingBlock
+        if defBlock.dominates(dominatingBlock, domTree) {
           dominatingBlock = defBlock
         }
         return .continueWalking
@@ -230,25 +231,25 @@ private extension EscapeInfo {
         outerBlockRange.insert(user.block)
 
         let val = op.value
-        if let defBlock = val.definingBlock {
-          // Also insert the operand's definition. Otherwise we would miss allocation
-          // instructions (for which the `visitUse` closure is not called).
-          outerBlockRange.insert(defBlock)
-          
-          // We need to explicitly add predecessor blocks of phi-arguments becaues they
-          // are not necesesarily visited by `EscapeInfo.walkDown`.
-          // This is important for the special case where there is a back-edge from the
-          // inner range to the inner rage's begin-block:
-          //
-          //   bb0:                      // <- need to be in the outer range
-          //     br bb1(%some_init_val)
-          //   bb1(%arg):
-          //     %k = alloc_ref $Klass   // innerInstRange.begin
-          //     cond_br bb2, bb1(%k)    // back-edge to bb1 == innerInstRange.blockRange.begin
-          //
-          if val is BlockArgument {
-            outerBlockRange.insert(contentsOf: defBlock.predecessors)
-          }
+        let defBlock = val.definingBlock
+
+        // Also insert the operand's definition. Otherwise we would miss allocation
+        // instructions (for which the `visitUse` closure is not called).
+        outerBlockRange.insert(defBlock)
+        
+        // We need to explicitly add predecessor blocks of phi-arguments becaues they
+        // are not necesesarily visited by `EscapeInfo.walkDown`.
+        // This is important for the special case where there is a back-edge from the
+        // inner range to the inner rage's begin-block:
+        //
+        //   bb0:                      // <- need to be in the outer range
+        //     br bb1(%some_init_val)
+        //   bb1(%arg):
+        //     %k = alloc_ref $Klass   // innerInstRange.begin
+        //     cond_br bb2, bb1(%k)    // back-edge to bb1 == innerInstRange.blockRange.begin
+        //
+        if val is BlockArgument {
+          outerBlockRange.insert(contentsOf: defBlock.predecessors)
         }
         return .continueWalking
       })

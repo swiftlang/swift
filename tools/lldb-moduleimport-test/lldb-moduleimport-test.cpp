@@ -49,6 +49,7 @@ validateModule(llvm::StringRef data, bool Verbose, bool requiresOSSAModules,
                swift::serialization::ValidationInfo &info,
                swift::serialization::ExtendedValidationInfo &extendedInfo) {
   info = swift::serialization::validateSerializedAST(data, requiresOSSAModules,
+                                                     /*requiredSDK*/StringRef(),
                                                      &extendedInfo);
   if (info.status != swift::serialization::Status::Valid) {
     llvm::outs() << "error: validateSerializedAST() failed\n";

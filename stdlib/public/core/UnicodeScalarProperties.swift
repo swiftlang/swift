@@ -1263,8 +1263,8 @@ extension Unicode.Scalar.Properties {
   /// The name of a scalar is immutable and never changed in future versions of
   /// the Unicode Standard. The `nameAlias` property is provided to issue
   /// corrections if a name was issued erroneously. For example, the `name` of
-  /// U+FE18 is "PRESENTATION FORM FOR VERTICAL RIGHT WHITE LENTICULAR BRACKET"
-  /// (note that "BRACKET" is misspelled). The `nameAlias` property then
+  /// U+FE18 is "PRESENTATION FORM FOR VERTICAL RIGHT WHITE LENTICULAR BRAKCET"
+  /// (note that "BRAKCET" is misspelled). The `nameAlias` property then
   /// contains the corrected name.
   ///
   /// If a scalar has no alias, this property is `nil`.

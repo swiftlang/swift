@@ -553,10 +553,12 @@ static void diagnoseRemovedDecl(const SDKNodeDecl *D) {
     if (D->hasDeclAttribute(DeclAttrKind::DAK_AlwaysEmitIntoClient))
       return;
   }
+  auto &Ctx = D->getSDKContext();
   // Don't diagnose removal of deprecated APIs.
-  if (!D->isDeprecated()) {
-    D->emitDiag(SourceLoc(), diag::removed_decl, false);
-  }
+  if (Ctx.getOpts().SkipRemoveDeprecatedCheck &&
+      D->isDeprecated())
+    return;
+  D->emitDiag(SourceLoc(), diag::removed_decl, false);
 }
 
 // This is first pass on two given SDKNode trees. This pass removes the common part
@@ -2334,11 +2336,13 @@ public:
     CheckerOpts.SwiftOnly =
         ParsedArgs.hasArg(OPT_abi) || ParsedArgs.hasArg(OPT_swift_only);
     CheckerOpts.SkipOSCheck = ParsedArgs.hasArg(OPT_disable_os_checks);
+    CheckerOpts.SkipRemoveDeprecatedCheck = ParsedArgs.hasArg(OPT_disable_remove_deprecated_check);
     CheckerOpts.CompilerStyle =
         CompilerStyleDiags || !SerializedDiagPath.empty();
     for (auto Arg : Args)
       CheckerOpts.ToolArgs.push_back(Arg);
-
+    for(auto spi: ParsedArgs.getAllArgValues(OPT_ignore_spi_groups))
+      CheckerOpts.SPIGroupNamesToIgnore.insert(spi);
     if (!SDK.empty()) {
       auto Ver = getSDKBuildVersion(SDK);
       if (!Ver.empty()) {

@@ -628,8 +628,8 @@ public:
   /// Should we add value names to local IR values?
   bool EnableValueNames = false;
 
-  // Is swifterror returned in a register by the target ABI.
-  bool IsSwiftErrorInRegister;
+  // Should `swifterror` attribute be explicitly added for the target ABI.
+  bool ShouldUseSwiftError;
 
   llvm::Type *VoidTy;                  /// void (usually {})
   llvm::IntegerType *Int1Ty;           /// i1
@@ -873,6 +873,9 @@ public:
   llvm::StructType *getEnumValueWitnessTableTy();
   llvm::PointerType *getValueWitnessTablePtrTy();
   llvm::PointerType *getEnumValueWitnessTablePtrTy();
+
+  llvm::IntegerType *getTypeMetadataRequestParamTy();
+  llvm::StructType *getTypeMetadataResponseTy();
 
   void unimplemented(SourceLoc, StringRef Message);
   [[noreturn]]

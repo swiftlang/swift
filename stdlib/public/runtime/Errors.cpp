@@ -15,6 +15,10 @@
 //===----------------------------------------------------------------------===//
 
 #if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+
 #include <mutex>
 #endif
 
@@ -29,10 +33,11 @@
 #include <stdarg.h>
 
 #include "ImageInspection.h"
-#include "swift/Runtime/Debug.h"
-#include "swift/Runtime/Mutex.h"
-#include "swift/Runtime/Portability.h"
 #include "swift/Demangling/Demangle.h"
+#include "swift/Runtime/Debug.h"
+#include "swift/Runtime/Portability.h"
+#include "swift/Threading/Errors.h"
+#include "swift/Threading/Mutex.h"
 #include "llvm/ADT/StringRef.h"
 
 #if defined(_MSC_VER)

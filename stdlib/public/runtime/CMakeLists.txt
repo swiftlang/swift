@@ -33,7 +33,6 @@ set(swift_runtime_sources
     Bincompat.cpp
     Casting.cpp
     CrashReporter.cpp
-    CygwinPort.cpp
     Demangle.cpp
     DynamicCast.cpp
     Enum.cpp
@@ -59,8 +58,6 @@ set(swift_runtime_sources
     KnownMetadata.cpp
     Metadata.cpp
     MetadataLookup.cpp
-    MutexPThread.cpp
-    MutexWin32.cpp
     Numeric.cpp
     Once.cpp
     Portability.cpp
@@ -70,6 +67,7 @@ set(swift_runtime_sources
     RuntimeInvocationsTracking.cpp
     SwiftDtoa.cpp
     SwiftTLSContext.cpp
+    ThreadingError.cpp
     AccessibleFunction.cpp)
 
 # Acknowledge that the following sources are known.
@@ -130,10 +128,13 @@ foreach(sdk ${SWIFT_SDKS})
 endforeach()
 
 
+# Gold LTO is unsupported. To prevent tests from failing when building
+# with LTO, force swift runtime to compile without LTO for Linux.
 add_swift_target_library(swiftImageRegistrationObjectELF
                   OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE
                   SwiftRT-ELF.cpp
                   C_COMPILE_FLAGS ${SWIFT_RUNTIME_CORE_CXX_FLAGS}
+                  C_COMPILE_FLAGS_LINUX -fno-lto
                   LINK_FLAGS ${SWIFT_RUNTIME_CORE_LINK_FLAGS}
                   TARGET_SDKS ${ELFISH_SDKS}
                   SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}

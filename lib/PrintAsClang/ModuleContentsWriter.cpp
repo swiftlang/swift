@@ -16,6 +16,7 @@
 #include "DeclAndTypePrinter.h"
 #include "OutputLanguageMode.h"
 #include "PrimitiveTypeMapping.h"
+#include "PrintSwiftToClangCoreScaffold.h"
 
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Module.h"
@@ -131,11 +132,14 @@ class ModuleWriter {
 public:
   ModuleWriter(raw_ostream &os, raw_ostream &prologueOS,
                llvm::SmallPtrSetImpl<ImportModuleTy> &imports, ModuleDecl &mod,
-               AccessLevel access, OutputLanguageMode outputLang)
+               SwiftToClangInteropContext &interopContext, AccessLevel access,
+               OutputLanguageMode outputLang)
       : os(os), imports(imports), M(mod),
-        printer(M, os, prologueOS, delayedMembers, typeMapping, access,
-                outputLang),
+        printer(M, os, prologueOS, delayedMembers, typeMapping, interopContext,
+                access, outputLang),
         outputLangMode(outputLang) {}
+
+  PrimitiveTypeMapping &getTypeMapping() { return typeMapping; }
 
   /// Returns true if we added the decl's module to the import set, false if
   /// the decl is a local decl.
@@ -264,6 +268,9 @@ public:
       forwardDeclare(ED);
     } else if (isa<AbstractTypeParamDecl>(TD)) {
       llvm_unreachable("should not see type params here");
+    } else if (isa<StructDecl>(TD)) {
+      // FIXME: add support here.
+      return;
     } else {
       assert(false && "unknown local type decl");
     }
@@ -406,6 +413,13 @@ public:
 
     os << '\n';
     printer.print(FD);
+    return true;
+  }
+
+  bool writeStruct(const StructDecl *SD) {
+    if (addImport(SD))
+      return true;
+    printer.print(SD);
     return true;
   }
 
@@ -584,6 +598,8 @@ public:
       if (outputLangMode == OutputLanguageMode::Cxx) {
         if (auto FD = dyn_cast<FuncDecl>(D))
           success = writeFunc(FD);
+        if (auto SD = dyn_cast<StructDecl>(D))
+          success = writeStruct(SD);
         // FIXME: Warn on unsupported exported decl.
       } else if (isa<ValueDecl>(D)) {
         if (auto CD = dyn_cast<ClassDecl>(D))
@@ -629,27 +645,32 @@ static AccessLevel getRequiredAccess(const ModuleDecl &M) {
   return M.isExternallyConsumed() ? AccessLevel::Public : AccessLevel::Internal;
 }
 
-void
-swift::printModuleContentsAsObjC(raw_ostream &os,
-                                 llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
-                                 ModuleDecl &M) {
+void swift::printModuleContentsAsObjC(
+    raw_ostream &os, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
+    ModuleDecl &M, SwiftToClangInteropContext &interopContext) {
   llvm::raw_null_ostream prologueOS;
-  ModuleWriter(os, prologueOS, imports, M, getRequiredAccess(M),
+  ModuleWriter(os, prologueOS, imports, M, interopContext, getRequiredAccess(M),
                OutputLanguageMode::ObjC)
       .write();
 }
 
 void swift::printModuleContentsAsCxx(
     raw_ostream &os, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
-    ModuleDecl &M) {
+    ModuleDecl &M, SwiftToClangInteropContext &interopContext) {
   std::string moduleContentsBuf;
   llvm::raw_string_ostream moduleOS{moduleContentsBuf};
   std::string modulePrologueBuf;
   llvm::raw_string_ostream prologueOS{modulePrologueBuf};
 
-  ModuleWriter(moduleOS, prologueOS, imports, M, getRequiredAccess(M),
-               OutputLanguageMode::Cxx)
-      .write();
+  // FIXME: Use getRequiredAccess once @expose is supported.
+  ModuleWriter writer(moduleOS, prologueOS, imports, M, interopContext,
+                      AccessLevel::Public, OutputLanguageMode::Cxx);
+  writer.write();
+
+  os << "#ifndef SWIFT_PRINTED_CORE\n";
+  os << "#define SWIFT_PRINTED_CORE\n";
+  printSwiftToClangCoreScaffold(interopContext, writer.getTypeMapping(), os);
+  os << "#endif\n";
 
   // FIXME: refactor.
   if (!prologueOS.str().empty()) {
@@ -659,11 +680,13 @@ void swift::printModuleContentsAsCxx(
     M.ValueDecl::getName().print(os);
     os << " {\n";
     os << "namespace " << cxx_synthesis::getCxxImplNamespaceName() << " {\n";
+    os << "extern \"C\" {\n";
     os << "#endif\n\n";
 
     os << prologueOS.str();
 
     os << "\n#ifdef __cplusplus\n";
+    os << "}\n";
     os << "}\n";
     os << "}\n";
   }

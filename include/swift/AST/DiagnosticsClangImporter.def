@@ -117,6 +117,10 @@ WARNING(nonmutating_without_mutable_fields,none,
 
 ERROR(module_map_not_found, none, "module map file '%0' not found", (StringRef))
 
+WARNING(libstdcxx_not_found, none,
+        "libstdc++ not found for '%0'; C++ stdlib may be unavailable",
+        (StringRef))
+
 NOTE(macro_not_imported_unsupported_operator, none, "operator not supported in macro arithmetic", ())
 NOTE(macro_not_imported_unsupported_named_operator, none, "operator '%0' not supported in macro arithmetic", (StringRef))
 NOTE(macro_not_imported_invalid_string_literal, none, "invalid string literal", ())

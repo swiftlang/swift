@@ -193,8 +193,7 @@ EXPR_NODES = [
     # NOTE: This appears only in SequenceExpr.
     Node('ArrowExpr', kind='Expr',
          children=[
-             Child('AsyncKeyword', kind='IdentifierToken',
-                   classification='Keyword',
+             Child('AsyncKeyword', kind='ContextualKeywordToken',
                    text_choices=['async'], is_optional=True),
              Child('ThrowsToken', kind='ThrowsToken',
                    is_optional=True),
@@ -394,8 +393,7 @@ EXPR_NODES = [
                        Child('SimpleInput', kind='ClosureParamList'),
                        Child('Input', kind='ParameterClause'),
                    ]),
-             Child('AsyncKeyword', kind='IdentifierToken',
-                   classification='Keyword',
+             Child('AsyncKeyword', kind='ContextualKeywordToken',
                    text_choices=['async'], is_optional=True),
              Child('ThrowsTok', kind='ThrowsToken', is_optional=True),
              Child('Output', kind='ReturnClause', is_optional=True),
@@ -408,8 +406,9 @@ EXPR_NODES = [
              Child('LeftBrace', kind='LeftBraceToken'),
              Child('Signature', kind='ClosureSignature', is_optional=True),
              Child('Statements', kind='CodeBlockItemList',
-                   collection_element_name='Statement'),
-             Child('RightBrace', kind='RightBraceToken'),
+                   collection_element_name='Statement', is_indented=True),
+             Child('RightBrace', kind='RightBraceToken',
+                   requires_leading_newline=True),
          ]),
 
     # unresolved-pattern-expr -> pattern

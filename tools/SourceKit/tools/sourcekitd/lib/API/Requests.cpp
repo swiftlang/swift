@@ -107,14 +107,15 @@ static void fillDictionaryForDiagnosticInfo(ResponseBuilder::Dictionary Elem,
 static SourceKit::Context *GlobalCtx = nullptr;
 
 void sourcekitd::initializeService(
-    StringRef runtimeLibPath, StringRef diagnosticDocumentationPath,
+    llvm::StringRef swiftExecutablePath, StringRef runtimeLibPath,
+    StringRef diagnosticDocumentationPath,
     std::function<void(sourcekitd_response_t)> postNotification) {
   INITIALIZE_LLVM();
   initializeSwiftModules();
   llvm::EnablePrettyStackTrace();
-  GlobalCtx =
-      new SourceKit::Context(runtimeLibPath, diagnosticDocumentationPath,
-                             SourceKit::createSwiftLangSupport);
+  GlobalCtx = new SourceKit::Context(swiftExecutablePath, runtimeLibPath,
+                                     diagnosticDocumentationPath,
+                                     SourceKit::createSwiftLangSupport);
   auto noteCenter = GlobalCtx->getNotificationCenter();
 
   noteCenter->addDocumentUpdateNotificationReceiver([postNotification](StringRef DocumentName) {

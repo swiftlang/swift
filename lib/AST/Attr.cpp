@@ -1720,6 +1720,13 @@ OriginallyDefinedInAttr::isActivePlatform(const ASTContext &ctx) const {
   return None;
 }
 
+OriginallyDefinedInAttr *OriginallyDefinedInAttr::clone(ASTContext &C,
+                                                        bool implicit) const {
+  return new (C) OriginallyDefinedInAttr(
+      implicit ? SourceLoc() : AtLoc, implicit ? SourceRange() : getRange(),
+      OriginalModuleName, Platform, MovedVersion, implicit);
+}
+
 bool AvailableAttr::isLanguageVersionSpecific() const {
   if (PlatformAgnostic ==
       PlatformAgnosticAvailabilityKind::SwiftVersionSpecific)
@@ -1940,6 +1947,15 @@ SPIAccessControlAttr::create(ASTContext &context,
   return new (mem) SPIAccessControlAttr(atLoc, range, spiGroups);
 }
 
+SPIAccessControlAttr *SPIAccessControlAttr::clone(ASTContext &C,
+                                                  bool implicit) const {
+  auto *attr = SPIAccessControlAttr::create(
+      C, implicit ? SourceLoc() : AtLoc, implicit ? SourceRange() : getRange(),
+      getSPIGroups());
+  attr->setImplicit(implicit);
+  return attr;
+}
+
 DifferentiableAttr::DifferentiableAttr(bool implicit, SourceLoc atLoc,
                                        SourceRange baseRange,
                                        enum DifferentiabilityKind diffKind,
@@ -2105,6 +2121,13 @@ void DerivativeAttr::setOriginalFunctionResolver(
   assert(!OriginalFunction && "cannot overwrite original function");
   OriginalFunction = resolver;
   ResolverContextData = resolverContextData;
+}
+
+void DerivativeAttr::setOriginalDeclaration(Decl *originalDeclaration) {
+  assert(originalDeclaration && "Original declaration must be non-null");
+  assert(!OriginalDeclaration &&
+         "Original declaration cannot have already been set");
+  OriginalDeclaration = originalDeclaration;
 }
 
 TransposeAttr::TransposeAttr(bool implicit, SourceLoc atLoc,

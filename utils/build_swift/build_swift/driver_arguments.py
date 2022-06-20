@@ -736,6 +736,9 @@ def create_argument_parser():
     option(['--build-libparser-only'], toggle_true('build_libparser_only'),
            help='build only libParser for SwiftSyntax')
 
+    option(['--build-lld'], toggle_true('build_lld'),
+           help='build lld as part of llvm')
+
     option('--skip-build-clang-tools-extra',
            toggle_false('build_clang_tools_extra'),
            default=True,
@@ -1106,7 +1109,7 @@ def create_argument_parser():
            help='skip testing iOS 32 bit simulator targets')
     option('--skip-test-watchos-32bit-simulator',
            toggle_false('test_watchos_32bit_simulator'),
-           default=True,
+           default=False,
            help='skip testing watchOS 32 bit simulator targets')
     option('--skip-test-ios-host',
            toggle_false('test_ios_host'),

@@ -3745,6 +3745,8 @@ store_borrow
 
 Stores the value ``%0`` to a stack location ``%1``, which must be an
 ``alloc_stack $T``.
+The stack location must not be modified by other instructions than
+``store_borrow``.
 The stored value is alive until the ``dealloc_stack`` or until another
 ``store_borrow`` overwrites the value. During the its lifetime, the stored
 value must not be modified or destroyed.
@@ -7442,6 +7444,68 @@ The remaining components identify the SIL differentiability witness:
 - Witness generic parameter clause (optional). When parsing SIL, the parsed
   witness generic parameter clause is combined with the original function's
   generic signature to form the full witness generic signature.
+
+Optimizer Dataflow Marker Instructions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+mark_must_check
+```````````````
+::
+
+  sil-instruction ::= 'mark_must_check'
+                      '[' sil-optimizer-analysis-marker ']'
+
+  sil-optimizer-analysis-marker ::= 'no_implicit_copy'
+
+A canary value inserted by a SIL generating frontend to signal to the move
+checker to check a specific value.  Valid only in Raw SIL. The relevant checkers
+should remove the `mark_must_check`_ instruction after successfully running the
+relevant diagnostic. The idea here is that instead of needing to introduce
+multiple "flaging" instructions for the optimizer, we can just reuse this one
+instruction by varying the kind.
+
+No Implicit Copy and No Escape Value Instructions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+copyable_to_moveonlywrapper
+```````````````````````````
+::
+
+  sil-instruction ::= 'copyable_to_moveonlywrapper'
+
+`copyable_to_moveonlywrapper`_ takes in a 'T' and maps it to a move only wrapped
+'@moveOnly T'. This is semantically used by a code generator initializing a new
+moveOnly binding from a copyable value. It semantically destroys its input
+@owned value and returns a brand new independent @owned @moveOnly value. It also
+is used to convert a trivial copyable value with type 'Trivial' into an owned
+non-trivial value of type '@moveOnly Trivial'. If one thinks of '@moveOnly' as a
+monad, this is how one injects a copyable value into the move only space.
+
+moveonlywrapper_to_copyable
+```````````````````````````
+::
+
+  sil-instruction ::= 'moveonlywrapper_to_copyable [owned]'
+  sil-instruction ::= 'moveonlywrapper_to_copyable [guaranteed]'
+
+`moveonlywrapper_to_copyable`_ takes in a '@moveOnly T' and produces a new 'T'
+value. This is a 'forwarding' instruction where at parse time, we only allow for
+one to choose it to be [owned] or [guaranteed]. With time, we may eliminate the
+need for the guaranteed form in the future.
+
+* `moveonlywrapper_to_copyable [owned]` is used to signal the end of lifetime of
+  the '@moveOnly' wrapper. SILGen inserts these when ever a move only value has
+  its ownership passed to a situation where a copyable value is needed. Since it
+  is consuming, we know that the no implicit copy or no-escape checker will ensure
+  that if we need a copy for it, the program will emit a diagnostic.
+
+* `moveonlywrapper_to_copyable [guaranteed]` is used to pass a @moveOnly T value
+  as a copyable guaranteed parameter with type 'T' to a function. In the case of
+  using no-implicit-copy checking this is always fine since no-implicit-copy is a
+  local pattern. This would be an error when performing no escape
+  checking. Importantly, this instruction also is where in the case of an
+  @moveOnly trivial type, we convert from the non-trivial representation to the
+  trivial representation.
 
 Assertion configuration
 ~~~~~~~~~~~~~~~~~~~~~~~

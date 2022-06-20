@@ -150,7 +150,7 @@ template<> void ProtocolConformanceDescriptor::dump() const {
   
   printf(" => ");
   
-  printf("witness table %pattern s\n", symbolName(getWitnessTablePattern()));
+  printf("witness table pattern (%p) %s\n", getWitnessTablePattern(), symbolName(getWitnessTablePattern()));
 }
 #endif
 
@@ -802,7 +802,18 @@ static _dyld_protocol_conformance_result getDyldSharedCacheConformance(
     ConformanceState &C, const ProtocolDescriptor *protocol,
     const ClassMetadata *objcClassMetadata,
     const ContextDescriptor *description, llvm::StringRef foreignTypeIdentity) {
+  // Protocols that aren't in the shared cache will never be found in the shared
+  // cache conformances, skip the call.
+  if (!C.inSharedCache(protocol)) {
+    DYLD_CONFORMANCES_LOG(
+        "Skipping shared cache lookup, protocol %p is not in shared cache.",
+        protocol);
+    return {_dyld_protocol_conformance_result_kind_not_found, nullptr};
+  }
+
   if (!foreignTypeIdentity.empty()) {
+    // Foreign types are non-unique so those can still be found in the shared
+    // cache even if the identity string is outside.
     DYLD_CONFORMANCES_LOG(
         "_dyld_find_foreign_type_protocol_conformance(%p, %.*s, %zu)", protocol,
         (int)foreignTypeIdentity.size(), foreignTypeIdentity.data(),
@@ -810,6 +821,17 @@ static _dyld_protocol_conformance_result getDyldSharedCacheConformance(
     return _dyld_find_foreign_type_protocol_conformance(
         protocol, foreignTypeIdentity.data(), foreignTypeIdentity.size());
   } else {
+    // If both the ObjC class metadata and description are outside the shared
+    // cache, then we'll never find a shared cache conformance, skip the call.
+    // We can still find a shared cache conformance if one is inside and one is
+    // outside.
+    if (!C.inSharedCache(objcClassMetadata) && !C.inSharedCache(description)) {
+      DYLD_CONFORMANCES_LOG("Skipping shared cache lookup, class %p and "
+                            "description %p are not in shared cache.",
+                            objcClassMetadata, description);
+      return {_dyld_protocol_conformance_result_kind_not_found, nullptr};
+    }
+
     DYLD_CONFORMANCES_LOG("_dyld_find_protocol_conformance(%p, %p, %p)",
                           protocol, objcClassMetadata, description);
     return _dyld_find_protocol_conformance(protocol, objcClassMetadata,
@@ -863,9 +885,11 @@ findConformanceWithDyld(ConformanceState &C, const Metadata *type,
   auto objcClassMetadata = swift_getObjCClassFromMetadataConditional(type);
 #if SHARED_CACHE_LOG_ENABLED
   auto typeName = swift_getTypeName(type, true);
-  DYLD_CONFORMANCES_LOG("Looking up conformance of %.*s to %s",
-                        (int)typeName.length, typeName.data,
-                        protocol->Name.get());
+  DYLD_CONFORMANCES_LOG("Looking up conformance of %.*s (type=%p, "
+                        "objcClassMetadata=%p, description=%p) to %s (%p)",
+                        (int)typeName.length, typeName.data, type,
+                        objcClassMetadata, description, protocol->Name.get(),
+                        protocol);
 #endif
   _dyld_protocol_conformance_result dyldResult;
   if (C.scanSectionsBackwards) {

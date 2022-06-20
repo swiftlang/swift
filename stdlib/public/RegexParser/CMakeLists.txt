@@ -22,6 +22,11 @@ foreach(source ${_MATCHING_ENGINE_SOURCES})
 endforeach()
 message(STATUS "Using Experimental String Processing library for _RegexParser (${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}).")
 
+set(SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS_NO_RESILIENCE)
+string(REGEX REPLACE "-enable-library-evolution" ""
+  SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS_NO_RESILIENCE
+  "${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}")
+
 add_swift_target_library(swift_RegexParser ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   "${MATCHING_ENGINE_SOURCES}"
 
@@ -37,7 +42,7 @@ add_swift_target_library(swift_RegexParser ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   C_COMPILE_FLAGS
     -Dswift_RegexParser_EXPORTS
   SWIFT_COMPILE_FLAGS
-    ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
+    ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS_NO_RESILIENCE}
     # Workaround until `_RegexParser` is imported as implementation-only
     # by `_StringProcessing`.
     -Xfrontend -disable-implicit-string-processing-module-import

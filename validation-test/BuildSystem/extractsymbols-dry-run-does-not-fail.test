@@ -5,7 +5,7 @@
 # in dry-run mode the symbol extraction
 # still runs some real commands against the installation
 # and symbol directories (e.g. find and cpio)
-# This test explictly checks that such commands
+# This test explicitly checks that such commands
 # do not cause build-script to fail when run
 # against empty directories (which is the typical
 # scenario in dry-run)

@@ -402,7 +402,7 @@ llvm::ErrorOr<ModuleDependencies> SerializedModuleLoaderBase::scanModuleFile(
   bool isFramework = false;
   serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
       modulePath.str(), std::move(moduleBuf.get()), nullptr, nullptr,
-      isFramework, isRequiredOSSAModules(),
+      isFramework, isRequiredOSSAModules(), Ctx.LangOpts.SDKName,
       Ctx.SearchPathOpts.DeserializedPathRecoverer,
       loadedModuleFile);
 
@@ -753,7 +753,7 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
   serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
       moduleInterfacePath, std::move(moduleInputBuffer),
       std::move(moduleDocInputBuffer), std::move(moduleSourceInfoInputBuffer),
-      isFramework, isRequiredOSSAModules(),
+      isFramework, isRequiredOSSAModules(), Ctx.LangOpts.SDKName,
       Ctx.SearchPathOpts.DeserializedPathRecoverer,
       loadedModuleFileCore);
   SerializedASTFile *fileUnit = nullptr;
@@ -1176,7 +1176,8 @@ bool SerializedModuleLoaderBase::canImportModule(ImportPath::Module path,
   // format, if present.
   if (currentVersion.empty() && *unusedModuleBuffer) {
     auto metaData = serialization::validateSerializedAST(
-        (*unusedModuleBuffer)->getBuffer(), Ctx.SILOpts.EnableOSSAModules);
+        (*unusedModuleBuffer)->getBuffer(), Ctx.SILOpts.EnableOSSAModules,
+        Ctx.LangOpts.SDKName);
     currentVersion = metaData.userModuleVersion;
   }
 
@@ -1319,7 +1320,7 @@ void SerializedModuleLoaderBase::loadExtensions(NominalTypeDecl *nominal,
 }
 
 void SerializedModuleLoaderBase::loadObjCMethods(
-       ClassDecl *classDecl,
+       NominalTypeDecl *typeDecl,
        ObjCSelector selector,
        bool isInstanceMethod,
        unsigned previousGeneration,
@@ -1327,7 +1328,7 @@ void SerializedModuleLoaderBase::loadObjCMethods(
   for (auto &modulePair : LoadedModuleFiles) {
     if (modulePair.second <= previousGeneration)
       continue;
-    modulePair.first->loadObjCMethods(classDecl, selector, isInstanceMethod,
+    modulePair.first->loadObjCMethods(typeDecl, selector, isInstanceMethod,
                                       methods);
   }
 }

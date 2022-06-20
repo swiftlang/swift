@@ -1354,7 +1354,7 @@ func testDynamicMemberSubscriptLookup() {
   }
 
   @dynamicMemberLookup public struct Binding<Value> {
-    subscript<Subject>(dynamicMember keyPath: WritableKeyPath<Value, Subject>) -> Binding<Subject> {
+    subscript<Subject>(dynamicMember keyPath: KeyPath<Value, Subject>) -> Binding<Subject> {
       fatalError()
     }
   }
@@ -1363,7 +1363,7 @@ func testDynamicMemberSubscriptLookup() {
     var bar: Binding<MyStruct>
 
     func test(index: Int) {
-      _ = bar[#^DYNAMIC_MEMBER_SUBSCRIPT_LOOKUP?xfail=rdar90363138^#index]
+      _ = bar[#^DYNAMIC_MEMBER_SUBSCRIPT_LOOKUP^#index]
     }
   }
 }
@@ -1371,6 +1371,7 @@ func testDynamicMemberSubscriptLookup() {
 // DYNAMIC_MEMBER_SUBSCRIPT_LOOKUP: Begin completions
 // DYNAMIC_MEMBER_SUBSCRIPT_LOOKUP-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: index[#Int#]; name=index
 // DYNAMIC_MEMBER_SUBSCRIPT_LOOKUP-DAG: Pattern/CurrNominal/Flair[ArgLabels]: ['[']{#keyPath: KeyPath<Binding<MyStruct>, Value>#}[']'][#Value#]; name=keyPath:
+// DYNAMIC_MEMBER_SUBSCRIPT_LOOKUP-DAG: Decl[Subscript]/CurrNominal/Flair[ArgLabels]: ['[']{#(index): Int#}[']'][#Int#]; name=:
 // DYNAMIC_MEMBER_SUBSCRIPT_LOOKUP: End completions
 
 func testVarInitializedByCallingClosure() {

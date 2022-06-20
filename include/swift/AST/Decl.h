@@ -3644,7 +3644,7 @@ public:
   bool isActor() const;
 
   /// Whether this nominal type qualifies as a distributed actor, meaning that
-  /// it is either a distributed actor.
+  /// it is either a distributed actor or a DistributedActor constrained protocol.
   bool isDistributedActor() const;
 
   /// Whether this nominal type qualifies as any actor (plain or distributed).
@@ -5355,6 +5355,10 @@ public:
   /// Does this have a 'distributed' modifier?
   bool isDistributed() const;
 
+  /// Return a distributed thunk if this computed property is marked as
+  /// 'distributed' and and nullptr otherwise.
+  FuncDecl *getDistributedThunk() const;
+
   /// Is this var known to be a "local" distributed actor,
   /// if so the implicit throwing ans some isolation checks can be skipped.
   bool isKnownToBeLocal() const;
@@ -5742,6 +5746,10 @@ public:
   }
   void setDefaultArgumentKind(DefaultArgumentKind K) {
     Bits.ParamDecl.defaultArgumentKind = static_cast<unsigned>(K);
+  }
+
+  void setDefaultArgumentKind(ArgumentAttrs K) {
+    setDefaultArgumentKind(K.argumentKind);
   }
 
   bool isNoImplicitCopy() const {
@@ -6265,8 +6273,11 @@ private:
   DerivativeFunctionConfigurationList *DerivativeFunctionConfigs = nullptr;
 
 public:
-  /// Get all derivative function configurations.
-  ArrayRef<AutoDiffConfig> getDerivativeFunctionConfigurations();
+  /// Get all derivative function configurations. If `lookInNonPrimarySources`
+  /// is true then lookup is done in non-primary sources as well. Note that
+  /// such lookup might end in cycles if done during sema stages.
+  ArrayRef<AutoDiffConfig>
+  getDerivativeFunctionConfigurations(bool lookInNonPrimarySources = true);
 
   /// Add the given derivative function configuration.
   void addDerivativeFunctionConfiguration(const AutoDiffConfig &config);
@@ -6403,6 +6414,9 @@ public:
   /// A function is concurrent if it has the @Sendable attribute.
   bool isSendable() const;
 
+  /// Determine if function has 'nonisolated' attribute
+  bool isNonisolated() const;
+
   /// Returns true if the function is a suitable 'async' context.
   ///
   /// Functions that are an 'async' context can make calls to 'async' functions.
@@ -6421,6 +6435,10 @@ public:
 
   /// Returns 'true' if the function is distributed.
   bool isDistributed() const;
+
+  /// Is this a thunk function used to access a distributed method outside
+  /// of its actor isolation context?
+  bool isDistributedThunk() const;
 
   /// For a 'distributed' target (func or computed property),
   /// get the 'thunk' responsible for performing the 'remoteCall'.
@@ -6750,7 +6768,7 @@ public:
   bool hasDynamicSelfResult() const;
 
   /// The async function marked as the alternative to this function, if any.
-  AbstractFunctionDecl *getAsyncAlternative() const;
+  AbstractFunctionDecl *getAsyncAlternative(bool isKnownObjC = false) const;
 
   /// If \p asyncAlternative is set, then compare its parameters to this
   /// (presumed synchronous) function's parameters to find the index of the

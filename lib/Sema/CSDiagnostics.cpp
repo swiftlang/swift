@@ -796,6 +796,10 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
       break;
     }
 
+    case ConstraintLocator::ResultBuilderBodyResult:
+      diagnostic = diag::cannot_convert_result_builder_result_to_return_type;
+      break;
+
     case ConstraintLocator::AutoclosureResult:
     case ConstraintLocator::ApplyArgToParam:
     case ConstraintLocator::ApplyArgument: {
@@ -920,8 +924,21 @@ bool ArrayLiteralToDictionaryConversionFailure::diagnoseAsError() {
                  CTP == CTP_Initialization);
 
   auto diagnostic = emitDiagnostic(diag::meant_dictionary_lit);
-  if (AE->getNumElements() == 1)
+  const auto numElements = AE->getNumElements();
+  if (numElements == 1) {
     diagnostic.fixItInsertAfter(AE->getElement(0)->getEndLoc(), ": <#value#>");
+  } else {
+    // If there is an even number of elements in the array, let's produce
+    // a fix-it which suggests to replace "," with ":" to form a dictionary
+    // literal.
+    if ((numElements & 1) == 0) {
+      const auto commaLocs = AE->getCommaLocs();
+      if (commaLocs.size() == numElements - 1) {
+        for (unsigned i = 0, e = numElements / 2; i != e; ++i)
+          diagnostic.fixItReplace(commaLocs[i * 2], ":");
+      }
+    }
+  }
   return true;
 }
 
@@ -1266,7 +1283,24 @@ SourceRange MemberAccessOnOptionalBaseFailure::getSourceRange() const {
 bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
   auto baseType = getMemberBaseType();
   auto locator = getLocator();
-  
+
+  // If this is an issue with `makeIterator` having an optional
+  // result, it would be diagnosed by fix on the base type.
+  if (auto anchor = locator->getAnchor()) {
+    if (auto *UDE = getAsExpr<UnresolvedDotExpr>(anchor)) {
+      if (UDE->isImplicit()) {
+        auto &solution = getSolution();
+        auto *baseLoc = solution.getConstraintLocator(
+            UDE->getBase(),
+            LocatorPathElt::ContextualType(CTP_ForEachSequence));
+
+        if (hasFixFor(solution, baseLoc))
+          return false;
+      }
+    }
+  }
+
+
   bool resultIsOptional = ResultTypeIsOptional;
 
   // If we've resolved the member overload to one that returns an optional
@@ -6895,6 +6929,7 @@ void NonEphemeralConversionFailure::emitSuggestionNotes() const {
     break;
   }
   case ConversionRestrictionKind::InoutToPointer:
+  case ConversionRestrictionKind::InoutToCPointer:
     // For an arbitrary inout-to-pointer, we can suggest
     // withUnsafe[Mutable][Bytes/Pointer].
     if (auto alternative = getAlternativeKind())
@@ -8141,5 +8176,65 @@ bool DefaultExprTypeMismatch::diagnoseAsError() {
     note.highlight(defaultExpr->getSourceRange());
   }
 
+  return true;
+}
+
+bool MissingExplicitExistentialCoercion::diagnoseAsError() {
+  auto diagnostic = emitDiagnostic(diag::result_requires_explicit_coercion,
+                                   ErasedResultType);
+  fixIt(diagnostic);
+  return true;
+}
+
+bool MissingExplicitExistentialCoercion::diagnoseAsNote() {
+  auto diagnostic = emitDiagnostic(
+      diag::candidate_result_requires_explicit_coercion, ErasedResultType);
+  fixIt(diagnostic);
+  return true;
+}
+
+bool MissingExplicitExistentialCoercion::fixItRequiresParens() const {
+  auto anchor = getAsExpr(getRawAnchor());
+
+  // If it's a member reference an an existential metatype, let's
+  // use the parent "call" expression.
+  if (auto *UDE = dyn_cast_or_null<UnresolvedDotExpr>(anchor))
+    anchor = findParentExpr(UDE);
+
+  if (!anchor)
+    return false;
+
+  const auto &solution = getSolution();
+  return llvm::any_of(
+      solution.OpenedExistentialTypes,
+      [&anchor](const auto &openedExistential) {
+        if (auto openedLoc = simplifyLocatorToAnchor(openedExistential.first)) {
+          return anchor == getAsExpr(openedLoc);
+        }
+        return false;
+      });
+}
+
+void MissingExplicitExistentialCoercion::fixIt(
+    InFlightDiagnostic &diagnostic) const {
+  bool requiresParens = fixItRequiresParens();
+
+  auto callRange = getSourceRange();
+
+  if (requiresParens)
+    diagnostic.fixItInsert(callRange.Start, "(");
+
+  auto printOpts = PrintOptions::forDiagnosticArguments();
+  diagnostic.fixItInsertAfter(callRange.End,
+                              "as " + ErasedResultType->getString(printOpts) +
+                                  (requiresParens ? ")" : ""));
+}
+
+bool ConflictingPatternVariables::diagnoseAsError() {
+  for (auto *var : Vars) {
+    emitDiagnosticAt(var->getStartLoc(),
+                     diag::type_mismatch_multiple_pattern_list, getType(var),
+                     ExpectedType);
+  }
   return true;
 }

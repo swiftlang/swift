@@ -691,6 +691,11 @@ def strict_concurrency : Joined<["-"], "strict-concurrency=">,
            "concurrency model, or 'complete' ('Sendable' and other checking is "
            "enabled for all code in the module)">;
 
+def enable_experimental_feature :
+  Separate<["-"], "enable-experimental-feature">,
+  Flags<[FrontendOption]>,
+  HelpText<"Enable an experimental feature">;
+
 def Rpass_EQ : Joined<["-"], "Rpass=">,
   Flags<[FrontendOption]>,
   HelpText<"Report performed transformations by optimization passes whose "
@@ -845,6 +850,9 @@ def debug_prefix_map : Separate<["-"], "debug-prefix-map">,
 def coverage_prefix_map : Separate<["-"], "coverage-prefix-map">,
   Flags<[FrontendOption]>,
   HelpText<"Remap source paths in coverage info">, MetaVarName<"<prefix=replacement>">;
+def file_prefix_map : Separate<["-"], "file-prefix-map">,
+  Flags<[FrontendOption]>,
+  HelpText<"Remap source paths in debug, coverage, and index info">, MetaVarName<"<prefix=replacement>">;
 
 def file_compilation_dir : Separate<["-"], "file-compilation-dir">,
   Flags<[FrontendOption]>, MetaVarName<"<path>">,
@@ -1250,6 +1258,10 @@ def index_unit_output_path : Separate<["-"], "index-unit-output-path">,
   Flags<[FrontendOption, ArgumentIsPath]>, MetaVarName<"<path>">,
   HelpText<"Use <path> as the output path in the produced index data.">;
 
+def index_ignore_clang_modules : Flag<["-"], "index-ignore-clang-modules">,
+  Flags<[FrontendOption]>,
+  HelpText<"Avoid indexing clang modules (pcms)">;
+
 def index_ignore_system_modules : Flag<["-"], "index-ignore-system-modules">,
   Flags<[NoInteractiveOption]>,
   HelpText<"Avoid indexing system modules">;
@@ -1387,6 +1399,10 @@ def ignored_usrs: Separate<["-", "--"], "ignored-usrs">,
   HelpText<"the file containing USRs of removed decls that the digester should ignore">,
   MetaVarName<"<path>">;
 
+def ignore_spi_groups : Separate<["-", "--"], "ignore-spi-group">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+  HelpText<"SPI group name to not diagnose about">;
+
 def protocol_requirement_allow_list: Separate<["-", "--"], "protocol-requirement-allow-list">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption, ArgumentIsPath]>,
   HelpText<"File containing a new-line separated list of protocol names">,
@@ -1429,6 +1445,10 @@ def swift_only: Flag<["-", "--"], "swift-only">,
 def disable_os_checks: Flag<["-", "--"], "disable-os-checks">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
   HelpText<"Skip OS related diagnostics">;
+
+def disable_remove_deprecated_check: Flag<["-", "--"], "disable-remove-deprecated-check">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+  HelpText<"Skip diagnosing removal of deprecated symbols">;
 
 def print_module: Flag<["-", "--"], "print-module">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption]>,

@@ -1194,7 +1194,7 @@ static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
       if (!isa<PatternBindingInitializer>(DC) ||
           !cast<PatternBindingInitializer>(DC)->getInitializedLazyVar())
         LS = LS.withOnMetatype();
-      DC = DC->getParent();
+      DC = DC->getParentForLookup();
     }
 
     // We don't look for generic parameters if we are in the context of a
@@ -1210,7 +1210,7 @@ static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
 
     if (auto *SE = dyn_cast<SubscriptDecl>(DC)) {
       ExtendedType = SE->getDeclContext()->getSelfTypeInContext();
-      DC = DC->getParent();
+      DC = DC->getParentForLookup();
       if (SE->isStatic())
         LS = LS.withOnMetatype();
     } else if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
@@ -1238,7 +1238,7 @@ static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
 
       if (AFD->getDeclContext()->isTypeContext()) {
         ExtendedType = AFD->getDeclContext()->getSelfTypeInContext();
-        DC = DC->getParent();
+        DC = DC->getParentForLookup();
 
         if (auto *FD = dyn_cast<FuncDecl>(AFD))
           if (FD->isStatic())
@@ -1288,7 +1288,7 @@ static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
       MemberReason = DeclVisibilityKind::MemberOfOutsideNominal;
     }
 
-    DC = DC->getParent();
+    DC = DC->getParentForLookup();
   }
 
   if (auto SF = dyn_cast<SourceFile>(DC)) {

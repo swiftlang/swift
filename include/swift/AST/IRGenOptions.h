@@ -254,6 +254,11 @@ public:
   /// Path prefixes that should be rewritten in coverage info.
   PathRemapper CoveragePrefixMap;
 
+  /// Path prefixes that should be rewritten in info besides debug and coverage
+  /// (use DebugPrefixMap and CoveragePrefixMap for those) - currently just
+  /// indexing info.
+  PathRemapper FilePrefixMap;
+
   /// What level of debug info to generate.
   IRGenDebugInfoLevel DebugInfoLevel : 2;
 
@@ -278,6 +283,8 @@ public:
   /// Emit runtime calls to check the end of the lifetime of stack promoted
   /// objects.
   unsigned EmitStackPromotionChecks : 1;
+
+  unsigned UseSingleModuleLLVMEmission : 1;
 
   /// Emit functions to separate sections.
   unsigned FunctionSections : 1;
@@ -442,13 +449,13 @@ public:
         DebugInfoFormat(IRGenDebugInfoFormat::None),
         DisableClangModuleSkeletonCUs(false), UseJIT(false),
         DisableLLVMOptzns(false), DisableSwiftSpecificLLVMOptzns(false),
-        Playground(false),
-        EmitStackPromotionChecks(false), FunctionSections(false),
+        Playground(false), EmitStackPromotionChecks(false),
+        UseSingleModuleLLVMEmission(false), FunctionSections(false),
         PrintInlineTree(false), EmbedMode(IRGenEmbedMode::None),
         LLVMLTOKind(IRGenLLVMLTOKind::None),
         SwiftAsyncFramePointer(SwiftAsyncFramePointerKind::Auto),
-        HasValueNamesSetting(false),
-        ValueNames(false), ReflectionMetadata(ReflectionMetadataMode::Runtime),
+        HasValueNamesSetting(false), ValueNames(false),
+        ReflectionMetadata(ReflectionMetadataMode::Runtime),
         EnableReflectionNames(true), EnableAnonymousContextMangledNames(false),
         ForcePublicLinkage(false), LazyInitializeClassMetadata(false),
         LazyInitializeProtocolConformances(false),
@@ -457,16 +464,21 @@ public:
         PrespecializeGenericMetadata(false), UseIncrementalLLVMCodeGen(true),
         UseTypeLayoutValueHandling(true), ForceStructTypeLayouts(false),
         GenerateProfile(false), EnableDynamicReplacementChaining(false),
-        DisableRoundTripDebugTypes(false), DisableDebuggerShadowCopies(false),
+        DisableDebuggerShadowCopies(false),
         DisableConcreteTypeMetadataMangledNameAccessors(false),
         DisableStandardSubstitutionsInReflectionMangling(false),
         EnableGlobalISel(false), VirtualFunctionElimination(false),
         WitnessMethodElimination(false), ConditionalRuntimeRecords(false),
         InternalizeAtLink(false), InternalizeSymbols(false),
-        NoPreallocatedInstantiationCaches(false),
-        CmdArgs(),
+        NoPreallocatedInstantiationCaches(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
-        TypeInfoFilter(TypeInfoDumpFilter::All) {}
+        TypeInfoFilter(TypeInfoDumpFilter::All) {
+#ifndef NDEBUG
+    DisableRoundTripDebugTypes = false;
+#else
+    DisableRoundTripDebugTypes = true;
+#endif
+  }
 
   /// Appends to \p os an arbitrary string representing all options which
   /// influence the llvm compilation but are not reflected in the llvm module
@@ -519,8 +531,8 @@ public:
     return llvm::hash_value(0);
   }
 
-  bool hasMultipleIRGenThreads() const { return NumThreads > 1; }
-  bool shouldPerformIRGenerationInParallel() const { return NumThreads != 0; }
+  bool hasMultipleIRGenThreads() const { return !UseSingleModuleLLVMEmission && NumThreads > 1; }
+  bool shouldPerformIRGenerationInParallel() const { return !UseSingleModuleLLVMEmission && NumThreads != 0; }
   bool hasMultipleIGMs() const { return hasMultipleIRGenThreads(); }
 };
 

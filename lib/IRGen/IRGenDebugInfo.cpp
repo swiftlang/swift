@@ -21,6 +21,7 @@
 #include "GenStruct.h"
 #include "GenType.h"
 #include "IRBuilder.h"
+#include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -63,10 +64,6 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Local.h"
-
-#ifndef NDEBUG
-#include "swift/AST/ASTDemangler.h"
-#endif
 
 using namespace swift;
 using namespace irgen;
@@ -135,6 +132,7 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
   llvm::DenseMap<TypeBase *, llvm::TrackingMDNodeRef> DITypeCache;
   llvm::DenseMap<const void *, llvm::TrackingMDNodeRef> DIModuleCache;
   llvm::StringMap<llvm::TrackingMDNodeRef> DIFileCache;
+  llvm::StringMap<llvm::TrackingMDNodeRef> RuntimeErrorFnCache;
   TrackingDIRefMap DIRefMap;
   TrackingDIRefMap InnerTypeCache;
   /// \}
@@ -915,7 +913,6 @@ private:
     if (!Opts.DisableRoundTripDebugTypes &&
         !Ty->getASTContext().LangOpts.EnableCXXInterop) {
       // Make sure we can reconstruct mangled types for the debugger.
-#ifndef NDEBUG
       auto &Ctx = Ty->getASTContext();
       Type Reconstructed = Demangle::getTypeForMangling(Ctx, Result);
       if (!Reconstructed) {
@@ -936,7 +933,6 @@ private:
         Reconstructed->dump(llvm::errs());
         abort();
       }
-#endif
     }
 
     return BumpAllocatedString(Result);
@@ -1729,6 +1725,7 @@ private:
     case TypeKind::SILToken:
     case TypeKind::BuiltinUnsafeValueBuffer:
     case TypeKind::BuiltinDefaultActorStorage:
+    case TypeKind::SILMoveOnly:
 
       LLVM_DEBUG(llvm::dbgs() << "Unhandled type: ";
                  DbgTy.getType()->dump(llvm::dbgs()); llvm::dbgs() << "\n");
@@ -2113,13 +2110,20 @@ void IRGenDebugInfoImpl::addFailureMessageToCurrentLoc(IRBuilder &Builder,
 
   llvm::DISubroutineType *DIFnTy = DBuilder.createSubroutineType(nullptr);
 
-  std::string FuncName = "Swift runtime failure: ";
-  FuncName += failureMsg;
-
-  llvm::DISubprogram *TrapSP = DBuilder.createFunction(
-      MainModule, FuncName, StringRef(), TrapLoc->getFile(), 0, DIFnTy, 0,
-      llvm::DINode::FlagArtificial, llvm::DISubprogram::SPFlagDefinition,
-      nullptr, nullptr, nullptr);
+  llvm::DISubprogram *TrapSP;
+  auto It = RuntimeErrorFnCache.find(failureMsg);
+  if (It != RuntimeErrorFnCache.end())
+    TrapSP = llvm::cast<llvm::DISubprogram>(It->second);
+  else {
+    std::string FuncName = "Swift runtime failure: ";
+    FuncName += failureMsg;
+    llvm::DIFile *File = getOrCreateFile({});
+    TrapSP = DBuilder.createFunction(
+        File, FuncName, StringRef(), File, 0,
+        DIFnTy, 0, llvm::DINode::FlagArtificial,
+        llvm::DISubprogram::SPFlagDefinition, nullptr, nullptr, nullptr);
+    RuntimeErrorFnCache.insert({failureMsg, llvm::TrackingMDNodeRef(TrapSP)});
+  }
 
   ScopeCache[TrapSc] = llvm::TrackingMDNodeRef(TrapSP);
   LastScope = TrapSc;

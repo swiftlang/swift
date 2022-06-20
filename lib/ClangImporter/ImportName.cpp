@@ -57,6 +57,20 @@ using namespace importer;
 using clang::CompilerInstance;
 using clang::CompilerInvocation;
 
+static const char *getOperatorName(clang::OverloadedOperatorKind Operator) {
+  switch (Operator) {
+  case clang::OO_None:
+  case clang::NUM_OVERLOADED_OPERATORS:
+    return nullptr;
+
+#define OVERLOADED_OPERATOR(Name, Spelling, Token, Unary, Binary, MemberOnly)  \
+  case clang::OO_##Name:                                                       \
+    return #Name;
+#include "clang/Basic/OperatorKinds.def"
+  }
+
+  llvm_unreachable("Invalid OverloadedOperatorKind!");
+}
 
 /// Determine whether the given Clang selector matches the given
 /// selector pieces.
@@ -855,16 +869,18 @@ static bool omitNeedlessWordsInFunctionName(
     StringRef argumentName;
     if (i < argumentNames.size())
       argumentName = argumentNames[i];
-    bool hasDefaultArg =
+    auto argumentAttrs =
         ClangImporter::Implementation::inferDefaultArgument(
             param->getType(),
             getParamOptionality(param, !nonNullArgs.empty() && nonNullArgs[i]),
             nameImporter.getIdentifier(baseName), argumentName, i == 0,
-            isLastParameter, nameImporter) != DefaultArgumentKind::None;
+            isLastParameter, nameImporter);
 
-    paramTypes.push_back(getClangTypeNameForOmission(clangCtx,
-                                                     param->getOriginalType())
-                            .withDefaultArgument(hasDefaultArg));
+    paramTypes.push_back(
+        (argumentAttrs.hasAlternateCXXOptionsEnumName()
+             ? OmissionTypeName(argumentAttrs.getAlternateCXXOptionsEnumName())
+             : getClangTypeNameForOmission(clangCtx, param->getOriginalType()))
+            .withDefaultArgument(argumentAttrs.hasDefaultArg()));
   }
 
   // Find the property names.
@@ -1501,14 +1517,14 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       completionHandlerParamIndex =
           swiftAsyncAttr->getCompletionHandlerIndex().getASTIndex();
     }
-    
+
     if (const auto *asyncErrorAttr = D->getAttr<clang::SwiftAsyncErrorAttr>()) {
       switch (auto convention = asyncErrorAttr->getConvention()) {
       // No flag parameter in these cases.
       case clang::SwiftAsyncErrorAttr::NonNullError:
       case clang::SwiftAsyncErrorAttr::None:
         break;
-      
+
       // Get the flag argument index and polarity from the attribute.
       case clang::SwiftAsyncErrorAttr::NonZeroArgument:
       case clang::SwiftAsyncErrorAttr::ZeroArgument:
@@ -1842,17 +1858,15 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     case clang::OverloadedOperatorKind::OO_LessEqual:
     case clang::OverloadedOperatorKind::OO_GreaterEqual:
     case clang::OverloadedOperatorKind::OO_AmpAmp:
-    case clang::OverloadedOperatorKind::OO_PipePipe:
-      baseName = clang::getOperatorSpelling(op);
+    case clang::OverloadedOperatorKind::OO_PipePipe: {
+      auto operatorName = isa<clang::CXXMethodDecl>(functionDecl)
+                              ? "__operator" + std::string{getOperatorName(op)}
+                              : clang::getOperatorSpelling(op);
+      baseName = swiftCtx.getIdentifier(operatorName).str();
       isFunction = true;
-      argumentNames.resize(
-          functionDecl->param_size() +
-              // C++ operators that are implemented as non-static member functions
-              // get imported into Swift as static member functions that use an
-              // additional parameter for the left-hand side operand instead of
-              // the receiver object.
-              (isa<clang::CXXMethodDecl>(D) ? 1 : 0));
+      addEmptyArgNamesForClangFunction(functionDecl, argumentNames);
       break;
+    }
     case clang::OverloadedOperatorKind::OO_Call:
       baseName = "callAsFunction";
       isFunction = true;

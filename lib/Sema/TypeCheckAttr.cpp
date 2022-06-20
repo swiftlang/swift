@@ -150,7 +150,6 @@ public:
   IGNORED_ATTR(OriginallyDefinedIn)
   IGNORED_ATTR(NoDerivative)
   IGNORED_ATTR(SpecializeExtension)
-  IGNORED_ATTR(Sendable)
   IGNORED_ATTR(NonSendable)
   IGNORED_ATTR(AtRethrows)
   IGNORED_ATTR(AtReasync)
@@ -322,6 +321,10 @@ public:
   void checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs);
 
   void visitKnownToBeLocalAttr(KnownToBeLocalAttr *attr);
+
+  void visitSendableAttr(SendableAttr *attr);
+
+  void visitDistributedThunkAttr(DistributedThunkAttr *attr);
 };
 
 } // end anonymous namespace
@@ -329,7 +332,7 @@ public:
 void AttributeChecker::visitNoImplicitCopyAttr(NoImplicitCopyAttr *attr) {
   // Only allow for this attribute to be used when experimental move only is
   // enabled.
-  if (!D->getASTContext().LangOpts.EnableExperimentalMoveOnly) {
+  if (!D->getASTContext().LangOpts.hasFeature(Feature::MoveOnly)) {
     auto error =
         diag::experimental_moveonly_feature_can_only_be_used_when_enabled;
     diagnoseAndRemoveAttr(attr, error);
@@ -476,6 +479,75 @@ void AttributeChecker::visitDynamicAttr(DynamicAttr *attr) {
     diagnoseAndRemoveAttr(attr, diag::dynamic_with_transparent);
 }
 
+/// Replaces asynchronous IBActionAttr/IBSegueActionAttr function declarations
+/// with a synchronous function. The body of the original function is moved
+/// inside of a task executed on the MainActor
+static void emitFixItIBActionRemoveAsync(ASTContext &ctx, const FuncDecl &FD) {
+  // If we don't have an async loc for some reason, things will explode
+  if (!FD.getAsyncLoc())
+    return;
+
+  std::string replacement = "";
+
+  // attributes, function name and everything up to `async` (exclusive)
+  replacement +=
+      CharSourceRange(ctx.SourceMgr, FD.getSourceRangeIncludingAttrs().Start,
+                      FD.getAsyncLoc())
+          .str();
+
+  CharSourceRange returnType = Lexer::getCharSourceRangeFromSourceRange(
+      ctx.SourceMgr, FD.getResultTypeSourceRange());
+
+  // If we have a return type, include that here
+  if (returnType.isValid()) {
+    replacement +=
+        (llvm::Twine("-> ") + Lexer::getCharSourceRangeFromSourceRange(
+                                  ctx.SourceMgr, FD.getResultTypeSourceRange())
+                                  .str())
+            .str();
+  }
+
+  if (!FD.hasBody()) {
+    // If we don't have any body, the sourcelocs won't work and will result in
+    // crashes, so just swap out what we can
+
+    SourceLoc endLoc =
+        returnType.isValid() ? returnType.getEnd() : FD.getAsyncLoc();
+    ctx.Diags
+        .diagnose(FD.getAsyncLoc(), diag::remove_async_add_task, FD.getName())
+        .fixItReplace(
+            SourceRange(FD.getSourceRangeIncludingAttrs().Start, endLoc),
+            replacement);
+    return;
+  }
+
+  if (returnType.isValid())
+    replacement += " "; // insert space between type name and lbrace
+
+  replacement += "{\nTask { @MainActor in";
+
+  // If the body of the function is just "{}", there isn't anything to wrap.
+  // stepping over the braces to grab just the body will result in the `Start`
+  // location of the source range to come after the `End` of the range, and we
+  // will overflow. Dance around this by just appending the end of the fix to
+  // the replacement.
+  if (FD.getBody()->getLBraceLoc() !=
+      FD.getBody()->getRBraceLoc().getAdvancedLocOrInvalid(-1)) {
+    // We actually have a body, so add that to the string
+    CharSourceRange functionBody(
+        ctx.SourceMgr, FD.getBody()->getLBraceLoc().getAdvancedLocOrInvalid(1),
+        FD.getBody()->getRBraceLoc().getAdvancedLocOrInvalid(-1));
+    replacement += functionBody.str();
+  }
+  replacement += " }\n}";
+
+  ctx.Diags
+      .diagnose(FD.getAsyncLoc(), diag::remove_async_add_task, FD.getName())
+      .fixItReplace(SourceRange(FD.getSourceRangeIncludingAttrs().Start,
+                                FD.getBody()->getRBraceLoc()),
+                    replacement);
+}
+
 static bool
 validateIBActionSignature(ASTContext &ctx, DeclAttribute *attr,
                           const FuncDecl *FD, unsigned minParameters,
@@ -499,6 +571,13 @@ validateIBActionSignature(ASTContext &ctx, DeclAttribute *attr,
   if (resultType->isVoid() != hasVoidResult) {
     ctx.Diags.diagnose(FD, diag::invalid_ibaction_result, attr->getAttrName(),
                        hasVoidResult);
+    valid = false;
+  }
+
+  if (FD->isAsyncContext()) {
+    ctx.Diags.diagnose(FD->getAsyncLoc(), diag::attr_decl_async,
+                       attr->getAttrName(), FD->getDescriptiveKind());
+    emitFixItIBActionRemoveAsync(ctx, *FD);
     valid = false;
   }
 
@@ -633,16 +712,16 @@ void AttributeChecker::visitIBInspectableAttr(IBInspectableAttr *attr) {
   // Only instance properties can be 'IBInspectable'.
   auto *VD = cast<VarDecl>(D);
   if (!VD->getDeclContext()->getSelfClassDecl() || VD->isStatic())
-    diagnoseAndRemoveAttr(attr, diag::invalid_ibinspectable,
-                                 attr->getAttrName());
+    diagnoseAndRemoveAttr(attr, diag::attr_must_be_used_on_class_instance,
+                          attr->getAttrName());
 }
 
 void AttributeChecker::visitGKInspectableAttr(GKInspectableAttr *attr) {
   // Only instance properties can be 'GKInspectable'.
   auto *VD = cast<VarDecl>(D);
   if (!VD->getDeclContext()->getSelfClassDecl() || VD->isStatic())
-    diagnoseAndRemoveAttr(attr, diag::invalid_ibinspectable,
-                                 attr->getAttrName());
+    diagnoseAndRemoveAttr(attr, diag::attr_must_be_used_on_class_instance,
+                          attr->getAttrName());
 }
 
 static Optional<Diag<bool,Type>>
@@ -691,7 +770,8 @@ void AttributeChecker::visitIBOutletAttr(IBOutletAttr *attr) {
   // Only instance properties can be 'IBOutlet'.
   auto *VD = cast<VarDecl>(D);
   if (!VD->getDeclContext()->getSelfClassDecl() || VD->isStatic())
-    diagnoseAndRemoveAttr(attr, diag::invalid_iboutlet);
+    diagnoseAndRemoveAttr(attr, diag::attr_must_be_used_on_class_instance,
+                          attr->getAttrName());
 
   if (!VD->isSettable(nullptr)) {
     // Allow non-mutable IBOutlet properties in module interfaces,
@@ -3023,6 +3103,7 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
     Failable,
     UnsatisfiedRequirements,
     Inaccessible,
+    SPI,
   };
   SmallVector<std::tuple<ConstructorDecl *, UnviableReason, Type>, 2> unviable;
 
@@ -3085,6 +3166,28 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
       return false;
     }
 
+    if (init->isSPI()) {
+      if (!protocol->isSPI()) {
+        unviable.push_back(
+            std::make_tuple(init, UnviableReason::SPI, genericParamType));
+        return false;
+      }
+      auto protocolSPIGroups = protocol->getSPIGroups();
+      auto initSPIGroups = init->getSPIGroups();
+      // If both are SPI, `init(erasing:)` must be available in all of the
+      // protocol's SPI groups.
+      // TODO: Do this more efficiently?
+      for (auto protocolGroup : protocolSPIGroups) {
+        auto foundIt = std::find(
+            initSPIGroups.begin(), initSPIGroups.end(), protocolGroup);
+        if (foundIt == initSPIGroups.end()) {
+          unviable.push_back(
+              std::make_tuple(init, UnviableReason::SPI, genericParamType));
+          return false;
+        }
+      }
+    }
+
     return true;
   });
 
@@ -3114,8 +3217,12 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
         break;
       case UnviableReason::Inaccessible:
         diags.diagnose(init->getLoc(), diag::type_eraser_init_not_accessible,
-                       init->getFormalAccess(), protocolType,
-                       protocol->getFormalAccess());
+                       init->getEffectiveAccess(), protocolType,
+                       protocol->getEffectiveAccess());
+        break;
+      case UnviableReason::SPI:
+        diags.diagnose(init->getLoc(), diag::type_eraser_init_spi,
+                       protocolType, protocol->isSPI());
         break;
       }
     }
@@ -3633,6 +3740,12 @@ void AttributeChecker::checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs) {
         diagnoseAndRemoveAttr(Attr, diag::attr_not_on_stored_properties, Attr);
         continue;
       }
+    }
+
+    if (isa<DestructorDecl>(D) || isa<ConstructorDecl>(D)) {
+      diagnoseAndRemoveAttr(Attr, diag::attr_invalid_on_decl_kind, Attr,
+                            D->getDescriptiveKind());
+      continue;
     }
 
     auto AtLoc = Attr->AtLoc;
@@ -4957,10 +5070,11 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
 /// - Stores the attribute in `ASTContext::DerivativeAttrs`.
 ///
 /// \returns true on error, false on success.
-static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
-                                    DerivativeAttr *attr) {
+static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
   // Note: Implementation must be idempotent because it may be called multiple
   // times for the same attribute.
+  Decl *D = attr->getOriginalDeclaration();
+  auto &Ctx = D->getASTContext();
   auto &diags = Ctx.Diags;
   // `@derivative` attribute requires experimental differentiable programming
   // to be enabled.
@@ -5373,13 +5487,18 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
 }
 
 void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
-  if (typeCheckDerivativeAttr(Ctx, D, attr))
+  if (typeCheckDerivativeAttr(attr))
     attr->setInvalid();
 }
 
 AbstractFunctionDecl *
 DerivativeAttrOriginalDeclRequest::evaluate(Evaluator &evaluator,
                                             DerivativeAttr *attr) const {
+  // Try to resolve the original function.
+  if (attr->isValid() && attr->OriginalFunction.isNull())
+    if (typeCheckDerivativeAttr(attr))
+      attr->setInvalid();
+
   // If the typechecker has resolved the original function, return it.
   if (auto *FD = attr->OriginalFunction.dyn_cast<AbstractFunctionDecl *>())
     return FD;
@@ -5803,6 +5922,26 @@ void AttributeChecker::visitKnownToBeLocalAttr(KnownToBeLocalAttr *attr) {
   }
 }
 
+void AttributeChecker::visitSendableAttr(SendableAttr *attr) {
+
+  if ((isa<AbstractFunctionDecl>(D) || isa<AbstractStorageDecl>(D)) &&
+      !isAsyncDecl(cast<ValueDecl>(D))) {
+    auto value = cast<ValueDecl>(D);
+    ActorIsolation isolation = getActorIsolation(value);
+    if (isolation.isActorIsolated()) {
+      diagnoseAndRemoveAttr(
+          attr, diag::sendable_isolated_sync_function,
+          isolation, value->getDescriptiveKind(), value->getName())
+        .warnUntilSwiftVersion(6);
+    }
+  }
+}
+
+void AttributeChecker::visitDistributedThunkAttr(DistributedThunkAttr *attr) {
+  if (!D->isImplicit())
+    diagnoseAndRemoveAttr(attr, diag::distributed_thunk_cannot_be_used);
+}
+
 void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
   // 'nonisolated' can be applied to global and static/class variables
   // that do not have storage.
@@ -6163,7 +6302,8 @@ static bool parametersMatch(const AbstractFunctionDecl *a,
 
 ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
                                         const ValueDecl *attached,
-                                        const AvailableAttr *attr) const {
+                                        const AvailableAttr *attr,
+                                        bool isKnownObjC) const {
   if (!attached || !attr)
     return nullptr;
 
@@ -6194,7 +6334,7 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
   auto minAccess = AccessLevel::Private;
   if (attached->getModuleContext()->isExternallyConsumed())
     minAccess = AccessLevel::Public;
-  bool attachedIsObjcVisible =
+  bool attachedIsObjcVisible = isKnownObjC ||
       objc_translation::isVisibleToObjC(attached, minAccess);
 
   SmallVector<ValueDecl *, 4> lookupResults;

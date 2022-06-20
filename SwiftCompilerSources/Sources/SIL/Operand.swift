@@ -70,6 +70,9 @@ public struct OperandArray : RandomAccessCollection, CustomReflectable {
     return Mirror(self, children: c)
   }
   
+  /// Returns a sub-array defined by `bounds`.
+  ///
+  /// Note: this does not return a Slice. The first index of the returnd array is always 0.
   public subscript(bounds: Range<Int>) -> OperandArray {
     precondition(bounds.lowerBound >= 0)
     precondition(bounds.upperBound <= endIndex)
@@ -99,12 +102,15 @@ public struct UseList : CollectionLikeSequence {
     self.firstOpPtr = firstOpPtr.op
   }
 
-  public var isSingleUse: Bool {
+  public var singleUse: Operand? {
     if let opPtr = firstOpPtr {
-      return Operand_nextUse(BridgedOperand(op: opPtr)).op == nil
+      if Operand_nextUse(BridgedOperand(op: opPtr)).op != nil { return nil }
+      return Operand(BridgedOperand(op: opPtr))
     }
-    return false
+    return nil
   }
+
+  public var isSingleUse: Bool { singleUse != nil }
 
   public func makeIterator() -> Iterator {
     return Iterator(currentOpPtr: firstOpPtr)

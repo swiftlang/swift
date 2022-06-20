@@ -63,21 +63,12 @@ def add_function(sizes, function, start_addr, end_addr, group_by_prefix):
         sizes[function] += size
 
 
-def flatten(*args):
-    for x in args:
-        if hasattr(x, '__iter__'):
-            for y in flatten(*x):
-                yield y
-        else:
-            yield x
-
-
 def read_sizes(sect_sizes, seg_sizes, file_name, function_details,
                group_by_prefix):
     # Check if multiple architectures are supported by the object file.
     # Prefer arm64 if available.
     architectures = subprocess.check_output(
-        ["otool", "-V", "-f", file_name]).split("\n")
+        ["otool", "-V", "-f", file_name]).decode('utf-8').split("\n")
     arch = None
     arch_pattern = re.compile(r'architecture ([\S]+)')
     for architecture in architectures:
@@ -88,26 +79,27 @@ def read_sizes(sect_sizes, seg_sizes, file_name, function_details,
             if "arm64" in arch:
                 arch = "arm64"
     if arch is not None:
-        arch_params = ["-arch", arch]
+        cmd = ["otool", "-arch", arch]
     else:
-        arch_params = []
+        cmd = ["otool"]
 
     if function_details:
         content = subprocess.check_output(
-            flatten([
-                "otool",
-                arch_params,
+            cmd + [
                 "-l",
                 "-v",
                 "-t",
-                file_name]
-            )).split("\n")
-        content += subprocess.check_output(flatten(
-            ["otool", arch_params, "-v", "-s", "__TEXT", "__textcoal_nt",
-             file_name])).split("\n")
+                file_name]).decode('utf-8').split("\n")
+        content += subprocess.check_output(
+            cmd + [
+                "-v",
+                "-s",
+                "__TEXT",
+                "__textcoal_nt",
+                file_name]).decode('utf-8').split("\n")
     else:
         content = subprocess.check_output(
-            flatten(["otool", arch_params, "-l", file_name])).split("\n")
+            cmd + ["-l", file_name]).decode('utf-8').split("\n")
 
     seg_name = None
     sect_name = None

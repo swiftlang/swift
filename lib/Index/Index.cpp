@@ -922,6 +922,7 @@ private:
   }
   bool reportPseudoAccessor(AbstractStorageDecl *D, AccessorKind AccKind,
                             bool IsRef, SourceLoc Loc);
+  bool reportIsDynamicRef(ValueDecl *D, IndexSymbol &Info);
 
   bool finishCurrentEntity() {
     Entity CurrEnt = EntitiesStack.pop_back_val();
@@ -1336,24 +1337,6 @@ bool IndexSwiftASTWalker::reportRelatedTypeRef(const TypeLoc &Ty, SymbolRoleSet 
   return true;
 }
 
-static bool isDynamicVarAccessorOrFunc(ValueDecl *D, SymbolInfo symInfo) {
-  if (auto NTD = D->getDeclContext()->getSelfNominalTypeDecl()) {
-    bool isClassOrProtocol = isa<ClassDecl>(NTD) || isa<ProtocolDecl>(NTD);
-    bool isInternalAccessor =
-      symInfo.SubKind == SymbolSubKind::SwiftAccessorWillSet ||
-      symInfo.SubKind == SymbolSubKind::SwiftAccessorDidSet ||
-      symInfo.SubKind == SymbolSubKind::SwiftAccessorAddressor ||
-      symInfo.SubKind == SymbolSubKind::SwiftAccessorMutableAddressor;
-    if (isClassOrProtocol &&
-        symInfo.Kind != SymbolKind::StaticMethod &&
-        !isInternalAccessor &&
-        !D->isFinal()) {
-      return true;
-    }
-  }
-  return false;
-}
-
 bool IndexSwiftASTWalker::reportPseudoAccessor(AbstractStorageDecl *D,
                                                AccessorKind AccKind, bool IsRef,
                                                SourceLoc Loc) {
@@ -1377,7 +1360,7 @@ bool IndexSwiftASTWalker::reportPseudoAccessor(AbstractStorageDecl *D,
     Info.symInfo.SubKind = getSubKindForAccessor(AccKind);
     Info.roles |= (SymbolRoleSet)SymbolRole::Implicit;
     Info.group = "";
-    if (isDynamicVarAccessorOrFunc(D, Info.symInfo)) {
+    if (ide::isDeclOverridable(D)) {
       Info.roles |= (SymbolRoleSet)SymbolRole::Dynamic;
     }
     return false;
@@ -1532,7 +1515,7 @@ bool IndexSwiftASTWalker::reportRef(ValueDecl *D, SourceLoc Loc,
   if (!shouldIndex(D, /*IsRef=*/true))
     return true; // keep walking
 
-  if (isa<AbstractFunctionDecl>(D)) {
+  if (isa<AbstractFunctionDecl>(D) || isa<EnumElementDecl>(D)) {
     if (initFuncRefIndexSymbol(D, Loc, Info))
       return true;
   } else if (isa<AbstractStorageDecl>(D)) {
@@ -1567,6 +1550,27 @@ bool IndexSwiftASTWalker::reportRef(ValueDecl *D, SourceLoc Loc,
   }
 
   return finishCurrentEntity();
+}
+
+bool IndexSwiftASTWalker::reportIsDynamicRef(ValueDecl *D, IndexSymbol &Info) {
+  Expr *BaseE = ide::getBase(ExprStack);
+  if (!BaseE)
+    return false;
+
+  if (!ide::isDynamicRef(BaseE, D))
+    return false;
+
+  Info.roles |= (unsigned)SymbolRole::Dynamic;
+
+  SmallVector<NominalTypeDecl *, 1> Types;
+  ide::getReceiverType(BaseE, Types);
+  for (auto *ReceiverTy : Types) {
+    if (addRelation(Info, (SymbolRoleSet) SymbolRole::RelationReceivedBy,
+                    ReceiverTy))
+      return true;
+  }
+
+  return false;
 }
 
 bool IndexSwiftASTWalker::reportImplicitConformance(ValueDecl *witness, ValueDecl *requirement,
@@ -1658,7 +1662,7 @@ bool IndexSwiftASTWalker::initFuncDeclIndexSymbol(FuncDecl *D,
   if (initIndexSymbol(D, D->getLoc(/*SerializedOK*/false), /*IsRef=*/false, Info))
     return true;
 
-  if (isDynamicVarAccessorOrFunc(D, Info.symInfo)) {
+  if (ide::isDeclOverridable(D)) {
     Info.roles |= (SymbolRoleSet)SymbolRole::Dynamic;
   }
 
@@ -1702,20 +1706,9 @@ bool IndexSwiftASTWalker::initFuncRefIndexSymbol(ValueDecl *D, SourceLoc Loc,
       return true;
   }
 
-  Expr *BaseE = ide::getBase(ExprStack);
-  if (!BaseE)
-    return false;
+  if (reportIsDynamicRef(D, Info))
+    return true;
 
-  if (ide::isDynamicCall(BaseE, D))
-    Info.roles |= (unsigned)SymbolRole::Dynamic;
-
-  SmallVector<NominalTypeDecl *, 1> Types;
-  ide::getReceiverType(BaseE, Types);
-  for (auto *ReceiverTy : Types) {
-    if (addRelation(Info, (SymbolRoleSet) SymbolRole::RelationReceivedBy,
-                    ReceiverTy))
-      return true;
-  }
   return false;
 }
 
@@ -1739,6 +1732,9 @@ bool IndexSwiftASTWalker::initVarRefIndexSymbols(Expr *CurrentE, ValueDecl *D,
   case swift::AccessKind::Write:
     Info.roles |= (unsigned)SymbolRole::Write;
   }
+
+  if (reportIsDynamicRef(D, Info))
+    return true;
 
   return false;
 }

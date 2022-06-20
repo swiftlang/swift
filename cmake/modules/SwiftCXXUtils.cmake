@@ -2,6 +2,5 @@
 set(SWIFT_LIBSTDCXX_PLATFORMS
     "LINUX"
     "FREEBSD"
-    "OPENBSD"
     "CYGWIN"
     "HAIKU")

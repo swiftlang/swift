@@ -180,13 +180,14 @@ static bool writeSIL(SILModule &SM, const PrimarySpecificPaths &PSPs,
 /// \see swift::printAsClangHeader
 static bool printAsClangHeaderIfNeeded(StringRef outputPath, ModuleDecl *M,
                                        StringRef bridgingHeader,
-                                       bool ExposePublicDeclsInClangHeader) {
+                                       bool ExposePublicDeclsInClangHeader,
+                                       const IRGenOptions &irGenOpts) {
   if (outputPath.empty())
     return false;
   return withOutputFile(
       M->getDiags(), outputPath, [&](raw_ostream &out) -> bool {
         return printAsClangHeader(out, M, bridgingHeader,
-                                  ExposePublicDeclsInClangHeader);
+                                  ExposePublicDeclsInClangHeader, irGenOpts);
       });
 }
 
@@ -588,6 +589,30 @@ mapFrontendInvocationToAction(const CompilerInvocation &Invocation) {
   // StaticLinkJob, DynamicLinkJob
 }
 
+// TODO: Apply elsewhere in the compiler
+static swift::file_types::ID computeFileTypeForPath(const StringRef Path) {
+  if (!llvm::sys::path::has_extension(Path))
+    return swift::file_types::ID::TY_INVALID;
+
+  auto Extension = llvm::sys::path::extension(Path).str();
+  auto FileType = file_types::lookupTypeForExtension(Extension);
+  if (FileType == swift::file_types::ID::TY_INVALID) {
+    auto PathStem = llvm::sys::path::stem(Path);
+    // If this path has a multiple '.' extension (e.g. .abi.json),
+    // then iterate over all preceeding possible extension variants.
+    while (llvm::sys::path::has_extension(PathStem)) {
+      auto NextExtension = llvm::sys::path::extension(PathStem);
+      PathStem = llvm::sys::path::stem(PathStem);
+      Extension = NextExtension.str() + Extension;
+      FileType = file_types::lookupTypeForExtension(Extension);
+      if (FileType != swift::file_types::ID::TY_INVALID)
+        break;
+    }
+  }
+
+  return FileType;
+}
+
 static DetailedTaskDescription
 constructDetailedTaskDescription(const CompilerInvocation &Invocation,
                                  ArrayRef<InputFile> PrimaryInputs,
@@ -612,20 +637,15 @@ constructDetailedTaskDescription(const CompilerInvocation &Invocation,
   for (const auto &input : PrimaryInputs) {
     // Main outputs
     auto OutputFile = input.outputFilename();
-    if (!OutputFile.empty()) {
-      Outputs.push_back(OutputPair(file_types::lookupTypeForExtension(
-                                       llvm::sys::path::extension(OutputFile)),
-                                   OutputFile));
-    }
+    if (!OutputFile.empty())
+      Outputs.push_back(OutputPair(computeFileTypeForPath(OutputFile), OutputFile));
 
     // Supplementary outputs
     const auto &primarySpecificFiles = input.getPrimarySpecificPaths();
     const auto &supplementaryOutputPaths =
         primarySpecificFiles.SupplementaryOutputs;
     supplementaryOutputPaths.forEachSetOutput([&](const std::string &output) {
-      Outputs.push_back(OutputPair(file_types::lookupTypeForExtension(
-                                       llvm::sys::path::extension(output)),
-                                   output));
+      Outputs.push_back(OutputPair(computeFileTypeForPath(output), output));
     });
   }
   return DetailedTaskDescription{Executable, Arguments, CommandLine, Inputs,
@@ -841,7 +861,7 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
     hadAnyError |= printAsClangHeaderIfNeeded(
         Invocation.getClangHeaderOutputPathForAtMostOnePrimary(),
         Instance.getMainModule(), BridgingHeaderPathForPrint,
-        opts.ExposePublicDeclsInClangHeader);
+        opts.ExposePublicDeclsInClangHeader, Invocation.getIRGenOptions());
   }
 
   // Only want the header if there's been any errors, ie. there's not much
@@ -1707,6 +1727,13 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   if (validateTBDIfNeeded(Invocation, MSF, *IRModule.getModule()))
     return true;
 
+  if (IRGenOpts.UseSingleModuleLLVMEmission) {
+    // Pretend the other files that drivers/build systems expect exist by
+    // creating empty files.
+    if (writeEmptyOutputFilesFor(Context, ParallelOutputFilenames, IRGenOpts))
+      return true;
+  }
+
   return generateCode(Instance, OutputFilename, IRModule.getModule(),
                       HashGlobal);
 }
@@ -1742,10 +1769,13 @@ static void emitIndexDataForSourceFile(SourceFile *PrimarySourceFile,
     if (OutputFile.empty())
       OutputFile = PSPs.OutputFilename;
     (void) index::indexAndRecord(PrimarySourceFile, OutputFile,
-                                 opts.IndexStorePath, opts.IndexSystemModules,
+                                 opts.IndexStorePath,
+                                 !opts.IndexIgnoreClangModules,
+                                 opts.IndexSystemModules,
                                  opts.IndexIgnoreStdlib, isDebugCompilation,
                                  Invocation.getTargetTriple(),
-                                 *Instance.getDependencyTracker());
+                                 *Instance.getDependencyTracker(),
+                                 Invocation.getIRGenOptions().FilePrefixMap);
   } else {
     std::string moduleToken =
         Invocation.getModuleOutputPathForAtMostOnePrimary();
@@ -1756,11 +1786,13 @@ static void emitIndexDataForSourceFile(SourceFile *PrimarySourceFile,
                                  opts.InputsAndOutputs
                                    .copyIndexUnitOutputFilenames(),
                                  moduleToken, opts.IndexStorePath,
+                                 !opts.IndexIgnoreClangModules,
                                  opts.IndexSystemModules,
                                  opts.IndexIgnoreStdlib,
                                  isDebugCompilation,
                                  Invocation.getTargetTriple(),
-                                 *Instance.getDependencyTracker());
+                                 *Instance.getDependencyTracker(),
+                                 Invocation.getIRGenOptions().FilePrefixMap);
   }
 }
 
@@ -2074,6 +2106,85 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     PDC.setSuppressOutput(true);
   }
 
+  auto emitParseableBeganMessage = [&Invocation, &Args]() {
+    const auto &IO = Invocation.getFrontendOptions().InputsAndOutputs;
+    const auto OSPid = getpid();
+    const auto ProcInfo = sys::TaskProcessInformation(OSPid);
+
+    // Parseable output clients may not understand the idea of a batch
+    // compilation. We assign each primary in a batch job a quasi process id,
+    // making sure it cannot collide with a real PID (always positive). Non-batch
+    // compilation gets a real OS PID.
+    int64_t Pid = IO.hasUniquePrimaryInput() ? OSPid : QUASI_PID_START;
+
+    if (IO.hasPrimaryInputs()) {
+      IO.forEachPrimaryInputWithIndex([&](const InputFile &Input,
+                                          unsigned idx) -> bool {
+        ArrayRef<InputFile> Inputs(Input);
+        emitBeganMessage(llvm::errs(),
+                         mapFrontendInvocationToAction(Invocation),
+                         constructDetailedTaskDescription(Invocation,
+                                                          Inputs,
+                                                          Args), Pid - idx,
+                         ProcInfo);
+        return false;
+      });
+    } else {
+      // If no primary inputs are present, we are in WMO.
+      emitBeganMessage(llvm::errs(),
+                       mapFrontendInvocationToAction(Invocation),
+                       constructDetailedTaskDescription(Invocation, IO.getAllInputs(), Args),
+                       OSPid, ProcInfo);
+    }
+  };
+
+  auto emitParseableFinishedMessage = [&Invocation, &Args, &FileSpecificDiagnostics](int ExitStatus) {
+    const auto &IO = Invocation.getFrontendOptions().InputsAndOutputs;
+    const auto OSPid = getpid();
+    const auto ProcInfo = sys::TaskProcessInformation(OSPid);
+
+    // Parseable output clients may not understand the idea of a batch
+    // compilation. We assign each primary in a batch job a quasi process id,
+    // making sure it cannot collide with a real PID (always positive). Non-batch
+    // compilation gets a real OS PID.
+    int64_t Pid = IO.hasUniquePrimaryInput() ? OSPid : QUASI_PID_START;
+
+    if (IO.hasPrimaryInputs()) {
+      IO.forEachPrimaryInputWithIndex([&](const InputFile &Input,
+                                          unsigned idx) -> bool {
+        assert(FileSpecificDiagnostics.count(Input.getFileName()) != 0 &&
+               "Expected diagnostic collection for input.");
+
+        // Join all diagnostics produced for this file into a single output.
+        auto PrimaryDiags = FileSpecificDiagnostics.lookup(Input.getFileName());
+        const char *const Delim = "";
+        std::ostringstream JoinedDiags;
+        std::copy(PrimaryDiags.begin(), PrimaryDiags.end(),
+                  std::ostream_iterator<std::string>(JoinedDiags, Delim));
+
+        emitFinishedMessage(llvm::errs(),
+                            mapFrontendInvocationToAction(Invocation),
+                            JoinedDiags.str(), ExitStatus, Pid - idx, ProcInfo);
+        return false;
+      });
+    } else {
+      // If no primary inputs are present, we are in WMO.
+      std::vector<std::string> AllDiagnostics;
+      for (const auto &FileDiagnostics : FileSpecificDiagnostics) {
+        AllDiagnostics.insert(AllDiagnostics.end(),
+                              FileDiagnostics.getValue().begin(),
+                              FileDiagnostics.getValue().end());
+      }
+      const char *const Delim = "";
+      std::ostringstream JoinedDiags;
+      std::copy(AllDiagnostics.begin(), AllDiagnostics.end(),
+                std::ostream_iterator<std::string>(JoinedDiags, Delim));
+      emitFinishedMessage(llvm::errs(),
+                          mapFrontendInvocationToAction(Invocation),
+                          JoinedDiags.str(), ExitStatus, OSPid, ProcInfo);
+    }
+  };
+
   // Because the serialized diagnostics consumer is initialized here,
   // diagnostics emitted above, within CompilerInvocation::parseArgs, are never
   // serialized. This is a non-issue because, in nearly all cases, frontend
@@ -2104,12 +2215,20 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     llvm::EnableStatistics();
   }
 
+
+  if (Invocation.getFrontendOptions().FrontendParseableOutput)
+    emitParseableBeganMessage();
+
   const DiagnosticOptions &diagOpts = Invocation.getDiagnosticOptions();
   bool verifierEnabled = diagOpts.VerifyMode != DiagnosticOptions::NoVerify;
 
   std::string InstanceSetupError;
   if (Instance->setup(Invocation, InstanceSetupError)) {
-    return finishDiagProcessing(1, /*verifierEnabled*/ false);
+    int ReturnCode = 1;
+    if (Invocation.getFrontendOptions().FrontendParseableOutput)
+      emitParseableFinishedMessage(ReturnCode);
+
+    return finishDiagProcessing(ReturnCode, /*verifierEnabled*/ false);
   }
 
   // The compiler instance has been configured; notify our observer.
@@ -2121,38 +2240,6 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     // Suppress printed diagnostic output during the compile if the verifier is
     // enabled.
     PDC.setSuppressOutput(true);
-  }
-
-  if (Invocation.getFrontendOptions().FrontendParseableOutput) {
-   const auto &IO = Invocation.getFrontendOptions().InputsAndOutputs;
-    const auto OSPid = getpid();
-    const auto ProcInfo = sys::TaskProcessInformation(OSPid);
-
-    // Parseable output clients may not understand the idea of a batch
-    // compilation. We assign each primary in a batch job a quasi process id,
-    // making sure it cannot collide with a real PID (always positive). Non-batch
-    // compilation gets a real OS PID.
-    int64_t Pid = IO.hasUniquePrimaryInput() ? OSPid : QUASI_PID_START;
-
-    if (IO.hasPrimaryInputs()) {
-      IO.forEachPrimaryInputWithIndex([&](const InputFile &Input,
-                                          unsigned idx) -> bool {
-        ArrayRef<InputFile> Inputs(Input);
-        emitBeganMessage(llvm::errs(),
-                         mapFrontendInvocationToAction(Invocation),
-                         constructDetailedTaskDescription(Invocation,
-                                                          Inputs,
-                                                          Args), Pid - idx,
-                         ProcInfo);
-        return false;
-      });
-    } else {
-      // If no primary inputs are present, we are in WMO.
-      emitBeganMessage(llvm::errs(),
-                       mapFrontendInvocationToAction(Invocation),
-                       constructDetailedTaskDescription(Invocation, IO.getAllInputs(), Args),
-                       OSPid, ProcInfo);
-    }
   }
 
   int ReturnValue = 0;
@@ -2173,52 +2260,8 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   if (auto *StatsReporter = Instance->getStatsReporter())
     StatsReporter->noteCurrentProcessExitStatus(r);
 
-  if (Invocation.getFrontendOptions().FrontendParseableOutput) {
-    const auto &IO = Invocation.getFrontendOptions().InputsAndOutputs;
-    const auto OSPid = getpid();
-    const auto ProcInfo = sys::TaskProcessInformation(OSPid);
-
-    // Parseable output clients may not understand the idea of a batch
-    // compilation. We assign each primary in a batch job a quasi process id,
-    // making sure it cannot collide with a real PID (always positive). Non-batch
-    // compilation gets a real OS PID.
-    int64_t Pid = IO.hasUniquePrimaryInput() ? OSPid : QUASI_PID_START;
-
-    if (IO.hasPrimaryInputs()) {
-      IO.forEachPrimaryInputWithIndex([&](const InputFile &Input,
-                                          unsigned idx) -> bool {
-        assert(FileSpecificDiagnostics.count(Input.getFileName()) != 0 &&
-               "Expected diagnostic collection for input.");
-
-        // Join all diagnostics produced for this file into a single output.
-        auto PrimaryDiags = FileSpecificDiagnostics.lookup(Input.getFileName());
-        const char *const Delim = "";
-        std::ostringstream JoinedDiags;
-        std::copy(PrimaryDiags.begin(), PrimaryDiags.end(),
-                  std::ostream_iterator<std::string>(JoinedDiags, Delim));
-
-        emitFinishedMessage(llvm::errs(),
-                            mapFrontendInvocationToAction(Invocation),
-                            JoinedDiags.str(), r, Pid - idx, ProcInfo);
-        return false;
-      });
-    } else {
-      // If no primary inputs are present, we are in WMO.
-      std::vector<std::string> AllDiagnostics;
-      for (const auto &FileDiagnostics : FileSpecificDiagnostics) {
-        AllDiagnostics.insert(AllDiagnostics.end(),
-                              FileDiagnostics.getValue().begin(),
-                              FileDiagnostics.getValue().end());
-      }
-      const char *const Delim = "";
-      std::ostringstream JoinedDiags;
-      std::copy(AllDiagnostics.begin(), AllDiagnostics.end(),
-                std::ostream_iterator<std::string>(JoinedDiags, Delim));
-      emitFinishedMessage(llvm::errs(),
-                          mapFrontendInvocationToAction(Invocation),
-                          JoinedDiags.str(), r, OSPid, ProcInfo);
-    }
-  }
+  if (Invocation.getFrontendOptions().FrontendParseableOutput)
+    emitParseableFinishedMessage(r);
 
   return r;
 }

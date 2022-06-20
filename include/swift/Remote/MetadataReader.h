@@ -1036,6 +1036,7 @@ public:
       TypeCache[MetadataAddress] = BuiltExist;
       return BuiltExist;
     }
+    case MetadataKind::ForeignReferenceType:
     case MetadataKind::ForeignClass: {
       auto descriptorAddr = readAddressOfNominalTypeDescriptor(Meta);
       if (!descriptorAddr)
@@ -1978,6 +1979,8 @@ protected:
         return _readMetadata<TargetExtendedExistentialTypeMetadata>(address);
       case MetadataKind::ForeignClass:
         return _readMetadata<TargetForeignClassMetadata>(address);
+      case MetadataKind::ForeignReferenceType:
+        return _readMetadata<TargetForeignReferenceTypeMetadata>(address);
       case MetadataKind::Function: {
         StoredSize flagsValue;
         auto flagsAddr =
@@ -2088,6 +2091,13 @@ protected:
         
     case MetadataKind::ForeignClass: {
       auto foreignMeta = cast<TargetForeignClassMetadata<Runtime>>(metadata);
+      StoredSignedPointer descriptorAddressSigned = foreignMeta->getDescriptionAsSignedPointer();
+      StoredPointer descriptorAddress = stripSignedPointer(descriptorAddressSigned);
+      return descriptorAddress;
+    }
+
+    case MetadataKind::ForeignReferenceType: {
+      auto foreignMeta = cast<TargetForeignReferenceTypeMetadata<Runtime>>(metadata);
       StoredSignedPointer descriptorAddressSigned = foreignMeta->getDescriptionAsSignedPointer();
       StoredPointer descriptorAddress = stripSignedPointer(descriptorAddressSigned);
       return descriptorAddress;

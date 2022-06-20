@@ -1,5 +1,4 @@
 // RUN: %target-swift-ide-test -print-module -module-to-print=MemberInline -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
-// XFAIL: *
 
 // CHECK: struct LoadableIntWrapper {
 // CHECK:   static func - (lhs: inout LoadableIntWrapper, rhs: LoadableIntWrapper) -> LoadableIntWrapper
@@ -134,11 +133,14 @@
 // CHECK: }
 // CHECK: typealias TemplatedDoubleArrayByVal = __CxxTemplateInst19TemplatedArrayByValIdE
 
+// CHECK: struct TemplatedByVal<T> {
+// CHECK-NEXT: }
 
-// CHECK: struct TemplatedSubscriptArrayByVal {
+// CHECK: struct TemplatedOperatorArrayByVal {
 // CHECK:   subscript(i: T) -> T { mutating get }
 // CHECK:   @available(*, unavailable, message: "use subscript")
 // CHECK:   mutating func __operatorSubscriptConst<T>(_ i: T) -> T
+// CHECK-NOT: mutating func __operatorPlus<T>(_ i: T) -> UnsafeMutablePointer<T>
 // CHECK: }
 
 // CHECK: struct NonTrivialArrayByVal {
@@ -187,4 +189,22 @@
 // CHECK: struct DerivedFromNonTrivialArrayByVal {
 // CHECK:   subscript(x: Int32) -> NonTrivial { get }
 // CHECK:   mutating func __operatorSubscriptConst(_ x: Int32) -> NonTrivial
+// CHECK: }
+
+// CHECK: struct Iterator {
+// CHECK:   var pointee: Int32 { mutating get }
+// CHECK:   @available(*, unavailable, message: "use .pointee property")
+// CHECK:   mutating func __operatorStar() -> UnsafeMutablePointer<Int32>
+// CHECK: }
+
+// CHECK: struct ConstIterator {
+// CHECK:   var pointee: Int32 { get }
+// CHECK:   @available(*, unavailable, message: "use .pointee property")
+// CHECK:   func __operatorStar() -> UnsafePointer<Int32>
+// CHECK: }
+
+// CHECK: struct ConstIteratorByVal {
+// CHECK:   var pointee: Int32 { get }
+// CHECK:   @available(*, unavailable, message: "use .pointee property")
+// CHECK:   func __operatorStar() -> Int32
 // CHECK: }

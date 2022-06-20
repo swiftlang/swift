@@ -511,6 +511,18 @@ static bool diagnoseNonSendableFromDeinit(ModuleDecl *module,
                                           RefElementAddrInst *inst) {
   VarDecl *var = inst->getField();
   Type ty = var->getType();
+  DeclContext* dc = inst->getFunction()->getDeclContext();
+
+// FIXME: we should emit diagnostics in other modes using:
+//
+//  if (!shouldDiagnoseExistingDataRaces(dc))
+//    return false;
+//
+// but until we decide how we want to handle isolated state from deinits,
+// we're going to limit the noise to complete mode for now.
+  if (dc->getASTContext().LangOpts.StrictConcurrencyLevel
+      != StrictConcurrency::Complete)
+      return false;
 
   if (isSendableType(module, ty))
     return false;

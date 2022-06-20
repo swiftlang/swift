@@ -59,7 +59,7 @@ let simplifyStrongReleasePass = InstructionPass<StrongReleaseInst>(
   // release of the class, squish the conversion.
   if let ier = op as? InitExistentialRefInst {
     if ier.uses.isSingleUse {
-      context.setOperand(of: release, at: 0, to: ier.operand)
+      release.setOperand(at: 0, to: ier.operand, context)
       context.erase(instruction: ier)
       return
     }

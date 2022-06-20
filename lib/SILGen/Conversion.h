@@ -231,13 +231,6 @@ canPeepholeConversions(SILGenFunction &SGF,
                        const Conversion &outerConversion,
                        const Conversion &innerConversion);
 
-ManagedValue emitPeepholedConversions(SILGenFunction &SGF, SILLocation loc,
-                                      const Conversion &outerConversion,
-                                      const Conversion &innerConversion,
-                                      ConversionPeepholeHint hint,
-                                      SGFContext C,
-                                      ValueProducerRef produceValue);
-
 /// An initialization where we ultimately want to apply a conversion to
 /// the value before completing the initialization.
 ///
@@ -354,8 +347,6 @@ public:
   void finishInitialization(SILGenFunction &SGF) override {
     assert(getState() == Initialized);
     State = Finished;
-    if (OwnedSubInitialization)
-      OwnedSubInitialization->finishInitialization(SGF);
   }
 };
 

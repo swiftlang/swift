@@ -118,7 +118,7 @@ void *swift::swift_slowAlloc(size_t size, size_t alignMask) {
 // i.e. 0 < alignment <= _minAllocationAlignment:
 //   The runtime may use either `free` or AlignedFree as long as it is
 //   consistent with allocation with the same alignment.
-void swift::swift_slowDealloc(void *ptr, size_t bytes, size_t alignMask) {
+static void swift_slowDeallocImpl(void *ptr, size_t alignMask) {
   if (alignMask <= MALLOC_ALIGN_MASK) {
 #if defined(__APPLE__) && SWIFT_STDLIB_HAS_DARWIN_LIBMALLOC
     malloc_zone_free(DEFAULT_ZONE(), ptr);
@@ -128,4 +128,8 @@ void swift::swift_slowDealloc(void *ptr, size_t bytes, size_t alignMask) {
   } else {
     AlignedFree(ptr);
   }
+}
+
+void swift::swift_slowDealloc(void *ptr, size_t bytes, size_t alignMask) {
+  swift_slowDeallocImpl(ptr, alignMask);
 }

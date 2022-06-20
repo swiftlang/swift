@@ -133,9 +133,9 @@ Projection::Projection(SingleValueInstruction *I) : Value() {
   }
   case SILInstructionKind::UncheckedTakeEnumDataAddrInst: {
     auto *UTEDAI = cast<UncheckedTakeEnumDataAddrInst>(I);
-    Value = ValueTy(ProjectionKind::Enum, UTEDAI->getElementNo());
+    Value = ValueTy(ProjectionKind::Enum, UTEDAI->getCaseIndex());
     assert(getKind() == ProjectionKind::Enum);
-    assert(getIndex() == int(UTEDAI->getElementNo()));
+    assert(getIndex() == int(UTEDAI->getCaseIndex()));
     break;
   }
   case SILInstructionKind::IndexAddrInst: {

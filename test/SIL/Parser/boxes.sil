@@ -89,3 +89,21 @@ sil [ossa] @address_of_box : $@convention(thin) (@in { var Int }, @in <T> { let 
 entry(%0 : $*{ var Int }, %1 : $*<T> { let T } <Int>):
   unreachable
 }
+
+// CHECK-LABEL: sil [ossa] @alloc_box_attrs
+sil [ossa] @alloc_box_attrs : $@convention(thin) () -> () {
+entry:
+  // CHECK: %0 = alloc_box $
+  %0 = alloc_box ${ let Int }
+  // CHECK: %1 = alloc_box [dynamic_lifetime] $
+  %1 = alloc_box [dynamic_lifetime] ${ let Int }
+  // CHECK: %2 = alloc_box [reflection] $
+  %2 = alloc_box [reflection] ${ let Int }
+  // CHECK: %3 = alloc_box [dynamic_lifetime] [reflection] $
+  %3 = alloc_box [dynamic_lifetime] [reflection] ${ let Int }
+  dealloc_box %3: ${ let Int }
+  dealloc_box %2: ${ let Int }
+  dealloc_box %1: ${ let Int }
+  dealloc_box %0: ${ let Int }
+  return undef : $()
+}

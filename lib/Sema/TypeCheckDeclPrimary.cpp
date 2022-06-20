@@ -64,6 +64,21 @@ using namespace swift;
 
 #define DEBUG_TYPE "TypeCheckDeclPrimary"
 
+static Type containsParameterizedProtocolType(Type inheritedTy) {
+  if (inheritedTy->is<ParameterizedProtocolType>()) {
+    return inheritedTy;
+  }
+
+  if (auto *compositionTy = inheritedTy->getAs<ProtocolCompositionType>()) {
+    for (auto memberTy : compositionTy->getMembers()) {
+      if (auto paramTy = containsParameterizedProtocolType(memberTy))
+        return paramTy;
+    }
+  }
+
+  return Type();
+}
+
 /// Check the inheritance clause of a type declaration or extension thereof.
 ///
 /// This routine performs detailed checking of the inheritance clause of the
@@ -212,10 +227,10 @@ static void checkInheritanceClause(
       inheritedAnyObject = { i, inherited.getSourceRange() };
     }
 
-    if (inheritedTy->is<ParameterizedProtocolType>()) {
+    if (auto paramTy = containsParameterizedProtocolType(inheritedTy)) {
       if (!isa<ProtocolDecl>(decl)) {
         decl->diagnose(diag::inheritance_from_parameterized_protocol,
-                       inheritedTy);
+                       paramTy);
       }
       continue;
     }
@@ -232,21 +247,21 @@ static void checkInheritanceClause(
         continue;
       }
 
+      // Classes and protocols can inherit from subclass existentials.
+      // For classes, we check for a duplicate superclass below.
+      // For protocols, the requirement machine emits a requirement
+      // conflict instead.
+      if (isa<ProtocolDecl>(decl))
+        continue;
+
       // AnyObject is not allowed except on protocols.
-      if (layout.hasExplicitAnyObject &&
-          !isa<ProtocolDecl>(decl)) {
+      if (layout.hasExplicitAnyObject) {
         decl->diagnose(diag::inheritance_from_anyobject);
         continue;
       }
 
       // If the existential did not have a class constraint, we're done.
       if (!layout.explicitSuperclass)
-        continue;
-
-      // Classes and protocols can inherit from subclass existentials.
-      // For classes, we check for a duplicate superclass below.
-      // For protocols, the GSB emits its own warning instead.
-      if (isa<ProtocolDecl>(decl))
         continue;
 
       assert(isa<ClassDecl>(decl));
@@ -2957,8 +2972,9 @@ public:
       if (isRepresentableInObjC(FD, reason, asyncConvention, errorConvention)) {
         if (FD->hasAsync()) {
           FD->setForeignAsyncConvention(*asyncConvention);
-          getASTContext().Diags.diagnose(CDeclAttr->getLocation(),
-                                         diag::cdecl_async);
+          getASTContext().Diags.diagnose(
+              CDeclAttr->getLocation(), diag::attr_decl_async,
+              CDeclAttr->getAttrName(), FD->getDescriptiveKind());
         } else if (FD->hasThrows()) {
           FD->setForeignErrorConvention(*errorConvention);
           getASTContext().Diags.diagnose(CDeclAttr->getLocation(),

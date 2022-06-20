@@ -1125,10 +1125,8 @@ public:
     SILDeclRef constant = SILDeclRef(e->getDecl());
 
     /// Some special handling may be necessary for thunks:
-    if (callSite && callSite->shouldApplyDistributedThunk()) {
-      if (auto distributedThunk = cast<AbstractFunctionDecl>(e->getDecl())->getDistributedThunk()) {
-        constant = SILDeclRef(distributedThunk).asDistributed();
-      }
+    if (callSite && callSite->usesDistributedThunk()) {
+      constant = SILDeclRef(e->getDecl()).asDistributed();
     } else if (afd->isBackDeployed()) {
       // If we're calling a back deployed function then we need to call a
       // thunk instead that will handle the fallback when the original
@@ -1142,6 +1140,8 @@ public:
     }
 
     auto captureInfo = SGF.SGM.Types.getLoweredLocalCaptures(constant);
+    SGF.SGM.Types.setCaptureTypeExpansionContext(constant, SGF.SGM.M);
+    
     if (afd->getDeclContext()->isLocalContext() &&
         !captureInfo.hasGenericParamCaptures())
       subs = SubstitutionMap();
@@ -1207,6 +1207,9 @@ public:
   }
   
   void visitAbstractClosureExpr(AbstractClosureExpr *e) {
+    SILDeclRef constant(e);
+
+    SGF.SGM.Types.setCaptureTypeExpansionContext(constant, SGF.SGM.M);
     // Emit the closure body.
     SGF.SGM.emitClosure(e);
 
@@ -1219,7 +1222,6 @@ public:
     
     // A directly-called closure can be emitted as a direct call instead of
     // really producing a closure object.
-    SILDeclRef constant(e);
 
     auto captureInfo = SGF.SGM.M.Types.getLoweredLocalCaptures(constant);
 
@@ -2924,7 +2926,6 @@ private:
     // substituted argument type by abstraction and/or bridging.
     auto paramSlice = claimNextParameters(1);
     SILParameterInfo param = paramSlice.front();
-
     assert(arg.hasLValueType() == param.isIndirectInOut());
 
     // Make sure we use the same value category for these so that we
@@ -3439,8 +3440,7 @@ void DelayedArgument::emitDefaultArgument(SILGenFunction &SGF,
   auto value = SGF.emitApplyOfDefaultArgGenerator(info.loc,
                                                   info.defaultArgsOwner,
                                                   info.destIndex,
-                                                  info.resultType,
-                                                  info.origResultType);
+                                                  info.resultType);
 
   SmallVector<ManagedValue, 4> loweredArgs;
   SmallVector<DelayedArgument, 4> delayedArgs;
@@ -3962,15 +3962,20 @@ SILGenFunction::emitBeginApply(SILLocation loc, ManagedValue fn,
   // Manage all the yielded values.
   auto yieldInfos = substFnType->getYields();
   assert(yieldValues.size() == yieldInfos.size());
+  bool useLoweredAddresses = silConv.useLoweredAddresses();
   for (auto i : indices(yieldValues)) {
     auto value = yieldValues[i];
     auto info = yieldInfos[i];
     if (info.isIndirectInOut()) {
       yields.push_back(ManagedValue::forLValue(value));
     } else if (info.isConsumed()) {
-      yields.push_back(emitManagedRValueWithCleanup(value));
+      !useLoweredAddresses && value->getType().isTrivial(getFunction())
+          ? yields.push_back(ManagedValue::forTrivialRValue(value))
+          : yields.push_back(emitManagedRValueWithCleanup(value));
     } else if (info.isGuaranteed()) {
-      yields.push_back(ManagedValue::forBorrowedRValue(value));
+      !useLoweredAddresses && value->getType().isTrivial(getFunction())
+          ? yields.push_back(ManagedValue::forTrivialRValue(value))
+          : yields.push_back(ManagedValue::forBorrowedRValue(value));
     } else {
       yields.push_back(ManagedValue::forTrivialRValue(value));
     }
@@ -5766,7 +5771,8 @@ RValue SILGenFunction::emitGetAccessor(SILLocation loc, SILDeclRef get,
                                        ArgumentSource &&selfValue, bool isSuper,
                                        bool isDirectUse,
                                        PreparedArguments &&subscriptIndices,
-                                       SGFContext c, bool isOnSelfParameter) {
+                                       SGFContext c,
+                                       bool isOnSelfParameter) {
   // Scope any further writeback just within this operation.
   FormalEvaluationScope writebackScope(*this);
 
@@ -5840,8 +5846,8 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
 ManagedValue SILGenFunction::emitAddressorAccessor(
     SILLocation loc, SILDeclRef addressor, SubstitutionMap substitutions,
     ArgumentSource &&selfValue, bool isSuper, bool isDirectUse,
-    PreparedArguments &&subscriptIndices, SILType addressType,
-    bool isOnSelfParameter) {
+    PreparedArguments &&subscriptIndices,
+    SILType addressType, bool isOnSelfParameter) {
   // Scope any further writeback just within this operation.
   FormalEvaluationScope writebackScope(*this);
 
@@ -5902,7 +5908,8 @@ SILGenFunction::emitCoroutineAccessor(SILLocation loc, SILDeclRef accessor,
   Callee callee =
     emitSpecializedAccessorFunctionRef(*this, loc, accessor,
                                        substitutions, selfValue,
-                                       isSuper, isDirectUse, isOnSelfParameter);
+                                       isSuper, isDirectUse,
+                                       isOnSelfParameter);
 
   // We're already in a full formal-evaluation scope.
   // Make a dead writeback scope; applyCoroutine won't try to pop this.

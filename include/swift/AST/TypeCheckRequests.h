@@ -18,6 +18,7 @@
 
 #include "swift/AST/ActorIsolation.h"
 #include "swift/AST/AnyFunctionRef.h"
+#include "swift/AST/ASTNode.h"
 #include "swift/AST/ASTTypeIDs.h"
 #include "swift/AST/Effects.h"
 #include "swift/AST/GenericParamList.h"
@@ -1236,17 +1237,20 @@ public:
 ///
 /// The thunk is responsible for invoking 'remoteCall' when invoked on a remote
 /// 'distributed actor'.
-class GetDistributedThunkRequest :
-    public SimpleRequest<GetDistributedThunkRequest,
-                         FuncDecl *(AbstractFunctionDecl *),
-                         RequestFlags::Cached> {
+class GetDistributedThunkRequest
+    : public SimpleRequest<
+          GetDistributedThunkRequest,
+          FuncDecl *(llvm::PointerUnion<VarDecl *, AbstractFunctionDecl *>),
+          RequestFlags::Cached> {
+  using Originator = llvm::PointerUnion<VarDecl *, AbstractFunctionDecl *>;
+
 public:
   using SimpleRequest::SimpleRequest;
 
 private:
   friend SimpleRequest;
 
-  FuncDecl *evaluate(Evaluator &evaluator, AbstractFunctionDecl *distributedFunc) const;
+  FuncDecl *evaluate(Evaluator &evaluator, Originator originator) const;
 
 public:
   // Caching
@@ -1502,12 +1506,82 @@ public:
   readDependencySource(const evaluator::DependencyRecorder &) const;
 };
 
+/// Describes the context in which the AST node to type check in a
+/// \c TypeCheckASTNodeAtLocRequest should be searched. This can be either of
+/// two cases:
+///  1. A \c DeclContext that contains the node representing the location to
+///     type check
+///  2. If the node that should be type checked that might not be part of the
+///     AST (e.g. because it is a dangling property attribute), an \c ASTNode
+///     that contains the location to type check in together with a DeclContext
+///     in which we should pretend that node occurs.
+class TypeCheckASTNodeAtLocContext {
+  DeclContext *DC;
+  ASTNode Node;
+
+  /// Memberwise initializer
+  TypeCheckASTNodeAtLocContext(DeclContext *DC, ASTNode Node)
+      : DC(DC), Node(Node) {
+    assert(DC != nullptr);
+  }
+
+public:
+  static TypeCheckASTNodeAtLocContext declContext(DeclContext *DC) {
+    return TypeCheckASTNodeAtLocContext(DC, /*Node=*/nullptr);
+  }
+
+  static TypeCheckASTNodeAtLocContext node(DeclContext *DC, ASTNode Node) {
+    assert(!Node.isNull());
+    return TypeCheckASTNodeAtLocContext(DC, Node);
+  }
+
+  DeclContext *getDeclContext() const { return DC; }
+
+  bool isForUnattachedNode() const { return !Node.isNull(); }
+
+  ASTNode getUnattachedNode() const {
+    assert(isForUnattachedNode());
+    return Node;
+  }
+
+  ASTNode &getUnattachedNode() {
+    assert(isForUnattachedNode());
+    return Node;
+  }
+
+  friend llvm::hash_code hash_value(const TypeCheckASTNodeAtLocContext &ctx) {
+    return llvm::hash_combine(ctx.DC, ctx.Node);
+  }
+
+  friend bool operator==(const TypeCheckASTNodeAtLocContext &lhs,
+                         const TypeCheckASTNodeAtLocContext &rhs) {
+    return lhs.DC == rhs.DC && lhs.Node == rhs.Node;
+  }
+
+  friend bool operator!=(const TypeCheckASTNodeAtLocContext &lhs,
+                         const TypeCheckASTNodeAtLocContext &rhs) {
+    return !(lhs == rhs);
+  }
+
+  friend SourceLoc
+  extractNearestSourceLoc(const TypeCheckASTNodeAtLocContext &ctx) {
+    if (!ctx.Node.isNull()) {
+      return ctx.Node.getStartLoc();
+    } else {
+      return extractNearestSourceLoc(ctx.DC);
+    }
+  }
+};
+
+void simple_display(llvm::raw_ostream &out,
+                    const TypeCheckASTNodeAtLocContext &ctx);
+
 /// Request to typecheck a function body element at the given source location.
 ///
 /// Produces true if an error occurred, false otherwise.
 class TypeCheckASTNodeAtLocRequest
     : public SimpleRequest<TypeCheckASTNodeAtLocRequest,
-                           bool(DeclContext *, SourceLoc),
+                           bool(TypeCheckASTNodeAtLocContext, SourceLoc),
                            RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -1516,7 +1590,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  bool evaluate(Evaluator &evaluator, DeclContext *DC, SourceLoc Loc) const;
+  bool evaluate(Evaluator &evaluator, TypeCheckASTNodeAtLocContext,
+                SourceLoc Loc) const;
 };
 
 /// Request to obtain a list of stored properties in a nominal type.
@@ -3369,7 +3444,8 @@ public:
 
 class RenamedDeclRequest
     : public SimpleRequest<RenamedDeclRequest,
-                           ValueDecl *(const ValueDecl *, const AvailableAttr *),
+                           ValueDecl *(const ValueDecl *, const AvailableAttr *,
+                                       bool isKnownObjC),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3378,7 +3454,7 @@ private:
   friend SimpleRequest;
 
   ValueDecl *evaluate(Evaluator &evaluator, const ValueDecl *attached,
-                      const AvailableAttr *attr) const;
+                      const AvailableAttr *attr, bool isKnownObjC) const;
 
 public:
   bool isCached() const { return true; }
@@ -3416,6 +3492,7 @@ public:
   bool isCached() const { return true; }
 };
 
+void simple_display(llvm::raw_ostream &out, ASTNode node);
 void simple_display(llvm::raw_ostream &out, Type value);
 void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);
 void simple_display(llvm::raw_ostream &out, ImplicitMemberAction action);

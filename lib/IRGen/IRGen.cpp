@@ -1096,8 +1096,9 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
     for (auto *file : filesToEmit) {
       if (auto *nextSF = dyn_cast<SourceFile>(file)) {
         IGM.emitSourceFile(*nextSF);
-      } else if (auto *nextSFU = dyn_cast<SynthesizedFileUnit>(file)) {
-        IGM.emitSynthesizedFileUnit(*nextSFU);
+        if (auto *synthSFU = file->getSynthesizedFile()) {
+          IGM.emitSynthesizedFileUnit(*synthSFU);
+        }
       } else {
         file->collectLinkLibraries([&IGM](LinkLibrary LinkLib) {
           IGM.addLinkLibrary(LinkLib);
@@ -1339,11 +1340,15 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
 
   for (auto *File : M->getFiles()) {
     if (auto *SF = dyn_cast<SourceFile>(File)) {
-      CurrentIGMPtr IGM = irgen.getGenModule(SF);
-      IGM->emitSourceFile(*SF);
-    } else if (auto *nextSFU = dyn_cast<SynthesizedFileUnit>(File)) {
-      CurrentIGMPtr IGM = irgen.getGenModule(nextSFU);
-      IGM->emitSynthesizedFileUnit(*nextSFU);
+      {
+        CurrentIGMPtr IGM = irgen.getGenModule(SF);
+        IGM->emitSourceFile(*SF);
+      }
+      
+      if (auto *synthSFU = File->getSynthesizedFile()) {
+        CurrentIGMPtr IGM = irgen.getGenModule(synthSFU);
+        IGM->emitSynthesizedFileUnit(*synthSFU);
+      }
     } else {
       File->collectLinkLibraries([&](LinkLibrary LinkLib) {
         irgen.getPrimaryIGM()->addLinkLibrary(LinkLib);
@@ -1485,7 +1490,8 @@ GeneratedModule swift::performIRGeneration(
       outModuleHash);
 
   if (Opts.shouldPerformIRGenerationInParallel() &&
-      !parallelOutputFilenames.empty()) {
+      !parallelOutputFilenames.empty() &&
+      !Opts.UseSingleModuleLLVMEmission) {
     ::performParallelIRGeneration(desc);
     // TODO: Parallel LLVM compilation cannot be used if a (single) module is
     // needed as return value.

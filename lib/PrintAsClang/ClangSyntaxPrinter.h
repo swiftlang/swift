@@ -20,12 +20,18 @@
 
 namespace swift {
 
+class ModuleDecl;
+
 namespace cxx_synthesis {
 
 /// Return the name of the implementation namespace that is used to hide
 /// declarations from the namespace that corresponds to the imported Swift
 /// module in C++.
 StringRef getCxxImplNamespaceName();
+
+/// Return the name of the C++ class inside of `swift::_impl`
+/// namespace that holds an opaque value, like a resilient struct.
+StringRef getCxxOpaqueStorageClassName();
 
 } // end namespace cxx_synthesis
 
@@ -37,6 +43,13 @@ public:
   /// trailing underscore.
   void printIdentifier(StringRef name);
 
+  /// Print the base name of the given declaration.
+  void printBaseName(const ValueDecl *decl);
+
+  /// Print the C-style prefix for the given module name, that's used for
+  /// C type names inside the module.
+  void printModuleNameCPrefix(const ModuleDecl &mod);
+
   /// Print a C++ namespace declaration with the give name and body.
   void
   printNamespace(llvm::function_ref<void(raw_ostream &OS)> namePrinter,
@@ -45,6 +58,13 @@ public:
   void
   printNamespace(StringRef name,
                  llvm::function_ref<void(raw_ostream &OS)> bodyPrinter) const;
+
+  /// Print an extern C block with given body.
+  void
+  printExternC(llvm::function_ref<void(raw_ostream &OS)> bodyPrinter) const;
+
+  /// Print the `swift::_impl::` namespace qualifier.
+  void printSwiftImplQualifier() const;
 
   /// Where nullability information should be printed.
   enum class NullabilityPrintKind {
@@ -60,6 +80,13 @@ public:
   /// Returns true if \p name matches a keyword in any Clang language mode.
   static bool isClangKeyword(StringRef name);
   static bool isClangKeyword(Identifier name);
+
+  /// Print the call expression to the Swift type metadata access function.
+  void printSwiftTypeMetadataAccessFunctionCall(StringRef name);
+
+  /// Print the expression to access the value witness table pointer from the
+  /// given type metadata variable.
+  void printValueWitnessTableAccessFromTypeMetadata(StringRef metadataVariable);
 
 protected:
   raw_ostream &os;

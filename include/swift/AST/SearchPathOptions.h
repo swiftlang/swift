@@ -327,10 +327,6 @@ public:
   /// would for a non-system header.
   bool DisableModulesValidateSystemDependencies = false;
 
-  /// Enforce loading only serialized modules built with the same SDK
-  /// as the context loading it.
-  bool EnableSameSDKCheck = true;
-
   /// A set of compiled modules that may be ready to use.
   std::vector<std::string> CandidateCompiledModules;
 

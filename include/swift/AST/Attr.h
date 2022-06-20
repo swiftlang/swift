@@ -1156,6 +1156,8 @@ public:
                                       SourceRange range,
                                       ArrayRef<Identifier> spiGroups);
 
+  SPIAccessControlAttr *clone(ASTContext &C, bool implicit) const;
+
   /// Name of SPIs declared by the attribute.
   ///
   /// Note: A single SPI name per attribute is currently supported but this
@@ -1268,6 +1270,13 @@ public:
   EffectsKind getKind() const { return EffectsKind(Bits.EffectsAttr.kind); }
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Effects;
+  }
+
+  EffectsAttr *clone(ASTContext &ctx) const {
+    if (getKind() == EffectsKind::Custom) {
+      return new (ctx) EffectsAttr(customString);
+    }
+    return new (ctx) EffectsAttr(getKind());
   }
 };
 
@@ -1712,12 +1721,15 @@ public:
   }
 };
 
-/// Describe a symbol was originally defined in another module. For example, given
+/// Describes a symbol that was originally defined in another module. For
+/// example, given the following declaration:
+///
 /// \code
 /// @_originallyDefinedIn(module: "Original", OSX 10.15) var foo: Int
 /// \endcode
 ///
-/// Where variable Foo has originally defined in another module called Original prior to OSX 10.15
+/// The variable \p foo was originally defined in another module called
+/// \p Original prior to OSX 10.15
 class OriginallyDefinedInAttr: public DeclAttribute {
 public:
   OriginallyDefinedInAttr(SourceLoc AtLoc, SourceRange Range,
@@ -1729,6 +1741,8 @@ public:
       OriginalModuleName(OriginalModuleName),
       Platform(Platform),
       MovedVersion(MovedVersion) {}
+
+  OriginallyDefinedInAttr *clone(ASTContext &C, bool implicit) const;
 
   // The original module name.
   const StringRef OriginalModuleName;
@@ -1938,6 +1952,10 @@ class DerivativeAttr final
   friend TrailingObjects;
   friend class DerivativeAttrOriginalDeclRequest;
 
+  /// The declaration on which the `@derivative` attribute is declared.
+  /// May not be a valid declaration for `@derivative` attributes.
+  /// Resolved during parsing and deserialization.
+  Decl *OriginalDeclaration = nullptr;
   /// The base type for the referenced original declaration. This field is
   /// non-null only for parsed attributes that reference a qualified original
   /// declaration. This field is not serialized; type-checking uses it to
@@ -1990,6 +2008,12 @@ public:
                                 TypeRepr *baseTypeRepr,
                                 DeclNameRefWithLoc original,
                                 IndexSubset *parameterIndices);
+
+  Decl *getOriginalDeclaration() const { return OriginalDeclaration; }
+
+  /// Sets the original declaration on which this attribute is declared.
+  /// Should only be used by parsing and deserialization.
+  void setOriginalDeclaration(Decl *originalDeclaration);
 
   TypeRepr *getBaseTypeRepr() const { return BaseTypeRepr; }
   DeclNameRefWithLoc getOriginalFunctionName() const {
@@ -2291,6 +2315,13 @@ public:
   void add(DeclAttribute *Attr) {
     Attr->Next = DeclAttrs;
     DeclAttrs = Attr;
+  }
+
+  /// Add multiple constructed DeclAttributes to this list.
+  void add(DeclAttributes &Attrs) {
+    for (auto attr : Attrs) {
+      add(attr);
+    }
   }
 
   // Iterator interface over DeclAttribute objects.

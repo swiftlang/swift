@@ -94,9 +94,6 @@ ERROR(forbidden_extended_escaping_string,none,
 ERROR(regex_literal_parsing_error,none,
       "%0", (StringRef))
 
-ERROR(prefix_slash_not_allowed,none,
-      "prefix operator may not contain '/'", ())
-
 //------------------------------------------------------------------------------
 // MARK: Lexer diagnostics
 //------------------------------------------------------------------------------
@@ -658,6 +655,10 @@ ERROR(sil_markmustcheck_invalid_attribute,none,
       "Attribute '[%0]' can not be applied to mark_value_as_moveonly", (StringRef))
 ERROR(sil_markmustcheck_requires_attribute,none,
       "mark_must_check requires an attribute like 'noImplicitCopy'", ())
+ERROR(sil_moveonlytocopyable_invalid_attribute,none,
+      "Attribute '[%0]' can not be applied to moveonlywrapper_to_copyable", (StringRef))
+ERROR(sil_moveonlytocopyable_requires_attribute,none,
+      "moveonlywrapper_to_copyable requires either a [guaranteed] or [owned] attribute", ())
 
 // SIL Basic Blocks
 ERROR(expected_sil_block_name,none,
@@ -1356,6 +1357,11 @@ ERROR(expected_type_after_as,none,
 ERROR(string_interpolation_extra,none,
       "extra tokens after interpolated string expression", ())
 
+// String interpolation isnt closed by a )
+// ie: `let west = "ye \("`
+ERROR(string_interpolation_unclosed, none,
+      "cannot find ')' to match opening '(' in string interpolation", ())
+
 // Interpolations with parameter labels or multiple values
 WARNING(string_interpolation_list_changing,none,
       "interpolating multiple values will not form a tuple in Swift 5", ())
@@ -1819,7 +1825,10 @@ ERROR(version_component_not_number,none,
 ERROR(compiler_version_too_many_components,none,
       "compiler version must not have more than five components", ())
 WARNING(unused_compiler_version_component,NoUsage,
-      "the second version component is not used for comparison", ())
+      "the second version component is not used for comparison in legacy "
+      "compiler versions%select{|; are you trying to encode a new Swift "
+      "compiler version for compatibility with legacy compilers?}0",
+      (bool))
 ERROR(empty_version_component,none,
       "found empty version component", ())
 ERROR(compiler_version_component_out_of_range,none,

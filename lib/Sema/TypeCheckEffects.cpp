@@ -1787,6 +1787,9 @@ public:
   void diagnoseUnhandledThrowSite(DiagnosticEngine &Diags, ASTNode E,
                                   bool isTryCovered,
                                   const PotentialEffectReason &reason) {
+    if (E.isImplicit())
+      return;
+
     switch (getKind()) {
     case Kind::PotentiallyHandled:
       if (IsNonExhaustiveCatch) {
@@ -1966,6 +1969,9 @@ public:
   void diagnoseUnhandledAsyncSite(DiagnosticEngine &Diags, ASTNode node,
                                   Optional<PotentialEffectReason> maybeReason,
                                   bool forAwait = false) {
+    if (node.isImplicit())
+      return;
+
     switch (getKind()) {
     case Kind::PotentiallyHandled: {
       Diags.diagnose(node.getStartLoc(), diag::async_in_nonasync_function,
@@ -2872,8 +2878,16 @@ private:
            // callee is isolated to an actor.
            auto callee = call->getCalledValue();
            if (callee) {
+             auto declKind = callee->getDescriptiveKind();
+             if (call->usesDistributedThunk()) {
+               // We need to determine whether this is a method or a property.
+               // Computed properties always form an implicit call to the thunk.
+               declKind = call->isImplicit()
+                              ? DescriptiveDeclKind::DistributedProperty
+                              : DescriptiveDeclKind::DistributedMethod;
+             }
              Ctx.Diags.diagnose(diag.expr.getStartLoc(), diag::actor_isolated_sync_func,
-                                callee->getDescriptiveKind(), callee->getName());
+                                declKind, callee->getName());
            } else {
              Ctx.Diags.diagnose(
                  diag.expr.getStartLoc(), diag::actor_isolated_sync_func_value,

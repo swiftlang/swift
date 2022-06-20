@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-verifier"
+
 #include "VerifierPrivate.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AnyFunctionRef.h"
@@ -36,6 +37,7 @@
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/SILVTableVisitor.h"
@@ -1469,10 +1471,8 @@ public:
               "Operand is of an ArchetypeType that does not exist in the "
               "Caller's generic param list.");
       if (auto OpenedA = getOpenedArchetypeOf(A)) {
-        const auto root =
-            cast<OpenedArchetypeType>(CanType(OpenedA->getRoot()));
         auto *openingInst =
-            F->getModule().getRootOpenedArchetypeDefInst(root, F);
+            F->getModule().getRootOpenedArchetypeDefInst(OpenedA.getRoot(), F);
         require(I == nullptr || openingInst == I ||
                     properlyDominates(openingInst, I),
                 "Use of an opened archetype should be dominated by a "
@@ -1605,7 +1605,7 @@ public:
         require(isArchetypeValidInFunction(A, AI->getFunction()),
                 "Archetype to be substituted must be valid in function.");
 
-        const auto root = cast<OpenedArchetypeType>(CanType(A->getRoot()));
+        const auto root = A.getRoot();
 
         // Collect all root opened archetypes used in the substitutions list.
         FoundRootOpenedArchetypes.insert(root);
@@ -2711,6 +2711,9 @@ public:
     require(!fnConv.useLoweredAddresses() || F.hasOwnership(),
             "copy_value is only valid in functions with qualified "
             "ownership");
+    require(I->getModule().getStage() == SILStage::Raw ||
+                !I->getOperand()->getType().isMoveOnlyWrapped(),
+            "@moveOnly types can only be copied in Raw SIL?!");
   }
 
   void checkDestroyValueInst(DestroyValueInst *I) {
@@ -4074,10 +4077,8 @@ public:
     Ty.visit([&](CanType t) {
       SILValue Def;
       if (const auto archetypeTy = dyn_cast<OpenedArchetypeType>(t)) {
-        const auto root =
-            cast<OpenedArchetypeType>(CanType(archetypeTy->getRoot()));
-        Def = I->getModule().getRootOpenedArchetypeDefInst(root,
-                                                           I->getFunction());
+        Def = I->getModule().getRootOpenedArchetypeDefInst(
+            archetypeTy.getRoot(), I->getFunction());
         require(Def, "Root opened archetype should be registered in SILModule");
       } else if (t->hasDynamicSelfType()) {
         require(I->getFunction()->hasSelfParam() ||
@@ -5395,6 +5396,26 @@ public:
     require(i->getModule().getStage() == SILStage::Raw,
             "Only valid in Raw SIL! Should have been eliminated by /some/ "
             "diagnostic pass");
+  }
+
+  void checkMoveOnlyWrapperToCopyableValueInst(
+      MoveOnlyWrapperToCopyableValueInst *cvt) {
+    require(cvt->getOperand()->getType().isObject(),
+            "Operand value should be an object");
+    require(!cvt->getType().isMoveOnlyWrapped(), "Output should not move only");
+    require(cvt->getType() ==
+                cvt->getOperand()->getType().removingMoveOnlyWrapper(),
+            "Result and operand must have the same type, today.");
+  }
+
+  void checkCopyableToMoveOnlyWrapperValueInst(
+      CopyableToMoveOnlyWrapperValueInst *cvt) {
+    require(cvt->getOperand()->getType().isObject(),
+            "Operand value should be an object");
+    require(cvt->getType().isMoveOnlyWrapped(), "Output should be move only");
+    require(cvt->getType() ==
+                cvt->getOperand()->getType().addingMoveOnlyWrapper(),
+            "Result and operand must have the same type, today.");
   }
 
   void verifyEpilogBlocks(SILFunction *F) {

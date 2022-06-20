@@ -14,4 +14,4 @@ func takesProtocol(_ x: Protocol) {}
 takesProtocol(ObjCProto.self)
 takesProtocol(ObjCProto2.self)
 takesProtocol(NonObjCProto.self) // expected-error{{cannot convert value of type '(any NonObjCProto).Type' to expected argument type 'Protocol'}}
-takesProtocol(TwoObjCProtos.self) // expected-error{{cannot convert value of type '(any TwoObjCProtos).Type' (aka '(ObjCProto & ObjCProto2).Protocol') to expected argument type 'Protocol'}}
+takesProtocol(TwoObjCProtos.self) // expected-error{{cannot convert value of type '(any TwoObjCProtos).Type' (aka '(any ObjCProto & ObjCProto2).Type') to expected argument type 'Protocol'}}

@@ -51,8 +51,12 @@ for filename in os.listdir(sdk_overlay_dir):
 
     # swift -build-module-from-parseable-interface
     output_path = os.path.join(output_dir, module_name + ".swiftmodule")
+    compiler_args = ["-o", output_path, "-module-name", module_name,
+                     interface_file]
+    if module_name == "std":
+        compiler_args += ["-enable-experimental-cxx-interop"]
+
     status = subprocess.call(compiler_invocation +
-                             ["-o", output_path, "-module-name", module_name,
-                              interface_file])
+                             compiler_args)
     if status != 0:
         print("# " + target_os + ": " + module_name)

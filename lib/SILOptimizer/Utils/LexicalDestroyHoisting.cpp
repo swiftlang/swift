@@ -20,6 +20,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SILOptimizer/Analysis/Reachability.h"
+#include "swift/SILOptimizer/Analysis/VisitBarrierAccessScopes.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeBorrowScope.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
@@ -43,6 +44,8 @@ struct Context final {
   /// value->getDefiningInstruction()
   SILInstruction *const definition;
 
+  SILBasicBlock *defBlock;
+
   SILFunction &function;
 
   InstructionDeleter &deleter;
@@ -50,7 +53,8 @@ struct Context final {
   Context(SILValue const &value, SILFunction &function,
           InstructionDeleter &deleter)
       : value(value), definition(value->getDefiningInstruction()),
-        function(function), deleter(deleter) {
+        defBlock(value->getParentBlock()), function(function),
+        deleter(deleter) {
     assert(value->isLexical());
     assert(value->getOwnershipKind() == OwnershipKind::Owned);
   }
@@ -95,87 +99,100 @@ bool findUsage(Context const &context, Usage &usage) {
 
 /// How destroy_value hoisting is obstructed.
 struct DeinitBarriers final {
-  /// Blocks up to "before the beginning" of which hoisting was able to proceed.
-  BasicBlockSetVector hoistingReachesBeginBlocks;
-
-  /// Blocks to "after the end" of which hoisting was able to proceed.
-  BasicBlockSet hoistingReachesEndBlocks;
-
   /// Instructions above which destroy_values cannot be hoisted.
-  SmallVector<SILInstruction *, 4> barriers;
+  SmallVector<SILInstruction *, 4> instructions;
 
   /// Blocks one of whose phis is a barrier and consequently out of which
   /// destroy_values cannot be hoisted.
-  SmallVector<SILBasicBlock *, 4> phiBarriers;
+  SmallVector<SILBasicBlock *, 4> phis;
 
-  DeinitBarriers(Context &context)
-      : hoistingReachesBeginBlocks(&context.function),
-        hoistingReachesEndBlocks(&context.function) {}
+  SmallVector<SILBasicBlock *, 4> blocks;
+
+  DeinitBarriers(Context &context) {}
   DeinitBarriers(DeinitBarriers const &) = delete;
   DeinitBarriers &operator=(DeinitBarriers const &) = delete;
 };
 
+class BarrierAccessScopeFinder;
+
 /// Works backwards from the current location of destroy_values to the earliest
 /// place they can be hoisted to.
 ///
-/// Implements BackwardReachability::BlockReachability.
-class DataFlow final {
+/// Implements IterativeBackwardReachability::Effects
+/// Implements IterativeBackwardReachability::bindBarriers::Visitor
+/// Implements VisitBarrierAccessScopes::Effects
+class Dataflow final {
+  using Reachability = IterativeBackwardReachability<Dataflow>;
+  using Effect = Reachability::Effect;
   Context const &context;
   Usage const &uses;
-  DeinitBarriers &result;
+  DeinitBarriers &barriers;
+  Reachability::Result result;
+  Reachability reachability;
+  SmallPtrSet<BeginAccessInst *, 8> barrierAccessScopes;
 
   enum class Classification { Barrier, Other };
 
-  BackwardReachability<DataFlow> reachability;
-
 public:
-  DataFlow(Context const &context, Usage const &uses, DeinitBarriers &result)
-      : context(context), uses(uses), result(result),
-        reachability(&context.function, *this) {
-    // Seed reachability with the scope ending uses from which the backwards
-    // data flow will begin.
-    for (auto *end : uses.ends) {
-      reachability.initLastUse(end);
-    }
-  }
-  DataFlow(DataFlow const &) = delete;
-  DataFlow &operator=(DataFlow const &) = delete;
+  Dataflow(Context const &context, Usage const &uses, DeinitBarriers &barriers)
+      : context(context), uses(uses), barriers(barriers),
+        result(&context.function),
+        reachability(&context.function, context.defBlock, *this, result) {}
+  Dataflow(Dataflow const &) = delete;
+  Dataflow &operator=(Dataflow const &) = delete;
 
-  void run() { reachability.solveBackward(); }
+  void run();
 
 private:
-  friend class BackwardReachability<DataFlow>;
-
-  bool hasReachableBegin(SILBasicBlock *block) {
-    return result.hoistingReachesBeginBlocks.contains(block);
-  }
-
-  void markReachableBegin(SILBasicBlock *block) {
-    result.hoistingReachesBeginBlocks.insert(block);
-  }
-
-  void markReachableEnd(SILBasicBlock *block) {
-    result.hoistingReachesEndBlocks.insert(block);
-  }
+  friend Reachability;
+  friend class BarrierAccessScopeFinder;
+  friend class VisitBarrierAccessScopes<Dataflow, BarrierAccessScopeFinder>;
 
   Classification classifyInstruction(SILInstruction *);
 
   bool classificationIsBarrier(Classification);
 
-  void visitedInstruction(SILInstruction *, Classification);
+  /// IterativeBackwardReachability::Effects
+  /// VisitBarrierAccessScopes::Effects
 
-  bool checkReachableBarrier(SILInstruction *);
+  auto gens() { return uses.ends; }
 
-  bool checkReachablePhiBarrier(SILBasicBlock *);
+  Effect effectForInstruction(SILInstruction *);
+  Effect effectForPhi(SILBasicBlock *);
+
+  /// VisitBarrierAccessScopes::Effects
+
+  auto localGens() { return result.localGens; }
+
+  bool isLocalGen(SILInstruction *instruction) {
+    return result.localGens.contains(instruction);
+  }
+
+  /// IterativeBackwardReachability::bindBarriers::Visitor
+
+  void visitBarrierInstruction(SILInstruction *instruction) {
+    barriers.instructions.push_back(instruction);
+  }
+
+  void visitBarrierPhi(SILBasicBlock *block) { barriers.phis.push_back(block); }
+
+  void visitBarrierBlock(SILBasicBlock *block) {
+    barriers.blocks.push_back(block);
+  }
 };
 
-DataFlow::Classification
-DataFlow::classifyInstruction(SILInstruction *instruction) {
+Dataflow::Classification
+Dataflow::classifyInstruction(SILInstruction *instruction) {
   if (instruction == context.definition) {
     return Classification::Barrier;
   }
   if (uses.users.contains(instruction)) {
     return Classification::Barrier;
+  }
+  if (auto *eai = dyn_cast<EndAccessInst>(instruction)) {
+    return barrierAccessScopes.contains(eai->getBeginAccess())
+               ? Classification::Barrier
+               : Classification::Other;
   }
   if (isDeinitBarrier(instruction)) {
     return Classification::Barrier;
@@ -183,7 +200,7 @@ DataFlow::classifyInstruction(SILInstruction *instruction) {
   return Classification::Other;
 }
 
-bool DataFlow::classificationIsBarrier(Classification classification) {
+bool Dataflow::classificationIsBarrier(Classification classification) {
   switch (classification) {
   case Classification::Barrier:
     return true;
@@ -193,26 +210,15 @@ bool DataFlow::classificationIsBarrier(Classification classification) {
   llvm_unreachable("exhaustive switch not exhaustive?!");
 }
 
-void DataFlow::visitedInstruction(SILInstruction *instruction,
-                                  Classification classification) {
-  assert(classifyInstruction(instruction) == classification);
-  switch (classification) {
-  case Classification::Barrier:
-    result.barriers.push_back(instruction);
-    return;
-  case Classification::Other:
-    return;
-  }
-  llvm_unreachable("exhaustive switch not exhaustive?!");
-}
-
-bool DataFlow::checkReachableBarrier(SILInstruction *instruction) {
+Dataflow::Effect Dataflow::effectForInstruction(SILInstruction *instruction) {
+  if (uses.ends.contains(instruction))
+    return Effect::Gen();
   auto classification = classifyInstruction(instruction);
-  visitedInstruction(instruction, classification);
-  return classificationIsBarrier(classification);
+  return classificationIsBarrier(classification) ? Effect::Kill()
+                                                 : Effect::NoEffect();
 }
 
-bool DataFlow::checkReachablePhiBarrier(SILBasicBlock *block) {
+Dataflow::Effect Dataflow::effectForPhi(SILBasicBlock *block) {
   assert(llvm::all_of(block->getArguments(),
                       [&](auto argument) { return PhiValue(argument); }));
 
@@ -221,10 +227,46 @@ bool DataFlow::checkReachablePhiBarrier(SILBasicBlock *block) {
         return classificationIsBarrier(
             classifyInstruction(predecessor->getTerminator()));
       });
-  if (isBarrier) {
-    result.phiBarriers.push_back(block);
+  return isBarrier ? Effect::Kill() : Effect::NoEffect();
+}
+
+/// Finds end_access instructions which are barriers to hoisting because the
+/// access scopes they contain barriers to hoisting.  Hoisting destroy_values
+/// into such access scopes could introduce exclusivity violations.
+///
+/// Implements BarrierAccessScopeFinder::Visitor
+class BarrierAccessScopeFinder final {
+  using Impl = VisitBarrierAccessScopes<Dataflow, BarrierAccessScopeFinder>;
+  Impl impl;
+  Dataflow &dataflow;
+
+public:
+  BarrierAccessScopeFinder(Context const &context, Dataflow &dataflow)
+      : impl(&context.function, dataflow, *this), dataflow(dataflow) {}
+
+  void find() { impl.visit(); }
+
+private:
+  friend Impl;
+
+  bool isInRegion(SILBasicBlock *block) {
+    return dataflow.result.discoveredBlocks.contains(block);
   }
-  return isBarrier;
+
+  void visitBarrierAccessScope(BeginAccessInst *bai) {
+    dataflow.barrierAccessScopes.insert(bai);
+    for (auto *eai : bai->getEndAccesses()) {
+      dataflow.reachability.addKill(eai);
+    }
+  }
+};
+
+void Dataflow::run() {
+  reachability.initialize();
+  BarrierAccessScopeFinder finder(context, *this);
+  finder.find();
+  reachability.solve();
+  reachability.findBarriers(*this);
 }
 
 /// Hoist the destroy_values of %value.
@@ -256,7 +298,7 @@ bool Rewriter::run() {
   //
   // A block is a phi barrier iff any of its predecessors' terminators get
   // classified as barriers.
-  for (auto *block : barriers.phiBarriers) {
+  for (auto *block : barriers.phis) {
     madeChange |= createDestroyValue(&block->front());
   }
 
@@ -271,13 +313,9 @@ bool Rewriter::run() {
   // have returned true for P, so none of its instructions would ever have been
   // classified (except for via checkReachablePhiBarrier, which doesn't record
   // terminator barriers).
-  for (auto instruction : barriers.barriers) {
+  for (auto instruction : barriers.instructions) {
     if (auto *terminator = dyn_cast<TermInst>(instruction)) {
       auto successors = terminator->getParentBlock()->getSuccessorBlocks();
-      // In order for the instruction to have been classified as a barrier,
-      // reachability would have had to reach the block containing it.
-      assert(barriers.hoistingReachesEndBlocks.contains(
-                terminator->getParentBlock()));
       for (auto *successor : successors) {
         madeChange |= createDestroyValue(&successor->front());
       }
@@ -301,12 +339,8 @@ bool Rewriter::run() {
   // P not having a reachable end--see BackwardReachability::meetOverSuccessors.
   //
   // control-flow-boundary(B) := beginning-reachable(B) && !end-reachable(P)
-  for (auto *block : barriers.hoistingReachesBeginBlocks) {
-    if (auto *predecessor = block->getSinglePredecessorBlock()) {
-      if (!barriers.hoistingReachesEndBlocks.contains(predecessor)) {
-        madeChange |= createDestroyValue(&block->front());
-      }
-    }
+  for (auto *block : barriers.blocks) {
+    madeChange |= createDestroyValue(&block->front());
   }
 
   if (madeChange) {
@@ -324,7 +358,7 @@ bool Rewriter::run() {
 
 bool Rewriter::createDestroyValue(SILInstruction *insertionPoint) {
   if (auto *ebi = dyn_cast<DestroyValueInst>(insertionPoint)) {
-    if (uses.ends.contains(insertionPoint)) {
+    if (llvm::find(uses.ends, insertionPoint) != uses.ends.end()) {
       reusedDestroyValueInsts.insert(insertionPoint);
       return false;
     }
@@ -342,7 +376,7 @@ bool run(Context &context) {
     return false;
 
   DeinitBarriers barriers(context);
-  DataFlow flow(context, usage, barriers);
+  Dataflow flow(context, usage, barriers);
   flow.run();
 
   Rewriter rewriter(context, usage, barriers);

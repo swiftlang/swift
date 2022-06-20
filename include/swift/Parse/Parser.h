@@ -1763,10 +1763,7 @@ public:
   /// Try re-lex a '/' operator character as a regex literal. This should be
   /// called when parsing in an expression position to ensure a regex literal is
   /// correctly parsed.
-  ///
-  /// If \p mustBeRegex is set to true, a regex literal will always be lexed if
-  /// enabled. Otherwise, it will not be lexed if it may be ambiguous.
-  void tryLexRegexLiteral(bool mustBeRegex);
+  void tryLexRegexLiteral(bool forUnappliedOperator);
 
   void validateCollectionElement(ParserResult<Expr> element);
 

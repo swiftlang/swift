@@ -2078,13 +2078,9 @@ static CanSILFunctionType getSILFunctionType(
     // Lower in the context of the closure. Since the set of captures is a
     // private contract between the closure and its enclosing context, we
     // don't need to keep its capture types opaque.
-    auto expansion = TypeExpansionContext::maximal(
-        constant->getAnyFunctionRef()->getAsDeclContext(), false);
-    // ...unless it's inlinable, in which case it might get inlined into
-    // some place we need to keep opaque types opaque.
-    if (constant->isSerialized())
-      expansion = TypeExpansionContext::minimal();
-    lowerCaptureContextParameters(TC, *constant, genericSig, expansion, inputs);
+    lowerCaptureContextParameters(TC, *constant, genericSig,
+                                  TC.getCaptureTypeExpansionContext(*constant),
+                                  inputs);
   }
   
   auto calleeConvention = ParameterConvention::Direct_Unowned;
@@ -2551,7 +2547,7 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
   auto archetypeVisitor = [&](CanType t) {
     if (auto archetypeTy = dyn_cast<ArchetypeType>(t)) {
       if (auto opened = dyn_cast<OpenedArchetypeType>(archetypeTy)) {
-        const auto root = cast<OpenedArchetypeType>(CanType(opened->getRoot()));
+        const auto root = opened.getRoot();
         assert((openedExistential == CanArchetypeType() ||
                 openedExistential == root) &&
                "one too many open existentials");
@@ -2582,17 +2578,15 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
   }
 
   auto substTypeHelper = [&](SubstitutableType *type) -> Type {
+    // FIXME: Type::subst should not pass in non-root archetypes.
+    // Consider only root archetypes.
+    if (auto *archetype = dyn_cast<ArchetypeType>(type)) {
+      if (!archetype->isRoot())
+        return Type();
+    }
+
     if (CanType(type) == openedExistential)
       return newArchetype;
-
-    // If a nested archetype is rooted on our opened existential, fail:
-    // Type::subst attempts to substitute the parent of a nested archetype
-    // only if it fails to find a replacement for the nested one.
-    if (auto *opened = dyn_cast<OpenedArchetypeType>(type)) {
-      if (openedExistential->isEqual(opened->getRoot())) {
-        return nullptr;
-      }
-    }
 
     return Type(type).subst(contextSubs);
   };
@@ -3086,12 +3080,8 @@ static CanSILFunctionType getSILFunctionTypeForClangDecl(
   }
 
   if (auto method = dyn_cast<clang::CXXMethodDecl>(clangDecl)) {
-    AbstractionPattern origPattern =
-        method->isOverloadedOperator()
-            ? AbstractionPattern::getCXXOperatorMethod(origType, method,
-                                                       foreignInfo.self)
-            : AbstractionPattern::getCXXMethod(origType, method,
-                                               foreignInfo.self);
+    AbstractionPattern origPattern = AbstractionPattern::getCXXMethod(origType, method,
+                                                                      foreignInfo.self);
     bool isMutating =
         TC.Context.getClangModuleLoader()->isCXXMethodMutating(method);
     auto conventions = CXXMethodConventions(method, isMutating);
@@ -3470,19 +3460,11 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
     if (!c.hasDecl())
       return SILFunctionTypeRepresentation::CFunctionPointer;
 
-    // TODO: Is this correct for operators?
     if (auto method =
-            dyn_cast_or_null<clang::CXXMethodDecl>(c.getDecl()->getClangDecl())) {
-      // Subscripts and call operators are imported as normal methods.
-      bool staticOperator = method->isOverloadedOperator() &&
-                            method->getOverloadedOperator() != clang::OO_Call &&
-                            method->getOverloadedOperator() != clang::OO_Subscript;
-      return isa<clang::CXXConstructorDecl>(method) ||
-                     method->isStatic() ||
-                     staticOperator
-          ? SILFunctionTypeRepresentation::CFunctionPointer
-          : SILFunctionTypeRepresentation::CXXMethod;
-    }
+            dyn_cast_or_null<clang::CXXMethodDecl>(c.getDecl()->getClangDecl()))
+      return isa<clang::CXXConstructorDecl>(method) || method->isStatic()
+                 ? SILFunctionTypeRepresentation::CFunctionPointer
+                 : SILFunctionTypeRepresentation::CXXMethod;
 
 
     // For example, if we have a function in a namespace:
@@ -4419,10 +4401,7 @@ getAbstractionPatternForConstant(ASTContext &ctx, SILDeclRef constant,
       assert(numParameterLists == 2);
       if (auto method = dyn_cast<clang::CXXMethodDecl>(clangDecl)) {
         // C++ method.
-        return method->isOverloadedOperator()
-                   ? AbstractionPattern::getCurriedCXXOperatorMethod(fnType,
-                                                                     bridgedFn)
-                   : AbstractionPattern::getCurriedCXXMethod(fnType, bridgedFn);
+        return AbstractionPattern::getCurriedCXXMethod(fnType, bridgedFn);
       } else {
         // C function imported as a method.
         return AbstractionPattern::getCurriedCFunctionAsMethod(fnType,
@@ -4508,19 +4487,6 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
 
     auto partialFnPattern = bridgingFnPattern.getFunctionResultType();
     for (unsigned i : indices(methodParams)) {
-      // C++ operators that are implemented as non-static member functions get
-      // imported into Swift as static methods that have an additional
-      // parameter for the left-hand-side operand instead of the receiver
-      // object. These are inout parameters and don't get bridged.
-      // TODO: Undo this if we stop using inout.
-      if (auto method = dyn_cast_or_null<clang::CXXMethodDecl>(
-              constant.getDecl()->getClangDecl())) {
-        if (i==0 && method->isOverloadedOperator()) {
-          bridgedParams.push_back(methodParams[0]);
-          continue;
-        }
-      }
-
       auto paramPattern = partialFnPattern.getFunctionParamType(i);
       auto bridgedParam =
           getBridgedParam(rep, paramPattern, methodParams[i], bridging);

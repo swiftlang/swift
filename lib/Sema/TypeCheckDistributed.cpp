@@ -247,7 +247,7 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
           decl->getDescriptiveKind(), decl->getName(), identifier);
       decl->diagnose(
           diag::note_distributed_actor_system_conformance_missing_adhoc_requirement,
-          decl->getName(), identifier,
+          Proto->getName(), identifier,
           "func remoteCall<Act, Err, Res>(\n"
           "    on actor: Act,\n"
           "    target: RemoteCallTarget,\n"
@@ -274,7 +274,7 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
           decl->getDescriptiveKind(), decl->getName(), identifier);
       decl->diagnose(
           diag::note_distributed_actor_system_conformance_missing_adhoc_requirement,
-          decl->getName(), identifier,
+          Proto->getName(), identifier,
           "func remoteCallVoid<Act, Err>(\n"
           "    on actor: Act,\n"
           "    target: RemoteCallTarget,\n"
@@ -303,7 +303,7 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
           diag::distributed_actor_system_conformance_missing_adhoc_requirement,
           decl->getDescriptiveKind(), decl->getName(), identifier);
       decl->diagnose(diag::note_distributed_actor_system_conformance_missing_adhoc_requirement,
-                     decl->getName(), identifier,
+                     Proto->getName(), identifier,
                      "mutating func recordArgument<Value: SerializationRequirement>(_ argument: RemoteCallArgument<Value>) throws\n");
       anyMissingAdHocRequirements = true;
     }
@@ -318,7 +318,7 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
           diag::distributed_actor_system_conformance_missing_adhoc_requirement,
           decl->getDescriptiveKind(), decl->getName(), identifier);
       decl->diagnose(diag::note_distributed_actor_system_conformance_missing_adhoc_requirement,
-                     decl->getName(), identifier,
+                     Proto->getName(), identifier,
                      "mutating func recordReturnType<Res: SerializationRequirement>(_ resultType: Res.Type) throws\n");
       anyMissingAdHocRequirements = true;
     }
@@ -339,7 +339,7 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
           diag::distributed_actor_system_conformance_missing_adhoc_requirement,
           decl->getDescriptiveKind(), decl->getName(), identifier);
       decl->diagnose(diag::note_distributed_actor_system_conformance_missing_adhoc_requirement,
-                     decl->getName(), identifier,
+                     Proto->getName(), identifier,
                      "mutating func decodeNextArgument<Argument: SerializationRequirement>() throws -> Argument\n");
       anyMissingAdHocRequirements = true;
     }
@@ -360,10 +360,9 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
           diag::distributed_actor_system_conformance_missing_adhoc_requirement,
           decl->getDescriptiveKind(), decl->getName(), identifier);
       decl->diagnose(
-          diag::
-              note_distributed_actor_system_conformance_missing_adhoc_requirement,
-          decl->getName(), identifier,
-          "mutating func onReturn<Success: SerializationRequirement>(value: "
+          diag::note_distributed_actor_system_conformance_missing_adhoc_requirement,
+          Proto->getName(), identifier,
+          "func onReturn<Success: SerializationRequirement>(value: "
           "Success) async throws\n");
       anyMissingAdHocRequirements = true;
     }
@@ -422,9 +421,9 @@ static bool checkDistributedTargetResultType(
             addCodableFixIt(resultNominalType, diag);
           }
         }
-
-        return true;
-      }
+      } // end if: diagnose
+      
+      return true;
     }
   }
 
@@ -484,7 +483,12 @@ bool swift::checkDistributedFunction(AbstractFunctionDecl *func) {
 
 bool CheckDistributedFunctionRequest::evaluate(
     Evaluator &evaluator, AbstractFunctionDecl *func) const {
-  assert(func->isDistributed());
+  if (auto *accessor = dyn_cast<AccessorDecl>(func)) {
+    auto *var = cast<VarDecl>(accessor->getStorage());
+    assert(var->isDistributed() && accessor->isGetter());
+  } else {
+    assert(func->isDistributed());
+  }
 
   auto &C = func->getASTContext();
   auto DC = func->getDeclContext();
@@ -579,23 +583,29 @@ bool swift::checkDistributedActorProperty(VarDecl *var, bool diagnose) {
 
   /// === Check if the declaration is a valid combination of attributes
   if (var->isStatic()) {
-    var->diagnose(diag::distributed_property_cannot_be_static,
-                      var->getName());
+    if (diagnose) {
+      var->diagnose(diag::distributed_property_cannot_be_static,
+                    var->getName());
+    }
     // TODO(distributed): fixit, offer removing the static keyword
     return true;
   }
 
   // it is not a computed property
   if (var->isLet() || var->hasStorageOrWrapsStorage()) {
-    var->diagnose(diag::distributed_property_can_only_be_computed,
-                  var->getDescriptiveKind(), var->getName());
+    if (diagnose) {
+      var->diagnose(diag::distributed_property_can_only_be_computed,
+                    var->getDescriptiveKind(), var->getName());
+    }
     return true;
   }
 
   // distributed properties cannot have setters
   if (var->getWriteImpl() != swift::WriteImplKind::Immutable) {
-    var->diagnose(diag::distributed_property_can_only_be_computed_get_only,
-                  var->getName());
+    if (diagnose) {
+      var->diagnose(diag::distributed_property_can_only_be_computed_get_only,
+                    var->getName());
+    }
     return true;
   }
 
@@ -655,6 +665,18 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal
   (void)nominal->getDefaultInitializer();
 
   for (auto member : nominal->getMembers()) {
+    // A distributed computed property needs to have a thunk for
+    // its getter accessor.
+    if (auto *var = dyn_cast<VarDecl>(member)) {
+      if (!var->isDistributed())
+        continue;
+
+      if (auto thunk = var->getDistributedThunk())
+        SF->DelayedFunctions.push_back(thunk);
+
+      continue;
+    }
+
     // --- Ensure all thunks
     if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
       if (!func->isDistributed())

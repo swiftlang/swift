@@ -11,11 +11,16 @@
 //===----------------------------------------------------------------------===//
 
 #include "ClangSyntaxPrinter.h"
+#include "swift/AST/Module.h"
 
 using namespace swift;
 using namespace cxx_synthesis;
 
 StringRef cxx_synthesis::getCxxImplNamespaceName() { return "_impl"; }
+
+StringRef cxx_synthesis::getCxxOpaqueStorageClassName() {
+  return "OpaqueStorage";
+}
 
 bool ClangSyntaxPrinter::isClangKeyword(StringRef name) {
   static const llvm::DenseSet<StringRef> keywords = [] {
@@ -43,6 +48,15 @@ void ClangSyntaxPrinter::printIdentifier(StringRef name) {
     os << '_';
 }
 
+void ClangSyntaxPrinter::printBaseName(const ValueDecl *decl) {
+  assert(decl->getName().isSimpleName());
+  printIdentifier(decl->getBaseIdentifier().str());
+}
+
+void ClangSyntaxPrinter::printModuleNameCPrefix(const ModuleDecl &mod) {
+  os << mod.getName().str() << '_';
+}
+
 /// Print a C++ namespace declaration with the give name and body.
 void ClangSyntaxPrinter::printNamespace(
     llvm::function_ref<void(raw_ostream &OS)> namePrinter,
@@ -60,6 +74,21 @@ void ClangSyntaxPrinter::printNamespace(
     StringRef name,
     llvm::function_ref<void(raw_ostream &OS)> bodyPrinter) const {
   printNamespace([&](raw_ostream &os) { os << name; }, bodyPrinter);
+}
+
+void ClangSyntaxPrinter::printExternC(
+    llvm::function_ref<void(raw_ostream &OS)> bodyPrinter) const {
+  os << "#ifdef __cplusplus\n";
+  os << "extern \"C\" {\n";
+  os << "#endif\n\n";
+  bodyPrinter(os);
+  os << "\n#ifdef __cplusplus\n";
+  os << "}\n";
+  os << "#endif\n";
+}
+
+void ClangSyntaxPrinter::printSwiftImplQualifier() const {
+  os << "swift::" << cxx_synthesis::getCxxImplNamespaceName() << "::";
 }
 
 void ClangSyntaxPrinter::printNullability(
@@ -101,4 +130,16 @@ void ClangSyntaxPrinter::printNullability(
 
   if (printKind != NullabilityPrintKind::After)
     os << ' ';
+}
+
+void ClangSyntaxPrinter::printSwiftTypeMetadataAccessFunctionCall(
+    StringRef name) {
+  os << name << "(0)";
+}
+
+void ClangSyntaxPrinter::printValueWitnessTableAccessFromTypeMetadata(
+    StringRef metadataVariable) {
+  os << "*(reinterpret_cast<";
+  printSwiftImplQualifier();
+  os << "ValueWitnessTable **>(" << metadataVariable << "._0) - 1)";
 }

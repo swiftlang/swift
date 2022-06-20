@@ -634,7 +634,8 @@ final class TestRunner {
       let index: (Int) -> String =
         { q == 2 ? "" : q <= 20 ?  base20[$0] : String($0) }
       let tail = (1..<q).map { prefix + index($0) } + ["MAX"]
-      return [withUnit("MIN")] + tail.map(c.delta ? withDelta : withUnit)
+      // QMIN identifies the quantile format, distinct from formats using "MIN"
+      return [withUnit("QMIN")] + tail.map(c.delta ? withDelta : withUnit)
     }
     return (
       ["#", "TEST", "SAMPLES"] +

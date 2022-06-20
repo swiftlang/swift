@@ -25,6 +25,7 @@
 #define SWIFT_BASIC_PATHREMAPPER_H
 
 #include "swift/Basic/LLVM.h"
+#include "clang/Basic/PathRemapper.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"
 
@@ -56,6 +57,15 @@ public:
         return (Twine(Mapping.second) +
                 Path.substr(Mapping.first.size())).str();
     return Path.str();
+  }
+
+  /// Returns the Clang PathRemapper equivalent, suitable for use with Clang
+  /// APIs.
+  clang::PathRemapper asClangPathRemapper() const {
+    clang::PathRemapper Remapper;
+    for (const auto &Mapping : PathMappings)
+      Remapper.addMapping(Mapping.first, Mapping.second);
+    return Remapper;
   }
 };
 

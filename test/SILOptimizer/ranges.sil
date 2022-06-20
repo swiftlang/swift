@@ -2,7 +2,8 @@
 
 // REQUIRES: swift_in_compiler
 
-// REQUIRES: rdar92963081
+// rdar92963081
+// UNSUPPORTED: OS=linux-gnu
 
 sil_stage canonical
 

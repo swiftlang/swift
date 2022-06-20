@@ -56,6 +56,9 @@ class ModuleFile
   friend class TypeDeserializer;
   friend class SILDeserializer;
   friend class ProtocolConformanceDeserializer;
+  template <serialization::decls_block::detail::TypeRecords TypeRecord>
+  friend class serialization::decls_block::detail::TypeRecordDispatch;
+  friend struct serialization::decls_block::detail::function_deserializer;
   using Status = serialization::Status;
   using TypeID = serialization::TypeID;
   using ProtocolConformanceID = serialization::ProtocolConformanceID;
@@ -631,7 +634,7 @@ public:
   ///
   /// \param methods The list of @objc methods in this class that have this
   /// selector and are instance/class methods as requested.
-  void loadObjCMethods(ClassDecl *classDecl,
+  void loadObjCMethods(NominalTypeDecl *typeDecl,
                        ObjCSelector selector,
                        bool isInstanceMethod,
                        llvm::TinyPtrVector<AbstractFunctionDecl *> &methods);

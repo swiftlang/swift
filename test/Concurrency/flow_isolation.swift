@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -swift-version 5 -parse-as-library -emit-sil -verify %s
+// RUN: %target-swift-frontend -strict-concurrency=complete -swift-version 5 -parse-as-library -emit-sil -verify %s
 
 func randomBool() -> Bool { return false }
 func logTransaction(_ i: Int) {}
@@ -16,6 +16,7 @@ func takeSendable(_ s: SendableType) {}
 
 class NonSendableType {
   var x: Int = 0
+  func f() {}
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -514,7 +515,7 @@ struct CardboardBox<T> {
 
 
 @available(SwiftStdlib 5.1, *)
-var globalVar: EscapeArtist?
+var globalVar: EscapeArtist? // expected-note 2 {{var declared here}}
 
 @available(SwiftStdlib 5.1, *)
 actor EscapeArtist {
@@ -523,7 +524,11 @@ actor EscapeArtist {
     init(attempt1: Bool) {
         self.x = 0
 
-        globalVar = self    // expected-note {{after making a copy of 'self', only non-isolated properties of 'self' can be accessed from this init}}
+        // expected-note@+2 {{after making a copy of 'self', only non-isolated properties of 'self' can be accessed from this init}}
+        // expected-warning@+1 {{reference to var 'globalVar' is not concurrency-safe because it involves shared mutable state}}
+        globalVar = self
+
+        // expected-warning@+1 {{reference to var 'globalVar' is not concurrency-safe because it involves shared mutable state}}
         Task { await globalVar!.isolatedMethod() }
 
         if self.x == 0 {  // expected-warning {{cannot access property 'x' here in non-isolated initializer; this is an error in Swift 6}}
@@ -698,5 +703,26 @@ actor OhBrother {
     _ = blah(self) // expected-note {{after this closure involving 'self', only non-isolated properties of 'self' can be accessed from this init}}
 
     whatever = 2 // expected-warning {{cannot access property 'whatever' here in non-isolated initializer; this is an error in Swift 6}}
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+@MainActor class AwesomeUIView {}
+
+@available(SwiftStdlib 5.1, *)
+class CheckDeinitFromClass: AwesomeUIView {
+  var ns: NonSendableType?
+  deinit {
+    ns?.f() // expected-warning {{cannot access property 'ns' with a non-sendable type 'NonSendableType?' from non-isolated deinit; this is an error in Swift 6}}
+    ns = nil // expected-warning {{cannot access property 'ns' with a non-sendable type 'NonSendableType?' from non-isolated deinit; this is an error in Swift 6}}
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+actor CheckDeinitFromActor {
+  var ns: NonSendableType?
+  deinit {
+    ns?.f() // expected-warning {{cannot access property 'ns' with a non-sendable type 'NonSendableType?' from non-isolated deinit; this is an error in Swift 6}}
+    ns = nil // expected-warning {{cannot access property 'ns' with a non-sendable type 'NonSendableType?' from non-isolated deinit; this is an error in Swift 6}}
   }
 }

@@ -294,6 +294,7 @@ _$S3abc6testityySiFTm ---> merged abc.testit(Swift.Int) -> ()
 _$S4main4TestC1xACSi_tc6_PRIV_Llfc ---> main.Test.(in _PRIV_).init(x: Swift.Int) -> main.Test
 _T0SqWOy.17 ---> outlined copy of Swift.Optional with unmangled suffix ".17"
 _T03nix6testitSaySiGyFTv_ ---> outlined variable #0 of nix.testit() -> [Swift.Int]
+_T03nix6testitSaySiGyFTv_r ---> outlined read-only object #0 of nix.testit() -> [Swift.Int]
 _T03nix6testitSaySiGyFTv0_ ---> outlined variable #1 of nix.testit() -> [Swift.Int]
 _T0So11UITextFieldC4textSSSgvgToTepb_ ---> outlined bridged method (pb) of @objc __C.UITextField.text.getter : Swift.String?
 _T0So11UITextFieldC4textSSSgvgToTeab_ ---> outlined bridged method (ab) of @objc __C.UITextField.text.getter : Swift.String?
@@ -431,4 +432,5 @@ $s4test3FooVAAyyAA1P_pyxqd__XPlF ---> test.Foo.test<A>(test.P<A, A1>) -> ()
 $s4test3FooVAAyyAA1P_pyxXPF ---> test.Foo.test(test.P<A>) -> ()
 $s4test3FooVAAyyAA1P_pF ---> test.Foo.test(test.P) -> ()
 $s4test3FooVAAyyAA1P_pyqd__XPAaDRd__lF ---> test.Foo.test<A where A1: test.P>(test.P<A1>) -> ()
-
+$sxxxIxzCXxxxesy -> $sxxxIxzCXxxxesy
+$Sxxx_x_xxIxzCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC$x -> $Sxxx_x_xxIxzCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC$x

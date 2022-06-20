@@ -63,6 +63,33 @@ class SelectorOK2 : NSObject, RequiredObserverOnlyCompletion {
   @nonobjc func hello(_ completion : @escaping (Bool) -> Void) -> Void { completion(true) }
 }
 
+// can declare an @objc protocol with both selectors...
+@objc protocol SelectorBothAsyncProto {
+  @objc(helloWithCompletion:)
+  func hello() async -> Bool
+
+  @available(*, renamed: "hello()")
+  @objc(helloWithCompletion:)
+  func hello(completion: @escaping (Bool) -> Void)
+}
+
+// and conform by implementing either one...
+class SelectorBothAsync1: NSObject, SelectorBothAsyncProto {
+  func hello() async -> Bool { true }
+}
+class SelectorBothAsync2: NSObject, SelectorBothAsyncProto {
+  func hello(completion: @escaping (Bool) -> Void) { completion(true) }
+}
+
+// but not without declaring the async alternative.
+@objc protocol BadSelectorBothAsyncProto {
+  @objc(helloWithCompletion:)
+  func hello() async -> Bool // expected-note {{method 'hello()' declared here}}
+
+  @objc(helloWithCompletion:)
+  func hello(completion: @escaping (Bool) -> Void) // expected-warning {{method 'hello(completion:)' with Objective-C selector 'helloWithCompletion:' conflicts with method 'hello()' with the same Objective-C selector; this is an error in Swift 6}}
+}
+
 // additional coverage for situation like C4, where the method names don't
 // clash on the ObjC side, but they do on Swift side, BUT their ObjC selectors
 // differ, so it's OK.

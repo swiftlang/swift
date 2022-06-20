@@ -20,6 +20,7 @@
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DefaultArgumentKind.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -228,7 +229,7 @@ namespace {
 
     // TODO: Add support for dependent types (SR-13809).
 #define DEPENDENT_TYPE(Class, Base)                                            \
-  ImportResult Visit##Class##Type(const clang::Class##Type *) { return Type(); }
+  ImportResult Visit##Class##Type(const clang::Class##Type *) { return Impl.SwiftContext.TheAnyType; }
 #define TYPE(Class, Base)
 #include "clang/AST/TypeNodes.inc"
 
@@ -1919,6 +1920,7 @@ private:
   NEVER_VISIT(SILBlockStorageType)
   NEVER_VISIT(SILBoxType)
   NEVER_VISIT(SILTokenType)
+  NEVER_VISIT(SILMoveOnlyType)
 
   VISIT(ProtocolCompositionType, compose)
 
@@ -2212,39 +2214,6 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
   unsigned index = 0;
   SmallBitVector nonNullArgs = getNonNullArgs(clangDecl, params);
 
-  // C++ operators that are implemented as non-static member functions get
-  // imported into Swift as static methods that have an additional
-  // parameter for the left-hand side operand instead of the receiver object.
-  if (auto CMD = dyn_cast<clang::CXXMethodDecl>(clangDecl)) {
-    // Subscripts and call operators are imported as normal methods.
-    bool staticOperator = clangDecl->isOverloadedOperator() &&
-                          clangDecl->getOverloadedOperator() != clang::OO_Call &&
-                          clangDecl->getOverloadedOperator() != clang::OO_Subscript;
-    if (staticOperator) {
-      auto param = new (SwiftContext)
-          ParamDecl(SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
-                    SwiftContext.getIdentifier("lhs"), dc);
-
-      auto parent = CMD->getParent();
-      auto parentType = importType(
-          parent->getASTContext().getRecordType(parent),
-          ImportTypeKind::Parameter, ImportDiagnosticAdder(*this, clangDecl),
-          allowNSUIntegerAsInt, Bridgeability::None,
-          getImportTypeAttrs(clangDecl));
-
-      param->setInterfaceType(parentType.getType());
-
-      if (SwiftContext.getClangModuleLoader()->isCXXMethodMutating(CMD)) {
-        // This implicitly makes the parameter indirect.
-        param->setSpecifier(ParamSpecifier::InOut);
-      } else {
-        param->setSpecifier(ParamSpecifier::Default);
-      }
-
-      parameters.push_back(param);
-    }
-  }
-
   for (auto param : params) {
     auto paramTy = param->getType();
     if (paramTy->isVoidType()) {
@@ -2442,7 +2411,7 @@ static bool isObjCMethodResultAudited(const clang::Decl *decl) {
           decl->hasAttr<clang::ObjCReturnsInnerPointerAttr>());
 }
 
-DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
+ArgumentAttrs ClangImporter::Implementation::inferDefaultArgument(
     clang::QualType type, OptionalTypeKind clangOptionality,
     DeclBaseName baseName, StringRef argumentLabel, bool isFirstParameter,
     bool isLastParameter, NameImporter &nameImporter) {
@@ -2487,10 +2456,29 @@ DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
       // If we've taken this branch it means we have an enum type, and it is
       // likely an integer or NSInteger that is being used by NS/CF_OPTIONS to
       // behave like a C enum in the presence of C++.
-      auto enumName = typedefType->getDecl()->getDeclName().getAsString();
+      auto enumName = typedefType->getDecl()->getName();
+      ArgumentAttrs argumentAttrs(DefaultArgumentKind::None, true, enumName);
       for (auto word : llvm::reverse(camel_case::getWords(enumName))) {
-        if (camel_case::sameWordIgnoreFirstCase(word, "options"))
-          return DefaultArgumentKind::EmptyArray;
+        if (camel_case::sameWordIgnoreFirstCase(word, "options")) {
+          argumentAttrs.argumentKind = DefaultArgumentKind::EmptyArray;
+          return argumentAttrs;
+        }
+        if (camel_case::sameWordIgnoreFirstCase(word, "units"))
+          return argumentAttrs;
+        if (camel_case::sameWordIgnoreFirstCase(word, "domain"))
+          return argumentAttrs;
+        if (camel_case::sameWordIgnoreFirstCase(word, "action"))
+          return argumentAttrs;
+        if (camel_case::sameWordIgnoreFirstCase(word, "controlevents"))
+          return argumentAttrs;
+        if (camel_case::sameWordIgnoreFirstCase(word, "state"))
+          return argumentAttrs;
+        if (camel_case::sameWordIgnoreFirstCase(word, "unit"))
+          return argumentAttrs;
+        if (camel_case::sameWordIgnoreFirstCase(word, "scrollposition"))
+          return argumentAttrs;
+        if (camel_case::sameWordIgnoreFirstCase(word, "edge"))
+          return argumentAttrs;
       }
     }
   }

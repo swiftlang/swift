@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -module-name parameterized -enable-parameterized-existential-types -disable-availability-checking %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name parameterized -disable-availability-checking %s | %FileCheck %s
 
 protocol P<T, U, V> {
   associatedtype T
@@ -20,6 +20,11 @@ struct S: Q {
   typealias X = Int
   typealias Y = String
   typealias Z = Float
+}
+
+struct R<T, U, V> {
+  var force: () -> any P<T, U, V>
+  // CHECK-LABEL: sil hidden [ossa] @$s13parameterized1RV5forceACyxq_q0_GAA1P_pyxq_q0_XPyc_tcfC : $@convention(method) <T, U, V> (@owned @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> () -> @out P<τ_0_0, τ_0_1, τ_0_2> for <T, U, V>, @thin R<T, U, V>.Type) -> @owned R<T, U, V> {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s13parameterized6upcastyAA1P_pAA1SVF : $@convention(thin) (S) -> @out P {
@@ -87,4 +92,9 @@ func upcastResult() {
   // CHECK: {{%.*}} = apply [[REUSE_FN]]([[NOESCAPE_PARTIAL_P_TO_Q_RES_THUNK_FN]]) : $@convention(thin) (@noescape @callee_guaranteed () -> @out P<Int, String, Float>) -> ()
 
   reuse({ () -> any Q<Int, String, Float> in S() })
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s13parameterized5forceAA1P_pyxq_q0_XPyr1_lF : $@convention(thin) <T, U, V> () -> @out P<T, U, V> {
+func force<T, U, V>() -> any P<T, U, V> {
+  return R(force: { force() }).force()
 }

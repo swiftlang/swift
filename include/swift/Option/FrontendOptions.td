@@ -278,6 +278,10 @@ def enable_experimental_concurrency :
   Flag<["-"], "enable-experimental-concurrency">,
   HelpText<"Enable experimental concurrency model">;
 
+def enable_experimental_cxx_interop :
+  Flag<["-"], "enable-experimental-cxx-interop">,
+  HelpText<"Enable C++ interop code generation and config directives">;
+
 def enable_lexical_borrow_scopes :
   Joined<["-"], "enable-lexical-borrow-scopes=">,
   HelpText<"Whether to emit lexical borrow scopes (default: true)">,
@@ -383,6 +387,12 @@ def warn_redundant_requirements : Flag<["-"], "warn-redundant-requirements">,
 
 def dump_type_witness_systems : Flag<["-"], "dump-type-witness-systems">,
   HelpText<"Enables dumping type witness systems from associated type inference">;
+
+def enable_round_trip_debug_types : Flag<["-"], "enable-round-trip-debug-types">,
+  HelpText<"Enables verification of debug info mangling">;
+
+def disable_round_trip_debug_types : Flag<["-"], "disable-round-trip-debug-types">,
+  HelpText<"Disables verification of debug info mangling">;
 
 def debug_generic_signatures : Flag<["-"], "debug-generic-signatures">,
   HelpText<"Debug generic signatures">;
@@ -495,6 +505,10 @@ def function_sections: Flag<["-"], "function-sections">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Emit functions to separate sections.">;
 
+def enable_single_module_llvm_emission: Flag<["-"], "enable-single-module-llvm-emission">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Emit LLVM IR into a single LLVM module in multithreaded mode.">;
+
 def stack_promotion_checks : Flag<["-"], "emit-stack-promotion-checks">,
   HelpText<"Emit runtime checks for correct stack promotion of objects.">;
 
@@ -538,10 +552,6 @@ def enable_experimental_named_opaque_types :
 def enable_explicit_existential_types :
   Flag<["-"], "enable-explicit-existential-types">,
   HelpText<"Enable experimental support for explicit existential types">;
-
-def enable_parameterized_existential_types :
-  Flag<["-"], "enable-parameterized-existential-types">,
-  HelpText<"Enable experimental support for parameterized existential types">;
 
 def enable_experimental_opened_existential_types :
   Flag<["-"], "enable-experimental-opened-existential-types">,
@@ -824,16 +834,6 @@ def emit_sorted_sil : Flag<["-"], "emit-sorted-sil">,
 
 def emit_syntax : Flag<["-"], "emit-syntax">,
   HelpText<"Parse input file(s) and emit the Syntax tree(s) as JSON">, ModeOpt;
-
-def enable_experimental_cxx_interop :
-  Flag<["-"], "enable-experimental-cxx-interop">,
-  HelpText<"Enable C++ interop code generation and config directives">,
-  Flags<[FrontendOption, HelpHidden]>;
-
-def enable_cxx_interop :
-  Flag<["-"], "enable-cxx-interop">,
-  HelpText<"Alias for -enable-experimental-cxx-interop">,
-  Flags<[FrontendOption, HelpHidden]>;
 
 def cxx_interop_getters_setters_as_properties :
   Flag<["-"], "cxx-interop-getters-setters-as-properties">,

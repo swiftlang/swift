@@ -27,6 +27,12 @@ static StringRef getRuntimeLibPath() {
   return sys::path::parent_path(SWIFTLIB_DIR);
 }
 
+static SmallString<128> getSwiftExecutablePath() {
+  SmallString<128> path = sys::path::parent_path(getRuntimeLibPath());
+  sys::path::append(path, "bin", "swift-frontend");
+  return path;
+}
+
 static void *createCancallationToken() {
   static std::atomic<size_t> handle(1000);
   return reinterpret_cast<void *>(
@@ -125,7 +131,8 @@ public:
   }
 
   CursorInfoTest()
-      : Ctx(*new SourceKit::Context(getRuntimeLibPath(),
+      : Ctx(*new SourceKit::Context(getSwiftExecutablePath(),
+                                    getRuntimeLibPath(),
                                     /*diagnosticDocumentationPath*/ "",
                                     SourceKit::createSwiftLangSupport,
                                     /*dispatchOnMain=*/false)) {

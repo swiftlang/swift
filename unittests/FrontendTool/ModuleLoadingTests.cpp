@@ -149,7 +149,7 @@ protected:
 
     auto bufData = (*bufOrErr)->getBuffer();
     auto validationInfo = serialization::validateSerializedAST(
-        bufData, silOpts.EnableOSSAModules);
+        bufData, silOpts.EnableOSSAModules, /*requiredSDK*/StringRef());
     ASSERT_EQ(serialization::Status::Valid, validationInfo.status);
     ASSERT_EQ(bufData, moduleBuffer->getBuffer());
   }

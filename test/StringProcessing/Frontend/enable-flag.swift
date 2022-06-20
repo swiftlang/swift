@@ -4,7 +4,7 @@
 
 // REQUIRES: swift_in_compiler
 
-prefix operator / // expected-error {{prefix operator may not contain '/'}}
+prefix operator /
 
 _ = /x/
 _ = #/x/#
