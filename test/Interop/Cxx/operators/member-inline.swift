@@ -30,6 +30,19 @@ OperatorsTestSuite.test("LoadableIntWrapper.call (inline)") {
   expectEqual(57, resultTwoArgs)
 }
 
+OperatorsTestSuite.test("LoadableIntWrapper.successor() (inline)") {
+  var wrapper = LoadableIntWrapper(value: 42)
+
+  let result1 = wrapper.successor()
+  expectEqual(43, result1.value)
+  expectEqual(42, wrapper.value) // Calling `successor()` should not mutate `wrapper`.
+
+  let result2 = result1.successor()
+  expectEqual(44, result2.value)
+  expectEqual(43, result1.value)
+  expectEqual(42, wrapper.value)
+}
+
 OperatorsTestSuite.test("LoadableBoolWrapper.exclaim (inline)") {
   var wrapper = LoadableBoolWrapper(value: true)
 
@@ -47,6 +60,19 @@ OperatorsTestSuite.test("AddressOnlyIntWrapper.call (inline)") {
   expectEqual(42, resultNoArgs)
   expectEqual(65, resultOneArg)
   expectEqual(57, resultTwoArgs)
+}
+
+OperatorsTestSuite.test("AddressOnlyIntWrapper.successor() (inline)") {
+  var wrapper = AddressOnlyIntWrapper(0)
+
+  let result1 = wrapper.successor()
+  expectEqual(1, result1.value)
+  expectEqual(0, wrapper.value) // Calling `successor()` should not mutate `wrapper`.
+
+  let result2 = result1.successor()
+  expectEqual(2, result2.value)
+  expectEqual(1, result1.value)
+  expectEqual(0, wrapper.value)
 }
 
 OperatorsTestSuite.test("DerivedFromAddressOnlyIntWrapper.call (inline, base class)") {
