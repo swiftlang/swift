@@ -9189,12 +9189,13 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
     return None;
   
   if (isDebugMode()) {
-  // If we had partially type-checked expressions, lets print
-  // fully type-checked expression after processDelayed is done.
-    if (needsPostProcessing) {
+    // If we had partially type-checked expressions, lets print
+    // fully type-checked target after processDelayed is done.
+    auto node = target.getAsASTNode();
+    if (node && needsPostProcessing) {
       auto &log = llvm::errs();
-      log << "---Fully type-checked expression---\n";
-      resultTarget->getAsExpr()->dump(log);
+      log << "---Fully type-checked target---\n";
+      node.dump(log);
       log << "\n";
     }
   }
