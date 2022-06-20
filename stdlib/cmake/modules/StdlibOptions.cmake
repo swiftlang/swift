@@ -191,16 +191,6 @@ else()
   set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default "dispatch")
 endif()
 
-include(Threading)
-
-threading_package_default("${SWIFT_HOST_VARIANT_SDK}"
-  SWIFT_THREADING_PACKAGE_default)
-
-set(SWIFT_THREADING_PACKAGE "${SWIFT_THREADING_PACKAGE_default}"
-    CACHE STRING
-    "The threading package to use.  Must be one of 'none', 'pthreads',
-    'darwin', 'linux', 'win32', 'c11'.")
-
 set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR
     "${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default}" CACHE STRING
     "Build the concurrency library to use the given global executor (options: dispatch, singlethreaded, hooked)")

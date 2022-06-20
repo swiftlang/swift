@@ -483,7 +483,8 @@ function(_compile_swift_files
     list(APPEND swift_flags "-Xfrontend" "-library-level"  "-Xfrontend" "api")
   endif()
 
-  if(SWIFT_THREADING_PACKAGE STREQUAL "none")
+  threading_package_or_default("${SWIFTFILE_SDK}" _threading_package)
+  if(_threading_package STREQUAL "none")
     list(APPEND swift_flags "-Xfrontend" "-assume-single-threaded")
   endif()
 

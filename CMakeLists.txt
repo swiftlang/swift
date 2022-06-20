@@ -192,16 +192,6 @@ option(SWIFT_STDLIB_ENABLE_UNICODE_DATA
     NOTE: Disabling this will cause many String methods to crash."
     TRUE)
 
-include(Threading)
-
-threading_package_default("${SWIFT_HOST_VARIANT_SDK}"
-  SWIFT_THREADING_PACKAGE_default)
-
-set(SWIFT_THREADING_PACKAGE "${SWIFT_THREADING_PACKAGE_default}"
-    CACHE STRING
-    "The threading package to use.  Must be one of 'none', 'pthreads',
-    'darwin', 'linux', 'win32', 'c11'.")
-
 option(SWIFT_BUILD_DYNAMIC_SDK_OVERLAY
     "Build dynamic variants of the Swift SDK overlay"
     TRUE)
@@ -1054,7 +1044,6 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
   message(STATUS "  Leak Detection Checker Entrypoints: ${SWIFT_RUNTIME_ENABLE_LEAK_CHECKER}")
   message(STATUS "")
 
-  message(STATUS "Threading Package:                  ${SWIFT_THREADING_PACKAGE}")
   message(STATUS "Differentiable Programming Support: ${SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING}")
   message(STATUS "Concurrency Support:                ${SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY}")
   message(STATUS "Distributed Support:                ${SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED}")
