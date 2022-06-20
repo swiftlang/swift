@@ -1290,13 +1290,17 @@ public:
   virtual ~SyntacticElementSolutionApplication() {}
 
 private:
-  ASTNode visit(Stmt *S) {
+
+  ASTNode visit(Stmt *S, bool performSyntacticDiagnostics = true) {
     auto rewritten = ASTVisitor::visit(S);
     if (!rewritten)
       return {};
 
-    if (auto *stmt = getAsStmt(rewritten))
-      performStmtDiagnostics(stmt, context.getAsDeclContext());
+    if (performSyntacticDiagnostics) {
+      if (auto *stmt = getAsStmt(rewritten)) {
+        performStmtDiagnostics(stmt, context.getAsDeclContext());
+      }
+    }
 
     return rewritten;
   }
@@ -1819,8 +1823,9 @@ public:
 
 private:
   ASTNode visitDoStmt(DoStmt *doStmt) override {
-    if (auto transformed = transformDo(doStmt))
-      return visit(transformed.get());
+    if (auto transformed = transformDo(doStmt)) {
+      return visit(transformed.get(), /*performSyntacticDiagnostics=*/false);
+    }
 
     auto newBody = visit(doStmt->getBody());
     if (!newBody)
