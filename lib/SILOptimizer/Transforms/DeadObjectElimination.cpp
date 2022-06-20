@@ -368,16 +368,6 @@ static bool onlyStoresToTailObjects(BuiltinInst *destroyArray,
   return true;
 }
 
-/// Inserts releases of all stores in \p users.
-static void insertCompensatingReleases(SILInstruction *before,
-                                       const UserList &users) {
-  for (SILInstruction *user : users) {
-    if (auto *store = dyn_cast<StoreInst>(user)) {
-      createDecrementBefore(store->getSrc(), before);
-    }
-  }
-}
-
 /// Analyze the use graph of AllocRef for any uses that would prevent us from
 /// zapping it completely.
 static bool
@@ -736,6 +726,7 @@ class DeadObjectElimination : public SILFunctionTransform {
   llvm::DenseMap<SILType, DestructorEffects> DestructorAnalysisCache;
 
   InstructionDeleter deleter;
+  DominanceInfo *domInfo = nullptr;
 
   void removeInstructions(ArrayRef<SILInstruction*> toRemove);
 
@@ -744,6 +735,9 @@ class DeadObjectElimination : public SILFunctionTransform {
   bool processKeyPath(KeyPathInst *KPI);
   bool processAllocBox(AllocBoxInst *ABI){ return false;}
   bool processAllocApply(ApplyInst *AI, DeadEndBlocks &DEBlocks);
+
+  bool insertCompensatingReleases(SILInstruction *before,
+                                  const UserList &users);
 
   bool getDeadInstsAfterInitializerRemoved(
     ApplyInst *AI, llvm::SmallVectorImpl<SILInstruction *> &ToDestroy);
@@ -780,9 +774,12 @@ class DeadObjectElimination : public SILFunctionTransform {
     if (getFunction()->hasOwnership())
       return;
 
+    assert(!domInfo);
+
     if (processFunction(*getFunction())) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
     }
+    domInfo = nullptr;
   }
 
 };
@@ -841,8 +838,11 @@ bool DeadObjectElimination::processAllocRef(AllocRefInstBase *ARI) {
       releaseOfTailElems = user;
     }
   }
-  if (releaseOfTailElems)
-    insertCompensatingReleases(releaseOfTailElems, UsersToRemove);
+  if (releaseOfTailElems) {
+    if (!insertCompensatingReleases(releaseOfTailElems, UsersToRemove)) {
+      return false;
+    }
+  }
 
   // Remove the AllocRef and all of its users.
   removeInstructions(
@@ -1051,6 +1051,33 @@ bool DeadObjectElimination::processAllocApply(ApplyInst *AI,
   ++DeadAllocApplyEliminated;
   return true;
 }
+
+/// Inserts releases of all stores in \p users.
+/// Returns false, if this is not possible.
+bool DeadObjectElimination::insertCompensatingReleases(SILInstruction *before,
+                                                       const UserList &users) {
+
+  // First check if all stored values dominate the release-point.
+  for (SILInstruction *user : users) {
+    if (auto *store = dyn_cast<StoreInst>(user)) {
+      if (!domInfo) {
+        domInfo = getAnalysis<DominanceAnalysis>()->get(before->getFunction());
+      }
+      SILBasicBlock *srcBlock = store->getSrc()->getParentBlock();
+      if (!domInfo->dominates(srcBlock, before->getParent()))
+        return false;
+    }
+  }
+
+  // Second, create the releases.
+  for (SILInstruction *user : users) {
+    if (auto *store = dyn_cast<StoreInst>(user)) {
+      createDecrementBefore(store->getSrc(), before);
+    }
+  }
+  return true;
+}
+
 
 //===----------------------------------------------------------------------===//
 //                              Top Level Driver
