@@ -11,15 +11,18 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IRGen/IRABIDetailsProvider.h"
+#include "Callee.h"
 #include "FixedTypeInfo.h"
 #include "GenType.h"
 #include "IRGen.h"
 #include "IRGenModule.h"
 
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/Subsystems.h"
 
 using namespace swift;
 using namespace irgen;
@@ -30,7 +33,7 @@ class IRABIDetailsProviderImpl {
 public:
   IRABIDetailsProviderImpl(ModuleDecl &mod, const IRGenOptions &opts)
       : typeConverter(mod),
-        silMod(SILModule::createEmptyModule(&mod, typeConverter, silOpts)),
+        silMod(swift::performASTLowering(&mod, typeConverter, SILOptions())),
         IRGen(opts, *silMod), IGM(IRGen, IRGen.createTargetMachine()) {}
 
   llvm::Optional<IRABIDetailsProvider::SizeAndAlignment>
@@ -42,6 +45,35 @@ public:
     return IRABIDetailsProvider::SizeAndAlignment{
         fixedTI->getFixedSize().getValue(),
         fixedTI->getFixedAlignment().getValue()};
+  }
+
+  IRABIDetailsProvider::FunctionABIExpansion
+  getFunctionABIExpansion(AbstractFunctionDecl *afd) {
+    IRABIDetailsProvider::FunctionABIExpansion FABIExpansion;
+    Mangle::ASTMangler mangler;
+
+    auto mangledName = mangler.mangleAnyDecl(afd, /*prefix=*/true);
+
+    for (auto &f : silMod->getFunctions()) {
+      if (f.getName() == mangledName) {
+        auto silFuncType = f.getLoweredFunctionType();
+        auto funcPointerKind =
+            FunctionPointerKind(FunctionPointerKind::BasicKind::Function);
+        auto signature =
+            Signature::getUncached(IGM, silFuncType, funcPointerKind);
+
+        for (unsigned i = 0; i < signature.getType()->getNumParams(); i++) {
+          auto set = signature.getAttributes().getAttributes(i);
+          if (set.hasAttribute(llvm::Attribute::AttrKind::SwiftSelf))
+            FABIExpansion.additionalParameters.push_back(
+              IRABIDetailsProvider::ABIParameter {
+                IRABIDetailsProvider::ABIParameterRole::Self,
+                    typeConverter.Context.getOpaquePointerDecl()
+              });
+        }
+      }
+    }
+    return FABIExpansion;
   }
 
 private:
@@ -64,4 +96,9 @@ IRABIDetailsProvider::~IRABIDetailsProvider() {}
 llvm::Optional<IRABIDetailsProvider::SizeAndAlignment>
 IRABIDetailsProvider::getTypeSizeAlignment(const NominalTypeDecl *TD) {
   return impl->getTypeSizeAlignment(TD);
+}
+
+IRABIDetailsProvider::FunctionABIExpansion
+IRABIDetailsProvider::getFunctionABIExpansion(AbstractFunctionDecl *afd){
+  return impl->getFunctionABIExpansion(afd);
 }

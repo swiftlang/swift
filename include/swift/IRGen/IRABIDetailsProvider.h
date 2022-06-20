@@ -14,6 +14,7 @@
 #define SWIFT_IRGEN_IRABIDETAILSPROVIDER_H
 
 #include "llvm/ADT/Optional.h"
+#include "swift/AST/Decl.h"
 #include <cstdint>
 #include <memory>
 #include <utility>
@@ -40,11 +41,23 @@ public:
     SizeType alignment;
   };
 
+  enum class ABIParameterRole { Self, Error };
+
+  struct ABIParameter {
+    ABIParameterRole role;
+    TypeDecl *typeDecl;
+  };
+
+  struct FunctionABIExpansion {
+    SmallVector<ABIParameter, 2> additionalParameters /* added after regular parameters */;
+  };
+
   /// Returns the size and alignment for the given type, or \c None if the type
   /// is not a fixed layout type.
   llvm::Optional<SizeAndAlignment>
   getTypeSizeAlignment(const NominalTypeDecl *TD);
-
+  IRABIDetailsProvider::FunctionABIExpansion
+  getFunctionABIExpansion(AbstractFunctionDecl *fd);
 private:
   std::unique_ptr<IRABIDetailsProviderImpl> impl;
 };

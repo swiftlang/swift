@@ -40,6 +40,7 @@
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/SourceManager.h"
+#include "SwiftToClangInteropContext.h"
 
 using namespace swift;
 using namespace swift::objc_translation;
@@ -835,8 +836,11 @@ private:
     os << "SWIFT_EXTERN ";
 
     DeclAndTypeClangFunctionPrinter funcPrinter(os, owningPrinter.typeMapping);
+    auto funcABIExpansion =
+        owningPrinter.interopContext.getIrABIDetails().getFunctionABIExpansion(FD);
     funcPrinter.printFunctionSignature(
         FD, funcABI.getSymbolName(), resultTy,
+        funcABIExpansion.additionalParameters,
         DeclAndTypeClangFunctionPrinter::FunctionSignatureKind::CFunctionProto);
     // Swift functions can't throw exceptions, we can only
     // throw them from C++ when emitting C++ inline thunks for the Swift
@@ -876,8 +880,9 @@ private:
 
     os << "inline ";
     DeclAndTypeClangFunctionPrinter funcPrinter(os, owningPrinter.typeMapping);
+    ABIExpansionParams expansionParams;
     funcPrinter.printFunctionSignature(
-        FD, FD->getName().getBaseIdentifier().get(), resultTy,
+        FD, FD->getName().getBaseIdentifier().get(), resultTy, expansionParams,
         DeclAndTypeClangFunctionPrinter::FunctionSignatureKind::CxxInlineThunk);
     // FIXME: Support throwing exceptions for Swift errors.
     if (!funcTy->isThrowing())
@@ -885,6 +890,8 @@ private:
     printFunctionClangAttributes(FD, funcTy);
     printAvailability(FD);
     os << " {\n";
+    if (funcTy->isThrowing())
+      os << "  void* opaqueError = nullptr;\n";
     os << "  return " << cxx_synthesis::getCxxImplNamespaceName()
        << "::" << funcABI.getSymbolName() << '(';
 
@@ -903,6 +910,10 @@ private:
         }
         ++index;
       });
+    } else if (funcTy->isThrowing()) {
+      os << "nullptr"; // swift self type
+      os << ", ";
+      os << "&opaqueError"; // swift error type
     }
 
     os << ");\n";

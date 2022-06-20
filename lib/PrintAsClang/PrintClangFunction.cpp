@@ -15,6 +15,7 @@
 #include "DeclAndTypePrinter.h"
 #include "OutputLanguageMode.h"
 #include "PrimitiveTypeMapping.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Type.h"
@@ -96,7 +97,9 @@ private:
 } // end namespace
 
 void DeclAndTypeClangFunctionPrinter::printFunctionSignature(
-    FuncDecl *FD, StringRef name, Type resultTy, FunctionSignatureKind kind) {
+    FuncDecl *FD, StringRef name, Type resultTy,
+    ABIExpansionParams &additionalParams,
+    FunctionSignatureKind kind) {
   OutputLanguageMode outputLang = kind == FunctionSignatureKind::CFunctionProto
                                       ? OutputLanguageMode::ObjC
                                       : OutputLanguageMode::Cxx;
@@ -130,6 +133,13 @@ void DeclAndTypeClangFunctionPrinter::printFunctionSignature(
 
   // Print out the parameter types.
   auto params = FD->getParameters();
+  if (kind == FunctionSignatureKind::CFunctionProto && FD->hasThrows())
+    additionalParams.push_back(
+        IRABIDetailsProvider::ABIParameter {
+            IRABIDetailsProvider::ABIParameterRole::Error,
+            resultTy->getASTContext().getOpaquePointerDecl()
+        });
+
   if (params->size()) {
     size_t paramIndex = 1;
     llvm::interleaveComma(*params, os, [&](const ParamDecl *param) {
@@ -148,6 +158,12 @@ void DeclAndTypeClangFunctionPrinter::printFunctionSignature(
       }
       print(objTy, argKind, paramName, param->isInOut());
       ++paramIndex;
+    });
+  } else if (!additionalParams.empty()) {
+    llvm::interleaveComma(additionalParams, os,
+                          [&](const IRABIDetailsProvider::ABIParameter param) {
+      auto newType = typeMapping.getKnownCxxTypeInfo(param.typeDecl);
+      os << newType->name;
     });
   } else if (kind == FunctionSignatureKind::CFunctionProto) {
     // Emit 'void' in an empty parameter list for C function declarations.

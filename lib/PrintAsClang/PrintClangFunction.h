@@ -15,6 +15,7 @@
 
 #include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/IRGen/IRABIDetailsProvider.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -22,6 +23,7 @@ namespace swift {
 
 class FuncDecl;
 class PrimitiveTypeMapping;
+typedef SmallVector<IRABIDetailsProvider::ABIParameter, 2> ABIExpansionParams;
 
 /// Responsible for printing a Swift function decl or type in C or C++ mode, to
 /// be included in a Swift module's generated clang header.
@@ -43,6 +45,7 @@ public:
   /// Print the C function declaration or the C++ function thunk that
   /// corresponds to the given function declaration.
   void printFunctionSignature(FuncDecl *FD, StringRef name, Type resultTy,
+                              ABIExpansionParams &additionalParams,
                               FunctionSignatureKind kind);
 
 private:
