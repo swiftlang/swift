@@ -15,6 +15,15 @@ function(threading_package_default sdk out_var)
     endif()
 endfunction()
 
+# Get the selected threading package
+function(threading_package_or_default sdk out_var)
+  set(package "${SWIFT_THREADING_PACKAGE}")
+  if(package STREQUAL "")
+    threading_package_default(sdk package)
+  endif()
+  set("${out_var}" "${package}" PARENT_SCOPE)
+endfunction()
+
 # Given the threading package, find the name for the preprocessor
 # define that we need to make.  Also deals with the default platform
 # setting.
