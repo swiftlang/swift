@@ -291,7 +291,7 @@ replaceLoad(SILInstruction *inst, SILValue newValue, AllocStackInst *asi,
         endBorrows.push_back(ebi);
       }
       for (auto *ebi : endBorrows) {
-        ebi->eraseFromParent();
+        prepareForDeletion(ebi, instructionsToDelete);
       }
       lbi->replaceAllUsesWith(newValue);
     }
