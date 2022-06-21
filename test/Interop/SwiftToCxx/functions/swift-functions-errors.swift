@@ -8,8 +8,8 @@
 
 // CHECK-LABEL: namespace _impl {
 
-// CHECK: SWIFT_EXTERN void $s9Functions18emptyThrowFunctionyyKF(void *, void *) SWIFT_CALL; // emptyThrowFunction()
-// CHECK: SWIFT_EXTERN void $s9Functions13throwFunctionyyKF(void *, void *) SWIFT_CALL; // throwFunction()
+// CHECK: SWIFT_EXTERN void $s9Functions18emptyThrowFunctionyyKF(SWIFT_CONTEXT void *, SWIFT_ERROR_RESULT void **) SWIFT_CALL; // emptyThrowFunction()
+// CHECK: SWIFT_EXTERN void $s9Functions13throwFunctionyyKF(SWIFT_CONTEXT void *, SWIFT_ERROR_RESULT void **) SWIFT_CALL; // throwFunction()
 
 // CHECK: }
 

@@ -163,7 +163,13 @@ void DeclAndTypeClangFunctionPrinter::printFunctionSignature(
     llvm::interleaveComma(additionalParams, os,
                           [&](const IRABIDetailsProvider::ABIParameter param) {
       auto newType = typeMapping.getKnownCxxTypeInfo(param.typeDecl);
-      os << newType->name;
+      if (swift::IRABIDetailsProvider::ABIParameterRole::Self == param.role) {
+        os << "SWIFT_CONTEXT ";
+        os << newType->name;
+      } else if (swift::IRABIDetailsProvider::ABIParameterRole::Error == param.role) {
+        os << "SWIFT_ERROR_RESULT ";
+        os << "void **";
+      }
     });
   } else if (kind == FunctionSignatureKind::CFunctionProto) {
     // Emit 'void' in an empty parameter list for C function declarations.
