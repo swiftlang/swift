@@ -754,7 +754,9 @@ swift::matchWitness(
           OptionalAdjustment(std::get<2>(types)));
       }
 
-      if (!req->isObjC() && reqTypeIsIUO != witnessTypeIsIUO)
+      if (!req->isObjC() &&
+          !isa_and_nonnull<clang::CXXMethodDecl>(witness->getClangDecl()) &&
+          reqTypeIsIUO != witnessTypeIsIUO)
         return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
 
       if (auto result = matchTypes(std::get<0>(types), std::get<1>(types))) {
