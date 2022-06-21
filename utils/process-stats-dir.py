@@ -356,7 +356,7 @@ def write_comparison(args, old_stats, new_stats):
                         s += " :white_check_mark:"
                 return s
             else:
-                v = int(vars(row)[field])
+                v = int(getattr(row, field))
                 if row.name.startswith('time.'):
                     return format_time(v)
                 else:
