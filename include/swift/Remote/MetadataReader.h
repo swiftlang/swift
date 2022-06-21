@@ -450,7 +450,7 @@ public:
                             Node::Kind::OpaqueTypeDescriptorSymbolicReference,
                             context.getResolved().getAddressData());
         }
-          
+
         return buildContextMangling(context, dem);
       }
       case Demangle::SymbolicReferenceKind::AccessorFunctionReference: {
@@ -2735,17 +2735,25 @@ private:
           || !*parentDescriptorResult
           || !parentDescriptorResult->isResolved())
         return nullptr;
-      
-      auto mangledNode =
-       demangleAnonymousContextName(parentDescriptorResult->getResolved(), dem);
-      if (!mangledNode)
+
+      if (parentDemangling->getKind() == Node::Kind::AnonymousContext) {
+        auto mangledNode =
+        demangleAnonymousContextName(parentDescriptorResult->getResolved(), dem);
+        if (!mangledNode)
+          return nullptr;
+        if (mangledNode->getKind() == Node::Kind::Global)
+          mangledNode = mangledNode->getChild(0);
+
+        auto opaqueNode = dem.createNode(Node::Kind::OpaqueReturnTypeOf);
+        opaqueNode->addChild(mangledNode, dem);
+        return opaqueNode;
+      } else if (parentDemangling->getKind() == Node::Kind::Module) {
+        auto opaqueNode = dem.createNode(Node::Kind::OpaqueReturnTypeOf);
+        opaqueNode->addChild(parentDemangling, dem);
+        return opaqueNode;
+      } else {
         return nullptr;
-      if (mangledNode->getKind() == Node::Kind::Global)
-        mangledNode = mangledNode->getChild(0);
-      
-      auto opaqueNode = dem.createNode(Node::Kind::OpaqueReturnTypeOf);
-      opaqueNode->addChild(mangledNode, dem);
-      return opaqueNode;
+      }
     }
     
     default:
