@@ -21,14 +21,6 @@ extension _StringGuts {
       return i
     }
 
-    return _slowRoundDownToNearestWord(i)
-  }
-
-  @inline(never)
-  internal func _slowRoundDownToNearestWord(
-    _ i: String.Index
-  ) -> String.Index {
-    let offset = i._encodedOffset
     let start = previousWordIndex(endingAt: offset)
     let end = nextWordIndex(startingAt: start)
     _internalInvariant(offset <= end, "Word breaking inconsistency")
@@ -104,7 +96,7 @@ extension _StringGuts {
 
   @inline(never)
   internal func _foreignPreviousWordIndex(endingAt i: Int) -> Int {
-    #if _runtime(_ObjC)
+#if _runtime(_ObjC)
     return previousWordBoundary(endingAt: i) {
       _internalInvariant($0 <= count)
 
