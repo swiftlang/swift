@@ -3944,8 +3944,20 @@ generateForEachStmtConstraints(
     forEachStmtInfo.makeIteratorVar = PB;
 
     // Type of sequence expression has to conform to Sequence protocol.
+    //
+    // Note that the following emulates having `$generator` separately
+    // type-checked by introducing a `TVO_PrefersSubtypeBinding` type
+    // variable that would make sure that result of `.makeIterator` would
+    // get ranked standalone.
     {
-      cs.addConstraint(ConstraintKind::ConformsTo, cs.getType(sequenceExpr),
+      auto *externalIteratorType = cs.createTypeVariable(
+          cs.getConstraintLocator(sequenceExpr), TVO_PrefersSubtypeBinding);
+
+      cs.addConstraint(ConstraintKind::Equal, externalIteratorType,
+                       cs.getType(sequenceExpr),
+                       externalIteratorType->getImpl().getLocator());
+
+      cs.addConstraint(ConstraintKind::ConformsTo, externalIteratorType,
                        sequenceProto->getDeclaredInterfaceType(),
                        contextualLocator);
 

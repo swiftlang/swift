@@ -2464,53 +2464,7 @@ namespace {
       if (!isCxxRecordImportable(decl))
         return nullptr;
 
-      auto result = VisitRecordDecl(decl);
-      if (!result)
-        return nullptr;
-
-      // If this struct is a C++ input iterator, we try to synthesize a
-      // conformance to the UnsafeCxxInputIterator protocol (which is defined in
-      // the std overlay). We consider a struct to be an input iterator if it
-      // has this member: `using iterator_category = std::input_iterator_tag`.
-      for (clang::Decl *member : decl->decls()) {
-        if (auto typeDecl = dyn_cast<clang::TypeDecl>(member)) {
-          if (!typeDecl->getIdentifier())
-            continue;
-
-          if (typeDecl->getName() == "iterator_category") {
-            // If this is a typedef or a using-decl, retrieve the underlying
-            // struct decl.
-            clang::CXXRecordDecl *underlyingDecl = nullptr;
-            if (auto typedefDecl = dyn_cast<clang::TypedefNameDecl>(typeDecl)) {
-              auto type = typedefDecl->getUnderlyingType();
-              underlyingDecl = type->getAsCXXRecordDecl();
-            } else {
-              underlyingDecl = dyn_cast<clang::CXXRecordDecl>(typeDecl);
-            }
-            if (underlyingDecl) {
-              auto isInputIteratorDecl = [&](const clang::CXXRecordDecl *base) {
-                return base->isInStdNamespace() && base->getIdentifier() &&
-                       base->getName() == "input_iterator_tag";
-              };
-
-              // Traverse all transitive bases of `underlyingDecl` to check if
-              // it inherits from `std::input_iterator_tag`.
-              bool isInputIterator = isInputIteratorDecl(underlyingDecl);
-              underlyingDecl->forallBases(
-                  [&](const clang::CXXRecordDecl *base) {
-                    if (isInputIteratorDecl(base)) {
-                      isInputIterator = true;
-                      return false;
-                    }
-                    return true;
-                  });
-              llvm::errs();
-            }
-          }
-        }
-      }
-
-      return result;
+      return VisitRecordDecl(decl);
     }
 
     bool isSpecializationDepthGreaterThan(
