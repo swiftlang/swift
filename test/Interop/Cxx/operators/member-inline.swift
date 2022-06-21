@@ -8,7 +8,7 @@ import StdlibUnittest
 var OperatorsTestSuite = TestSuite("Operators")
 
 #if !os(Windows)    // SR-13129
-OperatorsTestSuite.test("LoadableIntWrapper.plus (inline)") {
+OperatorsTestSuite.test("LoadableIntWrapper.minus (inline)") {
   var lhs = LoadableIntWrapper(value: 42)
   let rhs = LoadableIntWrapper(value: 23)
 
@@ -256,6 +256,14 @@ OperatorsTestSuite.test("PtrToPtr.subscript (inline)") {
   arr[0]![0] = ptr
   expectEqual(23, arr[0]![0]![0])
 }
+
+OperatorsTestSuite.test("AddressOnlyIntWrapper.minus") {
+   let lhs = AddressOnlyIntWrapper(42)
+   let rhs = AddressOnlyIntWrapper(23)
+
+   let result = lhs - rhs
+   expectEqual(19, result.value)
+ }
 
 // TODO: this causes a crash (does it also crash on main?)
 //OperatorsTestSuite.test("TemplatedSubscriptArrayByVal.subscript (inline)") {

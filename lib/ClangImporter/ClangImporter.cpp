@@ -4982,7 +4982,7 @@ ValueDecl *cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
     // support these we need to tell Swift to type check the synthesized bodies.
     // TODO: we also currently don't support static functions. That shouldn't be
     // too hard.
-    if (fn->isStatic() ||
+    if (fn->isStatic() || cast<clang::FunctionDecl>(fn->getClangDecl())->isOverloadedOperator() ||
         (fn->getClangDecl() &&
          isa<clang::FunctionTemplateDecl>(fn->getClangDecl())))
       return nullptr;
