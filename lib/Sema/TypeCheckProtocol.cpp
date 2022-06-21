@@ -5725,7 +5725,13 @@ TypeChecker::couldDynamicallyConformToProtocol(Type type, ProtocolDecl *Proto,
   // we cannot know statically.
   if (type->isExistentialType())
     return true;
-  
+
+  // The underlying concrete type may have a `Hashable` conformance that is
+  // not possible to know statically.
+  if (type->isAnyHashable()) {
+    return true;
+  }
+
   // A generic archetype may have protocol conformances we cannot know
   // statically.
   if (type->is<ArchetypeType>())
