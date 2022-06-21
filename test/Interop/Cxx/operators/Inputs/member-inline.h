@@ -50,7 +50,7 @@ struct AddressOnlyIntWrapper {
   }
 
   AddressOnlyIntWrapper operator-(AddressOnlyIntWrapper rhs) const {
-    return AddressOnlyIntWrapper(value + rhs.value);
+    return AddressOnlyIntWrapper(value - rhs.value);
   }
   AddressOnlyIntWrapper &operator++() {
     value++;
