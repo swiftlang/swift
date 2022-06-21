@@ -66,7 +66,40 @@ public func inoutSmall(_ en: inout Small, _ x: Int) {
 
 // CHECK: SWIFT_EXTERN void $s5Enums10inoutSmallyyAA0C0Oz_SitF(char * _Nonnull en, ptrdiff_t x) SWIFT_NOEXCEPT SWIFT_CALL; // inoutSmall(_:_:)
 // CHECK: SWIFT_EXTERN void $s5Enums9inoutTinyyyAA0C0Oz_SitF(char * _Nonnull en, ptrdiff_t x) SWIFT_NOEXCEPT SWIFT_CALL; // inoutTiny(_:_:)
+
+// CHECK:      struct swift_interop_stub_Enums_Small {
+// CHECK-NEXT:   uint64_t _1;
+// CHECK-NEXT:   uint8_t _2;
+// CHECK-NEXT: };
+
+// CHECK:      static inline void swift_interop_returnDirect_Enums_Small(char * _Nonnull result, struct swift_interop_stub_Enums_Small value) __attribute__((always_inline)) {
+// CHECK-NEXT:   memcpy(result + 0, &value._1, 8);
+// CHECK-NEXT:   memcpy(result + 8, &value._2, 1);
+// CHECK-NEXT: }
+
+// CHECK:      static inline struct swift_interop_stub_Enums_Small swift_interop_passDirect_Enums_Small(const char * _Nonnull value) __attribute__((always_inline)) {
+// CHECK-NEXT:   struct swift_interop_stub_Enums_Small result;
+// CHECK-NEXT:   memcpy(&result._1, value + 0, 8);
+// CHECK-NEXT:   memcpy(&result._2, value + 8, 1);
+// CHECK-NEXT:   return result;
+// CHECK-NEXT: }
+
 // CHECK: SWIFT_EXTERN struct swift_interop_stub_Enums_Small $s5Enums9makeSmallyAA0C0OSiF(ptrdiff_t x) SWIFT_NOEXCEPT SWIFT_CALL; // makeSmall(_:)
+
+// CHECK:      struct swift_interop_stub_Enums_Tiny {
+// CHECK-NEXT:   uint8_t _1;
+// CHECK-NEXT: };
+
+// CHECK:      static inline void swift_interop_returnDirect_Enums_Tiny(char * _Nonnull result, struct swift_interop_stub_Enums_Tiny value) __attribute__((always_inline)) {
+// CHECK-NEXT:   memcpy(result + 0, &value._1, 1);
+// CHECK-NEXT: }
+
+// CHECK:      static inline struct swift_interop_stub_Enums_Tiny swift_interop_passDirect_Enums_Tiny(const char * _Nonnull value) __attribute__((always_inline)) {
+// CHECK-NEXT:   struct swift_interop_stub_Enums_Tiny result;
+// CHECK-NEXT:   memcpy(&result._1, value + 0, 1);
+// CHECK-NEXT:   return result;
+// CHECK-NEXT: }
+
 // CHECK: SWIFT_EXTERN struct swift_interop_stub_Enums_Tiny $s5Enums8makeTinyyAA0C0OSiF(ptrdiff_t x) SWIFT_NOEXCEPT SWIFT_CALL; // makeTiny(_:)
 // CHECK: SWIFT_EXTERN struct swift_interop_stub_Enums_Small $s5Enums16passThroughSmallyAA0D0OADF(struct swift_interop_stub_Enums_Small en) SWIFT_NOEXCEPT SWIFT_CALL; // passThroughSmall(_:)
 // CHECK: SWIFT_EXTERN struct swift_interop_stub_Enums_Tiny $s5Enums15passThroughTinyyAA0D0OADF(struct swift_interop_stub_Enums_Tiny en) SWIFT_NOEXCEPT SWIFT_CALL; // passThroughTiny(_:)

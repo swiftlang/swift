@@ -240,7 +240,7 @@ public:
   }
   
   void forwardDeclare(const EnumDecl *ED) {
-    // FIXME: (tongjie) do we need this?
+    // TODO: skip for now; will overhaul the forward decals for c++ in the future
     if (outputLangMode == swift::OutputLanguageMode::Cxx) {
       return;
     }
