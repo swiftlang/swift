@@ -8,7 +8,7 @@ target_link_libraries(swiftOption PRIVATE
 
 set(features_merger "${SWIFT_SOURCE_DIR}/utils/merge-features.py")
 set(features_file_swift_src "${CMAKE_CURRENT_SOURCE_DIR}/features.json")
-set(features_file_clang_src "${LLVM_MAIN_SRC_DIR}/../clang/tools/driver/features.json")
+set(features_file_clang_src "${LLVM_BINARY_DIR}/share/clang/features.json")
 set(features_file_dest "${CMAKE_BINARY_DIR}/share/swift/features.json")
 
 add_custom_command(
