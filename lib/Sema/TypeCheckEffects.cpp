@@ -2879,6 +2879,10 @@ private:
            auto callee = call->getCalledValue();
            if (callee) {
              auto declKind = callee->getDescriptiveKind();
+
+             fprintf(stderr, "[%s:%d] (%s) callee:\n", __FILE__, __LINE__, __FUNCTION__);
+             callee->dump();
+
              if (call->usesDistributedThunk()) {
                // We need to determine whether this is a method or a property.
                // Computed properties always form an implicit call to the thunk.

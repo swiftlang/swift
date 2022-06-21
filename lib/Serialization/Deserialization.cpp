@@ -3287,6 +3287,7 @@ public:
     param->setVariadic(isVariadic);
     param->setAutoClosure(isAutoClosure);
     param->setIsolated(isIsolated);
+    param->setDistributedKnownToBeLocal(isDistributedKnownLocal);
     param->setCompileTimeConst(isCompileTimeConst);
 
     // Decode the default argument kind.

@@ -3680,6 +3680,9 @@ static void printParameterFlags(ASTPrinter &printer,
 
   if (flags.isCompileTimeConst())
     printer.printKeyword("_const", options, " ");
+
+  if (flags.isDistributedKnownToBeLocal())
+    printer.printKeyword("_local", options, " ");
 }
 
 void PrintAST::visitVarDecl(VarDecl *decl) {

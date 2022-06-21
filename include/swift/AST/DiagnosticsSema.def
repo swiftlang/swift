@@ -4667,6 +4667,10 @@ NOTE(protocol_isolated_to_global_actor_here,none,
 
 ERROR(isolated_parameter_not_actor,none,
       "'isolated' parameter has non-actor type %0", (Type))
+ERROR(local_parameter_not_distributed_actor,none,
+      "'_local' parameter has non-distributed-actor type %0", (Type))
+ERROR(local_not_supported_in_pattern,none,
+      "'_local' is not support in patterns", ())
 
 WARNING(non_sendable_param_type,none,
         "non-sendable type %0 %select{passed in call to %4 %2 %3|"

@@ -2113,7 +2113,7 @@ namespace {
       return ReferencedActor(var, isPotentiallyIsolated, ReferencedActor::NonIsolatedParameter);
     }
 
-    VarDecl *findReferencedBaseSelf(Expr *expr) {
+    VarDecl *findReferencedCallBase(Expr *expr) {
       if (auto selfVar = getReferencedParamOrCapture(expr))
         if (selfVar->isSelfParameter() || selfVar->isSelfParamCapture())
           return selfVar;
@@ -2133,10 +2133,17 @@ namespace {
         for (auto arg : *call->getArgs()) {
           if (auto declRef = dyn_cast<DeclRefExpr>(arg.getExpr())) {
             if (auto var = dyn_cast<VarDecl>(declRef->getDecl())) {
-              if (var->isSelfParameter()) {
-                return var;
-              }
+              return var;
             }
+          }
+        }
+      }
+
+      // maybe it's a property access?
+      if (auto memberRef = dyn_cast<MemberRefExpr>(expr)) {
+        if (auto baseDeclRef = dyn_cast<DeclRefExpr>(memberRef->getBase())) {
+          if (auto var = dyn_cast<VarDecl>(baseDeclRef->getDecl())) {
+            return var;
           }
         }
       }
@@ -2284,8 +2291,14 @@ namespace {
     /// context and false otherwise.
     bool isDistributedAccess(SourceLoc declLoc, ValueDecl *decl,
                              Expr *context) {
+      fprintf(stderr, "[%s:%d] (%s) decl:\n", __FILE__, __LINE__, __FUNCTION__);
+      decl->dump();
+
       // If base of the call is 'local' we permit skip distributed checks.
-      if (auto baseSelf = findReferencedBaseSelf(context)) {
+      if (auto baseSelf = findReferencedCallBase(context)) {
+        fprintf(stderr, "[%s:%d] (%s) base:\n", __FILE__, __LINE__, __FUNCTION__);
+        baseSelf->dump();
+
         if (baseSelf->isDistributedKnownToBeLocal())
           return false;
       }
@@ -4782,20 +4795,27 @@ VarDecl *swift::getReferencedParamOrCapture(
 }
 
 bool swift::isPotentiallyIsolatedActor(
-    VarDecl *var, llvm::function_ref<bool(ParamDecl *)> isIsolated) {
+    VarDecl *var,
+    llvm::function_ref<bool(ParamDecl *)> isIsolated,
+    llvm::function_ref<bool(ParamDecl *)> isDistributedKnownLocal) {
   if (!var)
     return false;
 
-  if (var->getName().str().equals("__secretlyKnownToBeLocal")) {
-    // FIXME(distributed): we did a dynamic check and know that this actor is
-    //   local, but we can't express that to the type system; the real
-    //   implementation will have to mark 'self' as "known to be local" after
-    //   an is-local check.
-    return true;
-  }
+//  if (var->getName().str().equals("__secretlyKnownToBeLocal")) {
+//    // FIXME(distributed): we did a dynamic check and know that this actor is
+//    //   local, but we can't express that to the type system; the real
+//    //   implementation will have to mark 'self' as "known to be local" after
+//    //   an is-local check.
+//    return true;
+//  }
 
-  if (auto param = dyn_cast<ParamDecl>(var))
-    return isIsolated(param);
+  if (auto param = dyn_cast<ParamDecl>(var)) {
+    if (isIsolated(param))
+      return true;
+
+    if (isDistributedKnownLocal(param))
+      return true;
+  }
 
   // If this is a captured 'self', check whether the original 'self' is
   // isolated.

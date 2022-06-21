@@ -58,11 +58,10 @@ distributed actor Worker: LifecycleWatch {
       let __secretlyKnownToBeLocal = worker
       await __secretlyKnownToBeLocal.terminated(actor: terminatedID)
 
-      // FIXME: Once the above fixme is solved, use this real code instead:
-      //    _ = await worker.whenLocal { __secretlyKnownToBeLocal in
-      //      let terminatedID = Worker.ID(parse: "<terminated-id>")
-      //      return await __secretlyKnownToBeLocal.terminated(actor: terminatedID)
-      //    }
+      _ = await worker.whenLocal { __secretlyKnownToBeLocal in
+        let terminatedID = Worker.ID(parse: "<terminated-id>")
+        return await __secretlyKnownToBeLocal.terminated(actor: terminatedID)
+      }
     }
     // CHECK: terminated (on ActorAddress(address: "<unique-id>")): ActorAddress(address: "<terminated-id>")
 

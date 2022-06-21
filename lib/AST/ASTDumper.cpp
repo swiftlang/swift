@@ -754,7 +754,7 @@ namespace {
       printStorageImpl(VD);
       printAccessors(VD);
       if (VD->isDistributedKnownToBeLocal()) {
-        OS << " known-to-be-local";
+        OS << " _local";
       }
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
@@ -913,7 +913,7 @@ namespace {
       PrintWithColorRAII(OS, ParenthesisColor) << '(';
       PrintWithColorRAII(OS, ParameterColor) << "parameter ";
       if (P->isDistributedKnownToBeLocal()) {
-        OS << "known-to-be-local ";
+        OS << "_local ";
       }
       printDeclName(P);
       if (!P->getArgumentName().empty())
@@ -1350,7 +1350,7 @@ void ValueDecl::dumpRef(raw_ostream &os) const {
   }
 
   if (getAttrs().hasAttribute<DistributedKnownToBeLocalAttr>()) {
-    os << " known-to-be-local";
+    os << " _local";
   }
 
   if (getAttrs().hasAttribute<DistributedThunkAttr>()) {

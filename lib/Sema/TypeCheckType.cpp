@@ -3640,6 +3640,9 @@ TypeResolver::resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,
     case TypeReprKind::Owned:
       name = "__owned";
       break;
+    case TypeReprKind::DistributedKnownToBeLocal:
+      name = "_local";
+      break;
     default:
       llvm_unreachable("unknown SpecifierTypeRepr kind");
     }
@@ -3690,8 +3693,30 @@ TypeResolver::resolveCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *repr,
 NeverNullType
 TypeResolver::resolveDistributedKnownToBeLocal(DistributedKnownToBeLocalTypeRepr *repr,
                                                TypeResolutionOptions options) {
-  // TODO: more diagnostics
-  return resolveType(repr->getBase(), options);
+  Type type = resolveType(repr->getBase(), options);
+
+  // '_local' is only value for non-EnumCaseDecl parameters.
+  if (!options.is(TypeResolverContext::FunctionInput) ||
+      options.hasBase(TypeResolverContext::EnumElementDecl)) {
+    diagnoseInvalid(
+        repr, repr->getSpecifierLoc(), diag::attr_only_on_parameters,
+        "_local");
+    return ErrorType::get(getASTContext());
+  }
+
+  // TODO(distributed): more diagnosis here, prevent from use in props, enums etc
+
+  // isolated parameters must be of 'distributed actor' type
+  if (!type->hasTypeParameter() &&
+      !type->isDistributedActor() &&
+      !type->hasError()) {
+    diagnoseInvalid(
+        repr, repr->getSpecifierLoc(),
+        diag::local_parameter_not_distributed_actor, type);
+    return ErrorType::get(getASTContext());
+  }
+
+  return type;
 }
 
 NeverNullType TypeResolver::resolveArrayType(ArrayTypeRepr *repr,

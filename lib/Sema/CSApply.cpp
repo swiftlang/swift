@@ -7961,6 +7961,9 @@ bool ExprRewriter::requiresDistributedThunk(Expr *base, SourceLoc memberLoc,
     [&](ParamDecl *P) {
     return P->isIsolated() ||
            llvm::is_contained(solution.isolatedParams, P);
+  },
+    [&](ParamDecl *P) {
+    return P->isDistributedKnownToBeLocal(); // TODO: need the solution too?
   });
 
   // Adjust the declaration context to the innermost context that is neither

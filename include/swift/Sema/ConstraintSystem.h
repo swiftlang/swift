@@ -2674,6 +2674,10 @@ private:
   /// The set of parameters that have been inferred to be 'isolated'.
   llvm::SmallSetVector<ParamDecl *, 2> isolatedParams;
 
+  /// The set of DistributedActor parameters that have been inferred
+  /// to be known to be local.
+  llvm::SmallSetVector<ParamDecl *, 2> distributedKnownLocalParams;
+
   /// Maps closure parameters to type variables.
   llvm::DenseMap<const ParamDecl *, TypeVariableType *>
     OpenedParameterTypes;
@@ -3243,6 +3247,9 @@ public:
 
     /// The length of \c isolatedParams.
     unsigned numIsolatedParams;
+
+    /// The length of \c distributedKnownLocalParams.
+    unsigned numDistributedKnownLocalParams;
 
     /// The length of \c ImplicitValueConversions.
     unsigned numImplicitValueConversions;

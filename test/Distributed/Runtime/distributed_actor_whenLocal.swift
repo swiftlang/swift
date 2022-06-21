@@ -30,18 +30,20 @@ func test() async throws {
 
   let local = Capybara(actorSystem: system)
   // await local.eat() // SHOULD ERROR
-  let valueWhenLocal: String? = await local.whenLocal { __secretlyKnownToBeLocal in
-    __secretlyKnownToBeLocal.eat()
+  let valueWhenLocal: String? = await local.whenLocal {
+    (definitelyLocal: _local Capybara) in await definitelyLocal.eat()
+//    definitelyLocal in definitelyLocal.eat()
   }
 
   // CHECK: valueWhenLocal: watermelon
   print("valueWhenLocal: \(valueWhenLocal ?? "nil")")
 
   let remote = try Capybara.resolve(id: local.id, using: system)
-  let valueWhenRemote: String? = await remote.whenLocal { __secretlyKnownToBeLocal in
-    __secretlyKnownToBeLocal.eat()
+  let valueWhenRemote: String? = await remote.whenLocal {
+    (definitelyLocal: _local Capybara) in definitelyLocal.eat()
+//    definitelyLocal in definitelyLocal.eat()
   }
-  
+
   // CHECK: valueWhenRemote: nil
   print("valueWhenRemote: \(valueWhenRemote ?? "nil")")
 }

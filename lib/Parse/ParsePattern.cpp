@@ -612,6 +612,8 @@ mapParsedParameters(Parser &parser,
       {
         auto unwrappedType = type;
         while (true) {
+          fprintf(stderr, "[%s:%d] (%s) HERE:\n", __FILE__, __LINE__, __FUNCTION__);
+          unwrappedType->dump();
           if (auto *ATR = dyn_cast<AttributedTypeRepr>(unwrappedType)) {
             auto &attrs = ATR->getAttrs();
             // At this point we actually don't know if that's valid to mark
@@ -625,10 +627,17 @@ mapParsedParameters(Parser &parser,
           }
 
           if (auto *STR = dyn_cast<SpecifierTypeRepr>(unwrappedType)) {
-            if (isa<IsolatedTypeRepr>(STR))
+            if (isa<IsolatedTypeRepr>(STR)) {
               param->setIsolated(true);
+            } else if (isa<DistributedKnownToBeLocalTypeRepr>(STR)) {
+              param->setDistributedKnownToBeLocal(true);
+              auto localAttr = new (parser.Context)
+                  DistributedKnownToBeLocalAttr(paramInfo.KnownToBeLocalLoc);
+              param->getAttrs().add(localAttr);
+            }
+
             unwrappedType = STR->getBase();
-            continue;;
+            continue;
           }
 
           if (auto *CTR = dyn_cast<CompileTimeConstTypeRepr>(unwrappedType)) {

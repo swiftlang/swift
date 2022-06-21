@@ -140,8 +140,18 @@ extension DistributedActor {
   /// state.
   ///
   /// When the actor is remote, the closure won't be executed and this function will return nil.
+//  public nonisolated func whenLocal<T: Sendable>(
+//    _ body: @Sendable (isolated Self) async throws -> T
+//  ) async rethrows -> T? {
+//    if __isLocalActor(self) {
+//       return try await body(self)
+//    } else {
+//      return nil
+//    }
+//  }
+
   public nonisolated func whenLocal<T: Sendable>(
-    _ body: @Sendable (isolated Self) async throws -> T
+    _ body: @Sendable (_local Self) async throws -> T
   ) async rethrows -> T? {
     if __isLocalActor(self) {
        return try await body(self)

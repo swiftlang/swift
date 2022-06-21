@@ -5639,6 +5639,7 @@ class ParamDecl : public VarDecl {
     /// Whether or not this parameter is '_const'.
     IsCompileTimeConst = 1 << 1,
 
+    // FIXME: it's not on the name but on the type
     /// Whether or not this parameter is a '_local DistributedActor' reference.
     IsDistributedKnownToBeLocal = 1 << 2,
   };
@@ -5678,11 +5679,17 @@ class ParamDecl : public VarDecl {
 
     /// Whether or not this parameter is 'isolated'.
     IsIsolated = 1 << 2,
+
+//    /// Whether or not this parameter is '_local'.
+//    IsDistributedKnownLocal = 1 << 3, // FIXME: can't do this because: /llvm-project/llvm/include/llvm/ADT/PointerIntPair.h:148:3: error: static_assert failed due to requirement '4U <= PointerLikeTypeTraits<swift::ParamDecl::StoredDefaultArgument *>::NumLowBitsAvailable' "PointerIntPair with integer size too large for pointer"
   };
 
   /// The default value, if any, along with flags.
   llvm::PointerIntPair<StoredDefaultArgument *, 3, OptionSet<Flags>>
       DefaultValueAndFlags;
+
+  // FIXME: can we pack this somewhere as flags, rather than ad hoc bool?
+  bool isDistributedKnownLocal = false;
 
   friend class ParamSpecifierRequest;
 
@@ -5882,6 +5889,25 @@ public:
     auto flags = DefaultValueAndFlags.getInt();
     DefaultValueAndFlags.setInt(value ? flags | Flags::IsIsolated
                                       : flags - Flags::IsIsolated);
+  }
+
+  /// Whether or not this parameter is marked with 'isolated'.
+  bool isDistributedKnownToBeLocal() const {
+    auto yes = getAttrs().hasAttribute<DistributedKnownToBeLocalAttr>() ||
+        ArgumentNameAndFlags.getInt().contains(ArgumentNameFlags::IsDistributedKnownToBeLocal);
+    if (getAttrs().hasAttribute<DistributedKnownToBeLocalAttr>()) {
+      fprintf(stderr, "[%s:%d] (%s) isDistributed LOCAL attr: %s\n", __FILE__, __LINE__, __FUNCTION__, this->getName().str().str().c_str());
+    }
+    if (ArgumentNameAndFlags.getInt().contains(ArgumentNameFlags::IsDistributedKnownToBeLocal)) {
+      fprintf(stderr, "[%s:%d] (%s) isDistributed LOCAL flag: %s\n", __FILE__, __LINE__, __FUNCTION__, this->getName().str().str().c_str());
+    }
+    return yes;
+  }
+
+  void setDistributedKnownToBeLocal(bool value = true) {
+    auto flags = ArgumentNameAndFlags.getInt();
+    ArgumentNameAndFlags.setInt(value ? flags | ArgumentNameFlags::IsDistributedKnownToBeLocal
+                                      : flags - ArgumentNameFlags::IsDistributedKnownToBeLocal);
   }
 
   /// Whether or not this parameter is marked with '_const'.

@@ -2031,7 +2031,10 @@ public:
               (isolated ? Isolated : 0) |
               (noDerivative ? NoDerivative : 0) |
               (compileTimeConst ? CompileTimeConst : 0) |
-              (distributedKnownLocal ? DistributedKnownToBeLocal : 0)){}
+              (distributedKnownLocal ? DistributedKnownToBeLocal : 0)) {
+    if (distributedKnownLocal)
+      fprintf(stderr, "[%s:%d] (%s) distributedKnownLocal = %d\n", __FILE__, __LINE__, __FUNCTION__, distributedKnownLocal);
+  }
 
   /// Create one from what's present in the parameter type
   inline static ParameterTypeFlags
@@ -2985,6 +2988,9 @@ public:
 
     /// Whether the parameter is 'isolated'.
     bool isIsolated() const { return Flags.isIsolated(); }
+
+    /// Whether the parameter is '_local'.
+    bool isDistributedKnownToBeLocal() const { return Flags.isDistributedKnownToBeLocal(); }
 
     /// Whether the parameter is 'isCompileTimeConst'.
     bool isCompileTimeConst() const { return Flags.isCompileTimeConst(); }

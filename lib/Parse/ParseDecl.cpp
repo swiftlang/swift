@@ -3997,6 +3997,9 @@ bool Parser::parseDeclModifierList(DeclAttributes &Attributes,
 ///     '__shared' attribute-list-clause attribute-list
 ///     '__owned' attribute-list-clause attribute-list
 ///     'some' attribute-list-clause attribute-list
+///     'isolated' attribute-list-clause attribute-list
+///     '_const' attribute-list-clause attribute-list
+///     '_local' attribute-list-clause attribute-list
 ///   attribute-list-clause:
 ///     '@' attribute
 ///     '@' attribute attribute-list-clause
@@ -4006,6 +4009,7 @@ Parser::parseTypeAttributeListPresent(ParamDecl::Specifier &Specifier,
                                       SourceLoc &SpecifierLoc,
                                       SourceLoc &IsolatedLoc,
                                       SourceLoc &ConstLoc,
+                                      SourceLoc &DistributedLocalLoc,
                                       TypeAttributes &Attributes) {
   PatternBindingInitializer *initContext = nullptr;
   Specifier = ParamDecl::Specifier::Default;
@@ -4013,7 +4017,8 @@ Parser::parseTypeAttributeListPresent(ParamDecl::Specifier &Specifier,
          Tok.isContextualKeyword("__shared") ||
          Tok.isContextualKeyword("__owned") ||
          Tok.isContextualKeyword("isolated") ||
-         Tok.isContextualKeyword("_const")) {
+         Tok.isContextualKeyword("_const") ||
+         Tok.isContextualKeyword("_local")) {
 
     if (Tok.isContextualKeyword("isolated")) {
       if (IsolatedLoc.isValid()) {
@@ -4026,6 +4031,11 @@ Parser::parseTypeAttributeListPresent(ParamDecl::Specifier &Specifier,
 
     if (Tok.isContextualKeyword("_const")) {
       ConstLoc = consumeToken();
+      continue;
+    }
+
+    if (Tok.isContextualKeyword("_local")) {
+      DistributedLocalLoc = consumeToken();
       continue;
     }
 
