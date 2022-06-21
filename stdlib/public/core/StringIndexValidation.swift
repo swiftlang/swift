@@ -402,22 +402,16 @@ extension _StringGuts {
 // Word index validation (String)
 extension _StringGuts {
   internal func validateWordIndex(
-    _ i: String._WordView.Index
-  ) -> String._WordView.Index {
-    let i = String.Index(_encodedOffset: i._encodedOffset)
-
-    return roundDownToNearestWord(
-      String._WordView.Index(scalarAlign(validateSubscalarIndex(i)))
-    )
+    _ i: String.Index
+  ) -> String.Index {
+    return roundDownToNearestWord(scalarAlign(validateSubscalarIndex(i)))
   }
 
   internal func validateInclusiveWordIndex(
-    _ i: String._WordView.Index
-  ) -> String._WordView.Index {
-    let i = String.Index(_encodedOffset: i._encodedOffset)
-
+    _ i: String.Index
+  ) -> String.Index {
     return roundDownToNearestWord(
-      String._WordView.Index(scalarAlign(validateInclusiveSubscalarIndex(i)))
+      scalarAlign(validateInclusiveSubscalarIndex(i))
     )
   }
 }

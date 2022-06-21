@@ -28,18 +28,57 @@ let StringWordBreaking = TestSuite("StringWordBreaking")
 //   }
 // }
 
+extension String {
+  @available(SwiftStdlib 5.7, *)
+  var _words: [String] {
+    var result: [String] = []
+
+    var i = startIndex
+
+    while i < endIndex {
+      let start = i
+      let end = _wordIndex(after: i)
+
+      let substr = self[start ..< end]
+      result.append(String(substr))
+
+      i = end
+    }
+
+    return result
+  }
+
+  @available(SwiftStdlib 5.7, *)
+  var _wordsBackwards: [String] {
+    var result: [String] = []
+
+    var i = endIndex
+
+    while i > startIndex {
+      let end = i
+      let start = _wordIndex(before: i)
+
+      let substr = self[start ..< end]
+      result.append(String(substr))
+
+      i = start
+    }
+
+    return result
+  }
+}
+
 if #available(SwiftStdlib 5.7, *) {
   StringWordBreaking.test("word breaking") {
     for wordBreakTest in wordBreakTests {
       expectEqual(
         wordBreakTest.1,
-        wordBreakTest.0._words().map { String($0) },
+        wordBreakTest.0._words,
         "string: \(String(reflecting: wordBreakTest.0))")
-      // FIXME: Reenable once we figure out what to do with WordView
-      // expectEqual(
-      //   wordBreakTest.1.reversed(),
-      //   wordBreakTest.0._words().reversed().map { String($0) },
-      //   "string: \(String(reflecting: wordBreakTest.0))")
+      expectEqual(
+        wordBreakTest.1.reversed(),
+        wordBreakTest.0._wordsBackwards,
+        "string: \(String(reflecting: wordBreakTest.0))")
     }
   }
 }
@@ -107,13 +146,12 @@ if #available(SwiftStdlib 5.7, *) {
       expectTrue(test._guts._isForeign())
       expectEqual(
         wordBreakTest.1,
-        test._words().map { String($0) },
+        test._words,
         "string: \(String(reflecting: wordBreakTest.0))")
-      // FIXME: Reenable once we figure out what to do with WordView
-      // expectEqual(
-      //   wordBreakTest.1,
-      //   test._words().reversed().map { String($0) },
-      //   "string: \(String(reflecting: wordBreakTest.0))")
+      expectEqual(
+        wordBreakTest.1.reversed(),
+        test._wordsBackwards,
+        "string: \(String(reflecting: wordBreakTest.0))")
     }
   }
 }

@@ -42,7 +42,6 @@
     "StringUTF8Validation.swift",
     "StringUnicodeScalarView.swift",
     "StringWordBreaking.swift",
-    "StringWordView.swift",
     "Substring.swift",
     "Unicode.swift",
     "UnicodeData.swift",

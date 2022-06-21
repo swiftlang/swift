@@ -11,8 +11,8 @@
 
 extension _StringGuts {
   internal func roundDownToNearestWord(
-    _ i: String._WordView.Index
-  ) -> String._WordView.Index {
+    _ i: String.Index
+  ) -> String.Index {
     _internalInvariant(i._encodedOffset <= count)
 
     let offset = i._encodedOffset
@@ -26,8 +26,8 @@ extension _StringGuts {
 
   @inline(never)
   internal func _slowRoundDownToNearestWord(
-    _ i: String._WordView.Index
-  ) -> String._WordView.Index {
+    _ i: String.Index
+  ) -> String.Index {
     let offset = i._encodedOffset
     let start = previousWordIndex(endingAt: offset)
     let end = nextWordIndex(startingAt: start)
@@ -37,7 +37,7 @@ extension _StringGuts {
       return i
     }
 
-    return String._WordView.Index(_encodedOffset: start)
+    return String.Index(_encodedOffset: start)
   }
 
   @inline(never)

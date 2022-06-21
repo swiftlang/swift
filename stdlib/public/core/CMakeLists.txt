@@ -171,7 +171,6 @@ set(SWIFTLIB_ESSENTIAL
   StringUTF8View.swift
   StringUTF8Validation.swift
   StringWordBreaking.swift
-  StringWordView.swift
   Substring.swift
   SwiftNativeNSArray.swift
   TemporaryAllocation.swift
