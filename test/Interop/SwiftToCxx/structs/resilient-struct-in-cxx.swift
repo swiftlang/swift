@@ -48,6 +48,14 @@ public struct FirstSmallStruct {
 // CHECK-NEXT:   return _impl::$s7Structs16FirstSmallStructV4dumpyyF(_getOpaquePointer());
 // CHECK-NEXT: }
 
+@frozen public struct FrozenStruct {
+    private let storedInt: Int32
+}
+// CHECK: class FrozenStruct final {
+// CHECK:        alignas(4) char _storage[4];
+// CHECK-NEXT:   friend class _impl::_impl_FrozenStruct;
+// CHECK-NEXT: };
+
 public struct LargeStruct {
     public let x1: Int
     let x2, x3, x4, x5, x6: Int
