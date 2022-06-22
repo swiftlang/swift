@@ -180,7 +180,7 @@ class Lexer {
   /// Retrieve the underlying diagnostic engine we emit diagnostics to. Note
   /// this should only be used for diagnostics not concerned with the current
   /// token.
-  DiagnosticEngine *getUnderlyingDiags() {
+  DiagnosticEngine *getUnderlyingDiags() const {
     return DiagQueue ? &DiagQueue->getUnderlyingDiags() : nullptr;
   }
 
@@ -218,7 +218,10 @@ public:
   /// \param Parent the parent lexer that scans the whole buffer
   /// \param BeginState start of the subrange
   /// \param EndState end of the subrange
-  Lexer(Lexer &Parent, State BeginState, State EndState);
+  /// \param EnableDiagnostics Whether to inherit the diagnostic engine of
+  /// \p Parent. If \c false, diagnostics will be disabled.
+  Lexer(const Lexer &Parent, State BeginState, State EndState,
+        bool EnableDiagnostics = true);
 
   /// Returns true if this lexer will produce a code completion token.
   bool isCodeCompletion() const {

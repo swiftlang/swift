@@ -1390,7 +1390,7 @@ namespace swift {
     DiagnosticEngine &getDiags() { return QueueEngine; }
 
     /// Retrieve the underlying engine which will receive the diagnostics.
-    DiagnosticEngine &getUnderlyingDiags() { return UnderlyingEngine; }
+    DiagnosticEngine &getUnderlyingDiags() const { return UnderlyingEngine; }
 
     /// Clear this queue and erase all diagnostics recorded.
     void clear() {

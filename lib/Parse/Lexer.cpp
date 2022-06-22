@@ -246,9 +246,11 @@ Lexer::Lexer(const LangOptions &Options, const SourceManager &SourceMgr,
   initialize(Offset, EndOffset);
 }
 
-Lexer::Lexer(Lexer &Parent, State BeginState, State EndState)
+Lexer::Lexer(const Lexer &Parent, State BeginState, State EndState,
+             bool EnableDiagnostics)
     : Lexer(PrincipalTag(), Parent.LangOpts, Parent.SourceMgr, Parent.BufferID,
-            Parent.getUnderlyingDiags(), Parent.LexMode,
+            EnableDiagnostics ? Parent.getUnderlyingDiags() : nullptr,
+            Parent.LexMode,
             Parent.IsHashbangAllowed
                 ? HashbangMode::Allowed
                 : HashbangMode::Disallowed,
