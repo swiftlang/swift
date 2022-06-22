@@ -636,7 +636,7 @@ void swift::checkDistributedActorProperties(const NominalTypeDecl *decl) {
 
   for (auto member : decl->getMembers()) {
     if (auto prop = dyn_cast<VarDecl>(member)) {
-      if (prop->isSynthesized())
+      if (prop->isImplicit())
         continue;
 
       auto id = prop->getName();

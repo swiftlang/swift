@@ -398,3 +398,12 @@ func __isRemoteActor(_ actor: AnyObject) -> Bool
 func __isLocalActor(_ actor: AnyObject) -> Bool {
   return !__isRemoteActor(actor)
 }
+
+@available(SwiftStdlib 5.7, *)
+public distributed actor FakeActorSystemGreeter {
+  public typealias ActorSystem = FakeActorSystem
+
+  public func greet(_ name: String) -> String {
+    "Hello, \(name)!"
+  }
+}

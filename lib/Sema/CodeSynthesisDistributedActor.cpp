@@ -37,40 +37,34 @@ using namespace swift;
 /************************ PROPERTY SYNTHESIS **********************************/
 /******************************************************************************/
 
-static VarDecl*
- lookupDistributedActorProperty(NominalTypeDecl *decl, DeclName name) {
-   assert(decl && "decl was null");
-   auto &C = decl->getASTContext();
+static VarDecl *lookupDistributedActorProperty(NominalTypeDecl *decl,
+                                               DeclName name) {
+  assert(decl && "decl was null");
+  auto members = decl->lookupDirect(name);
+  if (members.empty())
+    return nullptr;
 
-   auto clazz = dyn_cast<ClassDecl>(decl);
-   if (!clazz)
-     return nullptr;
+  auto &C = decl->getASTContext();
+  auto systemTy = getDistributedActorSystemType(decl);
+  auto idTy = getDistributedActorIDType(decl);
 
-   auto refs = decl->lookupDirect(name);
-   if (refs.size() != 1)
-     return nullptr;
+  for (auto member : members) {
+    auto var = dyn_cast<VarDecl>(member);
+    if (!var) {
+      continue;
+    }
 
-   auto var = dyn_cast<VarDecl>(refs.front());
-   if (!var)
-     return nullptr;
+    auto varTy = var->getInterfaceType();
+    if (name == C.Id_id && varTy->isEqual(idTy)) {
+      return var;
+    }
+    if (name == C.Id_actorSystem && varTy->isEqual(systemTy)) {
+      return var;
+    }
+  }
 
-   Type expectedType = Type();
-   if (name == C.Id_id) {
-     expectedType = getDistributedActorIDType(decl);
-   } else if (name == C.Id_actorSystem) {
-     expectedType = getDistributedActorSystemType(decl);
-   } else {
-     llvm_unreachable("Unexpected distributed actor property lookup!");
-   }
-   if (!expectedType)
-     return nullptr;
-
-   if (!var->getInterfaceType()->isEqual(expectedType))
-     return nullptr;
-
-   assert(var->isSynthesized() && "Expected compiler synthesized property");
-   return var;
- }
+  return nullptr;
+}
 
 // Note: This would be nice to implement in DerivedConformanceDistributedActor,
 // but we can't since those are lazily triggered and an implementation exists
@@ -79,8 +73,7 @@ static VarDecl*
 //
 // The "derived" mechanisms are not really geared towards emitting for
 // what already has a witness.
-static VarDecl *addImplicitDistributedActorIDProperty(
-    ClassDecl *nominal) {
+static VarDecl *addImplicitDistributedActorIDProperty(ClassDecl *nominal) {
   if (!nominal)
     return nullptr;
   if (!nominal->isDistributedActor())
