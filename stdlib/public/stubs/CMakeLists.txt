@@ -2,6 +2,7 @@ set(swift_stubs_sources
     Assert.cpp
     GlobalObjects.cpp
     LibcShims.cpp
+    PrintHook.cpp
     Random.cpp
     Stubs.cpp
     ThreadLocalStorage.cpp

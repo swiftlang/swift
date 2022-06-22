@@ -10,7 +10,39 @@
 //
 //===----------------------------------------------------------------------===//
 
+import SwiftShims
+
 #if !SWIFT_STDLIB_STATIC_PRINT
+
+/// Writes the textual representations of the given items into the standard
+/// output.
+///
+/// - Parameters:
+///   - items: Zero or more items to print.
+///   - separator: A string to print between each item.
+///   - terminator: The string to print after all items have been printed.
+///   - isDebug: Whether this function should call `_print()` or should call
+///     `_debugPrint()`.
+///
+/// This function is the bottleneck for the ``print(_:separator:terminator:)``
+/// and ``debugPrint(_:separator:terminator:)`` public functions.
+private func _print(
+  _ items: [Any],
+  separator: String,
+  terminator: String,
+  isDebug: Bool
+) {
+  let playgroundPrintHook = _playgroundPrintHook
+  if _slowPath(_swift_isPrintHookInstalled() || playgroundPrintHook != nil) {
+    var output = _TeeStream(left: "", right: _Stdout())
+    (isDebug ? _debugPrint : _print)(items, separator, terminator, &output)
+    _swift_invokePrintHooks(output.left, isDebug)
+    playgroundPrintHook?(output.left)
+  } else {
+    var output = _Stdout()
+    (isDebug ? _debugPrint : _print)(items, separator, terminator, &output)
+  }
+}
 
 /// Writes the textual representations of the given items into the standard
 /// output.
@@ -56,15 +88,7 @@ public func print(
   separator: String = " ",
   terminator: String = "\n"
 ) {
-  if let hook = _playgroundPrintHook {
-    var output = _TeeStream(left: "", right: _Stdout())
-    _print(items, separator: separator, terminator: terminator, to: &output)
-    hook(output.left)
-  }
-  else {
-    var output = _Stdout()
-    _print(items, separator: separator, terminator: terminator, to: &output)
-  }
+  _print(items, separator: separator, terminator: terminator, isDebug: false)
 }
 
 /// Writes the textual representations of the given items most suitable for
@@ -112,15 +136,7 @@ public func debugPrint(
   separator: String = " ",
   terminator: String = "\n"
 ) {
-  if let hook = _playgroundPrintHook {
-    var output = _TeeStream(left: "", right: _Stdout())
-    _debugPrint(items, separator: separator, terminator: terminator, to: &output)
-    hook(output.left)
-  }
-  else {
-    var output = _Stdout()
-    _debugPrint(items, separator: separator, terminator: terminator, to: &output)
-  }
+  _print(items, separator: separator, terminator: terminator, isDebug: true)
 }
 
 /// Writes the textual representations of the given items into the given output

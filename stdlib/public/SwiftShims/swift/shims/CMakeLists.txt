@@ -8,6 +8,7 @@ set(sources
   LibcOverlayShims.h
   LibcShims.h
   MetadataSections.h
+  PrintHook.h
   Random.h
   RefCount.h
   Reflection.h

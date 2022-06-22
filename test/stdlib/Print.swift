@@ -73,4 +73,37 @@ PrintTests.test("PlaygroundPrintHook") {
   expectEqual("%!1!2!3!4!\n%\n", printed)
 }
 
+PrintTests.test("PrintHooks") {
+  guard #available(SwiftStdlib 5.8, *) else {
+    return
+  }
+  
+  var printed = ""
+  var isDebug = false
+  _installPrintHook { message, debug in
+    printed = message
+    isDebug = debug
+  }
+
+  var s0 = ""
+  print("", 1, 2, 3, 4, "", separator: "|", to: &s0)
+  expectEqual("|1|2|3|4|\n", s0)
+  expectFalse(isDebug)
+  print("%\(s0)%")
+  expectEqual("%|1|2|3|4|\n%\n", printed)
+  expectFalse(isDebug)
+
+  printed = ""
+  var s1 = ""
+  print("", 1, 2, 3, 4, "", separator: "!", to: &s1)
+  expectEqual("", printed)
+  expectFalse(isDebug)
+  print("%\(s1)%")
+  expectEqual("%!1!2!3!4!\n%\n", printed)
+  expectFalse(isDebug)
+
+  debugPrint("")
+  expectTrue(isDebug)
+}
+
 runAllTests()

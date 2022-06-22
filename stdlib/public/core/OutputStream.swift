@@ -617,8 +617,38 @@ extension Unicode.Scalar: TextOutputStreamable {
   }
 }
 
+/// A hook function called by `print()` and `debugPrint()`.
+///
+/// - Parameters:
+///   - message: The message being printed.
+///   - isDebug: Whether or not `debugPrint()` is the caller.
+@available(SwiftStdlib 5.8, *)
+public typealias _PrintHook = (_ message: String, _ isDebug: Bool) -> Void
+
+@available(SwiftStdlib 5.8, *)
+@_silgen_name("_swift_installPrintHook")
+private func __installPrintHook(_ hook: @escaping _PrintHook)
+
+/// Install a hook in `print()` and `debugPrint()` for other components to print
+/// through.
+///
+/// - Parameters:
+///   - name: A unique name for the hook being installed. Reverse-DNS notation
+///     (e.g. `"org.swift.example-project"`) is recommended.
+///   - hook: The hook function to install.
+///
+/// - Warning: This function is not thread-safe. Print hooks should be set up
+///   as early as possible and should not be subsequently modified.
+@available(SwiftStdlib 5.8, *)
+public func _installPrintHook(
+  _ hook: @escaping _PrintHook
+) {
+  __installPrintHook(hook)
+}
+
 /// A hook for playgrounds to print through.
-public var _playgroundPrintHook: ((String) -> Void)? = nil
+@available(*, deprecated, message: "Use _installPrintHook(_:) instead.")
+public var _playgroundPrintHook: ((String) -> Void)?
 
 internal struct _TeeStream<L: TextOutputStream, R: TextOutputStream>
   : TextOutputStream
