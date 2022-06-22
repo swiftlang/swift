@@ -9,3 +9,4 @@ import ObjectiveC
 let v: NSObject?
 
 // REQUIRES: objc_interop
+// REQUIRES: rdar://95219987
