@@ -182,6 +182,7 @@ struct SILMoveOnlyTypeEliminatorVisitor
   NO_UPDATE_NEEDED(RefToBridgeObject)
   NO_UPDATE_NEEDED(BridgeObjectToRef)
   NO_UPDATE_NEEDED(UnconditionalCheckedCast)
+  NO_UPDATE_NEEDED(ClassMethod)
 #undef NO_UPDATE_NEEDED
 };
 

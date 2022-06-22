@@ -25,7 +25,10 @@ struct TrivialPair {
 
 sil @use_trivial : $@convention(thin) (Trivial) -> ()
 
-class Klass {}
+class Klass {
+  func foo()
+}
+
 struct KlassPair {
   var lhs: Klass
   var rhs: Klass
@@ -540,9 +543,9 @@ bb0(%0 : @guaranteed $Klass):
   %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
   %0aa = copy_value %0 : $Klass
   %0a = copyable_to_moveonlywrapper %0aa : $Klass
+  %notUsed = class_method %0a : $@moveOnly Klass, #Klass.foo : (Klass) -> () -> (), $@convention(method) (@guaranteed Klass) -> ()
   debug_value %0a : $@moveOnly Klass, let, name "foo"
   %2 = enum $@moveOnly FakeOptional<Klass>, #FakeOptional.some!enumelt, %0a : $@moveOnly Klass
-
   switch_enum %2 : $@moveOnly FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
 
 bb1(%2Payload : @owned $@moveOnly Klass):

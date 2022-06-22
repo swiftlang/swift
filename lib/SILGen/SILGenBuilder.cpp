@@ -918,5 +918,6 @@ ManagedValue SILGenBuilder::createGuaranteedMoveOnlyWrapperToCopyableValue(
     SILLocation loc, ManagedValue value) {
   auto *mdi =
       createGuaranteedMoveOnlyWrapperToCopyableValue(loc, value.getValue());
+  assert(mdi->getOperand()->getType().isObject() && "Expected an object?!");
   return ManagedValue::forUnmanaged(mdi);
 }

@@ -3082,6 +3082,18 @@ private:
 
       // If it's not already in memory, put it there.
       if (!result.getType().isAddress()) {
+        // If we have a move only wrapped type, we need to unwrap before we
+        // materialize. We will forward as appropriate so it will show up as a
+        // consuming use or a guaranteed use as appropriate.
+        if (result.getType().isMoveOnlyWrapped()) {
+          if (result.isPlusOne(SGF)) {
+            result =
+                SGF.B.createOwnedMoveOnlyWrapperToCopyableValue(loc, result);
+          } else {
+            result = SGF.B.createGuaranteedMoveOnlyWrapperToCopyableValue(
+                loc, result);
+          }
+        }
         result = result.materialize(SGF, loc);
       }
 
