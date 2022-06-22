@@ -401,6 +401,18 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   the result type provides a generalization where the callee chooses the
   resulting type and value.
 
+* The compiler now correctly emits errors for `@available` attributes on stored properties with the `lazy` modifier or with attached property wrappers. Previously, the attribute was accepted on this subset of stored properties but the resulting binary would crash at runtime when type metadata was unavailable.
+
+  ```swift
+  struct S {
+    @available(macOS 99, *) // error: stored properties cannot be marked potentially unavailable with '@available'
+    lazy var a: Int = 42
+  
+    @available(macOS 99, *) // error: stored properties cannot be marked potentially unavailable with '@available'
+    @Wrapper var b: Int
+  }
+  ```
+  
 * The compiler now correctly emits warnings for more kinds of expressions where a protocol conformance is used and may be unavailable at runtime. Previously, member reference expressions and type erasing expressions that used potentially unavailable conformances were not diagnosed, leading to potential crashes at runtime.
 
   ```swift
