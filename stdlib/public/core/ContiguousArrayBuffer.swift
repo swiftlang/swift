@@ -265,7 +265,7 @@ func getContiguousArrayStorageType<Element>(
 ) -> _ContiguousArrayStorage<Element>.Type {
     // We can only reset the type metadata to the correct metadata when bridging
     // on the current OS going forward.
-    if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+    if #available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *) { // SwiftStdlib 5.7
       if Element.self is AnyObject.Type {
         return _uncheckedUnsafeBitCast(
           _ContiguousArrayStorage<AnyObject>.self,
