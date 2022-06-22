@@ -11029,9 +11029,19 @@ retry_after_fail:
           return true;
         }
 
-        // If types lined up exactly, let's favor this overload choice.
-        if (Type(argFnType)->isEqual(choiceType))
-          constraint->setFavored();
+        // If types of arguments/parameters and result lined up exactly,
+        // let's favor this overload choice.
+        //
+        // Note this check ignores `ExtInfo` on purpose and only compares
+        // types, if there are overloads that differ only in effects then
+        // all of them are going to be considered and filtered as part of
+        // "favored" group after forming a valid partial solution.
+        if (auto *choiceFnType = choiceType->getAs<FunctionType>()) {
+          if (FunctionType::equalParams(argFnType->getParams(),
+                                        choiceFnType->getParams()) &&
+              argFnType->getResult()->isEqual(choiceFnType->getResult()))
+            constraint->setFavored();
+        }
 
         // Account for any optional unwrapping/binding
         for (unsigned i : range(numOptionalUnwraps)) {
