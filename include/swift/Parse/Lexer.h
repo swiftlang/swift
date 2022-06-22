@@ -644,6 +644,12 @@ private:
   void lexStringLiteral(unsigned CustomDelimiterLen = 0);
   void lexEscapedIdentifier();
 
+  /// Attempt to scan a regex literal, returning the end pointer, or `nullptr`
+  /// if a regex literal cannot be scanned.
+  const char *tryScanRegexLiteral(const char *TokStart, bool MustBeRegex,
+                                  DiagnosticEngine *Diags,
+                                  bool &CompletelyErroneous) const;
+
   /// Attempt to lex a regex literal, returning true if lexing should continue,
   /// false if this is not a regex literal.
   bool tryLexRegexLiteral(const char *TokStart);
