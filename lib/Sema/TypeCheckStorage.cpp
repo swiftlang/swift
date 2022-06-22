@@ -2908,6 +2908,7 @@ PropertyWrapperAuxiliaryVariablesRequest::evaluate(Evaluator &evaluator,
                                    name, dc);
     backingVar->setImplicit();
     backingVar->setOriginalWrappedProperty(var);
+    backingVar->setPropertyWrapperBackingProperty(true);
 
     // The backing storage is 'private'.
     backingVar->overwriteAccess(AccessLevel::Private);
