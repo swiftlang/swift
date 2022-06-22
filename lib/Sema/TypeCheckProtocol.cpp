@@ -6445,7 +6445,19 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
         if (!classDecl->isExplicitActor()) {
           dc->getSelfNominalTypeDecl()
               ->diagnose(diag::actor_protocol_illegal_inheritance,
-                         dc->getSelfNominalTypeDecl()->getName())
+                         dc->getSelfNominalTypeDecl()->getName(),
+                         proto->getName())
+              .fixItReplace(nominal->getStartLoc(), "actor");
+        }
+      }
+    } else if (proto->isSpecificProtocol(KnownProtocolKind::AnyActor)) {
+      if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
+        if (!classDecl->isExplicitActor() &&
+            !classDecl->isExplicitDistributedActor()) {
+          dc->getSelfNominalTypeDecl()
+              ->diagnose(diag::actor_protocol_illegal_inheritance,
+                         dc->getSelfNominalTypeDecl()->getName(),
+                         proto->getName())
               .fixItReplace(nominal->getStartLoc(), "actor");
         }
       }
