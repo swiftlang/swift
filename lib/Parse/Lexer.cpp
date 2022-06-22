@@ -246,9 +246,11 @@ Lexer::Lexer(const LangOptions &Options, const SourceManager &SourceMgr,
   initialize(Offset, EndOffset);
 }
 
-Lexer::Lexer(Lexer &Parent, State BeginState, State EndState)
+Lexer::Lexer(const Lexer &Parent, State BeginState, State EndState,
+             bool EnableDiagnostics)
     : Lexer(PrincipalTag(), Parent.LangOpts, Parent.SourceMgr, Parent.BufferID,
-            Parent.getUnderlyingDiags(), Parent.LexMode,
+            EnableDiagnostics ? Parent.getUnderlyingDiags() : nullptr,
+            Parent.LexMode,
             Parent.IsHashbangAllowed
                 ? HashbangMode::Allowed
                 : HashbangMode::Disallowed,
@@ -1970,27 +1972,76 @@ const char *Lexer::findEndOfCurlyQuoteStringLiteral(const char *Body,
   }
 }
 
-bool Lexer::tryLexRegexLiteral(const char *TokStart) {
+bool Lexer::isPotentialUnskippableBareSlashRegexLiteral(const Token &Tok) const {
+  if (!LangOpts.EnableBareSlashRegexLiterals)
+    return false;
+
+  // A `/.../` regex literal may only start on a binary or prefix operator.
+  if (Tok.isNot(tok::oper_prefix, tok::oper_binary_spaced,
+                tok::oper_binary_unspaced)) {
+    return false;
+  }
+  auto SlashIdx = Tok.getText().find("/");
+  if (SlashIdx == StringRef::npos)
+    return false;
+
+  auto Offset = getBufferPtrForSourceLoc(Tok.getLoc()) + SlashIdx;
+  bool CompletelyErroneous;
+  if (tryScanRegexLiteral(Offset, /*MustBeRegex*/ false, /*Diags*/ nullptr,
+                          CompletelyErroneous)) {
+    // Definitely a regex literal.
+    return true;
+  }
+
+  // A prefix '/' can never be a regex literal if it failed a heuristic.
+  if (Tok.is(tok::oper_prefix))
+    return false;
+
+  // We either don't have a regex literal, or we failed a heuristic. We now need
+  // to make sure we don't have an unbalanced `{` or `}`, as that would have the
+  // potential to change the range of a skipped body if we try to more
+  // agressively lex a regex literal during normal parsing. If we have balanced
+  // `{` + `}`, we can proceed with skipping. Worst case scenario is we emit a
+  // worse diagnostic.
+  // FIXME: We ought to silence lexer diagnostics when skipping, this would
+  // avoid emitting a worse diagnostic.
+  auto *EndPtr = tryScanRegexLiteral(Offset, /*MustBeRegex*/ true,
+                                     /*Diags*/ nullptr, CompletelyErroneous);
+  if (!EndPtr)
+    return false;
+
+  Lexer L(*this, State(Tok.getLoc().getAdvancedLoc(Tok.getLength())),
+          State(getSourceLoc(EndPtr)), /*EnableDiagnostics*/ false);
+
+  unsigned OpenBraces = 0;
+  while (L.peekNextToken().isNot(tok::eof)) {
+    Token Tok;
+    L.lex(Tok);
+    if (Tok.is(tok::l_brace))
+      OpenBraces += 1;
+    if (Tok.is(tok::r_brace)) {
+      if (OpenBraces == 0)
+        return true;
+      OpenBraces -= 1;
+    }
+  }
+
+  // If we have an unbalanced `{`, this is unskippable.
+  return OpenBraces != 0;
+}
+
+const char *Lexer::tryScanRegexLiteral(const char *TokStart, bool MustBeRegex,
+                                       DiagnosticEngine *Diags,
+                                       bool &CompletelyErroneous) const {
   // We need to have experimental string processing enabled, and have the
   // parsing logic for regex literals available.
   if (!LangOpts.EnableExperimentalStringProcessing || !regexLiteralLexingFn)
-    return false;
+    return nullptr;
 
-  bool MustBeRegex = true;
   bool IsForwardSlash = (*TokStart == '/');
 
   // Check if we're able to lex a `/.../` regex.
   if (IsForwardSlash) {
-    switch (ForwardSlashRegexMode) {
-    case LexerForwardSlashRegexMode::None:
-      return false;
-    case LexerForwardSlashRegexMode::Tentative:
-      MustBeRegex = false;
-      break;
-    case LexerForwardSlashRegexMode::Always:
-      break;
-    }
-
     // For `/.../` regex literals, we need to ban space and tab at the start of
     // a regex to avoid ambiguity with operator chains, e.g:
     //
@@ -2008,23 +2059,25 @@ bool Lexer::tryLexRegexLiteral(const char *TokStart) {
     case ' ':
     case '\t': {
       if (!MustBeRegex)
-        return false;
+        return nullptr;
 
-      // We must have a regex, so emit an error for space and tab.
-      StringRef DiagChar;
-      switch (*RegexContentStart) {
-      case ' ':
-        DiagChar = "space";
-        break;
-      case '\t':
-        DiagChar = "tab";
-        break;
-      default:
-        llvm_unreachable("Unhandled case");
+      if (Diags) {
+        // We must have a regex, so emit an error for space and tab.
+        StringRef DiagChar;
+        switch (*RegexContentStart) {
+        case ' ':
+          DiagChar = "space";
+          break;
+        case '\t':
+          DiagChar = "tab";
+          break;
+        default:
+          llvm_unreachable("Unhandled case");
+        }
+        Diags->diagnose(getSourceLoc(RegexContentStart),
+                        diag::lex_regex_literal_invalid_starting_char, DiagChar)
+            .fixItInsert(getSourceLoc(RegexContentStart), "\\");
       }
-      diagnose(RegexContentStart, diag::lex_regex_literal_invalid_starting_char,
-               DiagChar)
-          .fixItInsert(getSourceLoc(RegexContentStart), "\\");
       break;
     }
     default:
@@ -2037,14 +2090,13 @@ bool Lexer::tryLexRegexLiteral(const char *TokStart) {
   // - CompletelyErroneous will be set if there was an error that cannot be
   //   recovered from.
   auto *Ptr = TokStart;
-  bool CompletelyErroneous = regexLiteralLexingFn(
-      &Ptr, BufferEnd, MustBeRegex,
-      getBridgedOptionalDiagnosticEngine(getTokenDiags()));
+  CompletelyErroneous = regexLiteralLexingFn(
+      &Ptr, BufferEnd, MustBeRegex, getBridgedOptionalDiagnosticEngine(Diags));
 
   // If we didn't make any lexing progress, this isn't a regex literal and we
   // should fallback to lexing as something else.
   if (Ptr == TokStart)
-    return false;
+    return nullptr;
 
   // If we're lexing `/.../`, error if we ended on the opening of a comment.
   // We prefer to lex the comment as it's more likely than not that is what
@@ -2052,10 +2104,12 @@ bool Lexer::tryLexRegexLiteral(const char *TokStart) {
   // TODO: This should be sunk into the Swift library.
   if (IsForwardSlash && Ptr[-1] == '/' && (*Ptr == '*' || *Ptr == '/')) {
     if (!MustBeRegex)
-      return false;
+      return nullptr;
 
-    diagnose(TokStart, diag::lex_regex_literal_unterminated);
-
+    if (Diags) {
+      Diags->diagnose(getSourceLoc(TokStart),
+                      diag::lex_regex_literal_unterminated);
+    }
     // Move the pointer back to the '/' of the comment.
     Ptr--;
   }
@@ -2088,7 +2142,7 @@ bool Lexer::tryLexRegexLiteral(const char *TokStart) {
 
         // Invalid, so bail.
         if (GroupDepth == 0)
-          return false;
+          return nullptr;
 
         GroupDepth -= 1;
         break;
@@ -2101,9 +2155,32 @@ bool Lexer::tryLexRegexLiteral(const char *TokStart) {
       }
     }
   }
+  assert(Ptr > TokStart && Ptr <= BufferEnd);
+  return Ptr;
+}
+
+bool Lexer::tryLexRegexLiteral(const char *TokStart) {
+  bool IsForwardSlash = (*TokStart == '/');
+  bool MustBeRegex = true;
+
+  if (IsForwardSlash) {
+    switch (ForwardSlashRegexMode) {
+    case LexerForwardSlashRegexMode::None:
+      return false;
+    case LexerForwardSlashRegexMode::Tentative:
+      MustBeRegex = false;
+      break;
+    case LexerForwardSlashRegexMode::Always:
+      break;
+    }
+  }
+  bool CompletelyErroneous = false;
+  auto *Ptr = tryScanRegexLiteral(TokStart, MustBeRegex, getTokenDiags(),
+                                  CompletelyErroneous);
+  if (!Ptr)
+    return false;
 
   // Update to point to where we ended regex lexing.
-  assert(Ptr > TokStart && Ptr <= BufferEnd);
   CurPtr = Ptr;
 
   // If the lexing was completely erroneous, form an unknown token.
