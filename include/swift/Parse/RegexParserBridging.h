@@ -17,10 +17,6 @@
 #include "swift/AST/ASTBridging.h"
 #include <stdbool.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /// Attempt to lex a regex literal string. Takes the following arguments:
 ///
 /// - CurPtrPtr: A pointer to the current pointer of lexer, which should be the
@@ -60,12 +56,8 @@ typedef bool (*RegexLiteralParsingFn)(/*InputPtr*/ const char *_Nonnull,
                                       /*VersionOut*/ unsigned *_Nonnull,
                                       /*CaptureStructureOut*/ void *_Nonnull,
                                       /*CaptureStructureSize*/ unsigned,
-                                      /*DiagnosticBaseLoc*/ BridgedSourceLoc,
+                                      /*DiagnosticBaseLoc*/ swift::SourceLoc,
                                       BridgedDiagnosticEngine);
 void Parser_registerRegexLiteralParsingFn(RegexLiteralParsingFn _Nullable fn);
-
-#ifdef __cplusplus
-} // extern "C"
-#endif
 
 #endif // REGEX_PARSER_BRIDGING
