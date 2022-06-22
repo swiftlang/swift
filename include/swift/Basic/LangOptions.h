@@ -351,7 +351,7 @@ namespace swift {
     llvm::SmallSet<Feature, 2> Features;
 
     /// Temporary flag to support LLDB's transition to using \c Features.
-    bool EnableBareSlashRegexLiterals = false;
+    bool EnableBareSlashRegexLiterals = true;
 
     /// Use Clang function types for computing canonical types.
     /// If this option is false, the clang function types will still be computed

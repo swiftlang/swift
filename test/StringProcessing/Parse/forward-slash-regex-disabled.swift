@@ -1,6 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-string-processing -disable-availability-checking
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: that_bare_slash_regex_be_actually_disabled_by_default_which_it_isnt_because_im_running_a_test_with_it_enabled_by_default_here
 
 prefix operator /
 prefix operator ^/
