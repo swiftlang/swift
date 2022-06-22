@@ -4198,8 +4198,10 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
       if (behavior != DiagnosticBehavior::Ignore) {
         bool isError = behavior < DiagnosticBehavior::Warning;
         
+        // Avoid relying on the lifetime of 'this'.
+        const DeclContext *DC = this->DC;
         diagnoseOrDefer(requirement, isError,
-                        [this, requirement, witness, sendFrom](
+                        [DC, requirement, witness, sendFrom](
                           NormalProtocolConformance *conformance) {
           diagnoseSendabilityErrorBasedOn(conformance->getProtocol(), sendFrom,
                                           [&](DiagnosticBehavior limit) {
