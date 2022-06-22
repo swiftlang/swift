@@ -5433,6 +5433,9 @@ public:
     Bits.VarDecl.IsLazyStorageProperty = IsLazyStorage;
   }
 
+  bool isPropertyWrapperBackingProperty() const { return Bits.VarDecl.IsPropertyWrapperBackingProperty; }
+  void setPropertyWrapperBackingProperty(bool b) { Bits.VarDecl.IsPropertyWrapperBackingProperty = b; }
+
   /// True if this is a top-level global variable from the main source file.
   bool isTopLevelGlobal() const { return Bits.VarDecl.IsTopLevelGlobal; }
   void setTopLevelGlobal(bool b) { Bits.VarDecl.IsTopLevelGlobal = b; }
