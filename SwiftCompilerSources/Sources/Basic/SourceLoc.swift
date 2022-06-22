@@ -21,15 +21,15 @@ public struct SourceLoc {
     self.locationInFile = locationInFile
   }
 
-  public init?(bridged: BridgedSourceLoc) {
-    guard let locationInFile = bridged.pointer else {
+  public init?(bridged: swift.SourceLoc) {
+    guard bridged.isValid() else {
       return nil
     }
-    self.init(locationInFile: locationInFile)
+    self.locationInFile = bridged.getOpaquePointerValue().assumingMemoryBound(to: UInt8.self)
   }
 
-  public var bridged: BridgedSourceLoc {
-    .init(pointer: locationInFile)
+  public var bridged: swift.SourceLoc {
+    .init(llvm.SMLoc.getFromPointer(locationInFile))
   }
 }
 
@@ -40,8 +40,8 @@ extension SourceLoc {
 }
 
 extension Optional where Wrapped == SourceLoc {
-  public var bridged: BridgedSourceLoc {
-    self?.bridged ?? .init(pointer: nil)
+  public var bridged: swift.SourceLoc {
+    self?.bridged ?? .init()
   }
 }
 
@@ -68,6 +68,6 @@ public struct CharSourceRange {
 
 extension Optional where Wrapped == CharSourceRange {
   public var bridged: BridgedCharSourceRange {
-    self?.bridged ?? .init(start: .init(pointer: nil), byteLength: 0)
+    self?.bridged ?? .init(start: .init(), byteLength: 0)
   }
 }
