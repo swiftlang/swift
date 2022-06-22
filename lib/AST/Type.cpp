@@ -960,6 +960,67 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
     return newFnType;
   }
 
+  if (auto existentialType = getAs<ExistentialType>()) {
+    auto newConstraintType = existentialType->getConstraintType()
+        ->stripConcurrency(recurse, dropGlobalActor);
+    if (newConstraintType.getPointer() ==
+            existentialType->getConstraintType().getPointer())
+      return Type(this);
+
+    return ExistentialType::get(newConstraintType);
+  }
+
+  if (auto protocolType = getAs<ProtocolType>()) {
+    if (protocolType->getDecl()->isSpecificProtocol(
+            KnownProtocolKind::Sendable))
+      return ProtocolCompositionType::get(getASTContext(), { }, false);
+
+    return Type(this);
+  }
+
+  if (auto protocolCompositionType = getAs<ProtocolCompositionType>()) {
+    SmallVector<Type, 4> newMembers;
+    auto members = protocolCompositionType->getMembers();
+    for (unsigned i : indices(members)) {
+      auto memberType = members[i];
+      auto newMemberType =
+          memberType->stripConcurrency(recurse, dropGlobalActor);
+      if (!newMembers.empty()) {
+        newMembers.push_back(newMemberType);
+        continue;
+      }
+
+      if (memberType.getPointer() != newMemberType.getPointer()) {
+        newMembers.append(members.begin(), members.begin() + i);
+        newMembers.push_back(newMemberType);
+        continue;
+      }
+    }
+
+    if (!newMembers.empty()) {
+      return ProtocolCompositionType::get(
+          getASTContext(), newMembers,
+          protocolCompositionType->hasExplicitAnyObject());
+    }
+
+    return Type(this);
+  }
+
+  if (auto existentialMetatype = getAs<ExistentialMetatypeType>()) {
+    auto instanceType = existentialMetatype->getExistentialInstanceType();
+    auto newInstanceType =
+        instanceType->stripConcurrency(recurse, dropGlobalActor);
+    if (instanceType.getPointer() != newInstanceType.getPointer()) {
+      Optional<MetatypeRepresentation> repr;
+      if (existentialMetatype->hasRepresentation())
+        repr = existentialMetatype->getRepresentation();
+      return ExistentialMetatypeType::get(
+          newInstanceType, repr, getASTContext());
+    }
+
+    return Type(this);
+  }
+
   return Type(this);
 }
 
