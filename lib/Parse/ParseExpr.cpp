@@ -886,6 +886,8 @@ void Parser::tryLexRegexLiteral(bool forUnappliedOperator) {
 
   // Check to see if we have a regex literal `/.../`, optionally with a prefix
   // operator e.g `!/.../`.
+  // NOTE: If you change this logic you must also change the logic in
+  // isPotentialUnskippableBareSlashRegexLiteral.
   bool mustBeRegex = false;
   switch (Tok.getKind()) {
   case tok::oper_prefix:

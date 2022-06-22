@@ -1972,6 +1972,64 @@ const char *Lexer::findEndOfCurlyQuoteStringLiteral(const char *Body,
   }
 }
 
+bool Lexer::isPotentialUnskippableBareSlashRegexLiteral(const Token &Tok) const {
+  if (!LangOpts.EnableBareSlashRegexLiterals)
+    return false;
+
+  // A `/.../` regex literal may only start on a binary or prefix operator.
+  if (Tok.isNot(tok::oper_prefix, tok::oper_binary_spaced,
+                tok::oper_binary_unspaced)) {
+    return false;
+  }
+  auto SlashIdx = Tok.getText().find("/");
+  if (SlashIdx == StringRef::npos)
+    return false;
+
+  auto Offset = getBufferPtrForSourceLoc(Tok.getLoc()) + SlashIdx;
+  bool CompletelyErroneous;
+  if (tryScanRegexLiteral(Offset, /*MustBeRegex*/ false, /*Diags*/ nullptr,
+                          CompletelyErroneous)) {
+    // Definitely a regex literal.
+    return true;
+  }
+
+  // A prefix '/' can never be a regex literal if it failed a heuristic.
+  if (Tok.is(tok::oper_prefix))
+    return false;
+
+  // We either don't have a regex literal, or we failed a heuristic. We now need
+  // to make sure we don't have an unbalanced `{` or `}`, as that would have the
+  // potential to change the range of a skipped body if we try to more
+  // agressively lex a regex literal during normal parsing. If we have balanced
+  // `{` + `}`, we can proceed with skipping. Worst case scenario is we emit a
+  // worse diagnostic.
+  // FIXME: We ought to silence lexer diagnostics when skipping, this would
+  // avoid emitting a worse diagnostic.
+  auto *EndPtr = tryScanRegexLiteral(Offset, /*MustBeRegex*/ true,
+                                     /*Diags*/ nullptr, CompletelyErroneous);
+  if (!EndPtr)
+    return false;
+
+  Lexer L(*this, State(Tok.getLoc().getAdvancedLoc(Tok.getLength())),
+          State(getSourceLoc(EndPtr)), /*EnableDiagnostics*/ false);
+
+  unsigned OpenBraces = 0;
+  while (L.peekNextToken().isNot(tok::eof)) {
+    Token Tok;
+    L.lex(Tok);
+    if (Tok.is(tok::l_brace))
+      OpenBraces += 1;
+    if (Tok.is(tok::r_brace)) {
+      if (OpenBraces == 0)
+        return true;
+      OpenBraces -= 1;
+    }
+  }
+
+  // If we have an unbalanced `{`, this is unskippable.
+  return OpenBraces != 0;
+}
+
 const char *Lexer::tryScanRegexLiteral(const char *TokStart, bool MustBeRegex,
                                        DiagnosticEngine *Diags,
                                        bool &CompletelyErroneous) const {

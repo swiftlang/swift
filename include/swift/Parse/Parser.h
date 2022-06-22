@@ -715,13 +715,6 @@ public:
   /// plain Tok.is(T1) check).
   bool skipUntilTokenOrEndOfLine(tok T1, tok T2 = tok::NUM_TOKENS);
 
-  /// Skip a braced block (e.g. function body). The current token must be '{'.
-  /// Returns \c true if the parser hit the eof before finding matched '}'.
-  ///
-  /// Set \c HasNestedTypeDeclarations to true if a token for a type
-  /// declaration is detected in the skipped block.
-  bool skipBracedBlock(bool &HasNestedTypeDeclarations);
-
   /// Skip over SIL decls until we encounter the start of a Swift decl or eof.
   void skipSILUntilSwiftDecl();
 
@@ -1000,6 +993,8 @@ public:
   bool canDelayMemberDeclParsing(bool &HasOperatorDeclarations,
                                  bool &HasNestedClassDeclarations);
 
+  bool canDelayFunctionBodyParsing(bool &HasNestedTypeDeclarations);
+
   bool delayParsingDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
                             IterableDeclContext *IDC);
 
@@ -1210,9 +1205,7 @@ public:
                                        bool &hasEffectfulGet,
                                        AccessorKind currentKind,
                                        SourceLoc const& currentLoc);
-  
-  void consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
-                                   const DeclAttributes &Attrs);
+
   ParserResult<FuncDecl> parseDeclFunc(SourceLoc StaticLoc,
                                        StaticSpellingKind StaticSpelling,
                                        ParseDeclOptions Flags,

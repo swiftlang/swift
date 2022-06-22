@@ -580,6 +580,13 @@ public:
                             : LexerForwardSlashRegexMode::Tentative) {}
   };
 
+  /// Checks whether a given token could potentially contain the start of an
+  /// unskippable `/.../` regex literal. Such tokens need to go through the
+  /// parser, as they may become regex literal tokens. This includes operator
+  /// tokens such as `!/` which could be split into prefix `!` on a regex
+  /// literal.
+  bool isPotentialUnskippableBareSlashRegexLiteral(const Token &Tok) const;
+
 private:
   /// Nul character meaning kind.
   enum class NulCharacterKind {
