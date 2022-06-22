@@ -303,7 +303,9 @@ ExistentialLayout::ExistentialLayout(CanProtocolCompositionType type) {
       protoDecl = parameterized->getProtocol();
       containsParameterized = true;
     }
-    containsNonObjCProtocol |= !protoDecl->isObjC();
+    containsNonObjCProtocol |=
+        !protoDecl->isObjC() &&
+        !protoDecl->isSpecificProtocol(KnownProtocolKind::Sendable);
     protocols.push_back(protoDecl);
   }
 }
