@@ -2012,15 +2012,7 @@ public:
       << E->getDecls()[0]->getBaseName();
     PrintWithColorRAII(OS, ExprModifierColor)
       << " number_of_decls=" << E->getDecls().size()
-      << " function_ref=" << getFunctionRefKindStr(E->getFunctionRefKind())
-      << " decls=[\n";
-    interleave(E->getDecls(),
-               [&](ValueDecl *D) {
-                 OS.indent(Indent + 2);
-                 D->dumpRef(PrintWithColorRAII(OS, DeclModifierColor).getOS());
-               },
-               [&] { PrintWithColorRAII(OS, DeclModifierColor) << ",\n"; });
-    PrintWithColorRAII(OS, ExprModifierColor) << "]";
+      << " function_ref=" << getFunctionRefKindStr(E->getFunctionRefKind());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
