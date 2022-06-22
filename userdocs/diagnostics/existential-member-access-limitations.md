@@ -39,7 +39,7 @@ func foo(_ arg: Identifiable) {
 }
 ```
 
-An exception to this limitation are members that contain `Self` only in [covariant](https://en.wikipedia.org/wiki/Covariance_and_contravariance_(computer_science)) position (such as a method result type), where  `Self` can be safely substituted with the protocol or protocol composition type used to access the member — a representable supertype. On the other hand, resorting to this ploy in a contravariant parameter type position, like allowing one to pass a type-erased value to a method that accepts `Self`, is not type-safe and would expose the opportunity to pass in an argument of non-matching type.
+An exception to this limitation are members that contain `Self` only in [covariant](https://en.wikipedia.org/wiki/Covariance_and_contravariance_(computer_science)) position (such as a method result type), where  `Self` can be safely substituted with the protocol or protocol composition type used to access the member — a representable supertype. On the other hand, resorting to this ploy in contravariant parameter type position, like allowing one to pass a type-erased value to a method that accepts `Self`, is not type-safe and would expose the opportunity to pass in an argument of non-matching type.
 
 ```swift
 protocol Shape {
