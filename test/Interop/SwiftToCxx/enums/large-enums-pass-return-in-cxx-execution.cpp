@@ -9,6 +9,7 @@
 // RUN: %target-run %t/swift-enums-execution | %FileCheck %s
 
 // REQUIRES: executable_test
+// UNSUPPORTED: CPU=arm64e
 
 #include <cassert>
 #include <cstdint>
