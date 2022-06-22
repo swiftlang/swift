@@ -19,6 +19,11 @@ struct LoadableIntWrapper {
   int operator()(int x, int y) {
     return value + x * y;
   }
+
+  LoadableIntWrapper &operator++() {
+    value++;
+    return *this;
+  }
 };
 
 struct LoadableBoolWrapper {
@@ -43,6 +48,26 @@ struct AddressOnlyIntWrapper {
   int operator()(int x, int y) {
     return value + x * y;
   }
+
+  AddressOnlyIntWrapper &operator++() {
+    value++;
+    return *this;
+  }
+  AddressOnlyIntWrapper operator++(int) {
+    // This shouldn't be called, since we only support pre-increment operators.
+    return AddressOnlyIntWrapper(-777);
+  }
+};
+
+struct HasPostIncrementOperator {
+  HasPostIncrementOperator operator++(int) {
+    return HasPostIncrementOperator();
+  }
+};
+
+struct HasPreIncrementOperatorWithAnotherReturnType {
+  int value = 0;
+  const int &operator++() { return value; }
 };
 
 struct HasDeletedOperator {

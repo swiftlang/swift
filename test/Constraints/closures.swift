@@ -997,7 +997,7 @@ func rdar52204414() {
   let _: () -> Void = { return 42 }
   // expected-error@-1 {{cannot convert value of type 'Int' to closure result type 'Void'}}
   let _ = { () -> Void in return 42 }
-  // expected-error@-1 {{declared closure result 'Int' is incompatible with contextual type 'Void'}}
+  // expected-error@-1 {{declared closure result 'Void' is incompatible with return type 'Int'}} {{19-23=Int}}
 }
 
 // SR-12291 - trailing closure is used as an argument to the last (positionally) parameter.
