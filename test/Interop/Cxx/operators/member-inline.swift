@@ -16,6 +16,15 @@ OperatorsTestSuite.test("LoadableIntWrapper.minus (inline)") {
 
   expectEqual(19, result.value)
 }
+
+OperatorsTestSuite.test("AddressOnlyIntWrapper.minus") {
+   let lhs = AddressOnlyIntWrapper(42)
+   let rhs = AddressOnlyIntWrapper(23)
+
+   let result = lhs - rhs
+
+   expectEqual(19, result.value)
+}
 #endif
 
 OperatorsTestSuite.test("LoadableIntWrapper.call (inline)") {
@@ -49,14 +58,6 @@ OperatorsTestSuite.test("LoadableBoolWrapper.exclaim (inline)") {
   let resultExclaim = !wrapper
   expectEqual(false, resultExclaim.value)
 }
-
-OperatorsTestSuite.test("AddressOnlyIntWrapper.minus") {
-   let lhs = AddressOnlyIntWrapper(42)
-   let rhs = AddressOnlyIntWrapper(23)
-
-   let result = lhs - rhs
-   expectEqual(19, result.value)
- }
 
 OperatorsTestSuite.test("AddressOnlyIntWrapper.call (inline)") {
   var wrapper = AddressOnlyIntWrapper(42)
