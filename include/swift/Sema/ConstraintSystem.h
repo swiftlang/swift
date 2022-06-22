@@ -1312,6 +1312,9 @@ public:
   /// The set of parameters that have been inferred to be 'isolated'.
   llvm::SmallVector<ParamDecl *, 2> isolatedParams;
 
+  /// The set of parameters that have been inferred to be '_local'.
+  llvm::SmallVector<ParamDecl *, 2> distributedKnownLocalParams;
+
   /// The set of functions that have been transformed by a result builder.
   llvm::MapVector<AnyFunctionRef, AppliedBuilderTransform>
       resultBuilderTransformed;
@@ -2675,7 +2678,7 @@ private:
   llvm::SmallSetVector<ParamDecl *, 2> isolatedParams;
 
   /// The set of DistributedActor parameters that have been inferred
-  /// to be known to be local.
+  /// to be known to be '_local'.
   llvm::SmallSetVector<ParamDecl *, 2> distributedKnownLocalParams;
 
   /// Maps closure parameters to type variables.

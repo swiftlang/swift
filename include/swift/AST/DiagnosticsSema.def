@@ -4605,8 +4605,12 @@ ERROR(distributed_actor_isolated_method,none,
       "only 'distributed' instance methods can be called on a potentially remote distributed actor",
       ())
 ERROR(distributed_local_cannot_be_used,none,
-      "'local' cannot be used in user-defined code currently",
+      "'_local' cannot be used in this position, "
+      "only usable by a DistributedActor's 'whenLocal' method",
       ())
+ERROR(distributed_local_cannot_be_used_with_non_da_type,none,
+      "'_local' can only be used with DistributedActor types, but %0 was %1",
+      (Type, DescriptiveDeclKind))
 ERROR(distributed_thunk_cannot_be_used,none,
       "'distributed_thunk' cannot be used in user-defined code",
       ())

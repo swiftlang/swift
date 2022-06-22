@@ -159,6 +159,16 @@ extension DistributedActor {
       return nil
     }
   }
+
+  public nonisolated func whenLocal<T: Sendable>(
+    _ body: @Sendable (_local Self) throws -> T
+  ) rethrows -> T? {
+    if __isLocalActor(self) {
+       return try body(self)
+    } else {
+      return nil
+    }
+  }
 }
 
 /******************************************************************************/

@@ -612,8 +612,6 @@ mapParsedParameters(Parser &parser,
       {
         auto unwrappedType = type;
         while (true) {
-          fprintf(stderr, "[%s:%d] (%s) HERE:\n", __FILE__, __LINE__, __FUNCTION__);
-          unwrappedType->dump();
           if (auto *ATR = dyn_cast<AttributedTypeRepr>(unwrappedType)) {
             auto &attrs = ATR->getAttrs();
             // At this point we actually don't know if that's valid to mark

@@ -5679,17 +5679,11 @@ class ParamDecl : public VarDecl {
 
     /// Whether or not this parameter is 'isolated'.
     IsIsolated = 1 << 2,
-
-//    /// Whether or not this parameter is '_local'.
-//    IsDistributedKnownLocal = 1 << 3, // FIXME: can't do this because: /llvm-project/llvm/include/llvm/ADT/PointerIntPair.h:148:3: error: static_assert failed due to requirement '4U <= PointerLikeTypeTraits<swift::ParamDecl::StoredDefaultArgument *>::NumLowBitsAvailable' "PointerIntPair with integer size too large for pointer"
   };
 
   /// The default value, if any, along with flags.
   llvm::PointerIntPair<StoredDefaultArgument *, 3, OptionSet<Flags>>
       DefaultValueAndFlags;
-
-  // FIXME: can we pack this somewhere as flags, rather than ad hoc bool?
-  bool isDistributedKnownLocal = false;
 
   friend class ParamSpecifierRequest;
 
@@ -5906,6 +5900,10 @@ public:
 
   void setDistributedKnownToBeLocal(bool value = true) {
     auto flags = ArgumentNameAndFlags.getInt();
+    if (value && !getAttrs().hasAttribute<DistributedKnownToBeLocalAttr>()) {
+      getAttrs().add(new (getASTContext())
+                         DistributedKnownToBeLocalAttr(/*isImplicit=*/true));
+    }
     ArgumentNameAndFlags.setInt(value ? flags | ArgumentNameFlags::IsDistributedKnownToBeLocal
                                       : flags - ArgumentNameFlags::IsDistributedKnownToBeLocal);
   }

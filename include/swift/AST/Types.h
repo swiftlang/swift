@@ -2031,10 +2031,7 @@ public:
               (isolated ? Isolated : 0) |
               (noDerivative ? NoDerivative : 0) |
               (compileTimeConst ? CompileTimeConst : 0) |
-              (distributedKnownLocal ? DistributedKnownToBeLocal : 0)) {
-    if (distributedKnownLocal)
-      fprintf(stderr, "[%s:%d] (%s) distributedKnownLocal = %d\n", __FILE__, __LINE__, __FUNCTION__, distributedKnownLocal);
-  }
+              (distributedKnownLocal ? DistributedKnownToBeLocal : 0)) {}
 
   /// Create one from what's present in the parameter type
   inline static ParameterTypeFlags

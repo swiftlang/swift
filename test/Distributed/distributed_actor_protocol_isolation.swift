@@ -109,14 +109,14 @@ func testDA2(da: DA2) async throws {
 }
 
 func testDA2_butKnownToBeLocal(da: DA2) async throws {
-  try await da.whenLocal { __secretlyKnownToBeLocal in
-    __secretlyKnownToBeLocal.local()
-    await __secretlyKnownToBeLocal.localAsync()
-    try await __secretlyKnownToBeLocal.localAsyncThrows()
+  try await da.whenLocal { lad in
+    await lad.local()
+    await lad.localAsync()
+    try await lad.localAsyncThrows()
 
-    __secretlyKnownToBeLocal.dist()
-    await __secretlyKnownToBeLocal.distAsync()
-    try __secretlyKnownToBeLocal.distThrows()
-    try await __secretlyKnownToBeLocal.distAsyncThrows()
+    await lad.dist()
+    await lad.distAsync()
+    try await lad.distThrows()
+    try await lad.distAsyncThrows()
   }
 }

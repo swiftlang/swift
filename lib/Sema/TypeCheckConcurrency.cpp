@@ -2299,8 +2299,15 @@ namespace {
         fprintf(stderr, "[%s:%d] (%s) base:\n", __FILE__, __LINE__, __FUNCTION__);
         baseSelf->dump();
 
-        if (baseSelf->isDistributedKnownToBeLocal())
+        if (baseSelf->isDistributedKnownToBeLocal()) {
+          fprintf(stderr, "[%s:%d] (%s) was known local!\n", __FILE__, __LINE__, __FUNCTION__);
+          context->dump();
+
           return false;
+        } else {
+          fprintf(stderr, "[%s:%d] (%s) was NOT known local!\n", __FILE__, __LINE__, __FUNCTION__);
+          context->dump();
+        }
       }
 
       // Cannot reference subscripts, or stored properties.
@@ -2321,16 +2328,16 @@ namespace {
 
       // Check that we have a distributed function or computed property.
       if (auto afd = dyn_cast<AbstractFunctionDecl>(decl)) {
-        if (!afd->isDistributed()) {
-          ctx.Diags.diagnose(declLoc,
-                             diag::distributed_actor_isolated_method)
-              .fixItInsert(decl->getAttributeInsertionLoc(true), "distributed ");
-
-          noteIsolatedActorMember(decl, context);
-          return false;
+        if (afd->isDistributed()) {
+          // distributed method calls are always allowed
+          return true;
         }
 
-        return true;
+        ctx.Diags.diagnose(declLoc, diag::distributed_actor_isolated_method)
+            .fixItInsert(decl->getAttributeInsertionLoc(true), "distributed ");
+
+        noteIsolatedActorMember(decl, context);
+        return false;
       }
 
       return false;
@@ -4811,9 +4818,6 @@ bool swift::isPotentiallyIsolatedActor(
 
   if (auto param = dyn_cast<ParamDecl>(var)) {
     if (isIsolated(param))
-      return true;
-
-    if (isDistributedKnownLocal(param))
       return true;
   }
 

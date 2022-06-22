@@ -5915,9 +5915,41 @@ void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
 }
 
 void AttributeChecker::visitDistributedKnownToBeLocalAttr(DistributedKnownToBeLocalAttr *attr) {
-  if (!D->isImplicit()) {
-    diagnoseAndRemoveAttr(attr, diag::distributed_local_cannot_be_used);
+  if (D->isImplicit()) {
+    // Implicit code is fine, this is how we use '_local' in synthesized thunks.
+    return;
   }
+
+  // '_local' only makes sense to be used with DistributedActor types
+  if (auto param = dyn_cast<ParamDecl>(D)) {
+    auto nominal = param->getInterfaceType()->getAnyNominal();
+    if (!nominal)
+      return;
+
+    if (!nominal->isDistributedActor()) {
+      diagnoseAndRemoveAttr(
+          attr, diag::distributed_local_cannot_be_used_with_non_da_type,
+          nominal->getDeclaredType(), nominal->getDescriptiveKind());
+      // TODO(distributed): diagnoseAndRemoveAttr, seems we have wrong position for it though
+      return;
+    }
+  } else {
+    diagnoseAndRemoveAttr(attr, diag::distributed_local_cannot_be_used);
+    // TODO(distributed): diagnoseAndRemoveAttr, seems we have wrong position for it though
+    return;
+  }
+
+  // We only allow the `da.whenLocal { (...: _local DA) in }` to use '_local',
+  // currently, meaning that the local parameter will always be a closure
+  // param, since we're not able to safely carry it around and propagate the
+  // "local-ness" just yet.
+  // TODO(distributed): unlock this once '_local' is also implemented in properties
+  if (auto closureExpr = dyn_cast<AbstractClosureExpr>(D->getDeclContext())) {
+    return;
+  }
+
+  // Otherwise, it is in some user-defined context that cannot use this attr.
+  diagnoseAndRemoveAttr(attr, diag::distributed_local_cannot_be_used);
 }
 
 void AttributeChecker::visitSendableAttr(SendableAttr *attr) {

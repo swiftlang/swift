@@ -9870,8 +9870,9 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
           // an 'isolated' param is also implicitly '_local',
           // since in order to run "on" an actor, it must be a real local instance.
           distributedKnownLocalParams.insert(paramDecl);
-        } else if (contextualParam->isDistributedKnownToBeLocal() &&
-                   !flags.isDistributedKnownToBeLocal() && paramDecl) {
+        }
+        if (contextualParam->isDistributedKnownToBeLocal() &&
+            !flags.isDistributedKnownToBeLocal() && paramDecl) {
           distributedKnownLocalParams.insert(paramDecl);
         }
 

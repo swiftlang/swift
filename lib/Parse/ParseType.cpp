@@ -74,7 +74,7 @@ TypeRepr *Parser::applyAttributeToType(TypeRepr *ty,
 
   // Apply '_local'.
   if (distributedLocalLoc.isValid()) {
-    ty = new (Context) DistributedKnownToBeLocalTypeRepr(ty, isolatedLoc);
+    ty = new (Context) DistributedKnownToBeLocalTypeRepr(ty, distributedLocalLoc);
   }
 
   return ty;
