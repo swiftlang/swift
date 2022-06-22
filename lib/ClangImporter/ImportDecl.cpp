@@ -2191,11 +2191,7 @@ namespace {
               MD->overwriteAccess(AccessLevel::Private);
             } else if (cxxOperatorKind ==
                        clang::OverloadedOperatorKind::OO_PlusPlus) {
-              auto selfTy = result->getSelfInterfaceType();
-              auto returnTy =
-                  MD->getResultInterfaceType()->getAnyPointerElementType();
-              if (cxxMethod->param_empty() &&
-                  selfTy->getCanonicalType() == returnTy->getCanonicalType()) {
+              if (cxxMethod->param_empty()) {
                 // This is a pre-increment operator. We synthesize a
                 // non-mutating function called `successor() -> Self`.
                 FuncDecl *successorFunc = synthesizer.makeSuccessorFunc(MD);
