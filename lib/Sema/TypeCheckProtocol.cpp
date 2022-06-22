@@ -5127,9 +5127,7 @@ void ConformanceChecker::resolveValueWitnesses() {
       if (auto enteringIsolation = checkActorIsolation(requirement, witness)) {
 
         if (auto var = dyn_cast<VarDecl>(witness)) {
-          fprintf(stderr, "[%s:%d] (%s) NOPE\n", __FILE__, __LINE__, __FUNCTION__);
           if (var->getWriteImpl() != WriteImplKind::Immutable) {
-          fprintf(stderr, "[%s:%d] (%s) NOPE!!!\n", __FILE__, __LINE__, __FUNCTION__);
             Conformance->setInvalid();
           }
         } else {
