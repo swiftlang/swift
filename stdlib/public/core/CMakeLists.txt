@@ -170,6 +170,7 @@ set(SWIFTLIB_ESSENTIAL
   StringUTF16View.swift
   StringUTF8View.swift
   StringUTF8Validation.swift
+  StringWordBreaking.swift
   Substring.swift
   SwiftNativeNSArray.swift
   TemporaryAllocation.swift
@@ -178,7 +179,7 @@ set(SWIFTLIB_ESSENTIAL
   UnavailableStringAPIs.swift
   UnicodeData.swift
   UnicodeEncoding.swift
-  UnicodeGraphemeBreakProperty.swift
+  UnicodeBreakProperty.swift
   UnicodeHelpers.swift
   UnicodeParser.swift
   UnicodeScalarProperties.swift
