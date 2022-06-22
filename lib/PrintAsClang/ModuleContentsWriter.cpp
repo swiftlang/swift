@@ -240,7 +240,8 @@ public:
   }
   
   void forwardDeclare(const EnumDecl *ED) {
-    // TODO: skip for now; will overhaul the forward decals for c++ in the future
+    // TODO: skip for now; will overhaul the forward decals for c++ in the
+    // future
     if (outputLangMode == swift::OutputLanguageMode::Cxx) {
       return;
     }
