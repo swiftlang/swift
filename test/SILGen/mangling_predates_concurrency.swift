@@ -7,3 +7,13 @@
 public func excitingFunction<T: Sendable>(value: T, body: (@Sendable () -> Void)?) -> (@MainActor () -> Void) {
   { }
 }
+
+public protocol P { }
+
+// CHECK: sil [ossa] @$s29mangling_predates_concurrency13lotsOfChangesyyXlSgyp_AA1P_pypXpAaD_XlXptF
+@preconcurrency public func lotsOfChanges(
+  _: Sendable, _: P & Sendable, _: Sendable.Type,
+  _: (AnyObject & Sendable & P).Type
+) -> (AnyObject & Sendable)? {
+  nil
+}
