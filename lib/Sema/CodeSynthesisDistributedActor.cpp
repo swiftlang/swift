@@ -211,8 +211,8 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   auto func = static_cast<FuncDecl *>(context);
   auto funcDC = func->getDeclContext();
   NominalTypeDecl *nominal = funcDC->getSelfNominalTypeDecl();
-  assert(nominal && nominal->isDistributedActor() &&
-         "Distributed function must be part of distributed actor");
+//  assert(nominal && nominal->isDistributedActor() &&
+//         "Distributed function must be part of distributed actor");
 
   auto selfDecl = thunk->getImplicitSelfDecl();
   selfDecl->getAttrs().add(new (C) KnownToBeLocalAttr(implicit));
@@ -863,6 +863,9 @@ FuncDecl *GetDistributedThunkRequest::evaluate(Evaluator &evaluator,
 
     auto nominal = DC->getSelfNominalTypeDecl(); // NOTE: Always from DC
     assert(nominal);
+
+    fprintf(stderr, "[%s:%d] (%s) CONTEXT FOR THE THUNK:\n", __FILE__, __LINE__, __FUNCTION__);
+    func->getDeclContext()->dumpContext();
 
     // --- Prepare the "distributed thunk" which does the "maybe remote" dance:
     return createDistributedThunkFunction(func);

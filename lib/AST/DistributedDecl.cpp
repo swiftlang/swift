@@ -209,21 +209,33 @@ swift::getAssociatedDistributedInvocationDecoderDecodeNextArgumentFunction(
   assert(thunk);
   auto &C = thunk->getASTContext();
 
-  auto *actor = thunk->getDeclContext()->getSelfNominalTypeDecl();
-  if (!actor)
-    return nullptr;
-  if (!actor->isDistributedActor())
-    return nullptr;
+  fprintf(stderr, "[%s:%d] (%s) look for decodeNext for...\n", __FILE__, __LINE__, __FUNCTION__);
+  thunk->dump();
+
+//  auto *actor = thunk->getDeclContext()->getSelfNominalTypeDecl();
+//  if (!actor) {
+//    fprintf(stderr, "[%s:%d] (%s) null actor\n", __FILE__, __LINE__, __FUNCTION__);
+//    return nullptr;
+//  }
+//  if (!actor->isDistributedActor()) {
+//    fprintf(stderr, "[%s:%d] (%s) actor is not DA\n", __FILE__, __LINE__, __FUNCTION__);
+//    actor->dump();
+//    return nullptr;
+//  }
 
   auto systemTy = getConcreteReplacementForProtocolActorSystemType(thunk);
-  if (!systemTy)
+  if (!systemTy) {
+    fprintf(stderr, "[%s:%d] (%s) no system\n", __FILE__, __LINE__, __FUNCTION__);
     return nullptr;
+  }
 
   auto decoderTy =
       getDistributedActorSystemInvocationDecoderType(
           systemTy->getAnyNominal());
-  if (!decoderTy)
+  if (!decoderTy) {
+    fprintf(stderr, "[%s:%d] (%s) no decoder type\n", __FILE__, __LINE__, __FUNCTION__);
     return nullptr;
+  }
 
   return C.getDecodeNextArgumentOnDistributedInvocationDecoder(
       decoderTy->getAnyNominal());
@@ -1360,6 +1372,9 @@ AbstractFunctionDecl::getDistributedThunk() const {
 
 VarDecl*
 NominalTypeDecl::getDistributedActorSystemProperty() const {
+  fprintf(stderr, "[%s:%d] (%s) get actorSystem from...\n", __FILE__, __LINE__, __FUNCTION__);
+  this->dump();
+
   if (!isDistributedActor())
     return nullptr;
 

@@ -183,21 +183,28 @@ void swift::addCodableFixIt(
 
 bool IsDistributedActorRequest::evaluate(
     Evaluator &evaluator, NominalTypeDecl *nominal) const {
+  fprintf(stderr, "[%s:%d] (%s) IS DA [%s] or not....?\n", __FILE__, __LINE__, __FUNCTION__, nominal->getNameStr().str().c_str());
+  nominal->dump();
+
   // Protocols are actors if they inherit from `DistributedActor`.
   if (auto protocol = dyn_cast<ProtocolDecl>(nominal)) {
     auto &ctx = protocol->getASTContext();
     auto *distributedActorProtocol = ctx.getDistributedActorDecl();
-    return (protocol == distributedActorProtocol ||
-            protocol->inheritsFrom(distributedActorProtocol));
+    auto isDistributedActor = protocol == distributedActorProtocol ||
+            protocol->inheritsFrom(distributedActorProtocol);
+    fprintf(stderr, "[%s:%d] (%s) [%s]  IS DIST: %d\n", __FILE__, __LINE__, __FUNCTION__, nominal->getNameStr().str().c_str(), protocol == distributedActorProtocol);
+    fprintf(stderr, "[%s:%d] (%s) [%s] INH DIST: %d\n", __FILE__, __LINE__, __FUNCTION__, nominal->getNameStr().str().c_str(), protocol->inheritsFrom(distributedActorProtocol));
+    return isDistributedActor;
   }
 
   // Class declarations are 'distributed actors' if they are declared with
   // 'distributed actor'
-  auto classDecl = dyn_cast<ClassDecl>(nominal);
-  if(!classDecl)
-    return false;
+  if(auto classDecl = dyn_cast<ClassDecl>(nominal)) {
+    fprintf(stderr, "[%s:%d] (%s) IS DIST: %d\n", __FILE__, __LINE__, __FUNCTION__, classDecl->isExplicitDistributedActor());
+    return classDecl->isExplicitDistributedActor();
+  }
 
-  return classDecl->isExplicitDistributedActor();
+  return false;
 }
 
 // ==== ------------------------------------------------------------------------
