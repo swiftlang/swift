@@ -168,6 +168,10 @@ function(add_swift_compiler_modules_library name)
               "-emit-module-path" "${build_dir}/${module}.swiftmodule"
               "-parse-as-library" ${sources}
               "-wmo" ${swift_compile_options}
+              # LLVM modules and headers.
+              "-Xcc" "-I" "-Xcc" "${LLVM_MAIN_INCLUDE_DIR}"
+              # Generated LLVM headers.
+              "-Xcc" "-I" "-Xcc" "${LLVM_INCLUDE_DIR}"
               # Bridging modules and headers.
               "-Xcc" "-I" "-Xcc" "${SWIFT_SOURCE_DIR}/include"
               # Generated C headers.

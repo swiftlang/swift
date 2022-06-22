@@ -38,14 +38,13 @@ getDiagnosticArgument(const BridgedDiagnosticArgument &bridged) {
 } // namespace
 
 void DiagnosticEngine_diagnose(
-    BridgedDiagnosticEngine bridgedEngine, BridgedSourceLoc bridgedLoc,
+    BridgedDiagnosticEngine bridgedEngine, SourceLoc loc,
     BridgedDiagID bridgedDiagID,
     BridgedArrayRef /*BridgedDiagnosticArgument*/ bridgedArguments,
     BridgedCharSourceRange bridgedHighlight,
     BridgedArrayRef /*BridgedDiagnosticFixIt*/ bridgedFixIts) {
   auto *D = getDiagnosticEngine(bridgedEngine);
 
-  auto loc = getSourceLoc(bridgedLoc);
   auto diagID = static_cast<DiagID>(bridgedDiagID);
   SmallVector<DiagnosticArgument, 2> arguments;
   for (auto bridgedArg :
@@ -62,7 +61,7 @@ void DiagnosticEngine_diagnose(
 
   // Add fix-its.
   for (auto bridgedFixIt : getArrayRef<BridgedDiagnosticFixIt>(bridgedFixIts)) {
-    auto range = CharSourceRange(getSourceLoc(bridgedFixIt.start),
+    auto range = CharSourceRange(bridgedFixIt.start,
                                  bridgedFixIt.byteLength);
     auto text = getStringRef(bridgedFixIt.text);
     inflight.fixItReplaceChars(range.getStart(), range.getEnd(), text);

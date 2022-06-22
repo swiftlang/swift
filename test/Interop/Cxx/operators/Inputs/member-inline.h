@@ -49,6 +49,9 @@ struct AddressOnlyIntWrapper {
     return value + x * y;
   }
 
+  AddressOnlyIntWrapper operator-(AddressOnlyIntWrapper rhs) const {
+    return AddressOnlyIntWrapper(value - rhs.value);
+  }
   AddressOnlyIntWrapper &operator++() {
     value++;
     return *this;

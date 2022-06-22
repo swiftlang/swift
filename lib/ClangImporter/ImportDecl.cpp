@@ -2772,6 +2772,13 @@ namespace {
       if (!dc)
         return nullptr;
 
+      // We may have already imported this function decl before we imported the
+      // parent record. In such a case it's important we don't re-import.
+      auto known = Impl.ImportedDecls.find({decl, getVersion()});
+      if (known != Impl.ImportedDecls.end()) {
+        return known->second;
+      }
+
       bool isOperator = decl->getDeclName().getNameKind() ==
                         clang::DeclarationName::CXXOperatorName;
       bool isNonSubscriptOperator =
