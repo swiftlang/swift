@@ -103,6 +103,7 @@ class AnyFunctionType;
 class ASTContext;
 class FileUnit;
 class FuncDecl;
+class IRGenOptions;
 class KeyPathPattern;
 class ModuleDecl;
 class SILUndef;
@@ -353,6 +354,12 @@ private:
   /// The options passed into this SILModule.
   const SILOptions &Options;
 
+  /// IRGen options to be used by target specific SIL optimization passes.
+  ///
+  /// Not null, if the module is created by the compiler itself (and not
+  /// e.g. by lldb).
+  const IRGenOptions *irgenOptions;
+
   /// The number of functions created in this module, which will be the index of
   /// the next function.
   unsigned nextFunctionIndex = 0;
@@ -382,7 +389,8 @@ private:
 #endif
 
   SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
-            Lowering::TypeConverter &TC, const SILOptions &Options);
+            Lowering::TypeConverter &TC, const SILOptions &Options,
+            const IRGenOptions *irgenOptions = nullptr);
 
   SILModule(const SILModule&) = delete;
   void operator=(const SILModule&) = delete;
@@ -537,7 +545,8 @@ public:
   /// single-file mode, and a ModuleDecl in whole-module mode.
   static std::unique_ptr<SILModule>
   createEmptyModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
-                    Lowering::TypeConverter &TC, const SILOptions &Options);
+                    Lowering::TypeConverter &TC, const SILOptions &Options,
+                    const IRGenOptions *irgenOptions = nullptr);
 
   /// Get the Swift module associated with this SIL module.
   ModuleDecl *getSwiftModule() const { return TheSwiftModule; }
@@ -570,6 +579,7 @@ public:
   bool isOptimizedOnoneSupportModule() const;
 
   const SILOptions &getOptions() const { return Options; }
+  const IRGenOptions *getIRGenOptionsOrNull() const { return irgenOptions; }
 
   using iterator = FunctionListType::iterator;
   using const_iterator = FunctionListType::const_iterator;
