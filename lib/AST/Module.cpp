@@ -2438,12 +2438,7 @@ bool SourceFile::hasTestableOrPrivateImport(
       });
 }
 
-bool SourceFile::isImportedImplementationOnly(const ModuleDecl *module) const {
-  // Implementation-only imports are (currently) always source-file-specific,
-  // so if we don't have any, we know the search is complete.
-  if (!hasImplementationOnlyImports())
-    return false;
-
+RestrictedImportKind SourceFile::getRestrictedImportKind(const ModuleDecl *module) const {
   auto &imports = getASTContext().getImportCache();
 
   // Look at the imports of this source file.
@@ -2455,11 +2450,14 @@ bool SourceFile::isImportedImplementationOnly(const ModuleDecl *module) const {
     // If the module is imported this way, it's not imported
     // implementation-only.
     if (imports.isImportedBy(module, desc.module.importedModule))
-      return false;
+      return RestrictedImportKind::None;
   }
 
   // Now check this file's enclosing module in case there are re-exports.
-  return !imports.isImportedBy(module, getParentModule());
+  if (imports.isImportedBy(module, getParentModule()))
+    return RestrictedImportKind::None;
+
+  return RestrictedImportKind::ImplementationOnly;
 }
 
 bool ModuleDecl::isImportedImplementationOnly(const ModuleDecl *module) const {

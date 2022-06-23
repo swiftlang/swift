@@ -1503,7 +1503,9 @@ swift::getDisallowedOriginKind(const Decl *decl,
   downgradeToWarning = DowngradeToWarning::No;
   ModuleDecl *M = decl->getModuleContext();
   auto *SF = where.getDeclContext()->getParentSourceFile();
-  if (SF->isImportedImplementationOnly(M)) {
+
+  RestrictedImportKind howImported = SF->getRestrictedImportKind(M);
+  if (howImported != RestrictedImportKind::None) {
     // Temporarily downgrade implementation-only exportability in SPI to
     // a warning.
     if (where.isSPI())
@@ -1883,7 +1885,8 @@ public:
 
     const SourceFile *SF = refDecl->getDeclContext()->getParentSourceFile();
     ModuleDecl *M = PGD->getModuleContext();
-    if (!SF->isImportedImplementationOnly(M))
+    RestrictedImportKind howImported = SF->getRestrictedImportKind(M);
+    if (howImported == RestrictedImportKind::None)
       return;
 
     auto &DE = PGD->getASTContext().Diags;
