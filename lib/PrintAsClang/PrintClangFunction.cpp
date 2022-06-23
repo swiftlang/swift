@@ -133,18 +133,30 @@ public:
     visitPart(aliasTy->getSinglyDesugaredType(), optionalKind, isInOutParam);
   }
 
+  void visitEnumType(EnumType *ET, Optional<OptionalTypeKind> optionalKind,
+                     bool isInOutParam) {
+    visitValueType(ET, optionalKind, isInOutParam);
+  }
+
   void visitStructType(StructType *ST, Optional<OptionalTypeKind> optionalKind,
                        bool isInOutParam) {
-    const StructDecl *SD = ST->getStructOrBoundGenericStruct();
+    visitValueType(ST, optionalKind, isInOutParam);
+  }
+
+  void visitValueType(NominalType *NT, Optional<OptionalTypeKind> optionalKind,
+                      bool isInOutParam) {
+    assert(isa<StructType>(NT) || isa<EnumType>(NT));
+    const auto *decl = NT->getNominalOrBoundGenericNominal();
+    assert(isa<StructDecl>(decl) || isa<EnumDecl>(decl));
 
     // Handle known type names.
-    if (printIfKnownSimpleType(SD, optionalKind, isInOutParam))
+    if (printIfKnownSimpleType(decl, optionalKind, isInOutParam))
       return;
     // FIXME: Handle optional structures.
     if (typeUseKind == FunctionSignatureTypeUse::ParamType) {
       if (languageMode != OutputLanguageMode::Cxx &&
-          (SD->isResilient() ||
-           interopContext.getIrABIDetails().shouldPassIndirectly(ST))) {
+          (decl->isResilient() ||
+           interopContext.getIrABIDetails().shouldPassIndirectly(NT))) {
         if (modifiersDelegate.prefixIndirectParamValueTypeInC)
           (*modifiersDelegate.prefixIndirectParamValueTypeInC)(os);
         // FIXME: it would be nice to print out the C struct type here.
@@ -156,11 +168,11 @@ public:
 
       } else {
         ClangValueTypePrinter(os, cPrologueOS, typeMapping, interopContext)
-            .printValueTypeParameterType(SD, languageMode, isInOutParam);
+            .printValueTypeParameterType(decl, languageMode, isInOutParam);
       }
     } else
       ClangValueTypePrinter(os, cPrologueOS, typeMapping, interopContext)
-          .printValueTypeReturnType(SD, languageMode);
+          .printValueTypeReturnType(decl, languageMode);
   }
 
   void visitPart(Type Ty, Optional<OptionalTypeKind> optionalKind,
@@ -297,16 +309,19 @@ void DeclAndTypeClangFunctionPrinter::printCxxToCFunctionParameterUse(
     Type type, StringRef name, bool isInOut, bool isIndirect,
     llvm::Optional<AdditionalParam::Role> paramRole) {
   auto namePrinter = [&]() { ClangSyntaxPrinter(os).printIdentifier(name); };
-  if (!isKnownCxxType(type, typeMapping)) {
-    if (auto *structDecl = type->getStructOrBoundGenericStruct()) {
-      ClangValueTypePrinter(os, cPrologueOS, typeMapping, interopContext)
-          .printParameterCxxToCUseScaffold(
-              isIndirect || structDecl->isResilient() ||
-                  interopContext.getIrABIDetails().shouldPassIndirectly(type),
-              structDecl, namePrinter, isInOut,
-              /*isSelf=*/paramRole &&
-                  *paramRole == AdditionalParam::Role::Self);
-      return;
+  if (!isKnownCxxType(type, typeMapping) &&
+      !hasKnownOptionalNullableCxxMapping(type)) {
+    if (auto *decl = type->getNominalOrBoundGenericNominal()) {
+      if ((isa<StructDecl>(decl) || isa<EnumDecl>(decl))) {
+        ClangValueTypePrinter(os, cPrologueOS, typeMapping, interopContext)
+            .printParameterCxxToCUseScaffold(
+                isIndirect || decl->isResilient() ||
+                    interopContext.getIrABIDetails().shouldPassIndirectly(type),
+                decl, namePrinter, isInOut,
+                /*isSelf=*/paramRole &&
+                    *paramRole == AdditionalParam::Role::Self);
+        return;
+      }
     }
   }
   // Primitive types are passed directly without any conversions.
@@ -368,23 +383,26 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
 
   // Values types are returned either direcly in their C representation, or
   // indirectly by a pointer.
-  if (!isKnownCxxType(resultTy, typeMapping)) {
-    if (auto *structDecl = resultTy->getStructOrBoundGenericStruct()) {
-      bool isIndirect =
-          structDecl->isResilient() ||
-          interopContext.getIrABIDetails().shouldReturnIndirectly(resultTy);
-      ClangValueTypePrinter valueTypePrinter(os, cPrologueOS, typeMapping,
-                                             interopContext);
-      if (isIndirect) {
-        valueTypePrinter.printValueTypeIndirectReturnScaffold(
-            structDecl, [&](StringRef returnParam) {
-              printCallToCFunc(/*additionalParam=*/returnParam);
-            });
-      } else {
-        valueTypePrinter.printValueTypeDirectReturnScaffold(
-            structDecl, [&]() { printCallToCFunc(/*additionalParam=*/None); });
+  if (!isKnownCxxType(resultTy, typeMapping) &&
+      !hasKnownOptionalNullableCxxMapping(resultTy)) {
+    if (auto *decl = resultTy->getNominalOrBoundGenericNominal()) {
+      if ((isa<StructDecl>(decl) || isa<EnumDecl>(decl))) {
+        bool isIndirect =
+            decl->isResilient() ||
+            interopContext.getIrABIDetails().shouldReturnIndirectly(resultTy);
+        ClangValueTypePrinter valueTypePrinter(os, cPrologueOS, typeMapping,
+                                               interopContext);
+        if (isIndirect) {
+          valueTypePrinter.printValueTypeIndirectReturnScaffold(
+              decl, [&](StringRef returnParam) {
+                printCallToCFunc(/*additionalParam=*/returnParam);
+              });
+        } else {
+          valueTypePrinter.printValueTypeDirectReturnScaffold(
+              decl, [&]() { printCallToCFunc(/*additionalParam=*/None); });
+        }
+        return;
       }
-      return;
     }
   }
 
@@ -475,4 +493,15 @@ void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
                                      typeDeclContext->getDeclaredType(),
                                      /*isIndirect=*/false}});
   os << "  }\n";
+}
+
+bool DeclAndTypeClangFunctionPrinter::hasKnownOptionalNullableCxxMapping(
+    Type type) {
+  if (auto optionalObjectType = type->getOptionalObjectType()) {
+    if (auto typeInfo = typeMapping.getKnownCxxTypeInfo(
+            optionalObjectType->getNominalOrBoundGenericNominal())) {
+      return typeInfo->canBeNullable;
+    }
+  }
+  return false;
 }
