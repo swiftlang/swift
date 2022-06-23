@@ -4007,7 +4007,7 @@ TypeResolver::resolveExistentialType(ExistentialTypeRepr *repr,
   if (constraintType->hasError())
     return ErrorType::get(getASTContext());
 
-  if (!constraintType->isExistentialType()) {
+  if (!constraintType->isConstraintType()) {
     // Emit a tailored diagnostic for the incorrect optional
     // syntax 'any P?' with a fix-it to add parenthesis.
     auto wrapped = constraintType->getOptionalObjectType();
@@ -4021,14 +4021,18 @@ TypeResolver::resolveExistentialType(ExistentialTypeRepr *repr,
         .fixItReplace(repr->getSourceRange(), fix);
       return constraintType;
     }
+    
+    // Diagnose redundant `any` on an already existential type e.g. any (any P)
+    // with a fix-it to remove first any.
+    if (constraintType->is<ExistentialType>()) {
+      diagnose(repr->getLoc(), diag::redundant_any_in_existential, constraintType)
+          .fixItRemove(repr->getAnyLoc());
+      return constraintType;
+    }
 
-    auto anyStart = repr->getAnyLoc();
-    auto anyEnd = Lexer::getLocForEndOfToken(getASTContext().SourceMgr,
-                                             anyStart);
     diagnose(repr->getLoc(), diag::any_not_existential,
-             constraintType->isTypeParameter(),
-             constraintType)
-      .fixItRemove({anyStart, anyEnd});
+             constraintType->isTypeParameter(), constraintType)
+        .fixItRemove(repr->getAnyLoc());
     return constraintType;
   }
 

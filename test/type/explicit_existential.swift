@@ -331,3 +331,15 @@ func testEnumAssociatedValue() {
     case c3((P) -> Void)
   }
 }
+
+// https://github.com/apple/swift/issues/58920
+typealias Iterator = any IteratorProtocol
+var example: any Iterator = 5 // expected-error{{redundant 'any' has no effect on existential type 'Iterator' (aka 'any IteratorProtocol')}} {{14-18=}} 
+// expected-error@-1{{value of type 'Int' does not conform to specified type 'IteratorProtocol'}}
+var example1: any (any IteratorProtocol) = 5 // expected-error{{redundant 'any' has no effect on existential type 'any IteratorProtocol'}} {{15-19=}}
+// expected-error@-1{{value of type 'Int' does not conform to specified type 'IteratorProtocol'}}
+
+protocol PP {}
+struct A : PP {}
+let _: any PP = A() // Ok
+let _: any (any PP) = A() // expected-error{{redundant 'any' has no effect on existential type 'any PP'}} {{8-12=}}
