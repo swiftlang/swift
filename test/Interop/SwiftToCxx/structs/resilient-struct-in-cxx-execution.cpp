@@ -16,6 +16,8 @@
 
 // REQUIRES: executable_test
 
+// UNSUPPORTED: CPU=arm64e
+
 #include <assert.h>
 #include "structs.h"
 
