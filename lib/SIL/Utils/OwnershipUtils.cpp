@@ -689,8 +689,15 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
 /// Add this scopes live blocks into the PrunedLiveness result.
 void BorrowedValue::computeLiveness(PrunedLiveness &liveness) const {
   liveness.initializeDefBlock(value->getParentBlock());
-  visitLocalScopeEndingUses([&](Operand *endOp) {
-    liveness.updateForUse(endOp->getUser(), true);
+  visitTransitiveLifetimeEndingUses([&](Operand *endOp) {
+    if (endOp->getOperandOwnership() == OperandOwnership::EndBorrow) {
+      liveness.updateForUse(endOp->getUser(), /*lifetimeEnding*/ true);
+      return true;
+    }
+    assert(endOp->getOperandOwnership() == OperandOwnership::Reborrow);
+    auto *succBlock = cast<BranchInst>(endOp->getUser())->getDestBB();
+    liveness.initializeDefBlock(succBlock);
+    liveness.updateForUse(endOp->getUser(), /*lifetimeEnding*/ false);
     return true;
   });
 }
