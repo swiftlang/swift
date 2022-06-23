@@ -304,7 +304,23 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
     }
   };
 
-  if (requirements.concreteType) {
+  auto canUseConcreteType = [&](Type concreteType) -> bool {
+    // No concrete type - there's nothing to use.
+    if (!concreteType)
+      return false;
+
+    // The `Self` type of an opened existential cannot be
+    // concretely substituted.
+    if (getKind() == GenericEnvironment::Kind::OpenedExistential)
+      if (auto gpTy = depType->getAs<GenericTypeParamType>())
+        if (gpTy->isEqual(getGenericParams().back()))
+          return false;
+
+    return true;
+  };
+
+
+  if (canUseConcreteType(requirements.concreteType)) {
     return substForRequirements(requirements.concreteType);
   }
 

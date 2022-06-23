@@ -92,3 +92,13 @@ func protocolCompositionNotSupported1(_: SomeProto & Sequence<Int>) {}
 
 func protocolCompositionNotSupported2(_: any SomeProto & Sequence<Int>) {}
 // expected-error@-1 {{non-protocol, non-class type 'Sequence<Int>' cannot be used within a protocol-constrained type}}
+
+protocol Concretize<T> {
+  associatedtype T where T == Self
+}
+
+extension String : Concretize {}
+
+func foo(_ x: any Concretize<String>) {
+  print(x)
+}
