@@ -747,6 +747,15 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   if (AFD->hasAsync()) {
     addAsyncFunctionPointerSymbol(SILDeclRef(AFD));
   }
+
+  // Skip non objc compatible methods or non-public methods.
+  if (isa<DestructorDecl>(AFD) || !AFD->isObjC() ||
+      AFD->getFormalAccess() != AccessLevel::Public)
+    return;
+  if (auto *CD = dyn_cast<ClassDecl>(AFD->getDeclContext()))
+    recorder.addObjCMethod(CD, SILDeclRef(AFD));
+  else if (auto *ED = dyn_cast<ExtensionDecl>(AFD->getDeclContext()))
+    recorder.addObjCMethod(ED, SILDeclRef(AFD));
 }
 
 void TBDGenVisitor::visitFuncDecl(FuncDecl *FD) {
@@ -956,30 +965,9 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
       }
 
       TBD.addMethodDescriptor(method);
-
-      if (auto methodOrCtorOrDtor = method.getDecl()) {
-        // Skip non objc compatible methods or non-public methods.
-        if (!methodOrCtorOrDtor->isObjC() ||
-            methodOrCtorOrDtor->getFormalAccess() != AccessLevel::Public)
-          return;
-
-        // only handle FuncDecl here. Initializers are handled in
-        // visitConstructorDecl.
-        if (isa<FuncDecl>(methodOrCtorOrDtor))
-          recorder.addObjCMethod(CD, method);
-      }
     }
 
-    void addMethodOverride(SILDeclRef baseRef, SILDeclRef derivedRef) {
-      if (auto methodOrCtorOrDtor = derivedRef.getDecl()) {
-        if (!methodOrCtorOrDtor->isObjC() ||
-            methodOrCtorOrDtor->getFormalAccess() != AccessLevel::Public)
-          return;
-
-        if (isa<FuncDecl>(methodOrCtorOrDtor))
-          recorder.addObjCMethod(CD, derivedRef);
-      }
-    }
+    void addMethodOverride(SILDeclRef baseRef, SILDeclRef derivedRef) {}
 
     void addPlaceholder(MissingMemberDecl *) {}
 
@@ -1000,10 +988,6 @@ void TBDGenVisitor::visitConstructorDecl(ConstructorDecl *CD) {
     if (CD->hasAsync()) {
       addAsyncFunctionPointerSymbol(
           SILDeclRef(CD, SILDeclRef::Kind::Initializer));
-    }
-    if (auto parentClass = CD->getParent()->getSelfClassDecl()) {
-      if (parentClass->isObjC() || CD->isObjC())
-        recorder.addObjCMethod(parentClass, SILDeclRef(CD));
     }
   }
 
@@ -1399,8 +1383,11 @@ public:
     addOrGetObjCInterface(decl);
   }
 
-  void addObjCMethod(const ClassDecl *cls,
-                     SILDeclRef method) override {
+  void addObjCCategory(const ExtensionDecl *decl) override {
+    addOrGetObjCCategory(decl);
+  }
+
+  void addObjCMethod(const GenericContext *ctx, SILDeclRef method) override {
     SmallString<128> buffer;
     StringRef name = getSelectorName(method, buffer);
     apigen::APIAvailability availability;
@@ -1415,12 +1402,23 @@ public:
         access = apigen::APIAccess::Private;
     }
 
-    auto *clsRecord = addOrGetObjCInterface(cls);
-    api.addObjCMethod(clsRecord, name, moduleLoc, access, isInstanceMethod,
-                      false, availability);
+    apigen::ObjCContainerRecord *record = nullptr;
+    if (auto *cls = dyn_cast<ClassDecl>(ctx))
+      record = addOrGetObjCInterface(cls);
+    else if (auto *ext = dyn_cast<ExtensionDecl>(ctx))
+      record = addOrGetObjCCategory(ext);
+
+    if (record)
+      api.addObjCMethod(record, name, moduleLoc, access, isInstanceMethod,
+                        false, availability);
   }
 
 private:
+  /// Follow the naming schema that IRGen uses for Categories (see
+  /// ClassDataBuilder).
+  using CategoryNameKey = std::pair<const ClassDecl *, const ModuleDecl *>;
+  llvm::DenseMap<CategoryNameKey, unsigned> CategoryCounts;
+
   apigen::APIAvailability getAvailability(const Decl *decl) {
     bool unavailable = false;
     std::string introduced, obsoleted;
@@ -1477,11 +1475,46 @@ private:
     return cls;
   }
 
+  void buildCategoryName(const ExtensionDecl *ext, const ClassDecl *cls,
+                         SmallVectorImpl<char> &s) {
+    llvm::raw_svector_ostream os(s);
+    ModuleDecl *module = ext->getParentModule();
+    os << module->getName();
+    unsigned categoryCount = CategoryCounts[{cls, module}]++;
+    if (categoryCount > 0)
+      os << categoryCount;
+  }
+
+  apigen::ObjCCategoryRecord *addOrGetObjCCategory(const ExtensionDecl *decl) {
+    auto entry = categoryMap.find(decl);
+    if (entry != categoryMap.end())
+      return entry->second;
+
+    SmallString<128> interfaceBuffer;
+    SmallString<128> nameBuffer;
+    ClassDecl *cls = decl->getSelfClassDecl();
+    auto interface = cls->getObjCRuntimeName(interfaceBuffer);
+    buildCategoryName(decl, cls, nameBuffer);
+    apigen::APIAvailability availability = getAvailability(decl);
+    apigen::APIAccess access =
+        decl->isSPI() ? apigen::APIAccess::Private : apigen::APIAccess::Public;
+    apigen::APILinkage linkage =
+        decl->getMaxAccessLevel() == AccessLevel::Public
+            ? apigen::APILinkage::Exported
+            : apigen::APILinkage::Internal;
+    auto category = api.addObjCCategory(nameBuffer, linkage, moduleLoc, access,
+                                        availability, interface);
+    categoryMap.try_emplace(decl, category);
+    return category;
+  }
+
   apigen::API &api;
   ModuleDecl *module;
   apigen::APILoc moduleLoc;
 
   llvm::DenseMap<const ClassDecl*, apigen::ObjCInterfaceRecord*> classMap;
+  llvm::DenseMap<const ExtensionDecl *, apigen::ObjCCategoryRecord *>
+      categoryMap;
 };
 
 apigen::API APIGenRequest::evaluate(Evaluator &evaluator,

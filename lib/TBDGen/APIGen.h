@@ -152,6 +152,16 @@ struct ObjCInterfaceRecord : ObjCContainerRecord {
         superClassName(superClassName.data(), superClassName.size()) {}
 };
 
+struct ObjCCategoryRecord : ObjCContainerRecord {
+  std::string interface;
+
+  ObjCCategoryRecord(StringRef name, APILinkage linkage, APILoc loc,
+                     APIAccess access, APIAvailability availability,
+                     StringRef interface)
+      : ObjCContainerRecord(name, linkage, loc, access, availability),
+        interface(interface.data(), interface.size()) {}
+};
+
 class API {
 public:
   API(const llvm::Triple &triple) : target(triple) {}
@@ -167,11 +177,16 @@ public:
                                     APIAvailability availability,
                                     StringRef superClassName);
 
-  void addObjCMethod(ObjCInterfaceRecord *cls, StringRef name, APILoc loc,
+  ObjCCategoryRecord *addObjCCategory(StringRef name, APILinkage linkage,
+                                      APILoc loc, APIAccess access,
+                                      APIAvailability availability,
+                                      StringRef interface);
+
+  void addObjCMethod(ObjCContainerRecord *record, StringRef name, APILoc loc,
                      APIAccess access, bool isInstanceMethod, bool isOptional,
                      APIAvailability availability);
 
-  void writeAPIJSONFile(llvm::raw_ostream &os, bool PrettyPrint = false);
+  void writeAPIJSONFile(raw_ostream &os, bool PrettyPrint = false);
 
 private:
   const llvm::Triple target;
@@ -179,6 +194,7 @@ private:
   llvm::BumpPtrAllocator allocator;
   std::vector<GlobalRecord*> globals;
   std::vector<ObjCInterfaceRecord*> interfaces;
+  std::vector<ObjCCategoryRecord *> categories;
 };
 
 } // end namespace apigen
