@@ -623,7 +623,7 @@ public:
   /// Load the methods within the given class that produce
   /// Objective-C class or instance methods with the given selector.
   ///
-  /// \param classDecl The class in which we are searching for @objc methods.
+  /// \param typeDecl The class in which we are searching for @objc methods.
   /// The search only considers this class and its extensions; not any
   /// superclasses.
   ///
