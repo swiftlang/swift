@@ -70,7 +70,12 @@ struct HasPostIncrementOperator {
 
 struct HasPreIncrementOperatorWithAnotherReturnType {
   int value = 0;
-  const int &operator++() { return value; }
+  const int &operator++() { return ++value; }
+};
+
+struct HasPreIncrementOperatorWithVoidReturnType {
+  int value = 0;
+  void operator++() { ++value; }
 };
 
 struct HasDeletedOperator {
