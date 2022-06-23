@@ -18,10 +18,6 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 //===----------------------------------------------------------------------===//
@@ -56,7 +52,7 @@ typedef struct {
 } BridgedDiagnosticArgument;
 
 typedef struct {
-  BridgedSourceLoc start;
+  swift::SourceLoc start;
   SwiftInt byteLength;
   BridgedStringRef text;
 } BridgedDiagnosticFixIt;
@@ -70,7 +66,7 @@ typedef struct {
 } BridgedOptionalDiagnosticEngine;
 
 // FIXME: Can we bridge InFlightDiagnostic?
-void DiagnosticEngine_diagnose(BridgedDiagnosticEngine, BridgedSourceLoc loc,
+void DiagnosticEngine_diagnose(BridgedDiagnosticEngine, swift::SourceLoc loc,
                                BridgedDiagID diagID, BridgedArrayRef arguments,
                                BridgedCharSourceRange highlight,
                                BridgedArrayRef fixIts);
@@ -78,9 +74,5 @@ void DiagnosticEngine_diagnose(BridgedDiagnosticEngine, BridgedSourceLoc loc,
 bool DiagnosticEngine_hadAnyError(BridgedDiagnosticEngine);
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
-
-#ifdef __cplusplus
-} // extern "C"
-#endif
 
 #endif // SWIFT_AST_ASTBRIDGING_H

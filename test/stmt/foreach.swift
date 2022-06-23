@@ -245,3 +245,8 @@ func testForEachWhereWithClosure(_ x: [Int]) {
   for i in x where x.contains(where: { $0.byteSwapped == i }) {}
 }
 
+// https://github.com/apple/swift/issues/59522 - use of `prefix` with generic base causes ambiguity in for-in statement
+func test_no_ambiguity_with_prefix_iterator<C: Collection>(c: C) {
+  for _ in c.prefix(1) { // Ok
+  }
+}

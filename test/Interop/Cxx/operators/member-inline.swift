@@ -8,13 +8,22 @@ import StdlibUnittest
 var OperatorsTestSuite = TestSuite("Operators")
 
 #if !os(Windows)    // SR-13129
-OperatorsTestSuite.test("LoadableIntWrapper.plus (inline)") {
+OperatorsTestSuite.test("LoadableIntWrapper.minus (inline)") {
   var lhs = LoadableIntWrapper(value: 42)
   let rhs = LoadableIntWrapper(value: 23)
 
   let result = lhs - rhs
 
   expectEqual(19, result.value)
+}
+
+OperatorsTestSuite.test("AddressOnlyIntWrapper.minus") {
+   let lhs = AddressOnlyIntWrapper(42)
+   let rhs = AddressOnlyIntWrapper(23)
+
+   let result = lhs - rhs
+
+   expectEqual(19, result.value)
 }
 #endif
 

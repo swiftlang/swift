@@ -36,25 +36,14 @@ inline llvm::ArrayRef<T> getArrayRef(BridgedArrayRef bridged) {
   return {static_cast<const T *>(bridged.data), bridged.numElements};
 }
 
-inline SourceLoc getSourceLoc(const BridgedSourceLoc &bridged) {
-  return SourceLoc(
-      llvm::SMLoc::getFromPointer((const char *)bridged.pointer));
-}
-
-inline BridgedSourceLoc getBridgedSourceLoc(const SourceLoc &loc) {
-  return {static_cast<const unsigned char *>(loc.getOpaquePointerValue())};
-}
-
 inline CharSourceRange
 getCharSourceRange(const BridgedCharSourceRange &bridged) {
-  auto start = getSourceLoc(bridged.start);
-  return CharSourceRange(start, bridged.byteLength);
+  return CharSourceRange(bridged.start, bridged.byteLength);
 }
 
 inline BridgedCharSourceRange
 getBridgedCharSourceRange(const CharSourceRange &range) {
-  auto start = getBridgedSourceLoc(range.getStart());
-  return {start, range.getByteLength()};
+  return {range.getStart(), range.getByteLength()};
 }
 
 /// Copies the string in an malloc'ed memory and the caller is responsible for

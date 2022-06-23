@@ -4,6 +4,10 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/structs.h)
 
+// RUN: sed -e 's/^public struct/@frozen public struct/' %s > %t/small-structs-frozen.swift
+// RUN: %target-swift-frontend %t/small-structs-frozen.swift -enable-library-evolution -typecheck -module-name Structs -clang-header-expose-public-decls -emit-clang-header-path %t/small-structs-frozen.h -D RESILIENT
+// RUN: %FileCheck --check-prefixes=CHECK,RESILIENT %s < %t/small-structs-frozen.h
+
 public struct StructOneI64 {
     let x: Int64
 }
@@ -35,6 +39,21 @@ public struct StructDoubleAndFloat {
 // CHECK: class StructOneI16AndOneStruct final {
 
 // CHECK: class StructOneI64 final {
+
+#if RESILIENT
+/*not frozen*/ public struct StructOneI64_resilient {
+    let x: Int64
+}
+
+public func printStructOneI64_resilient(_ x : StructOneI64_resilient) {
+    print(x)
+}
+
+// RESILIENT:       class StructOneI64_resilient final {
+// RESILIENT:         swift::_impl::OpaqueStorage _storage;
+// RESILIENT-NEXT:    friend class _impl::_impl_StructOneI64_resilient;
+// RESILIENT-NEXT:  };
+#endif
 
 // CHECK: class StructTwoI32 final {
 

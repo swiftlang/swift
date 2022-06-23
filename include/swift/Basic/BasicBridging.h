@@ -14,11 +14,8 @@
 #define SWIFT_BASIC_BASICBRIDGING_H
 
 #include "swift/Basic/BridgedSwiftObject.h"
+#include "swift/Basic/SourceLoc.h"
 #include <stddef.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
@@ -48,18 +45,10 @@ void freeBridgedStringRef(BridgedStringRef str);
 //===----------------------------------------------------------------------===//
 
 typedef struct {
-  const unsigned char * _Nullable pointer;
-} BridgedSourceLoc;
-
-typedef struct {
-  BridgedSourceLoc start;
+  swift::SourceLoc start;
   SwiftInt byteLength;
 } BridgedCharSourceRange;
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
-
-#ifdef __cplusplus
-} // extern "C"
-#endif
 
 #endif
