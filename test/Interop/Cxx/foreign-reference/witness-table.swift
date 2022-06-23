@@ -1,6 +1,7 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none -Xfrontend -disable-llvm-verify -g)
 //
 // REQUIRES: executable_test
+// REQUIRES: rdar://95738946
 // XFAIL: OS=windows-msvc
 
 import StdlibUnittest
