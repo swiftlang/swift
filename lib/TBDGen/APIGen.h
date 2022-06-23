@@ -12,6 +12,7 @@
 #ifndef SWIFT_APIGEN_APIGEN_H
 #define SWIFT_APIGEN_APIGEN_H
 
+#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/BitmaskEnum.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/Optional.h"
@@ -57,7 +58,7 @@ public:
   APILoc(std::string file, unsigned line, unsigned col)
       : file(file), line(line), col(col) {}
 
-  llvm::StringRef getFilename() const { return file; }
+  StringRef getFilename() const { return file; }
   unsigned getLine() const { return line; }
   unsigned getColumn() const { return col; }
 
@@ -85,10 +86,10 @@ struct APIRecord {
   APIAccess access;
   APIAvailability availability;
 
-  APIRecord(llvm::StringRef name, APILoc loc, APILinkage linkage,
-            APIFlags flags, APIAccess access, APIAvailability availability)
-      : name(name.data(), name.size()), loc(loc), linkage(linkage), flags(flags),
-        access(access), availability(availability) {}
+  APIRecord(StringRef name, APILoc loc, APILinkage linkage, APIFlags flags,
+            APIAccess access, APIAvailability availability)
+      : name(name.data(), name.size()), loc(loc), linkage(linkage),
+        flags(flags), access(access), availability(availability) {}
 
   bool isWeakDefined() const {
     return (flags & APIFlags::WeakDefined) == APIFlags::WeakDefined;
@@ -116,9 +117,8 @@ enum class GVKind : uint8_t {
 struct GlobalRecord : APIRecord {
   GVKind kind;
 
-  GlobalRecord(llvm::StringRef name, APILoc loc, APILinkage linkage,
-               APIFlags flags, APIAccess access, GVKind kind,
-               APIAvailability availability)
+  GlobalRecord(StringRef name, APILoc loc, APILinkage linkage, APIFlags flags,
+               APIAccess access, GVKind kind, APIAvailability availability)
       : APIRecord(name, loc, linkage, flags, access, availability), kind(kind) {
   }
 };
@@ -127,7 +127,7 @@ struct ObjCMethodRecord : APIRecord {
   bool isInstanceMethod;
   bool isOptional;
 
-  ObjCMethodRecord(llvm::StringRef name, APILoc loc, APIAccess access,
+  ObjCMethodRecord(StringRef name, APILoc loc, APIAccess access,
                    bool isInstanceMethod, bool isOptional,
                    APIAvailability availability)
       : APIRecord(name, loc, APILinkage::Unknown, APIFlags::None, access,
@@ -138,16 +138,16 @@ struct ObjCMethodRecord : APIRecord {
 struct ObjCContainerRecord : APIRecord {
   std::vector<ObjCMethodRecord*> methods;
 
-  ObjCContainerRecord(llvm::StringRef name, APILinkage linkage, APILoc loc,
+  ObjCContainerRecord(StringRef name, APILinkage linkage, APILoc loc,
                       APIAccess access, const APIAvailability &availability)
       : APIRecord(name, loc, linkage, APIFlags::None, access, availability) {}
 };
 
 struct ObjCInterfaceRecord : ObjCContainerRecord {
   std::string superClassName;
-  ObjCInterfaceRecord(llvm::StringRef name, APILinkage linkage, APILoc loc,
+  ObjCInterfaceRecord(StringRef name, APILinkage linkage, APILoc loc,
                       APIAccess access, APIAvailability availability,
-                      llvm::StringRef superClassName)
+                      StringRef superClassName)
       : ObjCContainerRecord(name, linkage, loc, access, availability),
         superClassName(superClassName.data(), superClassName.size()) {}
 };
@@ -158,16 +158,16 @@ public:
 
   const llvm::Triple &getTarget() const { return target; }
 
-  void addSymbol(llvm::StringRef symbol, APILoc loc, APILinkage linkage,
+  void addSymbol(StringRef symbol, APILoc loc, APILinkage linkage,
                  APIFlags flags, APIAccess access,
                  APIAvailability availability);
 
-  ObjCInterfaceRecord *addObjCClass(llvm::StringRef name, APILinkage linkage,
+  ObjCInterfaceRecord *addObjCClass(StringRef name, APILinkage linkage,
                                     APILoc loc, APIAccess access,
                                     APIAvailability availability,
-                                    llvm::StringRef superClassName);
+                                    StringRef superClassName);
 
-  void addObjCMethod(ObjCInterfaceRecord *cls, llvm::StringRef name, APILoc loc,
+  void addObjCMethod(ObjCInterfaceRecord *cls, StringRef name, APILoc loc,
                      APIAccess access, bool isInstanceMethod, bool isOptional,
                      APIAvailability availability);
 
