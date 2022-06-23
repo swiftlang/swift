@@ -641,6 +641,10 @@ def disable_preallocated_instantiation_caches : Flag<["-"], "disable-preallocate
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Avoid preallocating metadata instantiation caches in globals">;
 
+def disable_readonly_static_objects : Flag<["-"], "disable-readonly-static-objects">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+  HelpText<"Avoid allocating static objects in a read-only data section">;
+
 def trap_function
   : Separate<["-"], "trap-function">, MetaVarName<"<name>">,
     HelpText<"Lower traps to calls to this function instead of trap instructions">;
