@@ -24,7 +24,7 @@
 namespace swift {
 namespace apigen {
 
-void API::addSymbol(llvm::StringRef symbol, APILoc loc, APILinkage linkage,
+void API::addSymbol(StringRef symbol, APILoc loc, APILinkage linkage,
                     APIFlags flags, APIAccess access,
                     APIAvailability availability) {
   auto *global = new (allocator) GlobalRecord(
@@ -32,18 +32,18 @@ void API::addSymbol(llvm::StringRef symbol, APILoc loc, APILinkage linkage,
   globals.push_back(global);
 }
 
-ObjCInterfaceRecord *API::addObjCClass(llvm::StringRef name, APILinkage linkage,
+ObjCInterfaceRecord *API::addObjCClass(StringRef name, APILinkage linkage,
                                        APILoc loc, APIAccess access,
                                        APIAvailability availability,
-                                       llvm::StringRef superClassName) {
+                                       StringRef superClassName) {
   auto *interface = new (allocator) ObjCInterfaceRecord(
       name, linkage, loc, access, availability, superClassName);
   interfaces.push_back(interface);
   return interface;
 }
 
-void API::addObjCMethod(ObjCInterfaceRecord *cls, llvm::StringRef name,
-                        APILoc loc, APIAccess access, bool isInstanceMethod,
+void API::addObjCMethod(ObjCInterfaceRecord *cls, StringRef name, APILoc loc,
+                        APIAccess access, bool isInstanceMethod,
                         bool isOptional, APIAvailability availability) {
   auto method = new (allocator) ObjCMethodRecord(
       name, loc, access, isInstanceMethod, isOptional, availability);
