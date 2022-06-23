@@ -67,22 +67,7 @@ public func inoutSmall(_ en: inout Small, _ x: Int) {
 // CHECK: SWIFT_EXTERN void $s5Enums10inoutSmallyyAA0C0Oz_SitF(char * _Nonnull en, ptrdiff_t x) SWIFT_NOEXCEPT SWIFT_CALL; // inoutSmall(_:_:)
 // CHECK: SWIFT_EXTERN void $s5Enums9inoutTinyyyAA0C0Oz_SitF(char * _Nonnull en, ptrdiff_t x) SWIFT_NOEXCEPT SWIFT_CALL; // inoutTiny(_:_:)
 
-// CHECK:      struct swift_interop_stub_Enums_Small {
-// CHECK-NEXT:   uint64_t _1;
-// CHECK-NEXT:   uint8_t _2;
-// CHECK-NEXT: };
-
-// CHECK:      static inline void swift_interop_returnDirect_Enums_Small(char * _Nonnull result, struct swift_interop_stub_Enums_Small value) __attribute__((always_inline)) {
-// CHECK-NEXT:   memcpy(result + 0, &value._1, 8);
-// CHECK-NEXT:   memcpy(result + 8, &value._2, 1);
-// CHECK-NEXT: }
-
-// CHECK:      static inline struct swift_interop_stub_Enums_Small swift_interop_passDirect_Enums_Small(const char * _Nonnull value) __attribute__((always_inline)) {
-// CHECK-NEXT:   struct swift_interop_stub_Enums_Small result;
-// CHECK-NEXT:   memcpy(&result._1, value + 0, 8);
-// CHECK-NEXT:   memcpy(&result._2, value + 8, 1);
-// CHECK-NEXT:   return result;
-// CHECK-NEXT: }
+// The check for generated stub is currently moved to small-enums-generated-stub-64bit.swift
 
 // CHECK: SWIFT_EXTERN struct swift_interop_stub_Enums_Small $s5Enums9makeSmallyAA0C0OSiF(ptrdiff_t x) SWIFT_NOEXCEPT SWIFT_CALL; // makeSmall(_:)
 
