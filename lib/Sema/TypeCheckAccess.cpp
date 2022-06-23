@@ -1511,6 +1511,11 @@ swift::getDisallowedOriginKind(const Decl *decl,
     if (where.isSPI())
       downgradeToWarning = DowngradeToWarning::Yes;
 
+    if (howImported == RestrictedImportKind::Implicit &&
+        !SF->getASTContext().isSwiftVersionAtLeast(6)) {
+      downgradeToWarning = DowngradeToWarning::Yes;
+    }
+
     // Even if the current module is @_implementationOnly, Swift should
     // not report an error in the cases where the decl is also exported from
     // a non @_implementationOnly module. Thus, we check to see if there is
@@ -1545,7 +1550,10 @@ swift::getDisallowedOriginKind(const Decl *decl,
         }
       }
     }
-    // Implementation-only imported, cannot be reexported.
+
+    // Restrictively imported, cannot be reexported.
+    if (howImported == RestrictedImportKind::Implicit)
+      return DisallowedOriginKind::ImplicitlyImported;
     return DisallowedOriginKind::ImplementationOnly;
   } else if ((decl->isSPI() || decl->isAvailableAsSPI()) && !where.isSPI()) {
     if (decl->isAvailableAsSPI() && !decl->isSPI()) {
