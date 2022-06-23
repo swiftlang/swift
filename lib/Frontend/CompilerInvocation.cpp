@@ -2329,6 +2329,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.NoPreallocatedInstantiationCaches = true;
   }
 
+  if (Args.hasArg(OPT_disable_readonly_static_objects)) {
+    Opts.DisableReadonlyStaticObjects = true;
+  }
+
   // Default to disabling swift async extended frame info on anything but
   // darwin. Other platforms are unlikely to have support for extended frame
   // pointer information.

@@ -1785,6 +1785,19 @@ bool IRGenModule::shouldPrespecializeGenericMetadata() {
          canPrespecializeTarget;
 }
 
+bool IRGenModule::canMakeStaticObjectsReadOnly() {
+  if (getOptions().DisableReadonlyStaticObjects)
+    return false;
+
+  // TODO: Support constant static arrays on other platforms, too.
+  // See also the comment in GlobalObjects.cpp.
+  if (!Triple.isOSDarwin())
+    return false;
+
+  return getAvailabilityContext().isContainedIn(
+          Context.getImmortalRefCountSymbolsAvailability());
+}
+
 void IRGenerator::addGenModule(SourceFile *SF, IRGenModule *IGM) {
   assert(GenModules.count(SF) == 0);
   GenModules[SF] = IGM;
