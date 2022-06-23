@@ -7,9 +7,6 @@
 
 class C {}
 
-@_silgen_name("exit")
-func exit(_ code : UInt32) -> Never
-
 @main
 enum Main {
   static func main() async {
@@ -21,8 +18,7 @@ enum Main {
     }
     Task.detached {
       try await Task.sleep(nanoseconds: 10_000_000_000)
-      print("Fail!")
-      exit(1)
+      fatalError("Fail!")
     }
     
     while weakRef != nil {
