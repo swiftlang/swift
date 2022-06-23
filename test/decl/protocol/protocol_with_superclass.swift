@@ -351,3 +351,12 @@ func usesProtoRefinesClass2<T : ProtoRefinesClassComposition>(_ t: T) {
   t.genericMethod((1, 2))
   let _: BaseProto = t
 }
+
+// https://github.com/apple/swift/issues/52883
+class issue52883_C: issue52883_P {}
+protocol issue52883_P: issue52883_C {
+  func foo()
+}
+extension issue52883_P {
+  func foo() {}
+}
