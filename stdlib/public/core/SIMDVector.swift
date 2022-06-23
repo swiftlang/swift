@@ -62,6 +62,7 @@ extension SIMDStorage {
 /// A type that can be used as an element in a SIMD vector.
 public protocol SIMDScalar {
   associatedtype SIMDMaskScalar: SIMDScalar & FixedWidthInteger & SignedInteger
+    where SIMDMaskScalar.SIMDMaskScalar == SIMDMaskScalar
   associatedtype SIMD2Storage: SIMDStorage where SIMD2Storage.Scalar == Self
   associatedtype SIMD4Storage: SIMDStorage where SIMD4Storage.Scalar == Self
   associatedtype SIMD8Storage: SIMDStorage where SIMD8Storage.Scalar == Self
