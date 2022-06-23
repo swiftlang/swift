@@ -1281,8 +1281,6 @@ static void noteIsolatedActorMember(
   // the declaration.
   if (isDistributedActor) {
     if (auto var = dyn_cast<VarDecl>(decl)) {
-      fprintf(stderr, "[%s:%d] (%s) VAR:\n", __FILE__, __LINE__, __FUNCTION__);
-      decl->dump();
       // Distributed actor properties are never accessible externally.
       decl->diagnose(diag::distributed_actor_isolated_property,
                      decl->getDescriptiveKind(), decl->getName(),
@@ -2113,13 +2111,6 @@ namespace {
     }
 
     VarDecl *findReferencedCallBase(Expr *expr) {
-      fprintf(stderr, "[%s:%d] (%s) FIND BASE:\n", __FILE__, __LINE__, __FUNCTION__);
-      expr->dump();
-      fprintf(stderr, "[%s:%d] (%s) ============================================================\n", __FILE__, __LINE__, __FUNCTION__);
-      fprintf(stderr, "[%s:%d] (%s) ============================================================\n", __FILE__, __LINE__, __FUNCTION__);
-      fprintf(stderr, "[%s:%d] (%s) ============================================================\n", __FILE__, __LINE__, __FUNCTION__);
-      fprintf(stderr, "[%s:%d] (%s) ============================================================\n", __FILE__, __LINE__, __FUNCTION__);
-
       if (auto selfVar = getReferencedParamOrCapture(expr))
         if (selfVar->isSelfParameter() || selfVar->isSelfParamCapture())
           return selfVar;
@@ -2297,26 +2288,11 @@ namespace {
     /// context and false otherwise.
     bool isDistributedAccess(SourceLoc declLoc, ValueDecl *decl,
                              Expr *context) {
-      fprintf(stderr, "[%s:%d] (%s) decl:\n", __FILE__, __LINE__, __FUNCTION__);
-      decl->dump();
-
       // If base of the call is 'local' we permit skip distributed checks.
       if (auto base = findReferencedCallBase(context)) {
-        fprintf(stderr, "[%s:%d] (%s) base:\n", __FILE__, __LINE__, __FUNCTION__);
-        base->dump();
-
         if (base->isDistributedKnownToBeLocal()) {
-          fprintf(stderr, "[%s:%d] (%s) was known local!\n", __FILE__, __LINE__, __FUNCTION__);
-          base->dump();
-
           return false;
-        } else {
-          fprintf(stderr, "[%s:%d] (%s) was NOT known local!\n", __FILE__, __LINE__, __FUNCTION__);
-          base->dump();
         }
-      } else {
-        fprintf(stderr, "[%s:%d] (%s) no base for: \n", __FILE__, __LINE__, __FUNCTION__);
-        context->dump();
       }
 
       // Cannot reference subscripts, or stored properties.
@@ -2331,8 +2307,6 @@ namespace {
           return true;
 
         // otherwise, it was a normal property or subscript and therefore illegal
-        fprintf(stderr, "[%s:%d] (%s) property access...!\n", __FILE__, __LINE__, __FUNCTION__);
-
         ctx.Diags.diagnose(
             declLoc, diag::distributed_actor_isolated_non_self_reference,
             decl->getDescriptiveKind(), decl->getName());

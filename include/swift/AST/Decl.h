@@ -5883,15 +5883,7 @@ public:
 
   /// Whether or not this parameter is marked with 'isolated'.
   bool isDistributedKnownToBeLocal() const {
-    auto yes = getAttrs().hasAttribute<DistributedKnownToBeLocalAttr>() ||
-        ArgumentNameAndFlags.getInt().contains(ArgumentNameFlags::IsDistributedKnownToBeLocal);
-    if (getAttrs().hasAttribute<DistributedKnownToBeLocalAttr>()) {
-      fprintf(stderr, "[%s:%d] (%s) isDistributed LOCAL attr: %s\n", __FILE__, __LINE__, __FUNCTION__, this->getName().str().str().c_str());
-    }
-    if (ArgumentNameAndFlags.getInt().contains(ArgumentNameFlags::IsDistributedKnownToBeLocal)) {
-      fprintf(stderr, "[%s:%d] (%s) isDistributed LOCAL flag: %s\n", __FILE__, __LINE__, __FUNCTION__, this->getName().str().str().c_str());
-    }
-    return yes;
+    return ArgumentNameAndFlags.getInt().contains(ArgumentNameFlags::IsDistributedKnownToBeLocal);
   }
 
   void setDistributedKnownToBeLocal(bool value = true) {
