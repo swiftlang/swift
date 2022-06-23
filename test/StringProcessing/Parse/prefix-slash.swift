@@ -15,7 +15,7 @@ _ = /E.e
 (/E.e).foo(/0)
 
 func foo<T, U>(_ x: T, _ y: U) {}
-foo(/E.e, /E.e) // expected-error {{expected ',' separator}}
+foo(/E.e, /E.e)
 foo((/E.e), /E.e)
 foo((/)(E.e), /E.e)
 

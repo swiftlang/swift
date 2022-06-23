@@ -49,7 +49,7 @@ func i() {
 func j() {
   _ = {
     0
-    /x}}} /
+    /x}}}/ 
     2
   }
 }
@@ -69,7 +69,7 @@ func m() {
 }
 func n() {
   _ = 2
-  /x} /
+  /x}/
     .bitWidth
 }
 func o() {
@@ -103,11 +103,6 @@ prefix func / <T> (_ x: T) -> T { x }
 enum E {
   case e
   func foo<T>(_ x: T) {}
-}
-
-func a6() {
-  func foo<T, U>(_ x: T, _ y: U) {}
-  foo(/E.e, /E.e) // expected-error {{expected ',' separator}}
 }
 
 func a7() { _ = /\/}/ }

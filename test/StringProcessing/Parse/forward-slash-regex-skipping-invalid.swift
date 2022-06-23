@@ -58,6 +58,28 @@ func m() {
 // Unbalanced `}`, make sure we don't consider the string literal `{`.
 func n() { / "{"}/ } // expected-error {{regex literal may not start with space; add backslash to escape}}
 
+func o() {
+  _ = {
+    0
+    /x}}} /
+    2
+  } // expected-error {{extraneous '}' at top level}}
+  // expected-error@-3 {{extraneous '}' at top level}}
+  // expected-error@-4 {{consecutive statements on a line must be separated by ';'}}
+  // expected-error@-5 {{unterminated regex literal}}
+  // expected-warning@-6 {{regular expression literal is unused}}
+  // expected-warning@-6 {{integer literal is unused}}
+} // expected-error {{extraneous '}' at top level}}
+
+func p() {
+  _ = 2
+  /x} /
+    .bitWidth
+  // expected-error@-2 {{consecutive statements on a line must be separated by ';'}}
+  // expected-error@-3 {{unterminated regex literal}}
+  // expected-error@-3 {{value of type 'Regex<Substring>' has no member 'bitWidth'}}
+} // expected-error {{extraneous '}' at top level}}
+
 func err1() { _ = / 0xG}/ }
 // expected-error@-1 {{regex literal may not start with space; add backslash to escape}}
 func err2() { _ = / 0oG}/ }
