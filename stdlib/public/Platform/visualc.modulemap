@@ -58,7 +58,7 @@ module _visualc_intrinsics [system] [extern_c] {
 
     explicit module ssse3 {
       export sse3
-      header "tmmintrinh"
+      header "tmmintrin.h"
     }
 
     explicit module sse4_1 {
