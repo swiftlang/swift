@@ -1693,6 +1693,11 @@ namespace {
         return recordMutableVarParent(parent, inout->getSubExpr());
       }
 
+      // Look through an expression that opens an existential
+      if (auto openExist = dyn_cast<OpenExistentialExpr>(subExpr)) {
+        return recordMutableVarParent(parent, openExist->getSubExpr());
+      }
+
       return false;
     }
 
