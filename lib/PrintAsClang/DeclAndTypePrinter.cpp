@@ -397,12 +397,11 @@ private:
         os << "  enum class cases { ";
         llvm::interleaveComma(
             ED->getAllCases(), os, [&](const EnumCaseDecl *caseDecl) {
-              llvm::interleaveComma(
-                  caseDecl->getElements(), os,
-                  [&](const EnumElementDecl *elementDecl) {
-                    syntaxPrinter.printIdentifier(
-                        elementDecl->getBaseIdentifier().str());
-                  });
+              llvm::interleaveComma(caseDecl->getElements(), os,
+                                    [&](const EnumElementDecl *elementDecl) {
+                                      syntaxPrinter.printIdentifier(
+                                          elementDecl->getNameStr());
+                                    });
             });
         os << " };\n";
       });
