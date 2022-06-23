@@ -735,12 +735,21 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
     return emitted;
   }
 
+  auto getBestLocation = [](SILDeclRef ref) -> SILLocation {
+    if (ref.hasDecl())
+      return ref.getDecl();
+    if (ref.loc.isNull())
+      return {(Decl *)nullptr};
+    if (auto *ace = ref.getAbstractClosureExpr())
+      return {ace};
+    return {(Decl *)nullptr};
+  };
+
   // Note: Do not provide any SILLocation. You can set it afterwards.
   SILGenFunctionBuilder builder(*this);
   auto &IGM = *this;
   auto *F = builder.getOrCreateFunction(
-      constant.hasDecl() ? constant.getDecl() : (Decl *)nullptr, constant,
-      forDefinition,
+      getBestLocation(constant), constant, forDefinition,
       [&IGM](SILLocation loc, SILDeclRef constant) -> SILFunction * {
         return IGM.getFunction(constant, NotForDefinition);
       });
