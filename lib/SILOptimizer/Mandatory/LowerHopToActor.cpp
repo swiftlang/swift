@@ -48,7 +48,6 @@ namespace {
 /// IRGen expects hops to be to executors before it runs.
 class LowerHopToActor {
   SILFunction *F;
-  SILBuilder B;
   DominanceInfo *Dominance;
 
   /// A map from an actor value to the executor we've derived for it.
@@ -57,11 +56,12 @@ class LowerHopToActor {
   bool processHop(HopToExecutorInst *hop);
   bool processExtract(ExtractExecutorInst *extract);
 
-  SILValue emitGetExecutor(SILLocation loc, SILValue actor, bool makeOptional);
+  SILValue emitGetExecutor(SILBuilderWithScope &B, SILLocation loc,
+                           SILValue actor, bool makeOptional);
 
 public:
   LowerHopToActor(SILFunction *f, DominanceInfo *dominance)
-    : F(f), B(*F), Dominance(dominance) { }
+    : F(f), Dominance(dominance) { }
 
   /// The entry point to the transformation.
   bool run();
@@ -99,9 +99,7 @@ bool LowerHopToActor::processHop(HopToExecutorInst *hop) {
   if (isOptionalBuiltinExecutor(actor->getType()))
     return false;
 
-  B.setInsertionPoint(hop);
-  B.setCurrentDebugScope(hop->getDebugScope());
-
+  SILBuilderWithScope B(hop);
   SILValue executor;
   if (actor->getType().is<BuiltinExecutorType>()) {
     // IRGen expects an optional Builtin.Executor, not a Builtin.Executor
@@ -112,7 +110,7 @@ bool LowerHopToActor::processHop(HopToExecutorInst *hop) {
   } else {
     // Get the dominating executor value for this actor, if available,
     // or else emit code to derive it.
-    executor = emitGetExecutor(hop->getLoc(), actor, /*optional*/true);
+    executor = emitGetExecutor(B, hop->getLoc(), actor, /*optional*/true);
   }
   assert(executor && "executor not set");
 
@@ -127,9 +125,9 @@ bool LowerHopToActor::processExtract(ExtractExecutorInst *extract) {
   // Dig out the executor.
   auto executor = extract->getExpectedExecutor();
   if (!isOptionalBuiltinExecutor(executor->getType())) {
-    B.setInsertionPoint(extract);
-    B.setCurrentDebugScope(extract->getDebugScope());
-    executor = emitGetExecutor(extract->getLoc(), executor, /*optional*/false);
+    SILBuilderWithScope B(extract);
+    executor =
+        emitGetExecutor(B, extract->getLoc(), executor, /*optional*/ false);
   }
 
   // Unconditionally replace the extract with the executor.
@@ -156,7 +154,8 @@ static AccessorDecl *getUnownedExecutorGetter(ASTContext &ctx,
   return nullptr;
 }
 
-SILValue LowerHopToActor::emitGetExecutor(SILLocation loc, SILValue actor,
+SILValue LowerHopToActor::emitGetExecutor(SILBuilderWithScope &B,
+                                          SILLocation loc, SILValue actor,
                                           bool makeOptional) {
   // Get the dominating executor value for this actor, if available,
   // or else emit code to derive it.
