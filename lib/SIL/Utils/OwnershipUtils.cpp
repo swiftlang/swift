@@ -741,6 +741,38 @@ bool BorrowedValue::visitExtendedScopeEndingUses(
   return true;
 }
 
+bool BorrowedValue::visitTransitiveLifetimeEndingUses(
+    function_ref<bool(Operand *)> visitor) const {
+  assert(isLocalScope());
+
+  SmallPtrSetVector<SILValue, 4> reborrows;
+
+  auto visitEnd = [&](Operand *scopeEndingUse) {
+    if (scopeEndingUse->getOperandOwnership() == OperandOwnership::Reborrow) {
+      BorrowingOperand(scopeEndingUse)
+          .visitBorrowIntroducingUserResults([&](BorrowedValue borrowedValue) {
+            reborrows.insert(borrowedValue.value);
+            return true;
+          });
+      // visitor on the reborrow
+      return visitor(scopeEndingUse);
+    }
+    // visitor on the end_borrow
+    return visitor(scopeEndingUse);
+  };
+
+  if (!visitLocalScopeEndingUses(visitEnd))
+    return false;
+
+  // reborrows grows in this loop.
+  for (unsigned idx = 0; idx < reborrows.size(); ++idx) {
+    if (!BorrowedValue(reborrows[idx]).visitLocalScopeEndingUses(visitEnd))
+      return false;
+  }
+
+  return true;
+}
+
 bool BorrowedValue::visitInteriorPointerOperandHelper(
     function_ref<void(InteriorPointerOperand)> func,
     BorrowedValue::InteriorPointerOperandVisitorKind kind) const {
