@@ -873,7 +873,8 @@ void NormalProtocolConformance::finishSignatureConformances() {
     if (substTy->hasTypeParameter())
       substTy = getDeclContext()->mapTypeIntoContext(substTy);
 
-    reqConformances.push_back(module->lookupConformance(substTy, reqProto)
+    reqConformances.push_back(module->lookupConformance(substTy, reqProto,
+                                                        /*allowMissing=*/true)
                                   .mapConformanceOutOfContext());
   }
   setSignatureConformances(reqConformances);
