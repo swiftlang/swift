@@ -2613,6 +2613,10 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
 
   for (llvm::Value *Piece : Storage) {
     SmallVector<uint64_t, 3> Operands;
+
+    if (DbgTy.getType()->isForeignReferenceType())
+      Operands.push_back(llvm::dwarf::DW_OP_deref);
+
     if (Indirection == IndirectValue || Indirection == CoroIndirectValue)
       Operands.push_back(llvm::dwarf::DW_OP_deref);
 
