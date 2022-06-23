@@ -5362,10 +5362,6 @@ public:
   /// 'distributed' and and nullptr otherwise.
   FuncDecl *getDistributedThunk() const;
 
-  /// Is this var known to be a "local" distributed actor,
-  /// if so the implicit throwing ans some isolation checks can be skipped.
-  bool isKnownToBeLocal() const;
-
   /// Is this a stored property that will _not_ trigger any user-defined code
   /// upon any kind of access?
   bool isOrdinaryStoredProperty() const;

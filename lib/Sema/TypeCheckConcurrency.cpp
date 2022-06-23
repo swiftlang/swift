@@ -1212,11 +1212,8 @@ bool ReferencedActor::isKnownToBeLocal() const {
   case NonIsolatedParameter:
   case SendableFunction:
   case SendableClosure:
-    if (isPotentiallyIsolated)
-      return true;
-
-    return actor && actor->isKnownToBeLocal();
-
+    return isPotentiallyIsolated ||
+           (actor && actor->isDistributedKnownToBeLocal());
   case Isolated:
     return true;
   }
@@ -1283,7 +1280,9 @@ static void noteIsolatedActorMember(
   // FIXME: Make this diagnostic more sensitive to the isolation context of
   // the declaration.
   if (isDistributedActor) {
-    if (isa<VarDecl>(decl)) {
+    if (auto var = dyn_cast<VarDecl>(decl)) {
+      fprintf(stderr, "[%s:%d] (%s) VAR:\n", __FILE__, __LINE__, __FUNCTION__);
+      decl->dump();
       // Distributed actor properties are never accessible externally.
       decl->diagnose(diag::distributed_actor_isolated_property,
                      decl->getDescriptiveKind(), decl->getName(),
@@ -2114,6 +2113,13 @@ namespace {
     }
 
     VarDecl *findReferencedCallBase(Expr *expr) {
+      fprintf(stderr, "[%s:%d] (%s) FIND BASE:\n", __FILE__, __LINE__, __FUNCTION__);
+      expr->dump();
+      fprintf(stderr, "[%s:%d] (%s) ============================================================\n", __FILE__, __LINE__, __FUNCTION__);
+      fprintf(stderr, "[%s:%d] (%s) ============================================================\n", __FILE__, __LINE__, __FUNCTION__);
+      fprintf(stderr, "[%s:%d] (%s) ============================================================\n", __FILE__, __LINE__, __FUNCTION__);
+      fprintf(stderr, "[%s:%d] (%s) ============================================================\n", __FILE__, __LINE__, __FUNCTION__);
+
       if (auto selfVar = getReferencedParamOrCapture(expr))
         if (selfVar->isSelfParameter() || selfVar->isSelfParamCapture())
           return selfVar;
@@ -2295,19 +2301,22 @@ namespace {
       decl->dump();
 
       // If base of the call is 'local' we permit skip distributed checks.
-      if (auto baseSelf = findReferencedCallBase(context)) {
+      if (auto base = findReferencedCallBase(context)) {
         fprintf(stderr, "[%s:%d] (%s) base:\n", __FILE__, __LINE__, __FUNCTION__);
-        baseSelf->dump();
+        base->dump();
 
-        if (baseSelf->isDistributedKnownToBeLocal()) {
+        if (base->isDistributedKnownToBeLocal()) {
           fprintf(stderr, "[%s:%d] (%s) was known local!\n", __FILE__, __LINE__, __FUNCTION__);
-          context->dump();
+          base->dump();
 
           return false;
         } else {
           fprintf(stderr, "[%s:%d] (%s) was NOT known local!\n", __FILE__, __LINE__, __FUNCTION__);
-          context->dump();
+          base->dump();
         }
+      } else {
+        fprintf(stderr, "[%s:%d] (%s) no base for: \n", __FILE__, __LINE__, __FUNCTION__);
+        context->dump();
       }
 
       // Cannot reference subscripts, or stored properties.
@@ -2318,13 +2327,19 @@ namespace {
         if (var && var->isDistributed())
           return true;
 
+        if (var && var->isDistributedKnownToBeLocal())
+          return true;
+
         // otherwise, it was a normal property or subscript and therefore illegal
+        fprintf(stderr, "[%s:%d] (%s) property access...!\n", __FILE__, __LINE__, __FUNCTION__);
+
         ctx.Diags.diagnose(
             declLoc, diag::distributed_actor_isolated_non_self_reference,
             decl->getDescriptiveKind(), decl->getName());
         noteIsolatedActorMember(decl, context);
         return false;
       }
+
 
       // Check that we have a distributed function or computed property.
       if (auto afd = dyn_cast<AbstractFunctionDecl>(decl)) {
@@ -4808,13 +4823,13 @@ bool swift::isPotentiallyIsolatedActor(
   if (!var)
     return false;
 
-//  if (var->getName().str().equals("__secretlyKnownToBeLocal")) {
-//    // FIXME(distributed): we did a dynamic check and know that this actor is
-//    //   local, but we can't express that to the type system; the real
-//    //   implementation will have to mark 'self' as "known to be local" after
-//    //   an is-local check.
-//    return true;
-//  }
+  if (var->getName().str().equals("__secretlyKnownToBeLocal")) {
+    // FIXME(distributed): we did a dynamic check and know that this actor is
+    //   local, but we can't express that to the type system; the real
+    //   implementation will have to mark 'self' as "known to be local" after
+    //   an is-local check.
+    return true;
+  }
 
   if (auto param = dyn_cast<ParamDecl>(var)) {
     if (isIsolated(param))

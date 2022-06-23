@@ -3711,7 +3711,7 @@ TypeResolver::resolveDistributedKnownToBeLocal(DistributedKnownToBeLocalTypeRepr
       !type->isDistributedActor() &&
       !type->hasError()) {
     diagnoseInvalid(
-        repr, repr->getSpecifierLoc(), // FIXME: this location is invalid hmmmm: <unknown>:0: error: diagnostic produced elsewhere: '_local' parameter has non-distributed-actor type 'C'
+        repr, repr->getSpecifierLoc(),
         diag::local_parameter_not_distributed_actor, type);
     return ErrorType::get(getASTContext());
   }

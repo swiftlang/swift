@@ -5920,24 +5920,9 @@ void AttributeChecker::visitDistributedKnownToBeLocalAttr(DistributedKnownToBeLo
     return;
   }
 
-  // '_local' only makes sense to be used with DistributedActor types
-  if (auto param = dyn_cast<ParamDecl>(D)) {
-    auto nominal = param->getInterfaceType()->getAnyNominal();
-    if (!nominal)
-      return;
-
-    if (!nominal->isDistributedActor()) {
-      diagnoseAndRemoveAttr(
-          attr, diag::distributed_local_cannot_be_used_with_non_da_type,
-          nominal->getDeclaredType(), nominal->getDescriptiveKind());
-      // TODO(distributed): diagnoseAndRemoveAttr, seems we have wrong position for it though
-      return;
-    }
-  } else {
-    diagnoseAndRemoveAttr(attr, diag::distributed_local_cannot_be_used);
-    // TODO(distributed): diagnoseAndRemoveAttr, seems we have wrong position for it though
-    return;
-  }
+  // We already checked if the attribute is applied to a DistributedActor type,
+  // during TypeResolver::resolveDistributedKnownToBeLocal so no need to check
+  // here again.
 
   // We only allow the `da.whenLocal { (...: _local DA) in }` to use '_local',
   // currently, meaning that the local parameter will always be a closure

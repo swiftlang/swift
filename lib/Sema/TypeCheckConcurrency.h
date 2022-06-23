@@ -209,6 +209,8 @@ struct ActorReferenceResult {
     /// The declaration is being accessed from outside the actor and
     /// potentially from a different node, so it must be marked 'distributed'.
     Distributed = 1 << 2,
+
+    /// Distributed but known to be local
   };
 
   using Options = OptionSet<Flags>;
