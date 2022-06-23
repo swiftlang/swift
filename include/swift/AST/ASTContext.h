@@ -880,6 +880,10 @@ public:
   /// for extended existential types.
   AvailabilityContext getParameterizedExistentialRuntimeAvailability();
 
+  /// Get the runtime availability of immortal ref-count symbols, which are
+  /// needed to place array buffers into constant data sections.
+  AvailabilityContext getImmortalRefCountSymbolsAvailability();
+
   /// Get the runtime availability of features introduced in the Swift 5.2
   /// compiler for the target platform.
   AvailabilityContext getSwift52Availability();
