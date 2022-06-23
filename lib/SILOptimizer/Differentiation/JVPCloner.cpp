@@ -702,22 +702,16 @@ public:
     extractAllElements(origResult, builder, origResults);
 
     // Get and partially apply the differential.
-    auto jvpGenericEnv = jvp->getGenericEnvironment();
-    auto jvpSubstMap = jvpGenericEnv
-                           ? jvpGenericEnv->getForwardingSubstitutionMap()
-                           : jvp->getForwardingSubstitutionMap();
+    auto jvpSubstMap = jvp->getForwardingSubstitutionMap();
     auto *differentialRef = builder.createFunctionRef(loc, &getDifferential());
     auto *differentialPartialApply = builder.createPartialApply(
         loc, differentialRef, jvpSubstMap, {diffStructVal},
         ParameterConvention::Direct_Guaranteed);
 
-    auto differentialType = jvp->getLoweredFunctionType()
-                                ->getResults()
-                                .back()
-                                .getSILStorageInterfaceType();
-    differentialType = differentialType.substGenericArgs(
-        getModule(), jvpSubstMap, TypeExpansionContext::minimal());
-    differentialType = differentialType.subst(getModule(), jvpSubstMap);
+    auto differentialType = jvp->mapTypeIntoContext(
+        jvp->getConventions().getSILType(
+            jvp->getLoweredFunctionType()->getResults().back(),
+            jvp->getTypeExpansionContext()));
     auto differentialFnType = differentialType.castTo<SILFunctionType>();
     auto differentialSubstType =
         differentialPartialApply->getType().castTo<SILFunctionType>();
