@@ -18,6 +18,17 @@
 // CHECK:   mutating func callAsFunction(_ x: Int32, _ y: Int32) -> Int32
 // CHECK: }
 
+// CHECK: struct HasPostIncrementOperator {
+// CHECK: }
+
+// CHECK: struct HasPreIncrementOperatorWithAnotherReturnType {
+// CHECK:   func successor() -> HasPreIncrementOperatorWithAnotherReturnType
+// CHECK: }
+
+// CHECK: struct HasPreIncrementOperatorWithVoidReturnType {
+// CHECK:   func successor() -> HasPreIncrementOperatorWithVoidReturnType
+// CHECK: }
+
 // CHECK: struct HasDeletedOperator {
 // CHECK: }
 
