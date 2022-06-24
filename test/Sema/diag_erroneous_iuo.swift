@@ -61,11 +61,8 @@ func genericFunctionSigil<T>(
 }
 
 func genericFunctionSigilArray<T>(
-  // FIXME: We validate these types multiple times resulting in multiple diagnostics
   iuo: [T!] // expected-error {{'!' is not allowed here; perhaps '?' was intended?}}{{10-11=?}}
-  // expected-error@-1 {{'!' is not allowed here; perhaps '?' was intended?}}{{10-11=?}}
 ) -> [T!] { // expected-error {{'!' is not allowed here; perhaps '?' was intended?}}{{8-9=?}}
-  // expected-error@-1 {{'!' is not allowed here; perhaps '?' was intended?}}{{8-9=?}}
   return iuo
 }
 
