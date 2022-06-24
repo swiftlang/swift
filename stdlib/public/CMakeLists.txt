@@ -104,11 +104,14 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
     list(APPEND swift_demangling_cflags -DSWIFT_STDLIB_HAS_TYPE_PRINTING)
   endif()
 
+  # Gold LTO is unsupported. To prevent tests from failing when building
+  # with LTO, force swiftDemangling library to compile without LTO for Linux.
   add_swift_target_library(swiftDemangling OBJECT_LIBRARY
     ${swiftDemanglingSources}
     C_COMPILE_FLAGS
       -DswiftCore_EXPORTS
       ${swift_demangling_cflags}
+    C_COMPILE_FLAGS_LINUX -fno-lto
     INSTALL_IN_COMPONENT never_install)
 
   add_swift_target_library(swiftDemanglingCR OBJECT_LIBRARY
