@@ -1059,7 +1059,7 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
   auto SILMod = std::unique_ptr<SILModule>(desc.SILMod);
   if (!SILMod) {
     auto loweringDesc = ASTLoweringDescriptor{
-        desc.Ctx, desc.Conv, desc.SILOpts,
+        desc.Ctx, desc.Conv, desc.SILOpts, nullptr,
         symsToEmit.map([](const auto &x) { return x.silRefsToEmit; })};
     SILMod = llvm::cantFail(Ctx.evaluator(LoweredSILRequest{loweringDesc}));
 

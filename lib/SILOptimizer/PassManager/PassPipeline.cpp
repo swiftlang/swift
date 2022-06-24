@@ -666,6 +666,7 @@ static void addMidLevelFunctionPipeline(SILPassPipelinePlan &P) {
 static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("ClosureSpecialize");
   P.addDeadFunctionAndGlobalElimination();
+  P.addTargetConstantFolding();
   P.addDeadStoreElimination();
   P.addDeadObjectElimination();
 
