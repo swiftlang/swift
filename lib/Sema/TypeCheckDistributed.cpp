@@ -629,8 +629,8 @@ bool swift::checkDistributedActorProperty(VarDecl *var, bool diagnose) {
 void swift::checkDistributedActorProperties(const NominalTypeDecl *decl) {
   auto &C = decl->getASTContext();
 
-  if (isa<ProtocolDecl>(decl)) {
-    // protocols don't matter for stored property checking
+  if (isa<ProtocolDecl>(decl) || isa<ExtensionDecl>(decl)) {
+    // protocols and extensions don't matter for stored property checking
     return;
   }
 
