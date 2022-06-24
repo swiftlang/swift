@@ -1404,19 +1404,19 @@ bool WitnessChecker::findBestWitness(
     case Regular: {
       witnesses = lookupValueWitnesses(requirement, ignoringNames);
 
-      ValueDecl* thunk = nullptr;
-      for (auto witness : witnesses) {
-        if (auto func = dyn_cast<FuncDecl>(witness)) {
-          if (func->isDistributed()) {
-            thunk = func->getDistributedThunk();
-            fprintf(stderr, "[%s:%d] (%s) ALSO CONSIDER THUNK!!!\n", __FILE__, __LINE__, __FUNCTION__);
-          }
-        }
-      }
-      if (thunk) {
-        witnesses.clear();
-        witnesses.push_back(thunk);
-      }
+//      ValueDecl* thunk = nullptr;
+//      for (auto witness : witnesses) {
+//        if (auto func = dyn_cast<FuncDecl>(witness)) {
+//          if (func->isDistributed()) {
+//            thunk = func->getDistributedThunk();
+//            fprintf(stderr, "[%s:%d] (%s) ALSO CONSIDER THUNK!!!\n", __FILE__, __LINE__, __FUNCTION__);
+//          }
+//        }
+//      }
+//      if (thunk) {
+//        witnesses.clear();
+//        witnesses.push_back(thunk);
+//      }
 
       break;
     }

@@ -7932,7 +7932,6 @@ bool ExprRewriter::requiresDistributedThunk(Expr *base, SourceLoc memberLoc,
   auto *memberDecl = memberRef.getDecl();
   assert(memberDecl);
 
-  auto *memberDC = memberDecl->getDeclContext();
   // Protocol requirements are dispatched through a witness which is always
   // a distributed thunk.
   //
@@ -7940,7 +7939,8 @@ bool ExprRewriter::requiresDistributedThunk(Expr *base, SourceLoc memberLoc,
   // but the witness of the distributed func requirement should
   // have been the thunk of the CONCRETE distributed actor....?
   // This way we'd call the isRemote/isLocal stuff, but defined IN the concrete DA.
-  if (isa_and_nonnull<ProtocolDecl>(memberDC->getAsDecl()))
+  auto *memberDC = memberDecl->getDeclContext();
+  if (isa<ProtocolDecl>(memberDC))
     return false;
 
   if (auto *FD = dyn_cast<FuncDecl>(memberDecl)) {
