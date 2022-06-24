@@ -295,27 +295,38 @@ bool MandatoryGenericSpecializer::
 optimizeInst(SILInstruction *inst, SILOptFunctionBuilder &funcBuilder,
              InstructionDeleter &deleter, ClassHierarchyAnalysis *cha) {
   if (auto as = ApplySite::isa(inst)) {
+
+    bool changed = false;
+
     // Specialization opens opportunities to devirtualize method calls.
-    ApplySite newAS = tryDevirtualizeApply(as, cha).first;
-    if (!newAS)
-      return false;
-    deleter.forceDelete(as.getInstruction());
-    auto newFAS = FullApplySite::isa(newAS.getInstruction());
-    if (!newFAS)
-      return true;
+    if (ApplySite newAS = tryDevirtualizeApply(as, cha).first) {
+      deleter.forceDelete(as.getInstruction());
+      changed = true;
+      as = newAS;
+    }
+
+    auto fas = FullApplySite::isa(as.getInstruction());
+    if (!fas)
+      return changed;
       
-    SILFunction *callee = newFAS.getReferencedFunctionOrNull();
-    if (!callee || callee->isTransparent() == IsNotTransparent)
-      return true;
+    SILFunction *callee = fas.getReferencedFunctionOrNull();
+    if (!callee)
+      return changed;
+      
+    if (callee->isTransparent() == IsNotTransparent &&
+        // Force inlining of co-routines, because co-routines may allocate
+        // memory.
+        !isa<BeginApplyInst>(fas.getInstruction()))
+      return changed;
 
     if (callee->isExternalDeclaration())
       getModule()->loadFunction(callee, SILModule::LinkingMode::LinkAll);
 
     if (callee->isExternalDeclaration())
-      return true;
+      return changed;
 
     // If the de-virtualized callee is a transparent function, inline it.
-    SILInliner::inlineFullApply(newFAS, SILInliner::InlineKind::MandatoryInline,
+    SILInliner::inlineFullApply(fas, SILInliner::InlineKind::MandatoryInline,
                                 funcBuilder, deleter);
     return true;
   }
