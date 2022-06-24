@@ -766,7 +766,9 @@ bool swift::performCompileStepsPostSema(CompilerInstance &Instance,
     const PrimarySpecificPaths PSPs =
         Instance.getPrimarySpecificPathsForWholeModuleOptimizationMode();
     SILOptions SILOpts = getSILOptions(PSPs);
-    auto SM = performASTLowering(mod, Instance.getSILTypes(), SILOpts);
+    IRGenOptions irgenOpts = Invocation.getIRGenOptions();
+    auto SM = performASTLowering(mod, Instance.getSILTypes(), SILOpts,
+                                 &irgenOpts);
     return performCompileStepsPostSILGen(Instance, std::move(SM), mod, PSPs,
                                          ReturnValue, observer);
   }
@@ -779,8 +781,9 @@ bool swift::performCompileStepsPostSema(CompilerInstance &Instance,
       const PrimarySpecificPaths PSPs =
           Instance.getPrimarySpecificPathsForSourceFile(*PrimaryFile);
       SILOptions SILOpts = getSILOptions(PSPs);
+    IRGenOptions irgenOpts = Invocation.getIRGenOptions();
       auto SM = performASTLowering(*PrimaryFile, Instance.getSILTypes(),
-                                   SILOpts);
+                                   SILOpts, &irgenOpts);
       result |= performCompileStepsPostSILGen(Instance, std::move(SM),
                                               PrimaryFile, PSPs, ReturnValue,
                                               observer);

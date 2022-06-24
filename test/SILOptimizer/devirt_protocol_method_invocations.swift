@@ -138,9 +138,8 @@ public func test_devirt_protocol_extension_method_invocation_with_self_return_ty
 // CHECK:   return [[T1]]
 
 // CHECK: sil @$s34devirt_protocol_method_invocations14testExMetatypeSiyF
-// CHECK:   [[T0:%.*]] = builtin "sizeof"<Int>
-// CHECK:   [[T1:%.*]] = builtin {{.*}}([[T0]]
-// CHECK:   [[T2:%.*]] = struct $Int ([[T1]] : {{.*}})
+// CHECK:   [[T0:%.*]] = integer_literal
+// CHECK:   [[T2:%.*]] = struct $Int ([[T0]] : {{.*}})
 // CHECK:   return [[T2]] : $Int
 
 @inline(never)
