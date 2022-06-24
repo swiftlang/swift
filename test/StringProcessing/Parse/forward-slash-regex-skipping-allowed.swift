@@ -5,12 +5,13 @@
 // RUN: %FileCheck -input-file %t/stats.csv %s
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: rdar95806819
 
 // Make sure we can skip in all of the below cases.
 
-// We don't appear to output a stats entry when it is 0.
-// CHECK-NOT: {{"Parse.NumFunctionsParsed"}}
+// The printing implementation differs in asserts and no-asserts builds, it will
+// either print `"Parse.NumFunctionsParsed" 0` or not print it at all. Make sure
+// we don't output any non-zero value.
+// CHECK-NOT: {{"Parse.NumFunctionsParsed" [^0]}}
 
 // Balanced `{}`, so okay.
 func a() { / {}/ }
