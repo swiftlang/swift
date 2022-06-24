@@ -4338,23 +4338,8 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
     return DependentMemberType::get(baseType, name);
   };
 
-  // If we don't have a substituted base type, fail.
-  if (!substBase) return failed();
-
   if (auto *selfType = substBase->getAs<DynamicSelfType>())
     substBase = selfType->getSelfType();
-
-  // If the parent is an archetype, extract the child archetype with the
-  // given name.
-  if (auto archetypeParent = substBase->getAs<ArchetypeType>()) {
-    if (Type memberArchetypeByName = archetypeParent->getNestedTypeByName(name))
-      return memberArchetypeByName;
-
-    // If looking for an associated type and the archetype is constrained to a
-    // class, continue to the default associated type lookup
-    if (!assocType || !archetypeParent->getSuperclass())
-      return failed();
-  }
 
   // If the parent is a type variable or a member rooted in a type variable,
   // or if the parent is a type parameter, we're done. Also handle
@@ -4364,50 +4349,61 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
       substBase->is<UnresolvedType>())
     return getDependentMemberType(substBase);
 
+  // If the parent is an archetype, extract the child archetype with the
+  // given name.
+  if (auto archetypeParent = substBase->getAs<ArchetypeType>()) {
+    if (Type memberArchetypeByName = archetypeParent->getNestedTypeByName(name))
+      return memberArchetypeByName;
+
+    // If looking for an associated type and the archetype is constrained to a
+    // class, continue to the default associated type lookup
+    if (!archetypeParent->getSuperclass())
+      return failed();
+  }
+
+  if (!assocType)
+    return failed();
+
   // Retrieve the member type with the given name.
 
   // Tuples don't have member types.
   if (substBase->is<TupleType>())
     return failed();
 
-  // If we know the associated type, look in the witness table.
-  if (assocType) {
-    auto proto = assocType->getProtocol();
-    ProtocolConformanceRef conformance =
-        lookupConformances(origBase->getCanonicalType(), substBase, proto);
+  // Look in the witness table.
+  auto proto = assocType->getProtocol();
+  ProtocolConformanceRef conformance =
+      lookupConformances(origBase->getCanonicalType(), substBase, proto);
 
-    if (conformance.isInvalid())
-      return failed();
-    if (!conformance.isConcrete())
-      return failed();
+  if (conformance.isInvalid())
+    return failed();
+  if (!conformance.isConcrete())
+    return failed();
 
-    // Retrieve the type witness.
-    auto witness =
-        conformance.getConcrete()->getTypeWitnessAndDecl(assocType, options);
+  // Retrieve the type witness.
+  auto witness =
+      conformance.getConcrete()->getTypeWitnessAndDecl(assocType, options);
 
-    auto witnessTy = witness.getWitnessType();
-    if (!witnessTy || witnessTy->hasError())
-      return failed();
+  auto witnessTy = witness.getWitnessType();
+  if (!witnessTy || witnessTy->hasError())
+    return failed();
 
-    // This is a hacky feature allowing code completion to migrate to
-    // using Type::subst() without changing output.
-    if (options & SubstFlags::DesugarMemberTypes) {
-      if (auto *aliasType = dyn_cast<TypeAliasType>(witnessTy.getPointer()))
-        witnessTy = aliasType->getSinglyDesugaredType();
+  // This is a hacky feature allowing code completion to migrate to
+  // using Type::subst() without changing output.
+  if (options & SubstFlags::DesugarMemberTypes) {
+    if (auto *aliasType = dyn_cast<TypeAliasType>(witnessTy.getPointer()))
+      witnessTy = aliasType->getSinglyDesugaredType();
 
-      // Another hack. If the type witness is a opaque result type. They can
-      // only be referred using the name of the associated type.
-      if (witnessTy->is<OpaqueTypeArchetypeType>())
-        witnessTy = witness.getWitnessDecl()->getDeclaredInterfaceType();
-    }
-
-    if (witnessTy->is<ErrorType>())
-      return failed();
-
-    return witnessTy;
+    // Another hack. If the type witness is a opaque result type. They can
+    // only be referred using the name of the associated type.
+    if (witnessTy->is<OpaqueTypeArchetypeType>())
+      witnessTy = witness.getWitnessDecl()->getDeclaredInterfaceType();
   }
 
-  return failed();
+  if (witnessTy->is<ErrorType>())
+    return failed();
+
+  return witnessTy;
 }
 
 ProtocolConformanceRef LookUpConformanceInModule::
@@ -4646,9 +4642,6 @@ static Type substType(Type derivedType,
     if (auto depMemTy = dyn_cast<DependentMemberType>(type)) {
       auto newBase = substType(depMemTy->getBase(),
                                substitutions, lookupConformances, options);
-      if (!newBase)
-        return Type();
-      
       return getMemberForBaseType(lookupConformances,
                                   depMemTy->getBase(), newBase,
                                   depMemTy->getAssocType(),
