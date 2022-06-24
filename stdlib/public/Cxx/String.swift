@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import std
+
 extension std.string {
   public init(_ string: String) {
     self.init()

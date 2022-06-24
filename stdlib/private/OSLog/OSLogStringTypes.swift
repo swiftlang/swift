@@ -22,6 +22,8 @@
 //  1.  "\(x, privacy: .private, align: .right\)"
 //  2.  "\(x, align: .right(columns: 10)\)"
 
+import ObjectiveC
+
 extension OSLogInterpolation {
 
   /// Defines interpolation for expressions of type String.
