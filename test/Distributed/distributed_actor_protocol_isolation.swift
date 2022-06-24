@@ -37,15 +37,18 @@ protocol MixedProtoDistributedActor: DistributedActor {
   func localThrows() throws
   func localAsyncThrows() async throws
 
-  distributed func dist()
-  distributed func distAsync() async
+//  distributed func dist() // FIXME(distributed): rdar://95949498 currently we are limited to explicitly 'async throws' protocol requirements that are distributed funcs
+//  distributed func distAsync() async // FIXME(distributed): rdar://95949498 currently we are limited to explicitly 'async throws' protocol requirements that are distributed funcs
   distributed func distAsyncThrows() async throws
 }
 
 protocol DistProtoDistributedActor: DistributedActor {
-  distributed func dist()
-  distributed func distAsync() async
-  distributed func distThrows() throws
+  distributed func dist() // FIXME(distributed): rdar://95949498 currently we are limited to explicitly 'async throws' protocol requirements that are distributed funcs
+  // expected-error@-1{{'distributed' protocol requirement 'dist()' must currently be declared explicitly 'async throws'}}
+  distributed func distAsync() async // FIXME(distributed): rdar://95949498 currently we are limited to explicitly 'async throws' protocol requirements that are distributed funcs
+  // expected-error@-1{{'distributed' protocol requirement 'distAsync()' must currently be declared explicitly 'async throws'}}
+  distributed func distThrows() throws // FIXME(distributed): rdar://95949498 currently we are limited to explicitly 'async throws' protocol requirements that are distributed funcs
+  // expected-error@-1{{'distributed' protocol requirement 'distThrows()' must currently be declared explicitly 'async throws'}}
   distributed func distAsyncThrows() async throws
 }
 
