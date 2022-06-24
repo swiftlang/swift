@@ -45,8 +45,8 @@ func test() async throws {
   print("remoteW is remote: \(__isRemoteActor(remoteW))")
 
   // direct calls work ok:
-//  let replyDirect = try await remoteW.submit(work: "Direct")
-//  print("reply direct: \(replyDirect)")
+  let replyDirect = try await remoteW.submit(work: "Direct")
+  print("reply direct: \(replyDirect)")
   // CHECK: remoteCall: on:main.TheWorker, target:main.TheWorker.submit(work:), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Direct"], returnType: Optional(Swift.String), errorType: Optional(Swift.Error)), throwing:Swift.Error, returning:Swift.String
   // CHECK: reply direct: TheWorker echo: Direct
 

@@ -1421,6 +1421,10 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
     }
   }
 
+  if (viable.size() == 2) {
+    return 0;
+  }
+
   SolutionDiff diff(viable);
 
   // Find a potential best.
