@@ -22,13 +22,26 @@ public enum EnumCaseIsCxxKeyword {
 }
 
 // CHECK: class EnumCaseIsCxxKeyword final {
-// CHECK: enum class cases { first, second, const_ };
+// CHECK:      enum class cases {
+// CHECK-NEXT:   first,
+// CHECK-NEXT:   second,
+// CHECK-NEXT:   const_
+// CHECK-NEXT: };
 
 // CHECK: class EnumCaseIsSwiftKeyword final {
-// CHECK: enum class cases { first, protocol };
+// CHECK:      enum class cases {
+// CHECK-NEXT:   first,
+// CHECK-NEXT:   protocol
+// CHECK-NEXT: };
 
 // CHECK: class EnumMultipleElementsInSingleCase final {
-// CHECK: enum class cases { first, second };
+// CHECK:      enum class cases {
+// CHECK-NEXT:   first,
+// CHECK-NEXT:   second
+// CHECK-NEXT: };
 
 // CHECK: class EnumSingleElementInSingleCase final {
-// CHECK: enum class cases { first, second };
+// CHECK:      enum class cases {
+// CHECK-NEXT:   first,
+// CHECK-NEXT:   second
+// CHECK-NEXT: };

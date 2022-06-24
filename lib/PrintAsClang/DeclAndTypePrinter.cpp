@@ -394,16 +394,17 @@ private:
                                     owningPrinter.interopContext);
       printer.printValueTypeDecl(ED, /*bodyPrinter=*/[&]() {
         ClangSyntaxPrinter syntaxPrinter(os);
-        os << "  enum class cases { ";
+        os << "  enum class cases {";
         llvm::interleaveComma(
             ED->getAllCases(), os, [&](const EnumCaseDecl *caseDecl) {
               llvm::interleaveComma(caseDecl->getElements(), os,
                                     [&](const EnumElementDecl *elementDecl) {
+                                      os << "\n    ";
                                       syntaxPrinter.printIdentifier(
                                           elementDecl->getNameStr());
                                     });
             });
-        os << " };\n";
+        os << "\n  };\n";
       });
       os << outOfLineDefinitions;
       outOfLineDefinitions.clear();
