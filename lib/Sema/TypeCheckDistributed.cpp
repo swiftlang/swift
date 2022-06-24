@@ -503,7 +503,11 @@ bool CheckDistributedFunctionRequest::evaluate(
     serializationRequirements = getDistributedSerializationRequirementProtocols(
         getDistributedActorSystemType(actor)->getAnyNominal(),
         C.getProtocol(KnownProtocolKind::DistributedActorSystem));
+  } else if (auto proto = dyn_cast<ProtocolDecl>(DC)) {
+    // FIXME: if it has a n AS defined, we can do checks based on that, otherwise, don't
+    return false;
   } else {
+    func->dump();
     llvm_unreachable("Cannot handle types other than extensions and actor "
                      "declarations in distributed function checking.");
   }
