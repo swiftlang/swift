@@ -50,6 +50,11 @@ Type getDistributedActorSystemType(NominalTypeDecl *actor);
 /// Determine the `ID` type for the given actor.
 Type getDistributedActorIDType(NominalTypeDecl *actor);
 
+/// Similar to `getDistributedSerializationRequirementType`, however, from the
+/// perspective of a concrete function. This way we're able to get the
+/// serialization requirement for specific members, also in protocols.
+Type getConcreteReplacementForMemberSerializationRequirement(ValueDecl *member);
+
 /// Get specific 'SerializationRequirement' as defined in 'nominal'
 /// type, which must conform to the passed 'protocol' which is expected
 /// to require the 'SerializationRequirement'.
