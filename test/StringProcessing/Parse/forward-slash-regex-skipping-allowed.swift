@@ -5,6 +5,7 @@
 // RUN: %FileCheck -input-file %t/stats.csv %s
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: rdar95806819
 
 // Make sure we can skip in all of the below cases.
 
