@@ -55,13 +55,13 @@ bool swift::threading_impl::thread_is_main() {
 
 void swift::threading_impl::once_slow(once_t &predicate, void (*fn)(void *),
                                       void *context) {
-  std::int64_t zero = 0;
-  if (predicate.compare_exchange_strong(zero, (std::int64_t)1,
+  std::intptr_t zero = 0;
+  if (predicate.compare_exchange_strong(zero, (std::intptr_t)1,
                                         std::memory_order_relaxed,
                                         std::memory_order_relaxed)) {
     fn(context);
 
-    predicate.store((std::int64_t)-1, std::memory_order_release);
+    predicate.store((std::intptr_t)-1, std::memory_order_release);
 
     pthread_mutex_lock(&onceMutex);
     pthread_mutex_unlock(&onceMutex);
@@ -70,7 +70,7 @@ void swift::threading_impl::once_slow(once_t &predicate, void (*fn)(void *),
   }
 
   pthread_mutex_lock(&onceMutex);
-  while (predicate.load(std::memory_order_acquire) >= (std::int64_t)0) {
+  while (predicate.load(std::memory_order_acquire) >= (std::intptr_t)0) {
     pthread_cond_wait(&onceCond, &onceMutex);
   }
   pthread_mutex_unlock(&onceMutex);

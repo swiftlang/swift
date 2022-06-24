@@ -148,13 +148,13 @@ inline void lazy_mutex_unsafe_unlock(lazy_mutex_handle &handle) {
 
 // .. Once ...................................................................
 
-typedef std::atomic<std::int64_t> once_t;
+typedef std::atomic<std::intptr_t> once_t;
 
 void once_slow(once_t &predicate, void (*fn)(void *), void *context);
 
 inline void once_impl(once_t &predicate, void (*fn)(void *), void *context) {
   // Sadly we can't use call_once() for this (no context)
-  if (std::atomic_load_explicit(&predicate, std::memory_order_acquire) < 0)
+  if (predicate.load(std::memory_order_acquire) < 0)
     return;
 
   once_slow(predicate, fn, context);
