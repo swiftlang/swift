@@ -1513,7 +1513,6 @@ swift::getDisallowedOriginKind(const Decl *decl,
 
     if (howImported == RestrictedImportKind::Implicit &&
         !SF->getASTContext().isSwiftVersionAtLeast(6)) {
-      downgradeToWarning = DowngradeToWarning::Yes;
     }
 
     // Even if the current module is @_implementationOnly, Swift should
