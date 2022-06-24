@@ -449,6 +449,11 @@ clang::QualType ClangTypeConverter::visitProtocolType(ProtocolType *type) {
   auto proto = type->getDecl();
   auto &clangCtx = ClangASTContext;
 
+  // Strip 'Sendable'.
+  auto strippedType = type->stripConcurrency(false, false);
+  if (strippedType.getPointer() != type)
+    return convert(strippedType);
+
   if (!proto->isObjC())
     return clang::QualType();
 
@@ -702,6 +707,11 @@ ClangTypeConverter::visitSILBlockStorageType(SILBlockStorageType *type) {
 
 clang::QualType
 ClangTypeConverter::visitProtocolCompositionType(ProtocolCompositionType *type) {
+  // Strip 'Sendable'.
+  auto strippedType = type->stripConcurrency(false, false);
+  if (strippedType.getPointer() != type)
+    return convert(strippedType);
+
   // Any will be lowered to AnyObject, so we return the same result.
   if (type->isAny())
     return getClangIdType(ClangASTContext);
