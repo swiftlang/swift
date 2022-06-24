@@ -648,8 +648,13 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
   auto &C = func->getASTContext();
   auto DC = func->getDeclContext();
 
-  auto systemTy = getConcreteReplacementForProtocolActorSystemType(func);
-  assert(systemTy &&
+  // NOTE: So we don't need a thunk in the protocol, we should call the underlying
+  // thing instead, which MUST have a thunk, since it must be a distributed func as well...
+  if (dyn_cast<ProtocolDecl>(DC)) {
+    return nullptr;
+  }
+
+  assert(getConcreteReplacementForProtocolActorSystemType(func) &&
          "Thunk synthesis must have concrete actor system type available");
 
   DeclName thunkName = func->getName();

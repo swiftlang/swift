@@ -414,8 +414,7 @@ struct SILDeclRef {
                       defaultArgIndex,
                       pointer.get<AutoDiffDerivativeFunctionIdentifier *>());
   }
-  /// Returns the distributed entry point corresponding to the same
-  /// decl.
+  /// Returns the distributed entry point corresponding to the same decl.
   SILDeclRef asDistributed(bool distributed = true) const {
     return SILDeclRef(loc.getOpaqueValue(), kind,
                       /*foreign=*/false,
