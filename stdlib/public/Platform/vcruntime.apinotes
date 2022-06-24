@@ -1,5 +1,5 @@
 ---
-Name: VisualC
+Name: vcruntime
 Functions:
 - Name: _setjmp
   Availability: nonswift
