@@ -702,6 +702,13 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal
   (void)nominal->getDistributedActorIDProperty();
 }
 
+void TypeChecker::checkDistributedFunc(FuncDecl *func) {
+  if (!func->isDistributed())
+    return;
+
+  swift::checkDistributedFunction(func);
+}
+
 llvm::SmallPtrSet<ProtocolDecl *, 2>
 swift::getDistributedSerializationRequirementProtocols(
     NominalTypeDecl *nominal, ProtocolDecl *protocol) {
