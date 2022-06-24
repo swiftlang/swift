@@ -509,6 +509,7 @@ bool CheckDistributedFunctionRequest::evaluate(
         getDistributedActorSystemType(actor)->getAnyNominal(),
         C.getProtocol(KnownProtocolKind::DistributedActorSystem));
   } else {
+    func->dump();
     llvm_unreachable("Cannot handle types other than extensions and actor "
                      "declarations in distributed function checking.");
   }

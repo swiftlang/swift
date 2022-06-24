@@ -7922,6 +7922,10 @@ bool ExprRewriter::requiresDistributedThunk(Expr *base, SourceLoc memberLoc,
   auto *memberDecl = memberRef.getDecl();
   assert(memberDecl);
 
+  auto *memberDC = memberDecl->getDeclContext();
+  if (memberDC->getSelfProtocolDecl())
+    return false;
+
   if (auto *FD = dyn_cast<FuncDecl>(memberDecl)) {
     if (!(FD->isInstanceMember() && FD->isDistributed()))
       return false;
