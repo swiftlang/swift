@@ -4454,12 +4454,6 @@ operator()(CanType dependentType, Type conformingReplacementType,
 ProtocolConformanceRef LookUpConformanceInSignature::
 operator()(CanType dependentType, Type conformingReplacementType,
            ProtocolDecl *conformedProtocol) const {
-  // Lookup conformances for opened existential.
-  if (conformingReplacementType->isOpenedExistential()) {
-    return conformedProtocol->getModuleContext()->lookupConformance(
-        conformingReplacementType, conformedProtocol);
-  }
-
   // FIXME: Should pass dependentType instead, once
   // GenericSignature::lookupConformance() does the right thing
   return Sig->lookupConformance(conformingReplacementType->getCanonicalType(),
