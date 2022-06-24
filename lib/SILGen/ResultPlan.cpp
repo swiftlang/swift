@@ -117,17 +117,12 @@ mapTypeOutOfOpenedExistentialContext(CanType t) {
   const auto mappedTy = t.subst(
       [&](SubstitutableType *t) -> Type {
         auto *archTy = cast<ArchetypeType>(t);
+        if (!archTy->isRoot())
+          return t;
+
         const auto index = std::find(openedTypes.begin(), openedTypes.end(),
-                                     archTy->getRoot()) -
-                           openedTypes.begin();
+                                     archTy) - openedTypes.begin();
         assert(index != openedTypes.end() - openedTypes.begin());
-
-        if (auto *dmt =
-                archTy->getInterfaceType()->getAs<DependentMemberType>()) {
-          return dmt->substRootParam(params[index],
-                                     MakeAbstractConformanceForGenericType());
-        }
-
         return params[index];
       },
       MakeAbstractConformanceForGenericType());
