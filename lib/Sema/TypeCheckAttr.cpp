@@ -5783,7 +5783,6 @@ void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
 
     // distributed func must be declared inside an distributed actor
     auto selfTy = dc->getSelfTypeInContext();
-
     if (!selfTy->isDistributedActor()) {
       auto diagnostic = diagnoseAndRemoveAttr(
         attr, diag::distributed_actor_func_not_in_distributed_actor);

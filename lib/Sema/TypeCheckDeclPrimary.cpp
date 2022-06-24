@@ -2880,6 +2880,7 @@ public:
     }
 
     TypeChecker::checkDeclAttributes(FD);
+    TypeChecker::checkDistributedFunc(FD);
 
     if (!checkOverrides(FD)) {
       // If a method has an 'override' keyword but does not
