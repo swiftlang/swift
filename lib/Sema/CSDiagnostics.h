@@ -1998,6 +1998,8 @@ public:
   /// so we have to attend to that in diagnostics.
   bool diagnoseMisplacedMissingArgument() const;
 
+  bool diagnoseAttemptedRegexBuilder() const;
+
 protected:
   /// \returns The position of the argument being diagnosed, starting at 1.
   unsigned getArgPosition() const { return Info.getArgPosition(); }

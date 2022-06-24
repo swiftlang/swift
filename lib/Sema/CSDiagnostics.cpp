@@ -26,6 +26,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -6730,9 +6731,88 @@ bool ArgumentMismatchFailure::diagnosePropertyWrapperMismatch() const {
   return true;
 }
 
+static void fixItImport(InFlightDiagnostic &diag, Identifier moduleName,
+                        DeclContext *dc) {
+  auto *SF = dc->getParentSourceFile();
+  assert(SF && "Not within a source file?");
+  auto decls = SF->getTopLevelDecls();
+  assert(!decls.empty() && "No decls in file?");
+
+  SourceLoc insertLoc;
+  bool isTrailing = true;
+
+  // Insert as the last import statement.
+  for (auto *decl : decls) {
+    auto *importDecl = dyn_cast<ImportDecl>(decl);
+    if (!importDecl) {
+      if (insertLoc.isValid())
+        break;
+      continue;
+    }
+    insertLoc = importDecl->getEndLoc();
+  }
+
+  // If we didn't have any import statements, insert it as the first decl.
+  if (insertLoc.isInvalid()) {
+    insertLoc = decls[0]->getStartLoc();
+    isTrailing = false;
+  }
+  if (insertLoc.isInvalid())
+    return;
+
+  SmallString<32> insertText;
+  if (isTrailing) {
+    insertText.append("\n");
+  }
+  insertText.append("import ");
+  insertText.append(moduleName.str());
+  if (isTrailing) {
+    diag.fixItInsertAfter(insertLoc, insertText);
+  } else {
+    insertText.append("\n\n");
+    diag.fixItInsert(insertLoc, insertText);
+  }
+}
+
+bool ArgumentMismatchFailure::diagnoseAttemptedRegexBuilder() const {
+  auto &ctx = getASTContext();
+
+  // Check if this an application of a Regex initializer, and the user has not
+  // imported _RegexBuilder.
+  auto *ctor = dyn_cast_or_null<ConstructorDecl>(getCallee());
+  if (!ctor)
+    return false;
+
+  auto *regexDecl = ctx.getRegexDecl();
+  if (!regexDecl)
+    return false;
+
+  auto *ctorDC = ctor->getInnermostTypeContext();
+  if (!ctorDC)
+    return false;
+
+  if (ctorDC->getSelfNominalTypeDecl() != regexDecl)
+    return false;
+
+  // If the RegexBuilder module is loaded, make sure it hasn't been imported.
+  if (auto *regexBuilderModule = ctx.getLoadedModule(ctx.Id_RegexBuilder)) {
+    auto &importCache = getASTContext().getImportCache();
+    if (importCache.isImportedBy(regexBuilderModule, getDC()))
+      return false;
+  }
+
+  // Suggest importing RegexBuilder.
+  auto diag = emitDiagnostic(diag::must_import_regex_builder_module);
+  fixItImport(diag, ctx.Id_RegexBuilder, getDC());
+  return true;
+}
+
 bool ArgumentMismatchFailure::diagnoseTrailingClosureMismatch() const {
   if (!Info.isTrailingClosure())
     return false;
+
+  if (diagnoseAttemptedRegexBuilder())
+    return true;
 
   auto paramType = getToType();
   if (paramType->lookThroughAllOptionalTypes()->is<AnyFunctionType>())
