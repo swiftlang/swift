@@ -4473,20 +4473,6 @@ Type DependentMemberType::substBaseType(Type substBase,
   return getMemberForBaseType(lookupConformance, getBase(), substBase,
                               getAssocType(), getName(), None);
 }
-
-Type DependentMemberType::substRootParam(Type newRoot,
-                                         LookupConformanceFn lookupConformance){
-  auto base = getBase();
-  if (base->is<GenericTypeParamType>()) {
-    return substBaseType(newRoot, lookupConformance);
-  }
-  if (auto depMem = base->getAs<DependentMemberType>()) {
-    return substBaseType(depMem->substRootParam(newRoot, lookupConformance),
-                         lookupConformance);
-  }
-  return Type();
-}
-
 static Type substGenericFunctionType(GenericFunctionType *genericFnType,
                                      TypeSubstitutionFn substitutions,
                                      LookupConformanceFn lookupConformances,

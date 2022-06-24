@@ -6146,10 +6146,6 @@ public:
   /// base.
   Type substBaseType(Type base, LookupConformanceFn lookupConformance);
 
-  /// Substitute the root generic type, looking up the chain of associated types.
-  /// Returns null if the member could not be found in the new root.
-  Type substRootParam(Type newRoot, LookupConformanceFn lookupConformance);
-
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::DependentMember;
