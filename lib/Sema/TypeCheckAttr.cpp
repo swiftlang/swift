@@ -219,6 +219,7 @@ public:
 
   void visitFinalAttr(FinalAttr *attr);
   void visitCompileTimeConstAttr(CompileTimeConstAttr *attr) {}
+  void visitDistributedKnownToBeLocalAttr(DistributedKnownToBeLocalAttr *attr);
   void visitIBActionAttr(IBActionAttr *attr);
   void visitIBSegueActionAttr(IBSegueActionAttr *attr);
   void visitLazyAttr(LazyAttr *attr);
@@ -318,8 +319,6 @@ public:
   void visitCompilerInitializedAttr(CompilerInitializedAttr *attr);
 
   void checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs);
-
-  void visitKnownToBeLocalAttr(KnownToBeLocalAttr *attr);
 
   void visitSendableAttr(SendableAttr *attr);
 
@@ -5915,10 +5914,27 @@ void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
   }
 }
 
-void AttributeChecker::visitKnownToBeLocalAttr(KnownToBeLocalAttr *attr) {
-  if (!D->isImplicit()) {
-    diagnoseAndRemoveAttr(attr, diag::distributed_local_cannot_be_used);
+void AttributeChecker::visitDistributedKnownToBeLocalAttr(DistributedKnownToBeLocalAttr *attr) {
+  if (D->isImplicit()) {
+    // Implicit code is fine, this is how we use '_local' in synthesized thunks.
+    return;
   }
+
+  // We already checked if the attribute is applied to a DistributedActor type,
+  // during TypeResolver::resolveDistributedKnownToBeLocal so no need to check
+  // here again.
+
+  // We only allow the `da.whenLocal { (...: _local DA) in }` to use '_local',
+  // currently, meaning that the local parameter will always be a closure
+  // param, since we're not able to safely carry it around and propagate the
+  // "local-ness" just yet.
+  // TODO(distributed): unlock this once '_local' is also implemented in properties
+  if (auto closureExpr = dyn_cast<AbstractClosureExpr>(D->getDeclContext())) {
+    return;
+  }
+
+  // Otherwise, it is in some user-defined context that cannot use this attr.
+  diagnoseAndRemoveAttr(attr, diag::distributed_local_cannot_be_used);
 }
 
 void AttributeChecker::visitSendableAttr(SendableAttr *attr) {

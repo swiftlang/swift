@@ -557,6 +557,9 @@ void SpecifierTypeRepr::printImpl(ASTPrinter &Printer,
   case TypeReprKind::CompileTimeConst:
     Printer.printKeyword("_const", Opts, " ");
     break;
+  case TypeReprKind::DistributedKnownToBeLocal:
+    Printer.printKeyword("_local", Opts, " ");
+    break;
   }
   printTypeRepr(Base, Printer, Opts);
 }

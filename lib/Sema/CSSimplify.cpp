@@ -9864,13 +9864,24 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
         auto flags = param.getParameterFlags();
 
         // Note when a parameter is inferred to be isolated.
-        if (contextualParam->isIsolated() && !flags.isIsolated() && paramDecl)
+        if (contextualParam->isIsolated() && !flags.isIsolated() && paramDecl) {
           isolatedParams.insert(paramDecl);
+
+          // an 'isolated' param is also implicitly '_local',
+          // since in order to run "on" an actor, it must be a real local instance.
+          distributedKnownLocalParams.insert(paramDecl);
+        }
+        if (contextualParam->isDistributedKnownToBeLocal() &&
+            !flags.isDistributedKnownToBeLocal() && paramDecl) {
+          distributedKnownLocalParams.insert(paramDecl);
+        }
 
         param =
             param.withFlags(flags.withInOut(contextualParam->isInOut())
                                  .withVariadic(contextualParam->isVariadic())
-                                 .withIsolated(contextualParam->isIsolated()));
+                                 .withIsolated(contextualParam->isIsolated())
+                                 .withDistributedKnownToBeLocal(
+                                    contextualParam->isDistributedKnownToBeLocal()));
       }
     }
 

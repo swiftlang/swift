@@ -753,8 +753,8 @@ namespace {
         PrintWithColorRAII(OS, DeclModifierColor) << " lazy";
       printStorageImpl(VD);
       printAccessors(VD);
-      if (VD->getAttrs().hasAttribute<KnownToBeLocalAttr>()) {
-        OS << " known-to-be-local";
+      if (VD->isDistributedKnownToBeLocal()) {
+        OS << " _local";
       }
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
@@ -912,8 +912,8 @@ namespace {
       OS.indent(Indent);
       PrintWithColorRAII(OS, ParenthesisColor) << '(';
       PrintWithColorRAII(OS, ParameterColor) << "parameter ";
-      if (P->getAttrs().hasAttribute<KnownToBeLocalAttr>()) {
-        OS << "known-to-be-local ";
+      if (P->isDistributedKnownToBeLocal()) {
+        OS << "_local ";
       }
       printDeclName(P);
       if (!P->getArgumentName().empty())
@@ -1349,8 +1349,8 @@ void ValueDecl::dumpRef(raw_ostream &os) const {
     os << moduleName;
   }
 
-  if (getAttrs().hasAttribute<KnownToBeLocalAttr>()) {
-    os << " known-to-be-local";
+  if (getAttrs().hasAttribute<DistributedKnownToBeLocalAttr>()) {
+    os << " _local";
   }
 
   if (getAttrs().hasAttribute<DistributedThunkAttr>()) {
@@ -3130,6 +3130,12 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
+  void visitDistributedKnownToBeLocalTypeRepr(DistributedKnownToBeLocalTypeRepr *T) {
+    printCommon("_local") << '\n';
+    printRec(T->getBase());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
   void visitOptionalTypeRepr(OptionalTypeRepr *T) {
     printCommon("type_optional") << '\n';
     printRec(T->getBase());
@@ -3536,6 +3542,7 @@ namespace {
       printFlag(paramFlags.isAutoClosure(), "autoclosure");
       printFlag(paramFlags.isNonEphemeral(), "nonEphemeral");
       printFlag(paramFlags.isCompileTimeConst(), "compileTimeConst");
+      printFlag(paramFlags.isDistributedKnownToBeLocal(), "distributedKnownLocal");
       switch (paramFlags.getValueOwnership()) {
       case ValueOwnership::Default: break;
       case ValueOwnership::Owned: printFlag("owned"); break;

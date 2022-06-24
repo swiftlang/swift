@@ -1656,6 +1656,12 @@ SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
         param->setIsolated(true);
     }
 
+    // Find any '_local' parameters in this closure and mark them as isolated.
+    for (auto param : solution.distributedKnownLocalParams) {
+      if (param->getDeclContext() == closure)
+        param->setDistributedKnownToBeLocal(true);
+    }
+
     // Coerce the result type, if it was written explicitly.
     if (closure->hasExplicitResultType()) {
       closure->setExplicitResultType(closureFnType->getResult());

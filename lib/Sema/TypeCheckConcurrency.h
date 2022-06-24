@@ -209,6 +209,8 @@ struct ActorReferenceResult {
     /// The declaration is being accessed from outside the actor and
     /// potentially from a different node, so it must be marked 'distributed'.
     Distributed = 1 << 2,
+
+    /// Distributed but known to be local
   };
 
   using Options = OptionSet<Flags>;
@@ -468,11 +470,13 @@ bool isAccessibleAcrossActors(
     ValueDecl *value, const ActorIsolation &isolation,
     const DeclContext *fromDC, Optional<ReferencedActor> actorInstance = None);
 
-/// Check whether given variable references to a potentially
-/// isolated actor.
+/// Check whether given variable references to a potentially isolated actor.
 bool isPotentiallyIsolatedActor(
-    VarDecl *var, llvm::function_ref<bool(ParamDecl *)> isIsolated =
-                      [](ParamDecl *P) { return P->isIsolated(); });
+    VarDecl *var,
+    llvm::function_ref<bool(ParamDecl *)> isIsolated =
+        [](ParamDecl *P) { return P->isIsolated(); },
+    llvm::function_ref<bool(ParamDecl *)> isDistributedKnownLocal =
+        [](ParamDecl *P) { return P->isDistributedKnownToBeLocal(); });
 
 } // end namespace swift
 

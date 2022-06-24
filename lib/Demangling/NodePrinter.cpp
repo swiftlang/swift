@@ -423,6 +423,7 @@ private:
     case Node::Kind::Initializer:
     case Node::Kind::Isolated:
     case Node::Kind::CompileTimeConst:
+    case Node::Kind::DistributedKnownToBeLocal:
     case Node::Kind::PropertyWrapperBackingInitializer:
     case Node::Kind::PropertyWrapperInitFromProjectedValue:
     case Node::Kind::KeyPathGetterThunkHelper:
@@ -1486,6 +1487,10 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   case Node::Kind::CompileTimeConst:
     Printer << "_const ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
+  case Node::Kind::DistributedKnownToBeLocal:
+    Printer << "_local ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
   case Node::Kind::Shared:

@@ -1998,6 +1998,12 @@ ManglingError Remangler::mangleCompileTimeConst(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleDistributedKnownToBeLocal(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
+  Buffer << "Yl";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleShared(Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << 'h';

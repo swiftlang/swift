@@ -1827,6 +1827,10 @@ ManglingError Remangler::mangleCompileTimeConst(Node *node, unsigned depth) {
   Buffer << "Yt";
   return mangleSingleChildNode(node, depth + 1); // type
 }
+ManglingError Remangler::mangleDistributedKnownToBeLocal(Node *node, unsigned depth) {
+  Buffer << "Yl";
+  return mangleSingleChildNode(node, depth + 1); // type
+}
 
 ManglingError Remangler::mangleNoDerivative(Node *node, unsigned depth) {
   Buffer << 'k';

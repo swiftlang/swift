@@ -2492,6 +2492,7 @@ directReferencesForTypeRepr(Evaluator &evaluator,
   case TypeReprKind::InOut:
   case TypeReprKind::Isolated:
   case TypeReprKind::CompileTimeConst:
+  case TypeReprKind::DistributedKnownToBeLocal:
   case TypeReprKind::Metatype:
   case TypeReprKind::Owned:
   case TypeReprKind::Protocol:

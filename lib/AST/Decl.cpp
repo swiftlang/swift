@@ -812,6 +812,10 @@ bool AbstractStorageDecl::isCompileTimeConst() const {
   return getAttrs().hasAttribute<CompileTimeConstAttr>();
 }
 
+bool AbstractStorageDecl::isDistributedKnownToBeLocal() const {
+  return getAttrs().hasAttribute<DistributedKnownToBeLocalAttr>();
+}
+
 bool AbstractStorageDecl::isTransparent() const {
   return getAttrs().hasAttribute<TransparentAttr>();
 }
@@ -6456,10 +6460,6 @@ bool VarDecl::isDistributed() const {
   return getAttrs().hasAttribute<DistributedActorAttr>();
 }
 
-bool VarDecl::isKnownToBeLocal() const {
-  return getAttrs().hasAttribute<KnownToBeLocalAttr>();
-}
-
 bool VarDecl::isOrdinaryStoredProperty() const {
   // we assume if it hasAttachedPropertyWrapper, it has no storage.
   //
@@ -7038,7 +7038,8 @@ AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
   auto flags = ParameterTypeFlags::fromParameterType(
       type, isVariadic(), isAutoClosure(), isNonEphemeral(),
       getValueOwnership(), isIsolated(), /*isNoDerivative*/ false,
-      isCompileTimeConst());
+      isCompileTimeConst(),
+      isDistributedKnownToBeLocal());
   return AnyFunctionType::Param(type, label, flags, internalLabel);
 }
 

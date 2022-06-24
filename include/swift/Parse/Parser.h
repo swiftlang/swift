@@ -1130,15 +1130,18 @@ public:
                                       SourceLoc &SpecifierLoc,
                                       SourceLoc &IsolatedLoc,
                                       SourceLoc &ConstLoc,
+                                      SourceLoc &DistributedLocalLoc,
                                       TypeAttributes &Attributes) {
     if (Tok.isAny(tok::at_sign, tok::kw_inout) ||
         (Tok.is(tok::identifier) &&
          (Tok.getRawText().equals("__shared") ||
           Tok.getRawText().equals("__owned") ||
           Tok.isContextualKeyword("isolated") ||
-          Tok.isContextualKeyword("_const"))))
+          Tok.isContextualKeyword("_const") ||
+          Tok.isContextualKeyword("_local"))))
       return parseTypeAttributeListPresent(
-          Specifier, SpecifierLoc, IsolatedLoc, ConstLoc, Attributes);
+          Specifier, SpecifierLoc, IsolatedLoc, ConstLoc, DistributedLocalLoc,
+          Attributes);
     return makeParserSuccess();
   }
 
@@ -1146,6 +1149,7 @@ public:
                                              SourceLoc &SpecifierLoc,
                                              SourceLoc &IsolatedLoc,
                                              SourceLoc &ConstLoc,
+                                             SourceLoc &DistributedLocalLoc,
                                              TypeAttributes &Attributes);
 
   bool parseConventionAttributeInternal(bool justChecking,
@@ -1328,7 +1332,8 @@ public:
                                  ParamDecl::Specifier Specifier,
                                  SourceLoc SpecifierLoc,
                                  SourceLoc IsolatedLoc,
-                                 SourceLoc ConstLoc);
+                                 SourceLoc ConstLoc,
+                                 SourceLoc DistributedLocalLoc);
 
   //===--------------------------------------------------------------------===//
   // Pattern Parsing
@@ -1389,6 +1394,9 @@ public:
 
     /// The location of the 'isolated' keyword, if present.
     SourceLoc IsolatedLoc;
+
+    /// The location of the '_local' keyword, if present.
+    SourceLoc KnownToBeLocalLoc;
 
     /// The location of the '_const' keyword, if present.
     SourceLoc CompileConstLoc;

@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 694; // add @objc protocol methods to objc method tables
+const uint16_t SWIFTMODULE_VERSION_MINOR = 695; // add '_local' for distributed actors to mark "known to be local"
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1099,7 +1099,8 @@ namespace decls_block {
     ValueOwnershipField, // inout, shared or owned?
     BCFixed<1>,          // isolated
     BCFixed<1>,          // noDerivative?
-    BCFixed<1>           // compileTimeConst
+    BCFixed<1>,          // compileTimeConst
+    BCFixed<1>           // distributedKnownLocal
   >;
 
   TYPE_LAYOUT(MetatypeTypeLayout,
@@ -1423,6 +1424,7 @@ namespace decls_block {
     BCFixed<1>,              // isAutoClosure?
     BCFixed<1>,              // isIsolated?
     BCFixed<1>,              // isCompileTimeConst?
+    BCFixed<1>,              // isDistributedKnownToBeLocal?
     DefaultArgumentField,    // default argument kind
     TypeIDField,             // default argument type
     BCBlob                   // default argument text

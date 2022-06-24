@@ -4829,6 +4829,9 @@ public:
   }
   bool isCompileTimeConst() const;
 
+  /// Is a reference to a distributed actor that is "known to be local".
+  bool isDistributedKnownToBeLocal() const;
+
   /// \returns the way 'static'/'class' should be spelled for this declaration.
   StaticSpellingKind getCorrectStaticSpelling() const;
 
@@ -5359,10 +5362,6 @@ public:
   /// 'distributed' and and nullptr otherwise.
   FuncDecl *getDistributedThunk() const;
 
-  /// Is this var known to be a "local" distributed actor,
-  /// if so the implicit throwing ans some isolation checks can be skipped.
-  bool isKnownToBeLocal() const;
-
   /// Is this a stored property that will _not_ trigger any user-defined code
   /// upon any kind of access?
   bool isOrdinaryStoredProperty() const;
@@ -5635,9 +5634,13 @@ class ParamDecl : public VarDecl {
 
     /// Whether or not this parameter is '_const'.
     IsCompileTimeConst = 1 << 1,
+
+    // FIXME: it's not on the name but on the type
+    /// Whether or not this parameter is a '_local DistributedActor' reference.
+    IsDistributedKnownToBeLocal = 1 << 2,
   };
 
-  llvm::PointerIntPair<Identifier, 2, OptionSet<ArgumentNameFlags>>
+  llvm::PointerIntPair<Identifier, 3, OptionSet<ArgumentNameFlags>>
       ArgumentNameAndFlags;
   SourceLoc ParameterNameLoc;
   SourceLoc ArgumentNameLoc;
@@ -5876,6 +5879,21 @@ public:
     auto flags = DefaultValueAndFlags.getInt();
     DefaultValueAndFlags.setInt(value ? flags | Flags::IsIsolated
                                       : flags - Flags::IsIsolated);
+  }
+
+  /// Whether or not this parameter is marked with 'isolated'.
+  bool isDistributedKnownToBeLocal() const {
+    return ArgumentNameAndFlags.getInt().contains(ArgumentNameFlags::IsDistributedKnownToBeLocal);
+  }
+
+  void setDistributedKnownToBeLocal(bool value = true) {
+    auto flags = ArgumentNameAndFlags.getInt();
+    if (value && !getAttrs().hasAttribute<DistributedKnownToBeLocalAttr>()) {
+      getAttrs().add(new (getASTContext())
+                         DistributedKnownToBeLocalAttr(/*isImplicit=*/true));
+    }
+    ArgumentNameAndFlags.setInt(value ? flags | ArgumentNameFlags::IsDistributedKnownToBeLocal
+                                      : flags - ArgumentNameFlags::IsDistributedKnownToBeLocal);
   }
 
   /// Whether or not this parameter is marked with '_const'.

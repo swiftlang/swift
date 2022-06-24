@@ -2710,11 +2710,13 @@ private:
     // course we're in a context that could never handle an 'async'. Then, we
     // produce an error.
     if (!Flags.has(ContextFlags::HasAnyAsyncSite)) {
-      if (CurContext.handlesAsync(ConditionalEffectKind::Conditional))
+      if (CurContext.handlesAsync(ConditionalEffectKind::Conditional)) {
         Ctx.Diags.diagnose(E->getAwaitLoc(), diag::no_async_in_await);
-      else
+        E->dump();
+      } else {
         CurContext.diagnoseUnhandledAsyncSite(Ctx.Diags, E, None,
-                                              /*forAwait=*/ true);
+                                              /*forAwait=*/true);
+      }
     }
 
     // Inform the parent of the walk that an 'await' exists here.
@@ -2879,6 +2881,7 @@ private:
            auto callee = call->getCalledValue();
            if (callee) {
              auto declKind = callee->getDescriptiveKind();
+
              if (call->usesDistributedThunk()) {
                // We need to determine whether this is a method or a property.
                // Computed properties always form an implicit call to the thunk.

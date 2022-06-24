@@ -135,13 +135,14 @@ extension DistributedActor {
 
   /// Executes the passed 'body' only when the distributed actor is local instance.
   ///
-  /// The `Self` passed to the body closure is isolated, meaning that the
+  /// The `Self` passed to the body closure is guaranteed to be local, and
+  /// accesses on it bypass the distributed isolation checks, meaning that the
   /// closure can be used to call non-distributed functions, or even access actor
-  /// state.
+  /// state using actor-isolation semantics (rather than distributed actor-isolation semantics).
   ///
   /// When the actor is remote, the closure won't be executed and this function will return nil.
-  public nonisolated func whenLocal<T: Sendable>(
-    _ body: @Sendable (isolated Self) async throws -> T
+  public nonisolated func whenLocal<T: Sendable>( // FIXME: do we need sendable req here?
+    _ body: @Sendable (_local Self) async throws -> T
   ) async rethrows -> T? {
     if __isLocalActor(self) {
        return try await body(self)
@@ -149,6 +150,17 @@ extension DistributedActor {
       return nil
     }
   }
+
+  public nonisolated func whenLocal<T: Sendable>(
+    _ body: (_local Self) throws -> T
+  ) rethrows -> T? {
+    if __isLocalActor(self) {
+       return try body(self)
+    } else {
+      return nil
+    }
+  }
+
 }
 
 /******************************************************************************/

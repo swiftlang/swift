@@ -2113,6 +2113,8 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
 
   if (auto isolated = dyn_cast<IsolatedTypeRepr>(nestedRepr))
     nestedRepr = isolated->getBase();
+  if (auto knownLocal = dyn_cast<DistributedKnownToBeLocalTypeRepr>(nestedRepr))
+    nestedRepr = knownLocal->getBase();
   
   if (isa<InOutTypeRepr>(nestedRepr) &&
       param->isDefaultArgument()) {

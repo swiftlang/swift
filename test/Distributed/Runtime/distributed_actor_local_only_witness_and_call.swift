@@ -55,14 +55,11 @@ distributed actor Worker: LifecycleWatch {
     // FIXME: Actor isolation getting with generics is pending implementation #59356
     do {
       let terminatedID = Worker.ID(parse: "<terminated-id>")
-      let __secretlyKnownToBeLocal = worker
-      await __secretlyKnownToBeLocal.terminated(actor: terminatedID)
 
-      // FIXME: Once the above fixme is solved, use this real code instead:
-      //    _ = await worker.whenLocal { __secretlyKnownToBeLocal in
-      //      let terminatedID = Worker.ID(parse: "<terminated-id>")
-      //      return await __secretlyKnownToBeLocal.terminated(actor: terminatedID)
-      //    }
+      _ = await worker.whenLocal { localWorker in
+        let terminatedID = Worker.ID(parse: "<terminated-id>")
+        return await localWorker.terminated(actor: terminatedID)
+      }
     }
     // CHECK: terminated (on ActorAddress(address: "<unique-id>")): ActorAddress(address: "<terminated-id>")
 

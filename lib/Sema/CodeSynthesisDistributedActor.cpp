@@ -215,7 +215,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
          "Distributed function must be part of distributed actor");
 
   auto selfDecl = thunk->getImplicitSelfDecl();
-  selfDecl->getAttrs().add(new (C) KnownToBeLocalAttr(implicit));
+  selfDecl->getAttrs().add(new (C) DistributedKnownToBeLocalAttr(implicit));
 
   // === return type
   Type returnTy = func->getResultInterfaceType();

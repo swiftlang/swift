@@ -1212,11 +1212,8 @@ bool ReferencedActor::isKnownToBeLocal() const {
   case NonIsolatedParameter:
   case SendableFunction:
   case SendableClosure:
-    if (isPotentiallyIsolated)
-      return true;
-
-    return actor && actor->isKnownToBeLocal();
-
+    return isPotentiallyIsolated ||
+           (actor && actor->isDistributedKnownToBeLocal());
   case Isolated:
     return true;
   }
@@ -1283,7 +1280,7 @@ static void noteIsolatedActorMember(
   // FIXME: Make this diagnostic more sensitive to the isolation context of
   // the declaration.
   if (isDistributedActor) {
-    if (isa<VarDecl>(decl)) {
+    if (auto var = dyn_cast<VarDecl>(decl)) {
       // Distributed actor properties are never accessible externally.
       decl->diagnose(diag::distributed_actor_isolated_property,
                      decl->getDescriptiveKind(), decl->getName(),
@@ -2118,7 +2115,7 @@ namespace {
       return ReferencedActor(var, isPotentiallyIsolated, ReferencedActor::NonIsolatedParameter);
     }
 
-    VarDecl *findReferencedBaseSelf(Expr *expr) {
+    VarDecl *findReferencedCallBase(Expr *expr) {
       if (auto selfVar = getReferencedParamOrCapture(expr))
         if (selfVar->isSelfParameter() || selfVar->isSelfParamCapture())
           return selfVar;
@@ -2138,10 +2135,17 @@ namespace {
         for (auto arg : *call->getArgs()) {
           if (auto declRef = dyn_cast<DeclRefExpr>(arg.getExpr())) {
             if (auto var = dyn_cast<VarDecl>(declRef->getDecl())) {
-              if (var->isSelfParameter()) {
-                return var;
-              }
+              return var;
             }
+          }
+        }
+      }
+
+      // maybe it's a property access?
+      if (auto memberRef = dyn_cast<MemberRefExpr>(expr)) {
+        if (auto baseDeclRef = dyn_cast<DeclRefExpr>(memberRef->getBase())) {
+          if (auto var = dyn_cast<VarDecl>(baseDeclRef->getDecl())) {
+            return var;
           }
         }
       }
@@ -2290,9 +2294,10 @@ namespace {
     bool isDistributedAccess(SourceLoc declLoc, ValueDecl *decl,
                              Expr *context) {
       // If base of the call is 'local' we permit skip distributed checks.
-      if (auto baseSelf = findReferencedBaseSelf(context)) {
-        if (baseSelf->getAttrs().hasAttribute<KnownToBeLocalAttr>())
+      if (auto base = findReferencedCallBase(context)) {
+        if (base->isDistributedKnownToBeLocal()) {
           return false;
+        }
       }
 
       // Cannot reference subscripts, or stored properties.
@@ -2303,6 +2308,9 @@ namespace {
         if (var && var->isDistributed())
           return true;
 
+        if (var && var->isDistributedKnownToBeLocal())
+          return true;
+
         // otherwise, it was a normal property or subscript and therefore illegal
         ctx.Diags.diagnose(
             declLoc, diag::distributed_actor_isolated_non_self_reference,
@@ -2311,18 +2319,19 @@ namespace {
         return false;
       }
 
+
       // Check that we have a distributed function or computed property.
       if (auto afd = dyn_cast<AbstractFunctionDecl>(decl)) {
-        if (!afd->isDistributed()) {
-          ctx.Diags.diagnose(declLoc,
-                             diag::distributed_actor_isolated_method)
-              .fixItInsert(decl->getAttributeInsertionLoc(true), "distributed ");
-
-          noteIsolatedActorMember(decl, context);
-          return false;
+        if (afd->isDistributed()) {
+          // distributed method calls are always allowed
+          return true;
         }
 
-        return true;
+        ctx.Diags.diagnose(declLoc, diag::distributed_actor_isolated_method)
+            .fixItInsert(decl->getAttributeInsertionLoc(true), "distributed ");
+
+        noteIsolatedActorMember(decl, context);
+        return false;
       }
 
       return false;
@@ -4787,7 +4796,9 @@ VarDecl *swift::getReferencedParamOrCapture(
 }
 
 bool swift::isPotentiallyIsolatedActor(
-    VarDecl *var, llvm::function_ref<bool(ParamDecl *)> isIsolated) {
+    VarDecl *var,
+    llvm::function_ref<bool(ParamDecl *)> isIsolated,
+    llvm::function_ref<bool(ParamDecl *)> isDistributedKnownLocal) {
   if (!var)
     return false;
 
@@ -4799,8 +4810,10 @@ bool swift::isPotentiallyIsolatedActor(
     return true;
   }
 
-  if (auto param = dyn_cast<ParamDecl>(var))
-    return isIsolated(param);
+  if (auto param = dyn_cast<ParamDecl>(var)) {
+    if (isIsolated(param))
+      return true;
+  }
 
   // If this is a captured 'self', check whether the original 'self' is
   // isolated.

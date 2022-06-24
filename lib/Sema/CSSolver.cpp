@@ -182,6 +182,7 @@ Solution ConstraintSystem::finalize() {
   solution.solutionApplicationTargets = solutionApplicationTargets;
   solution.caseLabelItems = caseLabelItems;
   solution.isolatedParams.append(isolatedParams.begin(), isolatedParams.end());
+  solution.distributedKnownLocalParams.append(distributedKnownLocalParams.begin(), distributedKnownLocalParams.end());
 
   for (const auto &transformed : resultBuilderTransformed) {
     solution.resultBuilderTransformed.insert(transformed);
@@ -293,6 +294,10 @@ void ConstraintSystem::applySolution(const Solution &solution) {
 
   for (auto param : solution.isolatedParams) {
     isolatedParams.insert(param);
+  }
+
+  for (auto param : solution.distributedKnownLocalParams) {
+    distributedKnownLocalParams.insert(param);
   }
 
   for (const auto &transformed : solution.resultBuilderTransformed) {
@@ -535,6 +540,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numSolutionApplicationTargets = cs.solutionApplicationTargets.size();
   numCaseLabelItems = cs.caseLabelItems.size();
   numIsolatedParams = cs.isolatedParams.size();
+  numDistributedKnownLocalParams = cs.distributedKnownLocalParams.size();
   numImplicitValueConversions = cs.ImplicitValueConversions.size();
   numArgumentLists = cs.ArgumentLists.size();
   numImplicitCallAsFunctionRoots = cs.ImplicitCallAsFunctionRoots.size();
@@ -645,6 +651,9 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   // Remove any isolated parameters.
   truncate(cs.isolatedParams, numIsolatedParams);
+
+  // Remove any distributed known-to-be-local parameters.
+  truncate(cs.distributedKnownLocalParams, numDistributedKnownLocalParams);
 
   // Remove any implicit value conversions.
   truncate(cs.ImplicitValueConversions, numImplicitValueConversions);

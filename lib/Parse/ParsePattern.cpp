@@ -166,7 +166,8 @@ bool Parser::startsParameterName(bool isClosure) {
     // If the first name wasn't "isolated", we're done.
     if (!Tok.isContextualKeyword("isolated") &&
         !Tok.isContextualKeyword("some") &&
-        !Tok.isContextualKeyword("any"))
+        !Tok.isContextualKeyword("any") &&
+        !Tok.isContextualKeyword("_local"))
       return true;
 
     // "isolated" can be an argument label, but it's also a contextual keyword,
@@ -255,12 +256,13 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       }
     }
     
-    // ('inout' | '__shared' | '__owned' | isolated)?
+    // ('inout' | '__shared' | '__owned' | isolated | '_local' | '_const')?
     bool hasSpecifier = false;
     while (Tok.is(tok::kw_inout) ||
            Tok.isContextualKeyword("__shared") ||
            Tok.isContextualKeyword("__owned") ||
            Tok.isContextualKeyword("isolated") ||
+           Tok.isContextualKeyword("_local") ||
            Tok.isContextualKeyword("_const")) {
 
       if (Tok.isContextualKeyword("isolated")) {
@@ -623,10 +625,17 @@ mapParsedParameters(Parser &parser,
           }
 
           if (auto *STR = dyn_cast<SpecifierTypeRepr>(unwrappedType)) {
-            if (isa<IsolatedTypeRepr>(STR))
+            if (isa<IsolatedTypeRepr>(STR)) {
               param->setIsolated(true);
+            } else if (isa<DistributedKnownToBeLocalTypeRepr>(STR)) {
+              param->setDistributedKnownToBeLocal(true);
+              auto localAttr = new (parser.Context)
+                  DistributedKnownToBeLocalAttr(paramInfo.KnownToBeLocalLoc);
+              param->getAttrs().add(localAttr);
+            }
+
             unwrappedType = STR->getBase();
-            continue;;
+            continue;
           }
 
           if (auto *CTR = dyn_cast<CompileTimeConstTypeRepr>(unwrappedType)) {
