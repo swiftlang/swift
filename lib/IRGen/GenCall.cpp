@@ -2916,8 +2916,9 @@ llvm::CallInst *IRBuilder::CreateCall(const FunctionPointer &fn,
       fn.getRawPointer()->getType()->getPointerElementType());
   llvm::CallInst *call =
       IRBuilderBase::CreateCall(fnTy, fn.getRawPointer(), args, bundles);
+
   call->setAttributes(
-      fixUpTypesInByValAndStructRetAttributes(fnTy, call->getAttributes()));
+      fixUpTypesInByValAndStructRetAttributes(fnTy, fn.getAttributes()));
   call->setCallingConv(fn.getCallingConv());
   return call;
 }
