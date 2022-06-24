@@ -416,7 +416,7 @@ CanType TypeJoin::visitProtocolCompositionType(CanType second) {
     if (fnTy && fnTy->getExtInfo().isNoEscape())
       return Nonexistent;
 
-    return getAnyExistentialType();
+    return TheAnyType;
   }
 
   assert(First != second);
