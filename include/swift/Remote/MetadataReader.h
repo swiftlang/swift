@@ -1231,9 +1231,9 @@ public:
 
     // Read the size of the requirement signature.
     uint64_t reqSigGenericSize = 0;
-    uint64_t genericHeaderSize = sizeof(GenericContextDescriptorHeader);
+    uint64_t genericHeaderSize = sizeof(TargetGenericContextDescriptorHeader<Runtime>);
     {
-      GenericContextDescriptorHeader header;
+      TargetGenericContextDescriptorHeader<Runtime> header;
       auto headerAddr = address + sizeof(flags);
 
       if (!Reader->readBytes(RemoteAddress(headerAddr),
@@ -1288,7 +1288,7 @@ public:
     
     TypeContextDescriptorFlags typeFlags(flags.getKindSpecificFlags());
     uint64_t baseSize = 0;
-    uint64_t genericHeaderSize = sizeof(GenericContextDescriptorHeader);
+    uint64_t genericHeaderSize = sizeof(TargetGenericContextDescriptorHeader<Runtime>);
     uint64_t metadataInitSize = 0;
     bool hasVTable = false;
 
@@ -1355,7 +1355,7 @@ public:
     // factor the layout stuff out...
     uint64_t genericsSize = 0;
     if (flags.isGeneric()) {
-      GenericContextDescriptorHeader header;
+      TargetGenericContextDescriptorHeader<Runtime> header;
       auto headerAddr = address
         + baseSize
         + genericHeaderSize

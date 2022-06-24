@@ -1842,7 +1842,7 @@ private:
          + (Flags.hasImplicitGenSigParams() ? 0 : getNumGenSigParams());
   }
 
-  size_t numTrailingObjects(OverloadToken<GenericRequirementDescriptor>) const {
+  size_t numTrailingObjects(OverloadToken<TargetGenericRequirementDescriptor<Runtime>>) const {
     return getNumGenSigRequirements() + getNumReqSigRequirements();
   }
 
@@ -2996,7 +2996,10 @@ public:
     return cd->getKind() == ContextDescriptorKind::OpaqueType;
   }
 };
-  
+
+
+template<template <typename Runtime> class ObjCInteropKind, unsigned PointerSize>
+using ExternalOpaqueTypeDescriptor = TargetOpaqueTypeDescriptor<External<ObjCInteropKind<RuntimeTarget<PointerSize>>>>;
 using OpaqueTypeDescriptor = TargetOpaqueTypeDescriptor<InProcess>;
 
 /// The instantiation cache for generic metadata.  This must be guaranteed
@@ -4676,7 +4679,7 @@ public:
   RelativeDirectPointer<const char, /*nullable*/ false> Name;
 
   /// The generic environment associated with this accessor function.
-  RelativeDirectPointer<GenericEnvironmentDescriptor, /*nullable*/ true>
+  RelativeDirectPointer<TargetGenericEnvironment<Runtime>, /*nullable*/ true>
       GenericEnvironment;
 
   /// The Swift function type, encoded as a mangled name.
