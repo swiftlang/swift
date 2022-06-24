@@ -20,7 +20,7 @@ import FakeDistributedActorSystems
 
 typealias DefaultDistributedActorSystem = FakeRoundtripActorSystem
 
-protocol DistributedWorker: DistributedActor {
+protocol DistributedWorker: DistributedActor where ActorSystem == DefaultDistributedActorSystem {
   associatedtype WorkItem: Sendable & Codable
   associatedtype WorkResult: Sendable & Codable
 
@@ -67,7 +67,16 @@ func test() async throws {
   let remoteW = try! TheWorker.resolve(id: w.id, using: system)
   print("remoteW is remote: \(__isRemoteActor(remoteW))")
 
-  let reply = try await remoteW.submit(work: "Hello")
+  // direct calls work ok:
+//  let reply = try await remoteW.submit(work: "Hello")
+
+  // Fails with:
+  // Cannot handle types other than extensions and actor declarations in distributed function checking.
+  // UNREACHABLE executed at /Users/ktoso/code/swift-project/swift/lib/Sema/TypeCheckDistributed.cpp:514!
+  func callWorker<W: DistributedWorker>(w: W) async throws -> String where W.WorkItem == String, W.WorkResult == String {
+    try await w.submit(work: "Hello")
+  }
+  let reply = try await callWorker(w: remoteW)
 
 //  let pool = WorkerPool<TheWorker>(worker: remoteW, actorSystem: system)
 //  let reply = try await pool.submit(work: "Hello")

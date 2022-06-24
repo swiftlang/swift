@@ -7789,11 +7789,21 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     apply->setArgs(args);
     cs.setType(apply, fnType->getResult());
 
-    // If this is a call to a distributed method thunk,
-    // let's mark the call as implicitly throwing/async.
+    // If this is a call to a distributed method thunk or
+    // distributed protocol requirement, let's mark the
+    // call as implicitly throwing/async.
     if (isa<SelfApplyExpr>(apply->getFn())) {
       auto *FD = dyn_cast<FuncDecl>(callee.getDecl());
-      if (FD && FD->isDistributedThunk()) {
+      auto isDistributedProtocolRequirement = [&](FuncDecl *func) {
+        if (!func->isDistributed())
+          return false;
+
+        auto *DC = func->getDeclContext();
+        return isa_and_nonnull<ProtocolDecl>(DC->getAsDecl());
+      };
+
+      if (FD &&
+          (FD->isDistributedThunk() || isDistributedProtocolRequirement(FD))) {
         apply->setImplicitlyThrows(true);
         apply->setImplicitlyAsync(ImplicitActorHopTarget::forInstanceSelf());
         apply->setUsesDistributedThunk(true);
@@ -7923,7 +7933,9 @@ bool ExprRewriter::requiresDistributedThunk(Expr *base, SourceLoc memberLoc,
   assert(memberDecl);
 
   auto *memberDC = memberDecl->getDeclContext();
-  if (memberDC->getSelfProtocolDecl())
+  // Protocol requirements are dispatched through a witness which is always
+  // a distributed thunk.
+  if (isa_and_nonnull<ProtocolDecl>(memberDC->getAsDecl()))
     return false;
 
   if (auto *FD = dyn_cast<FuncDecl>(memberDecl)) {
