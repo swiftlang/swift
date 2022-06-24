@@ -95,6 +95,11 @@ namespace swift {
     ErrorOnFailureRemarkOnSuccess
   };
 
+  enum class ConcurrencyModel : uint8_t {
+    Standard,
+    TaskToThread,
+  };
+
   /// A collection of options that affect the language dialect and
   /// provide compiler debugging facilities.
   class LangOptions final {
@@ -509,6 +514,13 @@ namespace swift {
 
     /// Enables dumping type witness systems from associated type inference.
     bool DumpTypeWitnessSystems = false;
+
+    /// The model of concurrency to be used.
+    ConcurrencyModel ActiveConcurrencyModel = ConcurrencyModel::Standard;
+
+    bool isConcurrencyModelTaskToThread() const {
+      return ActiveConcurrencyModel == ConcurrencyModel::TaskToThread;
+    }
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.

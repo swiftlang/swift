@@ -172,6 +172,16 @@ option(SWIFT_ENABLE_REFLECTION
   "Build stdlib with support for runtime reflection and mirrors."
   TRUE)
 
+if(SWIFT_FREESTANDING_FLAVOR STREQUAL "apple" AND NOT SWIFT_FREESTANDING_IS_DARWIN)
+  set(SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY_default TRUE)
+else()
+  set(SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY_default FALSE)
+endif()
+
+option(SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+       "Should concurrency use the task-to-thread model."
+       "${SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY_default}")
+
 option(SWIFT_STDLIB_HAS_STDIN
        "Build stdlib assuming the platform supports stdin and getline API."
        TRUE)
