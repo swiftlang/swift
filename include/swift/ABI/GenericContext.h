@@ -123,6 +123,9 @@ public:
     ///
     /// Only valid if the requirement has Layout kind.
     GenericRequirementLayoutKind Layout;
+
+    /// Raw value
+    int32_t RawOffset;
   };
 
   constexpr GenericRequirementFlags getFlags() const {
@@ -143,6 +146,16 @@ public:
   TargetProtocolDescriptorRef<Runtime> getProtocol() const {
     assert(getKind() == GenericRequirementKind::Protocol);
     return Protocol;
+  }
+
+  /// Retrieve the raw value contained in this generic requirement descriptor
+  int32_t getRawOffset() const {
+    return RawOffset;
+  }
+
+  constexpr inline auto
+  getOffsetOffset() const -> typename Runtime::StoredSize {
+    return offsetof(typename std::remove_reference<decltype(*this)>::type, RawOffset);
   }
 
   /// Retrieve the right-hand type for a SameType or BaseClass requirement.
@@ -301,7 +314,8 @@ public:
   }
 };
 
-using GenericEnvironmentDescriptor = TargetGenericEnvironment<InProcess>;
+using GenericEnvironmentDescriptor =
+TargetGenericEnvironment<InProcess>;
 
 /// CRTP class for a context descriptor that includes trailing generic
 /// context description.
