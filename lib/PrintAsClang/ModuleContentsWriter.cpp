@@ -439,8 +439,10 @@ public:
     bool allRequirementsSatisfied = true;
 
     for (auto proto : PD->getInheritedProtocols()) {
-      assert(proto->isObjC());
-      allRequirementsSatisfied &= require(proto);
+      if (printer.shouldInclude(proto)) {
+        assert(proto->isObjC());
+        allRequirementsSatisfied &= require(proto);
+      }
     }
 
     if (!allRequirementsSatisfied)
