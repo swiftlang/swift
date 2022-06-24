@@ -20,6 +20,8 @@
 //
 //    "\(x, format: .fixed(precision: 10), privacy: .private\)"
 
+import ObjectiveC
+
 extension OSLogInterpolation {
 
   /// Defines interpolation for expressions of type Float.
