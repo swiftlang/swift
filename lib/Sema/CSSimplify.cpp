@@ -1547,6 +1547,10 @@ shouldOpenExistentialCallArgument(
     adjustments |= OpenedExistentialAdjustmentFlags::InOut;
   }
 
+  // The argument may be a "var" instead of a "let".
+  if (auto lv = dyn_cast<LValueType>(argTy->getCanonicalType()))
+    argTy = lv->getObjectType();
+
   // The argument type needs to be an existential type or metatype thereof.
   if (!argTy->isAnyExistentialType())
     return None;
