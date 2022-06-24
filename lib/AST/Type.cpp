@@ -4331,7 +4331,7 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
 
   // Produce a failed result.
   auto failed = [&]() -> Type {
-    Type baseType = ErrorType::get(substBase ? substBase : origBase);
+    Type baseType = ErrorType::get(substBase);
     if (assocType)
       return DependentMemberType::get(baseType, assocType);
 
@@ -4349,38 +4349,42 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
       substBase->is<UnresolvedType>())
     return getDependentMemberType(substBase);
 
-  // If the parent is an archetype, extract the child archetype with the
-  // given name.
-  if (auto archetypeParent = substBase->getAs<ArchetypeType>()) {
-    if (Type memberArchetypeByName = archetypeParent->getNestedTypeByName(name))
-      return memberArchetypeByName;
-
-    // If looking for an associated type and the archetype is constrained to a
-    // class, continue to the default associated type lookup
-    if (!archetypeParent->getSuperclass())
-      return failed();
-  }
-
   if (!assocType)
     return failed();
 
-  // Retrieve the member type with the given name.
-
-  // Tuples don't have member types.
-  if (substBase->is<TupleType>())
-    return failed();
-
-  // Look in the witness table.
+  // Look up the conformance.
   auto proto = assocType->getProtocol();
-  ProtocolConformanceRef conformance =
-      lookupConformances(origBase->getCanonicalType(), substBase, proto);
+  ProtocolConformanceRef conformance;
+
+  // If we're replacing an opened existential, it's conceptually not part of
+  // the generic signature of the context, and instead it's own "root", so we
+  // can't use conformance access paths written in terms of the context
+  // signature interface types to find its conformances. Instead, do a global
+  // lookup.
+  if (origBase->is<OpenedArchetypeType>()) {
+    auto *parentModule = proto->getParentModule();
+    conformance = LookUpConformanceInModule(parentModule)(
+        origBase->getCanonicalType(), substBase, proto);
+  } else {
+    conformance = lookupConformances(
+        origBase->getCanonicalType(), substBase, proto);
+  }
 
   if (conformance.isInvalid())
     return failed();
-  if (!conformance.isConcrete())
-    return failed();
 
-  // Retrieve the type witness.
+  if (conformance.isAbstract()) {
+    // If the parent is an archetype, extract the child archetype with the
+    // given name.
+    if (auto archetypeParent = substBase->getAs<ArchetypeType>())
+      return archetypeParent->getNestedType(assocType);
+
+    return failed();
+  }
+
+  // Retrieve the member type with the given name.
+  assert(conformance.isConcrete());
+
   auto witness =
       conformance.getConcrete()->getTypeWitnessAndDecl(assocType, options);
 
