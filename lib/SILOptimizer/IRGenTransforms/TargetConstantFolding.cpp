@@ -15,9 +15,14 @@
 // It is a mandatory IRGen preparation pass (not a diagnostic pass).
 //
 //===----------------------------------------------------------------------===//
+///
+/// This file contains a pass for target specific constant folding:
+/// `TargetConstantFolding`. For details see the comments there.
+///
+//===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "target-constant-folding"
-#include "IRGenModule.h"
+#include "../../IRGen/IRGenModule.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
@@ -43,7 +48,9 @@ class TargetConstantFolding : public SILModuleTransform {
 private:
   /// The entry point to the transformation.
   void run() override {
-    auto *irgenOpts = getModule()->getIRGenOptionsOrNull();
+    SILModule *module = getModule();
+
+    auto *irgenOpts = module->getIRGenOptionsOrNull();
     if (!irgenOpts)
       return;
     
@@ -51,14 +58,14 @@ private:
     // Creating an IRGenModule involves some effort. Therefore this is a
     // module pass rather than a function pass so that this one-time setup
     // only needs to be done once and not for all functions in a module.
-    IRGenerator irgen(*irgenOpts, *getModule());
+    IRGenerator irgen(*irgenOpts, *module);
     auto targetMachine = irgen.createTargetMachine();
     if (!targetMachine)
       return;
     IRGenModule IGM(irgen, std::move(targetMachine));
 
     // Scan all instructions in the module for constant foldable instructions.
-    for (SILFunction &function : *getModule()) {
+    for (SILFunction &function : *module) {
     
       if (!function.shouldOptimize())
         continue;
@@ -118,6 +125,12 @@ private:
     if (!intTy)
       return false;
 
+    // The bit widths can differ if we are compiling for a 32 bit target.
+    if (value.getActiveBits() > intTy->getGreatestWidth()) {
+      // It's unlikely that a size/stride overflows 32 bits, but let's be on
+      // the safe side and catch a potential overflow.
+      return false;
+    }
     value = value.sextOrTrunc(intTy->getGreatestWidth());
 
     // Replace the builtin by an integer literal.
