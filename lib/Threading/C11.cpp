@@ -64,13 +64,13 @@ bool swift::threading_impl::thread_is_main() {
 
 void swift::threading_impl::once_slow(once_t &predicate, void (*fn)(void *),
                                       void *context) {
-  std::int64_t zero = 0;
-  if (std::atomic_compare_exchange_strong_explicit(&predicate, &zero, 1,
-                                                   std::memory_order_relaxed,
-                                                   std::memory_order_relaxed)) {
+  std::intptr_t zero = 0;
+  if (predicate.compare_exchange_strong(zero, (std::intptr_t)1,
+                                        std::memory_order_relaxed,
+                                        std::memory_order_relaxed)) {
     fn(context);
 
-    std::atomic_store_explicit(&predicate, -1, std::memory_order_release);
+    predicate.store((std::intptr_t)-1, std::memory_order_release);
 
     helper.once_lock();
     helper.once_unlock();
@@ -79,8 +79,7 @@ void swift::threading_impl::once_slow(once_t &predicate, void (*fn)(void *),
   }
 
   helper.once_lock();
-  while (std::atomic_load_explicit(&predicate, std::memory_order_acquire) >=
-         0) {
+  while (predicate.load(std::memory_order_acquire) >= (std::intptr_t)0) {
     helper.once_wait();
   }
   helper.once_unlock();
