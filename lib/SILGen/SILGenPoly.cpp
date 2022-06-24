@@ -4446,9 +4446,9 @@ void SILGenFunction::emitProtocolWitness(
     if ((requirement.hasDecl() && !getActorIsolation(requirement.getDecl()).isDistributedActor()) ||
         (requirement.hasDecl() && isa<FuncDecl>(requirement.getDecl()) && witness.getFuncDecl()->isDistributed())) {
       fprintf(stderr, "[%s:%d] (%s) witness thunk\n", __FILE__, __LINE__, __FUNCTION__);
-      witness = SILDeclRef(
-                    cast<AbstractFunctionDecl>(witness.getDecl())->getDistributedThunk())
-                    .asDistributed();
+      auto thunk = cast<AbstractFunctionDecl>(witness.getDecl())->getDistributedThunk();
+      thunk->dump();
+      witness = SILDeclRef(thunk) .asDistributed();
     }
   } else if (enterIsolation) {
     // If we are supposed to enter the actor, do so now by hopping to the

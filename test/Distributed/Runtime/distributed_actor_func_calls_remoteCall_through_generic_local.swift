@@ -25,8 +25,6 @@ protocol DistributedWorker: DistributedActor where ActorSystem == DefaultDistrib
   associatedtype WorkResult: Sendable & Codable
 
   distributed func submit(work: WorkItem) async throws -> WorkResult
-
-  func sync(work: WorkItem) -> WorkResult
 }
 
 distributed actor TheWorker: DistributedWorker {
@@ -34,12 +32,8 @@ distributed actor TheWorker: DistributedWorker {
   typealias WorkItem = String
   typealias WorkResult = String
 
-  distributed func submit(work: WorkItem) async throws -> WorkResult {
+  distributed func submit(work: WorkItem) -> WorkResult {
     "\(Self.self) echo: \(work)"
-  }
-
-  func sync(work: WorkItem) -> WorkResult {
-    return "SYNC: \(work)"
   }
 }
 
@@ -54,7 +48,7 @@ func test() async throws {
   // direct calls work ok:
   let replyDirect = try await remoteW.submit(work: "Direct")
   print("reply direct: \(replyDirect)")
-  // CHECK: >> remoteCall: on:main.TheWorker, target:main.TheWorker.submit(work:), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Direct"], returnType: Optional(Swift.String), errorType: Optional(Swift.Error)), throwing:Swift.Error, returning:Swift.String
+  // CHECK: >> remoteCall: on:main.TheWorker, target:main.TheWorker.submit(work:), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Direct"], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
   // CHECK: reply direct: TheWorker echo: Direct
 
   print("==== ---------------------------------------------------")
@@ -63,24 +57,10 @@ func test() async throws {
     try await w.submit(work: "Hello")
   }
   let reply = try await callWorker(w: remoteW)
-
   print("reply: \(reply)")
-  // CHECK: >> remoteCall: on:main.TheWorker, target:main.TheWorker.submit(work:), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Hello"], returnType: Optional(Swift.String), errorType: Optional(Swift.Error)), throwing:Swift.Error, returning:Swift.String
+  // CHECK: >> remoteCall: on:main.TheWorker, target:main.TheWorker.submit(work:), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Hello"], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
   // CHECK: << remoteCall return: TheWorker echo: Hello
   // CHECK: reply: TheWorker echo: Hello
-
-  // ----------
-  let replySyncRemote = await remoteW.whenLocal { __secretlyKnownToBeLocal in
-    __secretlyKnownToBeLocal.sync(work: "test")
-  }
-  print("reply sync (remote): \(replySyncRemote)")
-  // CHECK: reply sync (remote): nil
-
-  let replySyncLocal = await w.whenLocal { __secretlyKnownToBeLocal in
-    __secretlyKnownToBeLocal.sync(work: "test")
-  }
-  print("reply sync (local): \(replySyncLocal)")
-  // CHECK: reply sync (local): Optional("SYNC: test")
 }
 
 @main struct Main {
