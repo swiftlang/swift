@@ -42,23 +42,6 @@ distributed actor DistributedActor_1 {
   distributed let letProperty: String = "" // expected-error{{property 'letProperty' cannot be 'distributed', only computed properties can}}
   distributed var varProperty: String = "" // expected-error{{property 'varProperty' cannot be 'distributed', only computed properties can}}
 
-  distributed var computed: String {
-    "computed"
-  }
-
-  distributed var computedNotCodable: NotCodableValue { // expected-error{{result type 'NotCodableValue' of distributed property 'computedNotCodable' does not conform to serialization requirement 'Codable'}}
-    .init()
-  }
-
-  distributed var getSet: String { // expected-error{{'distributed' computed property 'getSet' cannot have setter}}
-    get {
-      "computed"
-    }
-    set {
-      _ = newValue
-    }
-  }
-
   distributed static func distributedStatic() {} // expected-error{{'distributed' method cannot be 'static'}}
   distributed class func distributedClass() {}
   // expected-error@-1{{class methods are only allowed within classes; use 'static' to declare a static method}}

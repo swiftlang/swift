@@ -3484,7 +3484,7 @@ ASTMangler::mangleOpaqueTypeDescriptorRecord(const OpaqueTypeDecl *decl) {
   return finalize();
 }
 
-std::string ASTMangler::mangleDistributedThunk(const AbstractFunctionDecl *thunk) {
+std::string ASTMangler::mangleDistributedThunk(const FuncDecl *thunk) {
   // Marker protocols cannot be checked at runtime, so there is no point
   // in recording them for distributed thunks.
   llvm::SaveAndRestore<bool> savedAllowMarkerProtocols(AllowMarkerProtocols,

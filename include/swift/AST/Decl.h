@@ -5345,10 +5345,6 @@ public:
   /// Does this have a 'distributed' modifier?
   bool isDistributed() const;
 
-  /// Return a distributed thunk if this computed property is marked as
-  /// 'distributed' and and nullptr otherwise.
-  FuncDecl *getDistributedThunk() const;
-
   /// Is this var known to be a "local" distributed actor,
   /// if so the implicit throwing ans some isolation checks can be skipped.
   bool isKnownToBeLocal() const;
@@ -6418,10 +6414,6 @@ public:
 
   /// Returns 'true' if the function is distributed.
   bool isDistributed() const;
-
-  /// Is this a thunk function used to access a distributed method outside
-  /// of its actor isolation context?
-  bool isDistributedThunk() const;
 
   /// For a 'distributed' target (func or computed property),
   /// get the 'thunk' responsible for performing the 'remoteCall'.

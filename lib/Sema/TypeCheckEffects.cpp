@@ -2859,16 +2859,8 @@ private:
            // callee is isolated to an actor.
            auto callee = call->getCalledValue();
            if (callee) {
-             auto declKind = callee->getDescriptiveKind();
-             if (call->usesDistributedThunk()) {
-               // We need to determine whether this is a method or a property.
-               // Computed properties always form an implicit call to the thunk.
-               declKind = call->isImplicit()
-                              ? DescriptiveDeclKind::DistributedProperty
-                              : DescriptiveDeclKind::DistributedMethod;
-             }
              Ctx.Diags.diagnose(diag.expr.getStartLoc(), diag::actor_isolated_sync_func,
-                                declKind, callee->getName());
+                                callee->getDescriptiveKind(), callee->getName());
            } else {
              Ctx.Diags.diagnose(
                  diag.expr.getStartLoc(), diag::actor_isolated_sync_func_value,

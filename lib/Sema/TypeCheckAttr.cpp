@@ -322,8 +322,6 @@ public:
   void visitKnownToBeLocalAttr(KnownToBeLocalAttr *attr);
 
   void visitSendableAttr(SendableAttr *attr);
-
-  void visitDistributedThunkAttr(DistributedThunkAttr *attr);
 };
 
 } // end anonymous namespace
@@ -5817,11 +5815,6 @@ void AttributeChecker::visitSendableAttr(SendableAttr *attr) {
         .warnUntilSwiftVersion(6);
     }
   }
-}
-
-void AttributeChecker::visitDistributedThunkAttr(DistributedThunkAttr *attr) {
-  if (!D->isImplicit())
-    diagnoseAndRemoveAttr(attr, diag::distributed_thunk_cannot_be_used);
 }
 
 void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
