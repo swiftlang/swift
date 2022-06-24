@@ -43,6 +43,7 @@ func test() async throws {
   let w = TheWorker(actorSystem: system)
   let remoteW = try! TheWorker.resolve(id: w.id, using: system)
   print("remoteW is remote: \(__isRemoteActor(remoteW))")
+  // CHECK: remoteW is remote: true
 
   // direct calls work ok:
   let replyDirect = try await remoteW.submit(work: "Direct")
