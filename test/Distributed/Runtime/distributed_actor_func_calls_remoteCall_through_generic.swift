@@ -37,29 +37,6 @@ distributed actor TheWorker: DistributedWorker {
   }
 }
 
-actor WorkerPool<Worker: DistributedWorker> {
-  typealias ActorSystem = FakeRoundtripActorSystem
-  typealias WorkItem = Worker.WorkItem
-  typealias WorkResult = Worker.WorkResult
-
-  let actorSystem: ActorSystem
-  let worker: Worker
-
-  init(worker: Worker, actorSystem: ActorSystem) {
-    self.worker = worker
-    self.actorSystem = actorSystem
-  }
-
-  func submit(work: WorkItem) async throws -> WorkResult {
-    let worker = try await self.selectWorker()
-    return try await worker.submit(work: work)
-  }
-
-  func selectWorker() async throws -> Worker {
-    return self.worker
-  }
-}
-
 func test() async throws {
   let system = DefaultDistributedActorSystem()
 
@@ -68,8 +45,12 @@ func test() async throws {
   print("remoteW is remote: \(__isRemoteActor(remoteW))")
 
   // direct calls work ok:
-//  let reply = try await remoteW.submit(work: "Hello")
+//  let replyDirect = try await remoteW.submit(work: "Direct")
+//  print("reply direct: \(replyDirect)")
+  // CHECK: remoteCall: on:main.TheWorker, target:main.TheWorker.submit(work:), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Direct"], returnType: Optional(Swift.String), errorType: Optional(Swift.Error)), throwing:Swift.Error, returning:Swift.String
+  // CHECK: reply direct: TheWorker echo: Direct
 
+  print("==== ---------------------------------------------------")
   // Fails with:
   // Cannot handle types other than extensions and actor declarations in distributed function checking.
   // UNREACHABLE executed at /Users/ktoso/code/swift-project/swift/lib/Sema/TypeCheckDistributed.cpp:514!
@@ -77,9 +58,6 @@ func test() async throws {
     try await w.submit(work: "Hello")
   }
   let reply = try await callWorker(w: remoteW)
-
-//  let pool = WorkerPool<TheWorker>(worker: remoteW, actorSystem: system)
-//  let reply = try await pool.submit(work: "Hello")
   // CHECK: >> remoteCall: on:main.TheWorker, target:main.TheWorker.submit(work:), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Hello"], returnType: Optional(Swift.String), errorType: Optional(Swift.Error)), throwing:Swift.Error, returning:Swift.String
 
   // CHECK: << remoteCall return: TheWorker echo: Hello
