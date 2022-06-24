@@ -52,7 +52,7 @@
 /// - `x.isStrictSuperset(of: y)` if and only if
 ///   `x.isSuperset(of: y) && x != y`
 /// - `x.isStrictSubset(of: y)` if and only if `x.isSubset(of: y) && x != y`
-public protocol SetAlgebra: Equatable, ExpressibleByArrayLiteral {
+public protocol SetAlgebra<Element>: Equatable, ExpressibleByArrayLiteral {
   /// A type for which the conforming type provides a containment test.
   associatedtype Element
   

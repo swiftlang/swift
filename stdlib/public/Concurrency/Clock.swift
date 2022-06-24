@@ -31,7 +31,7 @@ import Swift
 /// For more information about specific clocks see `ContinuousClock` and 
 /// `SuspendingClock`.
 @available(SwiftStdlib 5.7, *)
-public protocol Clock: Sendable {
+public protocol Clock<Duration>: Sendable {
   associatedtype Duration
   associatedtype Instant: InstantProtocol where Instant.Duration == Duration
 
