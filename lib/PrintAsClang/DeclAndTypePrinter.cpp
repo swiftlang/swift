@@ -392,8 +392,20 @@ private:
       ClangValueTypePrinter printer(os, owningPrinter.prologueOS,
                                     owningPrinter.typeMapping,
                                     owningPrinter.interopContext);
-      printer.printValueTypeDecl(
-          ED, /*bodyPrinter=*/[&]() {}); // TODO: (tongjie) print cases
+      printer.printValueTypeDecl(ED, /*bodyPrinter=*/[&]() {
+        ClangSyntaxPrinter syntaxPrinter(os);
+        os << "  enum class cases {";
+        llvm::interleaveComma(
+            ED->getAllCases(), os, [&](const EnumCaseDecl *caseDecl) {
+              llvm::interleaveComma(caseDecl->getElements(), os,
+                                    [&](const EnumElementDecl *elementDecl) {
+                                      os << "\n    ";
+                                      syntaxPrinter.printIdentifier(
+                                          elementDecl->getNameStr());
+                                    });
+            });
+        os << "\n  };\n";
+      });
       os << outOfLineDefinitions;
       outOfLineDefinitions.clear();
       return;
