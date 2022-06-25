@@ -181,6 +181,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
 
   auto selfDecl = thunk->getImplicitSelfDecl();
   selfDecl->getAttrs().add(new (C) KnownToBeLocalAttr(implicit));
+  auto selfRefExpr = new (C) DeclRefExpr(selfDecl, dloc, implicit);
 
   // === return type
   Type returnTy = func->getResultInterfaceType();
@@ -206,8 +207,8 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   Type remoteCallTargetTy = RCT->getDeclaredInterfaceType();
 
   // === __isRemoteActor(self)
-  ArgumentList *isRemoteArgs = ArgumentList::forImplicitSingle(
-      C, /*label=*/Identifier(), new (C) DeclRefExpr(selfDecl, dloc, implicit));
+  ArgumentList *isRemoteArgs =
+      ArgumentList::forImplicitSingle(C, /*label=*/Identifier(), selfRefExpr);
 
   FuncDecl *isRemoteFn = C.getIsRemoteDistributedActor();
   assert(isRemoteFn && "Could not find 'is remote' function, is the "
@@ -218,46 +219,23 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
       CallExpr::createImplicit(C, isRemoteDeclRef, isRemoteArgs);
 
   // === local branch ----------------------------------------------------------
-  BraceStmt *localBranchStmt;
-  if (auto accessor = dyn_cast<AccessorDecl>(func)) {
-    auto selfRefExpr = new (C) DeclRefExpr(selfDecl, dloc, implicit);
+  // -- forward arguments
+  SmallVector<Expr*, 4> forwardingParams;
+  forwardParameters(thunk, forwardingParams);
+  auto funcRef = UnresolvedDeclRefExpr::createImplicit(C, func->getName());
+  auto forwardingArgList = ArgumentList::forImplicitCallTo(funcRef->getName(), forwardingParams, C);
 
-    auto var = accessor->getStorage();
-
-    Expr *localPropertyAccess = new (C) MemberRefExpr(
-        selfRefExpr, sloc, ConcreteDeclRef(var), dloc, implicit);
-    localPropertyAccess =
-        AwaitExpr::createImplicit(C, sloc, localPropertyAccess);
-    if (accessor->hasThrows()) {
-      localPropertyAccess =
-          TryExpr::createImplicit(C, sloc, localPropertyAccess);
-    }
-
-    auto returnLocalPropertyAccess = new (C) ReturnStmt(sloc, localPropertyAccess, implicit);
-    localBranchStmt =
-        BraceStmt::create(C, sloc, {returnLocalPropertyAccess}, sloc, implicit);
-  } else {
-    // normal function
-    auto selfRefExpr = new (C) DeclRefExpr(selfDecl, dloc, implicit);
-
-    // -- forward arguments
-    SmallVector<Expr*, 4> forwardingParams;
-    forwardParameters(thunk, forwardingParams);
-    auto funcRef = UnresolvedDeclRefExpr::createImplicit(C, func->getName());
-    auto forwardingArgList = ArgumentList::forImplicitCallTo(funcRef->getName(), forwardingParams, C);
-    auto funcDeclRef =
-        UnresolvedDotExpr::createImplicit(C, selfRefExpr, func->getBaseName());
-
-    Expr *localFuncCall = CallExpr::createImplicit(C, funcDeclRef, forwardingArgList);
-    localFuncCall = AwaitExpr::createImplicit(C, sloc, localFuncCall);
-    if (func->hasThrows()) {
-      localFuncCall = TryExpr::createImplicit(C, sloc, localFuncCall);
-    }
-    auto returnLocalFuncCall = new (C) ReturnStmt(sloc, localFuncCall, implicit);
-
-    localBranchStmt =
-        BraceStmt::create(C, sloc, {returnLocalFuncCall}, sloc, implicit);
+  auto funcDeclRef =
+      UnresolvedDotExpr::createImplicit(C, selfRefExpr, func->getBaseName());
+  Expr *localFuncCall = CallExpr::createImplicit(C, funcDeclRef, forwardingArgList);
+  localFuncCall = AwaitExpr::createImplicit(C, sloc, localFuncCall);
+  if (func->hasThrows()) {
+    localFuncCall = TryExpr::createImplicit(C, sloc, localFuncCall);
   }
+  auto returnLocalFuncCall = new (C) ReturnStmt(sloc, localFuncCall, implicit);
+  auto localBranchStmt = 
+      BraceStmt::create(C, sloc, {returnLocalFuncCall}, sloc, implicit);
+
   // === remote branch  --------------------------------------------------------
   SmallVector<ASTNode, 8> remoteBranchStmts;
   // --- self.actorSystem
@@ -639,18 +617,7 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
   assert(systemTy &&
          "Thunk synthesis must have concrete actor system type available");
 
-  DeclName thunkName;
-
-  // Since accessors don't have names, let's generate one based on
-  // the computed property.
-  if (auto *accessor = dyn_cast<AccessorDecl>(func)) {
-    auto *var = accessor->getStorage();
-    thunkName = DeclName(C, var->getBaseName(),
-                         /*argumentNames=*/ArrayRef<Identifier>());
-  } else {
-    // Let's use the name of a 'distributed func'
-    thunkName = func->getName();
-  }
+  DeclName thunkName = func->getName();
 
   // --- Prepare generic parameters
   GenericParamList *genericParamList = nullptr;
@@ -701,7 +668,6 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
   if (isa<ClassDecl>(DC))
     thunk->getAttrs().add(new (C) FinalAttr(/*isImplicit=*/true));
 
-  thunk->getAttrs().add(new (C) DistributedThunkAttr(/*isImplicit=*/true));
   thunk->setGenericSignature(baseSignature);
   thunk->copyFormalAccessFrom(func, /*sourceIsParentContext=*/false);
   thunk->setBodySynthesizer(deriveBodyDistributed_thunk, func);
@@ -781,24 +747,10 @@ addDistributedActorCodableConformance(
 /*********************** SYNTHESIS ENTRY POINTS *******************************/
 /******************************************************************************/
 
-FuncDecl *GetDistributedThunkRequest::evaluate(Evaluator &evaluator,
-                                               Originator originator) const {
-  AbstractFunctionDecl *distributedTarget = nullptr;
-  if (auto *var = originator.dyn_cast<VarDecl *>()) {
-    if (!var->isDistributed())
-      return nullptr;
-
-    if (checkDistributedActorProperty(var, /*diagnose=*/false))
-      return nullptr;
-
-    distributedTarget = var->getAccessor(AccessorKind::Get);
-  } else {
-    distributedTarget = originator.get<AbstractFunctionDecl *>();
-    if (!distributedTarget->isDistributed())
-      return nullptr;
-  }
-
-  assert(distributedTarget);
+FuncDecl *GetDistributedThunkRequest::evaluate(
+    Evaluator &evaluator, AbstractFunctionDecl *distributedTarget) const {
+  if (!distributedTarget->isDistributed())
+    return nullptr;
 
   auto &C = distributedTarget->getASTContext();
   auto DC = distributedTarget->getDeclContext();
@@ -815,8 +767,7 @@ FuncDecl *GetDistributedThunkRequest::evaluate(Evaluator &evaluator,
   // we must avoid synthesis of the thunk because it'd also have errors,
   // giving an ugly user experience (errors in implicit code).
   if (distributedTarget->getInterfaceType()->hasError() ||
-      (!isa<AccessorDecl>(distributedTarget) &&
-       checkDistributedFunction(distributedTarget))) {
+      checkDistributedFunction(distributedTarget)) {
     return nullptr;
   }
 
