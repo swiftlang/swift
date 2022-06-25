@@ -1794,7 +1794,7 @@ bool TypeChecker::getDefaultGenericArgumentsString(
       }
 
       if (hasExplicitAnyObject)
-        members.push_back(typeDecl->getASTContext().getAnyObjectType());
+        members.push_back(typeDecl->getASTContext().getAnyObjectConstraint());
 
       auto type = ProtocolCompositionType::get(typeDecl->getASTContext(),
                                                members, hasExplicitAnyObject);

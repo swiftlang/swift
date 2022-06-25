@@ -907,7 +907,7 @@ namespace {
       if (type->isSugared())                                                   \
         return Visit(type->desugar());                                         \
       if (type->isDependentType())                                             \
-        return Impl.SwiftContext.TheAnyType;                                   \
+        return Impl.SwiftContext.getAnyExistentialType();                      \
       return Type();                                                           \
     }
     MAYBE_SUGAR_TYPE(TypeOfExpr)
@@ -1251,7 +1251,7 @@ namespace {
       if (type->isObjCIdType()) {
         return { Impl.SwiftContext.getAnyObjectType(),
                  ImportHint(ImportHint::ObjCBridged,
-                            Impl.SwiftContext.TheAnyType)};
+                            Impl.SwiftContext.getAnyExistentialType())};
       }
 
       return { importedType, ImportHint::ObjCPointer };
@@ -2368,7 +2368,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
   if (isVariadic) {
     auto paramTy =
         BoundGenericType::get(SwiftContext.getArrayDecl(), Type(),
-                              {SwiftContext.TheAnyType});
+                              {SwiftContext.getAnyExistentialType()});
     auto name = SwiftContext.getIdentifier("varargs");
     auto param = new (SwiftContext) ParamDecl(SourceLoc(), SourceLoc(),
                                               Identifier(), SourceLoc(),

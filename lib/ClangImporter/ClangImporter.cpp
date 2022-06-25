@@ -5414,7 +5414,7 @@ static ValueDecl *addThunkForDependentTypes(FuncDecl *oldDecl,
     // If the un-specialized function had a parameter with type "Any" preserve
     // that parameter. Otherwise, use the new function parameter.
     auto oldParamType = oldDecl->getParameters()->get(parameterIndex)->getType();
-    if (oldParamType->isEqual(newDecl->getASTContext().TheAnyType)) {
+    if (oldParamType->isEqual(newDecl->getASTContext().getAnyExistentialType())) {
       updatedAnyParams = true;
       auto newParam =
           ParamDecl::cloneWithoutType(newDecl->getASTContext(), newFnParam);
@@ -5429,7 +5429,7 @@ static ValueDecl *addThunkForDependentTypes(FuncDecl *oldDecl,
   // If we don't need this thunk, bail out.
   if (!updatedAnyParams &&
       !oldDecl->getResultInterfaceType()->isEqual(
-          oldDecl->getASTContext().TheAnyType))
+          oldDecl->getASTContext().getAnyExistentialType()))
     return newDecl;
 
   auto fixedParams =
@@ -5437,8 +5437,8 @@ static ValueDecl *addThunkForDependentTypes(FuncDecl *oldDecl,
 
   Type fixedResultType;
   if (oldDecl->getResultInterfaceType()->isEqual(
-          oldDecl->getASTContext().TheAnyType))
-    fixedResultType = oldDecl->getASTContext().TheAnyType;
+          oldDecl->getASTContext().getAnyExistentialType()))
+    fixedResultType = oldDecl->getASTContext().getAnyExistentialType();
   else
     fixedResultType = newDecl->getResultInterfaceType();
 
