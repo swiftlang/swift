@@ -1237,20 +1237,17 @@ public:
 ///
 /// The thunk is responsible for invoking 'remoteCall' when invoked on a remote
 /// 'distributed actor'.
-class GetDistributedThunkRequest
-    : public SimpleRequest<
-          GetDistributedThunkRequest,
-          FuncDecl *(llvm::PointerUnion<VarDecl *, AbstractFunctionDecl *>),
-          RequestFlags::Cached> {
-  using Originator = llvm::PointerUnion<VarDecl *, AbstractFunctionDecl *>;
-
+class GetDistributedThunkRequest :
+    public SimpleRequest<GetDistributedThunkRequest,
+                         FuncDecl *(AbstractFunctionDecl *),
+                         RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
 private:
   friend SimpleRequest;
 
-  FuncDecl *evaluate(Evaluator &evaluator, Originator originator) const;
+  FuncDecl *evaluate(Evaluator &evaluator, AbstractFunctionDecl *distributedFunc) const;
 
 public:
   // Caching

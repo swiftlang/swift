@@ -212,7 +212,6 @@ void SILGenFunction::emitDistActorIdentityInit(ConstructorDecl *ctor,
   initializeProperty(*this, loc, borrowedSelfArg, var, temp);
 }
 
-// TODO(distributed): rename to DistributedActorID
 InitializeDistActorIdentity::InitializeDistActorIdentity(ConstructorDecl *ctor,
                                        ManagedValue actorSelf)
                                        : ctor(ctor),

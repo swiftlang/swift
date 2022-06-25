@@ -745,8 +745,6 @@ namespace {
 
     void visitVarDecl(VarDecl *VD) {
       printCommon(VD, "var_decl");
-      if (VD->isDistributed())
-        PrintWithColorRAII(OS, DeclModifierColor) << " distributed";
       if (VD->isLet())
         PrintWithColorRAII(OS, DeclModifierColor) << " let";
       if (VD->getAttrs().hasAttribute<LazyAttr>())
@@ -876,9 +874,6 @@ namespace {
       }
       if (D->isDistributed()) {
         PrintWithColorRAII(OS, ExprModifierColor) << " distributed";
-      }
-      if (D->isDistributedThunk()) {
-        PrintWithColorRAII(OS, ExprModifierColor) << " distributed-thunk";
       }
 
       if (auto fac = D->getForeignAsyncConvention()) {
@@ -1351,10 +1346,6 @@ void ValueDecl::dumpRef(raw_ostream &os) const {
 
   if (getAttrs().hasAttribute<KnownToBeLocalAttr>()) {
     os << " known-to-be-local";
-  }
-
-  if (getAttrs().hasAttribute<DistributedThunkAttr>()) {
-    os << " distributed-thunk";
   }
 
   // Print location.
