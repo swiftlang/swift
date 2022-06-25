@@ -47,7 +47,6 @@ func testSimpleInterpolation() {
     // CHECK-NEXT: [[OFFSET3:%.+]] = getelementptr inbounds i8, i8* [[BUFFER]], i{{.*}} 3
     // CHECK-64-NEXT: store i8 8, i8* [[OFFSET3]], align 1
     // CHECK-32-NEXT: store i8 4, i8* [[OFFSET3]], align 1
-    // CHECK-NEXT: bitcast %swift.refcounted* %{{.*}} to %swift.opaque*
     // CHECK-NEXT: [[OFFSET4:%.+]] = getelementptr inbounds i8, i8* [[BUFFER]], i{{.*}} 4
     // CHECK-NEXT: [[BITCASTED:%.+]] = bitcast i8* [[OFFSET4]] to i{{.*}}*
     // CHECK-64-NEXT: store i64 -9223372036854775808, i64* [[BITCASTED]], align 1
@@ -112,7 +111,6 @@ func testInterpolationWithMultipleArguments() {
     // CHECK-NEXT: store i8 0, i8* [[OFFSET22]], align 1
     // CHECK-NEXT: [[OFFSET23:%.+]] = getelementptr inbounds i8, i8* [[BUFFER]], i{{.*}} 15
     // CHECK-NEXT: store i8 4, i8* [[OFFSET23]], align 1
-    // CHECK-NEXT: bitcast %swift.refcounted* %{{.*}} to %swift.opaque*
     // CHECK-NEXT: [[OFFSET24:%.+]] = getelementptr inbounds i8, i8* [[BUFFER]], i{{.*}} 16
     // CHECK-NEXT: [[BITCASTED3:%.+]] = bitcast i8* [[OFFSET24]] to i32*
     // CHECK-NEXT: store i32 511, i32* [[BITCASTED3]], align 1
@@ -161,7 +159,6 @@ func testNSObjectInterpolation(nsArray: NSArray) {
     // CHECK-NEXT: [[OFFSET3:%.+]] = getelementptr inbounds i8, i8* [[BUFFER]], i{{.*}} 3
     // CHECK-64-NEXT: store i8 8, i8* [[OFFSET3]], align 1
     // CHECK-32-NEXT: store i8 4, i8* [[OFFSET3]], align 1
-    // CHECK-NEXT: bitcast %swift.refcounted* %{{.*}} to %swift.opaque*
     // CHECK-NEXT: [[OFFSET4:%.+]] = getelementptr inbounds i8, i8* [[BUFFER]], i{{.*}} 4
     // CHECK-NEXT: [[BITCASTED_DEST:%.+]] = bitcast i8* [[OFFSET4]] to %TSo7NSArrayC**
     // CHECK-NEXT: [[BITCASTED_SRC:%.+]] = bitcast i8* [[NSARRAY_ARG]] to %TSo7NSArrayC*
@@ -205,7 +202,6 @@ func testFloatInterpolation(doubleValue: Double) {
     // CHECK-NEXT: store i8 0, i8* [[OFFSET2]], align 1
     // CHECK-NEXT: [[OFFSET3:%.+]] = getelementptr inbounds i8, i8* [[BUFFER]], i{{.*}} 3
     // CHECK-NEXT: store i8 8, i8* [[OFFSET3]], align 1
-    // CHECK-NEXT: bitcast %swift.refcounted* %{{.*}} to %swift.opaque*
     // CHECK-NEXT: [[OFFSET4:%.+]] = getelementptr inbounds i8, i8* [[BUFFER]], i{{.*}} 4
     // CHECK-NEXT: [[BITCASTED:%.+]] = bitcast i8* [[OFFSET4]] to double*
     // CHECK-NEXT: store double %0, double* [[BITCASTED]], align 1
@@ -266,7 +262,6 @@ func testDynamicPrecisionAndAlignment() {
     // CHECK-NEXT: store i8 0, i8* [[OFFSET22]], align 1
     // CHECK-NEXT: [[OFFSET23:%.+]] = getelementptr inbounds i8, i8* [[BUFFER]], i{{.*}} 15
     // CHECK-NEXT: store i8 4, i8* [[OFFSET23]], align 1
-    // CHECK-NEXT: bitcast %swift.refcounted* %{{.*}} to %swift.opaque*
     // CHECK-NEXT: [[OFFSET24:%.+]] = getelementptr inbounds i8, i8* [[BUFFER]], i{{.*}} 16
     // CHECK-NEXT: [[BITCASTED3:%.+]] = bitcast i8* [[OFFSET24]] to i32*
     // CHECK-NEXT: store i32 2147483647, i32* [[BITCASTED3]], align 1
