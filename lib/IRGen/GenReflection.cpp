@@ -1499,7 +1499,7 @@ emitAssociatedTypeMetadataRecord(const RootProtocolConformance *conformance) {
 void IRGenModule::emitBuiltinReflectionMetadata() {
   if (getSwiftModule()->isStdlibModule()) {
     BuiltinTypes.insert(Context.TheNativeObjectType);
-    BuiltinTypes.insert(Context.getAnyObjectType());
+    BuiltinTypes.insert(Context.getAnyObjectConstraint());
     BuiltinTypes.insert(Context.TheBridgeObjectType);
     BuiltinTypes.insert(Context.TheRawPointerType);
     BuiltinTypes.insert(Context.TheUnsafeValueBufferType);

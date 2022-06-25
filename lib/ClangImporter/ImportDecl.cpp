@@ -6496,7 +6496,7 @@ Optional<GenericParamList *> SwiftDeclConverter::importObjCGenericParams(
     }
     if (inherited.empty()) {
       inherited.push_back(
-        TypeLoc::withoutLoc(Impl.SwiftContext.getAnyObjectType()));
+        TypeLoc::withoutLoc(Impl.SwiftContext.getAnyObjectConstraint()));
     }
     genericParamDecl->setInherited(Impl.SwiftContext.AllocateCopy(inherited));
 

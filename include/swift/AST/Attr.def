@@ -664,7 +664,7 @@ SIMPLE_DECL_ATTR(_inheritActorContext, InheritActorContext,
 // 117 was 'spawn' and is now unused
 
 CONTEXTUAL_SIMPLE_DECL_ATTR(distributed, DistributedActor,
-  DeclModifier | OnClass | OnFunc | OnAccessor | OnVar |
+  DeclModifier | OnClass | OnFunc | OnVar |
   ABIBreakingToAdd | ABIBreakingToRemove |
   APIBreakingToAdd | APIBreakingToRemove,
   118)
@@ -734,12 +734,6 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(_local, KnownToBeLocal,
   ABIBreakingToAdd | ABIBreakingToRemove |
   APIBreakingToAdd | APIBreakingToRemove,
   130)
-
-SIMPLE_DECL_ATTR(_distributed_thunk, DistributedThunk,
-  OnFunc | UserInaccessible |
-  ABIBreakingToAdd | ABIBreakingToRemove |
-  APIBreakingToAdd | APIBreakingToRemove,
-  131)
 
 // If you're adding a new underscored attribute here, please document it in
 // docs/ReferenceGuides/UnderscoredAttributes.md.
