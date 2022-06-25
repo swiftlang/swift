@@ -46,8 +46,7 @@ class Dryer : WashingMachine {}
 class HairDryer {}
 
 let a: Toaster.Type.Protocol = Toaster.Type.self
-// FIXME: the existential metatype below should be spelled 'any Any.Type.Type'
-let b: Any.Type.Type = Toaster.Type.self // expected-error {{cannot convert value of type '(any Toaster.Type).Type' to specified type 'any (any Any).Type.Type'}}
+let b: Any.Type.Type = Toaster.Type.self // expected-error {{cannot convert value of type '(any Toaster.Type).Type' to specified type 'any Any.Type.Type'}}
 let c: Any.Type.Protocol = Toaster.Type.self // expected-error {{cannot convert value of type '(any Toaster.Type).Type' to specified type '(any Any.Type).Type'}}
 let d: Toaster.Type.Type = WashingMachine.Type.self
 let e: Any.Type.Type = WashingMachine.Type.self
