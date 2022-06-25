@@ -138,11 +138,8 @@ public protocol LazySequenceProtocol: Sequence {
   /// A sequence containing the same elements as this one, possibly with
   /// a simpler type.
   ///
-  /// When implementing lazy operations, wrapping `elements` instead
-  /// of `self` can prevent result types from growing an extra
-  /// `LazySequence` layer.  For example,
-  ///
-  /// _prext_ example needed
+  /// When implementing lazy operations, wrapping `elements` instead of `self`
+  /// can prevent result types from growing an extra `LazySequence` layer.
   ///
   /// Note: this property need not be implemented by conforming types,
   /// it has a default implementation in a protocol extension that

@@ -693,3 +693,16 @@ func SR_16058_tests() {
   // More than one optionality wrapping
   let _: String? = foo.flatMap { dict.SR16058(_: $0) } as? String // OK
 }
+
+// https://github.com/apple/swift/issues/59405
+func isHashable(_ error: Error) -> Bool {
+  (error as? AnyHashable) != nil // OK
+}
+
+func isHashable_is(_ error: Error) -> Bool {
+  error is AnyHashable // OK
+}
+
+func isHashable_composition(_ error: Error & AnyObject) -> Bool {
+  error is AnyHashable // OK
+}

@@ -8,13 +8,22 @@ import StdlibUnittest
 var OperatorsTestSuite = TestSuite("Operators")
 
 #if !os(Windows)    // SR-13129
-OperatorsTestSuite.test("LoadableIntWrapper.plus (inline)") {
+OperatorsTestSuite.test("LoadableIntWrapper.minus (inline)") {
   var lhs = LoadableIntWrapper(value: 42)
   let rhs = LoadableIntWrapper(value: 23)
 
   let result = lhs - rhs
 
   expectEqual(19, result.value)
+}
+
+OperatorsTestSuite.test("AddressOnlyIntWrapper.minus") {
+   let lhs = AddressOnlyIntWrapper(42)
+   let rhs = AddressOnlyIntWrapper(23)
+
+   let result = lhs - rhs
+
+   expectEqual(19, result.value)
 }
 #endif
 
@@ -28,6 +37,19 @@ OperatorsTestSuite.test("LoadableIntWrapper.call (inline)") {
   expectEqual(42, resultNoArgs)
   expectEqual(65, resultOneArg)
   expectEqual(57, resultTwoArgs)
+}
+
+OperatorsTestSuite.test("LoadableIntWrapper.successor() (inline)") {
+  var wrapper = LoadableIntWrapper(value: 42)
+
+  let result1 = wrapper.successor()
+  expectEqual(43, result1.value)
+  expectEqual(42, wrapper.value) // Calling `successor()` should not mutate `wrapper`.
+
+  let result2 = result1.successor()
+  expectEqual(44, result2.value)
+  expectEqual(43, result1.value)
+  expectEqual(42, wrapper.value)
 }
 
 OperatorsTestSuite.test("LoadableBoolWrapper.exclaim (inline)") {
@@ -47,6 +69,45 @@ OperatorsTestSuite.test("AddressOnlyIntWrapper.call (inline)") {
   expectEqual(42, resultNoArgs)
   expectEqual(65, resultOneArg)
   expectEqual(57, resultTwoArgs)
+}
+
+OperatorsTestSuite.test("AddressOnlyIntWrapper.successor() (inline)") {
+  var wrapper = AddressOnlyIntWrapper(0)
+
+  let result1 = wrapper.successor()
+  expectEqual(1, result1.value)
+  expectEqual(0, wrapper.value) // Calling `successor()` should not mutate `wrapper`.
+
+  let result2 = result1.successor()
+  expectEqual(2, result2.value)
+  expectEqual(1, result1.value)
+  expectEqual(0, wrapper.value)
+}
+
+OperatorsTestSuite.test("HasPreIncrementOperatorWithAnotherReturnType.successor() (inline)") {
+  var wrapper = HasPreIncrementOperatorWithAnotherReturnType()
+
+  let result1 = wrapper.successor()
+  expectEqual(1, result1.value)
+  expectEqual(0, wrapper.value) // Calling `successor()` should not mutate `wrapper`.
+
+  let result2 = result1.successor()
+  expectEqual(2, result2.value)
+  expectEqual(1, result1.value)
+  expectEqual(0, wrapper.value)
+}
+
+OperatorsTestSuite.test("HasPreIncrementOperatorWithVoidReturnType.successor() (inline)") {
+  var wrapper = HasPreIncrementOperatorWithVoidReturnType()
+
+  let result1 = wrapper.successor()
+  expectEqual(1, result1.value)
+  expectEqual(0, wrapper.value) // Calling `successor()` should not mutate `wrapper`.
+
+  let result2 = result1.successor()
+  expectEqual(2, result2.value)
+  expectEqual(1, result1.value)
+  expectEqual(0, wrapper.value)
 }
 
 OperatorsTestSuite.test("DerivedFromAddressOnlyIntWrapper.call (inline, base class)") {

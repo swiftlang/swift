@@ -23,9 +23,24 @@ Copy the invocation that has  ` -o <build-path>/swift-macosx-x86_64/stdlib/publi
 ### Choosing the bootstrapping mode
 By default, the compiler builds with the `boostrapping-with-hostlibs` (macOS) or `bootstrapping` (Linux) bootstrapping mode. To speed up local development it's recommended to build with the `hosttools` mode: `utils/build-script --bootstrapping=hosttools`.
 
-It requires a recently new swift toolchain to be installed on your build machine. On macOS this comes with your Xcode installation.
+It requires a recently new swift toolchain to be installed on your build machine. You might need to download and install a nightly Swift toolchain to build the Swift project in `hosttools` mode.
 
 Not that changing the bootstrapping mode needs a reconfiguration.
+
+#### Using a locally built Swift toolchain
+
+If you do not want to install a nightly Swift toolchain, or you need to debug Swift code within SwiftCompilerSources, you can build the Swift toolchain in `boostrapping-with-hostlibs` mode on your local machine once, and then use this toolchain to iterate on your changes with the `hosttools` mode:
+
+* Build the toolchain locally in `boostrapping-with-hostlibs` mode: `./utils/build-toolchain com.yourname`.
+* Copy the `swift-LOCAL-YYYY-MM-DD.xctoolchain` file from `./swift-nightly-install/Library/Developer/Toolchains` to `/Library/Developer/Toolchains`.
+* Launch Xcode, in the menu bar select _Xcode_ > _Toolchains_ > _Local Swift Development Snapshot YYYY-MM-DD_.
+* Remove the Swift build directory: `./build`.
+* Run the Swift build script with the locally built Swift toolchain in `hosttools` mode: `TOOLCHAINS=com.yourname.YYYYMMDD ./utils/build-script --bootstrapping=hosttools`. Repeat this step as you iterate on your change.
+
+To debug using LLDB, run LLDB from the locally built toolchain with a couple of environment variables set:
+```
+DYLD_LIBRARY_PATH=/Library/Developer/Toolchains/swift-LOCAL-YYYY-MM-DD.xctoolchain/usr/lib/swift/macosx DYLD_FRAMEWORK_PATH=/Applications/Xcode.app/Contents/Developer/Library/Frameworks /Library/Developer/Toolchains/swift-LOCAL-YYYY-MM-DD.xctoolchain/usr/bin/lldb
+```
 
 ### Working with two build directories
 For developing and debugging you are probably building a debug configuration of swift. But it's often beneficial to also build a release-assert configuration in parallel (`utils/build-script -R`).

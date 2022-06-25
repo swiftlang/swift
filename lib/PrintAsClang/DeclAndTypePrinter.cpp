@@ -386,6 +386,19 @@ private:
 
   void visitEnumDecl(EnumDecl *ED) {
     printDocumentationComment(ED);
+
+    if (outputLang == OutputLanguageMode::Cxx) {
+      // FIXME: Print enum's availability
+      ClangValueTypePrinter printer(os, owningPrinter.prologueOS,
+                                    owningPrinter.typeMapping,
+                                    owningPrinter.interopContext);
+      printer.printValueTypeDecl(
+          ED, /*bodyPrinter=*/[&]() {}); // TODO: (tongjie) print cases
+      os << outOfLineDefinitions;
+      outOfLineDefinitions.clear();
+      return;
+    }
+
     os << "typedef ";
     StringRef customName = getNameForObjC(ED, CustomNamesOnly);
     if (customName.empty()) {

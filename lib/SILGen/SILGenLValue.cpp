@@ -2647,8 +2647,6 @@ namespace {
         AccessKind(accessKind) {}
 
     void emitUsingStrategy(AccessStrategy strategy) {
-      auto var = dyn_cast<VarDecl>(Storage);
-
       switch (strategy.getKind()) {
       case AccessStrategy::Storage: {
         auto typeData =

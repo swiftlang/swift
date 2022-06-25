@@ -5725,7 +5725,13 @@ TypeChecker::couldDynamicallyConformToProtocol(Type type, ProtocolDecl *Proto,
   // we cannot know statically.
   if (type->isExistentialType())
     return true;
-  
+
+  // The underlying concrete type may have a `Hashable` conformance that is
+  // not possible to know statically.
+  if (type->isAnyHashable()) {
+    return true;
+  }
+
   // A generic archetype may have protocol conformances we cannot know
   // statically.
   if (type->is<ArchetypeType>())
@@ -6439,7 +6445,19 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
         if (!classDecl->isExplicitActor()) {
           dc->getSelfNominalTypeDecl()
               ->diagnose(diag::actor_protocol_illegal_inheritance,
-                         dc->getSelfNominalTypeDecl()->getName())
+                         dc->getSelfNominalTypeDecl()->getName(),
+                         proto->getName())
+              .fixItReplace(nominal->getStartLoc(), "actor");
+        }
+      }
+    } else if (proto->isSpecificProtocol(KnownProtocolKind::AnyActor)) {
+      if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
+        if (!classDecl->isExplicitActor() &&
+            !classDecl->isExplicitDistributedActor()) {
+          dc->getSelfNominalTypeDecl()
+              ->diagnose(diag::actor_protocol_illegal_inheritance,
+                         dc->getSelfNominalTypeDecl()->getName(),
+                         proto->getName())
               .fixItReplace(nominal->getStartLoc(), "actor");
         }
       }

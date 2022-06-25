@@ -2,7 +2,6 @@
 // REQUIRES: OS=linux-gnu
 // REQUIRES: static_stdlib
 // REQUIRES: lld_lto
-// XFAIL: *
 print("hello world!")
 // RUN: %empty-directory(%t)
 // RUN: %target-swiftc_driver -static-stdlib -use-ld=lld %import-static-libdispatch -o %t/static-stdlib-lld %s
