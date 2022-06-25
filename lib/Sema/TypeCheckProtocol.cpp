@@ -4588,7 +4588,10 @@ swift::checkTypeWitness(Type type, AssociatedTypeDecl *assocType,
 
   // Check protocol conformances.
   for (const auto reqProto : sig->getRequiredProtocols(depTy)) {
-    if (module->lookupConformance(contextType, reqProto)
+    if (module->lookupConformance(
+            contextType, reqProto,
+            /*allowMissing=*/reqProto->isSpecificProtocol(
+                KnownProtocolKind::Sendable))
             .isInvalid())
       return CheckTypeWitnessResult(reqProto->getDeclaredInterfaceType());
 
