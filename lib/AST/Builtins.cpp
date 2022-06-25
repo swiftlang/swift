@@ -682,7 +682,7 @@ namespace {
       if (wantsAdditionalAnyObjectRequirement) {
         Requirement req(RequirementKind::Conformance,
                         TheGenericParamList->getParams()[0]->getInterfaceType(),
-                        ctx.getAnyObjectType());
+                        ctx.getAnyObjectConstraint());
         addedRequirements.push_back(req);
       }
       for (auto gp : TheGenericParamList->getParams()) {
