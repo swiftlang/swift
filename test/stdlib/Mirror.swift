@@ -558,14 +558,12 @@ func verifyWeakUnownedReflection
     expectEqual(child.label, name)
     expectNotNil(child.value)
 
-    // FIXME: These casts are currently broken (Dec 2019)
-    // Once they are fixed, enable additional checks:
-    //let vp1 = child.value as? WeakUnownedTestsP1
-    //expectNotNil(vp1)
-    //expectEqual(vp1!.f1(), 2)
-    //let vp2 = child.value as? WeakUnownedTestsP2
-    //expectNotNil(vp2)
-    //expectEqual(vp2!.f2(), "b")
+    let vp1 = child.value as? WeakUnownedTestsP1
+    expectNotNil(vp1)
+    expectEqual(vp1!.f1(), 2)
+    let vp2 = child.value as? WeakUnownedTestsP2
+    expectNotNil(vp2)
+    expectEqual(vp2!.f2(), "b")
 
     let v = child.value as? ExpectedClass
     expectNotNil(v)
