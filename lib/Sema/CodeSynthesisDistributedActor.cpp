@@ -695,11 +695,28 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
   }
   ParameterList *params = ParameterList::create(C, paramDecls); // = funcParams->clone(C);
 
-  auto thunk = FuncDecl::createImplicit(
-      C, swift::StaticSpellingKind::None, thunkName, SourceLoc(),
-      /*async=*/true, /*throws=*/true,
-      genericParamList, params,
-      func->getResultInterfaceType(), DC);
+  FuncDecl *thunk = nullptr;
+  if (auto *accessor = dyn_cast<AccessorDecl>(func)) {
+    auto *distributedVar = cast<VarDecl>(accessor->getStorage());
+
+    thunk = AccessorDecl::create(
+        C, /*declLoc=*/accessor->getLoc(), /*accessorKeywordLoc=*/SourceLoc(),
+        AccessorKind::Get, distributedVar,
+        /*staticLoc=*/SourceLoc(), StaticSpellingKind::None,
+        /*async=*/true, /*asyncLoc=*/SourceLoc(),
+        /*throws=*/true, /*throwsLoc=*/SourceLoc(), genericParamList, params,
+        func->getResultInterfaceType(), accessor->getDeclContext());
+
+    thunk->setImplicit();
+  } else {
+    thunk = FuncDecl::createImplicit(
+        C, swift::StaticSpellingKind::None, func->getName(), SourceLoc(),
+        /*async=*/true, /*throws=*/true, genericParamList, params,
+        func->getResultInterfaceType(), DC);
+  }
+
+  assert(thunk && "couldn't create a distributed thunk");
+
   thunk->setSynthesized(true);
   thunk->setDistributedThunk(true);
   thunk->getAttrs().add(new (C) NonisolatedAttr(/*isImplicit=*/true));

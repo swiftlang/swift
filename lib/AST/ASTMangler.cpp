@@ -3190,6 +3190,14 @@ void ASTMangler::appendEntity(const ValueDecl *decl) {
   // Handle accessors specially, they are mangled as modifiers on the accessed
   // declaration.
   if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
+    if (accessor->isDistributedThunk()) {
+      appendContextOf(decl);
+      appendDeclName(accessor->getStorage());
+      appendDeclType(accessor, FunctionMangling);
+      appendOperator("F");
+      return;
+    }
+
     return appendAccessorEntity(
         getCodeForAccessorKind(accessor->getAccessorKind()),
         accessor->getStorage(), accessor->isStatic());
