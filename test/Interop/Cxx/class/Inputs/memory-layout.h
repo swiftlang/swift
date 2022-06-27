@@ -1,8 +1,8 @@
 #ifndef TEST_INTEROP_CXX_CLASS_INPUTS_MEMORY_LAYOUT_H
 #define TEST_INTEROP_CXX_CLASS_INPUTS_MEMORY_LAYOUT_H
 
-#include <stddef.h>
-#include <stdint.h>
+#include <cstddef>
+#include <cstdint>
 
 class PrivateMemberLayout {
   uint32_t a;
