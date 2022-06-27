@@ -55,7 +55,7 @@ struct OverrideSection {
 };
 
 OverrideSection ConcurrencyOverrides
-    __attribute__((section("__DATA,__s_async_hook"))) = {
+    __attribute__((section("__DATA,__s57async_hook"))) = {
         0,
 #define OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs)   \
   name##Override,
