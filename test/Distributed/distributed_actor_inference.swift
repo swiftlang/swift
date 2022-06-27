@@ -42,11 +42,13 @@ protocol DP {
 }
 
 protocol DPOK: DistributedActor {
-  distributed func hello()  // ok
+  distributed func hello() // FIXME(distributed): rdar://95949498 currently we are limited to explicitly 'async throws' protocol requirements that are distributed funcs
+  // expected-error@-1{{'distributed' protocol requirement 'hello()' must currently be declared explicitly 'async throws'}}
 }
 
 protocol DPOK2: DPOK {
-  distributed func again()  // ok
+  distributed func again() // FIXME(distributed): rdar://95949498 currently we are limited to explicitly 'async throws' protocol requirements that are distributed funcs
+  // expected-error@-1{{'distributed' protocol requirement 'again()' must currently be declared explicitly 'async throws'}}
 }
 
 enum SomeNotActorEnum_5 {
