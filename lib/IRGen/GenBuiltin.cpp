@@ -283,6 +283,15 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
+  if (Builtin.ID == BuiltinValueKind::TaskRunInline) {
+    auto result = args.claimNext();
+    auto closure = args.claimNext();
+    auto closureContext = args.claimNext();
+
+    emitTaskRunInline(IGF, substitutions, result, closure, closureContext);
+    return;
+  }
+
   if (Builtin.ID == BuiltinValueKind::CreateTaskGroup) {
     // Claim metadata pointer.
     (void)args.claimAll();

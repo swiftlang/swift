@@ -865,6 +865,8 @@ visitResumeThrowingContinuationThrowing(BuiltinInst *bi, StringRef attr) {
   return OperandOwnership::TrivialUse;
 }
 
+BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskRunInline)
+
 BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, CancelAsyncTask)
 BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, InitializeDefaultActor)
 BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, DestroyDefaultActor)

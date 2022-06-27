@@ -472,6 +472,23 @@ static void completeTaskWithClosure(SWIFT_ASYNC_CONTEXT AsyncContext *context,
   return completeTaskAndRelease(context, error);
 }
 
+/// The function that we put in the context of an inline task to handle the
+/// final return.
+///
+/// Because inline tasks can't produce errors, this function doesn't have an
+/// error parameter.
+///
+/// Because inline tasks' closures are noescaping, their closure contexts are
+/// stack allocated; so this function doesn't release them.
+SWIFT_CC(swiftasync)
+static void completeInlineTask(SWIFT_ASYNC_CONTEXT AsyncContext *context) {
+  // Set that there's no longer a running task in the current thread.
+  auto task = _swift_task_clearCurrent();
+  assert(task && "completing task, but there is no active task registered");
+
+  completeTaskImpl(task, context, /*error=*/nullptr);
+}
+
 SWIFT_CC(swiftasync)
 static void non_future_adapter(SWIFT_ASYNC_CONTEXT AsyncContext *_context) {
   auto asyncContextPrefix = reinterpret_cast<AsyncContextPrefix *>(
@@ -619,6 +636,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   TaskGroup *group = nullptr;
   AsyncLet *asyncLet = nullptr;
   bool hasAsyncLetResultBuffer = false;
+  RunInlineTaskOptionRecord *runInlineOption = nullptr;
   for (auto option = options; option; option = option->getParent()) {
     switch (option->getKind()) {
     case TaskOptionRecordKind::Executor:
@@ -638,7 +656,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
       jobFlags.task_setIsChildTask(true);
       break;
 
-    case TaskOptionRecordKind::AsyncLetWithBuffer:
+    case TaskOptionRecordKind::AsyncLetWithBuffer: {
       auto *aletRecord = cast<AsyncLetWithBufferTaskOptionRecord>(option);
       asyncLet = aletRecord->getAsyncLet();
       // TODO: Actually digest the result buffer into the async let task
@@ -650,6 +668,11 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
       jobFlags.task_setIsAsyncLetTask(true);
       jobFlags.task_setIsChildTask(true);
       break;
+    }
+    case TaskOptionRecordKind::RunInline: {
+      runInlineOption = cast<RunInlineTaskOptionRecord>(option);
+      break;
+    }
     }
   }
 
@@ -765,6 +788,17 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
       initialSlabSize = asyncLet->getSizeOfPreallocatedSpace()
                           - amountToAllocate;
     }
+  } else if (runInlineOption && runInlineOption->getAllocation()) {
+    // NOTE: If the space required for the task and initial context was
+    //       greater than SWIFT_TASK_RUN_INLINE_INITIAL_CONTEXT_BYTES,
+    //       getAllocation will return nullptr and we'll fall back to malloc to
+    //       allocate the buffer.
+    //
+    // This was already checked in swift_task_run_inline.
+    size_t runInlineBufferBytes = runInlineOption->getAllocationBytes();
+    assert(amountToAllocate <= runInlineBufferBytes);
+    allocation = runInlineOption->getAllocation();
+    initialSlabSize = runInlineBufferBytes - amountToAllocate;
   } else {
     allocation = malloc(amountToAllocate);
   }
@@ -852,12 +886,15 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
                        task, task->getTaskId(), parent, basePriority);
 
   // Initialize the task-local allocator.
-  initialContext->ResumeParent = reinterpret_cast<TaskContinuationFunction *>(
-                            asyncLet       ? &completeTask
-                          : closureContext ? &completeTaskWithClosure
-                                           : &completeTaskAndRelease);
-  if (asyncLet && initialSlabSize > 0) {
-    assert(parent);
+  initialContext->ResumeParent =
+      runInlineOption ? &completeInlineTask
+                      : reinterpret_cast<TaskContinuationFunction *>(
+                            asyncLet         ? &completeTask
+                            : closureContext ? &completeTaskWithClosure
+                                             : &completeTaskAndRelease);
+  if ((asyncLet || (runInlineOption && runInlineOption->getAllocation())) &&
+      initialSlabSize > 0) {
+    assert(parent || (runInlineOption && runInlineOption->getAllocation()));
     void *initialSlab = (char*)allocation + amountToAllocate;
     task->Private.initializeWithSlab(basePriority, initialSlab,
                                      initialSlabSize);
@@ -933,6 +970,64 @@ getAsyncClosureEntryPointAndContextSize(void *function) {
               fnPtr->Function.get()),
           fnPtr->ExpectedContextSize};
 }
+
+#if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
+SWIFT_CC(swift)
+void swift::swift_task_run_inline(OpaqueValue *result, void *closureAFP,
+                                  OpaqueValue *closureContext,
+                                  const Metadata *futureResultType) {
+  // Ensure that we're currently in a synchronous context.
+  if (swift_task_getCurrent()) {
+    swift_Concurrency_fatalError(0, "called runInline within an async context");
+  }
+
+  // Unpack the asynchronous function pointer.
+  FutureAsyncSignature::FunctionType *closure;
+  size_t closureContextSize;
+  std::tie(closure, closureContextSize) =
+      getAsyncClosureEntryPointAndContextSize<
+          FutureAsyncSignature,
+          SpecialPointerAuthDiscriminators::AsyncFutureFunction>(closureAFP);
+
+  // If the initial task and initial async frame aren't too big, allocate enough
+  // stack space for them and for use as the initial task slab.
+  //
+  // If they are too big, swift_task_create_common will fall back to malloc.
+  size_t candidateAllocationBytes = SWIFT_TASK_RUN_INLINE_INITIAL_CONTEXT_BYTES;
+  size_t minimumAllocationSize =
+      amountToAllocateForHeaderAndTask(/*parent=*/nullptr, /*group=*/nullptr,
+                                       futureResultType, closureContextSize)
+          .second;
+  void *allocation = nullptr;
+  size_t allocationBytes = 0;
+  if (minimumAllocationSize <= candidateAllocationBytes) {
+    allocationBytes = candidateAllocationBytes;
+    allocation = alloca(allocationBytes);
+  }
+
+  // Create a task to run the closure.  Pass a RunInlineTaskOptionRecord
+  // containing a pointer to the allocation enabling us to provide our stack
+  // allocation rather than swift_task_create_common having to malloc it.
+  RunInlineTaskOptionRecord option(allocation, allocationBytes);
+  auto taskAndContext = swift_task_create_common(
+      /*rawTaskCreateFlags=*/0, &option, futureResultType,
+      reinterpret_cast<TaskContinuationFunction *>(closure), closureContext,
+      /*initialContextSize=*/closureContextSize);
+
+  // Run the task.
+  swift_job_run(taskAndContext.Task, ExecutorRef::generic());
+  // Under the task-to-thread concurrency model, the task should always have
+  // completed by this point.
+
+  // Copy the result out to our caller.
+  auto *futureResult = taskAndContext.Task->futureFragment()->getStoragePtr();
+  futureResultType->getValueWitnesses()->initializeWithCopy(
+      result, futureResult, futureResultType);
+
+  // Destroy the task.
+  taskAndContext.Task->~AsyncTask();
+}
+#endif
 
 SWIFT_CC(swift)
 AsyncTaskAndContext swift::swift_task_create(

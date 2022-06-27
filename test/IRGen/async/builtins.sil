@@ -148,3 +148,22 @@ bb0:
   %21 = tuple ()
   return %21 : $()
 }
+
+
+// CHECK-LABEL: define{{.*}} swiftcc void @testRunInline(
+// CHECK-SAME:      %swift.opaque* noalias nocapture sret(%swift.opaque) [[RESULT:%[^,]+]],
+// CHECK-SAME:      i8* [[CLOSURE:%[^,]+]],
+// CHECK-SAME:      %swift.opaque* [[CLOSURE_CONTEXT:%[^,]+]],
+// CHECK-SAME:      %swift.type* [[FUTURE_RESULT_TYPE:%[^,]+]])
+// CHECK-SAME:  {
+// CHECK:         call swiftcc void @swift_task_run_inline(
+// CHECK-SAME:        %swift.opaque* [[RESULT]],
+// CHECK-SAME:        i8* [[CLOSURE]],
+// CHECK-SAME:        %swift.opaque* [[CLOSURE_CONTEXT]],
+// CHECK-SAME:        %swift.type* [[FUTURE_RESULT_TYPE]])
+// CHECK:       }
+sil hidden @testRunInline : $@convention(thin) <T> (@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T>) -> @out T {
+entry(%result : $*T, %closure : $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T>):
+  %void = builtin "taskRunInline"<T>(%result : $*T, %closure : $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T>) : $()
+  return %void : $()
+}

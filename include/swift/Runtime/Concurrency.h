@@ -92,6 +92,20 @@ AsyncTaskAndContext swift_task_create_common(
     TaskContinuationFunction *function, void *closureContext,
     size_t initialContextSize);
 
+#if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
+#define SWIFT_TASK_RUN_INLINE_INITIAL_CONTEXT_BYTES 4096
+/// Begin an async context in the current sync context and run the indicated
+/// closure in it.
+///
+/// This is only supported under the task-to-thread concurrency model and
+/// relies on a synchronous implementation of task blocking in order to work.
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift)
+void swift_task_run_inline(OpaqueValue *result, void *closureAFP,
+                           OpaqueValue *closureContext,
+                           const Metadata *futureResultType);
+#endif
+
 /// Allocate memory in a task.
 ///
 /// This must be called synchronously with the task.

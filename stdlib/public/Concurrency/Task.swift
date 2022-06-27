@@ -961,6 +961,67 @@ func _reportUnexpectedExecutor(_ _filenameStart: Builtin.RawPointer,
 @_silgen_name("swift_task_getCurrentThreadPriority")
 func _getCurrentThreadPriority() -> Int
 
+#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+@available(SwiftStdlib 5.8, *)
+@usableFromInline
+@_unavailableFromAsync(message: "Use _taskRunInline from a sync context to begin an async context.")
+internal func _taskRunInline<T>(_ body: () async -> T) -> T {
+#if compiler(>=5.5) && $BuiltinTaskRunInline
+  return Builtin.taskRunInline(body)
+#else
+  fatalError("Unsupported Swift compiler")
+#endif
+}
+
+@available(SwiftStdlib 5.8, *)
+extension Task where Failure == Never {
+  /// Start an async context within the current sync context and run the
+  /// provided async closure, returning the value it produces.
+  @available(SwiftStdlib 5.8, *)
+  @_spi(_TaskToThreadModel)
+  @_unavailableFromAsync(message: "Use Task.runInline from a sync context to begin an async context.")
+  public static func runInline(_ body: () async -> Success) -> Success {
+    return _taskRunInline(body)
+  }
+}
+
+@available(SwiftStdlib 5.8, *)
+extension Task where Failure == Error {
+  @available(SwiftStdlib 5.8, *)
+  @_alwaysEmitIntoClient
+  @usableFromInline
+  internal static func _runInlineHelper<T>(
+    body: () async -> Result<T, Error>,
+    rescue: (Result<T, Error>) throws -> T
+  ) rethrows -> T {
+    return try rescue(
+      _taskRunInline(body)
+    )
+  }
+
+  /// Start an async context within the current sync context and run the
+  /// provided async closure, returning or throwing the value or error it
+  /// produces.
+  @available(SwiftStdlib 5.8, *)
+  @_spi(_TaskToThreadModel)
+  @_unavailableFromAsync(message: "Use Task.runInline from a sync context to begin an async context.")
+  public static func runInline(_ body: () async throws -> Success) rethrows -> Success {
+    return try _runInlineHelper(
+      body: {
+        do { 
+          let value = try await body() 
+          return Result.success(value)
+        }
+        catch let error {
+          return Result.failure(error)
+        }
+    },
+      rescue: { try $0.get() }
+    )
+  }
+}
+#endif
+
 #if _runtime(_ObjC)
 
 /// Intrinsic used by SILGen to launch a task for bridging a Swift async method
