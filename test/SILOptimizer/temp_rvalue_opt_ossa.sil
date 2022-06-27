@@ -14,7 +14,10 @@ struct GS<Base> {
   var _value: Builtin.Int64
 }
 
-class Klass {}
+class Klass {
+  @_hasStorage var i: Int
+  init()
+}
 
 struct Two {
   var a: Klass
@@ -50,6 +53,7 @@ bb0(%0 : $*Klass, %1 : $*Klass):
 
 sil @throwing_function : $@convention(thin) (@in_guaranteed Klass) -> ((), @error Error)
 sil @use_gsbase_builtinnativeobject : $@convention(thin) (@guaranteed GS<Builtin.NativeObject>) -> ()
+sil [readonly] @readonly_throwing_func : $@convention(thin) (@in_guaranteed Int) -> @error Error
 
 sil_global @globalString : $String
 
@@ -975,6 +979,32 @@ bb0(%0 : $*Klass, %1 : @owned $Klass):
   %9999 = tuple()
   return %9999 : $()
 }
+
+// Just check that we don't crash here.
+// Currently this pattern is not optimized, but we might in future.
+sil [ossa] @dont_extend_access_scope_over_term_inst : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = ref_element_addr %0 : $Klass, #Klass.i
+  %2 = begin_access [read] [dynamic] %1 : $*Int
+  %3 = alloc_stack $Int
+  copy_addr %2 to [initialization] %3 : $*Int
+  end_access %2 : $*Int
+  %6 = function_ref @readonly_throwing_func : $@convention(thin) (@in_guaranteed Int) -> @error Error
+  try_apply %6(%3) : $@convention(thin) (@in_guaranteed Int) -> @error Error, normal bb1, error bb2
+bb1(%8 : $()):
+  destroy_addr %3 : $*Int
+  dealloc_stack %3 : $*Int
+  br bb3
+bb2(%12 : @owned $Error):
+  destroy_addr %3 : $*Int
+  dealloc_stack %3 : $*Int
+  destroy_value %12 : $Error
+  br bb3
+bb3:
+  %17 = tuple ()
+  return %17 : $()
+}
+
 
 /////////////////
 // Store Tests //
