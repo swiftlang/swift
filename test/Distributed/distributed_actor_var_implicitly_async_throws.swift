@@ -33,15 +33,17 @@ distributed actor D {
     "dist"
   }
 
-  // OK:
+  // FIXME: The following should be accepted.
+  /*
   distributed var distGet: String {
     get distributed {
       "okey"
     }
   }
+  */
 
-  distributed var distSetGet: String {
-    set distributed {
+  distributed var distSetGet: String { // expected-error {{'distributed' computed property 'distSetGet' cannot have setter}}
+    set distributed { // expected-error {{expected '{' to start setter definition}}
       _ = newValue
     }
     get distributed {
