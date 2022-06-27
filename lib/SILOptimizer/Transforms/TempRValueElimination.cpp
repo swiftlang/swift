@@ -403,6 +403,11 @@ bool TempRValueOptPass::extendAccessScopes(
         assert(endAccess->getBeginAccess()->getAccessKind() ==
                  SILAccessKind::Read &&
                "a may-write end_access should not be in the copysrc lifetime");
+
+        // Don't move instructions beyond the block's terminator.
+        if (isa<TermInst>(lastUseInst))
+          return false;
+
         endAccessToMove = endAccess;
       }
     } else if (endAccessToMove) {
