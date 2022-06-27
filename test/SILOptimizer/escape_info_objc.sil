@@ -4,7 +4,8 @@
 // REQUIRES: objc_interop
 // REQUIRES: PTRSIZE=64
 
-// REQUIRES: rdar95944300
+// Currently failing on arm: rdar://92963081
+// REQUIRES: CPU=x86_64
 
 sil_stage canonical
 
