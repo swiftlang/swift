@@ -139,3 +139,12 @@ func callFuncWithMetatypeArg() {
   metatypeArg(Int.self, false)                // expected-note {{called from here}}
 }
 
+struct GenStruct<A> {
+  var a: A
+}
+
+@_noAllocation
+func memoryLayout() -> Int? {
+  return MemoryLayout<GenStruct<Int>>.size
+}
+

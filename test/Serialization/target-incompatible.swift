@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %swift -target x86_64-unknown-darwin14 -o %t/mips-template.swiftmodule -parse-stdlib -emit-module -module-name mips %S/../Inputs/empty.swift
+// RUN: %swift -target x86_64-unknown-darwin14 -o %t/mips-template.swiftmodule -parse-stdlib -emit-module -module-name mips -Xllvm -sil-disable-pass=target-constant-folding %S/../Inputs/empty.swift
 // RUN: %{python} -u %S/Inputs/binary_sub.py x86_64-unknown-darwin14 mips64-unknown-darwin14 < %t/mips-template.swiftmodule > %t/mips.swiftmodule
 // RUN: not %target-swift-frontend -I %t -typecheck -parse-stdlib %s -DMIPS 2>&1 | %FileCheck -check-prefix=CHECK-MIPS %s
 
-// RUN: %swift -target x86_64-unknown-darwin14 -o %t/solaris-template.swiftmodule -parse-stdlib -emit-module -module-name solaris %S/../Inputs/empty.swift
+// RUN: %swift -target x86_64-unknown-darwin14 -o %t/solaris-template.swiftmodule -parse-stdlib -emit-module -module-name solaris -Xllvm -sil-disable-pass=target-constant-folding %S/../Inputs/empty.swift
 // RUN: %{python} -u %S/Inputs/binary_sub.py x86_64-unknown-darwin14 x86_64-unknown-solaris8 < %t/solaris-template.swiftmodule > %t/solaris.swiftmodule
 // RUN: not %target-swift-frontend -I %t -typecheck -parse-stdlib %s -DSOLARIS 2>&1 | %FileCheck -check-prefix=CHECK-SOLARIS %s
 
@@ -17,11 +17,11 @@
 
 // These checks should still hold with -enable-library-evolution.
 
-// RUN: %swift -target x86_64-unknown-darwin14 -o %t/mips-template.swiftmodule -parse-stdlib -emit-module -module-name mips %S/../Inputs/empty.swift -enable-library-evolution
+// RUN: %swift -target x86_64-unknown-darwin14 -o %t/mips-template.swiftmodule -parse-stdlib -emit-module -module-name mips -Xllvm -sil-disable-pass=target-constant-folding %S/../Inputs/empty.swift -enable-library-evolution
 // RUN: %{python} -u %S/Inputs/binary_sub.py x86_64-unknown-darwin14 mips64-unknown-darwin14 < %t/mips-template.swiftmodule > %t/mips.swiftmodule
 // RUN: not %target-swift-frontend -I %t -typecheck -parse-stdlib %s -DMIPS 2>&1 | %FileCheck -check-prefix=CHECK-MIPS %s
 
-// RUN: %swift -target x86_64-unknown-darwin14 -o %t/solaris-template.swiftmodule -parse-stdlib -emit-module -module-name solaris %S/../Inputs/empty.swift -enable-library-evolution
+// RUN: %swift -target x86_64-unknown-darwin14 -o %t/solaris-template.swiftmodule -parse-stdlib -emit-module -module-name solaris -Xllvm -sil-disable-pass=target-constant-folding %S/../Inputs/empty.swift -enable-library-evolution
 // RUN: %{python} -u %S/Inputs/binary_sub.py x86_64-unknown-darwin14 x86_64-unknown-solaris8 < %t/solaris-template.swiftmodule > %t/solaris.swiftmodule
 // RUN: not %target-swift-frontend -I %t -typecheck -parse-stdlib %s -DSOLARIS 2>&1 | %FileCheck -check-prefix=CHECK-SOLARIS %s
 
