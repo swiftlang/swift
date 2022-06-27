@@ -207,6 +207,7 @@ bool swift::immediate::autolinkImportedModules(ModuleDecl *M,
   // errors to libswiftFoundation in immediate mode when running on older OS versions
   // with a 13.0 SDK. This workaround scans through the list of dependencies and
   // manually adds libswiftFoundation if necessary.
+  auto &Target = M->getASTContext().LangOpts.Target;
   if (Target.isMacOSX() && Target.getOSMajorVersion() < 13) {
     bool linksFoundation = std::any_of(AllLinkLibraries.begin(),
         AllLinkLibraries.end(), [](auto &Lib) {
