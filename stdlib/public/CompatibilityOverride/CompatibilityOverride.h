@@ -90,7 +90,7 @@ namespace swift {
 // resolve to string literal containing the appropriate section name for the
 // current library.
 #define COMPATIBILITY_OVERRIDE_SECTION_NAME_swiftRuntime "__swift57_hooks"
-#define COMPATIBILITY_OVERRIDE_SECTION_NAME_swift_Concurrency "__s_async_hook"
+#define COMPATIBILITY_OVERRIDE_SECTION_NAME_swift_Concurrency "__s57async_hook"
 
 #define COMPATIBILITY_OVERRIDE_SECTION_NAME                                    \
   COMPATIBILITY_CONCAT(COMPATIBILITY_OVERRIDE_SECTION_NAME_,                   \
