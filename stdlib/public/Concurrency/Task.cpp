@@ -913,8 +913,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
 template<typename AsyncSignature, uint16_t AuthDiscriminator>
 SWIFT_ALWAYS_INLINE // so this doesn't hang out as a ptrauth gadget
 std::pair<typename AsyncSignature::FunctionType *, size_t>
-getAsyncClosureEntryPointAndContextSize(void *function,
-                                        HeapObject *functionContext) {
+getAsyncClosureEntryPointAndContextSize(void *function) {
   auto fnPtr =
       reinterpret_cast<const AsyncFunctionPointer<AsyncSignature> *>(function);
 #if SWIFT_PTRAUTH
@@ -934,11 +933,10 @@ AsyncTaskAndContext swift::swift_task_create(
     void *closureEntry, HeapObject *closureContext) {
   FutureAsyncSignature::FunctionType *taskEntry;
   size_t initialContextSize;
-  std::tie(taskEntry, initialContextSize)
-    = getAsyncClosureEntryPointAndContextSize<
-      FutureAsyncSignature,
-      SpecialPointerAuthDiscriminators::AsyncFutureFunction
-    >(closureEntry, closureContext);
+  std::tie(taskEntry, initialContextSize) =
+      getAsyncClosureEntryPointAndContextSize<
+          FutureAsyncSignature,
+          SpecialPointerAuthDiscriminators::AsyncFutureFunction>(closureEntry);
 
   return swift_task_create_common(
       taskCreateFlags, options, futureResultType,
