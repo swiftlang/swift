@@ -7,7 +7,7 @@
 
 // RUN: %target-build-swift %s -parse-as-library -target %target-cpu-apple-macosx10.15 -I %t/includes -emit-module -emit-library -module-name AssociatedTypeRequirements -o %t/AssociatedTypeRequirements %t/includes/testModB.o
 
-// RUN: %target-swift-reflection-dump -binary-filename %t/AssociatedTypeRequirements -binary-filename %platform-module-dir/%target-library-name(swiftCore) | %FileCheck %s
+// RUN: %target-swift-reflection-dump -binary-filename %t/AssociatedTypeRequirements | %FileCheck %s
 
 // CHECK: ASSOCIATED TYPES:
 // CHECK-NEXT: =============
@@ -17,9 +17,9 @@
 // CHECK-NEXT: (struct AssociatedTypeRequirements.Bar)
 
 // CHECK: opaque type conformance requirements:
-// CHECK-DAG: AssociatedTypeRequirements.protoA
-// CHECK-DAG: AssociatedTypeRequirements.protoB
-// CHECK-DAG: testModB.testModBProtocol
+// CHECK-NEXT: AssociatedTypeRequirements.protoA
+// CHECK-NEXT: AssociatedTypeRequirements.protoB
+// CHECK-NEXT: testModB.testModBProtocol
 
 import testModB
 
