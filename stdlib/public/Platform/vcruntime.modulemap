@@ -1,4 +1,4 @@
-//===--- visualc.modulemap ------------------------------------------------===//
+//===--- vcruntime.modulemap ----------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -84,23 +84,28 @@ module _visualc_intrinsics [system] [extern_c] {
   }
 }
 
-module visualc [system] {
-  module SAL {
-    header "sal.h"
-    export *
-  }
+module SAL [system] {
+  header "sal.h"
+  export *
 
-  module vcruntime {
-    header "vcruntime.h"
+  module Concurrency {
+    header "concurrencysal.h"
     export *
   }
+}
+
+module vcruntime [system] {
+  use SAL
+  export SAL
+
+  header "vcruntime.h"
 
   module setjmp {
     header "setjmp.h"
     export *
   }
 
-  module stdint {
+  explicit module stdint {
     header "stdint.h"
     export *
   }
