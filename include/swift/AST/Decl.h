@@ -412,7 +412,7 @@ protected:
   SWIFT_INLINE_BITFIELD(SubscriptDecl, VarDecl, 2,
     StaticSpelling : 2
   );
-  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+2+8+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+2+8+1+1+1+1+1+1+1,
     /// \see AbstractFunctionDecl::BodyKind
     BodyKind : 3,
 
@@ -439,7 +439,11 @@ protected:
 
     /// Whether peeking into this function detected nested type declarations.
     /// This is set when skipping over the decl at parsing.
-    HasNestedTypeDeclarations : 1
+    HasNestedTypeDeclarations : 1,
+
+    /// Whether this function is a distributed thunk for a distributed
+    /// function or computed property.
+    DistributedThunk: 1
   );
 
   SWIFT_INLINE_BITFIELD(FuncDecl, AbstractFunctionDecl, 1+1+2+1+1+2+1,
@@ -6318,6 +6322,7 @@ protected:
     Bits.AbstractFunctionDecl.Throws = Throws;
     Bits.AbstractFunctionDecl.HasSingleExpressionBody = false;
     Bits.AbstractFunctionDecl.HasNestedTypeDeclarations = false;
+    Bits.AbstractFunctionDecl.DistributedThunk = false;
   }
 
   void setBodyKind(BodyKind K) {
@@ -6418,6 +6423,16 @@ public:
 
   /// Returns 'true' if the function is distributed.
   bool isDistributed() const;
+
+  /// Is this a thunk function used to access a distributed method
+  /// or computed property outside of its actor isolation context?
+  bool isDistributedThunk() const {
+    return Bits.AbstractFunctionDecl.DistributedThunk;
+  }
+
+  void setDistributedThunk(bool isThunk) {
+    Bits.AbstractFunctionDecl.DistributedThunk = isThunk;
+  }
 
   /// For a 'distributed' target (func or computed property),
   /// get the 'thunk' responsible for performing the 'remoteCall'.

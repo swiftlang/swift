@@ -701,6 +701,7 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
       genericParamList, params,
       func->getResultInterfaceType(), DC);
   thunk->setSynthesized(true);
+  thunk->setDistributedThunk(true);
   thunk->getAttrs().add(new (C) NonisolatedAttr(/*isImplicit=*/true));
 
   if (isa<ClassDecl>(DC))
