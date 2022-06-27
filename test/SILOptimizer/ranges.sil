@@ -2,6 +2,8 @@
 
 // REQUIRES: swift_in_compiler
 
+// REQUIRES: rdar95944300
+
 // rdar92963081
 // UNSUPPORTED: OS=linux-gnu
 

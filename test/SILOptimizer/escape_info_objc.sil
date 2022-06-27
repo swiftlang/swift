@@ -4,6 +4,8 @@
 // REQUIRES: objc_interop
 // REQUIRES: PTRSIZE=64
 
+// REQUIRES: rdar95944300
+
 sil_stage canonical
 
 import Builtin
