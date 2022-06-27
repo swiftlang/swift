@@ -29,6 +29,19 @@ struct __attribute__((swift_attr("import_as_ref"))) MoveOnly {
 
 MoveOnly moveIntoResult(MoveOnly &x) { return move(x); }
 
+struct __attribute__((swift_attr("import_as_ref"))) NoCopyMove {
+  NoCopyMove() = default;
+  NoCopyMove(const NoCopyMove &) = delete;
+  NoCopyMove(NoCopyMove &&) = delete;
+
+  int test() const { return 42; }
+  int testMutable() { return 42; }
+
+  static NoCopyMove *create() {
+    return new (malloc(sizeof(NoCopyMove))) NoCopyMove();
+  }
+};
+
 struct __attribute__((swift_attr("import_as_ref"))) HasMoveOnlyChild {
   MoveOnly child;
 
