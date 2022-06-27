@@ -2332,8 +2332,16 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
   // Diagnose custom attributes that haven't been processed yet.
   for (auto customAttr : attrs.getCustomAttrs()) {
     // If this was the global actor we matched, ignore it.
-    if (globalActorAttr == customAttr)
+    if (globalActorAttr == customAttr) {
+      Decl *decl = nullptr;
+      if (getASTContext().LangOpts.isConcurrencyModelTaskToThread() &&
+          (decl = getDeclContext()->getAsDecl()) &&
+          !AvailableAttr::isUnavailable(decl))
+        diagnose(customAttr->getLocation(),
+                 diag::concurrency_task_to_thread_model_global_actor_annotation,
+                 customAttr->getTypeRepr(), "task-to-thread concurrency model");
       continue;
+    }
 
     // If this attribute was marked invalid, ignore it.
     if (customAttr->isInvalid())

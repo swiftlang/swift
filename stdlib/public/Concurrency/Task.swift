@@ -463,6 +463,17 @@ func taskCreateFlags(
 // ==== Task Creation ----------------------------------------------------------
 @available(SwiftStdlib 5.1, *)
 extension Task where Failure == Never {
+#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  @discardableResult
+  @_alwaysEmitIntoClient
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+  public init(
+    priority: TaskPriority? = nil,
+    @_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping () async -> Success
+  ) {
+    fatalError("Unavailable in task-to-thread concurrency model.")
+  }
+#else
   /// Runs the given nonthrowing operation asynchronously
   /// as part of a new top-level task on behalf of the current actor.
   ///
@@ -507,10 +518,22 @@ extension Task where Failure == Never {
     fatalError("Unsupported Swift compiler")
 #endif
   }
+#endif
 }
 
 @available(SwiftStdlib 5.1, *)
 extension Task where Failure == Error {
+#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  @discardableResult
+  @_alwaysEmitIntoClient
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+  public init(
+    priority: TaskPriority? = nil,
+    @_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping () async throws -> Success
+  ) {
+    fatalError("Unavailable in task-to-thread concurrency model")
+  }
+#else
   /// Runs the given throwing operation asynchronously
   /// as part of a new top-level task on behalf of the current actor.
   ///
@@ -556,11 +579,23 @@ extension Task where Failure == Error {
     fatalError("Unsupported Swift compiler")
 #endif
   }
+#endif
 }
 
 // ==== Detached Tasks ---------------------------------------------------------
 @available(SwiftStdlib 5.1, *)
 extension Task where Failure == Never {
+#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  @discardableResult
+  @_alwaysEmitIntoClient
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+  public static func detached(
+    priority: TaskPriority? = nil,
+    operation: __owned @Sendable @escaping () async -> Success
+  ) -> Task<Success, Failure> {
+    fatalError("Unavailable in task-to-thread concurrency model")
+  }
+#else
   /// Runs the given nonthrowing operation asynchronously
   /// as part of a new top-level task.
   ///
@@ -602,10 +637,22 @@ extension Task where Failure == Never {
     fatalError("Unsupported Swift compiler")
 #endif
   }
+#endif
 }
 
 @available(SwiftStdlib 5.1, *)
 extension Task where Failure == Error {
+#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  @discardableResult
+  @_alwaysEmitIntoClient
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+  public static func detached(
+    priority: TaskPriority? = nil,
+    operation: __owned @Sendable @escaping () async throws -> Success
+  ) -> Task<Success, Failure> {
+    fatalError("Unavailable in task-to-thread concurrency model")
+  }
+#else
   /// Runs the given throwing operation asynchronously
   /// as part of a new top-level task.
   ///
@@ -650,6 +697,7 @@ extension Task where Failure == Error {
     fatalError("Unsupported Swift compiler")
 #endif
   }
+#endif
 }
 
 // ==== Voluntary Suspension -----------------------------------------------------
@@ -833,6 +881,15 @@ internal func _asyncMainDrainQueue() -> Never
 @_silgen_name("swift_task_getMainExecutor")
 internal func _getMainExecutor() -> Builtin.Executor
 
+#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+@available(SwiftStdlib 5.1, *)
+@available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+@usableFromInline
+@preconcurrency
+internal func _runAsyncMain(_ asyncFun: @Sendable @escaping () async throws -> ()) {
+  fatalError("Unavailable in task-to-thread concurrency model")
+}
+#else
 @available(SwiftStdlib 5.1, *)
 @usableFromInline
 @preconcurrency
@@ -854,6 +911,7 @@ internal func _runAsyncMain(_ asyncFun: @Sendable @escaping () async throws -> (
   }
   _asyncMainDrainQueue()
 }
+#endif
 
 // FIXME: both of these ought to take their arguments _owned so that
 //        we can do a move out of the future in the common case where it's
