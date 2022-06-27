@@ -49,31 +49,24 @@ class SwiftSyntax(product.Product):
     def is_swiftpm_unified_build_product(cls):
         return True
 
-    def run_swiftsyntax_build_script(self, target, additional_params=[]):
-        llvm_build_dir = os.path.join(self.build_dir, '..', 'llvm-' + target)
-        llvm_build_dir = os.path.realpath(llvm_build_dir)
-
+    def run_swiftsyntax_build_script(self, target, command, additional_params=[]):
         script_path = os.path.join(self.source_dir, 'build-script.py')
 
         build_cmd = [
             script_path,
+            command,
             '--build-dir', self.build_dir,
             '--multiroot-data-file', MULTIROOT_DATA_FILE_PATH,
-            '--toolchain', self.install_toolchain_path(target),
-            '--filecheck-exec', os.path.join(llvm_build_dir, 'bin',
-                                             'FileCheck'),
+            '--toolchain', self.install_toolchain_path(target)
         ]
 
         if self.is_release():
             build_cmd.append('--release')
 
-        if self.args.swiftsyntax_verify_generated_files:
-            build_cmd.append('--verify-generated-files')
-
-        build_cmd.extend(additional_params)
-
         if self.args.verbose_build:
             build_cmd.append('--verbose')
+
+        build_cmd.extend(additional_params)
 
         shell.call(build_cmd)
 
@@ -81,14 +74,28 @@ class SwiftSyntax(product.Product):
         return True
 
     def build(self, host_target):
-        self.run_swiftsyntax_build_script(target=host_target)
+        if self.args.swiftsyntax_verify_generated_files:
+            self.run_swiftsyntax_build_script(target=host_target,
+                                              command='verify-source-code')
+
+        self.run_swiftsyntax_build_script(target=host_target, 
+                                          command='build')
 
     def should_test(self, host_target):
         return self.args.test_swiftsyntax
 
     def test(self, host_target):
+        llvm_build_dir = os.path.join(self.build_dir, '..', 'llvm-' + host_target)
+        llvm_build_dir = os.path.realpath(llvm_build_dir)
+
         self.run_swiftsyntax_build_script(target=host_target,
-                                          additional_params=['--test'])
+                                          command='test',
+                                          additional_params=[
+                                              '--filecheck-exec', 
+                                              os.path.join(llvm_build_dir, 
+                                                           'bin', 
+                                                           'FileCheck')
+                                          ])
 
     def should_install(self, host_target):
         return self.args.install_swiftsyntax
