@@ -565,6 +565,36 @@ static inline bool taskIsDetached(TaskCreateFlags createFlags, JobFlags jobFlags
   return taskIsUnstructured(jobFlags) && !createFlags.copyTaskLocals();
 }
 
+static std::pair<size_t, size_t> amountToAllocateForHeaderAndTask(
+    const AsyncTask *parent, const TaskGroup *group,
+    const Metadata *futureResultType, size_t initialContextSize) {
+  // Figure out the size of the header.
+  size_t headerSize = sizeof(AsyncTask);
+  if (parent) {
+    headerSize += sizeof(AsyncTask::ChildFragment);
+  }
+  if (group) {
+    headerSize += sizeof(AsyncTask::GroupChildFragment);
+  }
+  if (futureResultType) {
+    headerSize += FutureFragment::fragmentSize(headerSize, futureResultType);
+    // Add the future async context prefix.
+    headerSize += sizeof(FutureAsyncContextPrefix);
+  } else {
+    // Add the async context prefix.
+    headerSize += sizeof(AsyncContextPrefix);
+  }
+
+  headerSize = llvm::alignTo(headerSize, llvm::Align(alignof(AsyncContext)));
+  // Allocate the initial context together with the job.
+  // This means that we never get rid of this allocation.
+  size_t amountToAllocate = headerSize + initialContextSize;
+
+  assert(amountToAllocate % MaximumAlignment == 0);
+
+  return {headerSize, amountToAllocate};
+}
+
 /// Implementation of task creation.
 SWIFT_CC(swift)
 static AsyncTaskAndContext swift_task_create_commonImpl(
@@ -705,30 +735,9 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
 
   SWIFT_TASK_DEBUG_LOG("Task's base priority = %#zx", basePriority);
 
-  // Figure out the size of the header.
-  size_t headerSize = sizeof(AsyncTask);
-  if (parent) {
-    headerSize += sizeof(AsyncTask::ChildFragment);
-  }
-  if (group) {
-    headerSize += sizeof(AsyncTask::GroupChildFragment);
-  }
-  if (futureResultType) {
-    headerSize += FutureFragment::fragmentSize(headerSize, futureResultType);
-    // Add the future async context prefix.
-    headerSize += sizeof(FutureAsyncContextPrefix);
-  } else {
-    // Add the async context prefix.
-    headerSize += sizeof(AsyncContextPrefix);
-  }
-
-  headerSize = llvm::alignTo(headerSize, llvm::Align(alignof(AsyncContext)));
-
-  // Allocate the initial context together with the job.
-  // This means that we never get rid of this allocation.
-  size_t amountToAllocate = headerSize + initialContextSize;
-
-  assert(amountToAllocate % MaximumAlignment == 0);
+  size_t headerSize, amountToAllocate;
+  std::tie(headerSize, amountToAllocate) = amountToAllocateForHeaderAndTask(
+      parent, group, futureResultType, initialContextSize);
 
   unsigned initialSlabSize = 512;
 
