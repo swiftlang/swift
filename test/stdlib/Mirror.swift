@@ -1552,6 +1552,7 @@ mirrors.test("CustomMirrorIsInherited") {
 //===----------------------------------------------------------------------===//
 
 protocol SomeNativeProto {}
+protocol SomeOtherNativeProto {}
 extension Int: SomeNativeProto {}
 
 class SomeClass {}
@@ -1586,6 +1587,14 @@ mirrors.test("MetatypeMirror") {
     output = ""
     dump(nativeProtocolConcreteMetatype, to: &output)
     expectEqual(expectedNativeProtocolConcrete, output)
+
+    let nativeProtocolCompositionMetatype =
+        (SomeNativeProto & SomeOtherNativeProto).self
+    output = ""
+    dump(nativeProtocolCompositionMetatype, to: &output)
+    expectEqual(
+      "- Mirror.SomeNativeProto & Mirror.SomeOtherNativeProto #0\n",
+      output)
   }
 }
 
