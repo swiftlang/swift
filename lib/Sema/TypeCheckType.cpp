@@ -3810,6 +3810,19 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   if (doDiag && !options.contains(TypeResolutionFlags::SilenceErrors)) {
     // Prior to Swift 5, we allow 'as T!' and turn it into a disjunction.
     if (getASTContext().isSwiftVersionAtLeast(5)) {
+      // Mark this repr as invalid. This is the only way to indicate that
+      // something went wrong without supressing checking other reprs in
+      // the same type. For example:
+      //
+      // struct S<T, U> { ... }
+      //
+      // _ = S<Int!, String!>(...)
+      //
+      // Compiler should diagnose both `Int!` and `String!` as invalid,
+      // but returning `ErrorType` from here would stop type resolution
+      // after `Int!`.
+      repr->setInvalid();
+
       diagnose(repr->getStartLoc(),
                diag::implicitly_unwrapped_optional_in_illegal_position)
           .fixItReplace(repr->getExclamationLoc(), "?");
