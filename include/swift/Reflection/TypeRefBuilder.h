@@ -1242,6 +1242,86 @@ private:
     }
 
     llvm::Optional<std::string>
+    readFullyQualifiedTypeName(uintptr_t typeDescriptorTarget) {
+      std::string typeName;
+      auto contextTypeDescriptorBytes = OpaqueByteReader(
+          remote::RemoteAddress(typeDescriptorTarget),
+          sizeof(ExternalContextDescriptor<ObjCInteropKind, PointerSize>));
+      if (!contextTypeDescriptorBytes.get()) {
+        Error = "Failed to read context descriptor.";
+        return llvm::None;
+      }
+      const ExternalContextDescriptor<ObjCInteropKind, PointerSize>
+          *contextDescriptor =
+              (const ExternalContextDescriptor<ObjCInteropKind, PointerSize> *)
+                  contextTypeDescriptorBytes.get();
+
+      auto typeDescriptor =
+          dyn_cast<ExternalTypeContextDescriptor<ObjCInteropKind, PointerSize>>(
+              contextDescriptor);
+      if (!typeDescriptor) {
+        Error = "Unexpected type of context descriptor.";
+        return llvm::None;
+      }
+
+      auto optionalTypeName = readTypeNameFromTypeDescriptor(
+          typeDescriptor, typeDescriptorTarget);
+      if (!optionalTypeName.hasValue())
+        return llvm::None;
+      else
+        typeName = optionalTypeName.getValue();
+
+      std::vector<ContextNameInfo> contextNameChain;
+      contextNameChain.push_back(
+          ContextNameInfo{typeName, typeDescriptorTarget, false});
+      getParentContextChain(typeDescriptorTarget, contextDescriptor,
+                            contextNameChain);
+      return constructFullyQualifiedNameFromContextChain(contextNameChain);
+    }
+
+    llvm::Optional<std::string>
+    readFullyQualifiedProtocolName(
+        uintptr_t protocolDescriptorTarget) {
+      llvm::Optional<std::string> protocolName;
+      // Set low bit indicates that this is an indirect
+      // reference
+      if (protocolDescriptorTarget & 0x1) {
+        auto adjustedProtocolDescriptorTarget = protocolDescriptorTarget & ~0x1;
+        if (auto symbol = OpaquePointerReader(
+                remote::RemoteAddress(adjustedProtocolDescriptorTarget),
+                PointerSize)) {
+          if (!symbol->getSymbol().empty()) {
+            Demangle::Context Ctx;
+            auto demangledRoot =
+                Ctx.demangleSymbolAsNode(symbol->getSymbol().str());
+            assert(demangledRoot->getKind() == Node::Kind::Global);
+            assert(demangledRoot->getChild(0)->getKind() ==
+                   Node::Kind::ProtocolDescriptor);
+            protocolName =
+                nodeToString(demangledRoot->getChild(0)->getChild(0));
+          } else {
+            // This is an absolute address of a protocol descriptor
+            auto protocolDescriptorAddress = (uintptr_t)symbol->getOffset();
+            protocolName =
+                readFullyQualifiedProtocolNameFromProtocolDescriptor(
+                    protocolDescriptorAddress);
+          }
+        } else {
+          Error = "Error reading external protocol address.";
+          return llvm::None;
+        }
+      } else {
+        // If this is a direct reference, get symbol name from the protocol
+        // descriptor.
+        protocolName =
+            readFullyQualifiedProtocolNameFromProtocolDescriptor(
+                protocolDescriptorTarget);
+      }
+      return protocolName;
+    }
+
+  private:
+    llvm::Optional<std::string>
     readFullyQualifiedProtocolNameFromProtocolDescriptor(
         uintptr_t protocolDescriptorAddress) {
       llvm::Optional<std::string> protocolName =
@@ -1510,7 +1590,7 @@ private:
                 OpaqueByteReader, OpaqueStringReader, OpaquePointerReader,
                 OpaqueDynamicSymbolResolver);
         auto conformanceRequirementProtocolName =
-            nameReader.readFullyQualifiedProtocolNameFromProtocolDescriptor(
+            nameReader.readFullyQualifiedProtocolName(
                 protocolDescriptorAddress);
         result.push_back(*conformanceRequirementProtocolName);
       }
@@ -1608,41 +1688,12 @@ private:
         }
       }
 
-      auto contextTypeDescriptorBytes = OpaqueByteReader(
-          remote::RemoteAddress(contextTypeDescriptorAddress),
-          sizeof(ExternalContextDescriptor<ObjCInteropKind, PointerSize>));
-      if (!contextTypeDescriptorBytes.get()) {
-        Error = "Failed to read context descriptor.";
-        return llvm::None;
-      }
-      const ExternalContextDescriptor<ObjCInteropKind, PointerSize>
-          *contextDescriptor =
-              (const ExternalContextDescriptor<ObjCInteropKind, PointerSize> *)
-                  contextTypeDescriptorBytes.get();
-
-      auto typeDescriptor =
-          dyn_cast<ExternalTypeContextDescriptor<ObjCInteropKind, PointerSize>>(
-              contextDescriptor);
-      if (!typeDescriptor) {
-        Error = "Unexpected type of context descriptor.";
-        return llvm::None;
-      }
-
-      auto optionalTypeName = NameReader.readTypeNameFromTypeDescriptor(
-          typeDescriptor, contextTypeDescriptorAddress);
-      if (!optionalTypeName.hasValue())
+      auto fullyQualifiedName =
+          NameReader.readFullyQualifiedTypeName(contextTypeDescriptorAddress);
+      if (!fullyQualifiedName.hasValue())
         return llvm::None;
       else
-        typeName = optionalTypeName.getValue();
-
-      std::vector<ContextNameInfo> contextNameChain;
-      contextNameChain.push_back(
-          ContextNameInfo{typeName, contextTypeDescriptorAddress, false});
-      NameReader.getParentContextChain(contextTypeDescriptorAddress, contextDescriptor,
-                            contextNameChain);
-      std::string fullyQualifiedName =
-          NameReader.constructFullyQualifiedNameFromContextChain(contextNameChain);
-      return std::make_pair(mangledTypeName, fullyQualifiedName);
+        return std::make_pair(mangledTypeName, *fullyQualifiedName);
     }
 
     /// Extract protocol name from a Conformance Descriptor
@@ -1670,67 +1721,8 @@ private:
           (const char *)protocolDescriptorFieldAddress,
           (int32_t)*protocolDescriptorOffset);
 
-      auto constructFullyQualifiedProtocolName =
-          [&](uintptr_t protocolDescriptorAddress)
-          -> llvm::Optional<std::string> {
-        auto protocolName =
-            NameReader.readProtocolNameFromProtocolDescriptor(protocolDescriptorAddress);
-
-        // Read the protocol conformance descriptor itself
-        auto protocolContextDescriptorBytes = OpaqueByteReader(
-            remote::RemoteAddress(protocolDescriptorAddress),
-            sizeof(ExternalContextDescriptor<ObjCInteropKind, PointerSize>));
-        if (!protocolContextDescriptorBytes.get()) {
-          Error = "Failed to read context (protocol) descriptor.";
-          return llvm::None;
-        }
-        const ExternalContextDescriptor<ObjCInteropKind,
-                                        PointerSize> *protocolDescriptor =
-            (const ExternalContextDescriptor<ObjCInteropKind, PointerSize> *)
-                protocolContextDescriptorBytes.get();
-
-        std::vector<ContextNameInfo> contextNameChain;
-        contextNameChain.push_back(ContextNameInfo{
-            protocolName.getValue(), protocolDescriptorAddress, false});
-        NameReader.getParentContextChain(protocolDescriptorAddress, protocolDescriptor,
-                              contextNameChain);
-        return NameReader.constructFullyQualifiedNameFromContextChain(contextNameChain);
-      };
-
-      // Set low bit indicates that this is an indirect
-      // reference
-      if (protocolDescriptorTarget & 0x1) {
-        auto adjustedProtocolDescriptorTarget = protocolDescriptorTarget & ~0x1;
-        if (auto symbol = OpaquePointerReader(
-                remote::RemoteAddress(adjustedProtocolDescriptorTarget),
-                PointerSize)) {
-          if (!symbol->getSymbol().empty()) {
-            Demangle::Context Ctx;
-            auto demangledRoot =
-                Ctx.demangleSymbolAsNode(symbol->getSymbol().str());
-            assert(demangledRoot->getKind() == Node::Kind::Global);
-            assert(demangledRoot->getChild(0)->getKind() ==
-                   Node::Kind::ProtocolDescriptor);
-            protocolName =
-                nodeToString(demangledRoot->getChild(0)->getChild(0));
-          } else {
-            // This is an absolute address of a protocol descriptor
-            auto protocolDescriptorAddress = (uintptr_t)symbol->getOffset();
-            protocolName =
-                constructFullyQualifiedProtocolName(protocolDescriptorAddress);
-          }
-        } else {
-          Error = "Error reading external protocol address.";
-          return llvm::None;
-        }
-      } else {
-        // If this is a direct reference, get symbol name from the protocol
-        // descriptor.
-        protocolName =
-            constructFullyQualifiedProtocolName(protocolDescriptorTarget);
-      }
-
-      return protocolName;
+      return NameReader.readFullyQualifiedProtocolName(
+          protocolDescriptorTarget);
     }
 
     /// Given the address of a conformance descriptor, attempt to read it.
