@@ -5,6 +5,9 @@
 // RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir -target %target-cpu-apple-macosx10.50 | %FileCheck %s --check-prefix=CHECK-NEW
 // RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir -target %target-cpu-apple-macosx10.60 | %FileCheck %s --check-prefix=CHECK-NEW
 
+// RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir -target %target-cpu-apple-macosx10.50 -enable-ad-hoc-availability | %FileCheck %s --check-prefix=CHECK-OLD
+// RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir -target %target-cpu-apple-macosx10.60 -enable-ad-hoc-availability | %FileCheck %s --check-prefix=CHECK-NEW
+
 // REQUIRES: OS=macosx
 
 import weak_import_availability_helper
