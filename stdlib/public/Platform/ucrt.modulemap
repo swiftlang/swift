@@ -116,26 +116,38 @@ module ucrt [system] {
     header "process.h"
     export *
   }
+}
 
-  module corecrt {
-    header "corecrt.h"
-    header "corecrt_stdio_config.h"
+module corecrt [system] {
+  use vcruntime
+
+  header "corecrt.h"
+  header "corecrt_stdio_config.h"
+  export *
+
+  module io {
+    header "corecrt_io.h"
     export *
+  }
 
-    module io {
-      header "corecrt_io.h"
-      export *
-    }
+  module math {
+    header "corecrt_math.h"
+    export *
+  }
 
-    module math {
-      header "corecrt_math.h"
-      export *
-    }
+  module stdio {
+    header "corecrt_wstdio.h"
+    export *
+  }
 
-    module stdio {
-      header "corecrt_wstdio.h"
-      export *
-    }
+  module string {
+    header "corecrt_wstring.h"
+    export *
+  }
+
+  module time {
+    header "corecrt_wtime.h"
+    export *
   }
 }
 
