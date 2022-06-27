@@ -96,6 +96,37 @@ Type swift::getConcreteReplacementForProtocolActorSystemType(ValueDecl *member) 
   llvm_unreachable("Unable to fetch ActorSystem type!");
 }
 
+Type swift::getConcreteReplacementForMemberSerializationRequirement(
+    ValueDecl *member) {
+  auto &C = member->getASTContext();
+  auto *DC = member->getDeclContext();
+  auto DA = C.getDistributedActorDecl();
+
+  // === When declared inside an actor, we can get the type directly
+  if (auto classDecl = DC->getSelfClassDecl()) {
+    return getDistributedSerializationRequirementType(classDecl, C.getDistributedActorDecl());
+  }
+
+  /// === Maybe the value is declared in a protocol?
+  if (auto protocol = DC->getSelfProtocolDecl()) {
+    GenericSignature signature;
+    if (auto *genericContext = member->getAsGenericContext()) {
+      signature = genericContext->getGenericSignature();
+    } else {
+      signature = DC->getGenericSignatureOfContext();
+    }
+
+    auto SerReqAssocType = DA->getAssociatedType(C.Id_SerializationRequirement)
+                               ->getDeclaredInterfaceType();
+
+    // Note that this may be null, e.g. if we're a distributed func inside
+    // a protocol that did not declare a specific actor system requirement.
+    return signature->getConcreteType(SerReqAssocType);
+  }
+
+  llvm_unreachable("Unable to fetch ActorSystem type!");
+}
+
 Type swift::getDistributedActorSystemType(NominalTypeDecl *actor) {
   assert(!dyn_cast<ProtocolDecl>(actor) &&
          "Use getConcreteReplacementForProtocolActorSystemType instead to get"

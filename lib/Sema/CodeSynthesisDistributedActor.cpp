@@ -648,8 +648,13 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
   auto &C = func->getASTContext();
   auto DC = func->getDeclContext();
 
-  auto systemTy = getConcreteReplacementForProtocolActorSystemType(func);
-  assert(systemTy &&
+  // NOTE: So we don't need a thunk in the protocol, we should call the underlying
+  // thing instead, which MUST have a thunk, since it must be a distributed func as well...
+  if (dyn_cast<ProtocolDecl>(DC)) {
+    return nullptr;
+  }
+
+  assert(getConcreteReplacementForProtocolActorSystemType(func) &&
          "Thunk synthesis must have concrete actor system type available");
 
   DeclName thunkName = func->getName();
@@ -788,7 +793,6 @@ FuncDecl *GetDistributedThunkRequest::evaluate(
     return nullptr;
 
   auto &C = distributedTarget->getASTContext();
-  auto DC = distributedTarget->getDeclContext();
 
   if (!getConcreteReplacementForProtocolActorSystemType(distributedTarget)) {
     // Don't synthesize thunks, unless there is a *concrete* ActorSystem.
@@ -811,9 +815,6 @@ FuncDecl *GetDistributedThunkRequest::evaluate(
     // we won't be emitting the offending decl after all.
     if (!C.getLoadedModule(C.Id_Distributed))
       return nullptr;
-
-    auto nominal = DC->getSelfNominalTypeDecl(); // NOTE: Always from DC
-    assert(nominal);
 
     // --- Prepare the "distributed thunk" which does the "maybe remote" dance:
     return createDistributedThunkFunction(func);

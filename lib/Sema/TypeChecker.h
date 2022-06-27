@@ -1101,6 +1101,9 @@ diagnosePotentialOpaqueTypeUnavailability(SourceRange ReferenceRange,
 /// Type check a 'distributed actor' declaration.
 void checkDistributedActor(SourceFile *SF, NominalTypeDecl *decl);
 
+/// Type check a single 'distributed func' declaration.
+void checkDistributedFunc(FuncDecl *func);
+
 void checkConcurrencyAvailability(SourceRange ReferenceRange,
                                   const DeclContext *ReferenceDC);
 
