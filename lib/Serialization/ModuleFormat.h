@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 693; // existential Any and AnyObject
+const uint16_t SWIFTMODULE_VERSION_MINOR = 696; // @_distributed_thunk attribute
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1088,7 +1088,7 @@ namespace decls_block {
     TypeIDField,           // the interface type
     SubstitutionMapIDField // the arguments
   >;
-  
+
   using SequenceArchetypeTypeLayout = BCRecordLayout<
     SEQUENCE_ARCHETYPE_TYPE,
     GenericSignatureIDField, // generic environment
@@ -1157,7 +1157,7 @@ namespace decls_block {
     // Optionally a protocol conformance (for witness_methods)
     // Optionally a substitution map (for substituted function types)
   >;
-  
+
   using SILBlockStorageTypeLayout = BCRecordLayout<
     SIL_BLOCK_STORAGE_TYPE,
     TypeIDField            // capture type
