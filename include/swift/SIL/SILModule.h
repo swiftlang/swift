@@ -579,7 +579,12 @@ public:
   bool isOptimizedOnoneSupportModule() const;
 
   const SILOptions &getOptions() const { return Options; }
-  const IRGenOptions *getIRGenOptionsOrNull() const { return irgenOptions; }
+  const IRGenOptions *getIRGenOptionsOrNull() const {
+    // We don't want to serialize target specific SIL.
+    assert(isSerialized() &&
+           "Target specific options must not be used before serialization");
+    return irgenOptions;
+  }
 
   using iterator = FunctionListType::iterator;
   using const_iterator = FunctionListType::const_iterator;
