@@ -18,6 +18,7 @@ distributed actor DA {
   // Note to add the typealias is diagnosed on the protocol:
   // _Distributed.DistributedActor:3:20: note: diagnostic produced elsewhere: protocol requires nested type 'ActorSystem'; do you want to add it?
 }
+
 // When an actor declares a typealias for a system, but that system does not exist,
 // we need to fail gracefully, rather than crash trying to use the non-existing type.
 //
