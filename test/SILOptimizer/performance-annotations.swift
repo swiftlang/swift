@@ -148,3 +148,18 @@ func memoryLayout() -> Int? {
   return MemoryLayout<GenStruct<Int>>.size
 }
 
+class H {
+  var hash: Int { 27 }
+}
+
+struct MyStruct {
+  static var v: Int = {  // expected-note {{called from here}}
+    return H().hash      // expected-error {{Using type 'H' can cause metadata allocation or locks}}
+  }()
+}
+
+@_noAllocation
+func globalWithInitializer(x: MyStruct) {
+  _ = MyStruct.v         // expected-note {{called from here}}
+}
+

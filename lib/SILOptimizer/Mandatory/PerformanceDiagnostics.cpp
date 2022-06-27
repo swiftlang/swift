@@ -64,8 +64,8 @@ private:
   bool visitInst(SILInstruction *inst, PerformanceConstraints perfConstr,
                     LocWithParent *parentLoc);
 
-  bool visitCallee(FullApplySite as, PerformanceConstraints perfConstr,
-                      LocWithParent *parentLoc);
+  bool visitCallee(SILInstruction *callInst, CalleeList callees,
+                   PerformanceConstraints perfConstr, LocWithParent *parentLoc);
                       
   template<typename ...ArgTypes>
   void diagnose(LocWithParent loc, Diag<ArgTypes...> ID,
@@ -108,21 +108,37 @@ bool PerformanceDiagnostics::visitFunction(SILFunction *function,
           continue;
 
         // Recursively walk into the callees.
-        if (visitCallee(as,  perfConstr, parentLoc))
+        if (visitCallee(&inst, bca->getCalleeList(as), perfConstr, parentLoc))
           return true;
+      } else if (auto *bi = dyn_cast<BuiltinInst>(&inst)) {
+        switch (bi->getBuiltinInfo().ID) {
+          case BuiltinValueKind::Once:
+          case BuiltinValueKind::OnceWithContext:
+            if (auto *fri = dyn_cast<FunctionRefInst>(bi->getArguments()[1])) {
+              if (visitCallee(bi, fri->getReferencedFunction(), perfConstr, parentLoc))
+                return true;
+            } else {
+              LocWithParent loc(inst.getLoc().getSourceLoc(), parentLoc);
+              diagnose(loc, diag::performance_unknown_callees);
+              return true;
+            }
+            break;
+          default:
+            break;
+        }
       }
     }
   }
   return false;
 }
 
-bool PerformanceDiagnostics::visitCallee(FullApplySite as,
-                                            PerformanceConstraints perfConstr,
-                                            LocWithParent *parentLoc) {
-  CalleeList callees = bca->getCalleeList(as);
-  LocWithParent asLoc(as.getLoc().getSourceLoc(), parentLoc);
+bool PerformanceDiagnostics::visitCallee(SILInstruction *callInst,
+                                         CalleeList callees,
+                                         PerformanceConstraints perfConstr,
+                                         LocWithParent *parentLoc) {
+  LocWithParent asLoc(callInst->getLoc().getSourceLoc(), parentLoc);
   LocWithParent *loc = &asLoc;
-  if (parentLoc && asLoc.loc == as.getFunction()->getLocation().getSourceLoc())
+  if (parentLoc && asLoc.loc == callInst->getFunction()->getLocation().getSourceLoc())
     loc = parentLoc;
 
   if (callees.isIncomplete()) {
