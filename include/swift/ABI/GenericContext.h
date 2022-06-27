@@ -123,9 +123,6 @@ public:
     ///
     /// Only valid if the requirement has Layout kind.
     GenericRequirementLayoutKind Layout;
-
-    /// Raw value
-    int32_t RawOffset;
   };
 
   constexpr GenericRequirementFlags getFlags() const {
@@ -148,14 +145,16 @@ public:
     return Protocol;
   }
 
-  /// Retrieve the raw value contained in this generic requirement descriptor
-  int32_t getRawOffset() const {
-    return RawOffset;
+  /// Retreive the raw value of the Protocol requirement pointer.
+  int32_t getUnresolvedProtocolAddress() const {
+    assert(getKind() == GenericRequirementKind::Protocol);
+    return Protocol.getUnresolvedProtocolAddress();
   }
 
+  /// Retreive the offset to the Protocol field
   constexpr inline auto
-  getOffsetOffset() const -> typename Runtime::StoredSize {
-    return offsetof(typename std::remove_reference<decltype(*this)>::type, RawOffset);
+  getProtocolOffset() const -> typename Runtime::StoredSize {
+    return offsetof(typename std::remove_reference<decltype(*this)>::type, Protocol);
   }
 
   /// Retrieve the right-hand type for a SameType or BaseClass requirement.

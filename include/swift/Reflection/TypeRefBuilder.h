@@ -1567,17 +1567,17 @@ private:
         // opaqueTypeDescriptorAddress + offset of the protocol descriptor
         // offset in the descriptor
         auto protocolDescriptorOffsetOffset = (uintptr_t)(&req) +
-                                              req.getOffsetOffset() -
+                                              req.getProtocolOffset() -
                                               (uintptr_t)opaqueTypeDescriptor;
         auto protocolDescriptorOffsetAddress =
             opaqueTypeDescriptorAddress + protocolDescriptorOffsetOffset;
-        auto protocolDescriptorOffset = req.getRawOffset();
+        auto protocolDescriptorOffsetValue = req.getUnresolvedProtocolAddress();
 
         // Compute the address of the protocol descriptor by following the
         // offset
         auto protocolDescriptorAddress = detail::applyRelativeOffset(
             (const char *)protocolDescriptorOffsetAddress,
-            protocolDescriptorOffset);
+            protocolDescriptorOffsetValue);
 
         auto nameReader =
             QualifiedContextNameReader<ObjCInteropKind, PointerSize>(

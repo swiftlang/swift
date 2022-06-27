@@ -169,9 +169,8 @@ public:
   }
 
 #if SWIFT_OBJC_INTEROP
-  constexpr static TargetProtocolDescriptorRef forObjC(Protocol *objcProtocol) {
-    return TargetProtocolDescriptorRef{
-        reinterpret_cast<StoredPointer>(objcProtocol) | IsObjCBit};
+  constexpr static TargetProtocolDescriptorRef forObjC(StoredPointer objcProtocol) {
+    return TargetProtocolDescriptorRef{objcProtocol | IsObjCBit};
   }
 #endif
 
@@ -306,6 +305,16 @@ public:
         reinterpret_cast<
             ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor>>(
             swiftPointer.getPointer()));
+  }
+
+  /// Retrieve a reference to the protocol.
+  int32_t getUnresolvedProtocolAddress() const {
+#if SWIFT_OBJC_INTEROP
+    if (isObjC()) {
+      return objcPointer.getUnresolvedOffset();
+    }
+#endif
+    return swiftPointer.getUnresolvedOffset();
   }
 
   operator TargetProtocolDescriptorRef<Runtime>() const {
