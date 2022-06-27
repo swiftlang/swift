@@ -952,6 +952,9 @@ namespace {
 
     /// Simplify constructs like `UInt32(1)` into `1 as UInt32` if
     /// the type conforms to the expected literal protocol.
+    ///
+    /// \returns Either a transformed expression, or `ErrorExpr` upon type
+    /// resolution failure, or `nullptr` if transformation is not applicable.
     Expr *simplifyTypeConstructionWithLiteralArg(Expr *E);
 
     /// Whether the current expression \p E is in a context that might turn out
@@ -1422,8 +1425,9 @@ namespace {
         return KPE;
       }
 
-      if (auto *simplified = simplifyTypeConstructionWithLiteralArg(expr))
-        return simplified;
+      if (auto *result = simplifyTypeConstructionWithLiteralArg(expr)) {
+        return isa<ErrorExpr>(result) ? nullptr : result;
+      }
 
       // If we find an unresolved member chain, wrap it in an
       // UnresolvedMemberChainResultExpr (unless this has already been done).
@@ -2077,12 +2081,8 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
   if (auto precheckedTy = typeExpr->getInstanceType()) {
     castTy = precheckedTy;
   } else {
-    const auto options =
-        TypeResolutionOptions(TypeResolverContext::InExpression) |
-        TypeResolutionFlags::SilenceErrors;
-
     const auto result = TypeResolution::resolveContextualType(
-        typeExpr->getTypeRepr(), DC, options,
+        typeExpr->getTypeRepr(), DC, TypeResolverContext::InExpression,
         [](auto unboundTy) {
           // FIXME: Don't let unbound generic types escape type resolution.
           // For now, just return the unbound generic type.
@@ -2093,7 +2093,9 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
         PlaceholderType::get);
 
     if (result->hasError())
-      return nullptr;
+      return new (getASTContext())
+          ErrorExpr(typeExpr->getSourceRange(), result, typeExpr);
+
     castTy = result;
   }
 
