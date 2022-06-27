@@ -3859,8 +3859,13 @@ bool HasIsolatedSelfRequest::evaluate(
     return false;
 
   // For accessors, consider the storage declaration.
-  if (auto accessor = dyn_cast<AccessorDecl>(value))
-    value = accessor->getStorage();
+  if (auto accessor = dyn_cast<AccessorDecl>(value)) {
+    // distributed thunks are accessors only in spirit and
+    // should be handled as regular functions from isolation
+    // perspective.
+    if (!accessor->isDistributedThunk())
+      value = accessor->getStorage();
+  }
 
   // Check whether this member can be isolated to an actor at all.
   auto memberIsolation = getMemberIsolationPropagation(value);
