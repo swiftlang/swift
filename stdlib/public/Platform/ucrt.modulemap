@@ -116,6 +116,16 @@ module ucrt [system] {
     header "process.h"
     export *
   }
+
+  module malloc {
+    header "malloc.h"
+    export *
+  }
+
+  module wchar {
+    header "wchar.h"
+    export *
+  }
 }
 
 module corecrt [system] {
