@@ -194,5 +194,40 @@ sanePointerString.deallocate()
 var rawPointer = unsafeBitCast(0 as Int, to: Builtin.RawPointer.self)
 dump(rawPointer)
 
+// https://github.com/apple/swift/issues/43211
+// CHECK-LABEL: {{^}}weak with dynamic value{{$}}
+print("weak with dynamic value")
+do {
+  class Child {}
+  class Example {
+    weak var value: Child?
+  }
+
+  var c: Child? = Child()
+  let e = Example()
+  e.value = c
+
+  // CHECK-NEXT: c1: Optional(Reflection.{{.*}}.Child)
+  // CHECK-NEXT:   some: Reflection.{{.*}}.Child #0
+  dump(c, name: "c1")
+  // CHECK-NEXT: e1: Reflection.{{.*}}.Example #0
+  // CHECK-NEXT:   value: Optional(Reflection.{{.*}}.Child)
+  // CHECK-NEXT:     some: Reflection.{{.*}}.Child #1
+  dump(e, name: "e1")
+  // CHECK-NEXT: value1: Optional(Reflection.{{.*}}.Child)
+  // CHECK-NEXT:   some: Reflection.{{.*}}.Child #0
+  dump(e.value, name: "value1")
+
+  c = nil
+
+  // CHECK-NEXT: c2: nil
+  dump(c, name: "c2")
+  // CHECK-NEXT: e2: Reflection.{{.*}}.Example #0
+  // CHECK-NEXT:   value: nil
+  dump(e, name: "e2")
+  // CHECK-NEXT: value2: nil
+  dump(e.value, name: "value2")
+}
+
 // CHECK-LABEL: and now our song is done
 print("and now our song is done")
