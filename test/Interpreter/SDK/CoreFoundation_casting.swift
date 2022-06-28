@@ -85,3 +85,38 @@ func testCFStringAnyObjectType() {
   print("done")
 }
 testCFStringAnyObjectType()
+
+// https://github.com/apple/swift/issues/43022
+func testOptionalCFStringToStringAndNSString() {
+  let optCFStr: CFString? = "Swift" as CFString
+
+  // CHECK: {{^}}Optional(Swift){{$}}
+  print(optCFStr)
+
+  let swiftStr1 = optCFStr as? String
+  let swiftStr2 = optCFStr as String?
+
+  let nsStr1 = optCFStr as? NSString
+  let nsStr2 = optCFStr as NSString?
+
+  if let unwrapped = swiftStr1 {
+    // CHECK-NEXT: {{^}}Swift{{$}}
+    print(unwrapped)
+  }
+  if let unwrapped = swiftStr2 {
+    // CHECK-NEXT: {{^}}Swift{{$}}
+    print(unwrapped)
+  }
+  if let unwrapped = nsStr1 {
+    // CHECK-NEXT: {{^}}Swift{{$}}
+    print(unwrapped)
+  }
+  if let unwrapped = nsStr2 {
+    // CHECK-NEXT: {{^}}Swift{{$}}
+    print(unwrapped)
+  }
+
+  // CHECK-NEXT: {{^}}done{{$}}
+  print("done")
+}
+testOptionalCFStringToStringAndNSString()

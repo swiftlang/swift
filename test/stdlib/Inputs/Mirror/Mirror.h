@@ -27,4 +27,7 @@
 @interface FooMoreDerivedObjCClass : FooDerivedObjCClass
 @end
 
+@interface StringConvertibleInDebugAndOtherwise_ObjC : NSObject
+@end
+
 #endif
