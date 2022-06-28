@@ -583,7 +583,8 @@ bool CompilerInstance::setUpModuleLoaders() {
     ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
     InterfaceSubContextDelegateImpl ASTDelegate(
         Context->SourceMgr, &Context->Diags, Context->SearchPathOpts,
-        Context->LangOpts, Context->ClangImporterOpts, LoaderOpts,
+        Context->LangOpts, Context->ClangImporterOpts,
+        Context->TypeCheckerOpts, LoaderOpts,
         /*buildModuleCacheDirIfAbsent*/ false, ModuleCachePath,
         FEOpts.PrebuiltModuleCachePath,
         FEOpts.BackupModuleInterfaceDir,
@@ -1318,7 +1319,7 @@ static void countStatsPostSILOpt(UnifiedStatsReporter &Stats,
 
 bool CompilerInstance::performSILProcessing(SILModule *silModule) {
   if (performMandatorySILPasses(Invocation, silModule) &&
-      !Invocation.getFrontendOptions().AllowModuleWithCompilerErrors)
+      !Invocation.getLangOptions().AllowModuleWithCompilerErrors)
     return true;
 
   {

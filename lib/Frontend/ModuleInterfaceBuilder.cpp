@@ -252,7 +252,8 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
     };
 
     SubInstance.performSema();
-    if (SubInstance.getASTContext().hadError()) {
+    if (SubInstance.getASTContext().hadError() &&
+        !SubInstance.getASTContext().LangOpts.AllowModuleWithCompilerErrors) {
       LLVM_DEBUG(llvm::dbgs() << "encountered errors\n");
       return std::make_error_code(std::errc::not_supported);
     }
@@ -309,7 +310,8 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
       LLVM_DEBUG(llvm::dbgs() << "encountered errors\n");
       return std::make_error_code(std::errc::not_supported);
     }
-    if (SubInstance.getDiags().hadAnyError()) {
+    if (SubInstance.getDiags().hadAnyError() &&
+        !SubInstance.getASTContext().LangOpts.AllowModuleWithCompilerErrors) {
       return std::make_error_code(std::errc::not_supported);
     }
     return std::error_code();

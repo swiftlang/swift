@@ -2675,7 +2675,11 @@ public:
     if (!decl)
       return;
 
-    if (IsInvalid) {
+    // Output an error to ensure SILGen will definitely not run when the AST
+    // is invalid. Skip if there's already been an error - a diagnostic that
+    // includes this decl may currently be in the process of being output.
+    // Prefer that diagnostic over this one.
+    if (IsInvalid && !ctx.Diags.hadAnyError()) {
       decl->setInvalidBit();
 
       DeclName name;

@@ -425,7 +425,7 @@ static bool buildModuleFromInterface(CompilerInstance &Instance) {
   return ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
       Instance.getSourceMgr(), Instance.getDiags(),
       Invocation.getSearchPathOptions(), Invocation.getLangOptions(),
-      Invocation.getClangImporterOptions(),
+      Invocation.getClangImporterOptions(), Invocation.getTypeCheckerOptions(),
       Invocation.getClangModuleCachePath(), PrebuiltCachePath,
       FEOpts.BackupModuleInterfaceDir,
       Invocation.getModuleName(), InputPath, Invocation.getOutputFilename(), ABIPath,
