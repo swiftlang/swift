@@ -559,6 +559,19 @@ public:
 
   bool isLexical() const;
 
+  /// Unsafely eliminate moveonly from this value's type. Returns true if the
+  /// value's underlying type was move only and thus was changed. Returns false
+  /// otherwise.
+  ///
+  /// NOTE: Please do not use this directly! It is only meant to be used by the
+  /// optimizer pass: SILMoveOnlyTypeEliminator.
+  bool unsafelyEliminateMoveOnlyWrapper() {
+    if (!Type.isMoveOnlyWrapped())
+      return false;
+    Type = Type.removingMoveOnlyWrapper();
+    return true;
+  }
+
   static bool classof(SILNodePointer node) {
     return node->getKind() >= SILNodeKind::First_ValueBase &&
            node->getKind() <= SILNodeKind::Last_ValueBase;

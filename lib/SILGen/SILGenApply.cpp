@@ -1786,8 +1786,33 @@ static void emitRawApply(SILGenFunction &SGF,
 
   // Gather the arguments.
   for (auto i : indices(args)) {
-    auto argValue = (inputParams[i].isConsumed() ? args[i].forward(SGF)
-                                                 : args[i].getValue());
+    SILValue argValue;
+    if (inputParams[i].isConsumed()) {
+      argValue = args[i].forward(SGF);
+      if (argValue->getType().isMoveOnlyWrapped()) {
+        argValue =
+            SGF.B.createOwnedMoveOnlyWrapperToCopyableValue(loc, argValue);
+      }
+    } else {
+      ManagedValue arg = args[i];
+
+      // Move only is not represented in the Swift level type system, so if we
+      // have a move only value, convert it to a non-move only value. The
+      // move/is no escape checkers will ensure that it is legal to do this or
+      // will error. At this point we just want to make sure that the emitted
+      // types line up.
+      if (arg.getType().isMoveOnlyWrapped()) {
+        // We need to borrow so that we can convert from $@moveOnly T -> $T. Use
+        // a formal access borrow to ensure that we have tight scopes like we do
+        // when we borrow fn.
+        if (!arg.isPlusZero())
+          arg = arg.formalAccessBorrow(SGF, loc);
+        arg = SGF.B.createGuaranteedMoveOnlyWrapperToCopyableValue(loc, arg);
+      }
+
+      argValue = arg.getValue();
+    }
+
 #ifndef NDEBUG
     auto inputTy =
         substFnConv.getSILType(inputParams[i], SGF.getTypeExpansionContext());
@@ -3059,6 +3084,18 @@ private:
 
       // If it's not already in memory, put it there.
       if (!result.getType().isAddress()) {
+        // If we have a move only wrapped type, we need to unwrap before we
+        // materialize. We will forward as appropriate so it will show up as a
+        // consuming use or a guaranteed use as appropriate.
+        if (result.getType().isMoveOnlyWrapped()) {
+          if (result.isPlusOne(SGF)) {
+            result =
+                SGF.B.createOwnedMoveOnlyWrapperToCopyableValue(loc, result);
+          } else {
+            result = SGF.B.createGuaranteedMoveOnlyWrapperToCopyableValue(
+                loc, result);
+          }
+        }
         result = result.materialize(SGF, loc);
       }
 
