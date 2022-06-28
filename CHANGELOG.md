@@ -5,6 +5,20 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
 ## Swift 5.7
 
+* The Swift compiler no longer warns about redundant requirements in generic declarations. For example,
+  the following code diagnosed a warning in Swift 5.6 about the `T.Iterator : IteratorProtocol`
+  requirement being redundant, because it is implied by `T : Sequence`:
+
+  ```swift
+  func firstElement<T: Sequence>(_: T) -> T.Element where T.Iterator: IteratorProtocol {...}
+  ```
+
+  A redundant requirement does not indicate a coding error, and sometimes it is desirable to spell them
+  out for documentation purposes. For this reason these warnings are now disabled by default.
+
+  To restore the previous behavior, pass the `-Xfrontend -warn-redundant-requirements`
+  compiler flag.
+
 * [SE-0338][]:
 
   Non-isolated async functions now always execute on the global concurrent pool,
