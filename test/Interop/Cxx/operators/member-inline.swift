@@ -3,6 +3,7 @@
 // REQUIRES: executable_test
 
 import MemberInline
+import CxxShim
 import StdlibUnittest
 
 var OperatorsTestSuite = TestSuite("Operators")
