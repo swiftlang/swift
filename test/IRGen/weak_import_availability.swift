@@ -2,11 +2,10 @@
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/weak_import_availability_helper.swiftmodule -parse-as-library %S/Inputs/weak_import_availability_helper.swift -enable-library-evolution
 //
 // RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir | %FileCheck %s --check-prefix=CHECK-OLD
-// RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir -target x86_64-apple-macosx10.50 | %FileCheck %s --check-prefix=CHECK-NEW
-// RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir -target x86_64-apple-macosx10.60 | %FileCheck %s --check-prefix=CHECK-NEW
+// RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir -target %target-cpu-apple-macosx10.50 | %FileCheck %s --check-prefix=CHECK-NEW
+// RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir -target %target-cpu-apple-macosx10.60 | %FileCheck %s --check-prefix=CHECK-NEW
 
 // REQUIRES: OS=macosx
-// REQUIRES: CPU=x86_64
 
 import weak_import_availability_helper
 
