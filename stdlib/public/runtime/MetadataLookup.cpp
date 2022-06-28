@@ -35,6 +35,7 @@
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/StringExtras.h"
+#include <cctype>
 #include <cstring>
 #include <functional>
 #include <list>
