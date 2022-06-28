@@ -13,6 +13,8 @@ import argparse
 
 import os.path
 from distutils.util import strtobool
+from concurrent.futures import ThreadPoolExecutor
+from multiprocessing import cpu_count
 
 # Regex to match different types of Copright headers
 # matches years from 1000-2999
@@ -35,6 +37,7 @@ def get_parser():
     parser.add_argument('-d', '--debug', help="Print files whose copyright headers could not be found, or don't exist", action='store_true', default=False, required=False)
     parser.add_argument('-v', '--verbose', help="Print additional info on when copyright headers are conformant, or when files are patched", action='store_true', default=False, required=False)
     parser.add_argument('-p', '--patch', help='Replace non-conforming copyright headers with the correct years', action="store_true", default=False, required=False)
+    parser.add_argument('-t', '--threads', help='Number of threads to use when testing files for copyright history', default=cpu_count(), required=False)
     parser.add_argument('-i', '--interactive', help='Shows copyright notice before and after change. Asks for user confirmation when patching files', action="store_true", default=False, required=False)
     return parser
 
@@ -60,15 +63,18 @@ def discover_files(filepaths, recursive_opt):
     while i < len(filepaths):
         f = os.path.abspath(filepaths[i])
         # exit if files given on command line don't exist
+
+        if os.path.islink(f):
+            debug('Skipping symlink {}'.format(f))
+            i += 1
+            continue
+
         if not os.path.exists(f):
             print(f"Unexpected error: No such file or directory {f}", file=sys.stderr)
             sys.exit(1)
 
         if os.path.isdir(f):
-            if not recursive_opt:
-                print(f"You passed in a directory ({f}), without specifying a recursive search. That doesn't make sense because we can't check a directory for conformance. Either omit the directory, or add the --recursive flag.", file=sys.stderr)
-                sys.exit(1)
-            else:
+            if recursive_opt:
                 dir_contents = [os.path.join(f, path) for path in os.listdir(f)]
                 filepaths.extend(dir_contents)
         else:
@@ -81,7 +87,11 @@ def discover_files(filepaths, recursive_opt):
 def has_copyright_notice(candidate_filepath):
     """Checks if a file has a copyright notice"""
     with open(candidate_filepath, "r") as f:
-        contents = f.read()
+        try:
+            contents = f.read()
+        except UnicodeDecodeError:
+            debug("Skipping file {} because it is not UTF-8 encoded".format(candidate_filepath))
+            return False
     matches = re.findall(COPYRIGHT_EXISTS_PATTERN, contents)
 
     has_match = len(matches) > 0
@@ -117,12 +127,12 @@ def validate_copyright_notice(filepath, copyright_notice, expected_copyright_not
     """Checks whether copyright notice is conformant, tells user if any copyright headers should be changed."""
     if copyright_notice == expected_copyright_notice:
         verbose("Copyright notice for {} is conformant.".format(filepath))
-        return None
+        return (None, None)
     else:
         print("Non-Conforming copyright notice for {}. Copyright notice is '{}', should be '{}'.".format(
              filepath, copyright_notice, expected_copyright_notice
              ))
-        return expected_copyright_notice
+        return (filepath, expected_copyright_notice)
 
 
 def copyright_notice_is_conformant(filepath):
@@ -200,6 +210,7 @@ def main():
     args = parser.parse_args()
     DEBUG = args.debug
     VERBOSE = args.verbose
+    num_threads = int(args.threads)
     if VERBOSE:
         DEBUG = True
     if args.patch:
@@ -214,13 +225,14 @@ def main():
     files = discover_files(args.f, args.recursive)
     # filter filepaths - remove any paths which don't have a copyright notice
     copyright_notice_files = [f for f in files if has_copyright_notice(f)]
-    for f in copyright_notice_files:
-        correct_copyright_notice = copyright_notice_is_conformant(f)
-        # if the copyright notice should be changed
-        if correct_copyright_notice is not None:
-            # if we should be replacing headers in files
-            if args.patch:
-                patch(f, correct_copyright_notice, args.interactive)
+    debug('testing copyright notice files with {} threads'.format(num_threads))
+    with ThreadPoolExecutor(max_workers=num_threads) as executor:
+        for (f, correct_copyright_notice) in executor.map(copyright_notice_is_conformant, copyright_notice_files):
+            # if the copyright notice should be changed
+            if correct_copyright_notice is not None:
+                # if we should be replacing headers in files
+                if args.patch:
+                    patch(f, correct_copyright_notice, args.interactive)
 
 if __name__ == "__main__":
     main()
