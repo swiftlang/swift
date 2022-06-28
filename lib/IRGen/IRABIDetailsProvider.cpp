@@ -12,6 +12,7 @@
 
 #include "swift/IRGen/IRABIDetailsProvider.h"
 #include "FixedTypeInfo.h"
+#include "GenEnum.h"
 #include "GenType.h"
 #include "IRGen.h"
 #include "IRGenModule.h"
@@ -122,6 +123,19 @@ public:
     return {returnTy, {paramTy}};
   }
 
+  std::map<EnumElementDecl *, unsigned> getEnumTagMapping(EnumDecl *ED) {
+    std::map<EnumElementDecl *, unsigned> elements;
+    auto &enumImplStrat = getEnumImplStrategy(
+        IGM, ED->getDeclaredType()->getCanonicalType());
+
+    for (auto *element : ED->getAllElements()) {
+      auto tagIdx = enumImplStrat.getTagIndex(element);
+      elements.insert({element, tagIdx});
+    }
+
+    return elements;
+  }
+
 private:
   Lowering::TypeConverter typeConverter;
   // Default silOptions are sufficient, as we don't need to generated SIL.
@@ -161,4 +175,9 @@ bool IRABIDetailsProvider::enumerateDirectPassingRecordMembers(
 IRABIDetailsProvider::FunctionABISignature
 IRABIDetailsProvider::getTypeMetadataAccessFunctionSignature() {
   return impl->getTypeMetadataAccessFunctionSignature();
+}
+
+std::map<EnumElementDecl *, unsigned>
+IRABIDetailsProvider::getEnumTagMapping(EnumDecl *ED) {
+  return impl->getEnumTagMapping(ED);
 }

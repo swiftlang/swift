@@ -202,7 +202,25 @@ void ClangValueTypePrinter::printValueTypeDecl(
     os << ".getOpaquePointer()";
   os << "; }\n";
   os << "\n";
-
+  // Print out helper function for getting enum tag for enum type
+  if (isa<EnumDecl>(typeDecl)) {
+    // FIXME: (tongjie) return type should be unsigned
+    os << "  inline int _getEnumTag() const {\n";
+    os << "    auto metadata = " << cxx_synthesis::getCxxImplNamespaceName()
+       << "::";
+    printer.printSwiftTypeMetadataAccessFunctionCall(typeMetadataFuncName);
+    os << ";\n";
+    os << "    auto *vwTable = ";
+    printer.printValueWitnessTableAccessFromTypeMetadata("metadata");
+    os << ";\n";
+    os << "    const auto *enumVWTable = reinterpret_cast<";
+    ClangSyntaxPrinter(os).printSwiftImplQualifier();
+    os << "EnumValueWitnessTable";
+    os << " *>(vwTable);\n";
+    os << "    return enumVWTable->getEnumTag(_getOpaquePointer(), "
+          "metadata._0);\n";
+    os << "  }\n";
+  }
   // Print out the storage for the value type.
   os << "  ";
   if (isOpaqueLayout) {

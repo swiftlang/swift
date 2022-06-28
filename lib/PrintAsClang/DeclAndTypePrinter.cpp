@@ -15,6 +15,7 @@
 #include "PrimitiveTypeMapping.h"
 #include "PrintClangFunction.h"
 #include "PrintClangValueType.h"
+#include "SwiftToClangInteropContext.h"
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
@@ -31,6 +32,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/IDE/CommentConversion.h"
+#include "swift/IRGen/IRABIDetailsProvider.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
@@ -384,30 +386,65 @@ private:
     os << "@end\n";
   }
 
+  void visitEnumDeclCxx(EnumDecl *ED) {
+    // FIXME: Print enum's availability
+    ClangValueTypePrinter printer(os, owningPrinter.prologueOS,
+                                  owningPrinter.typeMapping,
+                                  owningPrinter.interopContext);
+    printer.printValueTypeDecl(ED, /*bodyPrinter=*/[&]() {
+      ClangSyntaxPrinter syntaxPrinter(os);
+      auto elementTagMapping =
+          owningPrinter.interopContext.getIrABIDetails().getEnumTagMapping(ED);
+
+      os << "  enum class cases {\n";
+      for (const auto &pair : elementTagMapping) {
+        os << "    ";
+        syntaxPrinter.printIdentifier(pair.first->getNameStr());
+        os << ",\n";
+      }
+      os << "  };\n"; // enum class cases' closing bracket
+
+      if (elementTagMapping.empty()) {
+        os << "\n";
+        return;
+      }
+
+      // Printing operator cases()
+      os << "  inline operator cases() const {\n";
+      os << "    switch (_getEnumTag()) {\n";
+      for (const auto &pair : elementTagMapping) {
+        if (pair == *elementTagMapping.crbegin()) {
+          os << "      case " << pair.second << ": default: return cases::";
+        } else {
+          os << "      case " << pair.second << ": return cases::";
+        }
+        syntaxPrinter.printIdentifier(pair.first->getNameStr());
+        os << ";\n";
+      }
+      os << "    }\n"; // switch's closing bracket
+      os << "  }\n";   // operator cases()'s closing bracket
+
+      // Printing predicates
+      for (const auto &pair : elementTagMapping) {
+        os << "  inline bool is";
+        auto name = pair.first->getNameStr().str();
+        name[0] = std::toupper(name[0]);
+        os << name << "() const {\n";
+        os << "    return *this == cases::";
+        syntaxPrinter.printIdentifier(pair.first->getNameStr());
+        os << ";\n  }\n";
+      }
+      os << "\n";
+    });
+    os << outOfLineDefinitions;
+    outOfLineDefinitions.clear();
+  }
+
   void visitEnumDecl(EnumDecl *ED) {
     printDocumentationComment(ED);
 
     if (outputLang == OutputLanguageMode::Cxx) {
-      // FIXME: Print enum's availability
-      ClangValueTypePrinter printer(os, owningPrinter.prologueOS,
-                                    owningPrinter.typeMapping,
-                                    owningPrinter.interopContext);
-      printer.printValueTypeDecl(ED, /*bodyPrinter=*/[&]() {
-        ClangSyntaxPrinter syntaxPrinter(os);
-        os << "  enum class cases {";
-        llvm::interleaveComma(
-            ED->getAllCases(), os, [&](const EnumCaseDecl *caseDecl) {
-              llvm::interleaveComma(caseDecl->getElements(), os,
-                                    [&](const EnumElementDecl *elementDecl) {
-                                      os << "\n    ";
-                                      syntaxPrinter.printIdentifier(
-                                          elementDecl->getNameStr());
-                                    });
-            });
-        os << "\n  };\n";
-      });
-      os << outOfLineDefinitions;
-      outOfLineDefinitions.clear();
+      visitEnumDeclCxx(ED);
       return;
     }
 
