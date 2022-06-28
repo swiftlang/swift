@@ -1301,7 +1301,7 @@ namespace {
                            ctx.Id_Regex.str());
         return Type();
       }
-      SmallVector<TupleTypeElt, 4> matchElements {ctx.getSubstringType()};
+      SmallVector<TupleTypeElt, 4> matchElements;
       if (decodeRegexCaptureTypes(ctx,
                                   E->getSerializedCaptureStructure(),
                                   /*atomType*/ ctx.getSubstringType(),
@@ -1310,6 +1310,7 @@ namespace {
                            diag::regex_capture_types_failed_to_decode);
         return Type();
       }
+      assert(!matchElements.empty() && "Should have decoded at least an atom");
       if (matchElements.size() == 1)
         return BoundGenericStructType::get(
             regexDecl, Type(), matchElements.front().getType());
