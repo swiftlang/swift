@@ -129,6 +129,7 @@ add_dependencies(sdk-overlay libstdcxx-modulemap)
 #
 add_swift_target_library(swiftstd ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
     std.swift
+    CxxSequence.swift
     String.swift
 
     SWIFT_MODULE_DEPENDS_OSX Darwin
