@@ -4867,6 +4867,9 @@ ERROR(regex_capture_types_failed_to_decode,none,
       "failed to decode capture types for regular expression literal; this may "
       "be a compiler bug", ())
 
+ERROR(must_import_regex_builder_module,none,
+      "regex builder requires the 'RegexBuilder' module be imported'", ())
+
 //------------------------------------------------------------------------------
 // MARK: Type Check Types
 //------------------------------------------------------------------------------
