@@ -45,6 +45,7 @@ func f() {
   (/E.e).foo(/0)
 
   func foo<T, U>(_ x: T, _ y: U) {}
+  foo(/E.e, /E.e)
   foo((/E.e), /E.e)
   foo((/)(E.e), /E.e)
 
