@@ -194,18 +194,25 @@ func test_no_ambiguity_with_unary_operators(width: CGFloat, height: CGFloat) {
 }
 
 func test_conversions_with_optional_promotion(d: Double, cgf: CGFloat) {
-  func test_double(_: Double??) {}
-  func test_cgfloat(_: CGFloat??) {}
+  func test_double(_: Double??, _: Double???) {}
+  func test_cgfloat(_: CGFloat??, _: CGFloat???) {}
 
   // CHECK: function_ref @$sSd12CoreGraphicsEySdAA7CGFloatVcfC
   // CHECK-NEXT: apply
   // CHECK-NEXT: enum $Optional<Double>, #Optional.some!enumelt
   // CHECK-NEXT: enum $Optional<Optional<Double>>, #Optional.some!enumelt
-  test_double(cgf)
+  test_double(cgf, cgf)
 
   // CHECK: function_ref @$s12CoreGraphics7CGFloatVyACSdcfC
   // CHECK-NEXT: apply
   // CHECK-NEXT: enum $Optional<CGFloat>, #Optional.some!enumelt
   // CHECK-NEXT: enum $Optional<Optional<CGFloat>>, #Optional.some!enumelt
-  test_cgfloat(d)
+  test_cgfloat(d, d)
+}
+
+// https://github.com/apple/swift/issues/59374
+func test_multi_argument_conversion_with_optional(d: Double, cgf: CGFloat) {
+  func test(_: Double, _: CGFloat?) {}
+
+  test(cgf, d) // Ok (CGFloat -> Double and Double? -> CGFloat?)
 }

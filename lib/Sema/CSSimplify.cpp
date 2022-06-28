@@ -12455,8 +12455,8 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     if (worseThanBestSolution())
       return SolutionKind::Error;
 
-    auto *conversionLoc = getConstraintLocator(
-        /*anchor=*/ASTNode(), LocatorPathElt::ImplicitConversion(restriction));
+    auto *conversionLoc =
+        getImplicitValueConversionLocator(locator, restriction);
 
     auto *applicationLoc =
         getConstraintLocator(conversionLoc, ConstraintLocator::ApplyFunction);
@@ -12464,19 +12464,17 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     auto *memberLoc = getConstraintLocator(
         applicationLoc, ConstraintLocator::ConstructorMember);
 
-    // Conversion has been already attempted for this direction
-    // and constructor choice has been recorded.
-    if (findSelectedOverloadFor(memberLoc))
-      return SolutionKind::Solved;
-
     // Allocate a single argument info to cover all possible
     // Double <-> CGFloat conversion locations.
-    if (!ArgumentLists.count(memberLoc)) {
+    auto *argumentsLoc =
+        getConstraintLocator(conversionLoc, ConstraintLocator::ApplyArgument);
+
+    if (!ArgumentLists.count(argumentsLoc)) {
       auto *argList = ArgumentList::createImplicit(
           getASTContext(), {Argument(SourceLoc(), Identifier(), nullptr)},
           /*firstTrailingClosureIndex=*/None,
           AllocationArena::ConstraintSolver);
-      ArgumentLists.insert({memberLoc, argList});
+      ArgumentLists.insert({argumentsLoc, argList});
     }
 
     auto *memberTypeLoc = getConstraintLocator(
