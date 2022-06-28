@@ -282,6 +282,21 @@ macro(configure_sdk_unix name architectures)
   endif()
   set(SWIFT_SDK_${prefix}_USE_ISYSROOT FALSE)
 
+  # GCC on Linux is usually located under `/usr`.
+  # However, Ubuntu 20.04 ships with another GCC installation under `/`, which
+  # does not include libstdc++. Swift build scripts pass `--sysroot=/` to
+  # Clang. By default, Clang tries to find GCC installation under sysroot, and
+  # if it doesn't exist, under `{sysroot}/usr`. On Ubuntu 20.04 and newer, it
+  # attempts to use the GCC without the C++ stdlib, which causes a build
+  # failure. To fix that, we tell Clang explicitly to use GCC from `/usr`.
+  # FIXME: This is a compromise. The value might depend on the architecture
+  # but add_swift_target_library does not allow passing different values
+  # depending on the architecture, so having a single value is the only
+  # possibility right now.
+  set(SWIFT_SDK_${prefix}_CXX_OVERLAY_SWIFT_COMPILE_FLAGS
+      -Xcc --gcc-toolchain=/usr
+    CACHE STRING "Extra flags for compiling the C++ overlay")
+
   foreach(arch ${architectures})
     if("${prefix}" STREQUAL "ANDROID")
       swift_android_sysroot(android_sysroot)
