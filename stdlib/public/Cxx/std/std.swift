@@ -11,3 +11,4 @@
 //===----------------------------------------------------------------------===//
 
 @_exported import std // Clang module
+@_exported import Cxx // Swift module

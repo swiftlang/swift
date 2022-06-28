@@ -5,7 +5,7 @@
 
 import StdlibUnittest
 import CustomSequence
-import std
+import Cxx
 
 var CxxSequenceTestSuite = TestSuite("CxxSequence")
 
