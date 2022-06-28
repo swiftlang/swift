@@ -7374,7 +7374,8 @@ Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
   // In implicit getter, if a CC token is the first token after '{', it might
   // be a start of an accessor block. Perform special completion for that.
   if (auto accessor = dyn_cast<AccessorDecl>(AFD)) {
-    if (peekToken().is(tok::code_complete) && accessor->isImplicitGetter()) {
+    if (CodeCompletion && peekToken().is(tok::code_complete) &&
+        accessor->isImplicitGetter()) {
       SourceLoc LBraceLoc, RBraceLoc;
       LBraceLoc = consumeToken(tok::l_brace);
       auto *CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
