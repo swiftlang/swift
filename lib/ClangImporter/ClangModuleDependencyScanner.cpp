@@ -44,8 +44,9 @@ public:
 
   ClangModuleDependenciesCacheImpl()
       : importHackFileCache(),
-        service(ScanningMode::MinimizedSourcePreprocessing, ScanningOutputFormat::Full),
-        tool(service) { }
+        service(ScanningMode::DependencyDirectivesScan,
+                ScanningOutputFormat::Full, clang::CASOptions(), nullptr),
+        tool(service) {}
   ~ClangModuleDependenciesCacheImpl();
 
   /// Retrieve the name of the file used for the "import hack" that is
