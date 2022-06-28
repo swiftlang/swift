@@ -3,7 +3,7 @@
 // REQUIRES: OS=macosx || OS=linux-gnu
 
 import CustomSequence
-import std
+import Cxx
 
 // === SimpleSequence ===
 
