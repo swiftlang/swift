@@ -1519,10 +1519,6 @@ shouldOpenExistentialCallArgument(
   if (isa_and_nonnull<clang::FunctionTemplateDecl>(callee->getClangDecl()))
     return None;
 
-  ASTContext &ctx = callee->getASTContext();
-  if (!ctx.LangOpts.EnableOpenedExistentialTypes)
-    return None;
-
   // The actual parameter type needs to involve a type variable, otherwise
   // type inference won't be possible.
   if (!paramTy->hasTypeVariable())

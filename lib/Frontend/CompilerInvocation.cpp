@@ -450,11 +450,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalConcurrency |=
     Args.hasArg(OPT_enable_experimental_concurrency);
 
-  Opts.EnableOpenedExistentialTypes =
-    Args.hasFlag(OPT_enable_experimental_opened_existential_types,
-                 OPT_disable_experimental_opened_existential_types,
-                 true);
-
   Opts.EnableInferPublicSendable |=
     Args.hasFlag(OPT_enable_infer_public_concurrent_value,
                  OPT_disable_infer_public_concurrent_value,
