@@ -2252,35 +2252,12 @@ namespace {
         }
       }
 
-      // Cannot reference subscripts, or stored properties.
-      auto var = dyn_cast<VarDecl>(decl);
-      if (isa<SubscriptDecl>(decl) || var) {
-        // But computed distributed properties are okay,
-        // and treated the same as a distributed func.
-        if (var && var->isDistributed()) {
-          bool explicitlyThrowing = false;
-          if (auto getter = var->getAccessor(swift::AccessorKind::Get)) {
-            explicitlyThrowing = getter->hasThrows();
-          }
-          return std::make_pair(
-              /*setThrows*/!explicitlyThrowing,
-              /*isDistributedThunk=*/true);
-        }
-
-        // otherwise, it was a normal property or subscript and therefore illegal
-        ctx.Diags.diagnose(
-            declLoc, diag::distributed_actor_isolated_non_self_reference,
-            decl->getDescriptiveKind(), decl->getName());
-        noteIsolatedActorMember(decl, context);
-        return None;
-      }
-
       // Check that we have a distributed function or computed property.
       if (auto afd = dyn_cast<AbstractFunctionDecl>(decl)) {
         if (!afd->isDistributed()) {
-          ctx.Diags.diagnose(declLoc,
-                             diag::distributed_actor_isolated_method)
-              .fixItInsert(decl->getAttributeInsertionLoc(true), "distributed ");
+          ctx.Diags.diagnose(declLoc, diag::distributed_actor_isolated_method)
+              .fixItInsert(decl->getAttributeInsertionLoc(true),
+                           "distributed ");
 
           noteIsolatedActorMember(decl, context);
           return None;
@@ -2291,7 +2268,24 @@ namespace {
             /*isDistributedThunk=*/true);
       }
 
-      return std::make_pair(/*setThrows=*/false, /*distributedThunk=*/false);
+      if (auto *var = dyn_cast<VarDecl>(decl)) {
+        if (var->isDistributed()) {
+          bool explicitlyThrowing = false;
+          if (auto getter = var->getAccessor(swift::AccessorKind::Get)) {
+            explicitlyThrowing = getter->hasThrows();
+          }
+          return std::make_pair(
+              /*setThrows*/ !explicitlyThrowing,
+              /*isDistributedThunk=*/true);
+        }
+      }
+
+      // This is either non-distributed variable, subscript, or something else.
+      ctx.Diags.diagnose(declLoc,
+                         diag::distributed_actor_isolated_non_self_reference,
+                         decl->getDescriptiveKind(), decl->getName());
+      noteIsolatedActorMember(decl, context);
+      return None;
     }
 
     /// Attempts to identify and mark a valid cross-actor use of a synchronous
