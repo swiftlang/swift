@@ -2112,7 +2112,7 @@ static CanSILFunctionType getSILFunctionType(
                         .withConcurrent(isSendable)
                         .withAsync(isAsync)
                         .build();
-  
+
   return SILFunctionType::get(genericSig, silExtInfo, coroutineKind,
                               calleeConvention, inputs, yields,
                               results, errorResult,

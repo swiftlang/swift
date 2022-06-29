@@ -1746,8 +1746,12 @@ static ManagedValue manageYield(SILGenFunction &SGF, SILValue value,
     if (value.getOwnershipKind() == OwnershipKind::None)
       return ManagedValue::forUnmanaged(value);
     return ManagedValue::forBorrowedObjectRValue(value);
-  case ParameterConvention::Indirect_In_Guaranteed:
-    return ManagedValue::forBorrowedAddressRValue(value);
+  case ParameterConvention::Indirect_In_Guaranteed: {
+    bool isOpaque = SGF.getTypeLowering(value->getType()).isAddressOnly() &&
+                    !SGF.silConv.useLoweredAddresses();
+    return isOpaque ? ManagedValue::forBorrowedObjectRValue(value)
+                    : ManagedValue::forBorrowedAddressRValue(value);
+  }
   }
   llvm_unreachable("bad kind");
 }
@@ -4435,23 +4439,7 @@ void SILGenFunction::emitProtocolWitness(
   SmallVector<ManagedValue, 8> origParams;
   collectThunkParams(loc, origParams);
 
-  if (witness.hasDecl() &&
-      getActorIsolation(witness.getDecl()).isDistributedActor()) {
-    // We witness protocol requirements using the distributed thunk, when:
-    // - the witness is isolated to a distributed actor, but the requirement is not
-    // - the requirement is a distributed func, and therefore can only be witnessed
-    //   by a distributed func; we handle this by witnessing the requirement with the thunk
-    // FIXME(distributed): this limits us to only allow distributed explicitly throwing async requirements... we need to fix this somehow.
-    if (requirement.hasDecl()) {
-      if ((!getActorIsolation(requirement.getDecl()).isDistributedActor()) ||
-          (isa<FuncDecl>(requirement.getDecl()) &&
-              requirement.getFuncDecl()->isDistributed())) {
-        auto thunk = cast<AbstractFunctionDecl>(witness.getDecl())
-                         ->getDistributedThunk();
-        witness = SILDeclRef(thunk).asDistributed();
-      }
-    }
-  } else if (enterIsolation) {
+  if (enterIsolation) {
     // If we are supposed to enter the actor, do so now by hopping to the
     // actor.
     Optional<ManagedValue> actorSelf;

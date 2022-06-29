@@ -4820,9 +4820,6 @@ ERROR(distributed_actor_func_static,none,
 ERROR(distributed_actor_func_not_in_distributed_actor,none,
       "'distributed' method can only be declared within 'distributed actor'",
       ())
-ERROR(distributed_method_requirement_must_be_async_throws,none, // FIXME(distributed): this is an implementation limitation we should lift
-      "'distributed' protocol requirement %0 must currently be declared explicitly 'async throws'",
-      (DeclName))
 ERROR(distributed_actor_user_defined_special_property,none,
       "property %0 cannot be defined explicitly, as it conflicts with "
       "distributed actor synthesized stored property",

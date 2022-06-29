@@ -7163,7 +7163,7 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
 ///
 /// \verbatim
 ///   decl-func:
-///     attribute-list? ('static' | 'class')? 'mutating'? 'func' 
+///     attribute-list? ('static' | 'class' | 'distributed')? 'mutating'? 'func'
 ///               any-identifier generic-params? func-signature where-clause?
 ///               stmt-brace?
 /// \endverbatim
@@ -7247,7 +7247,7 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
   }
 
   DebuggerContextChange DCC(*this, SimpleName, DeclKind::Func);
-  
+
   // Parse the generic-params, if present.
   GenericParamList *GenericParams;
   auto GenericParamResult = maybeParseGenericParams();

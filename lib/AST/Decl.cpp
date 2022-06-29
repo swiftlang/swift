@@ -9184,6 +9184,13 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
   return ActorIsolation::forUnspecified();
 }
 
+bool swift::isSameActorIsolated(ValueDecl *value, DeclContext *dc) {
+    auto valueIsolation = getActorIsolation(value);
+    auto dcIsolation = getActorIsolationOfContext(dc);
+    return valueIsolation.isActorIsolated() && dcIsolation.isActorIsolated() &&
+           valueIsolation.getActor() == dcIsolation.getActor();
+}
+
 ClangNode Decl::getClangNodeImpl() const {
   assert(Bits.Decl.FromClang);
   void * const *ptr = nullptr;
