@@ -477,7 +477,7 @@ namespace {
         if (auto superclassType = genericSig->getSuperclassBound(type))
           return superclassType;
         assert(genericSig->requiresClass(type));
-        return TC.Context.getAnyObjectConstraint();
+        return TC.Context.getAnyObjectType();
       }
 
       return type;
