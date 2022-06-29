@@ -1002,13 +1002,17 @@ bool Decl::isWeakImported(ModuleDecl *fromModule) const {
   if (isAlwaysWeakImported())
     return true;
 
-  auto containingContext = getAvailabilityForLinkage();
-  if (containingContext.isAlwaysAvailable())
+  auto availability = getAvailabilityForLinkage();
+  if (availability.isAlwaysAvailable())
     return false;
 
-  auto fromContext = AvailabilityContext::forDeploymentTarget(
-      fromModule->getASTContext());
-  return !fromContext.isContainedIn(containingContext);
+  auto &ctx = fromModule->getASTContext();
+  auto deploymentTarget = AvailabilityContext::forDeploymentTarget(ctx);
+
+  if (ctx.LangOpts.EnableAdHocAvailability)
+    return !availability.isSupersetOf(deploymentTarget);
+
+  return !deploymentTarget.isContainedIn(availability);
 }
 
 GenericContext::GenericContext(DeclContextKind Kind, DeclContext *Parent,
