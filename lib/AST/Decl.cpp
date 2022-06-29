@@ -4288,7 +4288,11 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
   // If `decl` is a nested type, find the parent type.
   Type ParentTy;
   DeclContext *dc = decl->getDeclContext();
-  if (!isa<ProtocolDecl>(decl) && dc->isTypeContext()) {
+  bool isObjCProtocol = isa<ProtocolDecl>(decl) && decl->hasClangNode();
+
+  // Objective-C protocols, unlike Swift protocols, could be nested
+  // in other types.
+  if ((isObjCProtocol || !isa<ProtocolDecl>(decl)) && dc->isTypeContext()) {
     switch (kind) {
     case DeclTypeKind::DeclaredType: {
       if (auto *nominal = dc->getSelfNominalTypeDecl())
