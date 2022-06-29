@@ -4445,7 +4445,7 @@ void SILGenFunction::emitProtocolWitness(
     if (requirement.hasDecl()) {
       if ((!getActorIsolation(requirement.getDecl()).isDistributedActor()) ||
           (isa<FuncDecl>(requirement.getDecl()) &&
-              witness.getFuncDecl()->isDistributed())) {
+              requirement.getFuncDecl()->isDistributed())) {
         auto thunk = cast<AbstractFunctionDecl>(witness.getDecl())
                          ->getDistributedThunk();
         witness = SILDeclRef(thunk).asDistributed();
