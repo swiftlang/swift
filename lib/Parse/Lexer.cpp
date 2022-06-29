@@ -2040,6 +2040,14 @@ const char *Lexer::tryScanRegexLiteral(const char *TokStart, bool MustBeRegex,
 
   bool IsForwardSlash = (*TokStart == '/');
 
+  auto spaceOrTabDescription = [](char c) -> StringRef {
+    switch (c) {
+    case ' ':  return "space";
+    case '\t': return "tab";
+    default:   llvm_unreachable("Unhandled case");
+    }
+  };
+
   // Check if we're able to lex a `/.../` regex.
   if (IsForwardSlash) {
     // For `/.../` regex literals, we need to ban space and tab at the start of
@@ -2055,33 +2063,17 @@ const char *Lexer::tryScanRegexLiteral(const char *TokStart, bool MustBeRegex,
     // TODO: This heuristic should be sunk into the Swift library once we have a
     // way of doing fix-its from there.
     auto *RegexContentStart = TokStart + 1;
-    switch (*RegexContentStart) {
-    case ' ':
-    case '\t': {
+    if (*RegexContentStart == ' ' || *RegexContentStart == '\t') {
       if (!MustBeRegex)
         return nullptr;
 
       if (Diags) {
         // We must have a regex, so emit an error for space and tab.
-        StringRef DiagChar;
-        switch (*RegexContentStart) {
-        case ' ':
-          DiagChar = "space";
-          break;
-        case '\t':
-          DiagChar = "tab";
-          break;
-        default:
-          llvm_unreachable("Unhandled case");
-        }
         Diags->diagnose(getSourceLoc(RegexContentStart),
-                        diag::lex_regex_literal_invalid_starting_char, DiagChar)
+                        diag::lex_regex_literal_invalid_starting_char,
+                        spaceOrTabDescription(*RegexContentStart))
             .fixItInsert(getSourceLoc(RegexContentStart), "\\");
       }
-      break;
-    }
-    default:
-      break;
     }
   }
 
@@ -2098,60 +2090,82 @@ const char *Lexer::tryScanRegexLiteral(const char *TokStart, bool MustBeRegex,
   if (Ptr == TokStart)
     return nullptr;
 
-  // If we're lexing `/.../`, error if we ended on the opening of a comment.
-  // We prefer to lex the comment as it's more likely than not that is what
-  // the user is expecting.
-  // TODO: This should be sunk into the Swift library.
-  if (IsForwardSlash && Ptr[-1] == '/' && (*Ptr == '*' || *Ptr == '/')) {
-    if (!MustBeRegex)
-      return nullptr;
+  // Perform some additional heuristics to see if we can lex `/.../`.
+  // TODO: These should all be sunk into the Swift library.
+  if (IsForwardSlash) {
+    // If we're lexing `/.../`, error if we ended on the opening of a comment.
+    // We prefer to lex the comment as it's more likely than not that is what
+    // the user is expecting.
+    if (Ptr[-1] == '/' && (*Ptr == '*' || *Ptr == '/')) {
+      if (!MustBeRegex)
+        return nullptr;
 
-    if (Diags) {
-      Diags->diagnose(getSourceLoc(TokStart),
-                      diag::lex_regex_literal_unterminated);
+      if (Diags) {
+        Diags->diagnose(getSourceLoc(TokStart),
+                        diag::lex_regex_literal_unterminated);
+      }
+      // Move the pointer back to the '/' of the comment.
+      Ptr--;
     }
-    // Move the pointer back to the '/' of the comment.
-    Ptr--;
-  }
+    auto *TokEnd = Ptr - 1;
+    auto *ContentEnd = TokEnd - 1;
 
-  // If we're tentatively lexing `/.../`, scan to make sure we don't have any
-  // unbalanced ')'s. This helps avoid ambiguity with unapplied operator
-  // references e.g `reduce(1, /)` and `foo(/, 0) / 2`. This would be invalid
-  // regex syntax anyways. This ensures users can surround their operator ref
-  // in parens `(/)` to fix the issue. This also applies to prefix operators
-  // that can be disambiguated as e.g `(/S.foo)`. Note we need to track whether
-  // or not we're in a custom character class `[...]`, as parens are literal
-  // there.
-  // TODO: This should be sunk into the Swift library.
-  if (IsForwardSlash && !MustBeRegex) {
-    unsigned CharClassDepth = 0;
-    unsigned GroupDepth = 0;
-    for (auto *Cursor = TokStart + 1; Cursor < Ptr - 1; Cursor++) {
-      switch (*Cursor) {
-      case '\\':
-        // Skip over the next character of an escape.
-        Cursor++;
-        break;
-      case '(':
-        if (CharClassDepth == 0)
-          GroupDepth += 1;
-        break;
-      case ')':
-        if (CharClassDepth != 0)
+    // We also ban unescaped space and tab at the end of a `/.../` literal.
+    if (*TokEnd == '/' && (TokEnd - TokStart > 2) && ContentEnd[-1] != '\\' &&
+        (*ContentEnd == ' ' || *ContentEnd == '\t')) {
+      if (!MustBeRegex)
+        return nullptr;
+
+      if (Diags) {
+        // Diagnose and suggest using a `#/.../#` literal instead. We could
+        // suggest escaping, but that would be wrong if the user has written (?x).
+        // TODO: Should we suggest this for space-as-first character too?
+        Diags->diagnose(getSourceLoc(ContentEnd),
+                        diag::lex_regex_literal_invalid_ending_char,
+                        spaceOrTabDescription(*ContentEnd))
+            .fixItInsert(getSourceLoc(TokStart), "#")
+            .fixItInsert(getSourceLoc(Ptr), "#");
+      }
+    }
+
+    // If we're tentatively lexing `/.../`, scan to make sure we don't have any
+    // unbalanced ')'s. This helps avoid ambiguity with unapplied operator
+    // references e.g `reduce(1, /)` and `foo(/, 0) / 2`. This would be invalid
+    // regex syntax anyways. This ensures users can surround their operator ref
+    // in parens `(/)` to fix the issue. This also applies to prefix operators
+    // that can be disambiguated as e.g `(/S.foo)`. Note we need to track whether
+    // or not we're in a custom character class `[...]`, as parens are literal
+    // there.
+    if (!MustBeRegex) {
+      unsigned CharClassDepth = 0;
+      unsigned GroupDepth = 0;
+      for (auto *Cursor = TokStart + 1; Cursor < TokEnd; Cursor++) {
+        switch (*Cursor) {
+        case '\\':
+          // Skip over the next character of an escape.
+          Cursor++;
           break;
+        case '(':
+          if (CharClassDepth == 0)
+            GroupDepth += 1;
+          break;
+        case ')':
+          if (CharClassDepth != 0)
+            break;
 
-        // Invalid, so bail.
-        if (GroupDepth == 0)
-          return nullptr;
+          // Invalid, so bail.
+          if (GroupDepth == 0)
+            return nullptr;
 
-        GroupDepth -= 1;
-        break;
-      case '[':
-        CharClassDepth += 1;
-        break;
-      case ']':
-        if (CharClassDepth != 0)
-          CharClassDepth -= 1;
+          GroupDepth -= 1;
+          break;
+        case '[':
+          CharClassDepth += 1;
+          break;
+        case ']':
+          if (CharClassDepth != 0)
+            CharClassDepth -= 1;
+        }
       }
     }
   }

@@ -143,6 +143,9 @@ ERROR(lex_invalid_closing_delimiter,none,
 ERROR(lex_regex_literal_invalid_starting_char,none,
       "regex literal may not start with %0; add backslash to escape",
       (StringRef))
+ERROR(lex_regex_literal_invalid_ending_char,none,
+      "regex literal may not end with %0; use extended literal instead",
+      (StringRef))
 ERROR(lex_regex_literal_unterminated,none,
       "unterminated regex literal", ())
 
