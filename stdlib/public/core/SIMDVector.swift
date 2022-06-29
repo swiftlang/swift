@@ -72,11 +72,13 @@ public protocol SIMDScalar {
 }
 
 /// A SIMD vector of a fixed number of elements.
-public protocol SIMD: SIMDStorage,
-                      Codable,
-                      Hashable,
-                      CustomStringConvertible,
-                      ExpressibleByArrayLiteral {
+public protocol SIMD<Scalar>:
+  SIMDStorage,
+  Codable,
+  Hashable,
+  CustomStringConvertible,
+  ExpressibleByArrayLiteral
+{
   /// The mask type resulting from pointwise comparisons of this vector type.
   associatedtype MaskStorage: SIMD
     where MaskStorage.Scalar: FixedWidthInteger & SignedInteger
