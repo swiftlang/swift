@@ -67,10 +67,7 @@ internal struct _ArrayBuffer<Element>: _ArrayBufferProtocol {
   ) -> _ArrayBuffer<U> {
     _internalInvariant(_isClassOrObjCExistential(Element.self))
     _internalInvariant(_isClassOrObjCExistential(U.self))
-    
-    // FIXME: can't check that U is derived from Element pending
-    // <rdar://problem/20028320> generic metatype casting doesn't work
-    // _internalInvariant(U.self is Element.Type)
+    _internalInvariant(U.self is Element.Type)
 
     return _ArrayBuffer<U>(
       storage: _ArrayBridgeStorage(native: _native._storage, isFlagged: true))
