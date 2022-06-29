@@ -205,23 +205,10 @@ private:
     if (!AFD->isDistributed())
       return;
 
-//    fprintf(stderr, "[%s:%d] (%s) REQUIRES NEW ENTRY func::: %s\n", __FILE__, __LINE__, __FUNCTION__, AFD->getNameStr());
-
     SILDeclRef declRef(AFD, kind);
 
     // Add another entry for the 'distributed' method:
-    asDerived().addMethod(declRef.asDistributed(
-        /*distributed=*/true
-//        ,
-//        DistributedWitnessFunctionIdentifier::get(
-//            DistributedWitnessFunctionKind::DistributedThunkWitness,
-//            AFD->getASTContext())
-        ));
-
-//    fprintf(stderr, "[%s:%d] (%s)     added before: \n", __FILE__, __LINE__, __FUNCTION__);
-//    declRef.dump();
-//    fprintf(stderr, "[%s:%d] (%s)     added distributed: \n", __FILE__, __LINE__, __FUNCTION__);
-//    declRef.asDistributed().dump();
+    asDerived().addMethod(declRef.asDistributed());
   }
 };
 

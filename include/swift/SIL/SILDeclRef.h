@@ -36,7 +36,6 @@ namespace swift {
   class AbstractFunctionDecl;
   class AbstractClosureExpr;
   class AutoDiffDerivativeFunctionIdentifier;
-  class DistributedWitnessFunctionIdentifier;
   class ValueDecl;
   class FuncDecl;
   class ClosureExpr;
@@ -67,10 +66,6 @@ MethodDispatch getMethodDispatch(AbstractFunctionDecl *method);
 
 /// True if calling the given method or property should use ObjC dispatch.
 bool requiresForeignEntryPoint(ValueDecl *vd);
-
-/// True if calling the given method or property should use a distributed thunk.
-/// E.g. when calling a distributed function cross-actor.
-bool requiresDistributedThunkEntryPoint(ValueDecl *vd);
 
 /// True if the entry point is natively foreign.
 bool requiresForeignToNativeThunk(ValueDecl *vd);
@@ -202,10 +197,6 @@ struct SILDeclRef {
                const GenericSignatureImpl *>
       pointer;
 
-  /// The distributed witness function identifier.
-  DistributedWitnessFunctionIdentifier *distributedWitnessFunctionIdentifier =
-      nullptr;
-
   /// Returns the type of AST node location being stored by the SILDeclRef.
   LocKind getLocKind() const {
     if (loc.is<ValueDecl *>())
@@ -222,14 +213,6 @@ struct SILDeclRef {
     if (!pointer.is<AutoDiffDerivativeFunctionIdentifier *>())
       return nullptr;
     return pointer.get<AutoDiffDerivativeFunctionIdentifier *>();
-  }
-
-  /// The distributed function witness identifier, used to differentiate the
-  /// witness stored for:
-  /// - calls "inside" distributed actor, directly to the witness, which may not be throwing or async at all
-  /// - calls "outside" the distributed actor (always async throws, pointing at the distributed thunk)
-  DistributedWitnessFunctionIdentifier * getDistributedInnerFunctionIdentifier() const {
-    return distributedWitnessFunctionIdentifier;
   }
 
   GenericSignature getSpecializedSignature() const {
@@ -252,8 +235,7 @@ struct SILDeclRef {
       bool isDistributed = false,
       bool isDistributedKnownToBeLocal = false,
       BackDeploymentKind backDeploymentKind = BackDeploymentKind::None,
-      AutoDiffDerivativeFunctionIdentifier *derivativeId = nullptr,
-      DistributedWitnessFunctionIdentifier *distributedWitnessId = nullptr);
+      AutoDiffDerivativeFunctionIdentifier *derivativeId = nullptr);
 
   /// Produces a SILDeclRef for the given ValueDecl or
   /// AbstractClosureExpr:
@@ -410,9 +392,7 @@ struct SILDeclRef {
            isDistributed == rhs.isDistributed &&
            backDeploymentKind == rhs.backDeploymentKind &&
            defaultArgIndex == rhs.defaultArgIndex &&
-           pointer == rhs.pointer &&
-           distributedWitnessFunctionIdentifier ==
-               rhs.distributedWitnessFunctionIdentifier;
+           pointer == rhs.pointer;
   }
   bool operator!=(SILDeclRef rhs) const {
     return !(*this == rhs);
@@ -432,26 +412,17 @@ struct SILDeclRef {
                       /*knownToBeLocal=*/false,
                       backDeploymentKind,
                       defaultArgIndex,
-                      pointer.get<AutoDiffDerivativeFunctionIdentifier *>(),
-                      distributedWitnessFunctionIdentifier);
+                      pointer.get<AutoDiffDerivativeFunctionIdentifier *>());
   }
   /// Returns the distributed entry point corresponding to the same decl.
-  SILDeclRef asDistributed(bool distributed = true,
-                           DistributedWitnessFunctionIdentifier *witnessId = nullptr) const {
+  SILDeclRef asDistributed(bool distributed = true) const {
     auto declRef = SILDeclRef(loc.getOpaqueValue(), kind,
                       /*foreign=*/false,
                       /*distributed=*/distributed,
                       /*knownToBeLocal=*/false,
                       backDeploymentKind,
                       defaultArgIndex,
-                      pointer.get<AutoDiffDerivativeFunctionIdentifier *>(),
-                      distributedWitnessFunctionIdentifier);
-
-    if (witnessId) {
-//      fprintf(stderr, "[%s:%d] (%s) mark as witness variant\n", __FILE__, __LINE__, __FUNCTION__);
-      declRef.distributedWitnessFunctionIdentifier = witnessId;
-    }
-
+                      pointer.get<AutoDiffDerivativeFunctionIdentifier *>());
     return declRef;
   }
 
@@ -464,8 +435,7 @@ struct SILDeclRef {
                       /*distributedKnownToBeLocal=*/isLocal,
                       backDeploymentKind,
                       defaultArgIndex,
-                      pointer.get<AutoDiffDerivativeFunctionIdentifier *>(),
-                      distributedWitnessFunctionIdentifier);
+                      pointer.get<AutoDiffDerivativeFunctionIdentifier *>());
   }
 
   /// Returns a copy of the decl with the given back deployment kind.
@@ -476,8 +446,7 @@ struct SILDeclRef {
                       isKnownToBeLocal,
                       backDeploymentKind,
                       defaultArgIndex,
-                      pointer.get<AutoDiffDerivativeFunctionIdentifier *>(),
-                      distributedWitnessFunctionIdentifier);
+                      pointer.get<AutoDiffDerivativeFunctionIdentifier *>());
   }
 
   /// Returns the entry point for the corresponding autodiff derivative
@@ -608,16 +577,14 @@ private:
                       bool isKnownToBeLocal,
                       BackDeploymentKind backDeploymentKind,
                       unsigned defaultArgIndex,
-                      AutoDiffDerivativeFunctionIdentifier *derivativeId,
-                      DistributedWitnessFunctionIdentifier *distributedWitnessId)
+                      AutoDiffDerivativeFunctionIdentifier *derivativeId)
       : loc(Loc::getFromOpaqueValue(opaqueLoc)), kind(kind),
         isForeign(isForeign),
         isDistributed(isDistributed),
         isKnownToBeLocal(isKnownToBeLocal),
         backDeploymentKind(backDeploymentKind),
         defaultArgIndex(defaultArgIndex),
-        pointer(derivativeId),
-        distributedWitnessFunctionIdentifier(distributedWitnessId) {}
+        pointer(derivativeId) {}
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILDeclRef C) {
@@ -640,11 +607,11 @@ template<> struct DenseMapInfo<swift::SILDeclRef> {
 
   static SILDeclRef getEmptyKey() {
     return SILDeclRef(PointerInfo::getEmptyKey(), Kind::Func, false, false,
-                      false, BackDeploymentKind::None, 0, nullptr, nullptr);
+                      false, BackDeploymentKind::None, 0, nullptr);
   }
   static SILDeclRef getTombstoneKey() {
     return SILDeclRef(PointerInfo::getTombstoneKey(), Kind::Func, false, false,
-                      false, BackDeploymentKind::None, 0, nullptr, nullptr);
+                      false, BackDeploymentKind::None, 0, nullptr);
   }
   static unsigned getHashValue(swift::SILDeclRef Val) {
     unsigned h1 = PointerInfo::getHashValue(Val.loc.getOpaqueValue());

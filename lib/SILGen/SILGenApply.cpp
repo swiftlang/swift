@@ -569,10 +569,6 @@ public:
     if (Constant)
       constant = Constant;
 
-    if (constant && constant->isDistributedThunk()) {
-      fprintf(stderr, "[%s:%d] (%s) YES\n", __FILE__, __LINE__, __FUNCTION__);
-    }
-
     auto isDistThunkCall = false;
     if (constant) {
       auto func = constant->getFuncDecl();
@@ -663,7 +659,7 @@ public:
       if (isDistThunkCall) {
         fprintf(stderr, "[%s:%d] (%s) CALL THE DISTRIBUTED!\n", __FILE__, __LINE__, __FUNCTION__);
         fn = SGF.B.createWitnessMethod(
-            Loc, lookupType, conformance, constant.getValue().asDistributed(),
+            Loc, lookupType, conformance, constant->asDistributed(),
             constantInfo.getSILType());
         fn->dump();
 

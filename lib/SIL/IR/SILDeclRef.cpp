@@ -121,35 +121,14 @@ bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
   return false;
 }
 
-bool swift::requiresDistributedThunkEntryPoint(ValueDecl *vd) {
-  assert(!isa<AbstractStorageDecl>(vd));
-
-  auto func = dyn_cast<AbstractFunctionDecl>(vd);
-  if (!func)
-    return false;
-
-  /// Calls on distributed funcs declared on protocols must always go through the thunk.
-  if (func->isDistributed() &&
-      isa<ProtocolDecl>(func->getDeclContext()))
-    return true;
-
-  if (auto *accessor = dyn_cast<AccessorDecl>(vd)) {
-    // FIXME(distributed): handle properties as well
-  }
-
-  return false;
-}
-
 SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind, bool isForeign,
                        bool isDistributed, bool isKnownToBeLocal,
                        SILDeclRef::BackDeploymentKind backDeploymentKind,
-                       AutoDiffDerivativeFunctionIdentifier *derivativeId,
-                       DistributedWitnessFunctionIdentifier *distributedWitnessId)
+                       AutoDiffDerivativeFunctionIdentifier *derivativeId)
     : loc(vd), kind(kind), isForeign(isForeign), 
       isDistributed(isDistributed), isKnownToBeLocal(isKnownToBeLocal),
       backDeploymentKind(backDeploymentKind), defaultArgIndex(0),
-      pointer(derivativeId),
-      distributedWitnessFunctionIdentifier(distributedWitnessId) {}
+      pointer(derivativeId) {}
 
 SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign,
                        bool asDistributed, bool asDistributedKnownToBeLocal)
