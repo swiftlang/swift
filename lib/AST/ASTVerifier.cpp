@@ -3086,9 +3086,10 @@ public:
       }
 
       // If a decl has the Throws bit set, the ThrowsLoc should be valid,
-      // and vice versa, unless the decl was imported, de-serialized, or
-      // implicit.
+      // and vice versa, unless the decl was imported, de-serialized,
+      // distributed (meaning the throws is implicit), or implicit.
       if (!AFD->isImplicit() &&
+          !AFD->isDistributed() &&
           isa<SourceFile>(AFD->getModuleScopeContext()) &&
           (AFD->getThrowsLoc().isValid() != AFD->hasThrows())) {
         Out << "function 'throws' location does not match 'throws' flag\n";

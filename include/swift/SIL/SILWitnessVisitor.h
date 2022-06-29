@@ -21,6 +21,7 @@
 
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/ProtocolAssociations.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/TypeLowering.h"
@@ -55,6 +56,9 @@ public:
 
     auto requirements = protocol->getRequirementSignature().getRequirements();
     for (const auto &reqt : requirements) {
+//      fprintf(stderr, "[%s:%d] (%s) reqt:::: %s\n", __FILE__, __LINE__, __FUNCTION__, protocol->getNameStr());
+//      reqt.dump();
+
       switch (reqt.getKind()) {
       // These requirements don't show up in the witness table.
       case RequirementKind::Superclass:
@@ -104,6 +108,8 @@ public:
 
     // Visit the witnesses for the direct members of a protocol.
     for (Decl *member : protocol->getMembers()) {
+//      fprintf(stderr, "[%s:%d] (%s) member:::\n", __FILE__, __LINE__, __FUNCTION__);
+//      member->dump();
       ASTVisitor<T>::visit(member);
     }
   }
@@ -145,6 +151,7 @@ public:
     if (SILDeclRef::requiresNewWitnessTableEntry(func)) {
       asDerived().addMethod(SILDeclRef(func, SILDeclRef::Kind::Func));
       addAutoDiffDerivativeMethodsIfRequired(func, SILDeclRef::Kind::Func);
+      addDistributedWitnessMethodsIfRequired(func, SILDeclRef::Kind::Func);
     }
   }
 
@@ -191,6 +198,30 @@ private:
               diffAttr->getDerivativeGenericSignature(),
               AFD->getASTContext())));
     }
+  }
+
+  void addDistributedWitnessMethodsIfRequired(AbstractFunctionDecl *AFD,
+                                              SILDeclRef::Kind kind) {
+    if (!AFD->isDistributed())
+      return;
+
+//    fprintf(stderr, "[%s:%d] (%s) REQUIRES NEW ENTRY func::: %s\n", __FILE__, __LINE__, __FUNCTION__, AFD->getNameStr());
+
+    SILDeclRef declRef(AFD, kind);
+
+    // Add another entry for the 'distributed' method:
+    asDerived().addMethod(declRef.asDistributed(
+        /*distributed=*/true
+//        ,
+//        DistributedWitnessFunctionIdentifier::get(
+//            DistributedWitnessFunctionKind::DistributedThunkWitness,
+//            AFD->getASTContext())
+        ));
+
+//    fprintf(stderr, "[%s:%d] (%s)     added before: \n", __FILE__, __LINE__, __FUNCTION__);
+//    declRef.dump();
+//    fprintf(stderr, "[%s:%d] (%s)     added distributed: \n", __FILE__, __LINE__, __FUNCTION__);
+//    declRef.asDistributed().dump();
   }
 };
 

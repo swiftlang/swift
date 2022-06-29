@@ -4439,23 +4439,31 @@ void SILGenFunction::emitProtocolWitness(
   SmallVector<ManagedValue, 8> origParams;
   collectThunkParams(loc, origParams);
 
-  if (witness.hasDecl() &&
-      getActorIsolation(witness.getDecl()).isDistributedActor()) {
-    // We witness protocol requirements using the distributed thunk, when:
-    // - the witness is isolated to a distributed actor, but the requirement is not
-    // - the requirement is a distributed func, and therefore can only be witnessed
-    //   by a distributed func; we handle this by witnessing the requirement with the thunk
-    // FIXME(distributed): this limits us to only allow distributed explicitly throwing async requirements... we need to fix this somehow.
-    if (requirement.hasDecl()) {
-      if ((!getActorIsolation(requirement.getDecl()).isDistributedActor()) ||
-          (isa<FuncDecl>(requirement.getDecl()) &&
-              witness.getFuncDecl()->isDistributed())) {
+  // TODO: how to mark SIL function a dist thunk
+  if (requirement.isDistributedThunk()) {
         auto thunk = cast<AbstractFunctionDecl>(witness.getDecl())
                          ->getDistributedThunk();
         witness = SILDeclRef(thunk).asDistributed();
-      }
-    }
-  } else if (enterIsolation) {
+  } else
+
+//  if (witness.hasDecl() &&
+//      getActorIsolation(witness.getDecl()).isDistributedActor()) {
+//    // We witness protocol requirements using the distributed thunk, when:
+//    // - the witness is isolated to a distributed actor, but the requirement is not
+//    // - the requirement is a distributed func, and therefore can only be witnessed
+//    //   by a distributed func; we handle this by witnessing the requirement with the thunk
+//    // FIXME(distributed): this limits us to only allow distributed explicitly throwing async requirements... we need to fix this somehow.
+//    if (requirement.hasDecl()) {
+//      if ((!getActorIsolation(requirement.getDecl()).isDistributedActor()) ||
+//          (isa<FuncDecl>(requirement.getDecl()) &&
+//              witness.getFuncDecl()->isDistributed())) {
+//        auto thunk = cast<AbstractFunctionDecl>(witness.getDecl())
+//                         ->getDistributedThunk();
+//        witness = SILDeclRef(thunk).asDistributed();
+//      }
+//    }
+//  } else
+      if (enterIsolation) {
     // If we are supposed to enter the actor, do so now by hopping to the
     // actor.
     Optional<ManagedValue> actorSelf;

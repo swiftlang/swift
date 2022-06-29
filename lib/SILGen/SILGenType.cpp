@@ -415,6 +415,10 @@ public:
     // If it's not an accessor, just look for the witness.
     if (!reqAccessor) {
       if (auto witness = asDerived().getWitness(reqDecl)) {
+
+//        fprintf(stderr, "[%s:%d] (%s) ADD METHOD ---------------------------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
+//        witness.getDecl()->dump();
+
         auto newDecl = requirementRef.withDecl(witness.getDecl());
         // Only import C++ methods as foreign. If the following
         // Objective-C function is imported as foreign:
@@ -430,6 +434,8 @@ public:
             requirementRef, getWitnessRef(newDecl, witness),
             witness);
       }
+
+
 
       return asDerived().addMissingMethod(requirementRef);
     }
@@ -473,6 +479,12 @@ private:
 
   SILDeclRef getWitnessRef(SILDeclRef requirementRef, Witness witness) {
     auto witnessRef = requirementRef.withDecl(witness.getDecl());
+    auto requirementFunc = requirementRef.getFuncDecl();
+
+//    if (requirementFunc) {
+//      fprintf(stderr, "[%s:%d] (%s) getWitness ... requirement: %s\n", __FILE__,
+//              __LINE__, __FUNCTION__, requirementFunc->getNameStr());
+//    }
     // If the requirement/witness is a derivative function, we need to
     // substitute the witness's derivative generic signature in its derivative
     // function identifier.
@@ -483,6 +495,18 @@ private:
           witness.getDerivativeGenericSignature(), witnessRef.getASTContext());
       witnessRef = witnessRef.asAutoDiffDerivativeFunction(witnessDerivativeId);
     }
+
+    // inside witness of dist func -> call the func
+    // inside witness of dist THUNK -> call the THUNK
+
+//    else if (requirementFunc && requirementFunc->isDistributed()) {
+//      fprintf(stderr, "[%s:%d] (%s) distributed requirement:\n", __FILE__, __LINE__, __FUNCTION__);
+//      requirementFunc->dump();
+//      fprintf(stderr, "[%s:%d] (%s) witness: \n", __FILE__, __LINE__, __FUNCTION__);
+//      witness.dump();
+//
+//      witnessRef = witnessRef.asDistributed();
+//    }
     return witnessRef;
   }
 };
@@ -528,6 +552,8 @@ public:
 
     auto *proto = Conformance->getProtocol();
     visitProtocolDecl(proto);
+
+    // this->Conformance->dump()
 
     addConditionalRequirements();
 
@@ -766,6 +792,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
       conformance.isConcrete() ? conformance.getConcrete() : nullptr;
   std::string nameBuffer =
       NewMangler.mangleWitnessThunk(manglingConformance, requirement.getDecl());
+
   // TODO(TF-685): Proper mangling for derivative witness thunks.
   if (auto *derivativeId = requirement.getDerivativeFunctionIdentifier()) {
     std::string kindString;
@@ -781,6 +808,38 @@ SILFunction *SILGenModule::emitProtocolWitness(
                  derivativeId->getParameterIndices()->getString();
   }
 
+  if (witnessRef.isDistributedThunk()) {
+    nameBuffer = nameBuffer + "TE";
+  }
+
+//  if (auto distWitnessId = witnessRef.getDistributedInnerFunctionIdentifier()) {
+//    fprintf(stderr, "[%s:%d] (%s) DIST WITNESS! \n", __FILE__, __LINE__, __FUNCTION__);
+//
+//    std::string kindString;
+//    switch (distWitnessId->getKind()) {
+//    case DistributedWitnessFunctionKind::DistributedThunkWitness:
+//      kindString = "TE";
+//      break;
+//    }
+//
+//
+//    // sil_witness_table hidden Greeter: Greeting module main {
+//    //  base_protocol DistributedActor: Greeter: DistributedActor module main
+//    //  method #Greeting.greeting: <Self where Self : Greeting> (isolated Self) -> () -> String : @$s4main7GreeterCAA8GreetingA2aDP8greetingSSyFTW	// protocol witness for Greeting.greeting() in conformance Greeter
+//    //  method #Greeting.greeting: <Self where Self : Greeting> (isolated Self) -> () -> String : @THUNK_$s4main7GreeterCAA8GreetingA2aDP8greetingSSyFTW_tw	// THUNK_$s4main7GreeterCAA8GreetingA2aDP8greetingSSyFTW_tw
+//    //}
+//
+//    // FTE TW
+//
+//    // TODO: remove prefix
+//    nameBuffer = "THUNK_" + nameBuffer + "_" + kindString;
+//
+////    if (auto func = requirement.getFuncDecl()) {
+////      fprintf(stderr, "[%s:%d] (%s) EMIT WITNESS FOR: %s >>> %s\n", __FILE__,
+////              __LINE__, __FUNCTION__, func->getNameStr(), nameBuffer.c_str());
+////    }
+//  }
+
   // If the thunked-to function is set to be always inlined, do the
   // same with the witness, on the theory that the user wants all
   // calls removed if possible, e.g. when we're able to devirtualize
@@ -790,6 +849,13 @@ SILFunction *SILGenModule::emitProtocolWitness(
   Inline_t InlineStrategy = InlineDefault;
   if (witnessRef.isAlwaysInline())
     InlineStrategy = AlwaysInline;
+
+//  if (auto func = requirement.getFuncDecl()) {
+//    fprintf(stderr, "[%s:%d] (%s) DONE EMIT WITNESS FOR: %s\n", __FILE__, __LINE__,
+//            __FUNCTION__, func->getNameStr());
+//    witnessRef.dump();
+//    witnessRef.getDecl()->dump();
+//  }
 
   SILGenFunctionBuilder builder(*this);
   auto *f = builder.createFunction(

@@ -471,6 +471,8 @@ struct ASTContext::Implementation {
   llvm::FoldingSet<IndexSubset> IndexSubsets;
   llvm::FoldingSet<AutoDiffDerivativeFunctionIdentifier>
       AutoDiffDerivativeFunctionIdentifiers;
+  llvm::FoldingSet<DistributedWitnessFunctionIdentifier>
+      DistributedWitnessFunctionIdentifiers;
 
   llvm::FoldingSet<GenericSignatureImpl> GenericSignatures;
 
@@ -5624,6 +5626,25 @@ AutoDiffDerivativeFunctionIdentifier *AutoDiffDerivativeFunctionIdentifier::get(
                          alignof(AutoDiffDerivativeFunctionIdentifier));
   auto *newNode = ::new (mem) AutoDiffDerivativeFunctionIdentifier(
       kind, parameterIndices, derivativeGenericSignature);
+  foldingSet.InsertNode(newNode, insertPos);
+
+  return newNode;
+}
+
+DistributedWitnessFunctionIdentifier *DistributedWitnessFunctionIdentifier::get(
+    DistributedWitnessFunctionKind kind, ASTContext &C) {
+  auto &foldingSet = C.getImpl().DistributedWitnessFunctionIdentifiers;
+  llvm::FoldingSetNodeID id;
+  id.AddInteger((unsigned)kind);
+
+  void *insertPos;
+  auto *existing = foldingSet.FindNodeOrInsertPos(id, insertPos);
+  if (existing)
+    return existing;
+
+  void *mem = C.Allocate(sizeof(DistributedWitnessFunctionIdentifier),
+                         alignof(DistributedWitnessFunctionIdentifier));
+  auto *newNode = ::new (mem) DistributedWitnessFunctionIdentifier(kind);
   foldingSet.InsertNode(newNode, insertPos);
 
   return newNode;

@@ -1360,6 +1360,32 @@ AbstractFunctionDecl *ASTContext::getRemoteCallOnDistributedActorSystem(
       nullptr);
 }
 
+DistributedWitnessFunctionKind::DistributedWitnessFunctionKind(StringRef string) {
+  Optional<innerty> result = llvm::StringSwitch<Optional<innerty>>(string)
+                                 .Case("tw", DistributedThunkWitness);
+  assert(result && "Invalid string");
+  rawValue = *result;
+}
+
+/*
+ * sil_witness_table hidden Greeter: Greeting module main {
+base_protocol DistributedActor: Greeter: DistributedActor module main
+method #Greeting.greeting: <Self where Self : Greeting> (isolated Self) -> () -> String : @$s4main7GreeterCAA8GreetingA2aDP8greetingSSyFTW	// protocol witness for Greeting.greeting() in conformance Greeter
+method #Greeting.greeting: <Self where Self : Greeting> (isolated Self) -> () -> String : @$s4main7GreeterCAA8GreetingA2aDP8greetingSSyFTW	// protocol witness for Greeting.greeting() in conformance Greeter
+}
+ */
+
+Optional<DistributedWitnessFunctionKind>
+DistributedWitnessFunctionKind::getAsDistributedWitnessFunctionKind() const {
+  switch (rawValue) {
+//  case ActualFunctionWitness:
+//    return {DistributedWitnessFunctionKind::ActualFunctionWitness};
+  case DistributedThunkWitness:
+    return {DistributedWitnessFunctionKind::DistributedThunkWitness};
+  }
+  llvm_unreachable("invalid derivative kind");
+}
+
 /******************************************************************************/
 /********************** Distributed Actor Properties **************************/
 /******************************************************************************/

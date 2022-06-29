@@ -15,8 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_DECL_TYPECHECKDISTRIBUTED_H
-#define SWIFT_DECL_TYPECHECKDISTRIBUTED_H
+#ifndef SWIFT_DECL_DISTRIBUTEDDECL_H
+#define SWIFT_DECL_DISTRIBUTEDDECL_H
 
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -129,4 +129,52 @@ extractDistributedSerializationRequirements(
 
 }
 
-#endif /* SWIFT_DECL_TYPECHECKDISTRIBUTED_H */
+// ==== ------------------------------------------------------------------------
+
+namespace swift {
+
+/// The kind of distributed function witness.
+struct DistributedWitnessFunctionKind {
+  enum innerty : uint8_t {
+//    /// The actual, user defined, function used as witness.
+//    /// It may or may not be 'async', 'throws' or both.
+//    ActualFunctionWitness = 0,
+    /// The distributed thunk function, used as witness.
+    /// It is always 'throws' and 'async'.
+    DistributedThunkWitness = 1
+  } rawValue;
+
+  DistributedWitnessFunctionKind() = default;
+  DistributedWitnessFunctionKind(innerty rawValue) : rawValue(rawValue) {}
+  explicit DistributedWitnessFunctionKind(unsigned rawValue)
+      : rawValue(static_cast<innerty>(rawValue)) {}
+  explicit DistributedWitnessFunctionKind(StringRef name);
+  operator innerty() const { return rawValue; }
+
+  Optional<DistributedWitnessFunctionKind> getAsDistributedWitnessFunctionKind() const;
+
+};
+
+/// A derivative function configuration, uniqued in `ASTContext`.
+/// Identifies a specific (inner, cross-actor) function given an original function.
+class DistributedWitnessFunctionIdentifier : public llvm::FoldingSetNode {
+  const DistributedWitnessFunctionKind kind;
+
+  DistributedWitnessFunctionIdentifier(
+      DistributedWitnessFunctionKind kind)
+      : kind(kind) {}
+
+public:
+  DistributedWitnessFunctionKind getKind() const { return kind; }
+
+  static DistributedWitnessFunctionIdentifier *
+  get(DistributedWitnessFunctionKind kind, ASTContext &C);
+
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    ID.AddInteger(kind);
+  }
+};
+
+}
+
+#endif /* SWIFT_DECL_DISTRIBUTEDDECL_H */

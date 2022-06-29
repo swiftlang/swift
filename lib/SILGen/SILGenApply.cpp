@@ -5186,8 +5186,18 @@ RValue SILGenFunction::emitApplyMethod(SILLocation loc, ConcreteDeclRef declRef,
   auto *call = cast<AbstractFunctionDecl>(declRef.getDecl());
 
   // Form the reference to the method.
-  auto callRef = SILDeclRef(call, SILDeclRef::Kind::Func)
-                     .asForeign(requiresForeignEntryPoint(declRef.getDecl()));
+  auto callRef =
+      SILDeclRef(call, SILDeclRef::Kind::Func)
+          .asForeign(requiresForeignEntryPoint(declRef.getDecl()))
+          .asDistributed(requiresDistributedThunkEntryPoint(declRef.getDecl()));
+
+//  if (requiresDistributedThunkEntryPoint(declRef.getDecl())) {
+//    fprintf(stderr, "[%s:%d] (%s) APPLY METHOD, marked as NEEDS THUNK CALL\n", __FILE__, __LINE__, __FUNCTION__);
+//    call->dump();
+//  }
+//
+//  fprintf(stderr, "[%s:%d] (%s) APPLY\n", __FILE__, __LINE__, __FUNCTION__);
+//  call->dump();
 
   if (auto distributedThunk = call->getDistributedThunk()) {
     callRef = SILDeclRef(distributedThunk).asDistributed();

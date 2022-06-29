@@ -19,20 +19,54 @@ import FakeDistributedActorSystems
 
 typealias DefaultDistributedActorSystem = FakeRoundtripActorSystem
 
-distributed actor Greeter {
-  distributed func empty() {
+protocol Greeting: DistributedActor {
+  distributed func greeting() -> String // async throw
+}
+
+extension Greeting {
+  func greetLocal(name: String) {
+    print("\(greeting()), \(name)!") // okay, we're on the actor
   }
 }
 
+extension Greeting where SerializationRequirement == Codable {
+  // okay, uses Codable to transfer arguments.
+  distributed func greetDistributed(name: String) {
+    // okay, we're on the actor
+    greetLocal(name: name)
+  }
+}
+
+extension Greeting where SerializationRequirement == Codable {
+  nonisolated func greetAliceALot() async throws {
+    try await greetDistributed(name: "Alice") // okay, via Codable
+    let rawGreeting = try await greeting() // okay, via Self's serialization requirement
+//    greetLocal(name: "Alice") // expected-error{{only 'distributed' instance methods can be called on a potentially remote distributed actor}}
+  }
+}
+
+distributed actor Greeter: Greeting {
+  distributed func direct() -> String { "direct" }
+  distributed func greeting() -> String {
+    "Hello"
+  }
+}
+
+// 1. Teach SILWitnessVisitor to add the asDistributed version of the SILDeclRef for
+//   distributed functions. See addAutoDiffDerivativeMethodsIfRequired for an approach to doing this.
+//
+// 2. SILGenWitnessTable will need to learn to distinction between the distributed and
+//   non-distributed SILDeclRefs and pick the appropriate witnesses.
+//
+// 3. Make sure that SILGenApply.cpp sets the asDistributed bit in the SILDeclRef when
+//   calling a distributed func in a DA protocol, even though there is no witness thunk declaration.
+
 func test() async throws {
   let system = DefaultDistributedActorSystem()
+  let g = Greeter(actorSystem: system)
 
-  let local = Greeter(actorSystem: system)
-  let ref = try Greeter.resolve(id: local.id, using: system)
-
-  try await ref.empty()
-  // CHECK: >> remoteCallVoid: on:main.Greeter, target:main.Greeter.empty(), invocation:FakeInvocationEncoder(genericSubs: [], arguments: [], returnType: nil, errorType: nil), throwing:Swift.Never
-  // CHECK: << onReturnVoid: ()
+  let direct = try await g.greeting()
+  print("direct(): \(direct)") // CHECK: direct(): direct
 }
 
 @main struct Main {
