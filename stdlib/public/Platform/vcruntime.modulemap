@@ -536,10 +536,12 @@ module std [system] {
     export *
   }
 
+/*
   module spanstream {
     header "spanstream"
     export *
   }
+*/
 
   module sstream {
     header "sstream"
