@@ -315,6 +315,7 @@ struct AssociatedType {
   std::string SubstitutedTypeMangledName;
   std::string SubstitutedTypeFullyQualifiedName;
   std::string SubstitutedTypeDiagnosticPrintName;
+  std::vector<std::string> OpaqueTypeProtocolConformanceRequirements;
 };
 
 /// Info about all of a given type's associated types, as read out from an Image
@@ -523,10 +524,10 @@ public:
                             Node::Kind::OpaqueTypeDescriptorSymbolicReference) {
       auto underlyingTy = OpaqueUnderlyingTypeReader(
                                          opaqueDescriptor->getIndex(), ordinal);
-      
+
       if (!underlyingTy)
         return nullptr;
-      
+
       GenericArgumentMap subs;
       for (unsigned d = 0, de = genericArgs.size(); d < de; ++d) {
         auto argsForDepth = genericArgs[d];
@@ -1011,11 +1012,114 @@ public:
                    bool printTypeName = false);
   FieldTypeCollectionResult collectFieldTypes(llvm::Optional<std::string> forMangledTypeName);
   void dumpFieldSection(std::ostream &stream);
-  AssociatedTypeCollectionResult collectAssociatedTypes(llvm::Optional<std::string> forMangledTypeName);
-  void dumpAssociatedTypeSection(std::ostream &stream);
   void dumpBuiltinTypeSection(std::ostream &stream);
   void dumpCaptureSection(std::ostream &stream);
   void dumpMultiPayloadEnumSection(std::ostream &stream);
+
+  ///
+  /// Extraction of associated types
+  ///
+public:
+  template <template <typename Runtime> class ObjCInteropKind,
+            unsigned PointerSize>
+  AssociatedTypeCollectionResult
+  collectAssociatedTypes(llvm::Optional<std::string> forMangledTypeName) {
+    AssociatedTypeCollectionResult result;
+    for (const auto &sections : ReflectionInfos) {
+      for (auto descriptor : sections.AssociatedType) {
+        // Read out the relevant info from the associated type descriptor:
+        // The type's name and which protocol conformance it corresponds to
+        auto typeRef = readTypeRef(descriptor, descriptor->ConformingTypeName);
+        auto typeName = nodeToString(demangleTypeRef(typeRef));
+        auto optionalMangledTypeName = normalizeReflectionName(typeRef);
+        auto protocolNode = demangleTypeRef(
+            readTypeRef(descriptor, descriptor->ProtocolTypeName));
+        auto protocolName = nodeToString(protocolNode);
+        clearNodeFactory();
+        if (optionalMangledTypeName.hasValue()) {
+          auto mangledTypeName = optionalMangledTypeName.getValue();
+          if (forMangledTypeName.hasValue()) {
+            if (mangledTypeName != forMangledTypeName.getValue())
+              continue;
+          }
+
+          // For each associated type, gather its typealias name,
+          // the substituted type info, and if the substituted type is opaque -
+          // gather its protocol conformance requirements
+          std::vector<AssociatedType> associatedTypes;
+          for (const auto &associatedTypeRef : *descriptor.getLocalBuffer()) {
+            auto associatedType = descriptor.getField(associatedTypeRef);
+            std::string typealiasTypeName =
+                getTypeRefString(
+                    readTypeRef(associatedType, associatedType->Name))
+                    .str();
+
+            std::string mangledSubstitutedTypeName =
+                std::string(associatedType->SubstitutedTypeName);
+            auto substitutedTypeRef = readTypeRef(
+                associatedType, associatedType->SubstitutedTypeName);
+            auto optionalMangledSubstitutedTypeName =
+                normalizeReflectionName(substitutedTypeRef);
+            if (optionalMangledSubstitutedTypeName.hasValue()) {
+              mangledSubstitutedTypeName =
+                  optionalMangledSubstitutedTypeName.getValue();
+            }
+
+            // We intentionally do not want to resolve opaque type
+            // references, because if the substituted type is opaque, we
+            // would like to get at its OpaqueTypeDescriptor address, which
+            // is stored on the OpaqueTypeDescriptorSymbolicReference typeRef.
+            auto substitutedDemangleTree =
+                demangleTypeRef(substitutedTypeRef,
+                                /* useOpaqueTypeSymbolicReferences */ true);
+
+            // If the substituted type is an opaque type, also gather info
+            // about which protocols it is required to conform to
+            std::vector<std::string> OpaqueTypeConformanceRequirements;
+            gatherConformanceRequirementsIfOpaque<ObjCInteropKind, PointerSize>(
+                substitutedDemangleTree, OpaqueTypeConformanceRequirements);
+
+            auto substitutedTypeName = nodeToString(substitutedDemangleTree);
+            std::stringstream OS;
+            dumpTypeRef(substitutedTypeRef, OS);
+            associatedTypes.emplace_back(
+                AssociatedType{typealiasTypeName, mangledSubstitutedTypeName,
+                               substitutedTypeName, OS.str(),
+                               OpaqueTypeConformanceRequirements});
+          }
+          result.AssociatedTypeInfos.emplace_back(AssociatedTypeInfo{
+              mangledTypeName, typeName, protocolName, associatedTypes});
+        }
+      }
+    }
+    return result;
+  }
+
+  template <template <typename Runtime> class ObjCInteropKind,
+            unsigned PointerSize>
+  void gatherConformanceRequirementsIfOpaque(
+      Demangle::Node *substitutedTypeDemangleTree,
+      std::vector<std::string> &OpaqueTypeConformanceRequirements) {
+    // With unresolved opaque symbolic references, the demangle tree we
+    // extract the opaque type descriptor's address from is of the form:
+    // kind=Type
+    //  kind=OpaqueType
+    //    kind=OpaqueTypeDescriptorSymbolicReference, index={{1-9+}}
+    // Where the `index` value is the descriptor's address
+    //
+    if (substitutedTypeDemangleTree->getKind() == Node::Kind::Type) {
+      auto childDemangleTree = substitutedTypeDemangleTree->getFirstChild();
+      if (childDemangleTree->getKind() == Node::Kind::OpaqueType) {
+        auto opaqueTypeChildDemangleTree = childDemangleTree->getFirstChild();
+        if (opaqueTypeChildDemangleTree->getKind() ==
+            Node::Kind::OpaqueTypeDescriptorSymbolicReference) {
+          OpaqueTypeConformanceRequirements =
+              collectOpaqueTypeConformanceNames<ObjCInteropKind, PointerSize>(
+                  opaqueTypeChildDemangleTree->getIndex());
+        }
+      }
+    }
+  }
 
 private:
   struct ContextNameInfo {
@@ -1148,7 +1252,6 @@ private:
           remote::RemoteAddress(protocolDescriptorAddress),
           sizeof(ExternalContextDescriptor<ObjCInteropKind, PointerSize>));
       if (!protocolContextDescriptorBytes.get()) {
-        // Error = "Failed to read context (protocol) descriptor.";
         return llvm::None;
       }
       const ExternalContextDescriptor<ObjCInteropKind, PointerSize>
@@ -1337,6 +1440,83 @@ private:
       return newQualifiedTypeName;
     }
   };
+
+  template <template <typename Runtime> class ObjCInteropKind,
+            unsigned PointerSize>
+  void dumpAssociatedTypeSection(std::ostream &stream) {
+    auto associatedTypeCollectionResult =
+        collectAssociatedTypes<ObjCInteropKind, PointerSize>(
+            llvm::Optional<std::string>());
+    for (const auto &info :
+         associatedTypeCollectionResult.AssociatedTypeInfos) {
+      stream << "- " << info.FullyQualifiedName << " : "
+             << info.ProtocolFullyQualifiedName << "\n";
+      for (const auto &typeAlias : info.AssociatedTypes) {
+        stream << "typealias " << typeAlias.TypeAliasName << " = "
+               << typeAlias.SubstitutedTypeFullyQualifiedName << "\n";
+        stream << typeAlias.SubstitutedTypeDiagnosticPrintName;
+        if (!typeAlias.OpaqueTypeProtocolConformanceRequirements.empty()) {
+          stream << "opaque type conformance requirements: \n";
+          for (const auto &protocolName :
+               typeAlias.OpaqueTypeProtocolConformanceRequirements) {
+            stream << protocolName << "\n";
+          }
+        }
+      }
+      stream << "\n";
+    }
+  }
+
+  template <template <typename Runtime> class ObjCInteropKind,
+            unsigned PointerSize>
+  std::vector<std::string>
+  collectOpaqueTypeConformanceNames(uintptr_t opaqueTypeDescriptorAddress) {
+    std::vector<std::string> result;
+    auto opaqueTypeDescriptorBytes = OpaqueByteReader(
+        remote::RemoteAddress(opaqueTypeDescriptorAddress),
+        sizeof(ExternalOpaqueTypeDescriptor<ObjCInteropKind, PointerSize>));
+    if (!opaqueTypeDescriptorBytes.get()) {
+      return result;
+    }
+    const ExternalOpaqueTypeDescriptor<ObjCInteropKind, PointerSize>
+        *opaqueTypeDescriptor =
+            (const ExternalOpaqueTypeDescriptor<ObjCInteropKind, PointerSize> *)
+                opaqueTypeDescriptorBytes.get();
+
+    if (!opaqueTypeDescriptor) {
+      return result;
+    }
+
+    for (const auto &req : opaqueTypeDescriptor->getGenericRequirements()) {
+      if (req.getKind() == GenericRequirementKind::Protocol) {
+        // Compute the address of the protocol descriptor offset as:
+        // opaqueTypeDescriptorAddress + offset of the protocol descriptor
+        // offset in the descriptor
+        auto protocolDescriptorOffsetOffset = (uintptr_t)(&req) +
+                                              req.getProtocolOffset() -
+                                              (uintptr_t)opaqueTypeDescriptor;
+        auto protocolDescriptorOffsetAddress =
+            opaqueTypeDescriptorAddress + protocolDescriptorOffsetOffset;
+        auto protocolDescriptorOffsetValue = req.getUnresolvedProtocolAddress();
+
+        // Compute the address of the protocol descriptor by following the
+        // offset
+        auto protocolDescriptorAddress = detail::applyRelativeOffset(
+            (const char *)protocolDescriptorOffsetAddress,
+            protocolDescriptorOffsetValue);
+
+        auto nameReader =
+            QualifiedContextNameReader<ObjCInteropKind, PointerSize>(
+                OpaqueByteReader, OpaqueStringReader, OpaquePointerReader,
+                OpaqueDynamicSymbolResolver);
+        auto conformanceRequirementProtocolName =
+            nameReader.readFullyQualifiedProtocolNameFromProtocolDescriptor(
+                protocolDescriptorAddress);
+        result.push_back(*conformanceRequirementProtocolName);
+      }
+    }
+    return result;
+  }
 
   ///
   /// Extraction of protocol conformances
@@ -1701,7 +1881,7 @@ public:
     stream << "\n";
     stream << "ASSOCIATED TYPES:\n";
     stream << "=================\n";
-    dumpAssociatedTypeSection(stream);
+    dumpAssociatedTypeSection<ObjCInteropKind, PointerSize>(stream);
     stream << "\n";
     stream << "BUILTIN TYPES:\n";
     stream << "==============\n";
