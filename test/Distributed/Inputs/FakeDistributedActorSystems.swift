@@ -172,6 +172,7 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
     }
 
     func doIt<A: DistributedActor>(active: A) async throws -> Res {
+      print("remoteCal .... ABOUT TO TOUCH ACTOR...")
       guard (actor.id) == active.id as! ActorID else {
         fatalError("Attempted to call mock 'roundtrip' on unknown actor: \(actor.id), known: \(active.id)")
       }

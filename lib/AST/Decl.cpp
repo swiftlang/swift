@@ -8765,10 +8765,10 @@ SourceRange FuncDecl::getSourceRange() const {
   if (ResultTyEndLoc.isValid())
     return { StartLoc, ResultTyEndLoc };
 
-  if (hasThrows() && getThrowsLoc().isValid())
+  if (hasThrows())
     return { StartLoc, getThrowsLoc() };
 
-  if (hasAsync() && getAsyncLoc().isValid())
+  if (hasAsync())
     return { StartLoc, getAsyncLoc() };
 
   auto LastParamListEndLoc = getParameters()->getSourceRange().End;

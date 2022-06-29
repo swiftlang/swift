@@ -415,10 +415,6 @@ public:
     // If it's not an accessor, just look for the witness.
     if (!reqAccessor) {
       if (auto witness = asDerived().getWitness(reqDecl)) {
-
-//        fprintf(stderr, "[%s:%d] (%s) ADD METHOD ---------------------------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
-//        witness.getDecl()->dump();
-
         auto newDecl = requirementRef.withDecl(witness.getDecl());
         // Only import C++ methods as foreign. If the following
         // Objective-C function is imported as foreign:
@@ -434,8 +430,6 @@ public:
             requirementRef, getWitnessRef(newDecl, witness),
             witness);
       }
-
-
 
       return asDerived().addMissingMethod(requirementRef);
     }
@@ -479,12 +473,6 @@ private:
 
   SILDeclRef getWitnessRef(SILDeclRef requirementRef, Witness witness) {
     auto witnessRef = requirementRef.withDecl(witness.getDecl());
-    auto requirementFunc = requirementRef.getFuncDecl();
-
-//    if (requirementFunc) {
-//      fprintf(stderr, "[%s:%d] (%s) getWitness ... requirement: %s\n", __FILE__,
-//              __LINE__, __FUNCTION__, requirementFunc->getNameStr());
-//    }
     // If the requirement/witness is a derivative function, we need to
     // substitute the witness's derivative generic signature in its derivative
     // function identifier.
@@ -496,8 +484,6 @@ private:
       witnessRef = witnessRef.asAutoDiffDerivativeFunction(witnessDerivativeId);
     }
 
-    // inside witness of dist func -> call the func
-    // inside witness of dist THUNK -> call the THUNK
 
 //    else if (requirementFunc && requirementFunc->isDistributed()) {
 //      fprintf(stderr, "[%s:%d] (%s) distributed requirement:\n", __FILE__, __LINE__, __FUNCTION__);
@@ -792,7 +778,6 @@ SILFunction *SILGenModule::emitProtocolWitness(
       conformance.isConcrete() ? conformance.getConcrete() : nullptr;
   std::string nameBuffer =
       NewMangler.mangleWitnessThunk(manglingConformance, requirement.getDecl());
-
   // TODO(TF-685): Proper mangling for derivative witness thunks.
   if (auto *derivativeId = requirement.getDerivativeFunctionIdentifier()) {
     std::string kindString;
@@ -809,7 +794,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
   }
 
   if (witnessRef.isDistributedThunk()) {
-    nameBuffer = nameBuffer + "TE";
+    nameBuffer = nameBuffer + "TE"; // TE signifies a distributed thunk.
   }
 
   // If the thunked-to function is set to be always inlined, do the

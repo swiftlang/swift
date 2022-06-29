@@ -823,14 +823,6 @@ bool SILDeclRef::isDistributedThunk() const {
   return kind == Kind::Func;
 }
 
-//bool SILDeclRef::isDistributedThunk() const {
-//  if (!isDistributed)
-//    return false;
-//  if (!isThunk())
-//    return false;
-//  return kind == Kind::Func;
-//}
-
 bool SILDeclRef::isBackDeploymentFallback() const {
   if (backDeploymentKind != BackDeploymentKind::Fallback)
     return false;

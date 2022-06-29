@@ -56,9 +56,6 @@ public:
 
     auto requirements = protocol->getRequirementSignature().getRequirements();
     for (const auto &reqt : requirements) {
-//      fprintf(stderr, "[%s:%d] (%s) reqt:::: %s\n", __FILE__, __LINE__, __FUNCTION__, protocol->getNameStr());
-//      reqt.dump();
-
       switch (reqt.getKind()) {
       // These requirements don't show up in the witness table.
       case RequirementKind::Superclass:
@@ -108,8 +105,6 @@ public:
 
     // Visit the witnesses for the direct members of a protocol.
     for (Decl *member : protocol->getMembers()) {
-//      fprintf(stderr, "[%s:%d] (%s) member:::\n", __FILE__, __LINE__, __FUNCTION__);
-//      member->dump();
       ASTVisitor<T>::visit(member);
     }
   }

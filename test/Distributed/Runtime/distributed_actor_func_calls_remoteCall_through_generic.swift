@@ -24,7 +24,7 @@ protocol DistributedWorker: DistributedActor where ActorSystem == DefaultDistrib
   associatedtype WorkItem: Sendable & Codable
   associatedtype WorkResult: Sendable & Codable
 
-  distributed func submit_witness_sync(work: WorkItem) -> WorkResult
+  distributed func submit_witness_sync(param: WorkItem) -> WorkResult
 //  distributed func submit_witness_throws(work: WorkItem) throws -> WorkResult
 //  distributed func submit_witness_async(work: WorkItem) async -> WorkResult
 //  distributed func submit_witness_asyncThrows(work: WorkItem) async throws -> WorkResult
@@ -41,10 +41,23 @@ distributed actor TheWorker: DistributedWorker {
   typealias WorkItem = String
   typealias WorkResult = String
 
-  distributed func submit_witness_sync(work: WorkItem) -> WorkResult {
-    "\(#function): \(work)"
+  distributed func submit_witness_sync(param: WorkItem) -> WorkResult {
+    "\(#function): \(param)"
   }
 
+}
+
+protocol Worker: Actor {
+  typealias WorkItem = String
+  typealias WorkResult = String
+
+  func submit_witness_sync(param: WorkItem) -> WorkResult
+}
+
+actor TheLocalWorker: Worker {
+  func submit_witness_sync(param: WorkItem) -> WorkResult {
+    "\(#function): \(param)"
+  }
 }
 
 func test_generic(system: DefaultDistributedActorSystem) async throws {
@@ -52,12 +65,18 @@ func test_generic(system: DefaultDistributedActorSystem) async throws {
   let remoteW = try! TheWorker.resolve(id: localW.id, using: system)
   precondition(__isRemoteActor(remoteW))
 
+  try await remoteW.submit_witness_sync(param: "HELLO")
+
   print("=== -------------------------------------------------------")
 
   // === sync witness ------
 
+  func callActorWorker<W: Worker>(w: W) async throws -> String where W.WorkItem == String, W.WorkResult == String {
+    await w.submit_witness_sync(param: "Hello")
+  }
+
   func callWorkerSync<W: DistributedWorker>(w: W) async throws -> String where W.WorkItem == String, W.WorkResult == String {
-    try await w.submit_witness_sync(work: "Hello")
+    try await w.submit_witness_sync(param: "Hello")
   }
   let replySync = try await callWorkerSync(w: remoteW)
   print("submit_witness_sync (remote): \(replySync)")

@@ -416,14 +416,13 @@ struct SILDeclRef {
   }
   /// Returns the distributed entry point corresponding to the same decl.
   SILDeclRef asDistributed(bool distributed = true) const {
-    auto declRef = SILDeclRef(loc.getOpaqueValue(), kind,
+    return SILDeclRef(loc.getOpaqueValue(), kind,
                       /*foreign=*/false,
                       /*distributed=*/distributed,
                       /*knownToBeLocal=*/false,
                       backDeploymentKind,
                       defaultArgIndex,
                       pointer.get<AutoDiffDerivativeFunctionIdentifier *>());
-    return declRef;
   }
 
   /// Returns the distributed known-to-be-local entry point corresponding to

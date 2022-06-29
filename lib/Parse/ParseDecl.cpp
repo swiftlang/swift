@@ -7287,12 +7287,6 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
 
   diagnoseWhereClauseInGenericParamList(GenericParams);
 
-//  // If there was a 'distributed' modifier, remember it as it will
-//  // cause implicit 'async' and 'throws' when we create the FuncDecl.
-//  bool isDistributedProtocolRequirement =
-//      Attributes.hasAttribute<DistributedActorAttr>() &&
-//          CurDeclContext && isa<ProtocolDecl>(CurDeclContext);
-
   // If there was an 'async' modifier, put it in the right place for a function.
   bool isAsync = asyncLoc.isValid();
   if (auto asyncAttr = Attributes.getAttribute<AsyncAttr>()) {
@@ -7305,22 +7299,6 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
     asyncAttr->setInvalid();
     isAsync = true;
   }
-//  if (!isAsync && isDistributedProtocolRequirement) {
-//    // is not explicitly async, but it is a distributed func protocol requirement
-//    // and therefore it is implicitly async; we must take care both start/end
-//    // loc for it are invalid.
-//    isAsync = isAsync || isDistributedProtocolRequirement;
-//    asyncLoc = SourceLoc();
-//  }
-//
-//  bool isThrows = throwsLoc.isValid();
-//  if (!isThrows && isDistributedProtocolRequirement) {
-//    // is not explicitly throws, but it is a distributed func protocol requirement
-//    // and therefore it is implicitly throws...
-//    isThrows = isThrows || isDistributedProtocolRequirement;
-//    throwsLoc = SourceLoc();
-//  }
-
 
   // Create the decl for the func and add it to the parent scope.
   auto *FD = FuncDecl::create(Context, StaticLoc, StaticSpelling,

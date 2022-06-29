@@ -577,9 +577,6 @@ public:
         constant->dump();
 
         if (auto proto = dyn_cast<ProtocolDecl>(func->getDeclContext())) {
-//          fprintf(stderr, "[%s:%d] (%s) is dist: %d\n", __FILE__, __LINE__, __FUNCTION__, constant->isDistributedThunk());
-//          proto->dump();
-
           isDistThunkCall = func->isDistributed() &&
                             isa<ProtocolDecl>(func->getDeclContext());
         }
@@ -5212,19 +5209,8 @@ RValue SILGenFunction::emitApplyMethod(SILLocation loc, ConcreteDeclRef declRef,
   auto *call = cast<AbstractFunctionDecl>(declRef.getDecl());
 
   // Form the reference to the method.
-  auto callRef =
-      SILDeclRef(call, SILDeclRef::Kind::Func)
-          .asForeign(requiresForeignEntryPoint(declRef.getDecl()))
-          .asDistributed(requiresDistributedThunkEntryPoint(declRef.getDecl()));
-
-  if (requiresDistributedThunkEntryPoint(declRef.getDecl())) {
-    fprintf(stderr, "[%s:%d] (%s) APPLY METHOD, marked as NEEDS THUNK CALL\n", __FILE__, __LINE__, __FUNCTION__);
-  } else {
-    fprintf(stderr, "[%s:%d] (%s) APPLY METHOD, NOT DIST\n", __FILE__, __LINE__, __FUNCTION__);
-  }
-
-  fprintf(stderr, "[%s:%d] (%s) APPLY\n", __FILE__, __LINE__, __FUNCTION__);
-  call->dump();
+  auto callRef = SILDeclRef(call, SILDeclRef::Kind::Func)
+                     .asForeign(requiresForeignEntryPoint(declRef.getDecl()));
 
   if (auto distributedThunk = call->getDistributedThunk()) {
     callRef = SILDeclRef(distributedThunk).asDistributed();
