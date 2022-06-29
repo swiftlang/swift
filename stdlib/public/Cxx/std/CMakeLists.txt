@@ -143,12 +143,7 @@ add_swift_target_library(swiftstd ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVE
     -Xfrontend -module-interface-preserve-types-as-written
 
     SWIFT_COMPILE_FLAGS_LINUX
-    # GCC on Linux is usually located under `/usr`.
-    # However, Ubuntu 20.04 ships with another GCC installation under `/`, which does not include libstdc++.
-    # Swift build scripts pass `--sysroot=/` to Clang. By default, Clang tries to find GCC installation under sysroot,
-    # and if it doesn't exist, under `{sysroot}/usr`. On Ubuntu 20.04 and newer, it attempts to use the GCC without the
-    # C++ stdlib, which causes a build failure. To fix that, we tell Clang explicitly to use GCC from `/usr`.
-    -Xcc --gcc-toolchain=/usr
+    ${SWIFT_SDK_LINUX_CXX_OVERLAY_SWIFT_COMPILE_FLAGS}
 
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
     TARGET_SDKS ALL_APPLE_PLATFORMS LINUX
