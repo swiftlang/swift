@@ -1064,5 +1064,9 @@ def clang_header_expose_public_decls:
   Flag<["-"], "clang-header-expose-public-decls">,
   HelpText<"Expose all public declarations in the generated clang header">,
   Flags<[FrontendOption, HelpHidden]>;
+  
+def enable_ad_hoc_availability :
+  Flag<["-"], "enable-ad-hoc-availability">,
+  HelpText<"Enable experimental support for ad hoc availability">;
 
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

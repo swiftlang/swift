@@ -385,9 +385,13 @@ bool SILFunction::isWeakImported() const {
   if (Availability.isAlwaysAvailable())
     return false;
 
-  auto fromContext = AvailabilityContext::forDeploymentTarget(
-      getASTContext());
-  return !fromContext.isContainedIn(Availability);
+  auto deploymentTarget =
+      AvailabilityContext::forDeploymentTarget(getASTContext());
+
+  if (getASTContext().LangOpts.EnableAdHocAvailability)
+    return !Availability.isSupersetOf(deploymentTarget);
+
+  return !deploymentTarget.isContainedIn(Availability);
 }
 
 SILBasicBlock *SILFunction::createBasicBlock() {
