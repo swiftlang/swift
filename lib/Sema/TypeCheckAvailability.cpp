@@ -3229,7 +3229,7 @@ public:
       maybeDiagParameterizedExistentialErasure(EE, Where);
     }
     if (auto *CC = dyn_cast<ExplicitCastExpr>(E)) {
-      if (!isa<CoerceExpr>(CC) &&
+      if (!isa<CoerceExpr>(CC) && CC->getCastType() &&
           CC->getCastType()->hasParameterizedExistential()) {
         SourceLoc loc = CC->getCastTypeRepr() ? CC->getCastTypeRepr()->getLoc()
                                               : E->getLoc();
