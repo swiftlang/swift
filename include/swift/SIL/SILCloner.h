@@ -1160,12 +1160,10 @@ template <typename ImplClass>
 void SILCloner<ImplClass>::visitStoreBorrowInst(StoreBorrowInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   if (!getBuilder().hasOwnership()) {
-    // TODO: Eliminate store_borrow result so we can use
-    // recordClonedInstruction. It is not "technically" necessary, but it is
-    // better from an invariant perspective.
     getBuilder().createStore(
         getOpLocation(Inst->getLoc()), getOpValue(Inst->getSrc()),
         getOpValue(Inst->getDest()), StoreOwnershipQualifier::Unqualified);
+    mapValue(Inst, getOpValue(Inst->getDest()));
     return;
   }
 
