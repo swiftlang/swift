@@ -730,9 +730,9 @@ extension Unsafe${Mutable}BufferPointer {
   @_alwaysEmitIntoClient
   // This custom silgen name is chosen to not interfere with the old ABI
 % if Mutable:
-  @_silgen_name("$_swift_se0333_UnsafeMutableBufferPointer_withMemoryRebound")
+  @_silgen_name("_swift_se0333_UnsafeMutableBufferPointer_withMemoryRebound")
 % else:
-  @_silgen_name("$_swift_se0333_UnsafeBufferPointer_withMemoryRebound")
+  @_silgen_name("_swift_se0333_UnsafeBufferPointer_withMemoryRebound")
 % end
   public func withMemoryRebound<T, Result>(
     to type: T.Type,
