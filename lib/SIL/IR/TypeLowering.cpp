@@ -244,22 +244,10 @@ namespace {
                                            RecursiveProperties::forReference());
     }
 
-    RecursiveProperties getMoveOnlyReferenceRecursiveProperties(
-        IsTypeExpansionSensitive_t isSensitive) {
-      return mergeIsTypeExpansionSensitive(isSensitive,
-                                           RecursiveProperties::forReference());
-    }
-
     RecursiveProperties
     getOpaqueRecursiveProperties(IsTypeExpansionSensitive_t isSensitive) {
       return mergeIsTypeExpansionSensitive(isSensitive,
                                            RecursiveProperties::forOpaque());
-    }
-
-    RecursiveProperties getMoveOnlyOpaqueRecursiveProperties(
-        IsTypeExpansionSensitive_t isSensitive) {
-      return mergeIsTypeExpansionSensitive(
-          isSensitive, RecursiveProperties::forMoveOnlyOpaque());
     }
 
 #define IMPL(TYPE, LOWERING)                                                 \
@@ -704,12 +692,12 @@ namespace {
       if (lowering.isAddressOnly()) {
         return asImpl().handleMoveOnlyAddressOnly(
             type->getCanonicalType(),
-            getMoveOnlyOpaqueRecursiveProperties(isSensitive));
+            getOpaqueRecursiveProperties(isSensitive));
       }
 
       return asImpl().handleMoveOnlyReference(
           type->getCanonicalType(),
-          getMoveOnlyReferenceRecursiveProperties(isSensitive));
+          getReferenceRecursiveProperties(isSensitive));
     }
 
     RetTy handleAggregateByProperties(CanType type, RecursiveProperties props) {
