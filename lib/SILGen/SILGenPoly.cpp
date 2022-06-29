@@ -4352,7 +4352,7 @@ getWitnessFunctionRef(SILGenFunction &SGF,
                       SILLocation loc) {
   switch (witnessKind) {
   case WitnessDispatchKind::Static:
-    if (auto *derivativeId = witness.getDerivativeFunctionIdentifier()) {
+    if (auto *derivativeId = witness.getDerivativeFunctionIdentifier()) { // TODO Maybe we need check here too
       auto originalFn =
           SGF.emitGlobalFunctionRef(loc, witness.asAutoDiffOriginalFunction());
       auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
@@ -4439,23 +4439,43 @@ void SILGenFunction::emitProtocolWitness(
   SmallVector<ManagedValue, 8> origParams;
   collectThunkParams(loc, origParams);
 
-  if (witness.hasDecl() &&
-      getActorIsolation(witness.getDecl()).isDistributedActor()) {
-    // We witness protocol requirements using the distributed thunk, when:
-    // - the witness is isolated to a distributed actor, but the requirement is not
-    // - the requirement is a distributed func, and therefore can only be witnessed
-    //   by a distributed func; we handle this by witnessing the requirement with the thunk
-    // FIXME(distributed): this limits us to only allow distributed explicitly throwing async requirements... we need to fix this somehow.
-    if (requirement.hasDecl()) {
-      if ((!getActorIsolation(requirement.getDecl()).isDistributedActor()) ||
-          (isa<FuncDecl>(requirement.getDecl()) &&
-              witness.getFuncDecl()->isDistributed())) {
-        auto thunk = cast<AbstractFunctionDecl>(witness.getDecl())
-                         ->getDistributedThunk();
-        witness = SILDeclRef(thunk).asDistributed();
-      }
-    }
-  } else if (enterIsolation) {
+//  // TODO: how to mark SIL function a dist thunk
+//  if (witness.hasDecl() &&
+//            getActorIsolation(witness.getDecl()).isDistributedActor()) {
+//
+//    if (requirement.isDistributedThunk()) {
+//      fprintf(stderr, "[%s:%d] (%s) witness is DIST THUNK!\n", __FILE__, __LINE__, __FUNCTION__);
+//      requirement.dump();
+//      F.dump();
+//
+//      auto thunk = cast<AbstractFunctionDecl>(witness.getDecl())
+//          ->getDistributedThunk();
+//      witness = SILDeclRef(thunk).asDistributed();
+//    } else {
+//      fprintf(stderr, "[%s:%d] (%s) witness is NOT DIST THUNK!!!!!!!!\n", __FILE__, __LINE__, __FUNCTION__);
+//      requirement.dump();
+//      F.dump();
+//    }
+//  } else
+
+//  if (witness.hasDecl() &&
+//      getActorIsolation(witness.getDecl()).isDistributedActor()) {
+//    // We witness protocol requirements using the distributed thunk, when:
+//    // - the witness is isolated to a distributed actor, but the requirement is not
+//    // - the requirement is a distributed func, and therefore can only be witnessed
+//    //   by a distributed func; we handle this by witnessing the requirement with the thunk
+//    // FIXME(distributed): this limits us to only allow distributed explicitly throwing async requirements... we need to fix this somehow.
+//    if (requirement.hasDecl()) {
+//      if ((!getActorIsolation(requirement.getDecl()).isDistributedActor()) ||
+//          (isa<FuncDecl>(requirement.getDecl()) &&
+//              requirement.getFuncDecl()->isDistributed())) {
+//        auto thunk = cast<AbstractFunctionDecl>(witness.getDecl())
+//                         ->getDistributedThunk();
+//        witness = SILDeclRef(thunk).asDistributed();
+//      }
+//    }
+//  } else
+      if (enterIsolation) {
     // If we are supposed to enter the actor, do so now by hopping to the
     // actor.
     Optional<ManagedValue> actorSelf;

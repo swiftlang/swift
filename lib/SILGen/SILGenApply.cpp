@@ -29,6 +29,7 @@
 #include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
@@ -627,6 +628,14 @@ public:
       return fn;
     }
     case Kind::WitnessMethod: {
+      if (auto func = constant->getFuncDecl()) {
+        if (func->isDistributed() &&
+            isa<ProtocolDecl>(func->getDeclContext())) {
+          // We must adjust the constant to use a distributed thunk.
+          constant = constant->asDistributed();
+        }
+      }
+
       auto constantInfo =
           SGF.getConstantInfo(SGF.getTypeExpansionContext(), *constant);
 
@@ -700,6 +709,14 @@ public:
       return createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
     }
     case Kind::WitnessMethod: {
+      if (auto func = constant->getFuncDecl()) {
+        if (func->isDistributed() &&
+            isa<ProtocolDecl>(func->getDeclContext())) {
+          /// We must adjust the constant to use a distributed thunk.
+          constant = constant->asDistributed();
+        }
+      }
+
       auto constantInfo =
           SGF.getConstantInfo(SGF.getTypeExpansionContext(), *constant);
       return createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
@@ -4496,6 +4513,10 @@ RValue SILGenFunction::emitApply(
     Optional<ImplicitActorHopTarget> implicitActorHopTarget) {
   auto substFnType = calleeTypeInfo.substFnType;
   auto substResultType = calleeTypeInfo.substResultType;
+
+  if (F.getName() == "$s4main12test_generic6systemyAA24FakeRoundtripActorSystemC_tYaKF14callWorkerSyncL_1wSSx_tYaKAA011DistributedJ0RzSS8WorkItemRtzSS0M6ResultRtzlF") {
+    fprintf(stderr, "[%s:%d] (%s) INSIDE $s4main12test_generic6systemyAA24FakeRoundtripActorSystemC_tYaKF14callWorkerSyncL_1wSSx_tYaKAA011DistributedJ0RzSS8WorkItemRtzSS0M6ResultRtzlF\n", __FILE__, __LINE__, __FUNCTION__);
+  }
 
   // Create the result plan.
   SmallVector<SILValue, 4> indirectResultAddrs;

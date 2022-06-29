@@ -483,6 +483,16 @@ private:
           witness.getDerivativeGenericSignature(), witnessRef.getASTContext());
       witnessRef = witnessRef.asAutoDiffDerivativeFunction(witnessDerivativeId);
     }
+
+
+//    else if (requirementFunc && requirementFunc->isDistributed()) {
+//      fprintf(stderr, "[%s:%d] (%s) distributed requirement:\n", __FILE__, __LINE__, __FUNCTION__);
+//      requirementFunc->dump();
+//      fprintf(stderr, "[%s:%d] (%s) witness: \n", __FILE__, __LINE__, __FUNCTION__);
+//      witness.dump();
+//
+//      witnessRef = witnessRef.asDistributed();
+//    }
     return witnessRef;
   }
 };
@@ -528,6 +538,8 @@ public:
 
     auto *proto = Conformance->getProtocol();
     visitProtocolDecl(proto);
+
+    // this->Conformance->dump()
 
     addConditionalRequirements();
 
@@ -694,6 +706,10 @@ SILFunction *SILGenModule::emitProtocolWitness(
   auto requirementInfo =
       Types.getConstantInfo(TypeExpansionContext::minimal(), requirement);
 
+  if (requirement.isDistributedThunk()) {
+    witnessRef = SILDeclRef(witnessRef.getFuncDecl()->getDistributedThunk(), SILDeclRef::Kind::Func).asDistributed();
+  }
+
   // Work out the lowered function type of the SIL witness thunk.
   auto reqtOrigTy = cast<GenericFunctionType>(requirementInfo.LoweredType);
 
@@ -779,6 +795,10 @@ SILFunction *SILGenModule::emitProtocolWitness(
     }
     nameBuffer = "AD__" + nameBuffer + "_" + kindString + "_" +
                  derivativeId->getParameterIndices()->getString();
+  }
+
+  if (requirement.isDistributedThunk()) {
+    nameBuffer = nameBuffer + "TE";
   }
 
   // If the thunked-to function is set to be always inlined, do the

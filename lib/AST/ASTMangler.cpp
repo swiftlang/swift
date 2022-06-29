@@ -243,6 +243,13 @@ std::string ASTMangler::mangleWitnessThunk(
       appendOperator("TW");
     }
   }
+
+//  if (auto func = dyn_cast<FuncDecl>(Requirement)) {
+//    if (func->isDistributed()) {
+//      appendSymbolKind(SymbolKind::DistributedThunk);
+//    }
+//  }
+
   return finalize();
 }
 

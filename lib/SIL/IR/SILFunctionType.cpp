@@ -20,6 +20,7 @@
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ForeignInfo.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -1914,6 +1915,21 @@ static CanSILFunctionType getSILFunctionType(
                                   substFnInterfaceType);
   }
 
+
+  bool isDistributed = false;
+  if (constant && constant.hasValue() && constant->hasDecl() && constant->isDistributedThunk()) {
+    if (auto funcDecl = dyn_cast<AbstractFunctionDecl>(constant->getDecl())) {
+      if (funcDecl->isDistributed()) {
+        if (isa<ProtocolDecl>(constant->getDecl()->getDeclContext())) {
+          if (auto emptyThunk = getDistributedWitnessThunkDecl(funcDecl)) {
+            constant = SILDeclRef(emptyThunk, swift::SILDeclRef::Kind::Func); // .asDistributed();
+            isDistributed = true;
+          }
+        }
+      }
+    }
+  }
+
   Optional<SILResultInfo> errorResult;
   assert(
       (!foreignInfo.error || substFnInterfaceType->getExtInfo().isThrowing()) &&
@@ -1925,7 +1941,7 @@ static CanSILFunctionType getSILFunctionType(
   bool isSendable = substFnInterfaceType->getExtInfo().isSendable();
 
   // Map 'async' to the appropriate `@async` modifier.
-  bool isAsync = false;
+  bool isAsync = isDistributed;
   if (substFnInterfaceType->getExtInfo().isAsync() && !foreignInfo.async) {
     assert(!origType.isForeign()
            && "using native Swift async for foreign type!");
@@ -1938,7 +1954,7 @@ static CanSILFunctionType getSILFunctionType(
   // that also throws. This prevents the need for a second possibly-thunking
   // conversion when using a non-throwing function in more abstract throwing
   // context.
-  bool isThrowing = substFnInterfaceType->getExtInfo().isThrowing();
+  bool isThrowing = isDistributed || substFnInterfaceType->getExtInfo().isThrowing();
   if (auto origFnType = origType.getAs<AnyFunctionType>()) {
     isThrowing |= origFnType->getExtInfo().isThrowing();
   }
@@ -2112,7 +2128,7 @@ static CanSILFunctionType getSILFunctionType(
                         .withConcurrent(isSendable)
                         .withAsync(isAsync)
                         .build();
-  
+
   return SILFunctionType::get(genericSig, silExtInfo, coroutineKind,
                               calleeConvention, inputs, yields,
                               results, errorResult,
