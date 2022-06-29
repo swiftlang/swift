@@ -2141,7 +2141,8 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     }
   };
 
-  auto emitParseableFinishedMessage = [&Invocation, &Args, &FileSpecificDiagnostics](int ExitStatus) {
+  auto emitParseableFinishedMessage = [&Invocation, &FileSpecificDiagnostics](
+                                          int ExitStatus) {
     const auto &IO = Invocation.getFrontendOptions().InputsAndOutputs;
     const auto OSPid = getpid();
     const auto ProcInfo = sys::TaskProcessInformation(OSPid);

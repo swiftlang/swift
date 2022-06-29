@@ -620,11 +620,11 @@ public:
   /// Note that this may cause other decls to load as well.
   void loadExtensions(NominalTypeDecl *nominal);
 
-  /// Load the methods within the given class that produce
+  /// Load the methods within the given nominal type that produce
   /// Objective-C class or instance methods with the given selector.
   ///
-  /// \param classDecl The class in which we are searching for @objc methods.
-  /// The search only considers this class and its extensions; not any
+  /// \param typeDecl The nominal in which we are searching for @objc methods.
+  /// The search only considers this type and its extensions; not any
   /// superclasses.
   ///
   /// \param selector The selector to search for.
