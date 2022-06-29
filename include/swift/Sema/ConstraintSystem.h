@@ -4423,10 +4423,11 @@ public:
          const OpenedTypeMap &replacements);
 
   /// Wrapper over swift::adjustFunctionTypeForConcurrency that passes along
-  /// the appropriate closure-type extraction function.
+  /// the appropriate closure-type and opening extraction functions.
   AnyFunctionType *adjustFunctionTypeForConcurrency(
     AnyFunctionType *fnType, ValueDecl *decl, DeclContext *dc,
-    unsigned numApplies, bool isMainDispatchQueue);
+    unsigned numApplies, bool isMainDispatchQueue,
+    OpenedTypeMap &replacements);
 
   /// Retrieve the type of a reference to the given value declaration.
   ///

@@ -1428,9 +1428,16 @@ static bool isRequirementOrWitness(const ConstraintLocatorBuilder &locator) {
 
 AnyFunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
     AnyFunctionType *fnType, ValueDecl *decl, DeclContext *dc,
-    unsigned numApplies, bool isMainDispatchQueue) {
+    unsigned numApplies, bool isMainDispatchQueue,
+    OpenedTypeMap &replacements) {
   return swift::adjustFunctionTypeForConcurrency(
-      fnType, decl, dc, numApplies, isMainDispatchQueue, GetClosureType{*this});
+      fnType, decl, dc, numApplies, isMainDispatchQueue, GetClosureType{*this},
+      [&](Type type) {
+        if (replacements.empty())
+          return type;
+
+        return openType(type, replacements);
+      });
 }
 
 /// For every parameter in \p type that has an error type, replace that
@@ -1479,11 +1486,6 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     AnyFunctionType *funcType = func->getInterfaceType()
         ->castTo<AnyFunctionType>();
-    if (!isRequirementOrWitness(locator)) {
-      unsigned numApplies = getNumApplications(value, false, functionRefKind);
-      funcType = adjustFunctionTypeForConcurrency(
-          funcType, func, useDC, numApplies, false);
-    }
     auto openedType = openFunctionType(
         funcType, locator, replacements, func->getDeclContext());
 
@@ -1500,6 +1502,13 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
                         ->castTo<FunctionType>();
     }
 
+    auto origOpenedType = openedType;
+    if (!isRequirementOrWitness(locator)) {
+      unsigned numApplies = getNumApplications(value, false, functionRefKind);
+      openedType = cast<FunctionType>(adjustFunctionTypeForConcurrency(
+          origOpenedType, func, useDC, numApplies, false, replacements));
+    }
+
     // The reference implicitly binds 'self'.
     return {openedType, openedType->getResult()};
   }
@@ -1512,19 +1521,19 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     auto numLabelsToRemove = getNumRemovedArgumentLabels(
         funcDecl, /*isCurriedInstanceReference=*/false, functionRefKind);
 
-    if (!isRequirementOrWitness(locator)) {
-      unsigned numApplies = getNumApplications(
-          funcDecl, false, functionRefKind);
-      funcType = adjustFunctionTypeForConcurrency(
-          funcType, funcDecl, useDC, numApplies, false);
-    }
-
     auto openedType = openFunctionType(funcType, locator, replacements,
                                        funcDecl->getDeclContext())
                           ->removeArgumentLabels(numLabelsToRemove);
-    openedType = unwrapPropertyWrapperParameterTypes(*this, funcDecl, functionRefKind,
-                                                     openedType->getAs<FunctionType>(),
-                                                     locator);
+    openedType = unwrapPropertyWrapperParameterTypes(*this, funcDecl, functionRefKind, openedType->castTo<FunctionType>(), locator);
+
+    auto origOpenedType = openedType;
+    if (!isRequirementOrWitness(locator)) {
+      unsigned numApplies = getNumApplications(
+          funcDecl, false, functionRefKind);
+      openedType = cast<FunctionType>(adjustFunctionTypeForConcurrency(
+          origOpenedType->castTo<FunctionType>(), funcDecl, useDC,
+          numApplies, false, replacements));
+    }
 
     if (isForCodeCompletion() && openedType->hasError()) {
       // In code completion, replace error types by placeholder types so we can
@@ -2096,22 +2105,13 @@ ConstraintSystem::getTypeOfMemberReference(
 
   AnyFunctionType *funcType;
 
-  if (isa<AbstractFunctionDecl>(value) ||
-      isa<EnumElementDecl>(value)) {
+  if (isa<AbstractFunctionDecl>(value) || isa<EnumElementDecl>(value)) {
     if (auto ErrorTy = value->getInterfaceType()->getAs<ErrorType>()) {
       return {ErrorType::get(ErrorTy->getASTContext()),
               ErrorType::get(ErrorTy->getASTContext())};
     }
     // This is the easy case.
     funcType = value->getInterfaceType()->castTo<AnyFunctionType>();
-
-    if (!isRequirementOrWitness(locator)) {
-      unsigned numApplies = getNumApplications(
-          value, hasAppliedSelf, functionRefKind);
-      funcType = adjustFunctionTypeForConcurrency(
-          funcType, value, useDC, numApplies,
-          isMainDispatchQueueMember(locator));
-    }
   } else {
     // For a property, build a type (Self) -> PropType.
     // For a subscript, build a type (Self) -> (Indices...) -> ElementType.
@@ -2128,11 +2128,7 @@ ConstraintSystem::getTypeOfMemberReference(
                               ->castTo<AnyFunctionType>()->getParams();
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       FunctionType::ExtInfo info;
-      auto *refFnType = FunctionType::get(indices, elementTy, info);
-
-      refType = adjustFunctionTypeForConcurrency(
-          refFnType, subscript, useDC, /*numApplies=*/1,
-          /*isMainDispatchQueue=*/false);
+      refType = FunctionType::get(indices, elementTy, info);
     } else {
       refType = getUnopenedTypeOfReference(cast<VarDecl>(value), baseTy, useDC,
                                            locator,
@@ -2242,6 +2238,22 @@ ConstraintSystem::getTypeOfMemberReference(
     FunctionType::ExtInfo info;
     openedType =
         FunctionType::get(fullFunctionType->getParams(), functionType, info);
+  }
+
+  // Adjust the type for concurrency.
+  Type origOpenedType = openedType;
+
+  if ((isa<AbstractFunctionDecl>(value) || isa<EnumElementDecl>(value)) &&
+      !isRequirementOrWitness(locator)) {
+    unsigned numApplies = getNumApplications(
+        value, hasAppliedSelf, functionRefKind);
+    openedType = adjustFunctionTypeForConcurrency(
+        origOpenedType->castTo<AnyFunctionType>(), value, useDC, numApplies,
+        isMainDispatchQueueMember(locator), replacements);
+  } else if (auto subscript = dyn_cast<SubscriptDecl>(value)) {
+    openedType = adjustFunctionTypeForConcurrency(
+        origOpenedType->castTo<AnyFunctionType>(), subscript, useDC,
+        /*numApplies=*/2, /*isMainDispatchQueue=*/false, replacements);
   }
 
   // Compute the type of the reference.
@@ -2456,6 +2468,7 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
           uncurryLevel);
     };
 
+    OpenedTypeMap emptyReplacements;
     if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
       auto elementTy = subscript->getElementInterfaceType();
 
@@ -2478,7 +2491,8 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
       FunctionType::ExtInfo info;
       type = adjustFunctionTypeForConcurrency(
           FunctionType::get(indices, elementTy, info),
-          subscript, useDC, /*numApplies=*/1, /*isMainDispatchQueue=*/false);
+          subscript, useDC, /*numApplies=*/1, /*isMainDispatchQueue=*/false,
+          emptyReplacements);
     } else if (auto var = dyn_cast<VarDecl>(decl)) {
       type = var->getValueInterfaceType();
       if (doesStorageProduceLValue(var, overload.getBaseType(), useDC)) {
@@ -2524,7 +2538,8 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
 
       type = adjustFunctionTypeForConcurrency(
           type->castTo<FunctionType>(),
-          decl, useDC, numApplies, /*isMainDispatchQueue=*/false)
+          decl, useDC, numApplies, /*isMainDispatchQueue=*/false,
+          emptyReplacements)
         ->getResult();
     }
   }

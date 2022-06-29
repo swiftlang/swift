@@ -4547,7 +4547,7 @@ static AnyFunctionType *applyUnsafeConcurrencyToFunctionType(
     return fnType;
 
   AnyFunctionType *outerFnType = nullptr;
-  if (func && func->hasImplicitSelfDecl()) {
+  if ((subscript && numApplies > 1) || (func && func->hasImplicitSelfDecl())) {
     outerFnType = fnType;
     fnType = outerFnType->getResult()->castTo<AnyFunctionType>();
 
@@ -4637,7 +4637,8 @@ static AnyFunctionType *applyUnsafeConcurrencyToFunctionType(
 AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
     AnyFunctionType *fnType, ValueDecl *decl, DeclContext *dc,
     unsigned numApplies, bool isMainDispatchQueue,
-    llvm::function_ref<Type(const AbstractClosureExpr *)> getType) {
+    llvm::function_ref<Type(const AbstractClosureExpr *)> getType,
+    llvm::function_ref<Type(Type)> openType) {
   // Apply unsafe concurrency features to the given function type.
   bool strictChecking = contextRequiresStrictConcurrencyChecking(dc, getType);
   fnType = applyUnsafeConcurrencyToFunctionType(
@@ -4660,7 +4661,7 @@ AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
       LLVM_FALLTHROUGH;
 
     case ActorIsolation::GlobalActor:
-      globalActorType = isolation.getGlobalActor();
+      globalActorType = openType(isolation.getGlobalActor());
       break;
     }
   }
