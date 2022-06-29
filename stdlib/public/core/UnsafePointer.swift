@@ -1013,7 +1013,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   @inlinable
   @_alwaysEmitIntoClient
   // This custom silgen name is chosen to not interfere with the old ABI
-  @_silgen_name("$_swift_se0333_UnsafeMutablePointer_withMemoryRebound")
+  @_silgen_name("_swift_se0333_UnsafeMutablePointer_withMemoryRebound")
   public func withMemoryRebound<T, Result>(
     to type: T.Type,
     capacity count: Int,
