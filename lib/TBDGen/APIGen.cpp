@@ -24,7 +24,7 @@
 namespace swift {
 namespace apigen {
 
-void API::addSymbol(llvm::StringRef symbol, APILoc loc, APILinkage linkage,
+void API::addSymbol(StringRef symbol, APILoc loc, APILinkage linkage,
                     APIFlags flags, APIAccess access,
                     APIAvailability availability) {
   auto *global = new (allocator) GlobalRecord(
@@ -32,22 +32,32 @@ void API::addSymbol(llvm::StringRef symbol, APILoc loc, APILinkage linkage,
   globals.push_back(global);
 }
 
-ObjCInterfaceRecord *API::addObjCClass(llvm::StringRef name, APILinkage linkage,
+ObjCInterfaceRecord *API::addObjCClass(StringRef name, APILinkage linkage,
                                        APILoc loc, APIAccess access,
                                        APIAvailability availability,
-                                       llvm::StringRef superClassName) {
+                                       StringRef superClassName) {
   auto *interface = new (allocator) ObjCInterfaceRecord(
       name, linkage, loc, access, availability, superClassName);
   interfaces.push_back(interface);
   return interface;
 }
 
-void API::addObjCMethod(ObjCInterfaceRecord *cls, llvm::StringRef name,
-                        APILoc loc, APIAccess access, bool isInstanceMethod,
+ObjCCategoryRecord *API::addObjCCategory(StringRef name, APILinkage linkage,
+                                         APILoc loc, APIAccess access,
+                                         APIAvailability availability,
+                                         StringRef interface) {
+  auto *category = new (allocator)
+      ObjCCategoryRecord(name, linkage, loc, access, availability, interface);
+  categories.push_back(category);
+  return category;
+}
+
+void API::addObjCMethod(ObjCContainerRecord *record, StringRef name, APILoc loc,
+                        APIAccess access, bool isInstanceMethod,
                         bool isOptional, APIAvailability availability) {
   auto method = new (allocator) ObjCMethodRecord(
       name, loc, access, isInstanceMethod, isOptional, availability);
-  cls->methods.push_back(method);
+  record->methods.push_back(method);
 }
 
 static void serialize(llvm::json::OStream &OS, APIAccess access) {
@@ -151,6 +161,30 @@ static void serialize(llvm::json::OStream &OS,
   });
 }
 
+static void serialize(llvm::json::OStream &OS,
+                      const ObjCCategoryRecord &record) {
+  OS.object([&]() {
+    OS.attribute("name", record.name);
+    serialize(OS, record.access);
+    serialize(OS, record.loc);
+    serialize(OS, record.linkage);
+    serialize(OS, record.availability);
+    OS.attribute("interface", record.interface);
+    OS.attributeArray("instanceMethods", [&]() {
+      for (auto &method : record.methods) {
+        if (method->isInstanceMethod)
+          serialize(OS, *method);
+      }
+    });
+    OS.attributeArray("classMethods", [&]() {
+      for (auto &method : record.methods) {
+        if (!method->isInstanceMethod)
+          serialize(OS, *method);
+      }
+    });
+  });
+}
+
 void API::writeAPIJSONFile(llvm::raw_ostream &os, bool PrettyPrint) {
   unsigned indentSize = PrettyPrint ? 2 : 0;
   llvm::json::OStream JSON(os, indentSize);
@@ -166,6 +200,11 @@ void API::writeAPIJSONFile(llvm::raw_ostream &os, bool PrettyPrint) {
       llvm::sort(interfaces, sortAPIRecords);
       for (const auto *i : interfaces)
         serialize(JSON, *i);
+    });
+    JSON.attributeArray("categories", [&]() {
+      llvm::sort(categories, sortAPIRecords);
+      for (const auto *c : categories)
+        serialize(JSON, *c);
     });
     JSON.attribute("version", "1.0");
   });

@@ -364,12 +364,12 @@ public func myFunction2() {}
 // CHECK-NEXT:     "super": "NSObject",
 // CHECK-NEXT:     "instanceMethods": [
 // CHECK-NEXT:       {
-// CHECK-NEXT:         "name": "init",
+// CHECK-NEXT:         "name": "method1",
 // CHECK-NEXT:         "access": "public",
 // CHECK-NEXT:         "file": "/@input/MyModule.swiftinterface"
 // CHECK-NEXT:       },
 // CHECK-NEXT:       {
-// CHECK-NEXT:         "name": "method1",
+// CHECK-NEXT:         "name": "init",
 // CHECK-NEXT:         "access": "public",
 // CHECK-NEXT:         "file": "/@input/MyModule.swiftinterface"
 // CHECK-NEXT:       }
@@ -416,12 +416,12 @@ public func myFunction2() {}
 // CHECK-NEXT:     "super": "_TtC8MyModule4Test",
 // CHECK-NEXT:     "instanceMethods": [
 // CHECK-NEXT:       {
-// CHECK-NEXT:         "name": "init",
+// CHECK-NEXT:         "name": "method1",
 // CHECK-NEXT:         "access": "public",
 // CHECK-NEXT:         "file": "/@input/MyModule.swiftinterface"
 // CHECK-NEXT:       },
 // CHECK-NEXT:       {
-// CHECK-NEXT:         "name": "method1",
+// CHECK-NEXT:         "name": "init",
 // CHECK-NEXT:         "access": "public",
 // CHECK-NEXT:         "file": "/@input/MyModule.swiftinterface"
 // CHECK-NEXT:       }
@@ -429,4 +429,5 @@ public func myFunction2() {}
 // CHECK-NEXT:     "classMethods": []
 // CHECK-NEXT:   }
 // CHECK-NEXT: ],
+// CHECK-NEXT: "categories": [],
 // CHECK-NEXT: "version": "1.0"
