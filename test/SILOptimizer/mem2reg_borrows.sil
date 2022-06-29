@@ -416,3 +416,33 @@ bb3:
   %r = tuple ()
   return %r : $()
 }
+
+// CHECK-LABEL: sil [ossa] @test_control_flow7 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'test_control_flow7'
+sil [ossa] @test_control_flow7 : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass, %1 : @guaranteed $Klass):
+  %stk = alloc_stack [lexical] $Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  %copy1 = copy_value %0 : $Klass
+  store %copy1 to [init] %stk : $*Klass
+  br bb3
+
+bb2:
+  %copy2 = copy_value %1 : $Klass
+  store %copy2 to [init] %stk : $*Klass
+  br bb3
+
+bb3:
+  %2 = load_borrow %stk : $*Klass
+  %3 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %2 : $Klass
+  destroy_addr %stk : $*Klass
+  dealloc_stack %stk : $*Klass
+  %8 = tuple ()
+  return %8 : $()
+}
+
