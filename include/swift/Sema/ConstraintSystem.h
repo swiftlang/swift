@@ -3658,6 +3658,12 @@ public:
   ConstraintLocator *
   getConstraintLocator(const ConstraintLocatorBuilder &builder);
 
+  /// Compute a constraint locator for an implicit value-to-value
+  /// conversion rooted at the given location.
+  ConstraintLocator *
+  getImplicitValueConversionLocator(ConstraintLocatorBuilder root,
+                                    ConversionRestrictionKind restriction);
+
   /// Lookup and return parent associated with given expression.
   Expr *getParentExpr(Expr *expr) {
     if (auto result = getExprDepthAndParent(expr))
