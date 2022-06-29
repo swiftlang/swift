@@ -14,7 +14,7 @@ _ = #// // expected-error@:5 {{unterminated regex literal}}
 
 _ = #/xy // expected-error@:5 {{unterminated regex literal}}
 
-_ = #/(?/# // expected-error@:7 {{expected group specifier}}
+_ = #/(?/# // expected-error@:9 {{expected group specifier}}
 _ = #/(?'/# // expected-error@:10 {{expected group name}}
 _ = #/(?'abc/# // expected-error@:13 {{expected '''}}
 _ = #/(?'abc /# // expected-error@:13 {{expected '''}}
@@ -42,7 +42,7 @@ do {
 }
 
 func foo<T>(_ x: T, _ y: T) {}
-foo(#/(?/#, #/abc/#) // expected-error@:7 {{expected group specifier}}
+foo(#/(?/#, #/abc/#) // expected-error@:9 {{expected group specifier}}
 foo(#/(?C/#, #/abc/#) // expected-error@:10 {{expected ')'}}
 
 foo(#/(?'/#, #/abc/#) // expected-error@:10 {{expected group name}}
