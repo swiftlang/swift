@@ -92,6 +92,7 @@ public class MyClass2 : NSObject {
 // CHECK-NEXT:       "classMethods": []
 // CHECK-NEXT:     }
 // CHECK-NEXT:   ],
+// CHECK-NEXT:   "categories": [],
 // CHECK-NEXT:   "version": "1.0"
 // CHECK-NEXT: }
 
@@ -264,12 +265,12 @@ public class MyClass2 : NSObject {
 // CHECK-SPI-NEXT:       "super": "NSObject",
 // CHECK-SPI-NEXT:       "instanceMethods": [
 // CHECK-SPI-NEXT:         {
-// CHECK-SPI-NEXT:           "name": "init",
+// CHECK-SPI-NEXT:           "name": "spiMethod",
 // CHECK-SPI-NEXT:           "access": "private",
 // CHECK-SPI-NEXT:           "file": "/@input/MyModule.swiftmodule"
 // CHECK-SPI-NEXT:         },
 // CHECK-SPI-NEXT:         {
-// CHECK-SPI-NEXT:           "name": "spiMethod",
+// CHECK-SPI-NEXT:           "name": "init",
 // CHECK-SPI-NEXT:           "access": "private",
 // CHECK-SPI-NEXT:           "file": "/@input/MyModule.swiftmodule"
 // CHECK-SPI-NEXT:         }
@@ -284,18 +285,19 @@ public class MyClass2 : NSObject {
 // CHECK-SPI-NEXT:       "super": "NSObject",
 // CHECK-SPI-NEXT:       "instanceMethods": [
 // CHECK-SPI-NEXT:         {
-// CHECK-SPI-NEXT:           "name": "init",
-// CHECK-SPI-NEXT:           "access": "public",
+// CHECK-SPI-NEXT:           "name": "spiMethod",
+// CHECK-SPI-NEXT:           "access": "private",
 // CHECK-SPI-NEXT:           "file": "/@input/MyModule.swiftmodule"
 // CHECK-SPI-NEXT:         },
 // CHECK-SPI-NEXT:         {
-// CHECK-SPI-NEXT:           "name": "spiMethod",
-// CHECK-SPI-NEXT:           "access": "private",
+// CHECK-SPI-NEXT:           "name": "init",
+// CHECK-SPI-NEXT:           "access": "public",
 // CHECK-SPI-NEXT:           "file": "/@input/MyModule.swiftmodule"
 // CHECK-SPI-NEXT:         }
 // CHECK-SPI-NEXT:       ],
 // CHECK-SPI-NEXT:       "classMethods": []
 // CHECK-SPI-NEXT:     }
 // CHECK-SPI-NEXT:   ],
+ // CHECK-SPI-NEXT:  "categories": [],
 // CHECK-SPI-NEXT:   "version": "1.0"
 // CHECK-SPI-NEXT: }
