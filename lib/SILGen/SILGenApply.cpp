@@ -569,6 +569,27 @@ public:
     if (Constant)
       constant = Constant;
 
+    if (constant && constant->isDistributedThunk()) {
+      fprintf(stderr, "[%s:%d] (%s) YES\n", __FILE__, __LINE__, __FUNCTION__);
+    }
+
+    auto isDistThunkCall = false;
+    if (constant) {
+      auto func = constant->getFuncDecl();
+      if (func && func->isDistributed()) {
+        fprintf(stderr, "\n[%s:%d] (%s) decl is dist: %d\n", __FILE__, __LINE__, __FUNCTION__, func->isDistributed());
+        constant->dump();
+
+        if (auto proto = dyn_cast<ProtocolDecl>(func->getDeclContext())) {
+//          fprintf(stderr, "[%s:%d] (%s) is dist: %d\n", __FILE__, __LINE__, __FUNCTION__, constant->isDistributedThunk());
+//          proto->dump();
+
+          isDistThunkCall = func->isDistributed() &&
+                            isa<ProtocolDecl>(func->getDeclContext());
+        }
+      }
+    }
+
     switch (kind) {
     case Kind::IndirectValue:
       assert(Substitutions.empty());
@@ -639,7 +660,16 @@ public:
       ArgumentScope S(SGF, Loc);
 
       SILValue fn;
-      if (!constant->isForeign) {
+      if (isDistThunkCall) {
+        fprintf(stderr, "[%s:%d] (%s) CALL THE DISTRIBUTED!\n", __FILE__, __LINE__, __FUNCTION__);
+        fn = SGF.B.createWitnessMethod(
+            Loc, lookupType, conformance, constant.getValue().asDistributed(),
+            constantInfo.getSILType());
+        fn->dump();
+
+        fprintf(stderr, "[%s:%d] (%s) CONFORMANCE:\n", __FILE__, __LINE__, __FUNCTION__);
+        conformance.dump();
+      } else if (!constant->isForeign) {
         fn = SGF.B.createWitnessMethod(
           Loc, lookupType, conformance, *constant,
           constantInfo.getSILType());
@@ -5191,13 +5221,14 @@ RValue SILGenFunction::emitApplyMethod(SILLocation loc, ConcreteDeclRef declRef,
           .asForeign(requiresForeignEntryPoint(declRef.getDecl()))
           .asDistributed(requiresDistributedThunkEntryPoint(declRef.getDecl()));
 
-//  if (requiresDistributedThunkEntryPoint(declRef.getDecl())) {
-//    fprintf(stderr, "[%s:%d] (%s) APPLY METHOD, marked as NEEDS THUNK CALL\n", __FILE__, __LINE__, __FUNCTION__);
-//    call->dump();
-//  }
-//
-//  fprintf(stderr, "[%s:%d] (%s) APPLY\n", __FILE__, __LINE__, __FUNCTION__);
-//  call->dump();
+  if (requiresDistributedThunkEntryPoint(declRef.getDecl())) {
+    fprintf(stderr, "[%s:%d] (%s) APPLY METHOD, marked as NEEDS THUNK CALL\n", __FILE__, __LINE__, __FUNCTION__);
+  } else {
+    fprintf(stderr, "[%s:%d] (%s) APPLY METHOD, NOT DIST\n", __FILE__, __LINE__, __FUNCTION__);
+  }
+
+  fprintf(stderr, "[%s:%d] (%s) APPLY\n", __FILE__, __LINE__, __FUNCTION__);
+  call->dump();
 
   if (auto distributedThunk = call->getDistributedThunk()) {
     callRef = SILDeclRef(distributedThunk).asDistributed();
