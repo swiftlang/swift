@@ -836,14 +836,18 @@ addDistributedActorCodableConformance(
 FuncDecl *GetDistributedThunkRequest::evaluate(Evaluator &evaluator,
                                                Originator originator) const {
   AbstractFunctionDecl *distributedTarget = nullptr;
-  if (auto *var = originator.dyn_cast<VarDecl *>()) {
-    if (!var->isDistributed())
+  if (auto *storage = originator.dyn_cast<AbstractStorageDecl *>()) {
+    if (!storage->isDistributed())
       return nullptr;
 
-    if (checkDistributedActorProperty(var, /*diagnose=*/false))
-      return nullptr;
+    if (auto *var = dyn_cast<VarDecl>(storage)) {
+      if (checkDistributedActorProperty(var, /*diagnose=*/false))
+        return nullptr;
 
-    distributedTarget = var->getAccessor(AccessorKind::Get);
+      distributedTarget = var->getAccessor(AccessorKind::Get);
+    } else {
+      llvm_unreachable("unsupported storage kind");
+    }
   } else {
     distributedTarget = originator.get<AbstractFunctionDecl *>();
     if (!distributedTarget->isDistributed())

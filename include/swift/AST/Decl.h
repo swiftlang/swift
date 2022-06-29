@@ -5123,6 +5123,13 @@ public:
 
   bool hasAnyNativeDynamicAccessors() const;
 
+  /// Does this have a 'distributed' modifier?
+  bool isDistributed() const;
+
+  /// Return a distributed thunk if this computed property is marked as
+  /// 'distributed' and and nullptr otherwise.
+  FuncDecl *getDistributedThunk() const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_AbstractStorageDecl &&
@@ -5355,13 +5362,6 @@ public:
 
   /// Is this an "async let" property?
   bool isAsyncLet() const;
-
-  /// Does this have a 'distributed' modifier?
-  bool isDistributed() const;
-
-  /// Return a distributed thunk if this computed property is marked as
-  /// 'distributed' and and nullptr otherwise.
-  FuncDecl *getDistributedThunk() const;
 
   /// Is this var known to be a "local" distributed actor,
   /// if so the implicit throwing ans some isolation checks can be skipped.
