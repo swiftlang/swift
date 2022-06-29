@@ -21,11 +21,84 @@ module std {
   requires cplusplus
   export *
 
+  module complex_h {
+    header "complex.h"
+    export ccomplex
+    export *
+  }
+  module tgmath_h {
+    header "tgmath.h"
+    export ccomplex
+    export cmath
+    export *
+  }
+
   /// C compatibility headers.
   module compat {
     module cassert {
       header "cassert"
-      requires cplusplus
+      export *
+    }
+    module cerrno {
+      header "cerrno"
+      export *
+    }
+    module cctype {
+      header "cctype"
+      export *
+    }
+    module cfloat {
+      header "cfloat"
+      export *
+    }
+    module ciso646 {
+      header "ciso646"
+      export *
+    }
+    module climits {
+      header "climits"
+      export *
+    }
+    module cmath {
+      header "cmath"
+      export *
+    }
+    module cstdarg {
+      header "cstdarg"
+      export *
+    }
+    module cstddef {
+      header "cstddef"
+      export *
+    }
+    module cstdio {
+      header "cstdio"
+      export *
+    }
+    module cstdlib {
+      header "cstdlib"
+      export *
+    }
+    module cstring {
+      header "cstring"
+      export *
+    }
+    module ctime {
+      header "ctime"
+      export *
+    }
+    module ctgmath {
+      header "ctgmath"
+      export ccomplex
+      export cmath
+      export *
+    }
+    module cwchar {
+      header "cwchar"
+      export *
+    }
+    module cwctype {
+      header "cwctype"
       export *
     }
   }

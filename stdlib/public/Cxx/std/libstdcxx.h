@@ -55,6 +55,17 @@
 #include "codecvt"
 #endif
 
+// Deprecated C-compatibility headers:
+
+// libstdc++ 4.8.5 bundled with CentOS 7 does not include stdlib.h.
+#if __has_include("stdlib.h")
+#include "stdlib.h"
+#endif
+// libstdc++ 4.8.5 bundled with CentOS 7 does not include math.h.
+#if __has_include("math.h")
+#include "math.h"
+#endif
+
 // C++17 and newer:
 
 #if __has_include("any")
