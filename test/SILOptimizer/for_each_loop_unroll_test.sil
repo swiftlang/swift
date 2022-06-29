@@ -33,9 +33,10 @@ bb0:
   %26 = thin_to_thick_function %25 : $@convention(thin) @noescape (@in_guaranteed Builtin.Int64) -> @error Error to $@noescape @callee_guaranteed (@in_guaranteed Builtin.Int64) -> @error Error
   // A stub for Sequence.forEach(_:)
   %30 = function_ref @forEach : $@convention(method) <τ_0_0 where τ_0_0 : Sequence> (@noescape @callee_guaranteed (@in_guaranteed τ_0_0.Element) -> @error Error, @in_guaranteed τ_0_0) -> @error Error
-  try_apply %30<[Builtin.Int64]>(%26, %22) : $@convention(method) <τ_0_0 where τ_0_0 : Sequence> (@noescape @callee_guaranteed (@in_guaranteed τ_0_0.Element) -> @error Error, @in_guaranteed τ_0_0) -> @error Error, normal bb1, error bb2
+  try_apply %30<[Builtin.Int64]>(%26, %23) : $@convention(method) <τ_0_0 where τ_0_0 : Sequence> (@noescape @callee_guaranteed (@in_guaranteed τ_0_0.Element) -> @error Error, @in_guaranteed τ_0_0) -> @error Error, normal bb1, error bb2
 
 bb1(%32 : $()):
+  end_borrow %23 : $*Array<Builtin.Int64>
   dealloc_stack %22 : $*Array<Builtin.Int64>
   end_borrow %21 : $Array<Builtin.Int64>
   destroy_value %3 : $Array<Builtin.Int64>
@@ -95,9 +96,10 @@ bb0(%0: @owned $@callee_guaranteed @substituted <A> () -> @out A for <Int>, %1: 
   %26 = thin_to_thick_function %25 : $@convention(thin) @noescape (@in_guaranteed @callee_guaranteed @substituted <A> () -> @out A for <Int>) -> @error Error to $@noescape @callee_guaranteed (@in_guaranteed @callee_guaranteed @substituted <A> () -> @out A for <Int>) -> @error Error
   // A stub for Sequence.forEach(_:)
   %30 = function_ref @forEach : $@convention(method) <τ_0_0 where τ_0_0 : Sequence> (@noescape @callee_guaranteed (@in_guaranteed τ_0_0.Element) -> @error Error, @in_guaranteed τ_0_0) -> @error Error
-  try_apply %30<[() -> Int]>(%26, %22) : $@convention(method) <τ_0_0 where τ_0_0 : Sequence> (@noescape @callee_guaranteed (@in_guaranteed τ_0_0.Element) -> @error Error, @in_guaranteed τ_0_0) -> @error Error, normal bb1, error bb2
+  try_apply %30<[() -> Int]>(%26, %23) : $@convention(method) <τ_0_0 where τ_0_0 : Sequence> (@noescape @callee_guaranteed (@in_guaranteed τ_0_0.Element) -> @error Error, @in_guaranteed τ_0_0) -> @error Error, normal bb1, error bb2
 
 bb1(%32 : $()):
+  end_borrow %23 : $*Array<() -> Int>
   dealloc_stack %22 : $*Array<() -> Int>
   end_borrow %21 : $Array<() -> Int>
   destroy_value %5 : $Array<() -> Int>
@@ -163,14 +165,16 @@ bb0:
   %26 = thin_to_thick_function %25 : $@convention(thin) @noescape (@in_guaranteed Builtin.Int64) -> @error Error to $@noescape @callee_guaranteed (@in_guaranteed Builtin.Int64) -> @error Error
   // A stub for Sequence.forEach(_:)
   %30 = function_ref @forEach : $@convention(method) <τ_0_0 where τ_0_0 : Sequence> (@noescape @callee_guaranteed (@in_guaranteed τ_0_0.Element) -> @error Error, @in_guaranteed τ_0_0) -> @error Error
-  try_apply %30<[Builtin.Int64]>(%26, %22) : $@convention(method) <τ_0_0 where τ_0_0 : Sequence> (@noescape @callee_guaranteed (@in_guaranteed τ_0_0.Element) -> @error Error, @in_guaranteed τ_0_0) -> @error Error, normal bb1, error bb2
+  try_apply %30<[Builtin.Int64]>(%26, %23) : $@convention(method) <τ_0_0 where τ_0_0 : Sequence> (@noescape @callee_guaranteed (@in_guaranteed τ_0_0.Element) -> @error Error, @in_guaranteed τ_0_0) -> @error Error, normal bb1, error bb2
 
 bb1(%32 : $()):
+  end_borrow %23 : $*Array<Builtin.Int64>
   // An indirect fixLifetime use
   dealloc_stack %22 : $*Array<Builtin.Int64>
   %33 = alloc_stack $Array<Builtin.Int64>
   %34 = store_borrow %21 to %33 : $*Array<Builtin.Int64>
-  fix_lifetime %33 : $*Array<Builtin.Int64>
+  fix_lifetime %34 : $*Array<Builtin.Int64>
+  end_borrow %34 : $*Array<Builtin.Int64>
   dealloc_stack %33 : $*Array<Builtin.Int64>
   end_borrow %21 : $Array<Builtin.Int64>
   destroy_value %3 : $Array<Builtin.Int64>
@@ -207,9 +211,10 @@ bb2(%arg2 : $Builtin.Int64):
   %26 = thin_to_thick_function %25 : $@convention(thin) @noescape (@in_guaranteed Builtin.Int64) -> @error Error to $@noescape @callee_guaranteed (@in_guaranteed Builtin.Int64) -> @error Error
   // A stub for Sequence.forEach(_:)
   %30 = function_ref @forEach : $@convention(method) <τ_0_0 where τ_0_0 : Sequence> (@noescape @callee_guaranteed (@in_guaranteed τ_0_0.Element) -> @error Error, @in_guaranteed τ_0_0) -> @error Error
-  try_apply %30<[Builtin.Int64]>(%26, %22) : $@convention(method) <τ_0_0 where τ_0_0 : Sequence> (@noescape @callee_guaranteed (@in_guaranteed τ_0_0.Element) -> @error Error, @in_guaranteed τ_0_0) -> @error Error, normal bb3, error bb4
+  try_apply %30<[Builtin.Int64]>(%26, %23) : $@convention(method) <τ_0_0 where τ_0_0 : Sequence> (@noescape @callee_guaranteed (@in_guaranteed τ_0_0.Element) -> @error Error, @in_guaranteed τ_0_0) -> @error Error, normal bb3, error bb4
 
 bb3(%32 : $()):
+  end_borrow %23 : $*Array<Builtin.Int64>
   dealloc_stack %22 : $*Array<Builtin.Int64>
   end_borrow %21 : $Array<Builtin.Int64>
   destroy_value %13 : $Array<Builtin.Int64>

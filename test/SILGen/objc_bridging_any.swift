@@ -151,8 +151,8 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
   // CHECK:   [[BRIDGE_OPTIONAL:%.*]] = function_ref @$sSq19_bridgeToObjectiveCyXlyF
   // CHECK:   [[TMP:%.*]] = alloc_stack $Optional<String>
   // CHECK:   [[BORROWED_OPT_STRING_COPY:%.*]] = begin_borrow [[OPT_STRING_COPY]]
-  // CHECK:   store_borrow [[BORROWED_OPT_STRING_COPY]] to [[TMP]]
-  // CHECK:   [[ANYOBJECT:%.*]] = apply [[BRIDGE_OPTIONAL]]<String>([[TMP]])
+  // CHECK:   [[SB1:%.*]] = store_borrow [[BORROWED_OPT_STRING_COPY]] to [[TMP]]
+  // CHECK:   [[ANYOBJECT:%.*]] = apply [[BRIDGE_OPTIONAL]]<String>([[SB1]])
   // CHECK:   end_borrow [[BORROWED_OPT_STRING_COPY]]
   // CHECK:   [[METHOD:%.*]] = objc_method [[SELF]] : $NSIdLover,
   // CHECK:   apply [[METHOD]]([[ANYOBJECT]], [[SELF]])
@@ -162,8 +162,8 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
   // CHECK:   [[BRIDGE_OPTIONAL:%.*]] = function_ref @$sSq19_bridgeToObjectiveCyXlyF
   // CHECK:   [[TMP:%.*]] = alloc_stack $Optional<NSString>
   // CHECK:   [[BORROWED_OPT_NSSTRING_COPY:%.*]] = begin_borrow [[OPT_NSSTRING_COPY]]
-  // CHECK:   store_borrow [[BORROWED_OPT_NSSTRING_COPY]] to [[TMP]]
-  // CHECK:   [[ANYOBJECT:%.*]] = apply [[BRIDGE_OPTIONAL]]<NSString>([[TMP]])
+  // CHECK:   [[SB2:%.*]] = store_borrow [[BORROWED_OPT_NSSTRING_COPY]] to [[TMP]]
+  // CHECK:   [[ANYOBJECT:%.*]] = apply [[BRIDGE_OPTIONAL]]<NSString>([[SB2]])
   // CHECK:   end_borrow [[BORROWED_OPT_NSSTRING_COPY]]
   // CHECK:   [[METHOD:%.*]] = objc_method [[SELF]] : $NSIdLover,
   // CHECK:   apply [[METHOD]]([[ANYOBJECT]], [[SELF]])
@@ -668,7 +668,8 @@ class AnyHashableClass : NSObject {
 // CHECK: [[FN:%.*]] = function_ref @$sIeg_ytIegr_TR
 // CHECK: partial_apply [callee_guaranteed] [[FN]]
 // CHECK: [[SELF:%.*]] = alloc_stack $Optional<@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>>
-// CHECK: apply [[BRIDGE]]<() -> ()>([[SELF]])
+// CHECK: [[SB:%.*]] = store_borrow {{.*}} to [[SELF]]
+// CHECK: apply [[BRIDGE]]<() -> ()>([[SB]])
 func bridgeOptionalFunctionToAnyObject(fn: (() -> ())?) -> AnyObject {
   return fn as AnyObject
 }

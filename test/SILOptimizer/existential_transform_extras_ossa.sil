@@ -295,7 +295,8 @@ bb0(%0 : @guaranteed $Klass3 & P):
   %3 = alloc_stack $@opened("77949BFA-77BC-11EB-BC0E-F2189810406F", Klass3 & P) Self
   %4 = store_borrow %2 to %3 : $*@opened("77949BFA-77BC-11EB-BC0E-F2189810406F", Klass3 & P) Self
   %5 = witness_method $@opened("77949BFA-77BC-11EB-BC0E-F2189810406F", Klass3 & P) Self, #P.foo : <Self where Self : P> (Self) -> () -> Int32, %2 : $@opened("77949BFA-77BC-11EB-BC0E-F2189810406F", Klass3 & P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
-  %6 = apply %5<@opened("77949BFA-77BC-11EB-BC0E-F2189810406F", Klass3 & P) Self>(%3) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
+  %6 = apply %5<@opened("77949BFA-77BC-11EB-BC0E-F2189810406F", Klass3 & P) Self>(%4) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
+  end_borrow %4 : $*@opened("77949BFA-77BC-11EB-BC0E-F2189810406F", Klass3 & P) Self
   dealloc_stack %3 : $*@opened("77949BFA-77BC-11EB-BC0E-F2189810406F", Klass3 & P) Self
   return %6 : $Int32
 }

@@ -5722,7 +5722,11 @@ ArgumentSource AccessorBaseArgPreparer::prepareAccessorObjectBaseArg() {
     assert(!selfParam.isIndirectMutating() &&
            "passing unmaterialized r-value as inout argument");
 
-    base = base.materialize(SGF, loc);
+    base = base.formallyMaterialize(SGF, loc);
+    auto shouldTake = IsTake_t(base.hasCleanup());
+    base = SGF.emitFormalAccessLoad(loc, base.forward(SGF),
+                                    SGF.getTypeLowering(baseLoweredType),
+                                    SGFContext(), shouldTake);
   }
 
   return ArgumentSource(loc, RValue(SGF, loc, baseFormalType, base));

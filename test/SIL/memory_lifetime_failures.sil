@@ -271,11 +271,12 @@ bb0(%0 :  $*T):
   return %res : $()
 }
 
-// CHECK: SIL memory lifetime failure in @test_store_borrow_destroy: memory is not initialized, but should be
+// CHECK: SIL memory lifetime failure in @test_store_borrow_destroy: store-borrow location cannot be written 
 sil [ossa] @test_store_borrow_destroy : $@convention(thin) (@guaranteed T) -> () {
 bb0(%0 :  @guaranteed $T):
   %s = alloc_stack $T
-  store_borrow %0 to %s : $*T
+  %sb = store_borrow %0 to %s : $*T
+  end_borrow %sb : $*T
   destroy_addr %s : $*T
   dealloc_stack %s : $*T
   %res = tuple ()
@@ -284,13 +285,14 @@ bb0(%0 :  @guaranteed $T):
 
 sil [ossa] @func_with_inout_param : $@convention(thin) (@inout T) -> ()
 
-// CHECK: SIL memory lifetime failure in @test_store_borrow_inout: store-borrow location cannot be written
+// T-CHECK: SIL memory lifetime failure in @test_store_borrow_inout: store-borrow location cannot be written
 sil [ossa] @test_store_borrow_inout : $@convention(thin) (@guaranteed T) -> () {
 bb0(%0 :  @guaranteed $T):
   %s = alloc_stack $T
-  store_borrow %0 to %s : $*T
+  %sb = store_borrow %0 to %s : $*T
   %f = function_ref @func_with_inout_param : $@convention(thin) (@inout T) -> ()
-  %a = apply %f(%s) : $@convention(thin) (@inout T) -> ()
+  %a = apply %f(%sb) : $@convention(thin) (@inout T) -> ()
+  end_borrow %sb : $*T
   dealloc_stack %s : $*T
   %res = tuple ()
   return %res : $()
@@ -300,7 +302,8 @@ bb0(%0 :  @guaranteed $T):
 sil [ossa] @test_store_borrow_store : $@convention(thin) (@guaranteed T, @owned T) -> () {
 bb0(%0 :  @guaranteed $T, %1 : @owned $T):
   %s = alloc_stack $T
-  store_borrow %0 to %s : $*T
+  %sb = store_borrow %0 to %s : $*T
+  end_borrow %sb : $*T
   store %1 to [assign] %s : $*T
   dealloc_stack %s : $*T
   %res = tuple ()
@@ -311,7 +314,8 @@ bb0(%0 :  @guaranteed $T, %1 : @owned $T):
 sil [ossa] @test_store_borrow_load : $@convention(thin) (@guaranteed T) -> @owned T {
 bb0(%0 :  @guaranteed $T):
   %s = alloc_stack $T
-  store_borrow %0 to %s : $*T
+  %sb = store_borrow %0 to %s : $*T
+  end_borrow %sb : $*T
   %res = load [take] %s : $*T
   dealloc_stack %s : $*T
   return %res : $T
@@ -321,7 +325,8 @@ bb0(%0 :  @guaranteed $T):
 sil [ossa] @test_store_borrow_copy_src : $@convention(thin) (@guaranteed T) -> @out T {
 bb0(%0 :  $*T, %1 :  @guaranteed $T):
   %s = alloc_stack $T
-  store_borrow %1 to %s : $*T
+  %sb = store_borrow %1 to %s : $*T
+  end_borrow %sb : $*T
   copy_addr [take] %s to [initialization] %0 : $*T
   dealloc_stack %s : $*T
   %res = tuple ()
@@ -332,7 +337,8 @@ bb0(%0 :  $*T, %1 :  @guaranteed $T):
 sil [ossa] @test_store_borrow_copy_dst : $@convention(thin) (@in_guaranteed T, @guaranteed T) -> () {
 bb0(%0 :  $*T, %1 :  @guaranteed $T):
   %s = alloc_stack $T
-  store_borrow %1 to %s : $*T
+  %sb = store_borrow %1 to %s : $*T
+  end_borrow %sb : $*T
   copy_addr %0 to %s : $*T
   dealloc_stack %s : $*T
   %res = tuple ()
@@ -343,7 +349,8 @@ bb0(%0 :  $*T, %1 :  @guaranteed $T):
 sil [ossa] @test_store_borrow_init_enum : $@convention(thin) (@guaranteed Optional<T>) -> () {
 bb0(%0 :  @guaranteed $Optional<T>):
   %s = alloc_stack $Optional<T>
-  store_borrow %0 to %s : $*Optional<T>
+  %sb = store_borrow %0 to %s : $*Optional<T>
+  end_borrow %sb : $*Optional<T>
   %ie = init_enum_data_addr %s : $*Optional<T>, #Optional.some!enumelt
   dealloc_stack %s : $*Optional<T>
   %res = tuple ()
@@ -354,8 +361,9 @@ bb0(%0 :  @guaranteed $Optional<T>):
 sil [ossa] @test_store_borrow_take_enum : $@convention(thin) (@guaranteed Optional<T>) -> () {
 bb0(%0 :  @guaranteed $Optional<T>):
   %s = alloc_stack $Optional<T>
-  store_borrow %0 to %s : $*Optional<T>
+  %sb = store_borrow %0 to %s : $*Optional<T>
   %ue = unchecked_take_enum_data_addr %s : $*Optional<T>, #Optional.some!enumelt
+  end_borrow %sb : $*Optional<T>
   dealloc_stack %s : $*Optional<T>
   %res = tuple ()
   return %res : $()
@@ -369,7 +377,8 @@ bb0(%0 : @guaranteed $T):
   store %copy to [init] %stk : $*T
   %ld = load [take] %stk : $*T
   destroy_value %ld : $T
-  store_borrow %0 to %stk : $*T
+  %sb = store_borrow %0 to %stk : $*T
+  end_borrow %sb : $*T
   dealloc_stack %stk : $*T
   %8 = tuple ()
   return %8 : $() 
@@ -385,7 +394,8 @@ bb0(%0 : @guaranteed $T):
   destroy_value %ld : $T
   br bb1
 bb1:
-  store_borrow %0 to %stk : $*T
+  %sb = store_borrow %0 to %stk : $*T
+  end_borrow %sb : $*T
   dealloc_stack %stk : $*T
   %8 = tuple ()
   return %8 : $() 

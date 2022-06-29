@@ -190,12 +190,13 @@ public:
   ManagedValue createFormalAccessLoadBorrow(SILLocation loc, ManagedValue base);
 
   using SILBuilder::createStoreBorrow;
-  void createStoreBorrow(SILLocation loc, ManagedValue value, SILValue address);
+  ManagedValue createStoreBorrow(SILLocation loc, ManagedValue value,
+                                 SILValue address);
 
   /// Create a store_borrow if we have a non-trivial value and a store [trivial]
   /// otherwise.
-  void createStoreBorrowOrTrivial(SILLocation loc, ManagedValue value,
-                                  SILValue address);
+  ManagedValue createStoreBorrowOrTrivial(SILLocation loc, ManagedValue value,
+                                          SILValue address);
 
   /// Prepares a buffer to receive the result of an expression, either using the
   /// 'emit into' initialization buffer if available, or allocating a temporary

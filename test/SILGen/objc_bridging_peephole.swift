@@ -118,8 +118,8 @@ func testForcedMethodResult(dummy: DummyClass) {
   // CHECK:      [[BRIDGE:%.*]] = function_ref @$sSq19_bridgeToObjectiveCyXlyF
   // CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $Optional<String>
   // CHECK-NEXT: [[BORROW:%.*]] = begin_borrow [[OPTSTRING]]
-  // CHECK-NEXT: store_borrow [[BORROW]] to [[TEMP]] : $*Optional<String>
-  // CHECK-NEXT: [[ANYOBJECT:%.*]] = apply [[BRIDGE]]<String>([[TEMP]])
+  // CHECK-NEXT: [[SB:%.*]] = store_borrow [[BORROW]] to [[TEMP]] : $*Optional<String>
+  // CHECK-NEXT: [[ANYOBJECT:%.*]] = apply [[BRIDGE]]<String>([[SB]])
   // CHECK:      [[USE:%.*]] = function_ref @$s22objc_bridging_peephole12useAnyObjectyyyXlF
   // CHECK:      apply [[USE]]([[ANYOBJECT]])
   useAnyObject(dummy.fetchNullproneString() as AnyObject)
@@ -227,8 +227,8 @@ func testForcedPropertyValue(dummy: DummyClass) {
   // CHECK:      [[BRIDGE:%.*]] = function_ref @$sSq19_bridgeToObjectiveCyXlyF
   // CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $Optional<String>
   // CHECK-NEXT: [[BORROW:%.*]] = begin_borrow [[OPTSTRING]]
-  // CHECK-NEXT: store_borrow [[BORROW]] to [[TEMP]] : $*Optional<String>
-  // CHECK-NEXT: [[ANYOBJECT:%.*]] = apply [[BRIDGE]]<String>([[TEMP]])
+  // CHECK-NEXT: [[SB:%.*]] = store_borrow [[BORROW]] to [[TEMP]] : $*Optional<String>
+  // CHECK-NEXT: [[ANYOBJECT:%.*]] = apply [[BRIDGE]]<String>([[SB]])
   // CHECK:      dealloc_stack [[TEMP]]
   // CHECK:      [[USE:%.*]] = function_ref @$s22objc_bridging_peephole12useAnyObjectyyyXlF
   // CHECK-NEXT: apply [[USE]]([[ANYOBJECT]])
