@@ -258,6 +258,7 @@ IDENTIFIER(Regex)
 IDENTIFIER_(regexString)
 IDENTIFIER(version)
 IDENTIFIER_(StringProcessing)
+IDENTIFIER(RegexBuilder)
 
 // Distributed actors
 IDENTIFIER(ActorID)
