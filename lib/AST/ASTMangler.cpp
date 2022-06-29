@@ -3190,6 +3190,13 @@ void ASTMangler::appendEntity(const ValueDecl *decl) {
   // Handle accessors specially, they are mangled as modifiers on the accessed
   // declaration.
   if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
+    // Distributed thunks associated with computed properties
+    // are currently implemented as accessors but they don't
+    // have to be and that could be changed in the future.
+    //
+    // Let's mangle them as `distributed func`s to make it easier
+    // to change implementation and because runtime needs a function
+    // type associated with the thunk to form a call to it.
     if (accessor->isDistributedThunk()) {
       appendContextOf(decl);
       appendDeclName(accessor->getStorage());
