@@ -6420,10 +6420,6 @@ bool VarDecl::isAsyncLet() const {
   return getAttrs().hasAttribute<AsyncAttr>();
 }
 
-bool VarDecl::isDistributed() const {
-  return getAttrs().hasAttribute<DistributedActorAttr>();
-}
-
 bool VarDecl::isKnownToBeLocal() const {
   return getAttrs().hasAttribute<KnownToBeLocalAttr>();
 }
