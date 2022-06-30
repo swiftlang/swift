@@ -3192,21 +3192,6 @@ void ASTMangler::appendEntity(const ValueDecl *decl) {
   // Handle accessors specially, they are mangled as modifiers on the accessed
   // declaration.
   if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
-    // Distributed thunks associated with computed properties
-    // are currently implemented as accessors but they don't
-    // have to be and that could be changed in the future.
-    //
-    // Let's mangle them as `distributed func`s to make it easier
-    // to change implementation and because runtime needs a function
-    // type associated with the thunk to form a call to it.
-    if (accessor->isDistributedThunk()) {
-      appendContextOf(decl);
-      appendDeclName(accessor->getStorage());
-      appendDeclType(accessor, FunctionMangling);
-      appendOperator("F");
-      return;
-    }
-
     return appendAccessorEntity(
         getCodeForAccessorKind(accessor->getAccessorKind()),
         accessor->getStorage(), accessor->isStatic());
@@ -3506,5 +3491,28 @@ std::string ASTMangler::mangleDistributedThunk(const AbstractFunctionDecl *thunk
   // in recording them for distributed thunks.
   llvm::SaveAndRestore<bool> savedAllowMarkerProtocols(AllowMarkerProtocols,
                                                        false);
+
+  // Since computed property SILDeclRef's refer to the "originator"
+  // of the thunk, we need to mangle distributed thunks of accessors
+  // specially.
+  if (auto *accessor = dyn_cast<AccessorDecl>(thunk)) {
+    // TODO: This needs to use accessor type instead of
+    //       distributed thunk after all SILDeclRefs are switched
+    //       to use "originator" instead of the thunk itself.
+    //
+    // ```
+    // beginMangling();
+    // appendContextOf(thunk);
+    // appendDeclName(accessor->getStorage());
+    // appendDeclType(accessor, FunctionMangling);
+    // appendOperator("F");
+    // appendSymbolKind(SymbolKind::DistributedThunk);
+    // return finalize();
+    // ```
+    auto *storage = accessor->getStorage();
+    thunk = storage->getDistributedThunk();
+    assert(thunk);
+  }
+
   return mangleEntity(thunk, SymbolKind::DistributedThunk);
 }

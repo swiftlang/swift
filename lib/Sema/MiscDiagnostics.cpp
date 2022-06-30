@@ -1424,10 +1424,7 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
           if (MRE->getAccessSemantics() == AccessSemantics::Ordinary) {
             bool shouldDiagnose = false;
             // Warn about any property access in the getter.
-            //
-            // Distributed thunks have to refer to the "local" version
-            // of the property directly with implicit `self.` base.
-            if (Accessor->isGetter() && !Accessor->isDistributedThunk())
+            if (Accessor->isGetter())
               shouldDiagnose = !isStore;
             // Warn about stores in the setter, but allow loads.
             if (Accessor->isSetter())
