@@ -431,10 +431,11 @@ static bool varIsSafeAcrossActors(const ModuleDecl *fromModule,
     if (var->getAttrs().hasAttribute<NonisolatedAttr>())
       return true;
 
-    // If it's distributed, it's not okay.
-    if (auto nominalParent = var->getDeclContext()->getSelfNominalTypeDecl())
+    // If it's distributed, generally variable access is not okay...
+    if (auto nominalParent = var->getDeclContext()->getSelfNominalTypeDecl()) {
       if (nominalParent->isDistributedActor())
         return false;
+    }
 
     // If it's actor-isolated but in the same module, then it's OK too.
     return (fromModule == var->getDeclContext()->getParentModule());
@@ -2292,15 +2293,7 @@ namespace {
     Optional<std::pair<bool, bool>>
     checkDistributedAccess(SourceLoc declLoc, ValueDecl *decl,
                            Expr *context) {
-      // Cannot reference properties or subscripts of distributed actors.
-      if (isPropOrSubscript(decl)) {
-        ctx.Diags.diagnose(
-            declLoc, diag::distributed_actor_isolated_non_self_reference,
-            decl->getDescriptiveKind(), decl->getName());
-        noteIsolatedActorMember(decl, context);
-        return None;
-      }
-
+      // If base of the call is 'local' we permit skip distributed checks.
       if (auto baseSelf = findReferencedBaseSelf(context)) {
         if (baseSelf->getAttrs().hasAttribute<KnownToBeLocalAttr>()) {
         return std::make_pair(
@@ -2309,20 +2302,40 @@ namespace {
         }
       }
 
-      // Check that we have a distributed function.
-      auto func = dyn_cast<AbstractFunctionDecl>(decl);
-      if (!func || !func->isDistributed()) {
-        ctx.Diags.diagnose(declLoc,
-                           diag::distributed_actor_isolated_method)
-          .fixItInsert(decl->getAttributeInsertionLoc(true), "distributed ");
+      // Check that we have a distributed function or computed property.
+      if (auto afd = dyn_cast<AbstractFunctionDecl>(decl)) {
+        if (!afd->isDistributed()) {
+          ctx.Diags.diagnose(declLoc, diag::distributed_actor_isolated_method)
+              .fixItInsert(decl->getAttributeInsertionLoc(true),
+                           "distributed ");
 
-        noteIsolatedActorMember(decl, context);
-        return None;
+          noteIsolatedActorMember(decl, context);
+          return None;
+        }
+
+        return std::make_pair(
+            /*setThrows=*/!afd->hasThrows(),
+            /*isDistributedThunk=*/true);
       }
 
-      return std::make_pair(
-          /*setThrows=*/!func->hasThrows(),
-          /*isDistributedThunk=*/true);
+      if (auto *var = dyn_cast<VarDecl>(decl)) {
+        if (var->isDistributed()) {
+          bool explicitlyThrowing = false;
+          if (auto getter = var->getAccessor(swift::AccessorKind::Get)) {
+            explicitlyThrowing = getter->hasThrows();
+          }
+          return std::make_pair(
+              /*setThrows*/ !explicitlyThrowing,
+              /*isDistributedThunk=*/true);
+        }
+      }
+
+      // This is either non-distributed variable, subscript, or something else.
+      ctx.Diags.diagnose(declLoc,
+                         diag::distributed_actor_isolated_non_self_reference,
+                         decl->getDescriptiveKind(), decl->getName());
+      noteIsolatedActorMember(decl, context);
+      return None;
     }
 
     /// Attempts to identify and mark a valid cross-actor use of a synchronous
@@ -2339,8 +2352,27 @@ namespace {
       // is it an access to a property?
       if (isPropOrSubscript(decl)) {
         // Cannot reference properties or subscripts of distributed actors.
-        if (isDistributed && !checkDistributedAccess(declLoc, decl, context))
-          return AsyncMarkingResult::NotDistributed;
+        if (isDistributed) {
+          bool setThrows = false;
+          bool usesDistributedThunk = false;
+          if (auto access = checkDistributedAccess(declLoc, decl, context)) {
+            std::tie(setThrows, usesDistributedThunk) = *access;
+          } else {
+            return AsyncMarkingResult::NotDistributed;
+          }
+
+          // distributed computed property access, mark it throws + async
+          if (auto lookupExpr = dyn_cast_or_null<LookupExpr>(context)) {
+            if (auto memberRef = dyn_cast<MemberRefExpr>(lookupExpr)) {
+              memberRef->setImplicitlyThrows(true);
+              memberRef->setAccessViaDistributedThunk();
+            } else {
+              llvm_unreachable("expected distributed prop to be a MemberRef");
+            }
+          } else {
+            llvm_unreachable("expected distributed prop to have LookupExpr");
+          }
+        }
 
         if (auto declRef = dyn_cast_or_null<DeclRefExpr>(context)) {
           if (usageEnv(declRef) == VarRefUseEnv::Read) {
@@ -2398,10 +2430,11 @@ namespace {
         bool setThrows = false;
         bool usesDistributedThunk = false;
         if (isDistributed) {
-          if (auto access = checkDistributedAccess(declLoc, decl, context))
+          if (auto access = checkDistributedAccess(declLoc, decl, context)) {
             std::tie(setThrows, usesDistributedThunk) = *access;
-          else
+          } else {
             return AsyncMarkingResult::NotDistributed;
+          }
         }
 
         // Mark call as implicitly 'async', and also potentially as
@@ -3871,8 +3904,9 @@ bool HasIsolatedSelfRequest::evaluate(
     return false;
 
   // For accessors, consider the storage declaration.
-  if (auto accessor = dyn_cast<AccessorDecl>(value))
+  if (auto accessor = dyn_cast<AccessorDecl>(value)) {
     value = accessor->getStorage();
+  }
 
   // Check whether this member can be isolated to an actor at all.
   auto memberIsolation = getMemberIsolationPropagation(value);

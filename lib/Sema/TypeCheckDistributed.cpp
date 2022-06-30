@@ -26,6 +26,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/Basic/Defer.h"
 
 using namespace swift;
 
@@ -421,9 +422,9 @@ static bool checkDistributedTargetResultType(
             addCodableFixIt(resultNominalType, diag);
           }
         }
-
-        return true;
-      }
+      } // end if: diagnose
+      
+      return true;
     }
   }
 
@@ -483,7 +484,12 @@ bool swift::checkDistributedFunction(AbstractFunctionDecl *func) {
 
 bool CheckDistributedFunctionRequest::evaluate(
     Evaluator &evaluator, AbstractFunctionDecl *func) const {
-  assert(func->isDistributed());
+  if (auto *accessor = dyn_cast<AccessorDecl>(func)) {
+    auto *var = cast<VarDecl>(accessor->getStorage());
+    assert(var->isDistributed() && accessor->isGetter());
+  } else {
+    assert(func->isDistributed());
+  }
 
   auto &C = func->getASTContext();
   auto DC = func->getDeclContext();
@@ -594,23 +600,26 @@ bool swift::checkDistributedActorProperty(VarDecl *var, bool diagnose) {
 
   /// === Check if the declaration is a valid combination of attributes
   if (var->isStatic()) {
-    var->diagnose(diag::distributed_property_cannot_be_static,
-                      var->getName());
+    if (diagnose)
+      var->diagnose(diag::distributed_property_cannot_be_static,
+                    var->getName());
     // TODO(distributed): fixit, offer removing the static keyword
     return true;
   }
 
   // it is not a computed property
   if (var->isLet() || var->hasStorageOrWrapsStorage()) {
-    var->diagnose(diag::distributed_property_can_only_be_computed,
-                  var->getDescriptiveKind(), var->getName());
+    if (diagnose)
+      var->diagnose(diag::distributed_property_can_only_be_computed,
+                    var->getDescriptiveKind(), var->getName());
     return true;
   }
 
   // distributed properties cannot have setters
   if (var->getWriteImpl() != swift::WriteImplKind::Immutable) {
-    var->diagnose(diag::distributed_property_can_only_be_computed_get_only,
-                  var->getName());
+    if (diagnose)
+      var->diagnose(diag::distributed_property_can_only_be_computed_get_only,
+                    var->getName());
     return true;
   }
 
@@ -671,6 +680,18 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal
 
 
   for (auto member : nominal->getMembers()) {
+    // A distributed computed property needs to have a thunk for
+    // its getter accessor.
+    if (auto *var = dyn_cast<VarDecl>(member)) {
+      if (!var->isDistributed())
+        continue;
+
+      if (auto thunk = var->getDistributedThunk())
+        SF->DelayedFunctions.push_back(thunk);
+
+      continue;
+    }
+
     // --- Ensure all thunks
     if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
       if (!func->isDistributed())

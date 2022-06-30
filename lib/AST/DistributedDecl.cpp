@@ -1321,6 +1321,10 @@ bool AbstractFunctionDecl::isDistributed() const {
   return getAttrs().hasAttribute<DistributedActorAttr>();
 }
 
+bool AbstractStorageDecl::isDistributed() const {
+  return getAttrs().hasAttribute<DistributedActorAttr>();
+}
+
 ConstructorDecl *
 NominalTypeDecl::getDistributedRemoteCallTargetInitFunction() const {
   auto mutableThis = const_cast<NominalTypeDecl *>(this);
@@ -1363,6 +1367,15 @@ AbstractFunctionDecl *ASTContext::getRemoteCallOnDistributedActorSystem(
 /******************************************************************************/
 /********************** Distributed Actor Properties **************************/
 /******************************************************************************/
+
+FuncDecl *AbstractStorageDecl::getDistributedThunk() const {
+  if (!isDistributed())
+    return nullptr;
+
+  auto mutableThis = const_cast<AbstractStorageDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           GetDistributedThunkRequest{mutableThis}, nullptr);
+}
 
 FuncDecl*
 AbstractFunctionDecl::getDistributedThunk() const {

@@ -79,7 +79,7 @@ public protocol DistributedActorSystem: Sendable {
   /// to the same actor.
   func assignID<Act>(_ actorType: Act.Type) -> ActorID
     where Act: DistributedActor,
-    Act.ID == ActorID
+          Act.ID == ActorID
 
   /// Invoked during a distributed actor's initialization, as soon as it becomes fully initialized.
   ///
@@ -98,7 +98,7 @@ public protocol DistributedActorSystem: Sendable {
   /// - Parameter actor: reference to the (local) actor that was just fully initialized.
   func actorReady<Act>(_ actor: Act)
     where Act: DistributedActor,
-    Act.ID == ActorID
+          Act.ID == ActorID
 
   /// Called during when a distributed actor is deinitialized, or fails to initialize completely (e.g. by throwing
   /// out of an `init` that did not completely initialize all of the actors stored properties yet).
