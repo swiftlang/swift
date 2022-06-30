@@ -26,4 +26,4 @@ extension testModAClass : myTestProto {}
 // CHECK: CONFORMANCES:
 // CHECK: =============
 // CHECK-DAG:  (__C.testModAClass) : ExternalConformanceCheck.myTestProto
-// CHECK-DAG: _$s8testModB0aB7BStructVMn (testModB.testModBStruct) : ExternalConformanceCheck.myTestProto
+// CHECK-DAG: 8testModB0aB7BStructV (testModB.testModBStruct) : ExternalConformanceCheck.myTestProto
