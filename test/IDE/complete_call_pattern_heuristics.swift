@@ -38,3 +38,14 @@ func subscriptAccess(info: [String: Int]) {
   info[#^SUBSCRIPT_ACCESS^#]
 // SUBSCRIPT_ACCESS: Pattern/Local/Flair[ArgLabels]:     {#keyPath: KeyPath<[String : Int], Value>#}[#KeyPath<[String : Int], Value>#]; name=keyPath:
 }
+
+struct StaticMethods {
+  static func before() {
+      self.after(num)#^AFTER_STATIC_FUNC^#
+  }
+  static func after(_ num: Int) -> (() -> Int) {}
+// AFTER_STATIC_FUNC: Begin completions, 2 items
+// AFTER_STATIC_FUNC-DAG: Keyword[self]/CurrNominal:          .self[#(() -> Int)#];
+// AFTER_STATIC_FUNC-DAG: Pattern/CurrModule/Flair[ArgLabels]: ()[#Int#];
+// AFTER_STATIC_FUNC: End completions
+}
