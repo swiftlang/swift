@@ -94,7 +94,7 @@ static bool isUnappliedFunctionRef(const OverloadChoice &Choice) {
       // We consider curried member calls as unapplied. E.g.
       //   MyStruct.someInstanceFunc(theInstance)#^COMPLETE^#
       // is unapplied.
-      return BaseTy->is<MetatypeType>();
+      return BaseTy->is<MetatypeType>() && !Choice.getDeclOrNull()->isStatic();
     } else {
       return false;
     }

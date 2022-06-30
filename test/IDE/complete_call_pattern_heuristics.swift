@@ -42,3 +42,13 @@ func testArg2Name3() {
 // LABELED_FIRSTARG-NOT: ['(']{#arg1: Int#}, {#arg2: Int#}[')'][#Void#];
 // LABELED_FIRSTARG: End completions
 
+struct StaticMethods {
+  static func before() {
+      self.after(num)#^AFTER_STATIC_FUNC^#
+  }
+  static func after(_ num: Int) -> (() -> Int) {}
+// AFTER_STATIC_FUNC: Begin completions, 2 items
+// AFTER_STATIC_FUNC-DAG: Keyword[self]/CurrNominal:          .self[#(() -> Int)#];
+// AFTER_STATIC_FUNC-DAG: Pattern/CurrModule/Flair[ArgLabels]: ()[#Int#];
+// AFTER_STATIC_FUNC: End completions
+}
