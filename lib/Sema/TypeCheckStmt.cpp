@@ -2586,8 +2586,8 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
       auto optBody = TypeChecker::applyResultBuilderBodyTransform(
           func, builderType,
           /*ClosuresInResultBuilderDontParticipateInInference=*/
-              ctx.CompletionCallback == nullptr && ctx.SolutionCallback == nullptr);
-      if (ctx.CompletionCallback && ctx.CompletionCallback->gotCallback()) {
+          ctx.CompletionCallback == nullptr && ctx.SolutionCallback == nullptr);
+      if ((ctx.CompletionCallback && ctx.CompletionCallback->gotCallback()) || (ctx.SolutionCallback && ctx.SolutionCallback->gotCallback())) {
         // We already informed the completion callback of solutions found by
         // type checking the entire result builder from
         // applyResultBuilderBodyTransform. No need to typecheck the requested
