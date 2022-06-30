@@ -3386,13 +3386,14 @@ void LValue::addMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
 
     void emitUsingDistributedThunk() {
       auto *var = cast<VarDecl>(Storage);
-      SILDeclRef accessor(var->getDistributedThunk(), SILDeclRef::Kind::Func,
+      SILDeclRef accessor(var->getAccessor(AccessorKind::Get),
+                          SILDeclRef::Kind::Func,
                           /*isForeign=*/false, /*isDistributed=*/true);
 
       auto typeData = getLogicalStorageTypeData(
           SGF.getTypeExpansionContext(), SGF.SGM, AccessKind, FormalRValueType);
 
-      asImpl().emitUsingGetterSetter(accessor, /*isDirect=*/false, typeData);
+      asImpl().emitUsingGetterSetter(accessor, /*isDirect=*/true, typeData);
     }
 
   } emitter(SGF, loc, var, subs, isSuper, accessKind,
