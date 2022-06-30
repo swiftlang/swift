@@ -1472,7 +1472,7 @@ static Type replaceParamErrorTypeByPlaceholder(Type type, ValueDecl *value) {
   return FunctionType::get(newParams, funcType->getResult());
 }
 
-std::pair<Type, Type>
+DeclReferenceType
 ConstraintSystem::getTypeOfReference(ValueDecl *value,
                                      FunctionRefKind functionRefKind,
                                      ConstraintLocatorBuilder locator,
@@ -1510,7 +1510,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     }
 
     // The reference implicitly binds 'self'.
-    return {openedType, openedType->getResult()};
+    return {origOpenedType, openedType, openedType->getResult()};
   }
 
   // Unqualified reference to a local or global function.
@@ -1544,7 +1544,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     // If we opened up any type variables, record the replacements.
     recordOpenedTypes(locator, replacements);
 
-    return { openedType, openedType };
+    return { origOpenedType, openedType, openedType };
   }
 
   // Unqualified reference to a type.
@@ -1565,17 +1565,18 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     // Module types are not wrapped in metatypes.
     if (type->is<ModuleType>())
-      return { type, type };
+      return { type, type, type };
 
     // If it's a value reference, refer to the metatype.
     type = MetatypeType::get(type);
-    return { type, type };
+    return { type, type, type };
   }
 
   // Only remaining case: unqualified reference to a property.
   auto *varDecl = cast<VarDecl>(value);
 
   // Determine the type of the value, opening up that type if necessary.
+  // FIXME: @preconcurrency
   bool wantInterfaceType = !varDecl->getDeclContext()->isLocalContext();
   Type valueType =
       getUnopenedTypeOfReference(varDecl, Type(), useDC, /*base=*/nullptr,
@@ -1583,7 +1584,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
   assert(!valueType->hasUnboundGenericType() &&
          !valueType->hasTypeParameter());
-  return { valueType, valueType };
+  return { valueType, valueType, valueType };
 }
 
 /// Bind type variables for archetypes that are determined from
@@ -2033,7 +2034,7 @@ Type constraints::typeEraseOpenedExistentialReference(
   });
 }
 
-std::pair<Type, Type>
+DeclReferenceType
 ConstraintSystem::getTypeOfMemberReference(
     Type baseTy, ValueDecl *value, DeclContext *useDC,
     bool isDynamicResult,
@@ -2089,7 +2090,7 @@ ConstraintSystem::getTypeOfMemberReference(
     memberTy = MetatypeType::get(memberTy);
 
     auto openedType = FunctionType::get({baseObjParam}, memberTy);
-    return { openedType, memberTy };
+    return { openedType, openedType, memberTy };
   }
 
   // Figure out the declaration context to use when opening this type.
@@ -2108,6 +2109,7 @@ ConstraintSystem::getTypeOfMemberReference(
   if (isa<AbstractFunctionDecl>(value) || isa<EnumElementDecl>(value)) {
     if (auto ErrorTy = value->getInterfaceType()->getAs<ErrorType>()) {
       return {ErrorType::get(ErrorTy->getASTContext()),
+              ErrorType::get(ErrorTy->getASTContext()),
               ErrorType::get(ErrorTy->getASTContext())};
     }
     // This is the easy case.
@@ -2393,7 +2395,7 @@ ConstraintSystem::getTypeOfMemberReference(
   // If we opened up any type variables, record the replacements.
   recordOpenedTypes(locator, replacements);
 
-  return { openedType, type };
+  return { origOpenedType, openedType, type };
 }
 
 Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
@@ -2591,7 +2593,7 @@ void ConstraintSystem::addOverloadSet(ArrayRef<Constraint *> choices,
 /// checking semantics, compute the type of the reference.  For now, follow
 /// the lead of \c getTypeOfMemberReference and return a pair of
 /// the full opened type and the reference's type.
-static std::pair<Type, Type> getTypeOfReferenceWithSpecialTypeCheckingSemantics(
+static DeclReferenceType getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     ConstraintSystem &CS, ConstraintLocator *locator,
     DeclTypeCheckingSemantics semantics) {
   switch (semantics) {
@@ -2619,7 +2621,7 @@ static std::pair<Type, Type> getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     FunctionType::ExtInfo info;
     auto refType = FunctionType::get({inputArg}, output, info);
-    return {refType, refType};
+    return {refType, refType, refType};
   }
   case DeclTypeCheckingSemantics::WithoutActuallyEscaping: {
     // Proceed with a "WithoutActuallyEscaping" operation. The body closure
@@ -2654,7 +2656,7 @@ static std::pair<Type, Type> getTypeOfReferenceWithSpecialTypeCheckingSemantics(
                                          .withAsync(true)
                                          .withThrows(true)
                                          .build());
-    return {refType, refType};
+    return {refType, refType, refType};
   }
   case DeclTypeCheckingSemantics::OpenExistential: {
     // The body closure receives a freshly-opened archetype constrained by the
@@ -2687,7 +2689,7 @@ static std::pair<Type, Type> getTypeOfReferenceWithSpecialTypeCheckingSemantics(
                                          .withThrows(true)
                                          .withAsync(true)
                                          .build());
-    return {refType, refType};
+    return {refType, refType, refType};
   }
   }
 
@@ -3272,8 +3274,9 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   };
 
   // Determine the type to which we'll bind the overload set's type.
+  Type openedType;
+  Type adjustedOpenedType;
   Type refType;
-  Type openedFullType;
 
   switch (auto kind = choice.getKind()) {
   case OverloadChoiceKind::Decl:
@@ -3286,28 +3289,27 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     // handle it now.
     const auto semantics =
         TypeChecker::getDeclTypeCheckingSemantics(choice.getDecl());
+    DeclReferenceType declRefType;
     if (semantics != DeclTypeCheckingSemantics::Normal) {
-      std::tie(openedFullType, refType) =
-          getTypeOfReferenceWithSpecialTypeCheckingSemantics(*this, locator,
-                                                             semantics);
-      // Declarations with special type checking semantics do not require
-      // any further adjustments to the constraint system. Break out of
-      // here so we don't do any more work.
-      break;
+      declRefType = getTypeOfReferenceWithSpecialTypeCheckingSemantics(
+          *this, locator, semantics);
     } else if (auto baseTy = choice.getBaseType()) {
       // Retrieve the type of a reference to the specific declaration choice.
       assert(!baseTy->hasTypeParameter());
 
-      std::tie(openedFullType, refType)
-        = getTypeOfMemberReference(baseTy, choice.getDecl(), useDC,
-                                   (kind == OverloadChoiceKind::DeclViaDynamic),
-                                   choice.getFunctionRefKind(),
-                                   locator, nullptr);
+      declRefType = getTypeOfMemberReference(
+          baseTy, choice.getDecl(), useDC,
+          (kind == OverloadChoiceKind::DeclViaDynamic),
+          choice.getFunctionRefKind(), locator, nullptr);
     } else {
-      std::tie(openedFullType, refType)
-        = getTypeOfReference(choice.getDecl(),
-                             choice.getFunctionRefKind(), locator, useDC);
+      declRefType = getTypeOfReference(
+          choice.getDecl(), choice.getFunctionRefKind(), locator, useDC);
     }
+
+    openedType = declRefType.openedType;
+    adjustedOpenedType = declRefType.adjustedOpenedType;
+    refType = declRefType.referenceType;
+
     break;
   }
 
@@ -3354,7 +3356,8 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     FunctionType::ExtInfo fullInfo;
     auto fullTy = FunctionType::get({baseParam}, subscriptTy, fullInfo);
-    openedFullType = fullTy;
+    openedType = fullTy;
+    adjustedOpenedType = fullTy;
     refType = subscriptTy;
 
     // Increase the score so that actual subscripts get preference.
@@ -3398,7 +3401,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       if (locator->isResultOfKeyPathDynamicMemberLookup() ||
           locator->isKeyPathSubscriptComponent()) {
         // Subscript type has a format of (Self[.Type) -> (Arg...) -> Result
-        auto declTy = openedFullType->castTo<FunctionType>();
+        auto declTy = adjustedOpenedType->castTo<FunctionType>();
         auto subscriptTy = declTy->getResult()->castTo<FunctionType>();
         // If we have subscript, each of the arguments has to conform to
         // Hashable, because it would be used as a component inside key path.
@@ -3460,7 +3463,8 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   }
 
   // Note that we have resolved this overload.
-  auto overload = SelectedOverload{choice, openedFullType, refType, boundType};
+  auto overload = SelectedOverload{
+      choice, openedType, adjustedOpenedType, refType, boundType};
   auto result = ResolvedOverloads.insert({locator, overload});
   assert(result.second && "Already resolved this overload?");
   (void)result;

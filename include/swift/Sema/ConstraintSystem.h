@@ -614,6 +614,10 @@ struct SelectedOverload {
   /// we're referencing a member.
   const Type openedFullType;
 
+  /// The opened type of the base of the reference to this overload, adjusted
+  /// for `@preconcurrency` or other contextual type-altering attributes.
+  const Type adjustedOpenedFullType;
+
   /// The opened type produced by referring to this overload.
   const Type openedType;
 
@@ -2469,6 +2473,26 @@ struct GetClosureType {
   ConstraintSystem &cs;
 
   Type operator()(const AbstractClosureExpr *expr) const;
+};
+
+/// Describes the type produced when referencing a declaration.
+struct DeclReferenceType {
+  /// The "opened" type, which is the type of the declaration where any
+  /// generic parameters have been replaced with type variables.
+  ///
+  /// The mapping from generic parameters to type variables will have been
+  /// recorded by \c recordOpenedTypes when this type is produced.
+  Type openedType;
+
+  /// The opened type, after performing contextual type adjustments such as
+  /// removing concurrency-related annotations for a `@preconcurrency`
+  /// operation.
+  Type adjustedOpenedType;
+
+  /// The type of the reference, which is the adjusted opened type after
+  /// (e.g.) applying the base of a member access. This is the type of the
+  /// expression used to form the declaration reference type.
+  Type referenceType;
 };
 
 /// Describes a system of constraints on type variables, the
@@ -4437,9 +4461,8 @@ public:
   ///
   /// \param decl The declarations whose type is being computed.
   ///
-  /// \returns a pair containing the full opened type (if applicable) and
-  /// opened type of a reference to declaration.
-  std::pair<Type, Type> getTypeOfReference(
+  /// \returns a description of the type of this declaration reference.
+  DeclReferenceType getTypeOfReference(
                           ValueDecl *decl,
                           FunctionRefKind functionRefKind,
                           ConstraintLocatorBuilder locator,
@@ -4497,9 +4520,8 @@ public:
   /// \param isDynamicResult Indicates that this declaration was found via
   /// dynamic lookup.
   ///
-  /// \returns a pair containing the full opened type (which includes the opened
-  /// base) and opened type of a reference to this member.
-  std::pair<Type, Type> getTypeOfMemberReference(
+  /// \returns a description of the type of this declaration reference.
+  DeclReferenceType getTypeOfMemberReference(
                           Type baseTy, ValueDecl *decl, DeclContext *useDC,
                           bool isDynamicResult,
                           FunctionRefKind functionRefKind,
