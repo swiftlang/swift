@@ -163,3 +163,41 @@ func globalWithInitializer(x: MyStruct) {
   _ = MyStruct.v         // expected-note {{called from here}}
 }
 
+@_noAllocation
+func callBadClosure(closure: ()->Int) -> Int {
+  return closure()
+}
+
+@_noAllocation
+func badClosure() {
+  _ = callBadClosure(closure: { // expected-note {{called from here}}
+     _ = Cl()                   // expected-error {{Using type 'Cl' can cause metadata allocation or locks}}
+     return 42
+    })
+}
+
+func badClosure2() {
+  _ = callBadClosure(closure: { // expected-note {{called from here}}
+     _ = Cl()                   // expected-error {{Using type 'Cl' can cause metadata allocation or locks}}
+     return 42
+    })
+}
+
+@_noAllocation
+func callGoodClosure(closure: ()->Int) -> Int {
+  return closure()
+}
+
+@_noAllocation
+func goodClosure() {
+  _ = callBadClosure(closure: {
+     return 42
+    })
+}
+
+func goodClosure2() {
+  _ = callBadClosure(closure: {
+     return 42
+    })
+}
+
