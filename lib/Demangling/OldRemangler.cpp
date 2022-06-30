@@ -2739,6 +2739,20 @@ ManglingError Remangler::mangleExtendedExistentialTypeShape(Node *node,
                                                      unsigned int depth) {
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
+ManglingError Remangler::mangleSymbolicExtendedExistentialType(Node *node,
+                                                     unsigned int depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+ManglingError Remangler::
+mangleUniqueExtendedExistentialTypeShapeSymbolicReference(Node *node,
+                                                     unsigned int depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+ManglingError Remangler::
+mangleNonUniqueExtendedExistentialTypeShapeSymbolicReference(Node *node,
+                                                     unsigned int depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
 ManglingError
 Remangler::mangleCanonicalSpecializedGenericMetaclass(Node *node,
                                                       unsigned depth) {

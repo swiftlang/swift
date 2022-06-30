@@ -267,7 +267,7 @@ private:
 
 ExistentialTypeGeneralization
 ExistentialTypeGeneralization::get(Type rawType) {
-  assert(rawType->isExistentialType());
+  assert(rawType->isAnyExistentialType());
   assert(!rawType->hasTypeParameter());
 
   // Canonicalize.  We need to generalize the canonical shape of the

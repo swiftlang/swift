@@ -454,6 +454,8 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     // substituting the generalization arguments into the demangle tree.
     // For now, unconditional casts will report '<<< invalid type >>>' when
     // they fail.
+    // TODO: for clients that need to guarantee round-tripping, demangle
+    // to a SymbolicExtendedExistentialType.
     return nullptr;
   }
   case MetadataKind::ExistentialMetatype: {
