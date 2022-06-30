@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "IRGenMangler.h"
+#include "ExtendedExistential.h"
 #include "GenClass.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/IRGenOptions.h"
@@ -93,7 +94,9 @@ IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
 
   AllowSymbolicReferences = true;
   CanSymbolicReference = [&](SymbolicReferent s) -> bool {
-    if (auto type = s.dyn_cast<const NominalTypeDecl *>()) {
+    switch (s.getKind()) {
+    case SymbolicReferent::NominalType: {
+      auto type = s.getNominalType();
       // The short-substitution types in the standard library have compact
       // manglings already, and the runtime ought to have a lookup table for
       // them. Symbolic referencing would be wasteful.
@@ -130,12 +133,15 @@ IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
       }
 
       return true;
-    } else if (s.is<const OpaqueTypeDecl *>()) {
+    }
+    case SymbolicReferent::OpaqueType:
       // Always symbolically reference opaque types.
       return true;
-    } else {
-      llvm_unreachable("symbolic referent not handled");
+    case SymbolicReferent::ExtendedExistentialTypeShape:
+      // Always symbolically reference extended existential type shapes.
+      return true;
     }
+    llvm_unreachable("symbolic referent not handled");
   };
 
   SymbolicReferences.clear();
@@ -319,12 +325,27 @@ mangleSymbolNameForSymbolicMangling(const SymbolicMangling &mangling,
       = Storage[prefixLen + offset+4]
       = '_';
     Buffer << ' ';
-    if (auto ty = referent.dyn_cast<const NominalTypeDecl*>())
+    switch (referent.getKind()) {
+    case SymbolicReferent::NominalType: {
+      auto ty = referent.getNominalType();
       appendContext(ty, ty->getAlternateModuleName());
-    else if (auto opaque = referent.dyn_cast<const OpaqueTypeDecl*>())
-      appendOpaqueDeclName(opaque);
-    else
-      llvm_unreachable("unhandled referent");
+      continue;
+    }
+    case SymbolicReferent::OpaqueType: {
+      appendOpaqueDeclName(referent.getOpaqueType());
+      continue;
+    }
+    case SymbolicReferent::ExtendedExistentialTypeShape: {
+      auto existentialType = referent.getType()->getCanonicalType();
+      auto shapeInfo =
+        ExtendedExistentialTypeShapeInfo::get(existentialType);
+      appendExtendedExistentialTypeShapeSymbol(shapeInfo.genSig,
+                                               shapeInfo.shapeType,
+                                               shapeInfo.isUnique());
+      continue;
+    }
+    }
+    llvm_unreachable("unhandled referent");
   }
   
   return finalize();
@@ -422,19 +443,26 @@ std::string IRGenMangler::mangleSymbolNameForGenericEnvironment(
 }
 
 std::string
-IRGenMangler::mangleExtendedExistentialTypeShape(bool isUnique,
-                                                 CanGenericSignature genSig,
-                                                 CanType shapeType) {
+IRGenMangler::mangleExtendedExistentialTypeShapeSymbol(
+                                                CanGenericSignature genSig,
+                                                CanType shapeType,
+                                                bool isUnique) {
   beginMangling();
+  appendExtendedExistentialTypeShapeSymbol(genSig, shapeType, isUnique);
+  return finalize();
+}
 
+void
+IRGenMangler::appendExtendedExistentialTypeShapeSymbol(
+                                                CanGenericSignature genSig,
+                                                CanType shapeType,
+                                                bool isUnique) {
   appendExtendedExistentialTypeShape(genSig, shapeType);
 
   // If this is non-unique, add a suffix to avoid accidental misuse
   // (and to make it easier to analyze in an image).
   if (!isUnique)
     appendOperator("Mq");
-
-  return finalize();
 }
 
 void

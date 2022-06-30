@@ -730,18 +730,33 @@ NodePointer Demangler::demangleSymbolicReference(unsigned char rawKind) {
   SymbolicReferenceKind kind;
   Directness direct;
   switch (rawKind) {
-  case 1:
+  case 0x01:
     kind = SymbolicReferenceKind::Context;
     direct = Directness::Direct;
     break;
-  case 2:
+  case 0x02:
     kind = SymbolicReferenceKind::Context;
     direct = Directness::Indirect;
     break;
-  case 9:
+  case 0x09:
     kind = SymbolicReferenceKind::AccessorFunctionReference;
     direct = Directness::Direct;
     break;
+  case 0x0a:
+    kind = SymbolicReferenceKind::UniqueExtendedExistentialTypeShape;
+    direct = Directness::Direct;
+    break;
+  case 0x0b:
+    kind = SymbolicReferenceKind::NonUniqueExtendedExistentialTypeShape;
+    direct = Directness::Direct;
+    break;
+  // These are all currently reserved but unused.
+  case 0x03: // direct to protocol conformance descriptor
+  case 0x04: // indirect to protocol conformance descriptor
+  case 0x05: // direct to associated conformance descriptor
+  case 0x06: // indirect to associated conformance descriptor
+  case 0x07: // direct to associated conformance access function
+  case 0x08: // indirect to associated conformance access function
   default:
     return nullptr;
   }
@@ -1653,17 +1668,21 @@ NodePointer Demangler::demangleRetroactiveConformance() {
   return createWithChildren(Node::Kind::RetroactiveConformance, index, conformance);
 }
 
+NodePointer Demangler::popRetroactiveConformances() {
+  NodePointer conformancesNode = nullptr;
+  while (auto conformance = popNode(Node::Kind::RetroactiveConformance)) {
+    if (!conformancesNode)
+      conformancesNode = createNode(Node::Kind::TypeList);
+    conformancesNode->addChild(conformance, *this);
+  }
+  if (conformancesNode)
+    conformancesNode->reverseChildren();
+  return conformancesNode;
+}
+
 bool Demangler::demangleBoundGenerics(Vector<NodePointer> &TypeListList,
                                       NodePointer &RetroactiveConformances) {
-  RetroactiveConformances = nullptr;
-  while (auto RetroactiveConformance =
-         popNode(Node::Kind::RetroactiveConformance)) {
-    if (!RetroactiveConformances)
-      RetroactiveConformances = createNode(Node::Kind::TypeList);
-    RetroactiveConformances->addChild(RetroactiveConformance, *this);
-  }
-  if (RetroactiveConformances)
-    RetroactiveConformances->reverseChildren();
+  RetroactiveConformances = popRetroactiveConformances();
   
   for (;;) {
     NodePointer TList = createNode(Node::Kind::TypeList);
@@ -3229,6 +3248,8 @@ NodePointer Demangler::demangleSpecialType() {
     case 'g':
     case 'G':
       return demangleExtendedExistentialShape(specialChar);
+    case 'j':
+      return demangleSymbolicExtendedExistentialType();
     case 'z':
       switch (auto cchar = nextChar()) {
       case 'B':
@@ -3364,6 +3385,37 @@ NodePointer Demangler::demangleSpecialType() {
     default:
       return nullptr;
   }
+}
+
+NodePointer Demangler::demangleSymbolicExtendedExistentialType() {
+  NodePointer retroactiveConformances = popRetroactiveConformances();
+
+  NodePointer args = createNode(Node::Kind::TypeList);
+  while (NodePointer ty = popNode(Node::Kind::Type)) {
+    args->addChild(ty, *this);
+  }
+  args->reverseChildren();
+
+  auto shape = popNode();
+  if (!shape)
+    return nullptr;
+  if (shape->getKind() !=
+        Node::Kind::UniqueExtendedExistentialTypeShapeSymbolicReference &&
+      shape->getKind() !=
+        Node::Kind::NonUniqueExtendedExistentialTypeShapeSymbolicReference)
+    return nullptr;
+
+  NodePointer existentialType;
+  if (!retroactiveConformances) {
+    existentialType =
+      createWithChildren(Node::Kind::SymbolicExtendedExistentialType,
+                         shape, args);
+  } else {
+    existentialType =
+      createWithChildren(Node::Kind::SymbolicExtendedExistentialType,
+                         shape, args, retroactiveConformances);
+  }
+  return createType(existentialType);
 }
 
 NodePointer Demangler::demangleExtendedExistentialShape(char nodeKind) {
