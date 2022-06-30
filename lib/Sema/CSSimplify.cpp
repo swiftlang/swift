@@ -11452,7 +11452,6 @@ ConstraintSystem::simplifyApplicableFnConstraint(
             FunctionType::get(trailingClosureTypes, callAsFunctionResultTy,
                               FunctionType::ExtInfo());
 
-        increaseScore(SK_DisfavoredOverload);
         // Form an unsolved constraint to apply trailing closures to a
         // callable type produced by `.init`. This constraint would become
         // active when `callableType` is bound.
