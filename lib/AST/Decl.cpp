@@ -3082,13 +3082,13 @@ void ValueDecl::setIsObjC(bool value) {
 bool ValueDecl::isSemanticallyFinal() const {
   // Actor types are semantically final.
   if (auto classDecl = dyn_cast<ClassDecl>(this)) {
-    if (classDecl->isActor())
+    if (classDecl->isAnyActor())
       return true;
   }
 
   // As are members of actor types.
   if (auto classDecl = getDeclContext()->getSelfClassDecl()) {
-    if (classDecl->isActor())
+    if (classDecl->isAnyActor())
       return true;
   }
 

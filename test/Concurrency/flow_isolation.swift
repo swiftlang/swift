@@ -305,7 +305,7 @@ actor Convenient {
         self.x = val
     }
 
-    convenience init(bigVal: Int) {
+    init(bigVal: Int) {
         if bigVal < 0 {
             self.init(val: 0)
             say(msg: "hello from actor!")
@@ -316,21 +316,21 @@ actor Convenient {
         Task { await self.mutateIsolatedState() }
     }
 
-    convenience init!(biggerVal1 biggerVal: Int) {
+    init!(biggerVal1 biggerVal: Int) {
         guard biggerVal < 1234567 else { return nil }
         self.init(bigVal: biggerVal)
         say(msg: "hello?")
     }
 
     @MainActor
-    convenience init?(biggerVal2 biggerVal: Int) async {
+    init?(biggerVal2 biggerVal: Int) async {
         guard biggerVal < 1234567 else { return nil }
         self.init(bigVal: biggerVal)
         say(msg: "hello?")
         await mutateIsolatedState()
     }
 
-    convenience init() async {
+    init() async {
         self.init(val: 10)
         self.x += 1
         mutateIsolatedState()
@@ -351,7 +351,7 @@ actor Convenient {
         Task { self }
     }
 
-    convenience init(throwyConvenient val: Int) throws {
+    init(throwyConvenient val: Int) throws {
         try self.init(throwyDesignated: val)
         say(msg: "hello?")
         Task { self }
@@ -387,13 +387,13 @@ actor MyActor {
 
     func helloWorld() {}
 
-    convenience init(ci1 c: Bool) {
+    init(ci1 c: Bool) {
         self.init(i1: c)
         Task { self }
         callMethod(self)
     }
 
-    convenience init(ci2 c: Bool) async {
+    init(ci2 c: Bool) async {
       self.init(i1: c)
       self.x = 1
       callMethod(self)

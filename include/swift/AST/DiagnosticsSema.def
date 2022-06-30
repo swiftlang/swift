@@ -3572,7 +3572,7 @@ ERROR(designated_init_in_extension,none,
 ERROR(cfclass_designated_init_in_extension,none,
       "designated initializer cannot be declared in an extension of %0",
       (DeclName))
-ERROR(enumstruct_convenience_init,none,
+ERROR(no_convenience_keyword_init,none,
       "initializers in %0 are not marked with 'convenience'",
       (StringRef))
 ERROR(nonclass_convenience_init,none,
