@@ -129,6 +129,8 @@ struct S5: P14 { // expected-error {{type 'S5' does not conform to protocol 'P14
 }
 
 // SR-12759
+
+// Note: the conformance to collection should succeed
 struct CountSteps1<T> : Collection {
   init(count: Int) { self.count = count }
   var count: Int
