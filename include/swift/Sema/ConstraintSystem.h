@@ -1530,10 +1530,6 @@ enum class ConstraintSystemFlags {
   /// left in-tact.
   AllowUnresolvedTypeVariables = 0x04,
 
-  /// If set, constraint system always reuses type of pre-typechecked
-  /// expression, and doesn't dig into its subexpressions.
-  ReusePrecheckedType = 0x08,
-
   /// If set, verbose output is enabled for this constraint system.
   ///
   /// Note that this flag is automatically applied to all constraint systems,
@@ -1542,16 +1538,16 @@ enum class ConstraintSystemFlags {
   /// \c DebugConstraintSolverAttempt. Finally, it can also be automatically
   /// enabled for a pre-configured set of expressions on line numbers by setting
   /// \c DebugConstraintSolverOnLines.
-  DebugConstraints = 0x10,
+  DebugConstraints = 0x08,
 
   /// Don't try to type check closure bodies, and leave them unchecked. This is
   /// used for source tooling functionalities.
-  LeaveClosureBodyUnchecked = 0x20,
+  LeaveClosureBodyUnchecked = 0x10,
 
   /// If set, we are solving specifically to determine the type of a
   /// CodeCompletionExpr, and should continue in the presence of errors wherever
   /// possible.
-  ForCodeCompletion = 0x40,
+  ForCodeCompletion = 0x20,
 
   /// Include Clang function types when checking equality for function types.
   ///
@@ -1562,10 +1558,10 @@ enum class ConstraintSystemFlags {
   /// should be treated as semantically different, as they may have different
   /// calling conventions, say due to Clang attributes such as
   /// `__attribute__((ns_consumed))`.
-  UseClangFunctionTypes = 0x80,
+  UseClangFunctionTypes = 0x40,
 
   /// When set, ignore async/sync mismatches
-  IgnoreAsyncSyncMismatch = 0x100,
+  IgnoreAsyncSyncMismatch = 0x80,
 };
 
 /// Options that affect the constraint system as a whole.
@@ -3790,10 +3786,6 @@ public:
 
   bool shouldSuppressDiagnostics() const {
     return Options.contains(ConstraintSystemFlags::SuppressDiagnostics);
-  }
-
-  bool shouldReusePrecheckedType() const {
-    return Options.contains(ConstraintSystemFlags::ReusePrecheckedType);
   }
 
   /// Whether we are solving to determine the possible types of a
