@@ -896,6 +896,48 @@ namespace {
       return closedAny;
     }
 
+    /// When we have a reference to a declaration whose type in context is
+    /// different from its normal interface type, introduce the appropriate
+    /// conversions. This can happen due to `@preconcurrency`.
+    Expr *adjustTypeForDeclReference(
+        Expr *expr, Type openedType, Type adjustedOpenedType,
+        llvm::function_ref<Type(Type)> getNewType = [](Type type) {
+          return type;
+        }) {
+      // If the types are the same, do nothing.
+      if (openedType->isEqual(adjustedOpenedType))
+        return expr;
+
+      auto &context = cs.getASTContext();
+
+      // If we have an optional type, wrap it up in a monadic '?' and recurse.
+      if (Type objectType = openedType->getOptionalObjectType()) {
+        Type adjustedRefType = getNewType(adjustedOpenedType);
+        Type adjustedObjectType = adjustedRefType->getOptionalObjectType();
+        assert(adjustedObjectType && "Not an optional?");
+
+        expr = new (context) BindOptionalExpr(expr, SourceLoc(), 0, objectType);
+        cs.cacheType(expr);
+        expr = adjustTypeForDeclReference(expr, objectType, adjustedObjectType);
+        expr = new (context) InjectIntoOptionalExpr(expr, adjustedRefType);
+        cs.cacheType(expr);
+        expr = new (context) OptionalEvaluationExpr(expr, adjustedRefType);
+        cs.cacheType(expr);
+        return expr;
+      }
+
+      // For a function type, perform a function conversion.
+      if (openedType->is<AnyFunctionType>()) {
+        expr = new (context) FunctionConversionExpr(
+            expr, getNewType(adjustedOpenedType));
+        cs.cacheType(expr);
+        return expr;
+      }
+
+      assert(false && "Unhandled adjustment");
+      return expr;
+    }
+
     /// Determines if a partially-applied member reference should be
     /// converted into a fully-applied member reference with a pair of
     /// closures.
@@ -1388,6 +1430,7 @@ namespace {
                          ConstraintLocatorBuilder memberLocator, bool Implicit,
                          AccessSemantics semantics) {
       const auto &choice = overload.choice;
+      const auto openedType = overload.openedType;
       const auto adjustedOpenedType = overload.adjustedOpenedType;
 
       ValueDecl *member = choice.getDecl();
@@ -1597,7 +1640,7 @@ namespace {
 
         auto computeRefType = [&](Type openedType) {
           // Compute the type of the reference.
-          Type refType = simplifyType(adjustedOpenedType);
+          Type refType = simplifyType(openedType);
 
           // If the base was an opened existential, erase the opened
           // existential.
@@ -1609,8 +1652,12 @@ namespace {
           return refType;
         };
 
-        Type refType = computeRefType(adjustedOpenedType);
+        Type refType = computeRefType(openedType);
         cs.setType(ref, refType);
+
+        // Adjust the declaration reference type, if required.
+        ref = adjustTypeForDeclReference(
+            ref, openedType, adjustedOpenedType, computeRefType);
 
         closeExistentials(ref, locator, /*force=*/openedExistential);
 
