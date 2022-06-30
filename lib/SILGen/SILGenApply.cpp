@@ -629,8 +629,7 @@ public:
     }
     case Kind::WitnessMethod: {
       if (auto func = constant->getFuncDecl()) {
-        if (func->isDistributed() &&
-            isa<ProtocolDecl>(func->getDeclContext())) {
+        if (func->isDistributed()) {
           // We must adjust the constant to use a distributed thunk.
           constant = constant->asDistributed();
         }
