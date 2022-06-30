@@ -401,11 +401,10 @@ getTypeOfCompletionOperatorImpl(DeclContext *DC, Expr *expr,
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
   expr = expr->walk(SanitizeExpr(Context,
-                                 /*shouldReusePrecheckedType=*/true));
+                                 /*shouldReusePrecheckedType=*/false));
 
   ConstraintSystemOptions options;
   options |= ConstraintSystemFlags::SuppressDiagnostics;
-  options |= ConstraintSystemFlags::ReusePrecheckedType;
   options |= ConstraintSystemFlags::LeaveClosureBodyUnchecked;
 
   // Construct a constraint system from this expression.
