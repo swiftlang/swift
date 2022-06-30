@@ -2155,7 +2155,6 @@ namespace {
         }
 
         Decl *member = Impl.importDecl(nd, getActiveSwiftVersion());
-
         if (!member) {
           if (!isa<clang::TypeDecl>(nd) && !isa<clang::FunctionDecl>(nd)) {
             // We don't know what this member is.
@@ -2184,11 +2183,13 @@ namespace {
         }
 
         if (auto MD = dyn_cast<FuncDecl>(member)) {
+
           // When 2 CXXMethods diff by "constness" alone we differentiate them
           // by changing the name of one. That changed method needs to be added
           // to the lookup table since it cannot be found lazily.
           if (auto cxxMethod = dyn_cast<clang::CXXMethodDecl>(m)) {
             auto cxxOperatorKind = cxxMethod->getOverloadedOperator();
+
             if (cxxOperatorKind == clang::OO_Star && cxxMethod->param_empty()) {
               // This is a dereference operator. We synthesize a computed
               // property called `pointee` for it.
@@ -8147,6 +8148,7 @@ ClangImporter::Implementation::importDeclContextOf(
   switch (context.getKind()) {
   case EffectiveClangContext::DeclContext: {
     auto dc = context.getAsDeclContext();
+
     // For C++-Interop in cases where #ifdef __cplusplus surround an extern "C"
     // you want to first check if the TU decl is the parent of this extern "C"
     // decl (aka LinkageSpecDecl) and then proceed.
