@@ -317,10 +317,6 @@ namespace swift {
     /// Enable experimental concurrency model.
     bool EnableExperimentalConcurrency = false;
 
-    /// Enable support for implicitly opening existential argument types
-    /// in calls to generic functions.
-    bool EnableOpenedExistentialTypes = false;
-
     /// Disable experimental ClangImporter diagnostics.
     bool DisableExperimentalClangImporterDiagnostics = false;
 
