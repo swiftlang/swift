@@ -193,14 +193,67 @@ const TypeRef *TypeRefBuilder::lookupSuperclass(const TypeRef *TR) {
   return Unsubstituted->subst(*this, *SubstMap);
 }
 
-RemoteRef<FieldDescriptor>
-TypeRefBuilder::getFieldTypeInfo(const TypeRef *TR) {
+static llvm::Optional<StringRef> FindOutermostModuleName(NodePointer Node) {
+  // Breadth first search until we find the module name so we find the outermost
+  // one.
+  llvm::SmallVector<NodePointer, 8> Queue;
+  Queue.push_back(Node);
+  // Instead of removing items from the front of the queue we just iterate over
+  // them.
+  for (size_t i = 0; i < Queue.size(); ++i) {
+    NodePointer Current = Queue[i];
+    if (Current->getKind() == Node::Kind::Module) {
+      if (Current->hasText())
+        return Current->getText();
+      else
+        return {};
+    }
+    for (auto Child : *Current)
+      Queue.push_back(Child);
+  }
+  return {};
+}
+
+void TypeRefBuilder::populateFieldTypeInfoCacheWithReflectionAtIndex(
+    size_t Index) {
+  if (ProcessedReflectionInfoIndexes.contains(Index))
+    return;
+
+  const auto &Info = ReflectionInfos[Index];
+  for (auto FD : Info.Field) {
+    if (!FD->hasMangledTypeName())
+      continue;
+    auto CandidateMangledName = readTypeRef(FD, FD->MangledTypeName);
+    if (auto NormalizedName = normalizeReflectionName(CandidateMangledName)) {
+      FieldTypeInfoCache[std::move(*NormalizedName)] = FD;
+    }
+  }
+
+  ProcessedReflectionInfoIndexes.insert(Index);
+}
+
+llvm::Optional<RemoteRef<FieldDescriptor>>
+TypeRefBuilder::findFieldDescriptorAtIndex(size_t Index,
+                                           const std::string &MangledName) {
+  populateFieldTypeInfoCacheWithReflectionAtIndex(Index);
+  auto Found = FieldTypeInfoCache.find(MangledName);
+  if (Found != FieldTypeInfoCache.end()) {
+    return Found->second;
+  }
+  return llvm::None;
+}
+
+RemoteRef<FieldDescriptor> TypeRefBuilder::getFieldTypeInfo(const TypeRef *TR) {
   const std::string *MangledName;
-  if (auto N = dyn_cast<NominalTypeRef>(TR))
+  NodePointer Node;
+  Demangler Dem;
+  if (auto N = dyn_cast<NominalTypeRef>(TR)) {
+    Node = N->getDemangling(Dem);
     MangledName = &N->getMangledName();
-  else if (auto BG = dyn_cast<BoundGenericTypeRef>(TR))
+  } else if (auto BG = dyn_cast<BoundGenericTypeRef>(TR)) {
+    Node = BG->getDemangling(Dem);
     MangledName = &BG->getMangledName();
-  else
+  } else
     return nullptr;
 
   // Try the cache.
@@ -208,25 +261,23 @@ TypeRefBuilder::getFieldTypeInfo(const TypeRef *TR) {
   if (Found != FieldTypeInfoCache.end())
     return Found->second;
 
-  // On failure, fill out the cache, ReflectionInfo by ReflectionInfo,
-  // until we find the field desciptor we're looking for.
-  while (FirstUnprocessedReflectionInfoIndex < ReflectionInfos.size()) {
-    auto &Info = ReflectionInfos[FirstUnprocessedReflectionInfoIndex];
-    for (auto FD : Info.Field) {
-      if (!FD->hasMangledTypeName())
-        continue;
-      auto CandidateMangledName = readTypeRef(FD, FD->MangledTypeName);
-      if (auto NormalizedName = normalizeReflectionName(CandidateMangledName))
-        FieldTypeInfoCache[std::move(*NormalizedName)] = FD;
-    }
+  // Heuristic: find the outermost Module node available, and try to parse the
+  // ReflectionInfos with a matching name first.
+  auto ModuleName = FindOutermostModuleName(Node);
+  // If we couldn't find a module name or the type is imported (__C module) we
+  // don't any useful information on which image to look for the type.
+  if (ModuleName && ModuleName != llvm::StringRef("__C"))
+    for (size_t i = 0; i < ReflectionInfos.size(); ++i)
+      if (llvm::is_contained(ReflectionInfos[i].PotentialModuleNames,
+                             ModuleName))
+        if (auto FD = findFieldDescriptorAtIndex(i, *MangledName))
+          return *FD;
 
-    // Since we're done with the current ReflectionInfo, increment early in
-    // case we get a cache hit.
-    ++FirstUnprocessedReflectionInfoIndex;
-    Found = FieldTypeInfoCache.find(*MangledName);
-    if (Found != FieldTypeInfoCache.end())
-      return Found->second;
-  }
+  // On failure, fill out the cache, ReflectionInfo by ReflectionInfo,
+  // until we find the field descriptor we're looking for.
+  for (size_t i = 0; i < ReflectionInfos.size(); ++i)
+    if (auto FD = findFieldDescriptorAtIndex(i, *MangledName))
+      return *FD;
 
   return nullptr;
 }
