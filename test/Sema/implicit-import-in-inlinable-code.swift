@@ -36,7 +36,7 @@ import libA
 
 @inlinable public func bar() {
   let a = ImportedType()
-  a.implicitlyImportedMethod() // expected-warning {{instance method 'implicitlyImportedMethod()' cannot be used in an '@inlinable' function because 'libB' was implicitly imported; this is an error in Swift 6}}
+  a.implicitlyImportedMethod() // expected-warning {{instance method 'implicitlyImportedMethod()' cannot be used in an '@inlinable' function because 'libB' was not imported by this file; this is an error in Swift 6}}
 
   // Expected implicit imports are still fine
   a.localModuleMethod()
@@ -48,7 +48,7 @@ import libA
 
 @inlinable public func bar() {
   let a = ImportedType()
-  a.implicitlyImportedMethod() // expected-error {{instance method 'implicitlyImportedMethod()' cannot be used in an '@inlinable' function because 'libB' was implicitly imported}}
+  a.implicitlyImportedMethod() // expected-error {{instance method 'implicitlyImportedMethod()' cannot be used in an '@inlinable' function because 'libB' was not imported by this file}}
 
   // Expected implicit imports are still fine
   a.localModuleMethod()
@@ -59,7 +59,7 @@ import libA
 
 @inlinable public func bar() {
   let a = ImportedType()
-  a.implicitlyImportedMethod() // expected-error {{instance method 'implicitlyImportedMethod()' cannot be used in an '@inlinable' function because 'libB' was implicitly imported}}
+  a.implicitlyImportedMethod() // expected-error {{instance method 'implicitlyImportedMethod()' cannot be used in an '@inlinable' function because 'libB' was not imported by this file}}
 
   // Expected implicit imports are still fine
   a.localModuleMethod()
