@@ -19,6 +19,9 @@ struct LoadableIntWrapper {
   int operator()(int x, int y) {
     return value + x * y;
   }
+  friend bool operator==(const LoadableIntWrapper lhs, const LoadableIntWrapper &rhs) {
+    return lhs.value == rhs.value;
+  }
 
   LoadableIntWrapper &operator++() {
     value++;

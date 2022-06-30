@@ -2117,14 +2117,13 @@ namespace {
         }
 
         if (auto friendDecl = dyn_cast<clang::FriendDecl>(m)) {
-            auto d = VisitFriendDecl(friendDecl);
-
-            // Check if the friend decl was converted into a FuncDecl
-            if(auto funcDecl = dyn_cast<FuncDecl>(d)) {
-                result->addMember(funcDecl);
-                methods.push_back(funcDecl);
+          if (auto d = VisitFriendDecl(friendDecl)) {
+            if (auto funcDecl = dyn_cast<FuncDecl>(d)) {
+              result->addMember(funcDecl);
+              methods.push_back(funcDecl);
             }
-            continue;
+          }
+          continue;
         }
 
         auto nd = dyn_cast<clang::NamedDecl>(m);
@@ -4776,6 +4775,10 @@ namespace {
       return nullptr;
     }
 
+    /**
+     * VisitFriendDecl will "unwrap" a `clang::FriendDecl` and return
+     * the imported swift verison of the underlying friend decl
+     */
     Decl *VisitFriendDecl(const clang::FriendDecl *decl) {
       // Unwrap the friend decl
       auto unwrappedFriendDecl = decl->getFriendDecl();
