@@ -16,6 +16,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/IDE/TypeCheckCompletionCallback.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "clang/AST/Attr.h"
@@ -29,7 +30,7 @@ class ConformingMethodListCallbacks : public CodeCompletionCallbacks {
   ArrayRef<const char *> ExpectedTypeNames;
   ConformingMethodListConsumer &Consumer;
   SourceLoc Loc;
-  Expr *ParsedExpr = nullptr;
+  CodeCompletionExpr *CCExpr = nullptr;
   DeclContext *CurDeclContext = nullptr;
 
   void getMatchingMethods(Type T,
@@ -55,34 +56,46 @@ public:
 void ConformingMethodListCallbacks::completeDotExpr(CodeCompletionExpr *E,
                                                     SourceLoc DotLoc) {
   CurDeclContext = P.CurDeclContext;
-  ParsedExpr = E->getBase();
+  CCExpr = E;
 }
 
 void ConformingMethodListCallbacks::completePostfixExpr(CodeCompletionExpr *E,
                                                         bool hasSpace) {
   CurDeclContext = P.CurDeclContext;
-  ParsedExpr = E->getBase();
+  CCExpr = E;
 }
 
+class ConformingMethodListCallback : public TypeCheckCompletionCallback {
+  CodeCompletionExpr *CCExpr;
+  SmallVector<Type, 2> Types;
+
+  void sawSolutionImpl(const constraints::Solution &S) override {
+    if (Type T = getTypeForCompletion(S, CCExpr->getBase())) {
+      Types.push_back(T);
+    }
+  }
+
+public:
+  ConformingMethodListCallback(CodeCompletionExpr *CCExpr) : CCExpr(CCExpr) {}
+
+  ArrayRef<Type> getTypes() const { return Types; }
+};
+
 void ConformingMethodListCallbacks::doneParsing() {
-  if (!ParsedExpr)
+  if (!CCExpr || !CCExpr->getBase())
     return;
 
+  ConformingMethodListCallback TypeCheckCallback(CCExpr);
+  llvm::SaveAndRestore<TypeCheckCompletionCallback *> CompletionCollector(
+      Context.CompletionCallback, &TypeCheckCallback);
   typeCheckContextAt(TypeCheckASTNodeAtLocContext::declContext(CurDeclContext),
-                     ParsedExpr->getLoc());
+                     CCExpr->getLoc());
 
-  Type T = ParsedExpr->getType();
-
-  // Type check the expression if needed.
-  if (!T || T->is<ErrorType>()) {
-    ConcreteDeclRef ReferencedDecl = nullptr;
-    auto optT = getTypeOfCompletionContextExpr(P.Context, CurDeclContext,
-                                               CompletionTypeCheckKind::Normal,
-                                               ParsedExpr, ReferencedDecl);
-    if (!optT)
-      return;
-    T = *optT;
+  if (TypeCheckCallback.getTypes().size() != 1) {
+    // Either no results or results were ambiguous, which we cannot handle.
+    return;
   }
+  Type T = TypeCheckCallback.getTypes()[0];
 
   if (!T || T->is<ErrorType>() || T->is<UnresolvedType>())
     return;
