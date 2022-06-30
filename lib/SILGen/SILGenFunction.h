@@ -1477,7 +1477,8 @@ public:
   ManagedValue emitAddressorAccessor(
       SILLocation loc, SILDeclRef addressor, SubstitutionMap substitutions,
       ArgumentSource &&optionalSelfValue, bool isSuper,
-      bool isDirectAccessorUse, PreparedArguments &&optionalSubscripts,
+      bool isDirectAccessorUse,
+      PreparedArguments &&optionalSubscripts,
       SILType addressType, bool isOnSelfParameter);
 
   CleanupHandle emitCoroutineAccessor(SILLocation loc, SILDeclRef accessor,
