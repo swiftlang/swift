@@ -1246,7 +1246,7 @@ public struct UnsafeMutableRawPointer: _Pointer {
 
   // This unavailable implementation uses the expected mangled name
   // of `storeBytes<T>(of:toByteOffset:as:)`, and provides an entry point for
-  // any binary compiled against the stlib binary for Swift 5.6 and older.
+  // any binary compiled against the stdlib binary for Swift 5.6 and older.
   @available(*, unavailable)
   @_silgen_name("sSv10storeBytes2of12toByteOffset2asyx_SixmtlF")
   @usableFromInline func _legacy_se0349_storeBytes<T>(

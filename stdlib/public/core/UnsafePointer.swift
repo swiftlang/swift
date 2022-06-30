@@ -327,7 +327,7 @@ public struct UnsafePointer<Pointee>: _Pointer {
 
   // This unavailable implementation uses the expected mangled name
   // of `withMemoryRebound<T, Result>(to:capacity:_:)`, and provides
-  // an entry point for any binary linked against the stlib binary
+  // an entry point for any binary linked against the stdlib binary
   // for Swift 5.6 and older.
   @available(*, unavailable)
   @_silgen_name("$sSP17withMemoryRebound2to8capacity_qd_0_qd__m_Siqd_0_SPyqd__GKXEtKr0_lF")
@@ -1034,7 +1034,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
 
   // This unavailable implementation uses the expected mangled name
   // of `withMemoryRebound<T, Result>(to:capacity:_:)`, and provides
-  // an entry point for any binary linked against the stlib binary
+  // an entry point for any binary linked against the stdlib binary
   // for Swift 5.6 and older.
   @available(*, unavailable)
   @_silgen_name("$sSp17withMemoryRebound2to8capacity_qd_0_qd__m_Siqd_0_Spyqd__GKXEtKr0_lF")

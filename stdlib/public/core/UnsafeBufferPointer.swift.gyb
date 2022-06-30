@@ -764,7 +764,7 @@ extension Unsafe${Mutable}BufferPointer {
 
   // This unavailable implementation uses the expected mangled name
   // of `withMemoryRebound<T, Result>(to:_:)`, and provides
-  // an entry point for any binary linked against the stlib binary
+  // an entry point for any binary linked against the stdlib binary
   // for Swift 5.6 and older.
   @available(*, unavailable)
 % if Mutable:
