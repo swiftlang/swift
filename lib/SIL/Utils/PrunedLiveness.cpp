@@ -110,20 +110,13 @@ bool PrunedLiveness::updateForBorrowingOperand(Operand *op) {
 
   // A nested borrow scope is considered a use-point at each scope ending
   // instruction.
-  //
-  // TODO: Handle reborrowed copies by considering the extended borrow
-  // scope. Temporarily bail-out on reborrows because we can't handle uses
-  // that aren't dominated by currentDef.
-  if (!BorrowingOperand(op).visitScopeEndingUses([this](Operand *end) {
-        if (end->getOperandOwnership() == OperandOwnership::Reborrow) {
-          return false;
-        }
-        updateForUse(end->getUser(), /*lifetimeEnding*/ false);
-        return true;
-      })) {
-    return false;
-  }
-  return true;
+  return BorrowingOperand(op).visitScopeEndingUses([&](Operand *end) {
+    if (end->getOperandOwnership() == OperandOwnership::Reborrow) {
+      return false;
+    }
+    updateForUse(end->getUser(), /*lifetimeEnding*/ false);
+    return true;
+  });
 }
 
 void PrunedLiveness::extendAcrossLiveness(PrunedLiveness &otherLivesness) {
@@ -180,7 +173,7 @@ bool PrunedLiveness::areUsesOutsideBoundary(
 
   for (auto *use : uses) {
     auto *user = use->getUser();
-    if (isWithinBoundary(user) || checkDeadEnd(user))
+    if (isWithinBoundary(user) && !checkDeadEnd(user))
       return false;
   }
   return true;
@@ -190,10 +183,24 @@ bool PrunedLiveness::areUsesOutsideBoundary(
 // with no holes in the liverange. The lifetime-ending uses are also
 // recorded--destroy_value or end_borrow. However destroy_values may not
 // jointly-post dominate if dead-end blocks are present.
+//
+// Note: Uses with OperandOwnership::NonUse are considered normal uses for
+// liveness. If we want to change this behavior, then it needs to be done
+// consistently wherever compiler logic assumes post-dominating end-of-lifetime.
 void PrunedLiveness::computeSSALiveness(SILValue def) {
+  if (def->use_empty())
+    return;
+
   initializeDefBlock(def->getParentBlock());
   for (Operand *use : def->getUses()) {
-    updateForUse(use->getUser(), use->isLifetimeEnding());
+    switch (use->getOperandOwnership()) {
+    default:
+      updateForUse(use->getUser(), use->isLifetimeEnding());
+      break;
+    case OperandOwnership::Borrow:
+      updateForBorrowingOperand(use);
+      break;
+    }
   }
 }
 
@@ -240,6 +247,13 @@ static void findLastUserInBlock(SILBasicBlock *bb,
 }
 
 void PrunedLivenessBoundary::compute(const PrunedLiveness &liveness) {
+  assert(empty() && "boundary already initialized");
+
+  // Return immediately for empty liveness. It may have a LiveWithin block for
+  // the definition, but attempting to call findLastUserInBlock will crash.
+  if (liveness.empty()) {
+    return;
+  }
   for (SILBasicBlock *bb : liveness.getDiscoveredBlocks()) {
     // Process each block that has not been visited and is not LiveOut.
     switch (liveness.getBlockLiveness(bb)) {

@@ -18,67 +18,41 @@
 
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/BasicBlockUtils.h"
+#include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeInstruction.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 
 using namespace swift;
+
+llvm::cl::opt<bool> EnableCompleteOSSALifetimes(
+    "complete-ossa-lifetimes",
+    llvm::cl::init(true),
+    llvm::cl::desc("Automatically complete OSSA lifetimes after SILGen"),
+    llvm::cl::Hidden);
 
 // Define a CanonicalizeInstruction subclass for use in SILGenCleanup.
 struct SILGenCanonicalize final : CanonicalizeInstruction {
   bool changed = false;
-  llvm::SmallPtrSet<SILInstruction *, 16> deadOperands;
+  InstructionDeleter &deleter;
 
-  SILGenCanonicalize(DeadEndBlocks &deadEndBlocks)
-      : CanonicalizeInstruction(DEBUG_TYPE, deadEndBlocks) {}
+  SILGenCanonicalize(SILFunction *f, InstructionDeleter &deleter)
+    : CanonicalizeInstruction(f, DEBUG_TYPE), deleter(deleter) {}
 
-  void notifyNewInstruction(SILInstruction *) override { changed = true; }
+  void notifyNewInstruction(SILInstruction * = nullptr) override {
+    changed = true;
+  }
 
   // Just delete the given 'inst' and record its operands. The callback isn't
   // allowed to mutate any other instructions.
   void killInstruction(SILInstruction *inst) override {
-    deadOperands.erase(inst);
-    for (auto &operand : inst->getAllOperands()) {
-      if (auto *operInst = operand.get()->getDefiningInstruction())
-        deadOperands.insert(operInst);
-    }
-    inst->eraseFromParent();
+    deleter.forceDelete(inst);
     changed = true;
   }
 
   void notifyHasNewUsers(SILValue) override { changed = true; }
-
-  /// Delete trivially dead instructions in non-determistic order.
-  ///
-  /// We either have that nextII is endII or if nextII is not endII then endII
-  /// is nextII->getParent()->end().
-  SILBasicBlock::iterator deleteDeadOperands(SILBasicBlock::iterator nextII,
-                                             SILBasicBlock::iterator endII) {
-    auto callbacks = InstModCallbacks().onDelete([&](SILInstruction *deadInst) {
-      LLVM_DEBUG(llvm::dbgs() << "Trivially dead: " << *deadInst);
-
-      // If nextII is the instruction we are going to delete, move nextII past
-      // it.
-      if (deadInst->getIterator() == nextII)
-        ++nextII;
-
-      // Then remove the instruction from the set and delete it.
-      deadOperands.erase(deadInst);
-      deadInst->eraseFromParent();
-    });
-
-    while (!deadOperands.empty()) {
-      SILInstruction *deadOperInst = *deadOperands.begin();
-
-      // Make sure at least the first instruction is removed from the set.
-      deadOperands.erase(deadOperInst);
-
-      // Then delete this instruction/everything else that we can.
-      eliminateDeadInstruction(deadOperInst, callbacks);
-    }
-    return nextII;
-  }
 };
 
 //===----------------------------------------------------------------------===//
@@ -96,30 +70,56 @@ namespace {
 // pipeline runs in bottom-up closure order.
 struct SILGenCleanup : SILModuleTransform {
   void run() override;
+
+  bool completeOSSALifetimes(SILFunction *function);
 };
+
+bool SILGenCleanup::completeOSSALifetimes(SILFunction *function) {
+  if (!EnableCompleteOSSALifetimes)
+    return false;
+
+  bool changed = false;
+
+  for (auto &bb : *function) {
+    for (SILArgument *arg : bb.getArguments()) {
+      changed |= completeOSSALifetime(arg);
+    }
+    for (SILInstruction &inst : bb) {
+      for (auto result : inst.getResults()) {
+        changed |= completeOSSALifetime(result);
+      }
+    }
+  }
+  return changed;
+}
 
 void SILGenCleanup::run() {
   auto &module = *getModule();
   for (auto &function : module) {
+
     LLVM_DEBUG(llvm::dbgs()
                << "\nRunning SILGenCleanup on " << function.getName() << "\n");
 
-    DeadEndBlocks deadEndBlocks(&function);
-    SILGenCanonicalize sgCanonicalize(deadEndBlocks);
+    bool changed = completeOSSALifetimes(&function);
+
+    InstructionDeleter deleter;
+    SILGenCanonicalize sgCanonicalize(&function, deleter);
 
     // Iterate over all blocks even if they aren't reachable. No phi-less
     // dataflow cycles should have been created yet, and these transformations
     // are simple enough they shouldn't be affected by cycles.
     for (auto &bb : function) {
-      for (auto ii = bb.begin(), ie = bb.end(); ii != ie;) {
-        ii = sgCanonicalize.canonicalize(&*ii);
-        ii = sgCanonicalize.deleteDeadOperands(ii, ie);
+      for (SILInstruction *inst : deleter.updatingRange(&bb)) {
+        sgCanonicalize.canonicalize(inst);
+        deleter.cleanupDeadInstructions();
       }
     }
-    if (sgCanonicalize.changed) {
+    changed |= sgCanonicalize.changed;
+    if (changed) {
       auto invalidKind = SILAnalysis::InvalidationKind::Instructions;
       invalidateAnalysis(&function, invalidKind);
     }
+    function.verifyOwnership();
   }
 }
 

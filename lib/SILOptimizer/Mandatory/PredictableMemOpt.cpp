@@ -1197,7 +1197,7 @@ void AvailableValueAggregator::addHandOffCopyDestroysForPhis(
     // Then perform the linear lifetime check. If we succeed, continue. We have
     // no further work to do.
     auto *loadOperand = &load->getAllOperands()[0];
-    LinearLifetimeChecker checker(deadEndBlocks);
+    LinearLifetimeChecker checker;
     bool consumedInLoop = checker.completeConsumingUseSet(
         phi, loadOperand, [&](SILBasicBlock::iterator iter) {
           SILBuilderWithScope builder(iter);
@@ -1279,7 +1279,7 @@ void AvailableValueAggregator::addMissingDestroysForCopiedValues(
     // Then perform the linear lifetime check. If we succeed, continue. We have
     // no further work to do.
     auto *loadOperand = &load->getAllOperands()[0];
-    LinearLifetimeChecker checker(deadEndBlocks);
+    LinearLifetimeChecker checker;
     bool consumedInLoop = checker.completeConsumingUseSet(
         cvi, loadOperand, [&](SILBasicBlock::iterator iter) {
           SILBuilderWithScope builder(iter);

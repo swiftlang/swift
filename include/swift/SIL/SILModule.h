@@ -860,7 +860,17 @@ public:
 
   /// Run the SIL verifier to make sure that all Functions follow
   /// invariants.
-  void verify() const;
+  void verify(bool isCompleteOSSA = true,
+              bool checkLinearLifetime = true) const;
+
+  /// Run the SIL verifier without assuming OSSA lifetimes end at dead end
+  /// blocks.
+  void verifyIncompleteOSSA() const {
+    verify(/*completeOSSALifetimes=*/false);
+  }
+
+  /// Check linear OSSA lifetimes, assuming complete OSSA.
+  void verifyOwnership() const;
 
   /// Check if there are any leaking instructions.
   ///

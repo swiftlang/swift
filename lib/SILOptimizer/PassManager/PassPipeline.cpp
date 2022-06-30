@@ -115,7 +115,6 @@ static void addDefiniteInitialization(SILPassPipelinePlan &P) {
 // should be in the -Onone pass pipeline and the prepare optimizations pipeline.
 static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("Mandatory Diagnostic Passes + Enabling Optimization Passes");
-  P.addSILGenCleanup();
   P.addDiagnoseInvalidEscapingCaptures();
   P.addDiagnoseStaticExclusivity();
   P.addNestedSemanticFunctionCheck();
@@ -227,12 +226,21 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
 }
 
 SILPassPipelinePlan
-SILPassPipelinePlan::getDiagnosticPassPipeline(const SILOptions &Options) {
+SILPassPipelinePlan::getSILGenPassPipeline(const SILOptions &Options) {
   SILPassPipelinePlan P(Options);
+  P.startPipeline("SILGen Passes");
+
+  P.addSILGenCleanup();
 
   if (SILViewSILGenCFG) {
     addCFGPrinterPipeline(P, "SIL View SILGen CFG");
   }
+  return P;
+}
+
+SILPassPipelinePlan
+SILPassPipelinePlan::getDiagnosticPassPipeline(const SILOptions &Options) {
+  SILPassPipelinePlan P(Options);
 
   // If we are asked do debug serialization, instead of running all diagnostic
   // passes, just run mandatory inlining with dead transparent function cleanup

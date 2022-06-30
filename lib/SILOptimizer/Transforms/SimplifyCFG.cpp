@@ -1239,7 +1239,7 @@ bool SimplifyCFG::simplifyBranchOperands(OperandValueArrayRef Operands) {
     // All of our interesting simplifications are on single-value instructions
     // for now.
     if (auto *I = dyn_cast<SingleValueInstruction>(*O)) {
-      simplifyAndReplaceAllSimplifiedUsesAndErase(I, callbacks, deBlocks);
+      simplifyAndReplaceAllSimplifiedUsesAndErase(I, callbacks);
     }
   }
   return callbacks.hadCallbackInvocation();

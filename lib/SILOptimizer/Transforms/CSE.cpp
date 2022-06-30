@@ -967,8 +967,7 @@ bool CSE::processNode(DominanceInfoNode *Node) {
     // If the instruction can be simplified (e.g. X+0 = X) then replace it with
     // its simpler value.
     InstModCallbacks callbacks;
-    nextI = simplifyAndReplaceAllSimplifiedUsesAndErase(Inst, callbacks,
-                                                        &DeadEndBBs);
+    nextI = simplifyAndReplaceAllSimplifiedUsesAndErase(Inst, callbacks);
     if (callbacks.hadCallbackInvocation()) {
       ++NumSimplify;
       Changed = true;
@@ -1400,7 +1399,7 @@ class SILCSE : public SILFunctionTransform {
     auto *Fn = getFunction();
     DeadEndBlocks DeadEndBBs(Fn);
     InstModCallbacks callbacks;
-    OwnershipFixupContext FixupCtx{callbacks, DeadEndBBs};
+    OwnershipFixupContext FixupCtx{callbacks};
     CSE C(RunsOnHighLevelSil, SEA, FuncBuilder, DeadEndBBs, FixupCtx);
     bool Changed = false;
 

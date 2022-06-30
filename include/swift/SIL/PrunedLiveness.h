@@ -238,7 +238,9 @@ public:
 
   bool empty() const {
     assert(!liveBlocks.empty() || users.empty());
-    return liveBlocks.empty();
+    // There may be a liveBlock created by initializeDefBlock with no users. The
+    // true test of emptiness is whether there are any users.
+    return users.empty();
   }
 
   void clear() {
@@ -309,7 +311,12 @@ public:
   void updateForUse(SILInstruction *user, bool lifetimeEnding);
 
   /// Updates the liveness for a whole borrow scope, beginning at \p op.
-  /// Returns false if this cannot be done.
+  ///
+  /// Returns false if any of the uses are Reborrows. This should still be valid
+  /// as long as guaranteed phis are well-formed, where each phi operand borrows
+  /// an owned value and each of those owned values are part of a phi web that
+  /// encloses the entire guaranteed phi lifetime. But some clients may want to
+  /// bail-out on reborrows for now.
   bool updateForBorrowingOperand(Operand *op);
 
   /// Update this liveness to extend across the given liveness.
@@ -336,18 +343,25 @@ public:
 
   /// \p deadEndBlocks is optional.
   bool areUsesWithinBoundary(ArrayRef<Operand *> uses,
-                             DeadEndBlocks *deadEndBlocks) const;
+                             DeadEndBlocks *deadEndBlocks = nullptr) const;
 
   /// \p deadEndBlocks is optional.
   bool areUsesOutsideBoundary(ArrayRef<Operand *> uses,
-                              DeadEndBlocks *deadEndBlocks) const;
+                              DeadEndBlocks *deadEndBlocks = nullptr) const;
 
   /// Compute liveness for a single SSA definition.
+  ///
+  /// Warning: Users should check liveness.empty() after calling
+  /// computeSSALiveness() and before assuming well-formed liveness. This
+  /// liveness result will be empty iff \p def has no uses.
   void computeSSALiveness(SILValue def);
 };
 
 /// Record the last use points and CFG edges that form the boundary of
 /// PrunedLiveness.
+///
+/// Note: Before using the boundary check if it is empty. This happens when
+/// liveness is computed for a value with no uses.
 struct PrunedLivenessBoundary {
   SmallVector<SILInstruction *, 8> lastUsers;
   SmallVector<SILBasicBlock *, 8> boundaryEdges;
@@ -355,6 +369,13 @@ struct PrunedLivenessBoundary {
   void clear() {
     lastUsers.clear();
     boundaryEdges.clear();
+  }
+  
+  /// Return true if liveness is empty, meaning there are no users.
+  bool empty() const {
+    assert(!lastUsers.empty() || boundaryEdges.empty() &&
+           "can't have boundary edges with no users");
+    return lastUsers.empty();
   }
 
   /// Visit the point at which a lifetime-ending instruction must be inserted,

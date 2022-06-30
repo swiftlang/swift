@@ -852,7 +852,7 @@ void TempRValueOptPass::run() {
     // Simplify any access scope markers that were only used by the dead
     // copy_addr and other potentially unused addresses.
     if (srcInst) {
-      simplifyAndReplaceAllSimplifiedUsesAndErase(srcInst, callbacks, &deBlocks);
+      simplifyAndReplaceAllSimplifiedUsesAndErase(srcInst, callbacks);
     }
   }
   if (!deadCopies.empty()) {

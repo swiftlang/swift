@@ -673,6 +673,8 @@ public:
   }
 
   /// Verify that this SILValue and its uses respects ownership invariants.
+  ///
+  /// \p DEBlocks is nullptr when OSSA lifetimes are complete.
   void verifyOwnership(DeadEndBlocks *DEBlocks) const;
 
   LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,

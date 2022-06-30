@@ -189,8 +189,7 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
   {
     SmallVector<Operand *, 8> scratchSpace;
     if (llvm::any_of(borrowScopeIntroducers, [&](BorrowedValue borrowScope) {
-      return !borrowScope.areUsesWithinLocalScope(lr.getAllConsumingUses(),
-                                                  nullptr);
+          return !borrowScope.areUsesWithinLocalScope(lr.getAllConsumingUses());
         })) {
       return false;
     }
@@ -219,7 +218,7 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
 
       if (llvm::any_of(borrowScopeIntroducers, [&](BorrowedValue borrowScope) {
             return !borrowScope.areUsesWithinLocalScope(
-                phiArgLR.getAllConsumingUses(), nullptr);
+                phiArgLR.getAllConsumingUses());
           })) {
         return false;
       }
@@ -766,7 +765,7 @@ bool SemanticARCOptVisitor::tryPerformOwnedCopyValueOptimization(
   // Ok, we have an owned value. If we do not have any non-destroying consuming
   // uses, see if all of our uses (ignoring destroying uses) are within our
   // parent owned value's lifetime.
-  LinearLifetimeChecker checker(ctx.getDeadEndBlocks());
+  LinearLifetimeChecker checker;
   if (!checker.validateLifetime(originalValue, parentLifetimeEndingUses,
                                 allCopyUses))
     return false;

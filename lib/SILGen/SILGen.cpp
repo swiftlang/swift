@@ -85,7 +85,7 @@ SILGenModule::~SILGenModule() {
       f.setLinkage(SILLinkage::PublicExternal);
   }
 
-  M.verify();
+  M.verifyIncompleteOSSA();
 }
 
 static SILDeclRef
@@ -1232,7 +1232,7 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
   assert(!F->isExternalDeclaration() && "did not emit any function body?!");
   LLVM_DEBUG(llvm::dbgs() << "lowered sil:\n";
              F->print(llvm::dbgs()));
-  F->verify();
+  F->verifyIncompleteOSSA();
 
   emitDifferentiabilityWitnessesForFunction(constant, F);
 }
@@ -1674,7 +1674,7 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
   auto dc = binding->getDeclContext();
   SILGenFunction(*this, *f, dc).emitLazyGlobalInitializer(binding, pbdEntry);
   emitLazyConformancesForFunction(f);
-  f->verify();
+  f->verifyIncompleteOSSA();
 
   return f;
 }
@@ -2155,7 +2155,7 @@ public:
 
       LLVM_DEBUG(llvm::dbgs() << "lowered toplevel sil:\n";
                  toplevel->print(llvm::dbgs()));
-      toplevel->verify();
+      toplevel->verifyIncompleteOSSA();
       sgm.emitLazyConformancesForFunction(toplevel);
     }
   }
