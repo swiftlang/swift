@@ -300,47 +300,6 @@ extension _StringGuts {
       scalarAlign(validateInclusiveSubscalarIndex(i, in: bounds)),
       in: bounds)
   }
-
-  internal func validateCharacterRange(
-    _ range: Range<String.Index>
-  ) -> Range<String.Index> {
-    if
-      isFastCharacterIndex(range.lowerBound),
-      isFastCharacterIndex(range.upperBound)
-    {
-      _precondition(range.upperBound._encodedOffset <= count,
-        "String index range is out of bounds")
-      return range
-    }
-
-    let r = validateSubscalarRange(range)
-    let l = roundDownToNearestCharacter(scalarAlign(r.lowerBound))
-    let u = roundDownToNearestCharacter(scalarAlign(r.upperBound))
-    return Range(_uncheckedBounds: (l, u))
-  }
-
-  internal func validateCharacterRange(
-    _ range: Range<String.Index>,
-    in bounds: Range<String.Index>
-  ) -> Range<String.Index> {
-    _internalInvariant(bounds.upperBound <= endIndex)
-
-    if
-      isFastCharacterIndex(range.lowerBound),
-      isFastCharacterIndex(range.upperBound)
-    {
-      _precondition(
-        range.lowerBound >= bounds.lowerBound
-        && range.upperBound <= bounds.upperBound,
-        "String index range is out of bounds")
-      return range
-    }
-
-    let r = validateSubscalarRange(range, in: bounds)
-    let l = roundDownToNearestCharacter(scalarAlign(r.lowerBound), in: bounds)
-    let u = roundDownToNearestCharacter(scalarAlign(r.upperBound), in: bounds)
-    return Range(_uncheckedBounds: (l, u))
-  }
 }
 
 // Temporary additions to deal with binary compatibility issues with existing
@@ -437,5 +396,22 @@ extension _StringGuts {
 
     return roundDownToNearestCharacter(
       scalarAlign(validateInclusiveSubscalarIndex_5_7(i)))
+  }
+}
+
+// Word index validation (String)
+extension _StringGuts {
+  internal func validateWordIndex(
+    _ i: String.Index
+  ) -> String.Index {
+    return roundDownToNearestWord(scalarAlign(validateSubscalarIndex(i)))
+  }
+
+  internal func validateInclusiveWordIndex(
+    _ i: String.Index
+  ) -> String.Index {
+    return roundDownToNearestWord(
+      scalarAlign(validateInclusiveSubscalarIndex(i))
+    )
   }
 }
