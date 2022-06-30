@@ -11,4 +11,8 @@
 // CHECK: bb{{[0-9]+}}(%{{[0-9]+}} : $@convention(objc_method) (@convention(block) @Sendable () -> (), @opened
 func testDynamicDispatch(p: P, completionHandler: @escaping () -> Void) {
   p.f?(completionHandler)
+
+  // CHECK: dynamic_method_br
+  // CHECK: bb{{[0-9]+}}(%{{[0-9]+}} : $@convention(objc_method) (@convention(block) @Sendable () -> (), @opened
+  let _ = p.f
 }
