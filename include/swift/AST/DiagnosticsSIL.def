@@ -83,6 +83,8 @@ ERROR(magic_identifier_invalid_arg_name,none,
 ERROR(magic_identifier_unknown_arg_name,none,
       "unknown argument name %0 passed to literal expression %1",
       (StringRef, StringRef))
+ERROR(magic_identifier_must_be_default_arg_value,none,
+      "#transcription(of:) is only valid as a default argument value", ())
 WARNING(magic_identifier_poor_transcription,none,
         "this expression's source representation cannot be found; a generic "
         "string literal will be substituted", ())

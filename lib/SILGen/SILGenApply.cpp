@@ -2075,10 +2075,10 @@ buildTranscriptionLiteral(SILGenFunction &SGF, SGFContext C,
       // Not a default argument and/or value didn't look like an identifier.
       // Resolve the source code of the magic identifier's argument instead.
       // This is syntactically acceptable, but it is unlikely to produce a
-      // useful string, so warn.
+      // useful string, so emit an error.
       auto exprRange = arg.getExpr()->getSourceRange();
       SGF.SGM.diagnose(exprRange.Start,
-                       diag::magic_identifier_poor_transcription);
+                       diag::magic_identifier_must_be_default_arg_value);
       transcription = transcribe(SGF, ctx, exprRange);
     }
   }
