@@ -1818,12 +1818,6 @@ NodePointer Demangler::demangleBoundGenericArgs(NodePointer Nominal,
   case Node::Kind::Constructor:
     // Well, not really a nominal type.
     return createWithChildren(Node::Kind::BoundGenericFunction, Nominal, args);
-  case Node::Kind::Type:
-    if (!Nominal->hasChildren())
-      return nullptr;
-    if (Nominal->getFirstChild()->getKind() != Node::Kind::ProtocolList)
-      return nullptr;
-    return createWithChildren(Node::Kind::ParameterizedProtocol, Nominal, args);
   default:
     return nullptr;
   }
@@ -2366,6 +2360,9 @@ NodePointer Demangler::demangleGenericParamIndex() {
   }
   if (nextIf('z')) {
     return getDependentGenericParamType(0, 0);
+  }
+  if (nextIf('s')) {
+    return createNode(Node::Kind::ConstrainedExistentialSelf);
   }
   return getDependentGenericParamType(0, demangleIndex() + 1);
 }
@@ -3268,20 +3265,10 @@ NodePointer Demangler::demangleSpecialType() {
                                            MTR, Type));
     }
     case 'P': {
-      NodePointer RetroactiveConformances;
-      Vector<NodePointer> TypeListList(*this, 4);
-
-      if (!demangleBoundGenerics(TypeListList, RetroactiveConformances))
-        return nullptr;
-
-      NodePointer Type = popNode(Node::Kind::Type);
-      if (!Type)
-        return nullptr;
-
-      NodePointer BoundNode = demangleBoundGenericArgs(Type, TypeListList, 0);
-      NodePointer NTy = createType(BoundNode);
-      addSubstitution(NTy);
-      return NTy;
+      NodePointer Reqs = demangleConstrainedExistentialRequirementList();
+      NodePointer Base = popNode(Node::Kind::Type);
+      return createType(
+          createWithChildren(Node::Kind::ConstrainedExistential, Base, Reqs));
     }
     case 'p':
       return createType(createWithChild(Node::Kind::ExistentialMetatype,
@@ -3571,6 +3558,22 @@ NodePointer Demangler::demangleProtocolList() {
 NodePointer Demangler::demangleProtocolListType() {
   NodePointer ProtoList = demangleProtocolList();
   return createType(ProtoList);
+}
+
+NodePointer Demangler::demangleConstrainedExistentialRequirementList() {
+  NodePointer ReqList =
+      createNode(Node::Kind::ConstrainedExistentialRequirementList);
+  bool firstElem = false;
+  do {
+    firstElem = (popNode(Node::Kind::FirstElementMarker) != nullptr);
+    NodePointer Req = popNode(isRequirement);
+    if (!Req)
+      return nullptr;
+    ReqList->addChild(Req, *this);
+  } while (!firstElem);
+
+  ReqList->reverseChildren();
+  return ReqList;
 }
 
 NodePointer Demangler::demangleGenericSignature(bool hasParamCounts) {

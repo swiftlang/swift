@@ -24,7 +24,7 @@ struct S: Q {
 
 struct R<T, U, V> {
   var force: () -> any P<T, U, V>
-  // CHECK-LABEL: sil hidden [ossa] @$s13parameterized1RV5forceACyxq_q0_GAA1P_pyxq_q0_XPyc_tcfC : $@convention(method) <T, U, V> (@owned @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> () -> @out P<τ_0_0, τ_0_1, τ_0_2> for <T, U, V>, @thin R<T, U, V>.Type) -> @owned R<T, U, V> {
+  // CHECK-LABEL: sil hidden [ossa] @$s13parameterized1RV5forceACyxq_q0_GAA1P_px1TRts_q_1URtsq0_1VRtsXPyc_tcfC : $@convention(method) <T, U, V> (@owned @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> () -> @out P<τ_0_0, τ_0_1, τ_0_2> for <T, U, V>, @thin R<T, U, V>.Type) -> @owned R<T, U, V> {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s13parameterized6upcastyAA1P_pAA1SVF : $@convention(thin) (S) -> @out P {
@@ -75,26 +75,26 @@ func reuse(_ k: () -> any P<Int, String, Float>) {}
 func upcastResult() {
   // CHECK: [[RES_FN:%.*]] = function_ref @$s13parameterized12upcastResultyyFAA1SVyXEfU_ : $@convention(thin) () -> S
   // CHECK: [[THICK_RES_FN:%.*]] = thin_to_thick_function [[RES_FN]] : $@convention(thin) () -> S to $@noescape @callee_guaranteed () -> S
-  // CHECK: [[S_TO_P_RES_THUNK_FN:%.*]] = function_ref @$s13parameterized1SVIgd_AA1P_pySiSSSfXPIegr_TR : $@convention(thin) (@noescape @callee_guaranteed () -> S) -> @out P<Int, String, Float>
+  // CHECK: [[S_TO_P_RES_THUNK_FN:%.*]] = function_ref @$s13parameterized1SVIgd_AA1P_pSi1TAaDPRts_SS1UAFRtsSf1VAFRtsXPIegr_TR : $@convention(thin) (@noescape @callee_guaranteed () -> S) -> @out P<Int, String, Float>
   // CHECK: [[PARTIAL_RES_THUNK_FN:%.*]] = partial_apply [callee_guaranteed] [[S_TO_P_RES_THUNK_FN]]([[THICK_RES_FN]]) : $@convention(thin) (@noescape @callee_guaranteed () -> S) -> @out P<Int, String, Float>
   // CHECK: [[NOESCAPE_RES_THUNK_FN:%.*]] = convert_escape_to_noescape [not_guaranteed] [[PARTIAL_RES_THUNK_FN]] : $@callee_guaranteed () -> @out P<Int, String, Float> to $@noescape @callee_guaranteed () -> @out P<Int, String, Float>
-  // CHECK: [[REUSE_FN:%.*]] = function_ref @$s13parameterized5reuseyyAA1P_pySiSSSfXPyXEF : $@convention(thin) (@noescape @callee_guaranteed () -> @out P<Int, String, Float>) -> ()
+  // CHECK: [[REUSE_FN:%.*]] = function_ref @$s13parameterized5reuseyyAA1P_pSi1TAaCPRts_SS1UAERtsSf1VAERtsXPyXEF : $@convention(thin) (@noescape @callee_guaranteed () -> @out P<Int, String, Float>) -> ()
   // CHECK: {{%.*}} = apply [[REUSE_FN]]([[NOESCAPE_RES_THUNK_FN]]) : $@convention(thin) (@noescape @callee_guaranteed () -> @out P<Int, String, Float>) -> ()
 
   reuse({ () -> S in S() })
 
-  // CHECK: [[RES_Q_FN:%.*]] = function_ref @$s13parameterized12upcastResultyyFAA1Q_pySiSSSfXPyXEfU0_ : $@convention(thin) () -> @out Q<Int, String, Float>
+  // CHECK: [[RES_Q_FN:%.*]] = function_ref @$s13parameterized12upcastResultyyFAA1Q_pSi1XAaCPRts_SS1YAERtsSf1ZAERtsXPyXEfU0_ : $@convention(thin) () -> @out Q<Int, String, Float>
   // CHECK: [[THICK_NOESCAPE_RES_Q_FN:%.*]] = thin_to_thick_function [[RES_Q_FN]] : $@convention(thin) () -> @out Q<Int, String, Float> to $@noescape @callee_guaranteed () -> @out Q<Int, String, Float>
-  // CHECK: [[P_TO_Q_RES_THUNK_FN:%.*]] = function_ref @$s13parameterized1Q_pySiSSSfXPIgr_AA1P_pySiSSSfXPIegr_TR : $@convention(thin) (@noescape @callee_guaranteed () -> @out Q<Int, String, Float>) -> @out P<Int, String, Float>
+  // CHECK: [[P_TO_Q_RES_THUNK_FN:%.*]] = function_ref @$s13parameterized1Q_pSi1XAaBPRts_SS1YADRtsSf1ZADRtsXPIgr_AA1P_pSi1TAaJPRts_SS1UALRtsSf1VALRtsXPIegr_TR : $@convention(thin) (@noescape @callee_guaranteed () -> @out Q<Int, String, Float>) -> @out P<Int, String, Float>
   // CHECK: [[PARTIAL_P_TO_Q_RES_THUNK_FN:%.*]] = partial_apply [callee_guaranteed] [[P_TO_Q_RES_THUNK_FN]]([[THICK_NOESCAPE_RES_Q_FN]]) : $@convention(thin) (@noescape @callee_guaranteed () -> @out Q<Int, String, Float>) -> @out P<Int, String, Float>
   // CHECK: [[NOESCAPE_PARTIAL_P_TO_Q_RES_THUNK_FN:%.*]] = convert_escape_to_noescape [not_guaranteed] [[PARTIAL_P_TO_Q_RES_THUNK_FN]] : $@callee_guaranteed () -> @out P<Int, String, Float> to $@noescape @callee_guaranteed () -> @out P<Int, String, Float>
-  // CHECK: [[REUSE_FN:%.*]] = function_ref @$s13parameterized5reuseyyAA1P_pySiSSSfXPyXEF : $@convention(thin) (@noescape @callee_guaranteed () -> @out P<Int, String, Float>) -> ()
+  // CHECK: [[REUSE_FN:%.*]] = function_ref @$s13parameterized5reuseyyAA1P_pSi1TAaCPRts_SS1UAERtsSf1VAERtsXPyXEF : $@convention(thin) (@noescape @callee_guaranteed () -> @out P<Int, String, Float>) -> ()
   // CHECK: {{%.*}} = apply [[REUSE_FN]]([[NOESCAPE_PARTIAL_P_TO_Q_RES_THUNK_FN]]) : $@convention(thin) (@noescape @callee_guaranteed () -> @out P<Int, String, Float>) -> ()
 
   reuse({ () -> any Q<Int, String, Float> in S() })
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s13parameterized5forceAA1P_pyxq_q0_XPyr1_lF : $@convention(thin) <T, U, V> () -> @out P<T, U, V> {
+// CHECK-LABEL: sil hidden [ossa] @$s13parameterized5forceAA1P_px1TRts_q_1URtsq0_1VRtsXPyr1_lF : $@convention(thin) <T, U, V> () -> @out P<T, U, V> {
 func force<T, U, V>() -> any P<T, U, V> {
   return R(force: { force() }).force()
 }

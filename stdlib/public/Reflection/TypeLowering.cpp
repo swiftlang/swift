@@ -1758,7 +1758,7 @@ public:
   }
 
   bool
-  visitParameterizedProtocolTypeRef(const ParameterizedProtocolTypeRef *PPT) {
+  visitConstrainedExistentialTypeRef(const ConstrainedExistentialTypeRef *CET) {
     return true;
   }
 
@@ -1879,7 +1879,7 @@ public:
   }
 
   MetatypeRepresentation
-  visitParameterizedProtocolTypeRef(const ParameterizedProtocolTypeRef *PPT) {
+  visitConstrainedExistentialTypeRef(const ConstrainedExistentialTypeRef *CET) {
     return MetatypeRepresentation::Thin;
   }
 
@@ -2330,8 +2330,8 @@ public:
   }
 
   const TypeInfo *
-  visitParameterizedProtocolTypeRef(const ParameterizedProtocolTypeRef *PPT) {
-    return visitProtocolCompositionTypeRef(PPT->getBase());
+  visitConstrainedExistentialTypeRef(const ConstrainedExistentialTypeRef *CET) {
+    return visitProtocolCompositionTypeRef(CET->getBase());
   }
 
   const TypeInfo *visitMetatypeTypeRef(const MetatypeTypeRef *M) {

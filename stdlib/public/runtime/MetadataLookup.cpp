@@ -1313,6 +1313,29 @@ private:
   TypeReferenceOwnership ReferenceOwnership;
 
 public:
+  struct BuiltLayoutConstraint {
+    bool operator==(BuiltLayoutConstraint rhs) const { return true; }
+    operator bool() const { return true; }
+  };
+  using BuiltLayoutConstraint = BuiltLayoutConstraint;
+#if LLVM_PTR_SIZE == 4
+  /// Unfortunately the alignment of TypeRef is too large to squeeze in 3 extra
+  /// bits on (some?) 32-bit systems.
+  class BigBuiltTypeIntPair {
+    BuiltType Ptr;
+    RequirementKind Int;
+
+  public:
+    BigBuiltTypeIntPair(BuiltType ptr, RequirementKind i) : Ptr(ptr), Int(i) {}
+    RequirementKind getInt() const { return Int; }
+    BuiltType getPointer() const { return Ptr; }
+    uint64_t getOpaqueValue() const {
+      return (uint64_t)Ptr | ((uint64_t)Int << 32);
+    }
+  };
+#endif
+
+public:
   DecodedMetadataBuilder(Demangler &demangler,
                          SubstGenericParameterFn substGenericParameter,
                          SubstDependentWitnessTableFn substWitnessTable)
@@ -1327,6 +1350,23 @@ public:
   using BuiltSubstitution = std::pair<BuiltType, BuiltType>;
   using BuiltSubstitutionMap = llvm::ArrayRef<BuiltSubstitution>;
   using BuiltGenericTypeParam = const Metadata *;
+  struct Requirement : public RequirementBase<BuiltType,
+#if LLVM_PTR_SIZE == 4
+                                              BigBuiltTypeIntPair,
+#else
+                                              llvm::PointerIntPair<
+                                                  BuiltType, 3,
+                                                  RequirementKind>,
+
+#endif
+                                              BuiltLayoutConstraint> {
+    Requirement(RequirementKind kind, BuiltType first, BuiltType second)
+        : RequirementBase(kind, first, second) {}
+    Requirement(RequirementKind kind, BuiltType first,
+                BuiltLayoutConstraint second)
+        : RequirementBase(kind, first, second) {}
+  };
+  using BuiltRequirement = Requirement;
 
   BuiltType decodeMangledType(NodePointer node,
                               bool forRequirement = true) {
@@ -1522,8 +1562,8 @@ public:
   }
 
   TypeLookupErrorOr<BuiltType>
-  createParameterizedProtocolType(BuiltType base,
-                                  llvm::ArrayRef<BuiltType> args) const {
+  createConstrainedExistentialType(BuiltType base,
+                                   llvm::ArrayRef<BuiltRequirement> rs) const {
     // FIXME: Runtime plumbing.
     return BuiltType();
   }
@@ -1650,11 +1690,6 @@ public:
   }
 
   using BuiltSILBoxField = llvm::PointerIntPair<BuiltType, 1>;
-  struct BuiltLayoutConstraint {
-    bool operator==(BuiltLayoutConstraint rhs) const { return true; }
-    operator bool() const { return true; }
-  };
-  using BuiltLayoutConstraint = BuiltLayoutConstraint;
   BuiltLayoutConstraint getLayoutConstraint(LayoutConstraintKind kind) {
     return {};
   }
@@ -1663,38 +1698,6 @@ public:
                                    unsigned alignment) {
     return {};
   }
-
-#if LLVM_PTR_SIZE == 4
-  /// Unfortunately the alignment of TypeRef is too large to squeeze in 3 extra
-  /// bits on (some?) 32-bit systems.
-  class BigBuiltTypeIntPair {
-    BuiltType Ptr;
-    RequirementKind Int;
-  public:
-    BigBuiltTypeIntPair(BuiltType ptr, RequirementKind i) : Ptr(ptr), Int(i) {}
-    RequirementKind getInt() const { return Int; }
-    BuiltType getPointer() const { return Ptr; }
-    uint64_t getOpaqueValue() const {
-      return (uint64_t)Ptr | ((uint64_t)Int << 32);
-    }
-  };
-#endif
-
-  struct Requirement : public RequirementBase<BuiltType,
-#if LLVM_PTR_SIZE == 4
-         BigBuiltTypeIntPair,
-#else
-         llvm::PointerIntPair<BuiltType, 3, RequirementKind>,
-
-#endif
-         BuiltLayoutConstraint> {
-    Requirement(RequirementKind kind, BuiltType first, BuiltType second)
-        : RequirementBase(kind, first, second) {}
-    Requirement(RequirementKind kind, BuiltType first,
-                BuiltLayoutConstraint second)
-        : RequirementBase(kind, first, second) {}
-  };
-  using BuiltRequirement = Requirement;
 
   TypeLookupErrorOr<BuiltType> createSILBoxTypeWithLayout(
       llvm::ArrayRef<BuiltSILBoxField> Fields,
