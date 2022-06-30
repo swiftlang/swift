@@ -20,35 +20,50 @@ import FakeDistributedActorSystems
 typealias DefaultDistributedActorSystem = FakeRoundtripActorSystem
 
 protocol Greeting: DistributedActor {
-  distributed func greeting() -> String // async throw
+  distributed func greeting() -> String
+  distributed func greetingAsyncThrows() async throws -> String
 }
 
 extension Greeting {
-  func greetLocal(name: String) {
-    print("\(greeting()), \(name)!") // okay, we're on the actor
+  func greetLocal(name: String) async throws {
+    try await print("\(greetingAsyncThrows()), \(name)!") // requirement is async throws, things work
   }
+
+  // FIXME(distributed): won't work today, it will try to treat the greeting() call as async, but can't
+  //  We should understand that greeting is called on self, and not use the thunk witness.
+//  func greetLocal2(name: String) {
+//    print("\(greeting()), \(name)!") // okay, we're on the actor
+//  }
 }
 
 extension Greeting where SerializationRequirement == Codable {
   // okay, uses Codable to transfer arguments.
-  distributed func greetDistributed(name: String) {
+  distributed func greetDistributed(name: String) async throws {
     // okay, we're on the actor
-    greetLocal(name: name)
+    try await greetLocal(name: name)
   }
+
+//  distributed func greetDistributed2(name: String) async throws {
+//    // okay, we're on the actor
+//    try await greetLocal2(name: name)
+//  }
 }
 
 extension Greeting where SerializationRequirement == Codable {
   nonisolated func greetAliceALot() async throws {
     try await greetDistributed(name: "Alice") // okay, via Codable
     let rawGreeting = try await greeting() // okay, via Self's serialization requirement
-//    greetLocal(name: "Alice") // expected-error{{only 'distributed' instance methods can be called on a potentially remote distributed actor}}
+    // greetLocal(name: "Alice") // would be error: only 'distributed' instance methods can be called on a potentially remote distributed actor}}
   }
 }
 
 distributed actor Greeter: Greeting {
-  distributed func direct() -> String { "direct" }
   distributed func greeting() -> String {
     "Hello"
+  }
+
+  distributed func greetingAsyncThrows() -> String {
+    "Hello from AsyncThrows"
   }
 }
 
@@ -56,8 +71,15 @@ func test() async throws {
   let system = DefaultDistributedActorSystem()
   let g = Greeter(actorSystem: system)
 
-  let direct = try await g.greeting()
-  print("direct(): \(direct)") // CHECK: direct(): direct
+  let greeting = try await g.greeting()
+  print("greeting(): \(greeting)") // CHECK: greeting(): Hello
+
+  try await g.greetDistributed(name: "Caplin")
+  // CHECK: Hello from AsyncThrows, Caplin!
+
+  // FIXME(distributed): won't work as the greetLocal() will have issues (crash trying to call self.greeting() assuming it is a thunk call, even though it is on self)
+  //  try await g.greetDistributed2(name: "Caplin")
+
 }
 
 @main struct Main {
