@@ -63,7 +63,16 @@ distributed actor Greeter: Greeting {
   }
 
   distributed func greetingAsyncThrows() -> String {
-    "Hello from AsyncThrows"
+    noop() // no await needed, we're in the same actor
+    return "Hello from AsyncThrows"
+  }
+
+  func callNoop() {
+    noop() // no await needed, we're in the same actor
+  }
+
+  distributed func noop() {
+    // nothing
   }
 }
 

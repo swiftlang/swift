@@ -4514,10 +4514,6 @@ RValue SILGenFunction::emitApply(
   auto substFnType = calleeTypeInfo.substFnType;
   auto substResultType = calleeTypeInfo.substResultType;
 
-  if (F.getName() == "$s4main12test_generic6systemyAA24FakeRoundtripActorSystemC_tYaKF14callWorkerSyncL_1wSSx_tYaKAA011DistributedJ0RzSS8WorkItemRtzSS0M6ResultRtzlF") {
-    fprintf(stderr, "[%s:%d] (%s) INSIDE $s4main12test_generic6systemyAA24FakeRoundtripActorSystemC_tYaKF14callWorkerSyncL_1wSSx_tYaKAA011DistributedJ0RzSS8WorkItemRtzSS0M6ResultRtzlF\n", __FILE__, __LINE__, __FUNCTION__);
-  }
-
   // Create the result plan.
   SmallVector<SILValue, 4> indirectResultAddrs;
   resultPlan->gatherIndirectResultAddrs(*this, loc, indirectResultAddrs);

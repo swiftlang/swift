@@ -484,15 +484,6 @@ private:
       witnessRef = witnessRef.asAutoDiffDerivativeFunction(witnessDerivativeId);
     }
 
-
-//    else if (requirementFunc && requirementFunc->isDistributed()) {
-//      fprintf(stderr, "[%s:%d] (%s) distributed requirement:\n", __FILE__, __LINE__, __FUNCTION__);
-//      requirementFunc->dump();
-//      fprintf(stderr, "[%s:%d] (%s) witness: \n", __FILE__, __LINE__, __FUNCTION__);
-//      witness.dump();
-//
-//      witnessRef = witnessRef.asDistributed();
-//    }
     return witnessRef;
   }
 };
@@ -538,8 +529,6 @@ public:
 
     auto *proto = Conformance->getProtocol();
     visitProtocolDecl(proto);
-
-    // this->Conformance->dump()
 
     addConditionalRequirements();
 
@@ -706,8 +695,24 @@ SILFunction *SILGenModule::emitProtocolWitness(
   auto requirementInfo =
       Types.getConstantInfo(TypeExpansionContext::minimal(), requirement);
 
-  if (requirement.isDistributedThunk()) {
-    witnessRef = SILDeclRef(witnessRef.getFuncDecl()->getDistributedThunk(), SILDeclRef::Kind::Func).asDistributed();
+  auto shouldUseDistributedThunkWitness =
+      // always use a distributed thunk for distributed requirements:
+      requirement.isDistributedThunk() ||
+      // for non-distributed requirements, which are however async/throws,
+      // and have a proper witness (passed typechecking), we can still invoke
+      // them on the distributed actor; but must do so through the distributed
+      // thunk as the call "through an existential" we never statically know
+      // if the actor is local or not.
+      (requirement.hasAsync() && requirement.hasDecl() &&
+       requirement.getFuncDecl() &&
+       !requirement.getFuncDecl()->isDistributed() && witnessRef.hasDecl() &&
+       witnessRef.getFuncDecl() && witnessRef.getFuncDecl()->isDistributed());
+
+  if (shouldUseDistributedThunkWitness) {
+    auto thunkDeclRef = SILDeclRef(
+        witnessRef.getFuncDecl()->getDistributedThunk(),
+        SILDeclRef::Kind::Func);
+    witnessRef = thunkDeclRef.asDistributed();
   }
 
   // Work out the lowered function type of the SIL witness thunk.
