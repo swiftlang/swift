@@ -397,7 +397,7 @@ enum class SelfAccessKind : uint8_t {
   Consuming,
 };
 using SelfAccessKindField = BCFixed<2>;
-  
+
 /// Translates an operator decl fixity to a Serialization fixity, whose values
 /// are guaranteed to be stable.
 static inline OperatorKind getStableFixity(OperatorFixity fixity) {
@@ -965,48 +965,6 @@ namespace decls_block {
 #include "DeclTypeRecordNodes.def"
   };
 
-  namespace detail {
-  enum TypeRecords : uint16_t {
-#define TYPE(Id) Id##_TYPE = decls_block::RecordKind::Id##_TYPE,
-#include "DeclTypeRecordNodes.def"
-  };
-
-  template <TypeRecords Record>
-  class TypeRecordDispatch {};
-
-  template <TypeRecords RecordCode, typename ...Ts>
-  struct code { public: constexpr static TypeRecords value = RecordCode; };
-
-  struct function_deserializer {
-    static llvm::Expected<Type>
-    deserialize(ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch,
-                StringRef blobData, bool isGeneric);
-  };
-
-#define TYPE_LAYOUT_IMPL(LAYOUT, ...)                                          \
-  using LAYOUT = BCRecordLayout<__VA_ARGS__>;                                  \
-  template <>                                                                  \
-  class detail::TypeRecordDispatch<                                            \
-      detail::code<detail::TypeRecords::__VA_ARGS__>::value> {                 \
-    friend class swift::ModuleFile;                                            \
-    static llvm::Expected<Type>                                                \
-    deserialize(ModuleFile &MF,                                                \
-                llvm::SmallVectorImpl<uint64_t> &scratch,                      \
-                StringRef blobData);                                           \
-  }
-  } // namespace detail
-
-/// This \c TYPE_LAYOUT(...) macro replaces the usual \c BCRecordLayout coding
-/// structures below by enforcing structural checks for the definition of
-/// deserialization members. If you forget to define a \c TYPE_LAYOUT(...) for a
-/// \c TYPE(...) there will be a gnarly SFINAE error pointing at it in
-/// DeclTypeRecordNodes.def.
-///
-/// This macro pairs with \c DESERIALIZE_TYPE(...) in Deserialization.cpp such
-/// that if you forget \c DESERIALIZE_TYPE(...) you will come up
-/// with a linker error.
-#define TYPE_LAYOUT(LAYOUT, ...) TYPE_LAYOUT_IMPL(LAYOUT, __VA_ARGS__)
-
   using ClangTypeLayout = BCRecordLayout<
     CLANG_TYPE,
     BCArray<BCVBR<6>>
@@ -1018,53 +976,52 @@ namespace decls_block {
   >;
 
   /// A placeholder for invalid types
-  TYPE_LAYOUT(ErrorTypeLayout,
+  using ErrorTypeLayout = BCRecordLayout<
     ERROR_TYPE,
     TypeIDField // original type (if any)
-  );
+  >;
 
-  TYPE_LAYOUT(BuiltinAliasTypeLayout,
+  using BuiltinAliasTypeLayout = BCRecordLayout<
     BUILTIN_ALIAS_TYPE,
     DeclIDField, // typealias decl
     TypeIDField  // canonical type (a fallback)
-  );
+  >;
 
-  TYPE_LAYOUT(TypeAliasTypeLayout,
+  using TypeAliasTypeLayout = BCRecordLayout<
     NAME_ALIAS_TYPE,
-    DeclIDField,           // typealias decl
-    TypeIDField,           // parent type
-    TypeIDField,           // underlying type
-    TypeIDField,           // substituted type
+    DeclIDField,      // typealias decl
+    TypeIDField,      // parent type
+    TypeIDField,      // underlying type
+    TypeIDField,      // substituted type
     SubstitutionMapIDField // substitution map
-  );
+  >;
 
-  TYPE_LAYOUT(GenericTypeParamTypeLayout,
-    GENERIC_TYPE_PARAM_TYPE,
+  using GenericTypeParamTypeLayout = BCRecordLayout<GENERIC_TYPE_PARAM_TYPE,
     BCFixed<1>,  // type sequence?
     DeclIDField, // generic type parameter decl or depth
     BCVBR<4> // index + 1, or zero if we have a generic type
             // parameter decl
-  );
+  >;
 
-  TYPE_LAYOUT(DependentMemberTypeLayout,
+  using DependentMemberTypeLayout = BCRecordLayout<
     DEPENDENT_MEMBER_TYPE,
-    TypeIDField, // base type
-    DeclIDField  // associated type decl
-  );
-  TYPE_LAYOUT(NominalTypeLayout,
+    TypeIDField,      // base type
+    DeclIDField       // associated type decl
+  >;
+  using NominalTypeLayout = BCRecordLayout<
     NOMINAL_TYPE,
     DeclIDField, // decl
     TypeIDField  // parent
-  );
+  >;
 
-  TYPE_LAYOUT(ParenTypeLayout,
+  using ParenTypeLayout = BCRecordLayout<
     PAREN_TYPE,
-    TypeIDField // inner type
-  );
+    TypeIDField         // inner type
+  >;
 
-  TYPE_LAYOUT(TupleTypeLayout,
+  using TupleTypeLayout = BCRecordLayout<
     TUPLE_TYPE
-  );
+  >;
 
   using TupleTypeEltLayout = BCRecordLayout<
     TUPLE_TYPE_ELT,
@@ -1072,19 +1029,19 @@ namespace decls_block {
     TypeIDField         // type
   >;
 
-  TYPE_LAYOUT(FunctionTypeLayout,
+  using FunctionTypeLayout = BCRecordLayout<
     FUNCTION_TYPE,
-    TypeIDField,                     // output
+    TypeIDField, // output
     FunctionTypeRepresentationField, // representation
-    ClangTypeIDField,                // type
-    BCFixed<1>,                      // noescape?
-    BCFixed<1>,                      // concurrent?
-    BCFixed<1>,                      // async?
-    BCFixed<1>,                      // throws?
-    DifferentiabilityKindField,      // differentiability kind
-    TypeIDField                      // global actor
+    ClangTypeIDField, // type
+    BCFixed<1>,  // noescape?
+    BCFixed<1>,   // concurrent?
+    BCFixed<1>,   // async?
+    BCFixed<1>,   // throws?
+    DifferentiabilityKindField, // differentiability kind
+    TypeIDField   // global actor
     // trailed by parameters
-  );
+  >;
 
   using FunctionParamLayout = BCRecordLayout<
     FUNCTION_PARAM,
@@ -1100,156 +1057,154 @@ namespace decls_block {
     BCFixed<1>           // compileTimeConst
   >;
 
-  TYPE_LAYOUT(MetatypeTypeLayout,
+  using MetatypeTypeLayout = BCRecordLayout<
     METATYPE_TYPE,
-    TypeIDField,                // instance type
-    MetatypeRepresentationField // representation
-  );
+    TypeIDField,                       // instance type
+    MetatypeRepresentationField        // representation
+  >;
 
-  TYPE_LAYOUT(ExistentialMetatypeTypeLayout,
+  using ExistentialMetatypeTypeLayout = BCRecordLayout<
     EXISTENTIAL_METATYPE_TYPE,
-    TypeIDField,                // instance type
-    MetatypeRepresentationField // representation
-  );
+    TypeIDField,                       // instance type
+    MetatypeRepresentationField        // representation
+  >;
 
-  TYPE_LAYOUT(PrimaryArchetypeTypeLayout,
+  using PrimaryArchetypeTypeLayout = BCRecordLayout<
     PRIMARY_ARCHETYPE_TYPE,
     GenericSignatureIDField, // generic environment
     TypeIDField              // interface type
-  );
+  >;
 
-  TYPE_LAYOUT(OpenedArchetypeTypeLayout,
+  using OpenedArchetypeTypeLayout = BCRecordLayout<
     OPENED_ARCHETYPE_TYPE,
     TypeIDField,            // the existential type
     TypeIDField,            // the interface type
     GenericSignatureIDField // generic signature
-  );
+  >;
 
-  TYPE_LAYOUT(OpaqueArchetypeTypeLayout,
+  using OpaqueArchetypeTypeLayout = BCRecordLayout<
     OPAQUE_ARCHETYPE_TYPE,
     DeclIDField,           // the opaque type decl
     TypeIDField,           // the interface type
     SubstitutionMapIDField // the arguments
-  );
+  >;
 
-  TYPE_LAYOUT(SequenceArchetypeTypeLayout,
+  using SequenceArchetypeTypeLayout = BCRecordLayout<
     SEQUENCE_ARCHETYPE_TYPE,
     GenericSignatureIDField, // generic environment
     TypeIDField              // interface type
-  );
+  >;
 
-  TYPE_LAYOUT(DynamicSelfTypeLayout,
+  using DynamicSelfTypeLayout = BCRecordLayout<
     DYNAMIC_SELF_TYPE,
-    TypeIDField // self type
-  );
+    TypeIDField          // self type
+  >;
 
-  TYPE_LAYOUT(ProtocolCompositionTypeLayout,
+  using ProtocolCompositionTypeLayout = BCRecordLayout<
     PROTOCOL_COMPOSITION_TYPE,
     BCFixed<1>,          // has AnyObject constraint
     BCArray<TypeIDField> // protocols
-  );
+  >;
 
-  TYPE_LAYOUT(ParameterizedProtocolTypeLayout,
+  using ParameterizedProtocolTypeLayout = BCRecordLayout<
     PARAMETERIZED_PROTOCOL_TYPE,
     TypeIDField,         // base
     BCArray<TypeIDField> // arguments
-  );
+  >;
 
-  TYPE_LAYOUT(BoundGenericTypeLayout,
+  using BoundGenericTypeLayout = BCRecordLayout<
     BOUND_GENERIC_TYPE,
-    DeclIDField,         // generic decl
-    TypeIDField,         // parent
+    DeclIDField, // generic decl
+    TypeIDField, // parent
     BCArray<TypeIDField> // generic arguments
-  );
+  >;
 
-  TYPE_LAYOUT(GenericFunctionTypeLayout,
+  using GenericFunctionTypeLayout = BCRecordLayout<
     GENERIC_FUNCTION_TYPE,
-    TypeIDField,                     // output
+    TypeIDField,         // output
     FunctionTypeRepresentationField, // representation
-    BCFixed<1>,                      // concurrent?
-    BCFixed<1>,                      // async?
-    BCFixed<1>,                      // throws?
-    DifferentiabilityKindField,      // differentiability kind
-    TypeIDField,                     // global actor
-    GenericSignatureIDField          // generic signature
+    BCFixed<1>,          // concurrent?
+    BCFixed<1>,          // async?
+    BCFixed<1>,          // throws?
+    DifferentiabilityKindField, // differentiability kind
+    TypeIDField,         // global actor
+    GenericSignatureIDField // generic signture
 
     // trailed by parameters
-  );
+  >;
 
-  TYPE_LAYOUT(SILFunctionTypeLayout,
+  using SILFunctionTypeLayout = BCRecordLayout<
     SIL_FUNCTION_TYPE,
     BCFixed<1>,                         // concurrent?
     BCFixed<1>,                         // async?
-    SILCoroutineKindField,              // coroutine kind
-    ParameterConventionField,           // callee convention
+    SILCoroutineKindField, // coroutine kind
+    ParameterConventionField, // callee convention
     SILFunctionTypeRepresentationField, // representation
-    BCFixed<1>,                         // pseudogeneric?
-    BCFixed<1>,                         // noescape?
-    DifferentiabilityKindField,         // differentiability kind
-    BCFixed<1>,                         // error result?
-    BCVBR<6>,                           // number of parameters
-    BCVBR<5>,                           // number of yields
-    BCVBR<5>,                           // number of results
-    GenericSignatureIDField,            // invocation generic signature
-    SubstitutionMapIDField,             // invocation substitutions
-    SubstitutionMapIDField,             // pattern substitutions
-    ClangTypeIDField,    // clang function type, for foreign conventions
-    BCArray<TypeIDField> // parameter types/conventions, alternating
-                          // followed by result types/conventions, alternating
-                          // followed by error result type/convention
+    BCFixed<1>,            // pseudogeneric?
+    BCFixed<1>,            // noescape?
+    DifferentiabilityKindField, // differentiability kind
+    BCFixed<1>,            // error result?
+    BCVBR<6>,              // number of parameters
+    BCVBR<5>,              // number of yields
+    BCVBR<5>,              // number of results
+    GenericSignatureIDField, // invocation generic signature
+    SubstitutionMapIDField, // invocation substitutions
+    SubstitutionMapIDField, // pattern substitutions
+    ClangTypeIDField,      // clang function type, for foreign conventions
+    BCArray<TypeIDField>   // parameter types/conventions, alternating
+                           // followed by result types/conventions, alternating
+                           // followed by error result type/convention
     // Optionally a protocol conformance (for witness_methods)
     // Optionally a substitution map (for substituted function types)
-  );
+  >;
 
-  TYPE_LAYOUT(SILBlockStorageTypeLayout,
+  using SILBlockStorageTypeLayout = BCRecordLayout<
     SIL_BLOCK_STORAGE_TYPE,
-    TypeIDField // capture type
-  );
-
-  TYPE_LAYOUT(SILMoveOnlyTypeLayout,
-    SIL_MOVE_ONLY_TYPE,
-    TypeIDField            // inner type
-  );
+    TypeIDField            // capture type
+  >;
 
   using SILLayoutLayout = BCRecordLayout<
     SIL_LAYOUT,
     GenericSignatureIDField,    // generic signature
-    BCFixed<1>,                 // captures generic env
     BCVBR<8>,                   // number of fields
     BCArray<TypeIDWithBitField> // field types with mutability
   >;
 
-  TYPE_LAYOUT(SILBoxTypeLayout,
+  using SILBoxTypeLayout = BCRecordLayout<
     SIL_BOX_TYPE,
-    SILLayoutIDField,      // layout
+    SILLayoutIDField,     // layout
     SubstitutionMapIDField // substitutions
-  );
+  >;
 
-#define SYNTAX_SUGAR_TYPE_LAYOUT(LAYOUT, CODE)                                 \
-  TYPE_LAYOUT(LAYOUT, CODE, TypeIDField)
+  template <unsigned Code>
+  using SyntaxSugarTypeLayout = BCRecordLayout<
+    Code,
+    TypeIDField // element type
+  >;
 
-  SYNTAX_SUGAR_TYPE_LAYOUT(ArraySliceTypeLayout, ARRAY_SLICE_TYPE);
-  SYNTAX_SUGAR_TYPE_LAYOUT(OptionalTypeLayout, OPTIONAL_TYPE);
-  SYNTAX_SUGAR_TYPE_LAYOUT(VariadicSequenceTypeLayout, VARIADIC_SEQUENCE_TYPE);
-  SYNTAX_SUGAR_TYPE_LAYOUT(ExistentialTypeLayout, EXISTENTIAL_TYPE);
+  using ArraySliceTypeLayout = SyntaxSugarTypeLayout<ARRAY_SLICE_TYPE>;
+  using OptionalTypeLayout = SyntaxSugarTypeLayout<OPTIONAL_TYPE>;
+  using VariadicSequenceTypeLayout = SyntaxSugarTypeLayout<VARIADIC_SEQUENCE_TYPE>;
+  using ExistentialTypeLayout =
+      SyntaxSugarTypeLayout<EXISTENTIAL_TYPE>;
 
-  TYPE_LAYOUT(DictionaryTypeLayout,
+  using DictionaryTypeLayout = BCRecordLayout<
     DICTIONARY_TYPE,
     TypeIDField, // key type
     TypeIDField  // value type
-  );
+  >;
 
-  TYPE_LAYOUT(ReferenceStorageTypeLayout,
+  using ReferenceStorageTypeLayout = BCRecordLayout<
     REFERENCE_STORAGE_TYPE,
     ReferenceOwnershipField, // ownership
     TypeIDField              // implementation type
-  );
+  >;
 
-  TYPE_LAYOUT(UnboundGenericTypeLayout,
+  using UnboundGenericTypeLayout = BCRecordLayout<
     UNBOUND_GENERIC_TYPE,
     DeclIDField, // generic decl
     TypeIDField  // parent
-  );
+  >;
 
   using TypeAliasLayout = BCRecordLayout<
     TYPE_ALIAS_DECL,
@@ -1655,8 +1610,7 @@ namespace decls_block {
 
   using AnyPatternLayout = BCRecordLayout<
     ANY_PATTERN,
-    TypeIDField, // type
-    BCFixed<1>   // isAsyncLet
+    TypeIDField  // type
     // FIXME: is the type necessary?
   >;
 
@@ -1792,7 +1746,7 @@ namespace decls_block {
     BCFixed<1>,        // restrict to protocol extension
     BCFixed<1>         // imported from Clang?
   >;
-  
+
   using XRefOpaqueReturnTypePathPieceLayout = BCRecordLayout<
     XREF_OPAQUE_RETURN_TYPE_PATH_PIECE,
     IdentifierIDField // mangled name of defining decl
@@ -1858,7 +1812,7 @@ namespace decls_block {
     BCFixed<1>, // implicit flag
     BCVBR<8>    // alignment
   >;
-  
+
   using SwiftNativeObjCRuntimeBaseDeclAttrLayout = BCRecordLayout<
     SwiftNativeObjCRuntimeBase_DECL_ATTR,
     BCFixed<1>, // implicit flag
@@ -2086,10 +2040,6 @@ namespace decls_block {
     BC_AVAIL_TUPLE, // OS version
     BCVBR<5>        // platform
   >;
-
-#undef SYNTAX_SUGAR_TYPE_LAYOUT
-#undef TYPE_LAYOUT
-#undef TYPE_LAYOUT_IMPL
 }
 
 /// Returns the encoding kind for the given decl.
