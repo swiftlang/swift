@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -module-name inlinable_attribute -emit-verbose-sil -warnings-as-errors %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name inlinable_attribute -emit-verbose-sil -warnings-as-errors -disable-availability-checking %s | %FileCheck %s
 
 // CHECK-LABEL: sil [serialized] [ossa] @$s19inlinable_attribute15fragileFunctionyyF : $@convention(thin) () -> ()
 @inlinable public func fragileFunction() {
@@ -33,6 +33,32 @@ public class MyCls {
 
   // CHECK-LABEL: sil [ossa] @$s19inlinable_attribute5MyClsC15convenienceInitACyt_tcfC : $@convention(method) (@thick MyCls.Type) -> @owned MyCls
   public convenience init(convenienceInit: ()) {
+    self.init(designatedInit: ())
+  }
+}
+
+public actor MyAct {
+  // CHECK-LABEL: sil [serialized] [ossa] @$s19inlinable_attribute5MyActCfD : $@convention(method) (@owned MyAct) -> ()
+  @inlinable deinit {}
+
+  /// whether delegating or not, the initializers for an actor are not serialized unless marked inlinable.
+
+  // CHECK-LABEL: sil [exact_self_class] [ossa] @$s19inlinable_attribute5MyActC14designatedInitACyt_tcfC : $@convention(method) (@thick MyAct.Type) -> @owned MyAct
+  // CHECK-LABEL: sil [ossa] @$s19inlinable_attribute5MyActC14designatedInitACyt_tcfc : $@convention(method) (@owned MyAct) -> @owned MyAct
+  public init(designatedInit: ()) {}
+
+  // CHECK-LABEL: sil [ossa] @$s19inlinable_attribute5MyActC15convenienceInitACyt_tcfC : $@convention(method) (@thick MyAct.Type) -> @owned MyAct
+  public init(convenienceInit: ()) {
+    self.init(designatedInit: ())
+  }
+
+
+  // CHECK-LABEL: sil [serialized] [exact_self_class] [ossa] @$s19inlinable_attribute5MyActC0A14DesignatedInitACyt_tcfC : $@convention(method) (@thick MyAct.Type) -> @owned MyAct
+  // CHECK-LABEL: sil [serialized] [ossa] @$s19inlinable_attribute5MyActC0A14DesignatedInitACyt_tcfc : $@convention(method) (@owned MyAct) -> @owned MyAct
+  @inlinable public init(inlinableDesignatedInit: ()) {}
+
+  // CHECK-LABEL: sil [serialized] [ossa] @$s19inlinable_attribute5MyActC0A15ConvenienceInitACyt_tcfC : $@convention(method) (@thick MyAct.Type) -> @owned MyAct
+  @inlinable public init(inlinableConvenienceInit: ()) {
     self.init(designatedInit: ())
   }
 }

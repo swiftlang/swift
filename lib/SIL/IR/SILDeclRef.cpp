@@ -662,13 +662,14 @@ IsSerialized_t SILDeclRef::isSerialized() const {
     return IsSerialized;
 
   // The allocating entry point for designated initializers are serialized
-  // if the class is @usableFromInline or public.
+  // if the class is @usableFromInline or public. Actors are excluded because
+  // whether the init is designated is not clearly reflected in the source code.
   if (kind == SILDeclRef::Kind::Allocator) {
     auto *ctor = cast<ConstructorDecl>(d);
-    if (ctor->isDesignatedInit() &&
-        ctor->getDeclContext()->getSelfClassDecl()) {
-      if (!ctor->hasClangNode())
-        return IsSerialized;
+    if (auto classDecl = ctor->getDeclContext()->getSelfClassDecl()) {
+      if (!classDecl->isAnyActor() && ctor->isDesignatedInit())
+        if (!ctor->hasClangNode())
+          return IsSerialized;
     }
   }
 
