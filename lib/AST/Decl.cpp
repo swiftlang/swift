@@ -2259,6 +2259,9 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
     assert(hasStorage());
     return AccessStrategy::getStorage();
 
+  case AccessSemantics::DistributedThunk:
+    return AccessStrategy::getDistributedThunkDispatchStrategy();
+
   case AccessSemantics::Ordinary:
     // Skip these checks for local variables, both because they're unnecessary
     // and because we won't necessarily have computed access.
@@ -6415,10 +6418,6 @@ bool VarDecl::isLet() const {
 
 bool VarDecl::isAsyncLet() const {
   return getAttrs().hasAttribute<AsyncAttr>();
-}
-
-bool VarDecl::isDistributed() const {
-  return getAttrs().hasAttribute<DistributedActorAttr>();
 }
 
 bool VarDecl::isKnownToBeLocal() const {

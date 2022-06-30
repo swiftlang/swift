@@ -3309,6 +3309,7 @@ public:
     bool overriddenAffectsABI, needsNewVTableEntry, isTransparent;
     DeclID opaqueReturnTypeID;
     bool isUserAccessible;
+    bool isDistributedThunk;
     ArrayRef<uint64_t> nameAndDependencyIDs;
 
     if (!isAccessor) {
@@ -3327,6 +3328,7 @@ public:
                                           needsNewVTableEntry,
                                           opaqueReturnTypeID,
                                           isUserAccessible,
+                                          isDistributedThunk,
                                           nameAndDependencyIDs);
     } else {
       decls_block::AccessorLayout::readRecord(scratch, contextID, isImplicit,
@@ -3344,6 +3346,7 @@ public:
                                               rawAccessLevel,
                                               needsNewVTableEntry,
                                               isTransparent,
+                                              isDistributedThunk,
                                               nameAndDependencyIDs);
     }
 
@@ -3519,6 +3522,8 @@ public:
 
     if (!isAccessor)
       fn->setUserAccessible(isUserAccessible);
+
+    fn->setDistributedThunk(isDistributedThunk);
 
     return fn;
   }

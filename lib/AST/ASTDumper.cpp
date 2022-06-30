@@ -255,6 +255,7 @@ static StringRef getAccessSemanticsString(AccessSemantics value) {
     case AccessSemantics::Ordinary: return "ordinary";
     case AccessSemantics::DirectToStorage: return "direct_to_storage";
     case AccessSemantics::DirectToImplementation: return "direct_to_impl";
+    case AccessSemantics::DistributedThunk: return "distributed_thunk";
   }
 
   llvm_unreachable("Unhandled AccessSemantics in switch.");
@@ -742,6 +743,8 @@ namespace {
 
     void visitVarDecl(VarDecl *VD) {
       printCommon(VD, "var_decl");
+      if (VD->isDistributed())
+        PrintWithColorRAII(OS, DeclModifierColor) << " distributed";
       if (VD->isLet())
         PrintWithColorRAII(OS, DeclModifierColor) << " let";
       if (VD->getAttrs().hasAttribute<LazyAttr>())
@@ -871,6 +874,9 @@ namespace {
       }
       if (D->isDistributed()) {
         PrintWithColorRAII(OS, ExprModifierColor) << " distributed";
+      }
+      if (D->isDistributedThunk()) {
+        PrintWithColorRAII(OS, ExprModifierColor) << " distributed-thunk";
       }
 
       if (auto fac = D->getForeignAsyncConvention()) {

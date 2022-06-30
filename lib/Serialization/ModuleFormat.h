@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 693; // existential Any and AnyObject
+const uint16_t SWIFTMODULE_VERSION_MINOR = 696; // `distributed thunk` bit on `AbstractFunctionDecl`
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -397,7 +397,7 @@ enum class SelfAccessKind : uint8_t {
   Consuming,
 };
 using SelfAccessKindField = BCFixed<2>;
-  
+
 /// Translates an operator decl fixity to a Serialization fixity, whose values
 /// are guaranteed to be stable.
 static inline OperatorKind getStableFixity(OperatorFixity fixity) {
@@ -1088,7 +1088,7 @@ namespace decls_block {
     TypeIDField,           // the interface type
     SubstitutionMapIDField // the arguments
   >;
-  
+
   using SequenceArchetypeTypeLayout = BCRecordLayout<
     SEQUENCE_ARCHETYPE_TYPE,
     GenericSignatureIDField, // generic environment
@@ -1157,7 +1157,7 @@ namespace decls_block {
     // Optionally a protocol conformance (for witness_methods)
     // Optionally a substitution map (for substituted function types)
   >;
-  
+
   using SILBlockStorageTypeLayout = BCRecordLayout<
     SIL_BLOCK_STORAGE_TYPE,
     TypeIDField            // capture type
@@ -1404,6 +1404,7 @@ namespace decls_block {
     BCFixed<1>,   // requires a new vtable slot
     DeclIDField,  // opaque result type decl
     BCFixed<1>,   // isUserAccessible?
+    BCFixed<1>,   // is distributed thunk
     BCArray<IdentifierIDField> // name components,
                                // followed by TypeID dependencies
     // The record is trailed by:
@@ -1455,6 +1456,7 @@ namespace decls_block {
     AccessLevelField, // access level
     BCFixed<1>,   // requires a new vtable slot
     BCFixed<1>,   // is transparent
+    BCFixed<1>,   // is distributed thunk
     BCArray<IdentifierIDField> // name components,
                                // followed by TypeID dependencies
     // The record is trailed by:
@@ -1744,7 +1746,7 @@ namespace decls_block {
     BCFixed<1>,        // restrict to protocol extension
     BCFixed<1>         // imported from Clang?
   >;
-  
+
   using XRefOpaqueReturnTypePathPieceLayout = BCRecordLayout<
     XREF_OPAQUE_RETURN_TYPE_PATH_PIECE,
     IdentifierIDField // mangled name of defining decl
@@ -1810,7 +1812,7 @@ namespace decls_block {
     BCFixed<1>, // implicit flag
     BCVBR<8>    // alignment
   >;
-  
+
   using SwiftNativeObjCRuntimeBaseDeclAttrLayout = BCRecordLayout<
     SwiftNativeObjCRuntimeBase_DECL_ATTR,
     BCFixed<1>, // implicit flag

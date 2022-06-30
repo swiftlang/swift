@@ -3484,10 +3484,33 @@ ASTMangler::mangleOpaqueTypeDescriptorRecord(const OpaqueTypeDecl *decl) {
   return finalize();
 }
 
-std::string ASTMangler::mangleDistributedThunk(const FuncDecl *thunk) {
+std::string ASTMangler::mangleDistributedThunk(const AbstractFunctionDecl *thunk) {
   // Marker protocols cannot be checked at runtime, so there is no point
   // in recording them for distributed thunks.
   llvm::SaveAndRestore<bool> savedAllowMarkerProtocols(AllowMarkerProtocols,
                                                        false);
+
+  // Since computed property SILDeclRef's refer to the "originator"
+  // of the thunk, we need to mangle distributed thunks of accessors
+  // specially.
+  if (auto *accessor = dyn_cast<AccessorDecl>(thunk)) {
+    // TODO: This needs to use accessor type instead of
+    //       distributed thunk after all SILDeclRefs are switched
+    //       to use "originator" instead of the thunk itself.
+    //
+    // ```
+    // beginMangling();
+    // appendContextOf(thunk);
+    // appendDeclName(accessor->getStorage());
+    // appendDeclType(accessor, FunctionMangling);
+    // appendOperator("F");
+    // appendSymbolKind(SymbolKind::DistributedThunk);
+    // return finalize();
+    // ```
+    auto *storage = accessor->getStorage();
+    thunk = storage->getDistributedThunk();
+    assert(thunk);
+  }
+
   return mangleEntity(thunk, SymbolKind::DistributedThunk);
 }
