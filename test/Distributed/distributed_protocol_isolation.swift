@@ -25,11 +25,15 @@ protocol DistProtocol: DistributedActor {
   // expected-note@-3{{distributed actor-isolated instance method 'local()' declared here}}
   // expected-note@-4{{distributed actor-isolated instance method 'local()' declared here}}
 
-  distributed func dist() -> String
-  distributed func dist(string: String) -> String
+  distributed func dist() -> String // FIXME(distributed): rdar://95949498 currently we are limited to explicitly 'async throws' protocol requirements that are distributed funcs
+  // expected-error@-1{{'distributed' protocol requirement 'dist()' must currently be declared explicitly 'async throws'}}
+  distributed func dist(string: String) -> String // FIXME(distributed): rdar://95949498 currently we are limited to explicitly 'async throws' protocol requirements that are distributed funcs
+  // expected-error@-1{{'distributed' protocol requirement 'dist(string:)' must currently be declared explicitly 'async throws'}}
 
-  distributed func distAsync() async -> String
-  distributed func distThrows() throws -> String
+  distributed func distAsync() async -> String // FIXME(distributed): rdar://95949498 currently we are limited to explicitly 'async throws' protocol requirements that are distributed funcs
+  // expected-error@-1{{'distributed' protocol requirement 'distAsync()' must currently be declared explicitly 'async throws'}}
+  distributed func distThrows() throws -> String // FIXME(distributed): rdar://95949498 currently we are limited to explicitly 'async throws' protocol requirements that are distributed funcs
+  // expected-error@-1{{'distributed' protocol requirement 'distThrows()' must currently be declared explicitly 'async throws'}}
   distributed func distAsyncThrows() async throws -> String
 }
 
@@ -253,8 +257,9 @@ func test_watchingDA_any(da: any TerminationWatchingDA) async throws {
 // MARK: Error cases
 
 protocol ErrorCases: DistributedActor {
-  distributed func unexpectedAsyncThrows() -> String
-  // expected-note@-1{{protocol requires function 'unexpectedAsyncThrows()' with type '() -> String'; do you want to add a stub?}}
+  distributed func unexpectedAsyncThrows() -> String // FIXME(distributed): rdar://95949498 currently we are limited to explicitly 'async throws' protocol requirements that are distributed funcs
+  // expected-error@-1{{'distributed' protocol requirement 'unexpectedAsyncThrows()' must currently be declared explicitly 'async throws'}}
+  // expected-note@-2{{protocol requires function 'unexpectedAsyncThrows()' with type '() -> String'; do you want to add a stub?}}
 }
 
 distributed actor BadGreeter: ErrorCases {

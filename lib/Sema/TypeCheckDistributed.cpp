@@ -502,9 +502,25 @@ bool CheckDistributedFunctionRequest::evaluate(
     serializationRequirements = getDistributedSerializationRequirementProtocols(
         getDistributedActorSystemType(actor)->getAnyNominal(),
         C.getProtocol(KnownProtocolKind::DistributedActorSystem));
+  } else if (isa<ProtocolDecl>(DC)) {
+    if (auto seqReqTy =
+        getConcreteReplacementForMemberSerializationRequirement(func)) {
+      auto seqReqTyDes = seqReqTy->castTo<ExistentialType>()->getConstraintType()->getDesugaredType();
+      for (auto req : flattenDistributedSerializationTypeToRequiredProtocols(seqReqTyDes)) {
+        serializationRequirements.insert(req);
+      }
+    }
+
+    // The distributed actor constrained protocol has no serialization requirements
+    // or actor system defined, so these will only be enforced, by implementations
+    // of DAs conforming to it, skip checks here.
+    if (serializationRequirements.empty()) {
+      return false;
+    }
   } else {
-    llvm_unreachable("Cannot handle types other than extensions and actor "
-                     "declarations in distributed function checking.");
+    llvm_unreachable("Distributed function detected in type other than extension, "
+                     "distributed actor, or protocol! This should not be possible "
+                     ", please file a bug.");
   }
 
   // If the requirement is exactly `Codable` we diagnose it ia bit nicer.
@@ -652,11 +668,22 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal
   // If applicable, this will create the default 'init(transport:)' initializer
   (void)nominal->getDefaultInitializer();
 
+
   for (auto member : nominal->getMembers()) {
     // --- Ensure all thunks
     if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
       if (!func->isDistributed())
         continue;
+
+      if (!isa<ProtocolDecl>(nominal)) {
+        auto systemTy = getConcreteReplacementForProtocolActorSystemType(func);
+        if (!systemTy || systemTy->hasError()) {
+          nominal->diagnose(
+              diag::distributed_actor_conformance_missing_system_type,
+              nominal->getName());
+          return;
+        }
+      }
 
       if (auto thunk = func->getDistributedThunk()) {
         SF->DelayedFunctions.push_back(thunk);
@@ -673,6 +700,13 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal
   // Also, the 'id' var must be added before the 'actorSystem'.
   // See NOTE (id-before-actorSystem) for more details.
   (void)nominal->getDistributedActorIDProperty();
+}
+
+void TypeChecker::checkDistributedFunc(FuncDecl *func) {
+  if (!func->isDistributed())
+    return;
+
+  swift::checkDistributedFunction(func);
 }
 
 llvm::SmallPtrSet<ProtocolDecl *, 2>

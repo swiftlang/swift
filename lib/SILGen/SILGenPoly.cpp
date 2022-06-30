@@ -4435,15 +4435,22 @@ void SILGenFunction::emitProtocolWitness(
   SmallVector<ManagedValue, 8> origParams;
   collectThunkParams(loc, origParams);
 
-  // If the witness is isolated to a distributed actor, but the requirement is
-  // not, go through the distributed thunk.
   if (witness.hasDecl() &&
-      getActorIsolation(witness.getDecl()).isDistributedActor() &&
-      requirement.hasDecl() &&
-      !getActorIsolation(requirement.getDecl()).isDistributedActor()) {
-    witness = SILDeclRef(
-        cast<AbstractFunctionDecl>(witness.getDecl())->getDistributedThunk())
-          .asDistributed();
+      getActorIsolation(witness.getDecl()).isDistributedActor()) {
+    // We witness protocol requirements using the distributed thunk, when:
+    // - the witness is isolated to a distributed actor, but the requirement is not
+    // - the requirement is a distributed func, and therefore can only be witnessed
+    //   by a distributed func; we handle this by witnessing the requirement with the thunk
+    // FIXME(distributed): this limits us to only allow distributed explicitly throwing async requirements... we need to fix this somehow.
+    if (requirement.hasDecl()) {
+      if ((!getActorIsolation(requirement.getDecl()).isDistributedActor()) ||
+          (isa<FuncDecl>(requirement.getDecl()) &&
+              requirement.getFuncDecl()->isDistributed())) {
+        auto thunk = cast<AbstractFunctionDecl>(witness.getDecl())
+                         ->getDistributedThunk();
+        witness = SILDeclRef(thunk).asDistributed();
+      }
+    }
   } else if (enterIsolation) {
     // If we are supposed to enter the actor, do so now by hopping to the
     // actor.
