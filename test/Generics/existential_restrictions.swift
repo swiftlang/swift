@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-objc-interop -disable-experimental-opened-existential-types
+// RUN: %target-typecheck-verify-swift -enable-objc-interop
 
 protocol P { }
 @objc protocol OP { }
@@ -8,14 +8,14 @@ protocol CP : class { }
   static func createNewOne() -> SP
 }
 
-func fP<T : P>(_ t: T) { }
+func fP<T : P>(_ t: T?) { }
 // expected-note@-1 {{required by global function 'fP' where 'T' = 'any P'}}
 // expected-note@-2 {{required by global function 'fP' where 'T' = 'any OP & P'}}
-func fOP<T : OP>(_ t: T) { }
+func fOP<T : OP>(_ t: T?) { }
 // expected-note@-1 {{required by global function 'fOP' where 'T' = 'any OP & P'}}
 func fOPE(_ t: OP) { }
-func fSP<T : SP>(_ t: T) { }
-func fAO<T : AnyObject>(_ t: T) { }
+func fSP<T : SP>(_ t: T?) { }
+func fAO<T : AnyObject>(_ t: T?) { }
 // expected-note@-1 {{where 'T' = 'any P'}}
 // expected-note@-2 {{where 'T' = 'any CP'}}
 // expected-note@-3 {{where 'T' = 'any OP & P'}}
