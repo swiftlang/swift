@@ -2525,7 +2525,7 @@ assessRequirementFailureImpact(ConstraintSystem &cs, Type requirementType,
     if (auto *typeVar = requirementType->getAs<TypeVariableType>()) {
       unsigned choiceImpact = 0;
       if (auto choice = cs.findSelectedOverloadFor(ODRE)) {
-        choice->openedType.visit([&](Type type) {
+        choice->adjustedOpenedType.visit([&](Type type) {
           if (type->isEqual(typeVar))
             ++choiceImpact;
         });
@@ -4350,7 +4350,7 @@ static bool repairOutOfOrderArgumentsInBinaryFunction(
   if (!(overload && overload->choice.isDecl()))
     return false;
 
-  auto *fnType = overload->openedType->getAs<FunctionType>();
+  auto *fnType = overload->adjustedOpenedType->getAs<FunctionType>();
   if (!(fnType && fnType->getNumParams() == 2))
     return false;
 
@@ -5306,7 +5306,7 @@ bool ConstraintSystem::repairFailures(
           auto callee = getCalleeLocator(loc);
           if (auto overload = findSelectedOverloadFor(callee)) {
             auto fnType =
-                simplifyType(overload->openedType)->castTo<FunctionType>();
+                simplifyType(overload->adjustedOpenedType)->castTo<FunctionType>();
             auto paramIdx = argToParamElt->getParamIdx();
             auto paramType = fnType->getParams()[paramIdx].getParameterType();
             if (auto paramFnType = paramType->getAs<FunctionType>()) {

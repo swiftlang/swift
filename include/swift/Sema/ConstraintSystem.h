@@ -621,8 +621,12 @@ struct SelectedOverload {
   /// The opened type produced by referring to this overload.
   const Type openedType;
 
+  /// The opened type produced by referring to this overload, adjusted for
+  /// `@preconcurrency` or other contextual type-altering attributes.
+  const Type adjustedOpenedType;
+
   /// The type that this overload binds. Note that this may differ from
-  /// openedType, for example it will include any IUO unwrapping that has taken
+  /// adjustedOpenedType, for example it will include any IUO unwrapping that has taken
   /// place.
   const Type boundType;
 };
@@ -2489,10 +2493,15 @@ struct DeclReferenceType {
   /// operation.
   Type adjustedOpenedType;
 
+  /// The type of the reference, based on the original opened type. This is the
+  /// type that the expression used to form the declaration reference would
+  /// have if no adjustments had been applied.
+  Type referenceType;
+
   /// The type of the reference, which is the adjusted opened type after
   /// (e.g.) applying the base of a member access. This is the type of the
-  /// expression used to form the declaration reference type.
-  Type referenceType;
+  /// expression used to form the declaration reference.
+  Type adjustedReferenceType;
 };
 
 /// Describes a system of constraints on type variables, the
@@ -4509,6 +4518,14 @@ public:
         [](const AbstractClosureExpr *) {
           return Type();
         });
+
+  /// Given the opened type and a pile of information about a member reference,
+  /// determine the reference type of the member reference.
+  Type getMemberReferenceTypeFromOpenedType(
+      Type &openedType, Type baseObjTy, ValueDecl *value, DeclContext *outerDC,
+      ConstraintLocator *locator, bool hasAppliedSelf,
+      bool isStaticMemberRefOnProtocol, bool isDynamicResult,
+      OpenedTypeMap &replacements);
 
   /// Retrieve the type of a reference to the given value declaration,
   /// as a member with a base of the given type.
