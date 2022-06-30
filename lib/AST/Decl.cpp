@@ -5252,7 +5252,7 @@ bool ClassDecl::hasRefCountingAnnotations() const {
 ReferenceCounting ClassDecl::getObjectModel() const {
   if (isForeignReferenceType())
     return hasRefCountingAnnotations()
-               ? ReferenceCounting::CxxCustom
+               ? ReferenceCounting::Custom
                : ReferenceCounting::None;
 
   if (checkAncestry(AncestryFlags::ObjCObjectModel))

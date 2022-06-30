@@ -6041,7 +6041,7 @@ ReferenceCounting TypeBase::getReferenceCounting() {
     return lookThroughAllOptionalTypes()
                    ->getClassOrBoundGenericClass()
                    ->hasRefCountingAnnotations()
-               ? ReferenceCounting::CxxCustom
+               ? ReferenceCounting::Custom
                : ReferenceCounting::None;
 
   // In the absence of Objective-C interoperability, everything uses native

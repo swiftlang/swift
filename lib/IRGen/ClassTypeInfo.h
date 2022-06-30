@@ -61,7 +61,7 @@ public:
 
   void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value,
                          Atomicity atomicity) const override {
-    if (getReferenceCounting() == ReferenceCounting::CxxCustom) {
+    if (getReferenceCounting() == ReferenceCounting::Custom) {
       auto releaseFn = findForeignReferenceTypeRefCountingOperation(getClass(),
           ForeignReferenceTypeRefCountingOperation::release);
       IGF.emitForeignReferenceTypeLifetimeOperation(releaseFn, value);
@@ -73,7 +73,7 @@ public:
 
   void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value,
                         Atomicity atomicity) const override {
-    if (getReferenceCounting() == ReferenceCounting::CxxCustom) {
+    if (getReferenceCounting() == ReferenceCounting::Custom) {
       auto releaseFn = findForeignReferenceTypeRefCountingOperation(getClass(),
           ForeignReferenceTypeRefCountingOperation::retain);
       IGF.emitForeignReferenceTypeLifetimeOperation(releaseFn, value);
@@ -87,7 +87,7 @@ public:
   // using basic reference counting.
   void strongRetain(IRGenFunction &IGF, Explosion &e,
                     Atomicity atomicity) const override {
-    if (getReferenceCounting() == ReferenceCounting::CxxCustom) {
+    if (getReferenceCounting() == ReferenceCounting::Custom) {
       llvm::Value *value = e.claimNext();
       auto releaseFn = findForeignReferenceTypeRefCountingOperation(getClass(),
           ForeignReferenceTypeRefCountingOperation::retain);
@@ -100,7 +100,7 @@ public:
 
   void strongRelease(IRGenFunction &IGF, Explosion &e,
                      Atomicity atomicity) const override {
-    if (getReferenceCounting() == ReferenceCounting::CxxCustom) {
+    if (getReferenceCounting() == ReferenceCounting::Custom) {
       llvm::Value *value = e.claimNext();
       auto releaseFn = findForeignReferenceTypeRefCountingOperation(getClass(),
           ForeignReferenceTypeRefCountingOperation::release);
