@@ -253,8 +253,6 @@ _ = 0. / 1 / 2 // expected-error {{expected member name following '.'}}
 _ = 0 . / 1 / 2 // expected-error {{expected member name following '.'}}
 
 switch "" {
-case /x/:
-  break
 case _ where /x/:
   // expected-error@-1 {{cannot convert value of type 'Regex<Substring>' to expected condition type 'Bool'}}
   break

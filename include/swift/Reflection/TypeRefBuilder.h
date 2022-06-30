@@ -354,6 +354,24 @@ struct FieldTypeCollectionResult {
   std::vector<std::string> Errors;
 };
 
+struct TypeRefDecl {
+  std::string mangledName;
+
+  // Only used when building a bound generic typeref, and when the
+  // generic params for all the levels are stored as a flat array.
+  llvm::Optional<std::vector<size_t>> genericParamsPerLevel;
+
+  TypeRefDecl(std::string mangledName, 
+              std::vector<size_t> genericParamsPerLevel)
+      : mangledName(mangledName), 
+        genericParamsPerLevel(genericParamsPerLevel) {}
+
+  TypeRefDecl(std::string mangledName) 
+      : mangledName(mangledName), 
+        genericParamsPerLevel(llvm::None) {}
+
+};
+
 /// An implementation of MetadataReader's BuilderType concept for
 /// building TypeRefs, and parsing field metadata from any images
 /// it has been made aware of.
@@ -366,7 +384,7 @@ class TypeRefBuilder {
 
 public:
   using BuiltType = const TypeRef *;
-  using BuiltTypeDecl = llvm::Optional<std::string>;
+  using BuiltTypeDecl = llvm::Optional<TypeRefDecl>;
   using BuiltProtocolDecl =
       llvm::Optional<std::pair<std::string, bool /*isObjC*/>>;
   using BuiltSubstitution = std::pair<const TypeRef *, const TypeRef *>;
@@ -375,6 +393,8 @@ public:
   using BuiltGenericTypeParam = const GenericTypeParameterTypeRef *;
   using BuiltGenericSignature = const GenericSignatureRef *;
   using BuiltSubstitutionMap = llvm::DenseMap<DepthAndIndex, const TypeRef *>;
+
+  static constexpr bool needsToPrecomputeParentGenericContextShapes = true;
 
   TypeRefBuilder(const TypeRefBuilder &other) = delete;
   TypeRefBuilder &operator=(const TypeRefBuilder &other) = delete;
@@ -433,12 +453,30 @@ public:
     return BuiltinTypeRef::create(*this, mangledName);
   }
 
-  llvm::Optional<std::string> createTypeDecl(Node *node, bool &typeAlias) {
+  BuiltTypeDecl createTypeDecl(Node *node, std::vector<size_t> paramsPerLevel) {
     auto mangling = Demangle::mangleNode(node);
     if (!mangling.isSuccess()) {
       return llvm::None;
     }
-    return mangling.result();
+    return {{mangling.result(), paramsPerLevel}};
+  }
+
+  BuiltTypeDecl createTypeDecl(std::string &&mangledName,
+                               std::vector<size_t> paramsPerLevel) {
+    return {{std::move(mangledName), {paramsPerLevel}}};
+  }
+
+  BuiltTypeDecl createTypeDecl(Node *node, bool &typeAlias) {
+    auto mangling = Demangle::mangleNode(node);
+    if (!mangling.isSuccess()) {
+      return llvm::None;
+    }
+    return {{mangling.result()}};
+  }
+
+  BuiltTypeDecl createTypeDecl(std::string &&mangledName,
+                                             bool &typeAlias) {
+    return {{(mangledName)}};;
   }
 
   BuiltProtocolDecl
@@ -455,24 +493,20 @@ public:
     return std::make_pair(name, true);
   }
 
-  llvm::Optional<std::string> createTypeDecl(std::string &&mangledName,
-                                             bool &typeAlias) {
-    return std::move(mangledName);
+
+  const NominalTypeRef *
+  createNominalType(const BuiltTypeDecl &typeRefDecl) {
+    return NominalTypeRef::create(*this, typeRefDecl->mangledName, nullptr);
   }
 
   const NominalTypeRef *
-  createNominalType(const llvm::Optional<std::string> &mangledName) {
-    return NominalTypeRef::create(*this, *mangledName, nullptr);
-  }
-
-  const NominalTypeRef *
-  createNominalType(const llvm::Optional<std::string> &mangledName,
+  createNominalType(const BuiltTypeDecl &typeRefDecl,
                     const TypeRef *parent) {
-    return NominalTypeRef::create(*this, *mangledName, parent);
+    return NominalTypeRef::create(*this, typeRefDecl->mangledName, parent);
   }
 
   const TypeRef *
-  createTypeAliasType(const llvm::Optional<std::string> &mangledName,
+  createTypeAliasType(const BuiltTypeDecl &typeRefDecl,
                       const TypeRef *parent) {
     // TypeRefs don't contain sugared types
     return nullptr;
@@ -498,17 +532,75 @@ public:
     return nullptr;
   }
 
-  const BoundGenericTypeRef *
-  createBoundGenericType(const llvm::Optional<std::string> &mangledName,
-                         const std::vector<const TypeRef *> &args) {
-    return BoundGenericTypeRef::create(*this, *mangledName, args, nullptr);
+  const BoundGenericTypeRef *createBoundGenericTypeReconstructingParent(
+      const NodePointer node, const TypeRefDecl &decl, size_t shapeIndex,
+      const llvm::ArrayRef<const TypeRef *> &args, size_t argsIndex) {
+    if (!node || !node->hasChildren())
+      return nullptr;
+    
+    auto maybeGenericParamsPerLevel = decl.genericParamsPerLevel;
+    if (!maybeGenericParamsPerLevel)
+      return nullptr;
+
+    auto genericParamsPerLevel = *maybeGenericParamsPerLevel;
+
+    auto kind = node->getKind();
+    // Kinds who have a "BoundGeneric..." variant.
+    if (kind != Node::Kind::Class && kind != Node::Kind::Structure &&
+        kind != Node::Kind::Enum && kind != Node::Kind::Protocol &&
+        kind != Node::Kind::OtherNominalType && kind != Node::Kind::TypeAlias &&
+        kind != Node::Kind::Function)
+      return nullptr;
+    auto mangling = Demangle::mangleNode(node);
+    if (!mangling.isSuccess())
+      return nullptr;
+
+    auto numGenericArgs = genericParamsPerLevel[shapeIndex];
+
+    std::vector<const TypeRef *> genericParams(
+        args.end() - argsIndex - numGenericArgs, args.end() - argsIndex);
+
+    const BoundGenericTypeRef *parent = nullptr;
+    if (node->hasChildren())
+     parent = createBoundGenericTypeReconstructingParent(
+        node->getFirstChild(), decl, --shapeIndex, args, argsIndex + numGenericArgs);
+
+    return BoundGenericTypeRef::create(*this, mangling.result(), genericParams,
+                                       parent);
   }
 
   const BoundGenericTypeRef *
-  createBoundGenericType(const llvm::Optional<std::string> &mangledName,
+  createBoundGenericType(const BuiltTypeDecl &builtTypeDecl,
+                         const llvm::ArrayRef<const TypeRef *> &args) {
+    if (!builtTypeDecl)
+      return nullptr;
+
+    if (!builtTypeDecl->genericParamsPerLevel)
+      return BoundGenericTypeRef::create(*this, builtTypeDecl->mangledName, args, nullptr);
+
+  
+    auto node = Dem.demangleType(builtTypeDecl->mangledName);
+    if (!node || !node->hasChildren() || node->getKind() != Node::Kind::Type)
+      return nullptr;
+
+    auto type = node->getFirstChild();
+    return createBoundGenericTypeReconstructingParent(
+        type, *builtTypeDecl, builtTypeDecl->genericParamsPerLevel->size() - 1, args, 0);
+  }
+
+  const BoundGenericTypeRef *
+  createBoundGenericType(const BuiltTypeDecl &builtTypeDecl,
                          llvm::ArrayRef<const TypeRef *> args,
                          const TypeRef *parent) {
-    return BoundGenericTypeRef::create(*this, *mangledName, args, parent);
+    if (!builtTypeDecl)
+      return nullptr;
+
+    if (!builtTypeDecl->genericParamsPerLevel)
+      return BoundGenericTypeRef::create(*this, builtTypeDecl->mangledName, args,
+                                       parent);
+    assert(parent == nullptr &&
+           "Parent is not null but we're reconstructing the parent!");
+    return createBoundGenericType(builtTypeDecl, args);
   }
 
   const TypeRef *
@@ -627,7 +719,7 @@ public:
     if (protocol->second) {
       return llvm::cast<TypeRef>(createObjCProtocolType(protocol->first));
     } else {
-      return llvm::cast<TypeRef>(createNominalType(protocol->first));
+      return llvm::cast<TypeRef>(createNominalType(TypeRefDecl(protocol->first)));
     }
   }
 
