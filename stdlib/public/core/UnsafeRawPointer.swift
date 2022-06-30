@@ -1226,6 +1226,7 @@ public struct UnsafeMutableRawPointer: _Pointer {
   ///   - type: The type of `value`.
   @inlinable
   @_alwaysEmitIntoClient
+  // This custom silgen name is chosen to not interfere with the old ABI
   @_silgen_name("_swift_se0349_UnsafeMutableRawPointer_storeBytes")
   public func storeBytes<T>(
     of value: T, toByteOffset offset: Int = 0, as type: T.Type
