@@ -204,14 +204,14 @@ func test_params(
 distributed actor DijonMustard {
   nonisolated init(system: FakeActorSystem) {} // expected-warning {{'nonisolated' on an actor's synchronous initializer is invalid; this is an error in Swift 6}} {{3-15=}}
 
-  convenience init(conv: FakeActorSystem) { // expected-warning {{initializers in actors are not marked with 'convenience'; this is an error in Swift 6}}{{3-15=}}
+  convenience init(conv: FakeActorSystem) {
     self.init(system: conv)
     self.f() // expected-error {{actor-isolated instance method 'f()' can not be referenced from a non-isolated context}}
   }
 
   func f() {} // expected-note {{distributed actor-isolated instance method 'f()' declared here}}
 
-  nonisolated init(conv2: FakeActorSystem) { // expected-warning {{'nonisolated' on an actor's synchronous initializer is invalid; this is an error in Swift 6}} {{3-15=}}
+  nonisolated convenience init(conv2: FakeActorSystem) { // expected-warning {{'nonisolated' on an actor's synchronous initializer is invalid; this is an error in Swift 6}} {{3-15=}}
     self.init(system: conv2)
   }
 }

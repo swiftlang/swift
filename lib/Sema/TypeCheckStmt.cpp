@@ -1702,7 +1702,6 @@ static void checkClassConstructorBody(ClassDecl *classDecl,
   ASTContext &ctx = classDecl->getASTContext();
   bool wantSuperInitCall = false;
   bool isDelegating = false;
-
   auto initKindAndExpr = ctor->getDelegatingOrChainedInitKind();
   switch (initKindAndExpr.initKind) {
   case BodyInitKind::Delegating:

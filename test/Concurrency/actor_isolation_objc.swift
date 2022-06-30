@@ -55,7 +55,3 @@ actor Dril: NSObject {
     return true
   }
 }
-
-
-// makes sure the synthesized init's delegation kind is determined correctly.
-actor Pumpkin: NSObject {}

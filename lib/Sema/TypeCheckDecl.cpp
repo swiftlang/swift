@@ -379,64 +379,40 @@ CtorInitializerKind
 InitKindRequest::evaluate(Evaluator &evaluator, ConstructorDecl *decl) const {
   auto &diags = decl->getASTContext().Diags;
 
-  if (auto nominal = decl->getDeclContext()->getSelfNominalTypeDecl()) {
+  // Convenience inits are only allowed on classes and in extensions thereof.
+  if (decl->getAttrs().hasAttribute<ConvenienceAttr>()) {
+    if (auto nominal = decl->getDeclContext()->getSelfNominalTypeDecl()) {
+      auto classDecl = dyn_cast<ClassDecl>(nominal);
 
-    // Convenience inits are only allowed on classes and in extensions thereof.
-    if (auto convenAttr = decl->getAttrs().getAttribute<ConvenienceAttr>()) {
-      if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
-        if (classDecl->isAnyActor()) {
-          // For an actor "convenience" is not required, but we'll honor it.
-          diags.diagnose(decl->getLoc(),
-                diag::no_convenience_keyword_init, "actors")
-            .fixItRemove(convenAttr->getLocation())
-            .warnUntilSwiftVersion(6);
+      // Forbid convenience inits on Foreign CF types, as Swift does not yet
+      // support user-defined factory inits.
+      if (classDecl &&
+          classDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
+        diags.diagnose(decl->getLoc(), diag::cfclass_convenience_init);
+      }
 
-        } else { // not an actor
-          // Forbid convenience inits on Foreign CF types, as Swift does not yet
-          // support user-defined factory inits.
-          if (classDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType)
-            diags.diagnose(decl->getLoc(), diag::cfclass_convenience_init);
-        }
+      if (!classDecl) {
+        auto ConvenienceLoc =
+          decl->getAttrs().getAttribute<ConvenienceAttr>()->getLocation();
 
-      } else { // not a ClassDecl
-        auto ConvenienceLoc = convenAttr->getLocation();
-
-        // Produce a tailored diagnostic for structs and enums. They should
-        // not have `convenience`.
+        // Produce a tailored diagnostic for structs and enums.
         bool isStruct = dyn_cast<StructDecl>(nominal) != nullptr;
         if (isStruct || dyn_cast<EnumDecl>(nominal)) {
-          diags.diagnose(decl->getLoc(), diag::no_convenience_keyword_init,
+          diags.diagnose(decl->getLoc(), diag::enumstruct_convenience_init,
                          isStruct ? "structs" : "enums")
             .fixItRemove(ConvenienceLoc);
         } else {
-          diags.diagnose(decl->getLoc(), diag::no_convenience_keyword_init,
-                         nominal->getName().str())
+          diags.diagnose(decl->getLoc(), diag::nonclass_convenience_init,
+                         nominal->getName())
             .fixItRemove(ConvenienceLoc);
         }
         return CtorInitializerKind::Designated;
       }
-
-      return CtorInitializerKind::Convenience;
     }
 
-    // if there is no `convenience` keyword...
+    return CtorInitializerKind::Convenience;
 
-    // actors infer whether they are `convenience` from their body kind.
-    if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
-      if (classDecl->isAnyActor()) {
-        auto kind = decl->getDelegatingOrChainedInitKind();
-        switch (kind.initKind) {
-          case BodyInitKind::ImplicitChained:
-          case BodyInitKind::Chained:
-          case BodyInitKind::None:
-            return CtorInitializerKind::Designated;
-
-          case BodyInitKind::Delegating:
-            return CtorInitializerKind::Convenience;
-        }
-      }
-    }
-
+  } else if (auto nominal = decl->getDeclContext()->getSelfNominalTypeDecl()) {
     // A designated init for a class must be written within the class itself.
     //
     // This is because designated initializers of classes get a vtable entry,
@@ -461,11 +437,10 @@ InitKindRequest::evaluate(Evaluator &evaluator, ConstructorDecl *decl) const {
         return CtorInitializerKind::Convenience;
       }
     }
-  } // end of Nominal context
 
-  // initializers in protocol extensions must be convenience inits
-  if (decl->getDeclContext()->getExtendedProtocolDecl()) {
-    return CtorInitializerKind::Convenience;
+    if (decl->getDeclContext()->getExtendedProtocolDecl()) {
+      return CtorInitializerKind::Convenience;
+    }
   }
 
   return CtorInitializerKind::Designated;

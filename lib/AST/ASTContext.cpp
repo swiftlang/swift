@@ -3072,14 +3072,10 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
     }
 
     // Convenience initializers have a dynamic 'self' in '-swift-version 5'.
-    //
-    // NOTE: it's important that we check if it's a convenience init only after
-    // confirming it's not semantically final, or else there can be a request
-    // evaluator cycle to determine the init kind for actors, which are final.
     if (Ctx.isSwiftVersionAtLeast(5)) {
-      if (wantDynamicSelf)
+      if (wantDynamicSelf && CD->isConvenienceInit())
         if (auto *classDecl = selfTy->getClassOrBoundGenericClass())
-          if (!classDecl->isSemanticallyFinal() && CD->isConvenienceInit())
+          if (!classDecl->isSemanticallyFinal())
             isDynamicSelf = true;
     }
   } else if (isa<DestructorDecl>(AFD)) {
