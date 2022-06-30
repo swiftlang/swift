@@ -2748,6 +2748,10 @@ llvm::MDString *irgen::typeIdForMethod(IRGenModule &IGM, SILDeclRef method) {
 
 static llvm::Value *emitVTableSlotLoad(IRGenFunction &IGF, Address slot,
                                        SILDeclRef method, Signature signature) {
+  if (method.isDistributedThunk()) {
+    assert(false);
+  }
+
   if (IGF.IGM.getOptions().VirtualFunctionElimination) {
     // For LLVM IR VFE, emit a @llvm.type.checked.load with the type of the
     // method.

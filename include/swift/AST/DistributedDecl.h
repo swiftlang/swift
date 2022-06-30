@@ -65,6 +65,14 @@ AbstractFunctionDecl *
 getAssociatedDistributedInvocationDecoderDecodeNextArgumentFunction(
     ValueDecl *thunk);
 
+/// Get a body-less abstract thunk function to be used as source of its
+/// type-signature in witness tables.
+///
+/// `AFD` must be declared in a `ProtocolDecl`, or we'll return nullptr.
+///
+/// Returns null if `AFD` was not `distributed`.
+AbstractFunctionDecl *getDistributedWitnessThunkDecl(AbstractFunctionDecl *AFD);
+
 /// Get the specific 'InvocationEncoder' type of a specific distributed actor
 /// system.
 Type getDistributedActorSystemInvocationEncoderType(NominalTypeDecl *system);

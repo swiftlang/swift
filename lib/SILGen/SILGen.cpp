@@ -851,6 +851,8 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
     auto *dc = loc.getAsDeclContext();
     assert(dc);
 
+//    auto thunk = dyn_cast<FuncDecl>(constant.getDecl())->getDistributedThunk();
+
     preEmitFunction(constant, f, loc);
     PrettyStackTraceSILFunction X("silgen emitDistributedThunk", f);
     f->setBare(IsBare);

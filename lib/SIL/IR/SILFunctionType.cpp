@@ -20,6 +20,7 @@
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ForeignInfo.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -1914,6 +1915,31 @@ static CanSILFunctionType getSILFunctionType(
                                   substFnInterfaceType);
   }
 
+
+  bool isDistributed = false;
+  if (constant && constant->hasDecl()) {
+    if (auto funcDecl = dyn_cast<AbstractFunctionDecl>(constant->getDecl())) {
+      if (funcDecl->isDistributed()) {
+        fprintf(stderr, "[%s:%d] (%s) IS DISTRIBUTED CONSTANT:\n", __FILE__, __LINE__, __FUNCTION__);
+        constant->dump();
+        if (isa<ProtocolDecl>(constant->getDecl()->getDeclContext())) {
+          fprintf(stderr, "[%s:%d] (%s) IS DISTRIBUTED CONSTANT IN PROTOCOL:\n", __FILE__, __LINE__, __FUNCTION__);
+          constant->dump();
+
+//          if (auto thunk = funcDecl->getDistributedThunk()) {
+          if (auto emptyThunk = getDistributedWitnessThunkDecl(funcDecl)) {
+            fprintf(stderr, "[%s:%d] (%s) HAS THUNK!\n", __FILE__, __LINE__, __FUNCTION__);
+            emptyThunk->dump();
+            emptyThunk->getInterfaceType().dump();
+            constant = SILDeclRef(emptyThunk, swift::SILDeclRef::Kind::Func); // .asDistributed();
+          } else {
+            assert(false && "Could not generate thunk to get signature off it");
+          }
+        }
+      }
+    }
+  }
+
   Optional<SILResultInfo> errorResult;
   assert(
       (!foreignInfo.error || substFnInterfaceType->getExtInfo().isThrowing()) &&
@@ -1925,7 +1951,7 @@ static CanSILFunctionType getSILFunctionType(
   bool isSendable = substFnInterfaceType->getExtInfo().isSendable();
 
   // Map 'async' to the appropriate `@async` modifier.
-  bool isAsync = false;
+  bool isAsync = isDistributed || false;
   if (substFnInterfaceType->getExtInfo().isAsync() && !foreignInfo.async) {
     assert(!origType.isForeign()
            && "using native Swift async for foreign type!");
@@ -1938,7 +1964,7 @@ static CanSILFunctionType getSILFunctionType(
   // that also throws. This prevents the need for a second possibly-thunking
   // conversion when using a non-throwing function in more abstract throwing
   // context.
-  bool isThrowing = substFnInterfaceType->getExtInfo().isThrowing();
+  bool isThrowing = isDistributed || substFnInterfaceType->getExtInfo().isThrowing();
   if (auto origFnType = origType.getAs<AnyFunctionType>()) {
     isThrowing |= origFnType->getExtInfo().isThrowing();
   }
@@ -2112,12 +2138,17 @@ static CanSILFunctionType getSILFunctionType(
                         .withConcurrent(isSendable)
                         .withAsync(isAsync)
                         .build();
-  
-  return SILFunctionType::get(genericSig, silExtInfo, coroutineKind,
+
+  auto ffff = SILFunctionType::get(genericSig, silExtInfo, coroutineKind,
                               calleeConvention, inputs, yields,
                               results, errorResult,
                               substFunctionTypeSubs, SubstitutionMap(),
                               TC.Context, witnessMethodConformance);
+
+  if (isDistributed) {
+    ffff.dump();
+  }
+  return ffff;
 }
 
 //===----------------------------------------------------------------------===//

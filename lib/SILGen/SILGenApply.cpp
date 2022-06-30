@@ -694,6 +694,20 @@ public:
     if (Constant)
       constant = Constant;
 
+    auto isDistThunkCall = false;
+    if (constant) {
+      auto func = constant->getFuncDecl();
+      if (func && func->isDistributed()) {
+        fprintf(stderr, "\n[%s:%d] (%s) decl is dist: %d\n", __FILE__, __LINE__, __FUNCTION__, func->isDistributed());
+        constant->dump();
+
+        if (auto proto = dyn_cast<ProtocolDecl>(func->getDeclContext())) {
+          isDistThunkCall = func->isDistributed() &&
+                            isa<ProtocolDecl>(func->getDeclContext());
+        }
+      }
+    }
+
     switch (kind) {
     case Kind::IndirectValue:
       assert(Substitutions.empty());
@@ -723,6 +737,9 @@ public:
       return createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
     }
     case Kind::WitnessMethod: {
+      if (isDistThunkCall) {
+        constant = constant->asDistributed();
+      }
       auto constantInfo =
           SGF.getConstantInfo(SGF.getTypeExpansionContext(), *constant);
       return createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());

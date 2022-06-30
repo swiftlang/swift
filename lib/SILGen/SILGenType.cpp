@@ -793,10 +793,6 @@ SILFunction *SILGenModule::emitProtocolWitness(
                  derivativeId->getParameterIndices()->getString();
   }
 
-  if (witnessRef.isDistributedThunk()) {
-    nameBuffer = nameBuffer + "TE"; // TE signifies a distributed thunk.
-  }
-
   // If the thunked-to function is set to be always inlined, do the
   // same with the witness, on the theory that the user wants all
   // calls removed if possible, e.g. when we're able to devirtualize
