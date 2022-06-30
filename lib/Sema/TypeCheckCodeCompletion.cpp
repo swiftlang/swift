@@ -486,6 +486,11 @@ TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
   // Build temporary expression to typecheck.
   // We allocate these expressions on the stack because we know they can't
   // escape and there isn't a better way to allocate scratch Expr nodes.
+
+  // Use a placeholder expr for the LHS argument to avoid sending
+  // a pre-type-checked AST through the constraint system.
+  OpaqueValueExpr argExpr(LHS->getSourceRange(), LHSTy,
+                          /*isPlaceholder=*/true);
   UnresolvedDeclRefExpr UDRE(DeclNameRef(opName), refKind, DeclNameLoc(Loc));
   auto *opExpr = TypeChecker::resolveDeclRefExpr(
       &UDRE, DC, /*replaceInvalidRefsWithErrors=*/true);
@@ -497,7 +502,7 @@ TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
     //   (declref_expr name=<opName>)
     //   (argument_list
     //     (<LHS>)))
-    auto *postfixExpr = PostfixUnaryExpr::create(ctx, opExpr, LHS);
+    auto *postfixExpr = PostfixUnaryExpr::create(ctx, opExpr, &argExpr);
     return getTypeOfCompletionOperatorImpl(DC, postfixExpr, referencedDecl);
   }
 
@@ -508,7 +513,7 @@ TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
     //     (<LHS>)
     //     (code_completion_expr)))
     CodeCompletionExpr dummyRHS(Loc);
-    auto *binaryExpr = BinaryExpr::create(ctx, LHS, opExpr, &dummyRHS,
+    auto *binaryExpr = BinaryExpr::create(ctx, &argExpr, opExpr, &dummyRHS,
                                           /*implicit*/ true);
     return getTypeOfCompletionOperatorImpl(DC, binaryExpr, referencedDecl);
   }

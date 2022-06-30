@@ -334,10 +334,6 @@ namespace swift {
     /// `func f() -> <T> T`.
     bool EnableExperimentalNamedOpaqueTypes = false;
 
-    /// Enable support for implicitly opening existential argument types
-    /// in calls to generic functions.
-    bool EnableOpenedExistentialTypes = false;
-
     /// Enable experimental flow-sensitive concurrent captures.
     bool EnableExperimentalFlowSensitiveConcurrentCaptures = false;
 
