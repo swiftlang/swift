@@ -245,7 +245,7 @@ extension _SmallString {
       (rawBufPtr: UnsafeMutableRawBufferPointer) -> Int in
       let len = try f(rawBufPtr)
       UnsafeMutableRawBufferPointer(
-        rebasing: rawBufPtr[len...]
+        rebasing: rawBufPtr[len..<rawBufPtr.endIndex]
       ).initializeMemory(as: UInt8.self, repeating: 0)
       return len
     }
