@@ -419,48 +419,60 @@ InitKindRequest::evaluate(Evaluator &evaluator, ConstructorDecl *decl) const {
       return CtorInitializerKind::Convenience;
     }
 
-    // if there is no `convenience` keyword...
+    // if there's no `convenience` attribute...
 
-    // actors infer whether they are `convenience` from their body kind.
-    if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
-      if (classDecl->isAnyActor()) {
+    if (auto classDcl = dyn_cast<ClassDecl>(nominal)) {
+
+      // actors infer whether they are `convenience` from their body kind.
+      if (classDcl->isAnyActor()) {
         auto kind = decl->getDelegatingOrChainedInitKind();
         switch (kind.initKind) {
           case BodyInitKind::ImplicitChained:
           case BodyInitKind::Chained:
           case BodyInitKind::None:
-            return CtorInitializerKind::Designated;
+            break; // it's designated, we need more checks.
 
           case BodyInitKind::Delegating:
             return CtorInitializerKind::Convenience;
         }
       }
-    }
 
-    // A designated init for a class must be written within the class itself.
-    //
-    // This is because designated initializers of classes get a vtable entry,
-    // and extensions cannot add vtable entries to the extended type.
-    //
-    // If we implement the ability for extensions defined in the same module
-    // (or the same file) to add vtable entries, we can re-evaluate this
-    // restriction.
-    if (isa<ClassDecl>(nominal) && !decl->isSynthesized() &&
-        isa<ExtensionDecl>(decl->getDeclContext()) &&
-        !(decl->getAttrs().hasAttribute<DynamicReplacementAttr>())) {
-      if (cast<ClassDecl>(nominal)->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
-        diags.diagnose(decl->getLoc(),
-                       diag::cfclass_designated_init_in_extension,
-                       nominal->getName());
-        return CtorInitializerKind::Designated;
-      } else {
-        diags.diagnose(decl->getLoc(),
-                       diag::designated_init_in_extension,
-                       nominal->getName())
-            .fixItInsert(decl->getLoc(), "convenience ");
+      // A designated init for a class must be written within the class itself.
+      //
+      // This is because designated initializers of classes get a vtable entry,
+      // and extensions cannot add vtable entries to the extended type.
+      //
+      // If we implement the ability for extensions defined in the same module
+      // (or the same file) to add vtable entries, we can re-evaluate this
+      // restriction.
+      if (!decl->isSynthesized() &&
+          isa<ExtensionDecl>(decl->getDeclContext()) &&
+          !(decl->getAttrs().hasAttribute<DynamicReplacementAttr>())) {
+
+        if (classDcl->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
+          diags.diagnose(decl->getLoc(),
+                         diag::designated_init_in_extension_no_convenience_tip,
+                         nominal->getName());
+
+          // despite having reported it as an error, say that it is designated.
+          return CtorInitializerKind::Designated;
+
+        } else if (classDcl->isAnyActor()) {
+          // tailor the diagnostic to not mention `convenience`
+          diags.diagnose(decl->getLoc(),
+                         diag::designated_init_in_extension_no_convenience_tip,
+                         nominal->getName());
+
+        } else {
+          diags.diagnose(decl->getLoc(),
+                             diag::designated_init_in_extension,
+                             nominal->getName())
+                 .fixItInsert(decl->getLoc(), "convenience ");
+        }
+
         return CtorInitializerKind::Convenience;
       }
-    }
+    } // end of Class context
   } // end of Nominal context
 
   // initializers in protocol extensions must be convenience inits

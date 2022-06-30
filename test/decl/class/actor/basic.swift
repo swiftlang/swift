@@ -46,4 +46,10 @@ extension A2 {
 
   class subscript(i: Int) -> Int { i } // expected-error{{class subscripts are only allowed within classes; use 'static' to declare a static subscript}}
   static subscript(s: String) -> String { s }
+
+  init(delegates: ()) {
+    self.init()
+  }
+
+  init(doesNotDelegate: ()) {} // expected-error {{designated initializer cannot be declared in an extension of 'A2'}}
 }
