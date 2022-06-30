@@ -621,6 +621,9 @@ public:
                      llvm::DenseSet<clang::FunctionDecl *>>>
       cxxMethods;
 
+  /// Keep track of cxx friend decls in order to .
+  llvm::DenseSet<clang::Decl *> cxxFriends;
+
   // Cache for already-specialized function templates and any thunks they may
   // have.
   llvm::DenseMap<clang::FunctionDecl *, ValueDecl *>

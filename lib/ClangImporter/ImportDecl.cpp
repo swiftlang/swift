@@ -2116,6 +2116,17 @@ namespace {
           continue;
         }
 
+        if (auto friendDecl = dyn_cast<clang::FriendDecl>(m)) {
+            auto d = VisitFriendDecl(friendDecl);
+
+            // Check if the friend decl was converted into a FuncDecl
+            if(auto funcDecl = dyn_cast<FuncDecl>(d)) {
+                result->addMember(funcDecl);
+                methods.push_back(funcDecl);
+            }
+            continue;
+        }
+
         auto nd = dyn_cast<clang::NamedDecl>(m);
         if (!nd) {
           // We couldn't import the member, so we can't reference it in Swift.
@@ -2145,6 +2156,7 @@ namespace {
         }
 
         Decl *member = Impl.importDecl(nd, getActiveSwiftVersion());
+
         if (!member) {
           if (!isa<clang::TypeDecl>(nd) && !isa<clang::FunctionDecl>(nd)) {
             // We don't know what this member is.
@@ -2173,13 +2185,11 @@ namespace {
         }
 
         if (auto MD = dyn_cast<FuncDecl>(member)) {
-
           // When 2 CXXMethods diff by "constness" alone we differentiate them
           // by changing the name of one. That changed method needs to be added
           // to the lookup table since it cannot be found lazily.
           if (auto cxxMethod = dyn_cast<clang::CXXMethodDecl>(m)) {
             auto cxxOperatorKind = cxxMethod->getOverloadedOperator();
-
             if (cxxOperatorKind == clang::OO_Star && cxxMethod->param_empty()) {
               // This is a dereference operator. We synthesize a computed
               // property called `pointee` for it.
@@ -3043,6 +3053,16 @@ namespace {
 
       result->setIsObjC(false);
       result->setIsDynamic(false);
+
+      bool isFromFriend = Impl.cxxFriends.contains(decl);
+      // If this function decl is from a friend it should be declared
+      // as static.
+      if (isFromFriend) {
+        if(auto resultAsFunc = cast<FuncDecl>(result)) {
+          resultAsFunc->setStatic();
+          resultAsFunc->setImportAsStaticMember();
+        }
+      }
 
       Impl.recordImplicitUnwrapForDecl(result,
                                        importedType.isImplicitlyUnwrapped());
@@ -4757,8 +4777,39 @@ namespace {
     }
 
     Decl *VisitFriendDecl(const clang::FriendDecl *decl) {
-      // Friends are not imported; Swift has a different access control
-      // mechanism.
+      // Unwrap the friend decl
+      auto unwrappedFriendDecl = decl->getFriendDecl();
+
+      // Get the context for which the friend decl lives
+      auto friendContext = decl->getDeclContext();
+
+      // Now we check to see if the unwrapped decl is something
+      // we currently support
+      if(auto funcDecl = dyn_cast<clang::FunctionDecl>(unwrappedFriendDecl)) {
+
+        // Keep track, so we know later on how to properly create this
+        // decl
+        Impl.cxxFriends.insert(funcDecl);
+
+        // If this Friend lives inside a CXXRecord, we want to
+        // add a static function inside that decl
+        if (friendContext->getDeclKind() == clang::Decl::CXXRecord) {
+
+          // We import this function just as we would any function decl
+          // and then perform some modifications afterwards to attach to the
+          // proper context
+          auto d = VisitFunctionDecl(funcDecl);
+
+          // The decl context for `funcDecl` will be set to TranslationUnit since
+          // friend functions are not "apart" of the record they belong to directly
+          // In swift we would like the function decl to be added to the record
+          // but as a static function method. For that reason we must reassign the
+          // decl context chosen by VisitFunctionDecl to the CXXRecord from which
+          // this friend decl came
+          d->setDeclContext(Impl.importDeclContextOf(decl, friendContext));
+          return d;
+        }
+      }
       return nullptr;
     }
 
@@ -8093,7 +8144,6 @@ ClangImporter::Implementation::importDeclContextOf(
   switch (context.getKind()) {
   case EffectiveClangContext::DeclContext: {
     auto dc = context.getAsDeclContext();
-
     // For C++-Interop in cases where #ifdef __cplusplus surround an extern "C"
     // you want to first check if the TU decl is the parent of this extern "C"
     // decl (aka LinkageSpecDecl) and then proceed.
