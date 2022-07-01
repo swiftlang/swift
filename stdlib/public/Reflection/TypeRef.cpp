@@ -583,35 +583,8 @@ public:
     genericNode->addChild(unspecializedType, Dem);
     genericNode->addChild(genericArgsList, Dem);
 
-    auto parent = BG->getParent();
-    if (!parent)
-      return genericNode;
-
-    auto parentNode = visit(parent);
-    if (!parentNode || !parentNode->hasChildren() ||
-        parentNode->getKind() != Node::Kind::Type ||
-        !unspecializedType->hasChildren())
-      return genericNode;
-
-    // Peel off the "Type" node.
-    parentNode = parentNode->getFirstChild();
-
-    auto nominalNode = unspecializedType->getFirstChild();
-
-    if (nominalNode->getNumChildren() != 2)
-      return genericNode;
-
-    // Save identifier for reinsertion later, we have to remove it
-    // so we can insert the parent node as the first child.
-    auto identifierNode = nominalNode->getLastChild();
-
-    // Remove all children.
-    nominalNode->removeChildAt(1);
-    nominalNode->removeChildAt(0);
-
-    // Add the parent we just visited back in, followed by the identifier.
-    nominalNode->addChild(parentNode, Dem);
-    nominalNode->addChild(identifierNode, Dem);
+    if (auto parent = BG->getParent())
+      assert(false && "not implemented");
 
     return genericNode;
   }

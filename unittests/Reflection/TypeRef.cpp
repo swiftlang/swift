@@ -28,17 +28,6 @@ static const std::string Shmodule = "Shmodule";
 static const std::string MyProtocol = "MyProtocol";
 static const std::string Shmrotocol = "Shmrotocol";
 
-static const TypeRefDecl ABC_decl = {"ABC"};
-static const TypeRefDecl ABCD_decl = {"ABCD"};
-static const TypeRefDecl XYZ_decl = {"XYZ"};
-static const TypeRefDecl Empty_decl = {""};
-static const TypeRefDecl MyClass_decl = {"MyClass"};
-static const TypeRefDecl NotMyClass_decl = {"NotMyClass"};
-static const TypeRefDecl MyModule_decl = {"MyModule"};
-static const TypeRefDecl Shmodule_decl = {"Shmodule"};
-static const TypeRefDecl MyProtocol_decl = {"MyProtocol"};
-static const TypeRefDecl Shmrotocol_decl = {"Shmrotocol"};
-
 using Param = remote::FunctionParam<const TypeRef *>;
 
 TEST(TypeRefTest, UniqueBuiltinTypeRef) {
@@ -55,15 +44,15 @@ TEST(TypeRefTest, UniqueBuiltinTypeRef) {
 TEST(TypeRefTest, UniqueNominalTypeRef) {
   TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
-  auto N1 = Builder.createNominalType(ABC_decl, nullptr);
-  auto N2 = Builder.createNominalType(ABC_decl, nullptr);
-  auto N3 = Builder.createNominalType(ABCD_decl, nullptr);
+  auto N1 = Builder.createNominalType(ABC, nullptr);
+  auto N2 = Builder.createNominalType(ABC, nullptr);
+  auto N3 = Builder.createNominalType(ABCD, nullptr);
 
   EXPECT_EQ(N1, N2);
   EXPECT_NE(N2, N3);
 
-  auto N4 = Builder.createNominalType(ABC_decl, N1);
-  auto N5 = Builder.createNominalType(ABC_decl, N1);
+  auto N4 = Builder.createNominalType(ABC, N1);
+  auto N5 = Builder.createNominalType(ABC, N1);
 
   EXPECT_EQ(N4, N5);
 }
@@ -74,18 +63,18 @@ TEST(TypeRefTest, UniqueBoundGenericTypeRef) {
   auto GTP00 = Builder.createGenericTypeParameterType(0, 0);
   auto GTP01 = Builder.createGenericTypeParameterType(0, 1);
 
-  auto BG1 = Builder.createBoundGenericType(ABC_decl, {}, nullptr);
-  auto BG2 = Builder.createBoundGenericType(ABC_decl, {}, nullptr);
-  auto BG3 = Builder.createBoundGenericType(ABCD_decl, {}, nullptr);
+  auto BG1 = Builder.createBoundGenericType(ABC, {}, nullptr);
+  auto BG2 = Builder.createBoundGenericType(ABC, {}, nullptr);
+  auto BG3 = Builder.createBoundGenericType(ABCD, {}, nullptr);
 
   EXPECT_EQ(BG1, BG2);
   EXPECT_NE(BG2, BG3);
 
   std::vector<const TypeRef *> GenericParams { GTP00, GTP01 };
 
-  auto BG4 = Builder.createBoundGenericType(ABC_decl, GenericParams, nullptr);
-  auto BG5 = Builder.createBoundGenericType(ABC_decl, GenericParams, nullptr);
-  auto BG6 = Builder.createBoundGenericType(ABCD_decl, GenericParams, nullptr);
+  auto BG4 = Builder.createBoundGenericType(ABC, GenericParams, nullptr);
+  auto BG5 = Builder.createBoundGenericType(ABC, GenericParams, nullptr);
+  auto BG6 = Builder.createBoundGenericType(ABCD, GenericParams, nullptr);
 
   EXPECT_EQ(BG4, BG5);
   EXPECT_NE(BG5, BG6);
@@ -95,8 +84,8 @@ TEST(TypeRefTest, UniqueBoundGenericTypeRef) {
 TEST(TypeRefTest, UniqueTupleTypeRef) {
   TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
-  auto N1 = Builder.createNominalType(ABC_decl, nullptr);
-  auto N2 = Builder.createNominalType(XYZ_decl, nullptr);
+  auto N1 = Builder.createNominalType(ABC, nullptr);
+  auto N2 = Builder.createNominalType(XYZ, nullptr);
 
   std::vector<const TypeRef *> Void;
   auto Void1 = Builder.createTupleType(Void, "");
@@ -122,8 +111,8 @@ TEST(TypeRefTest, UniqueFunctionTypeRef) {
 
   std::vector<const TypeRef *> Void;
   auto VoidResult = Builder.createTupleType(Void, "");
-  Param Param1 = Builder.createNominalType(ABC_decl, nullptr);
-  Param Param2 = Builder.createNominalType(XYZ_decl, nullptr);
+  Param Param1 = Builder.createNominalType(ABC, nullptr);
+  Param Param2 = Builder.createNominalType(XYZ, nullptr);
 
   std::vector<Param> VoidParams;
   std::vector<Param> Parameters1{Param1, Param2};
@@ -307,7 +296,7 @@ TEST(TypeRefTest, UniqueProtocolTypeRef) {
 TEST(TypeRefTest, UniqueMetatypeTypeRef) {
   TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
-  auto N1 = Builder.createNominalType(ABC_decl, nullptr);
+  auto N1 = Builder.createNominalType(ABC, nullptr);
   auto M1 = Builder.createMetatypeType(N1, None);
   auto M2 = Builder.createMetatypeType(N1, None);
   auto MM3 = Builder.createMetatypeType(M1, None);
@@ -321,7 +310,7 @@ TEST(TypeRefTest, UniqueMetatypeTypeRef) {
 TEST(TypeRefTest, UniqueExistentialMetatypeTypeRef) {
   TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
-  auto N1 = Builder.createNominalType(ABC_decl, nullptr);
+  auto N1 = Builder.createNominalType(ABC, nullptr);
   auto M1 = Builder.createExistentialMetatypeType(N1);
   auto M2 = Builder.createExistentialMetatypeType(N1);
   auto MM3 = Builder.createExistentialMetatypeType(M1);
@@ -346,8 +335,8 @@ TEST(TypeRefTest, UniqueGenericTypeParameterTypeRef) {
 TEST(TypeRefTest, UniqueDependentMemberTypeRef) {
   TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
-  auto N1 = Builder.createNominalType(ABC_decl, nullptr);
-  auto N2 = Builder.createNominalType(XYZ_decl, nullptr);
+  auto N1 = Builder.createNominalType(ABC, nullptr);
+  auto N2 = Builder.createNominalType(XYZ, nullptr);
   TypeRefBuilder::BuiltProtocolDecl P1 = std::make_pair(ABC, false);
   TypeRefBuilder::BuiltProtocolDecl P2 = std::make_pair(ABCD, false);
 
@@ -405,8 +394,8 @@ TEST(TypeRefTest, UniqueOpaqueTypeRef) {
 TEST(TypeRefTest, UniqueUnownedStorageType) {
   TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
-  auto N1 = Builder.createNominalType(MyClass_decl, nullptr);
-  auto N2 = Builder.createNominalType(NotMyClass_decl, nullptr);
+  auto N1 = Builder.createNominalType(MyClass, nullptr);
+  auto N2 = Builder.createNominalType(NotMyClass, nullptr);
   auto RS1 = Builder.createUnownedStorageType(N1);
   auto RS2 = Builder.createUnownedStorageType(N1);
   auto RS3 = Builder.createUnownedStorageType(N2);
@@ -418,8 +407,8 @@ TEST(TypeRefTest, UniqueUnownedStorageType) {
 TEST(TypeRefTest, UniqueWeakStorageType) {
   TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
-  auto N1 = Builder.createNominalType(MyClass_decl, nullptr);
-  auto N2 = Builder.createNominalType(NotMyClass_decl, nullptr);
+  auto N1 = Builder.createNominalType(MyClass, nullptr);
+  auto N2 = Builder.createNominalType(NotMyClass, nullptr);
   auto RS1 = Builder.createWeakStorageType(N1);
   auto RS2 = Builder.createWeakStorageType(N1);
   auto RS3 = Builder.createWeakStorageType(N2);
@@ -431,8 +420,8 @@ TEST(TypeRefTest, UniqueWeakStorageType) {
 TEST(TypeRefTest, UniqueUnmanagedStorageType) {
   TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
-  auto N1 = Builder.createNominalType(MyClass_decl, nullptr);
-  auto N2 = Builder.createNominalType(NotMyClass_decl, nullptr);
+  auto N1 = Builder.createNominalType(MyClass, nullptr);
+  auto N2 = Builder.createNominalType(NotMyClass, nullptr);
   auto RS1 = Builder.createUnmanagedStorageType(N1);
   auto RS2 = Builder.createUnmanagedStorageType(N1);
   auto RS3 = Builder.createUnmanagedStorageType(N2);
@@ -447,12 +436,12 @@ TEST(TypeRefTest, UniqueUnmanagedStorageType) {
 TEST(TypeRefTest, UniqueAfterSubstitution) {
   TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
-  TypeRefDecl MangledIntName("Si");
+  std::string MangledIntName("Si");
   auto NominalInt = Builder.createNominalType(MangledIntName,
                                               /*parent*/ nullptr);
   std::vector<const TypeRef *> ConcreteArgs { NominalInt, NominalInt };
 
-  TypeRefDecl MangledName("ABC");
+  std::string MangledName("ABC");
 
   auto ConcreteBG = Builder.createBoundGenericType(MangledName,
                                                    ConcreteArgs,
@@ -480,17 +469,17 @@ TEST(TypeRefTest, NestedTypes) {
 
   auto GTP00 = Builder.createGenericTypeParameterType(0, 0);
 
-  TypeRefDecl ParentName("parent");
+  std::string ParentName("parent");
   std::vector<const TypeRef *> ParentArgs { GTP00 };
   auto Parent = Builder.createBoundGenericType(ParentName, ParentArgs,
                                                /*parent*/ nullptr);
 
-  TypeRefDecl ChildName("child");
+  std::string ChildName("child");
   auto Child = Builder.createNominalType(ChildName, Parent);
 
   EXPECT_FALSE(Child->isConcrete());
 
-  TypeRefDecl SubstName("subst");
+  std::string SubstName("subst");
   auto SubstArg = Builder.createNominalType(SubstName, /*parent*/ nullptr);
 
   std::vector<const TypeRef *> SubstParentArgs { SubstArg };
@@ -512,7 +501,7 @@ TEST(TypeRefTest, DeriveSubstitutions) {
   auto GTP00 = Builder.createGenericTypeParameterType(0, 0);
   auto GTP01 = Builder.createGenericTypeParameterType(0, 1);
 
-  TypeRefDecl NominalName("nominal");
+  std::string NominalName("nominal");
   std::vector<const TypeRef *> NominalArgs { GTP00 };
   auto Nominal = Builder.createBoundGenericType(NominalName, NominalArgs,
                                                /*parent*/ nullptr);
@@ -522,10 +511,10 @@ TEST(TypeRefTest, DeriveSubstitutions) {
       {Nominal}, Result, FunctionTypeFlags(),
       FunctionMetadataDifferentiabilityKind::NonDifferentiable, nullptr);
 
-  TypeRefDecl SubstOneName("subst1");
+  std::string SubstOneName("subst1");
   auto SubstOne = Builder.createNominalType(SubstOneName, /*parent*/ nullptr);
 
-  TypeRefDecl SubstTwoName("subst2");
+  std::string SubstTwoName("subst2");
   auto SubstTwo = Builder.createNominalType(SubstTwoName, /*parent*/ nullptr);
 
   GenericArgumentMap Subs;

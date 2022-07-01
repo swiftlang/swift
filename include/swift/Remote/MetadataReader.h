@@ -30,7 +30,6 @@
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Basic/Unreachable.h"
 
-#include <type_traits>
 #include <vector>
 #include <unordered_map>
 
@@ -2819,14 +2818,8 @@ private:
 
   /// Given a read nominal type descriptor, attempt to build a
   /// nominal type decl from it.
-  template <
-      typename T = BuilderType,
-      typename std::enable_if_t<
-          !std::is_same<
-              bool,
-              decltype(T::needsToPrecomputeParentGenericContextShapes)>::value,
-          bool> = true>
-  BuiltTypeDecl buildNominalTypeDecl(ContextDescriptorRef descriptor) {
+  BuiltTypeDecl
+  buildNominalTypeDecl(ContextDescriptorRef descriptor) {
     // Build the demangling tree from the context tree.
     Demangler dem;
     auto node = buildContextMangling(descriptor, dem);
@@ -2834,41 +2827,6 @@ private:
       return BuiltTypeDecl();
     bool typeAlias = false;
     BuiltTypeDecl decl = Builder.createTypeDecl(node, typeAlias);
-    return decl;
-  }
-
-  template <
-      typename T = BuilderType,
-      typename std::enable_if_t<
-          std::is_same<
-              bool,
-              decltype(T::needsToPrecomputeParentGenericContextShapes)>::value,
-          bool> = true>
-  BuiltTypeDecl buildNominalTypeDecl(ContextDescriptorRef descriptor) {
-    // Build the demangling tree from the context tree.
-    Demangler dem;
-    auto node = buildContextMangling(descriptor, dem);
-    if (!node || node->getKind() != Node::Kind::Type)
-      return BuiltTypeDecl();
-    std::vector<size_t> paramsPerLevel;
-    size_t runningCount = 0;
-    std::function<void(ContextDescriptorRef current, size_t &)> countLevels =
-        [&](ContextDescriptorRef current, size_t &runningCount) {
-          if (auto parentContextRef = readParentContextDescriptor(current))
-            if (parentContextRef->isResolved())
-              if (auto parentContext = parentContextRef->getResolved())
-                countLevels(parentContext, runningCount);
-
-          auto genericContext = current->getGenericContext();
-          if (!genericContext)
-            return;
-          auto contextHeader = genericContext->getGenericContextHeader();
-
-          paramsPerLevel.emplace_back(contextHeader.NumParams - runningCount);
-          runningCount += paramsPerLevel.back();
-        };
-    countLevels(descriptor, runningCount);
-    BuiltTypeDecl decl = Builder.createTypeDecl(node, paramsPerLevel);
     return decl;
   }
 

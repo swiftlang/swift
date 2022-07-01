@@ -64,8 +64,6 @@ public:
   using BuiltRequirement = swift::Requirement;
   using BuiltSubstitutionMap = swift::SubstitutionMap;
 
-  static constexpr bool needsToPrecomputeParentGenericContextShapes = false;
-
   explicit ASTBuilder(ASTContext &ctx) : Ctx(ctx) {}
 
   ASTContext &getASTContext() { return Ctx; }
