@@ -580,6 +580,8 @@ protected:
   NodePointer demangleIndexSubset();
   NodePointer demangleDifferentiableFunctionType();
 
+  NodePointer demangleConstrainedExistentialRequirementList();
+
   bool demangleBoundGenerics(Vector<NodePointer> &TypeListList,
                              NodePointer &RetroactiveConformances);
   

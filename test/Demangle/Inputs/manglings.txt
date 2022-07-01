@@ -427,9 +427,8 @@ $s1A3bar1aySSYt_tF ---> A.bar(a: _const Swift.String) -> ()
 $s1t1fyyFSiAA3StrVcs7KeyPathCyADSiGcfu_SiADcfu0_33_556644b740b1b333fecb81e55a7cce98ADSiTf3npk_n ---> function signature specialization <Arg[1] = [Constant Propagated KeyPath : _556644b740b1b333fecb81e55a7cce98<t.Str,Swift.Int>]> of implicit closure #2 (t.Str) -> Swift.Int in implicit closure #1 (Swift.KeyPath<t.Str, Swift.Int>) -> (t.Str) -> Swift.Int in t.f() -> ()
 $s21back_deploy_attribute0A12DeployedFuncyyFTwb ---> back deployment thunk for back_deploy_attribute.backDeployedFunc() -> ()
 $s21back_deploy_attribute0A12DeployedFuncyyFTwB ---> back deployment fallback for back_deploy_attribute.backDeployedFunc() -> ()
-$s4test3FooVAAyyAA1P_pyxqd__XPlF ---> test.Foo.test<A>(test.P<A, A1>) -> ()
-$s4test3FooVAAyyAA1P_pyxXPF ---> test.Foo.test(test.P<A>) -> ()
+$s4test3fooyyAA1P_px1TRts_XPlF ---> test.foo<A>(any test.P<Self.T == A>) -> ()
+$s4test3fooyyAA1P_pSS1TAaCPRts_Si1UAERtsXPF ---> test.foo(any test.P<Self.test.P.T == Swift.String, Self.test.P.U == Swift.Int>) -> ()
 $s4test3FooVAAyyAA1P_pF ---> test.Foo.test(test.P) -> ()
-$s4test3FooVAAyyAA1P_pyqd__XPAaDRd__lF ---> test.Foo.test<A where A1: test.P>(test.P<A1>) -> ()
 $sxxxIxzCXxxxesy -> $sxxxIxzCXxxxesy
 $Sxxx_x_xxIxzCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC$x -> $Sxxx_x_xxIxzCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC$x
