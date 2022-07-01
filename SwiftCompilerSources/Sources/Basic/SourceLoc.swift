@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import ASTBridging
+
 public struct SourceLoc {
   /// Points into a source file.
   let locationInFile: UnsafePointer<UInt8>
