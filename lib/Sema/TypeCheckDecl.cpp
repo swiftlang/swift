@@ -2846,16 +2846,5 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
     return error();
   }
 
-  // By default, the user cannot extend a bound generic type, unless it's
-  // referenced via a non-generic typealias type.
-  if (!ext->getASTContext().LangOpts.EnableExperimentalBoundGenericExtensions &&
-      extendedType->isSpecialized() &&
-      !isNonGenericTypeAliasType(extendedType)) {
-    diags.diagnose(ext->getLoc(), diag::extension_specialization,
-                   extendedType->getAnyNominal()->getName())
-         .highlight(extendedRepr->getSourceRange());
-    return error();
-  }
-
   return extendedType;
 }

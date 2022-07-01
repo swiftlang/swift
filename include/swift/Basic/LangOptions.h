@@ -482,13 +482,6 @@ namespace swift {
     // FrontendOptions.
     bool AllowModuleWithCompilerErrors = false;
 
-    /// Enable extensions of (sugared) bound generic types
-    ///
-    /// \code
-    /// extension [Int] { /**/ }
-    /// \endcode
-    bool EnableExperimentalBoundGenericExtensions = true;
-
     /// A helper enum to represent whether or not we customized the default
     /// ASTVerifier behavior via a frontend flag. By default, we do not
     /// customize.
