@@ -1641,16 +1641,16 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
     out << "] ";
   }
   if (involvesTypeVariables()) {
-    out << "involves_type_vars=[";
+    out << "[involves_type_vars: ";
     interleave(AdjacentVars,
                [&](const auto *typeVar) { out << typeVar->getString(PO); },
-               [&out]() { out << " "; });
+               [&out]() { out << ", "; });
     out << "] ";
   }
 
   auto numDefaultable = getNumViableDefaultableBindings();
   if (numDefaultable > 0)
-    out << "#defaultable_bindings=" << numDefaultable << " ";
+    out << "#defaultable_bindings: " << numDefaultable << " ";
 
   auto printBinding = [&](const PotentialBinding &binding) {
     auto type = binding.BindingType;
@@ -1678,14 +1678,14 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
   out << "]";
 
   if (!Defaults.empty()) {
-    out << " defaults={";
+    out << "[defaults: ";
     for (const auto &entry : Defaults) {
       auto *constraint = entry.second;
       PotentialBinding binding{constraint->getSecondType(),
                                AllowedBindingKind::Exact, constraint};
       printBinding(binding);
     }
-    out << "}";
+    out << "] ";
   }
 }
 
