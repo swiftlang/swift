@@ -3603,10 +3603,10 @@ ERROR(designated_init_in_extension,none,
       "designated initializer cannot be declared in an extension of %0; "
       "did you mean this to be a convenience initializer?",
       (DeclName))
-ERROR(cfclass_designated_init_in_extension,none,
+ERROR(designated_init_in_extension_no_convenience_tip,none,
       "designated initializer cannot be declared in an extension of %0",
       (DeclName))
-ERROR(enumstruct_convenience_init,none,
+ERROR(no_convenience_keyword_init,none,
       "initializers in %0 are not marked with 'convenience'",
       (StringRef))
 ERROR(nonclass_convenience_init,none,
