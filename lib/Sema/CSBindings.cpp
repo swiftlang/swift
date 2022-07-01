@@ -1671,9 +1671,11 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
     out << type.getString(PO);
   };
 
-  out << "bindings={";
+  out << "[with possible bindings: ";
   interleave(Bindings, printBinding, [&]() { out << "; "; });
-  out << "}";
+  if (Bindings.empty())
+    out << "<empty>";
+  out << "]";
 
   if (!Defaults.empty()) {
     out << " defaults={";
