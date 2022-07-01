@@ -55,25 +55,29 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 * [SE-0350][]:
 
   The standard library has a new `Regex<Output>` type.
-  
+
   This type represents an _extended regular expression_, allowing more fluent
   string processing operations. A `Regex` may be created by
   [initialization from a string][SE-0355]:
-  ```
+
+  ```swift
   let pattern = "a[bc]+" // matches "a" followed by one or more instances
                          // of either "b" or "c"
   let regex = try! Regex(pattern)
   ```
+
   Or via a [regex literal][SE-0354]:
-  ```
+
+  ```swift
   let regex = #/a[bc]+/#
   ```
+
   In Swift 6, `/` will also be supported as a delimiter for `Regex` literals.
   You can enable this mode in Swift 5.7 with the `-enable-bare-slash-regex`
   flag. Doing so will cause some existing expressions that use `/` as an 
   operator to no longer compile; you can add parentheses or line breaks as a
   workaround.
-  
+
   There are [new string-processing algorithms][SE-0357] that support
   `String`, `Regex` and arbitrary `Collection` types.
 
@@ -165,7 +169,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   Protocols with primary associated types can now be used in existential types,
   enabling same-type constraints on those associated types.
 
-  ```
+  ```swift
   let strings: any Collection<String> = [ "Hello" ]
   ```
 
@@ -508,12 +512,12 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   struct S {
     @available(macOS 99, *) // error: stored properties cannot be marked potentially unavailable with '@available'
     lazy var a: Int = 42
-  
+
     @available(macOS 99, *) // error: stored properties cannot be marked potentially unavailable with '@available'
     @Wrapper var b: Int
   }
   ```
-  
+
 * The compiler now correctly emits warnings for more kinds of expressions where a protocol conformance is used and may be unavailable at runtime. Previously, member reference expressions and type erasing expressions that used potentially unavailable conformances were not diagnosed, leading to potential crashes at runtime.
 
   ```swift
