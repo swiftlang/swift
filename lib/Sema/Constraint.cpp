@@ -322,7 +322,7 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   llvm_unreachable("Unhandled ConstraintKind in switch.");
 }
 
-void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
+void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm, bool skipLocator) const {
   // Print all type variables as $T0 instead of _ here.
   PrintOptions PO;
   PO.PrintTypesForDebugging = true;
@@ -352,7 +352,8 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
                    Out << ">  [favored]  ";
                  else
                    Out << ">             ";
-                 constraint->print(Out, sm);
+                 constraint->print(Out, sm,
+                   /*skipLocator=*/constraint->getLocator() == Locator);
                },
                [&] { Out << "\n"; });
     return;
@@ -522,7 +523,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
     fix->print(Out);
   }
 
-  if (Locator) {
+  if (Locator && !skipLocator) {
     Out << " [[";
     Locator->dump(sm, Out);
     Out << "]];";
