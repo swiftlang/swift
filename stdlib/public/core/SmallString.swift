@@ -255,7 +255,8 @@ extension _SmallString {
       self._storage = (0, 0)
       withUnsafeMutablePointer(to: &self._storage) {
         UnsafeMutableRawPointer($0).copyMemory(
-          from: rawBufPtr.baseAddress!, byteCount: len
+          from: rawBufPtr.baseAddress._unsafelyUnwrappedUnchecked,
+          byteCount: len
         )
       }
       return len
