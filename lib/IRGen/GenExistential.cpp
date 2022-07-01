@@ -1440,16 +1440,23 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T) {
     return createErrorExistentialTypeInfo(IGM, layout);
   }
 
-  // Note: Protocol composition types are not nominal, but we name them anyway.
-  if (auto existential = T->getAs<ExistentialType>()) {
-    T = existential->getConstraintType()->getCanonicalType();
-  }
   llvm::StructType *type;
-  if (isa<ProtocolType>(T) || isa<ParameterizedProtocolType>(T))
+  if (T->hasParameterizedExistential()) {
     type = IGM.createNominalType(T);
-  else
-    type = IGM.createNominalType(cast<ProtocolCompositionType>(T.getPointer()));
-    
+  } else {
+    // Note: Protocol composition types are not nominal, but we name them
+    // anyway.
+    if (auto existential = T->getAs<ExistentialType>()) {
+      T = existential->getConstraintType()->getCanonicalType();
+    }
+
+    if (isa<ProtocolType>(T))
+      type = IGM.createNominalType(T);
+    else
+      type =
+          IGM.createNominalType(cast<ProtocolCompositionType>(T.getPointer()));
+  }
+
   assert(type->isOpaque() && "creating existential type in concrete struct");
 
   // In an opaque metadata, the first two fields are the fixed buffer
