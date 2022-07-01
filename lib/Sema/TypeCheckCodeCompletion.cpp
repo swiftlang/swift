@@ -109,13 +109,11 @@ namespace {
 /// FIXME: Remove this.
 class SanitizeExpr : public ASTWalker {
   ASTContext &C;
-  bool ShouldReusePrecheckedType;
   llvm::SmallDenseMap<OpaqueValueExpr *, Expr *, 4> OpenExistentials;
 
 public:
-  SanitizeExpr(ASTContext &C,
-               bool shouldReusePrecheckedType)
-    : C(C), ShouldReusePrecheckedType(shouldReusePrecheckedType) { }
+  SanitizeExpr(ASTContext &C)
+    : C(C) { }
 
   std::pair<bool, ArgumentList *>
   walkToArgumentListPre(ArgumentList *argList) override {
@@ -126,12 +124,6 @@ public:
 
   std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
     while (true) {
-
-      // If we should reuse pre-checked types, don't sanitize the expression
-      // if it's already type-checked.
-      if (ShouldReusePrecheckedType && expr->getType())
-        return { false, expr };
-
       // OpenExistentialExpr contains OpaqueValueExpr in its sub expression.
       if (auto OOE = dyn_cast<OpenExistentialExpr>(expr)) {
         auto archetypeVal = OOE->getOpaqueValue();
@@ -301,8 +293,7 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
                                  FreeTypeVariableBinding allowFreeTypeVariables) {
   auto &Context = dc->getASTContext();
 
-  expr = expr->walk(SanitizeExpr(Context,
-                                 /*shouldReusePrecheckedType=*/false));
+  expr = expr->walk(SanitizeExpr(Context));
 
   FrontendStatsTracer StatsTracer(Context.Stats,
                                   "typecheck-expr-no-apply", expr);
@@ -400,12 +391,10 @@ getTypeOfCompletionOperatorImpl(DeclContext *DC, Expr *expr,
                                   "typecheck-completion-operator", expr);
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
-  expr = expr->walk(SanitizeExpr(Context,
-                                 /*shouldReusePrecheckedType=*/true));
+  expr = expr->walk(SanitizeExpr(Context));
 
   ConstraintSystemOptions options;
   options |= ConstraintSystemFlags::SuppressDiagnostics;
-  options |= ConstraintSystemFlags::ReusePrecheckedType;
   options |= ConstraintSystemFlags::LeaveClosureBodyUnchecked;
 
   // Construct a constraint system from this expression.
@@ -577,8 +566,7 @@ bool TypeChecker::typeCheckForCodeCompletion(
     return false;
 
   if (auto *expr = getAsExpr(node)) {
-    node = expr->walk(SanitizeExpr(Context,
-                                   /*shouldReusePrecheckedType=*/false));
+    node = expr->walk(SanitizeExpr(Context));
   }
 
   CompletionContextFinder contextAnalyzer(node, DC);
@@ -774,7 +762,7 @@ swift::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
 bool swift::typeCheckExpression(DeclContext *DC, Expr *&parsedExpr) {
   auto &ctx = DC->getASTContext();
 
-  parsedExpr = parsedExpr->walk(SanitizeExpr(ctx, /*shouldReusePrecheckedType=*/false));
+  parsedExpr = parsedExpr->walk(SanitizeExpr(ctx));
 
   DiagnosticSuppression suppression(ctx.Diags);
   auto resultTy = TypeChecker::typeCheckExpression(
