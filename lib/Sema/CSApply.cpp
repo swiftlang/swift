@@ -5706,8 +5706,17 @@ ArgumentList *ExprRewriter::coerceCallArguments(
   // Quickly test if any further fix-ups for the argument types are necessary.
   auto matches = args->matches(params, [&](Expr *E) { return cs.getType(E); });
   if (matches && !shouldInjectWrappedValuePlaceholder &&
-      !paramInfo.anyContextualInfo())
+      !paramInfo.anyContextualInfo()) {
+    // Propagate preconcurrency to any closure arguments.
+    if (preconcurrency) {
+      for (const auto &arg : *args) {
+        Expr *argExpr = arg.getExpr();
+        applyContextualClosureFlags(argExpr, false, false, preconcurrency);
+      }
+    }
+
     return args;
+  }
 
   // Determine the parameter bindings that were applied.
   auto *locatorPtr = cs.getConstraintLocator(locator);
