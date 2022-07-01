@@ -614,11 +614,19 @@ struct SelectedOverload {
   /// we're referencing a member.
   const Type openedFullType;
 
+  /// The opened type of the base of the reference to this overload, adjusted
+  /// for `@preconcurrency` or other contextual type-altering attributes.
+  const Type adjustedOpenedFullType;
+
   /// The opened type produced by referring to this overload.
   const Type openedType;
 
+  /// The opened type produced by referring to this overload, adjusted for
+  /// `@preconcurrency` or other contextual type-altering attributes.
+  const Type adjustedOpenedType;
+
   /// The type that this overload binds. Note that this may differ from
-  /// openedType, for example it will include any IUO unwrapping that has taken
+  /// adjustedOpenedType, for example it will include any IUO unwrapping that has taken
   /// place.
   const Type boundType;
 };
@@ -2469,6 +2477,31 @@ struct GetClosureType {
   ConstraintSystem &cs;
 
   Type operator()(const AbstractClosureExpr *expr) const;
+};
+
+/// Describes the type produced when referencing a declaration.
+struct DeclReferenceType {
+  /// The "opened" type, which is the type of the declaration where any
+  /// generic parameters have been replaced with type variables.
+  ///
+  /// The mapping from generic parameters to type variables will have been
+  /// recorded by \c recordOpenedTypes when this type is produced.
+  Type openedType;
+
+  /// The opened type, after performing contextual type adjustments such as
+  /// removing concurrency-related annotations for a `@preconcurrency`
+  /// operation.
+  Type adjustedOpenedType;
+
+  /// The type of the reference, based on the original opened type. This is the
+  /// type that the expression used to form the declaration reference would
+  /// have if no adjustments had been applied.
+  Type referenceType;
+
+  /// The type of the reference, which is the adjusted opened type after
+  /// (e.g.) applying the base of a member access. This is the type of the
+  /// expression used to form the declaration reference.
+  Type adjustedReferenceType;
 };
 
 /// Describes a system of constraints on type variables, the
@@ -4423,10 +4456,11 @@ public:
          const OpenedTypeMap &replacements);
 
   /// Wrapper over swift::adjustFunctionTypeForConcurrency that passes along
-  /// the appropriate closure-type extraction function.
+  /// the appropriate closure-type and opening extraction functions.
   AnyFunctionType *adjustFunctionTypeForConcurrency(
     AnyFunctionType *fnType, ValueDecl *decl, DeclContext *dc,
-    unsigned numApplies, bool isMainDispatchQueue);
+    unsigned numApplies, bool isMainDispatchQueue,
+    OpenedTypeMap &replacements);
 
   /// Retrieve the type of a reference to the given value declaration.
   ///
@@ -4436,9 +4470,8 @@ public:
   ///
   /// \param decl The declarations whose type is being computed.
   ///
-  /// \returns a pair containing the full opened type (if applicable) and
-  /// opened type of a reference to declaration.
-  std::pair<Type, Type> getTypeOfReference(
+  /// \returns a description of the type of this declaration reference.
+  DeclReferenceType getTypeOfReference(
                           ValueDecl *decl,
                           FunctionRefKind functionRefKind,
                           ConstraintLocatorBuilder locator,
@@ -4486,6 +4519,14 @@ public:
           return Type();
         });
 
+  /// Given the opened type and a pile of information about a member reference,
+  /// determine the reference type of the member reference.
+  Type getMemberReferenceTypeFromOpenedType(
+      Type &openedType, Type baseObjTy, ValueDecl *value, DeclContext *outerDC,
+      ConstraintLocator *locator, bool hasAppliedSelf,
+      bool isStaticMemberRefOnProtocol, bool isDynamicResult,
+      OpenedTypeMap &replacements);
+
   /// Retrieve the type of a reference to the given value declaration,
   /// as a member with a base of the given type.
   ///
@@ -4496,9 +4537,8 @@ public:
   /// \param isDynamicResult Indicates that this declaration was found via
   /// dynamic lookup.
   ///
-  /// \returns a pair containing the full opened type (which includes the opened
-  /// base) and opened type of a reference to this member.
-  std::pair<Type, Type> getTypeOfMemberReference(
+  /// \returns a description of the type of this declaration reference.
+  DeclReferenceType getTypeOfMemberReference(
                           Type baseTy, ValueDecl *decl, DeclContext *useDC,
                           bool isDynamicResult,
                           FunctionRefKind functionRefKind,
