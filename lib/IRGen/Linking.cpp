@@ -533,8 +533,8 @@ std::string LinkEntity::mangleAsString() const {
     auto existentialType = getExtendedExistentialTypeShapeType();
     auto isUnique = isExtendedExistentialTypeShapeUnique();
 
-    return mangler.mangleExtendedExistentialTypeShape(
-                     isUnique, genSig, existentialType);
+    return mangler.mangleExtendedExistentialTypeShapeSymbol(
+                     genSig, existentialType, isUnique);
   }
   }
   llvm_unreachable("bad entity kind!");

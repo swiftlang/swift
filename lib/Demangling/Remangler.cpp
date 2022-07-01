@@ -3498,6 +3498,29 @@ ManglingError Remangler::mangleExtendedExistentialTypeShape(Node *node,
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleSymbolicExtendedExistentialType(Node *node,
+                                                     unsigned int depth) {
+  RETURN_IF_ERROR(mangle(node->getChild(0), depth+1));
+  for (auto arg: *node->getChild(1))
+    RETURN_IF_ERROR(mangle(arg, depth+1));
+  if (node->getNumChildren() > 2)
+    for (auto conf: *node->getChild(2))
+      RETURN_IF_ERROR(mangle(conf, depth+1));
+  return ManglingError::Success;
+}
+ManglingError Remangler::
+mangleUniqueExtendedExistentialTypeShapeSymbolicReference(Node *node,
+                                                     unsigned int depth) {
+  // We don't support absolute references in the mangling of these
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+ManglingError Remangler::
+mangleNonUniqueExtendedExistentialTypeShapeSymbolicReference(Node *node,
+                                                     unsigned int depth) {
+  // We don't support absolute references in the mangling of these
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
 } // anonymous namespace
 
 /// The top-level interface to the remangler.

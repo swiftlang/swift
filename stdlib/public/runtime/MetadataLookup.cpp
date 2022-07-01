@@ -98,6 +98,8 @@ static uintptr_t resolveSymbolicReferenceOffset(SymbolicReferenceKind kind,
         *(const TargetSignedContextPointer<InProcess> *)ptr;
       return (uintptr_t)contextPtr;
     }
+    case SymbolicReferenceKind::UniqueExtendedExistentialTypeShape:
+    case SymbolicReferenceKind::NonUniqueExtendedExistentialTypeShape:
     case SymbolicReferenceKind::AccessorFunctionReference: {
       swift_unreachable("should not be indirectly referenced");
     }
@@ -158,6 +160,14 @@ ResolveAsSymbolicReference::operator()(SymbolicReferenceKind kind,
 #endif
     break;
   }
+  case Demangle::SymbolicReferenceKind::UniqueExtendedExistentialTypeShape:
+    nodeKind = Node::Kind::UniqueExtendedExistentialTypeShapeSymbolicReference;
+    isType = false;
+    break;
+  case Demangle::SymbolicReferenceKind::NonUniqueExtendedExistentialTypeShape:
+    nodeKind = Node::Kind::NonUniqueExtendedExistentialTypeShapeSymbolicReference;
+    isType = false;
+    break;
   }
   
   auto node = Dem.createNode(nodeKind, ptr);
@@ -177,6 +187,7 @@ _buildDemanglingForSymbolicReference(SymbolicReferenceKind kind,
   case SymbolicReferenceKind::Context:
     return _buildDemanglingForContext(
       (const ContextDescriptor *)resolvedReference, {}, Dem);
+
   case SymbolicReferenceKind::AccessorFunctionReference:
 #if SWIFT_PTRAUTH
     // The pointer refers to an accessor function, which we need to sign.
@@ -184,6 +195,25 @@ _buildDemanglingForSymbolicReference(SymbolicReferenceKind kind,
       ptrauth_key_function_pointer, 0);
 #endif
     return Dem.createNode(Node::Kind::AccessorFunctionReference,
+                          (uintptr_t)resolvedReference);
+
+  case SymbolicReferenceKind::UniqueExtendedExistentialTypeShape:
+#if SWIFT_PTRAUTH
+    resolvedReference = ptrauth_sign_unauthenticated(resolvedReference,
+      ptrauth_key_process_independent_data,
+      SpecialPointerAuthDiscriminators::ExtendedExistentialTypeShape);
+#endif
+    return Dem.createNode(Node::Kind::UniqueExtendedExistentialTypeShapeSymbolicReference,
+                          (uintptr_t)resolvedReference);
+
+  case SymbolicReferenceKind::NonUniqueExtendedExistentialTypeShape:
+#if SWIFT_PTRAUTH
+    // The pointer refers to an accessor function, which we need to sign.
+    resolvedReference = ptrauth_sign_unauthenticated(resolvedReference,
+      ptrauth_key_process_independent_data,
+      SpecialPointerAuthDiscriminators::NonUniqueExtendedExistentialTypeShape);
+#endif
+    return Dem.createNode(Node::Kind::NonUniqueExtendedExistentialTypeShapeSymbolicReference,
                           (uintptr_t)resolvedReference);
   }
   
@@ -1520,6 +1550,55 @@ public:
     if (!accessFunction) return BuiltType();
 
     return accessFunction(MetadataState::Abstract, allGenericArgsVec).Value;
+  }
+
+  TypeLookupErrorOr<BuiltType>
+  createSymbolicExtendedExistentialType(NodePointer shapeNode,
+                                  llvm::ArrayRef<BuiltType> genArgs) const {
+    const ExtendedExistentialTypeShape *shape;
+    if (shapeNode->getKind() ==
+          Node::Kind::UniqueExtendedExistentialTypeShapeSymbolicReference) {
+      shape = reinterpret_cast<const ExtendedExistentialTypeShape *>(
+                shapeNode->getIndex());
+    } else if (shapeNode->getKind() ==
+        Node::Kind::NonUniqueExtendedExistentialTypeShapeSymbolicReference) {
+      auto nonUniqueShape =
+        reinterpret_cast<const NonUniqueExtendedExistentialTypeShape *>(
+                shapeNode->getIndex());
+      shape = swift_getExtendedExistentialTypeShape(nonUniqueShape);
+    } else {
+      return TYPE_LOOKUP_ERROR_FMT("Tried to build an extended existential "
+                                   "metatype from an unexpected shape node");
+    }
+
+    auto rawShape =
+      swift_auth_data_non_address(shape,
+          SpecialPointerAuthDiscriminators::ExtendedExistentialTypeShape);
+    auto genSig = rawShape->getGeneralizationSignature();
+
+    // Collect the type arguments; they should all be key arguments.
+    if (genArgs.size() != genSig.getParams().size())
+      return TYPE_LOOKUP_ERROR_FMT("Length mismatch building an extended "
+                                   "existential metatype");
+    llvm::SmallVector<const void *, 8> allArgsVec;
+    allArgsVec.append(genArgs.begin(), genArgs.end());
+
+    // Collect any other generic arguments.
+    auto error = _checkGenericRequirements(
+        genSig.getRequirements(), allArgsVec,
+        [genArgs](unsigned depth, unsigned index) -> const Metadata * {
+          if (depth != 0 || index >= genArgs.size())
+            return nullptr;
+          return genArgs[index];
+        },
+        [](const Metadata *type, unsigned index) -> const WitnessTable * {
+          swift_unreachable("never called");
+        });
+    if (error)
+      return *error;
+
+    return swift_getExtendedExistentialTypeMetadata_unique(shape,
+                                                           allArgsVec.data());
   }
 
   TypeLookupErrorOr<BuiltType> createBuiltinType(StringRef builtinName,

@@ -124,6 +124,9 @@ public:
   Type createConstrainedExistentialType(Type base,
                                         ArrayRef<BuiltRequirement> constraints);
 
+  Type createSymbolicExtendedExistentialType(NodePointer shapeNode,
+                                             ArrayRef<Type> genArgs);
+
   Type createExistentialMetatypeType(Type instance,
                      Optional<Demangle::ImplMetatypeRepresentation> repr=None);
 
