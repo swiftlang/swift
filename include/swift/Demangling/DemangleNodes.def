@@ -340,6 +340,9 @@ NODE(BackDeploymentThunk)
 NODE(BackDeploymentFallback)
 NODE(ExtendedExistentialTypeShape)
 NODE(Uniquable)
+NODE(UniqueExtendedExistentialTypeShapeSymbolicReference)
+NODE(NonUniqueExtendedExistentialTypeShapeSymbolicReference)
+NODE(SymbolicExtendedExistentialType)
 
 #undef CONTEXT_NODE
 #undef NODE

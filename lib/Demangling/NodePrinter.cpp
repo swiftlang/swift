@@ -599,6 +599,9 @@ private:
     case Node::Kind::BackDeploymentFallback:
     case Node::Kind::ExtendedExistentialTypeShape:
     case Node::Kind::Uniquable:
+    case Node::Kind::UniqueExtendedExistentialTypeShapeSymbolicReference:
+    case Node::Kind::NonUniqueExtendedExistentialTypeShapeSymbolicReference:
+    case Node::Kind::SymbolicExtendedExistentialType:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -3008,6 +3011,33 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     print(type, depth + 1);
 
     Options.DisplayWhereClauses = savedDisplayWhereClauses;
+    return nullptr;
+  }
+  case Node::Kind::UniqueExtendedExistentialTypeShapeSymbolicReference:
+    Printer << "unique existential shape symbolic reference 0x";
+    Printer.writeHex(Node->getIndex());
+    return nullptr;
+  case Node::Kind::NonUniqueExtendedExistentialTypeShapeSymbolicReference:
+    Printer << "non-unique existential shape symbolic reference 0x";
+    Printer.writeHex(Node->getIndex());
+    return nullptr;
+  case Node::Kind::SymbolicExtendedExistentialType: {
+    auto shape = Node->getChild(0);
+    bool isUnique =
+      (shape->getKind() ==
+         Node::Kind::UniqueExtendedExistentialTypeShapeSymbolicReference);
+    Printer << "symbolic existential type ("
+            << (isUnique ? "" : "non-")
+            << "unique) 0x";
+    Printer.writeHex(shape->getIndex());
+    Printer << " <";
+    print(Node->getChild(1), depth + 1);
+    if (Node->getNumChildren() > 2) {
+      Printer << ", ";
+      print(Node->getChild(2), depth + 1);
+    }
+    Printer << ">";
+
     return nullptr;
   }
   }
