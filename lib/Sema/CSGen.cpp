@@ -1700,9 +1700,48 @@ namespace {
       if (!optTy)
         return Type();
 
-      // Prior to Swift 5, 'try?' always adds an additional layer of optionality,
-      // even if the sub-expression was already optional.
-      if (CS.getASTContext().LangOpts.isSwiftVersionAtLeast(5)) {
+      bool isDelegationToOptionalInit = false;
+      {
+        Expr *e = expr->getSubExpr();
+        while (true) {
+          e = e->getSemanticsProvidingExpr();
+
+          // Look through force-value expressions.
+          if (auto *FVE = dyn_cast<ForceValueExpr>(e)) {
+            e = FVE->getSubExpr();
+            continue;
+          }
+
+          break;
+        }
+
+        if (auto *CE = dyn_cast<CallExpr>(e)) {
+          if (auto *UDE = dyn_cast<UnresolvedDotExpr>(CE->getFn())) {
+            if (!CS.getType(UDE->getBase())->is<AnyMetatypeType>()) {
+              auto overload =
+                  CS.findSelectedOverloadFor(CS.getConstraintLocator(
+                      UDE, ConstraintLocator::ConstructorMember));
+              if (overload) {
+                auto *decl = overload->choice.getDeclOrNull();
+                if (decl && isa<ConstructorDecl>(decl) &&
+                    decl->getDeclContext()
+                        ->getSelfNominalTypeDecl()
+                        ->isOptionalDecl())
+                  isDelegationToOptionalInit = true;
+              }
+            }
+          }
+        }
+      }
+
+      // Prior to Swift 5, 'try?' always adds an additional layer of
+      // optionality, even if the sub-expression was already optional.
+      //
+      // NB Keep adding the additional layer in Swift 5 and on if this 'try?'
+      // applies to a delegation to an 'Optional' initializer, or else we won't
+      // discern the difference between a failure and a constructed value.
+      if (CS.getASTContext().LangOpts.isSwiftVersionAtLeast(5) &&
+          !isDelegationToOptionalInit) {
         CS.addConstraint(ConstraintKind::Conversion,
                          CS.getType(expr->getSubExpr()), optTy,
                          CS.getConstraintLocator(expr));

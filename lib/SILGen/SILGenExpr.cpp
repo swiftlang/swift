@@ -4166,23 +4166,31 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
   auto ctorDecl = cast<ConstructorDecl>(selfDecl->getDeclContext());
   auto selfIfaceTy = ctorDecl->getDeclContext()->getSelfInterfaceType();
   auto selfTy = ctorDecl->mapTypeIntoContext(selfIfaceTy);
-  
-  auto newSelfTy = E->getSubExpr()->getType();
-  bool outerIsOptional = false;
-  bool innerIsOptional = false;
-  auto objTy = newSelfTy->getOptionalObjectType();
-  if (objTy) {
-    outerIsOptional = true;
-    newSelfTy = objTy;
 
-    // "try? self.init()" can give us two levels of optional if the initializer
-    // we delegate to is failable.
-    objTy = newSelfTy->getOptionalObjectType();
-    if (objTy) {
-      innerIsOptional = true;
-      newSelfTy = objTy;
+  bool isChaining; // Ignored
+  auto *otherCtor = E->getCalledConstructor(isChaining)->getDecl();
+  assert(otherCtor);
+
+  auto getOptionalityDepth = [](Type ty) {
+    unsigned level = 0;
+    Type objTy = ty->getOptionalObjectType();
+    while (objTy) {
+      ++level;
+      objTy = objTy->getOptionalObjectType();
     }
-  }
+
+    return level;
+  };
+
+  // The optionality depth of the 'new self' value. This can be '2' if the ctor
+  // we are delegating/chaining to is both throwing and failable, or more if
+  // 'self' is optional.
+  auto srcOptionalityDepth = getOptionalityDepth(E->getSubExpr()->getType());
+
+  // The optionality depth of the result type of the enclosing initializer in
+  // this context.
+  const auto destOptionalityDepth = getOptionalityDepth(
+      ctorDecl->mapTypeIntoContext(ctorDecl->getResultInterfaceType()));
 
   // The subexpression consumes the current 'self' binding.
   assert(SGF.SelfInitDelegationState == SILGenFunction::NormalSelf
@@ -4199,13 +4207,25 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
     SGF.emitAddressOfLocalVarDecl(E, selfDecl, selfTy->getCanonicalType(),
                                   SGFAccessKind::Write).getLValueAddress();
 
-  // Handle a nested optional case (see above).
-  if (innerIsOptional)
+  // Flatten a nested optional if 'new self' is a deeper optional than we
+  // can return.
+  if (srcOptionalityDepth > destOptionalityDepth) {
+    assert(destOptionalityDepth > 0);
+    assert(otherCtor->isFailable() && otherCtor->hasThrows());
+
+    --srcOptionalityDepth;
     newSelf = flattenOptional(SGF, E, newSelf);
 
-  // If both the delegated-to initializer and our enclosing initializer can
-  // fail, deal with the failure.
-  if (outerIsOptional && ctorDecl->isFailable()) {
+    assert(srcOptionalityDepth == destOptionalityDepth &&
+           "Flattening a single level was not enough?");
+  }
+
+  // If the enclosing ctor is failable and the optionality depths match, switch
+  // on 'new self' to either return 'nil' or continue with the projected value.
+  if (srcOptionalityDepth == destOptionalityDepth && ctorDecl->isFailable()) {
+    assert(destOptionalityDepth > 0);
+    assert(otherCtor->isFailable() || otherCtor->hasThrows());
+
     SILBasicBlock *someBB = SGF.createBasicBlock();
 
     auto hasValue = SGF.emitDoesOptionalHaveValue(E, newSelf.getValue());
@@ -4224,7 +4244,7 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
                                     SGF.getTypeLowering(newSelf.getType()),
                                                     SGFContext());
   }
-  
+
   // If we called a constructor that requires a downcast, perform the downcast.
   auto destTy = SGF.getLoweredType(selfTy);
   if (newSelf.getType() != destTy) {
