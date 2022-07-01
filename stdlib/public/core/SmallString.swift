@@ -253,15 +253,10 @@ extension _SmallString {
       _internalInvariant(len <= _SmallString.capacity)
       
       self._storage = (0, 0)
-      withUnsafeMutableBytes(of: &self._storage) { storagePtr in
-        var i = 0
-        while i < len {
-          storagePtr.storeBytes(
-            of: rawBufPtr.load(fromByteOffset: i, as: UInt8.self),
-            as: UInt8.self
-          )
-          i &+= 1
-        }
+      withUnsafeMutablePointer(to: &self._storage) {
+        UnsafeMutableRawPointer($0).copyMemory(
+          from: rawBufPtr.baseAddress!, byteCount: len
+        )
       }
       return len
     }
