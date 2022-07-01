@@ -2,8 +2,6 @@
 
 // CHECK: struct LoadableIntWrapper {
 // CHECK:   func successor() -> LoadableIntWrapper
-// CHECK:   static func == (lhs: LoadableIntWrapper, rhs: LoadableIntWrapper) -> Bool
-// CHECK:   static func - (obj: LoadableIntWrapper) -> LoadableIntWrapper
 // CHECK:   static func - (lhs: inout LoadableIntWrapper, rhs: LoadableIntWrapper) -> LoadableIntWrapper
 // CHECK:   mutating func callAsFunction() -> Int32
 // CHECK:   mutating func callAsFunction(_ x: Int32) -> Int32

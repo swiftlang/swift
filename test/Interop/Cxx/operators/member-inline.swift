@@ -28,7 +28,7 @@ OperatorsTestSuite.test("AddressOnlyIntWrapper.minus") {
 #endif
 
 OperatorsTestSuite.test("LoadableIntWrapper.equal (inline)") {
-  var lhs = LoadableIntWrapper(value: 42)
+  let lhs = LoadableIntWrapper(value: 42)
   let rhs = LoadableIntWrapper(value: 42)
 
   let result = lhs == rhs
@@ -37,8 +37,9 @@ OperatorsTestSuite.test("LoadableIntWrapper.equal (inline)") {
 }
 
 OperatorsTestSuite.test("LoadableIntWrapper.unaryMinus (inline)") {
-  var lhs = LoadableIntWrapper(value: 42)
-  expectEqual(-42, -lhs)
+  let lhs = LoadableIntWrapper(value: 42)
+  let inverseLhs = -lhs;
+  expectEqual(-42, inverseLhs.value)
 }
 
 OperatorsTestSuite.test("LoadableIntWrapper.call (inline)") {
