@@ -1133,6 +1133,9 @@ swift::extractUserModuleVersionFromInterface(StringRef moduleInterfacePath) {
 bool SerializedModuleLoaderBase::canImportModule(ImportPath::Module path,
                                                  llvm::VersionTuple version,
                                                  bool underlyingVersion) {
+  // FIXME: Swift submodules?
+  if (path.hasSubmodule())
+    return false;
   // If underlying version is specified, this should be handled by Clang importer.
   if (!version.empty() && underlyingVersion)
     return false;
@@ -1153,7 +1156,6 @@ bool SerializedModuleLoaderBase::canImportModule(ImportPath::Module path,
     unusedModuleDocBuffer = &moduleDocBuffer;
   }
 
-  // FIXME: Swift submodules?
   auto mID = path[0];
   auto found = findModule(mID, unusedModuleInterfacePath, unusedModuleBuffer,
                           unusedModuleDocBuffer, unusedModuleSourceInfoBuffer,
@@ -1193,10 +1195,12 @@ bool SerializedModuleLoaderBase::canImportModule(ImportPath::Module path,
 bool MemoryBufferSerializedModuleLoader::canImportModule(
     ImportPath::Module path, llvm::VersionTuple version,
     bool underlyingVersion) {
+  // FIXME: Swift submodules?
+  if (path.hasSubmodule())
+    return false;
   // If underlying version is specified, this should be handled by Clang importer.
   if (!version.empty() && underlyingVersion)
     return false;
-  // FIXME: Swift submodules?
   auto mID = path[0];
   auto mIt = MemoryBuffers.find(mID.Item.str());
   if (mIt == MemoryBuffers.end())
