@@ -1413,7 +1413,7 @@ DictionaryExpr *DictionaryExpr::create(ASTContext &C, SourceLoc LBracketLoc,
                                   Ty);
 }
 
-static ValueDecl *getCalledValue(Expr *E) {
+static ValueDecl *getCalledValue(Expr *E, bool skipFunctionConversions) {
   if (auto *DRE = dyn_cast<DeclRefExpr>(E))
     return DRE->getDecl();
 
@@ -1422,11 +1422,16 @@ static ValueDecl *getCalledValue(Expr *E) {
 
   // Look through SelfApplyExpr.
   if (auto *SAE = dyn_cast<SelfApplyExpr>(E))
-    return SAE->getCalledValue();
+    return SAE->getCalledValue(skipFunctionConversions);
+
+  if (skipFunctionConversions) {
+    if (auto fnConv = dyn_cast<FunctionConversionExpr>(E))
+      return getCalledValue(fnConv->getSubExpr(), skipFunctionConversions);
+  }
 
   Expr *E2 = E->getValueProvidingExpr();
   if (E != E2)
-    return getCalledValue(E2);
+    return getCalledValue(E2, skipFunctionConversions);
 
   return nullptr;
 }
@@ -1468,8 +1473,8 @@ Expr *DefaultArgumentExpr::getCallerSideDefaultExpr() const {
                            new (ctx) ErrorExpr(getSourceRange(), getType()));
 }
 
-ValueDecl *ApplyExpr::getCalledValue() const {
-  return ::getCalledValue(Fn);
+ValueDecl *ApplyExpr::getCalledValue(bool skipFunctionConversions) const {
+  return ::getCalledValue(Fn, skipFunctionConversions);
 }
 
 SubscriptExpr::SubscriptExpr(Expr *base, ArgumentList *argList,
@@ -1909,6 +1914,8 @@ Expr *AutoClosureExpr::getUnwrappedCurryThunkExpr() const {
   auto maybeUnwrapConversions = [](Expr *expr) {
     if (auto *covariantReturn = dyn_cast<CovariantReturnConversionExpr>(expr))
       expr = covariantReturn->getSubExpr();
+    if (auto *functionConversion = dyn_cast<FunctionConversionExpr>(expr))
+      expr = functionConversion->getSubExpr();
     return expr;
   };
 
@@ -1944,7 +1951,8 @@ Expr *AutoClosureExpr::getUnwrappedCurryThunkExpr() const {
       innerBody = maybeUnwrapConversions(innerBody);
 
       if (auto *outerCall = dyn_cast<ApplyExpr>(innerBody)) {
-        if (auto *innerCall = dyn_cast<ApplyExpr>(outerCall->getFn())) {
+        auto outerFn = maybeUnwrapConversions(outerCall->getFn());
+        if (auto *innerCall = dyn_cast<ApplyExpr>(outerFn)) {
           return innerCall->getFn();
         }
       }
