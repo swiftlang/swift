@@ -476,16 +476,23 @@ struct MoveOnlyChecker {
   MoveOnlyChecker(SILFunction *fn, DeadEndBlocks *deBlocks)
       : fn(fn), copyOfBorrowedProjectionChecker(deBlocks) {}
 
+  /// Search through the current function for candidate mark_must_check
+  /// [noimplicitcopy]. If we find one that does not fit a pattern that we
+  /// understand, emit an error diagnostic telling the programmer that the move
+  /// checker did not know how to recognize this code pattern.
+  ///
+  /// \returns true if we deleted a mark_must_check inst that we didn't
+  /// recognize after emitting the diagnostic.
+  bool searchForCandidateMarkMustChecks();
+
   bool check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
              DominanceInfo *domTree);
 };
 
 } // namespace
 
-bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
-                            DominanceInfo *domTree) {
+bool MoveOnlyChecker::searchForCandidateMarkMustChecks() {
   bool changed = false;
-
   for (auto &block : *fn) {
     for (auto ii = block.begin(), ie = block.end(); ii != ie;) {
       auto *mmci = dyn_cast<MarkMustCheckInst>(&*ii);
@@ -530,6 +537,24 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
       changed = true;
     }
   }
+  return changed;
+}
+
+bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
+                            DominanceInfo *domTree) {
+  bool changed = false;
+
+  // First search for candidates to process and emit diagnostics on any
+  // mark_must_check [noimplicitcopy] we didn't recognize.
+  changed |= searchForCandidateMarkMustChecks();
+
+  // If we didn't find any introducers to check, just return changed.
+  //
+  // NOTE: changed /can/ be true here if we had any mark_must_check
+  // [noimplicitcopy] that we didn't understand and emitting a diagnostic upon
+  // and then deleting.
+  if (moveIntroducersToProcess.empty())
+    return changed;
 
   auto callbacks =
       InstModCallbacks().onDelete([&](SILInstruction *instToDelete) {
