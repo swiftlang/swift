@@ -487,7 +487,7 @@ namespace swift {
     /// \code
     /// extension [Int] { /**/ }
     /// \endcode
-    bool EnableExperimentalBoundGenericExtensions = false;
+    bool EnableExperimentalBoundGenericExtensions = true;
 
     /// A helper enum to represent whether or not we customized the default
     /// ASTVerifier behavior via a frontend flag. By default, we do not
