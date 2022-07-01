@@ -244,9 +244,9 @@ extension _SmallString {
     var tmp = self._storage
     let len = try withUnsafeMutableBytes(of: &tmp) {
       (rawBufPtr: UnsafeMutableRawBufferPointer) -> Int in
-      var len = try f(rawBufPtr)
+      let len = try f(rawBufPtr)
       
-      if len == 0 {
+      if len <= 0 {
         return 0
       }
       
@@ -261,7 +261,7 @@ extension _SmallString {
       }
       return len
     }
-
+    
     if len == 0 {
       self = _SmallString()
       return
