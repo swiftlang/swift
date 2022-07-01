@@ -231,10 +231,7 @@ public:
     extractAllElements(origResult, Builder, origResults);
 
     // Get and partially apply the pullback.
-    auto vjpGenericEnv = vjp->getGenericEnvironment();
-    auto vjpSubstMap = vjpGenericEnv
-                           ? vjpGenericEnv->getForwardingSubstitutionMap()
-                           : vjp->getForwardingSubstitutionMap();
+    auto vjpSubstMap = vjp->getForwardingSubstitutionMap();
     auto *pullbackRef = Builder.createFunctionRef(loc, pullback);
 
     // Prepare partial application arguments.
@@ -257,13 +254,10 @@ public:
     auto *pullbackPartialApply = Builder.createPartialApply(
         loc, pullbackRef, vjpSubstMap, {partialApplyArg},
         ParameterConvention::Direct_Guaranteed);
-    auto pullbackType = vjp->getLoweredFunctionType()
-                            ->getResults()
-                            .back()
-                            .getSILStorageInterfaceType();
-    pullbackType = pullbackType.substGenericArgs(
-        getModule(), vjpSubstMap, TypeExpansionContext::minimal());
-    pullbackType = pullbackType.subst(getModule(), vjpSubstMap);
+    auto pullbackType = vjp->mapTypeIntoContext(
+        vjp->getConventions().getSILType(
+            vjp->getLoweredFunctionType()->getResults().back(),
+            vjp->getTypeExpansionContext()));
     auto pullbackFnType = pullbackType.castTo<SILFunctionType>();
     auto pullbackSubstType =
         pullbackPartialApply->getType().castTo<SILFunctionType>();

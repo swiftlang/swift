@@ -26,6 +26,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -421,7 +422,7 @@ bool RequirementFailure::diagnoseAsNote() {
   // Layout requirement doesn't have a second type, let's always
   // `AnyObject`.
   auto requirementTy = req.getKind() == RequirementKind::Layout
-                           ? getASTContext().getAnyObjectType()
+                           ? getASTContext().getAnyObjectConstraint()
                            : req.getSecondType();
 
   emitDiagnosticAt(reqDC->getAsDecl(), getDiagnosticAsNote(), getLHS(),
@@ -1308,7 +1309,7 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
   // only a '?' fixit) even though the constraint system didn't need to add any
   // additional optionality.
   auto overload = getOverloadChoiceIfAvailable(locator);
-  if (overload && overload->openedType->getOptionalObjectType())
+  if (overload && overload->adjustedOpenedType->getOptionalObjectType())
     resultIsOptional = true;
 
   auto unwrappedBaseType = baseType->getOptionalObjectType();
@@ -2215,7 +2216,7 @@ AssignmentFailure::getMemberRef(ConstraintLocator *locator) const {
     if (isValidKeyPathDynamicMemberLookup(subscript)) {
       // Type has a following format:
       // `(Self) -> (dynamicMember: {Writable}KeyPath<T, U>) -> U`
-      auto *fullType = member->openedFullType->castTo<FunctionType>();
+      auto *fullType = member->adjustedOpenedFullType->castTo<FunctionType>();
       auto *fnType = fullType->getResult()->castTo<FunctionType>();
 
       auto paramTy = fnType->getParams()[0].getPlainType();
@@ -4616,7 +4617,7 @@ bool MissingArgumentsFailure::diagnoseAsError() {
 bool MissingArgumentsFailure::diagnoseAsNote() {
   auto *locator = getLocator();
   if (auto overload = getCalleeOverloadChoiceIfAvailable(locator)) {
-    auto *fn = resolveType(overload->openedType)->getAs<AnyFunctionType>();
+    auto *fn = resolveType(overload->adjustedOpenedType)->getAs<AnyFunctionType>();
     auto loc = overload->choice.getDecl()->getLoc();
 
     if (loc.isInvalid())
@@ -4940,7 +4941,7 @@ bool MissingArgumentsFailure::isMisplacedMissingArgument(
     return false;
 
   auto *fnType =
-      solution.simplifyType(overloadChoice->openedType)->getAs<FunctionType>();
+      solution.simplifyType(overloadChoice->adjustedOpenedType)->getAs<FunctionType>();
   if (!(fnType && fnType->getNumParams() == 2))
     return false;
 
@@ -6486,6 +6487,9 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
   if (diagnosePropertyWrapperMismatch())
     return true;
 
+  if (diagnoseAttemptedRegexBuilder())
+    return true;
+
   if (diagnoseTrailingClosureMismatch())
     return true;
 
@@ -6727,6 +6731,91 @@ bool ArgumentMismatchFailure::diagnosePropertyWrapperMismatch() const {
     return true;
 
   emitDiagnostic(diag::cannot_convert_initializer_value, argType, paramType);
+  return true;
+}
+
+/// Add a fix-it to insert an import of a module.
+static void fixItImport(InFlightDiagnostic &diag, Identifier moduleName,
+                        DeclContext *dc) {
+  auto *SF = dc->getParentSourceFile();
+  if (!SF)
+    return;
+
+  SourceLoc insertLoc;
+  bool isTrailing = true;
+
+  // Check if we can insert as the last import statement.
+  auto decls = SF->getTopLevelDecls();
+  for (auto *decl : decls) {
+    auto *importDecl = dyn_cast<ImportDecl>(decl);
+    if (!importDecl) {
+      if (insertLoc.isValid())
+        break;
+      continue;
+    }
+    insertLoc = importDecl->getEndLoc();
+  }
+
+  // If not, insert it as the first decl with a valid source location.
+  if (insertLoc.isInvalid()) {
+    for (auto *decl : decls) {
+      if (auto loc = decl->getStartLoc()) {
+        insertLoc = loc;
+        isTrailing = false;
+        break;
+      }
+    }
+  }
+
+  // If we didn't resolve to a valid location, give up.
+  if (insertLoc.isInvalid())
+    return;
+
+  SmallString<32> insertText;
+  if (isTrailing) {
+    insertText.append("\n");
+  }
+  insertText.append("import ");
+  insertText.append(moduleName.str());
+  if (isTrailing) {
+    diag.fixItInsertAfter(insertLoc, insertText);
+  } else {
+    insertText.append("\n\n");
+    diag.fixItInsert(insertLoc, insertText);
+  }
+}
+
+bool ArgumentMismatchFailure::diagnoseAttemptedRegexBuilder() const {
+  auto &ctx = getASTContext();
+
+  // Should be a lone trailing closure argument.
+  if (!Info.isTrailingClosure() || !Info.getArgList()->isUnary())
+    return false;
+
+  // Check if this an application of a Regex initializer, and the user has not
+  // imported RegexBuilder.
+  auto *ctor = dyn_cast_or_null<ConstructorDecl>(getCallee());
+  if (!ctor)
+    return false;
+
+  auto *ctorDC = ctor->getInnermostTypeContext();
+  if (!ctorDC || ctorDC->getSelfNominalTypeDecl() != ctx.getRegexDecl())
+    return false;
+
+  // If the RegexBuilder module is loaded, make sure it hasn't been imported.
+  // Note this will cause us to diagnose even if another SourceFile has
+  // imported RegexBuilder, and its extensions have leaked into this file. This
+  // is a longstanding lookup bug, and it's probably a good idea to suggest
+  // explicitly importing RegexBuilder regardless in that case.
+  if (auto *regexBuilderModule = ctx.getLoadedModule(ctx.Id_RegexBuilder)) {
+    auto &importCache = getASTContext().getImportCache();
+    if (importCache.isImportedBy(regexBuilderModule, getDC()))
+      return false;
+  }
+
+  // Suggest importing RegexBuilder.
+  auto diag = emitDiagnostic(diag::must_import_regex_builder_module);
+  fixItImport(diag, ctx.Id_RegexBuilder, getDC());
   return true;
 }
 

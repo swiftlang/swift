@@ -1,5 +1,4 @@
 // RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx10.50
-// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx10.50 -enable-experimental-opened-existential-types
 
 // REQUIRES: OS=macosx
 

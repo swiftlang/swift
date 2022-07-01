@@ -1806,8 +1806,7 @@ public:
                                       ConstraintLocator *locator)
       : ContextualFailure(solution, type, protocolType, locator),
         Context(context) {
-    assert(protocolType->is<ProtocolType>() ||
-           protocolType->is<ProtocolCompositionType>());
+    assert(protocolType->isExistentialType());
   }
 
   bool diagnoseAsError() override;
@@ -1997,6 +1996,10 @@ public:
   /// Are currently impossible to fix correctly,
   /// so we have to attend to that in diagnostics.
   bool diagnoseMisplacedMissingArgument() const;
+
+  /// Diagnose an attempt to pass a trailing closure to a Regex initializer
+  /// without importing RegexBuilder.
+  bool diagnoseAttemptedRegexBuilder() const;
 
 protected:
   /// \returns The position of the argument being diagnosed, starting at 1.

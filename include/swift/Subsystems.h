@@ -179,12 +179,14 @@ namespace swift {
   /// SIL of all files in the module is present in the SILModule.
   std::unique_ptr<SILModule>
   performASTLowering(ModuleDecl *M, Lowering::TypeConverter &TC,
-                     const SILOptions &options);
+                     const SILOptions &options,
+                     const IRGenOptions *irgenOptions = nullptr);
 
   /// Turn a source file into SIL IR.
   std::unique_ptr<SILModule>
   performASTLowering(FileUnit &SF, Lowering::TypeConverter &TC,
-                     const SILOptions &options);
+                     const SILOptions &options,
+                     const IRGenOptions *irgenOptions = nullptr);
 
   using ModuleOrSourceFile = PointerUnion<ModuleDecl *, SourceFile *>;
 

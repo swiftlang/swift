@@ -416,6 +416,11 @@ bool Remangler::mangleStandardSubstitution(Node *node) {
 void Remangler::mangleDependentGenericParamIndex(Node *node,
                                                  const char *nonZeroPrefix,
                                                  char zeroOp) {
+  if (node->getKind() == Node::Kind::ConstrainedExistentialSelf) {
+    Buffer << 's';
+    return;
+  }
+
   auto paramDepth = node->getChild(0)->getIndex();
   auto index = node->getChild(1)->getIndex();
 
@@ -449,7 +454,8 @@ Remangler::mangleConstrainedType(Node *node, unsigned depth) {
     node = getChildOfType(node->getFirstChild());
   }
 
-  if (node->getKind() != Node::Kind::DependentGenericParamType) {
+  if (node->getKind() != Node::Kind::DependentGenericParamType &&
+      node->getKind() != Node::Kind::ConstrainedExistentialSelf) {
     RETURN_IF_ERROR(mangle(node, depth + 1));
     if (!Chain.size())
       return std::pair<int, Node *>{-1, nullptr};
@@ -601,7 +607,7 @@ ManglingError Remangler::mangleGenericArgs(Node *node, char &Separator,
       break;
     }
 
-    case Node::Kind::ParameterizedProtocol: {
+    case Node::Kind::ConstrainedExistential: {
       Buffer << Separator;
       Separator = '_';
       RETURN_IF_ERROR(mangleChildNodes(node->getChild(1), depth + 1));
@@ -1225,12 +1231,29 @@ ManglingError Remangler::mangleErrorType(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
-ManglingError Remangler::mangleParameterizedProtocol(Node *node,
-                                                     unsigned int depth) {
-  RETURN_IF_ERROR(mangleType(node->getChild(0), depth + 1));
-  char separator = 'y';
-  RETURN_IF_ERROR(mangleGenericArgs(node, separator, depth + 1));
+ManglingError Remangler::mangleConstrainedExistential(Node *node,
+                                                      unsigned int depth) {
+  RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
+  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
   Buffer << "XP";
+  return ManglingError::Success;
+}
+
+ManglingError
+Remangler::mangleConstrainedExistentialRequirementList(Node *node,
+                                                       unsigned int depth) {
+  assert(node->getNumChildren() > 0);
+  bool FirstElem = true;
+  for (size_t Idx = 0, Num = node->getNumChildren(); Idx < Num; ++Idx) {
+    RETURN_IF_ERROR(mangleChildNode(node, Idx, depth + 1));
+    mangleListSeparator(FirstElem);
+  }
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleConstrainedExistentialSelf(Node *node,
+                                                          unsigned int depth) {
+  Buffer << "s";
   return ManglingError::Success;
 }
 
@@ -3529,7 +3552,7 @@ bool Demangle::isSpecialized(Node *node) {
     case Node::Kind::BoundGenericTypeAlias:
     case Node::Kind::BoundGenericProtocol:
     case Node::Kind::BoundGenericFunction:
-    case Node::Kind::ParameterizedProtocol:
+    case Node::Kind::ConstrainedExistential:
       return true;
 
     case Node::Kind::Structure:
@@ -3632,7 +3655,7 @@ ManglingErrorOr<NodePointer> Demangle::getUnspecialized(Node *node,
       return nominalType;
     }
 
-    case Node::Kind::ParameterizedProtocol: {
+    case Node::Kind::ConstrainedExistential: {
       NodePointer unboundType = node->getChild(0);
       DEMANGLER_ASSERT(unboundType->getKind() == Node::Kind::Type, unboundType);
       return unboundType;

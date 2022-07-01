@@ -9,6 +9,9 @@
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: back_deploy_concurrency
 
+// This test is disabled because it seems to require dedicated CPU access:
+// REQUIRES: rdar94451729
+
 import _Concurrency
 import StdlibUnittest
 

@@ -64,8 +64,9 @@ distributed actor D4 {
 }
 
 protocol P1: DistributedActor {
-  distributed func dist() -> String
-  // expected-note@-1{{'dist()' declared here}}
+  distributed func dist() -> String // FIXME(distributed): rdar://95949498 currently we are limited to explicitly 'async throws' protocol requirements that are distributed funcs
+  // expected-error@-1{{'distributed' protocol requirement 'dist()' must currently be declared explicitly 'async throws'}}
+  // expected-note@-2{{'dist()' declared here}}
 }
 
 distributed actor D5: P1 {

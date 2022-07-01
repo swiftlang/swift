@@ -1002,13 +1002,17 @@ bool Decl::isWeakImported(ModuleDecl *fromModule) const {
   if (isAlwaysWeakImported())
     return true;
 
-  auto containingContext = getAvailabilityForLinkage();
-  if (containingContext.isAlwaysAvailable())
+  auto availability = getAvailabilityForLinkage();
+  if (availability.isAlwaysAvailable())
     return false;
 
-  auto fromContext = AvailabilityContext::forDeploymentTarget(
-      fromModule->getASTContext());
-  return !fromContext.isContainedIn(containingContext);
+  auto &ctx = fromModule->getASTContext();
+  auto deploymentTarget = AvailabilityContext::forDeploymentTarget(ctx);
+
+  if (ctx.LangOpts.EnableAdHocAvailability)
+    return !availability.isSupersetOf(deploymentTarget);
+
+  return !deploymentTarget.isContainedIn(availability);
 }
 
 GenericContext::GenericContext(DeclContextKind Kind, DeclContext *Parent,
@@ -2272,6 +2276,9 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
     assert(hasStorage());
     return AccessStrategy::getStorage();
 
+  case AccessSemantics::DistributedThunk:
+    return AccessStrategy::getDistributedThunkDispatchStrategy();
+
   case AccessSemantics::Ordinary:
     // Skip these checks for local variables, both because they're unnecessary
     // and because we won't necessarily have computed access.
@@ -2860,7 +2867,7 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
     // Functions and subscripts cannot overload differing only in opaque return
     // types. Replace the opaque type with `Any`.
     if (type->is<OpaqueTypeArchetypeType>()) {
-      type = ProtocolCompositionType::get(ctx, {}, /*hasAnyObject*/ false);
+      type = ctx.getAnyExistentialType();
     }
 
     return mapSignatureParamType(ctx, type);
@@ -3075,13 +3082,13 @@ void ValueDecl::setIsObjC(bool value) {
 bool ValueDecl::isSemanticallyFinal() const {
   // Actor types are semantically final.
   if (auto classDecl = dyn_cast<ClassDecl>(this)) {
-    if (classDecl->isActor())
+    if (classDecl->isAnyActor())
       return true;
   }
 
   // As are members of actor types.
   if (auto classDecl = getDeclContext()->getSelfClassDecl()) {
-    if (classDecl->isActor())
+    if (classDecl->isAnyActor())
       return true;
   }
 
@@ -4288,7 +4295,11 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
   // If `decl` is a nested type, find the parent type.
   Type ParentTy;
   DeclContext *dc = decl->getDeclContext();
-  if (!isa<ProtocolDecl>(decl) && dc->isTypeContext()) {
+  bool isObjCProtocol = isa<ProtocolDecl>(decl) && decl->hasClangNode();
+
+  // Objective-C protocols, unlike Swift protocols, could be nested
+  // in other types.
+  if ((isObjCProtocol || !isa<ProtocolDecl>(decl)) && dc->isTypeContext()) {
     switch (kind) {
     case DeclTypeKind::DeclaredType: {
       if (auto *nominal = dc->getSelfNominalTypeDecl())
@@ -6450,10 +6461,6 @@ bool VarDecl::isLet() const {
 
 bool VarDecl::isAsyncLet() const {
   return getAttrs().hasAttribute<AsyncAttr>();
-}
-
-bool VarDecl::isDistributed() const {
-  return getAttrs().hasAttribute<DistributedActorAttr>();
 }
 
 bool VarDecl::isKnownToBeLocal() const {

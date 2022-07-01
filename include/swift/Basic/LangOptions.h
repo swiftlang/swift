@@ -164,6 +164,10 @@ namespace swift {
     /// Only check the availability of the API, ignore function bodies.
     bool CheckAPIAvailabilityOnly = false;
 
+    /// Causes the compiler to treat declarations available at the current
+    /// runtime OS version as potentially unavailable.
+    bool EnableAdHocAvailability = false;
+
     /// Should conformance availability violations be diagnosed as errors?
     bool EnableConformanceAvailabilityErrors = false;
 
@@ -312,10 +316,6 @@ namespace swift {
 
     /// Enable experimental concurrency model.
     bool EnableExperimentalConcurrency = false;
-
-    /// Enable support for implicitly opening existential argument types
-    /// in calls to generic functions.
-    bool EnableOpenedExistentialTypes = false;
 
     /// Disable experimental ClangImporter diagnostics.
     bool DisableExperimentalClangImporterDiagnostics = false;

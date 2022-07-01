@@ -335,7 +335,7 @@ extension IndexingIterator: Sendable
 /// or bidirectional collection must traverse the entire collection to count
 /// the number of contained elements, accessing its `count` property is an
 /// O(*n*) operation.
-public protocol Collection: Sequence {
+public protocol Collection<Element>: Sequence {
   // FIXME: ideally this would be in MigrationSupport.swift, but it needs
   // to be on the protocol instead of as an extension
   @available(*, deprecated/*, obsoleted: 5.0*/, message: "all index distances are now of type Int")

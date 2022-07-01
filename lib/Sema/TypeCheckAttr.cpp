@@ -322,8 +322,6 @@ public:
   void visitKnownToBeLocalAttr(KnownToBeLocalAttr *attr);
 
   void visitSendableAttr(SendableAttr *attr);
-
-  void visitDistributedThunkAttr(DistributedThunkAttr *attr);
 };
 
 } // end anonymous namespace
@@ -5912,6 +5910,24 @@ void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
       }
       return;
     }
+
+    // Diagnose for the limitation that we currently have to require distributed
+    // actor constrained protocols to declare the distributed requirements as
+    // 'async throws'
+    // FIXME: rdar://95949498 allow requirements to not declare explicit async/throws in protocols; those effects are implicit in any case
+    if (isa<ProtocolDecl>(dc)) {
+      if (!funcDecl->hasAsync() || !funcDecl->hasThrows()) {
+        auto diag = funcDecl->diagnose(diag::distributed_method_requirement_must_be_async_throws,
+                           funcDecl->getName());
+        if (!funcDecl->hasAsync()) {
+          diag.fixItInsertAfter(funcDecl->getThrowsLoc(), " async");
+        }
+        if (!funcDecl->hasThrows()) {
+          diag.fixItInsertAfter(funcDecl->getThrowsLoc(), " throws");
+        }
+        return;
+      }
+    }
   }
 }
 
@@ -5934,11 +5950,6 @@ void AttributeChecker::visitSendableAttr(SendableAttr *attr) {
         .warnUntilSwiftVersion(6);
     }
   }
-}
-
-void AttributeChecker::visitDistributedThunkAttr(DistributedThunkAttr *attr) {
-  if (!D->isImplicit())
-    diagnoseAndRemoveAttr(attr, diag::distributed_thunk_cannot_be_used);
 }
 
 void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {

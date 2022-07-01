@@ -164,7 +164,6 @@ public:
   }
 
   void initializeDefBlock(SILBasicBlock *defBB) {
-    assert(!seenUse && "cannot initialize more defs with partial liveness");
     markBlockLive(defBB, LiveWithin);
   }
 
@@ -228,6 +227,15 @@ class PrunedLiveness {
   /// blocks. This is used to enable our callers to emit errors on non-lifetime
   /// ending uses that extend liveness into a loop body.
   SmallSetVector<SILInstruction *, 8> *nonLifetimeEndingUsesInLiveOut;
+
+private:
+  bool isWithinBoundaryHelper(SILInstruction *inst, SILValue def) const;
+
+  bool areUsesWithinBoundaryHelper(ArrayRef<Operand *> uses, SILValue def,
+                                   DeadEndBlocks *deadEndBlocks) const;
+
+  bool areUsesOutsideBoundaryHelper(ArrayRef<Operand *> uses, SILValue def,
+                                    DeadEndBlocks *deadEndBlocks) const;
 
 public:
   PrunedLiveness(SmallVectorImpl<SILBasicBlock *> *discoveredBlocks = nullptr,
@@ -341,6 +349,25 @@ public:
   /// \p deadEndBlocks is optional.
   bool areUsesOutsideBoundary(ArrayRef<Operand *> uses,
                               DeadEndBlocks *deadEndBlocks) const;
+
+  /// PrunedLiveness utilities can be used with multiple defs. This api can be
+  /// used to check if \p inst occurs in between the definition \p def and the
+  /// liveness boundary.
+  // This api varies from isWithinBoundary(SILInstruction *inst) which cannot
+  // distinguish when \p inst is a use before definition in the same block as
+  // the definition.
+  bool isWithinBoundaryOfDef(SILInstruction *inst, SILValue def) const;
+
+  /// Returns true when all \p uses are between \p def and the liveness boundary
+  /// \p deadEndBlocks is optional.
+  bool areUsesWithinBoundaryOfDef(ArrayRef<Operand *> uses, SILValue def,
+                                  DeadEndBlocks *deadEndBlocks) const;
+
+  /// Returns true if any of the \p uses are before the \p def or after the
+  /// liveness boundary
+  /// \p deadEndBlocks is optional.
+  bool areUsesOutsideBoundaryOfDef(ArrayRef<Operand *> uses, SILValue def,
+                                   DeadEndBlocks *deadEndBlocks) const;
 
   /// Compute liveness for a single SSA definition.
   void computeSSALiveness(SILValue def);
