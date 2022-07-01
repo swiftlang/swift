@@ -1450,16 +1450,24 @@ private:
           (const char *)contextDescriptorFieldAddress,
           *contextDescriptorOffset);
 
-      // Instead of a type descriptor this may just be a symbol reference, check that first
+      // Instead of a type descriptor this may just be a reference to an external, check that first
       if (auto symbol = OpaqueDynamicSymbolResolver(remote::RemoteAddress(contextTypeDescriptorAddress))) {
         if (!symbol->isResolved()) {
-          mangledTypeName = symbol->getSymbol().str();
           Demangle::Context Ctx;
           auto demangledRoot =
-              Ctx.demangleSymbolAsNode(mangledTypeName);
+            Ctx.demangleSymbolAsNode(symbol->getSymbol().str());
           assert(demangledRoot->getKind() == Node::Kind::Global);
-          typeName =
-              nodeToString(demangledRoot->getChild(0)->getChild(0));
+          auto nomTypeDescriptorRoot = demangledRoot->getChild(0);
+          assert(nomTypeDescriptorRoot->getKind() == Node::Kind::NominalTypeDescriptor);
+          auto typeRoot = nomTypeDescriptorRoot->getChild(0);
+          typeName = nodeToString(typeRoot);
+
+          auto typeMangling = Demangle::mangleNode(typeRoot);
+          if (!typeMangling.isSuccess())
+            mangledTypeName = "";
+          else
+            mangledTypeName = typeMangling.result();
+
           return std::make_pair(mangledTypeName, typeName);
         } else if (symbol->getOffset()) {
           // If symbol is empty and has an offset, this is the resolved remote address
