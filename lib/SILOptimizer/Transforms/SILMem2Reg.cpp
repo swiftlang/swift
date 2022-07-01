@@ -285,7 +285,7 @@ replaceLoad(SILInstruction *inst, SILValue newValue, AllocStackInst *asi,
 
   if (auto *lbi = dyn_cast<LoadBorrowInst>(inst)) {
     if (shouldAddLexicalLifetime(asi)) {
-      assert(isa<BeginBorrowInst>(newValue));
+      assert(isa<BeginBorrowInst>(newValue) || isa<SILPhiArgument>(newValue));
       SmallVector<SILInstruction *, 4> endBorrows;
       for (auto *ebi : lbi->getUsersOfType<EndBorrowInst>()) {
         endBorrows.push_back(ebi);
