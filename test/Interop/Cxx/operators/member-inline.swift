@@ -36,6 +36,11 @@ OperatorsTestSuite.test("LoadableIntWrapper.equal (inline)") {
   expectTrue(result)
 }
 
+OperatorsTestSuite.test("LoadableIntWrapper.unaryMinus (inline)") {
+  var lhs = LoadableIntWrapper(value: 42)
+  expectEqual(-42, -lhs)
+}
+
 OperatorsTestSuite.test("LoadableIntWrapper.call (inline)") {
   var wrapper = LoadableIntWrapper(value: 42)
 

@@ -3054,11 +3054,10 @@ namespace {
       result->setIsObjC(false);
       result->setIsDynamic(false);
 
-      bool isFromFriend = Impl.cxxFriends.contains(decl);
       // If this function decl is from a friend it should be declared
       // as static.
-      if (isFromFriend) {
-        if(auto resultAsFunc = cast<FuncDecl>(result)) {
+      if (decl->getFriendObjectKind() != clang::Decl::FriendObjectKind::FOK_None) {
+        if (auto resultAsFunc = cast<FuncDecl>(result)) {
           resultAsFunc->setStatic();
           resultAsFunc->setImportAsStaticMember();
         }
@@ -4787,34 +4786,19 @@ namespace {
       // Get the context for which the friend decl lives
       auto friendContext = decl->getDeclContext();
 
-      // Now we check to see if the unwrapped decl is something
-      // we currently support
-      if(auto funcDecl = dyn_cast<clang::FunctionDecl>(unwrappedFriendDecl)) {
+      auto d = Impl.importDecl(unwrappedFriendDecl, getActiveSwiftVersion());
 
-        // Keep track, so we know later on how to properly create this
-        // decl
-        Impl.cxxFriends.insert(funcDecl);
+      if (!d) return nullptr;
 
-        // If this Friend lives inside a CXXRecord, we want to
-        // add a static function inside that decl
-        if (friendContext->getDeclKind() == clang::Decl::CXXRecord) {
-
-          // We import this function just as we would any function decl
-          // and then perform some modifications afterwards to attach to the
-          // proper context
-          auto d = VisitFunctionDecl(funcDecl);
-
-          // The decl context for `funcDecl` will be set to TranslationUnit since
-          // friend functions are not "apart" of the record they belong to directly
-          // In swift we would like the function decl to be added to the record
-          // but as a static function method. For that reason we must reassign the
-          // decl context chosen by VisitFunctionDecl to the CXXRecord from which
-          // this friend decl came
-          d->setDeclContext(Impl.importDeclContextOf(decl, friendContext));
-          return d;
-        }
-      }
-      return nullptr;
+      // The decl context for `funcDecl` will be set to TranslationUnit
+      // since friend functions are not "apart" of the record they belong to
+      // directly. In swift, we would like the function decl to be added to
+      // the record but as a static function method. For that reason we must
+      // reassign the decl context chosen by VisitFunctionDecl to the
+      // CXXRecord from which this friend decl came
+      auto dc = Impl.importDeclContextOf(decl, friendContext);
+      d->setDeclContext(dc);
+      return d;
     }
 
     Decl *VisitFriendTemplateDecl(const clang::FriendTemplateDecl *decl) {

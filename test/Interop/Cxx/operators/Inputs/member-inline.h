@@ -19,14 +19,20 @@ struct LoadableIntWrapper {
   int operator()(int x, int y) {
     return value + x * y;
   }
+
+  LoadableIntWrapper &operator++() {
+    value++;
+    return *this;
+  }
+
+  // Friend functions
   friend bool operator==(const LoadableIntWrapper lhs,
                          const LoadableIntWrapper &rhs) {
     return lhs.value == rhs.value;
   }
 
-  LoadableIntWrapper &operator++() {
-    value++;
-    return *this;
+  friend LoadableIntWrapper operator-(const LoadableIntWrapper& obj) {
+    return LoadableIntWrapper{.value = -obj.value};
   }
 };
 

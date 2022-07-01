@@ -621,12 +621,6 @@ public:
                      llvm::DenseSet<clang::FunctionDecl *>>>
       cxxMethods;
 
-  /// Keep track of cxx friend decls otherwise the compiler will
-  /// not be able to delineate between decl and a decl that came from
-  /// a friend (which may need to be treated differently, for example: make it
-  /// static)
-  llvm::DenseSet<clang::Decl *> cxxFriends;
-
   // Cache for already-specialized function templates and any thunks they may
   // have.
   llvm::DenseMap<clang::FunctionDecl *, ValueDecl *>
