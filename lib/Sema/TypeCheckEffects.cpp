@@ -2857,7 +2857,7 @@ private:
          if (call && call->isImplicitlyAsync()) {
            // Emit a tailored note if the call is implicitly async, meaning the
            // callee is isolated to an actor.
-           auto callee = call->getCalledValue();
+           auto callee = call->getCalledValue(/*skipFunctionConversions=*/true);
            if (callee) {
              Ctx.Diags.diagnose(diag.expr.getStartLoc(), diag::actor_isolated_sync_func,
                                 callee->getDescriptiveKind(), callee->getName());

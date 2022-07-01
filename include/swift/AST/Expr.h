@@ -4553,7 +4553,7 @@ public:
     Bits.ApplyExpr.ShouldApplyDistributedThunk = flag;
   }
 
-  ValueDecl *getCalledValue() const;
+  ValueDecl *getCalledValue(bool skipFunctionConversions = false) const;
 
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_ApplyExpr &&
