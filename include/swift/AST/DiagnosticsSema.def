@@ -1907,9 +1907,6 @@ ERROR(extension_access_with_conformances,none,
       "protocol conformances", (DeclAttribute))
 ERROR(extension_metatype,none,
       "cannot extend a metatype %0", (Type))
-ERROR(extension_specialization,none,
-      "constrained extension must be declared on the unspecialized generic "
-      "type %0 with constraints specified by a 'where' clause", (Identifier))
 ERROR(extension_placeholder,none,
       "cannot extend a type that contains placeholders", ())
 ERROR(extension_stored_property,none,
