@@ -47,6 +47,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
+// REQUIRES: objc_interop
 
 // rdar://76038845
 // REQUIRES: concurrency_runtime
@@ -54,16 +55,30 @@
 
 import MysteryInit
 
-@main
-struct Main {
-  static func main() {
-    switch BigFoot() {
+// NOTE: the number of myth/real checks in this function (in either mode) should
+// match the number of times `test` is called. The -NOT check is there to catch
+// any mistakes in updating the test.
+func test(_ bigFoot: any NamedEntity) {
+  switch bigFoot.name {
     case .none:
       print("bigfoot is myth")
       // CHECK-NO-DELEGATES: bigfoot is myth
+      // CHECK-NO-DELEGATES: bigfoot is myth
+
+      // CHECK-NO-DELEGATES-NOT: bigfoot
     default:
       print("bigfoot is real")
       // CHECK-DELEGATES: bigfoot is real
+      // CHECK-DELEGATES: bigfoot is real
+
+      // CHECK-DELEGATES-NOT: bigfoot
     }
+}
+
+@main
+struct Main {
+  static func main() {
+    test(BigFoot())
+    test(BigFootObjC())
   }
 }
