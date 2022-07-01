@@ -1313,6 +1313,8 @@ private:
   TypeReferenceOwnership ReferenceOwnership;
 
 public:
+  using BuiltType = const Metadata *;
+
   struct BuiltLayoutConstraint {
     bool operator==(BuiltLayoutConstraint rhs) const { return true; }
     operator bool() const { return true; }
@@ -1343,7 +1345,6 @@ public:
       substGenericParameter(substGenericParameter),
       substWitnessTable(substWitnessTable) { }
 
-  using BuiltType = const Metadata *;
   using BuiltTypeDecl = const ContextDescriptor *;
   using BuiltProtocolDecl = ProtocolDescriptorRef;
   using BuiltGenericSignature = const Metadata *;
