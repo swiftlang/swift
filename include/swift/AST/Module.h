@@ -949,7 +949,10 @@ inline SourceLoc extractNearestSourceLoc(const ModuleDecl *mod) {
 }
 
 /// Collects modules that this module imports via `@_exported import`.
-void collectParsedExportedImports(const ModuleDecl *M, SmallPtrSetImpl<ModuleDecl *> &Imports);
+void collectParsedExportedImports(const ModuleDecl *M,
+                                  SmallPtrSetImpl<ModuleDecl *> &Imports,
+                                  SmallVectorImpl<Decl *> &Decls,
+                                  bool AddQualifiedImportModules = false);
 
 } // end namespace swift
 
