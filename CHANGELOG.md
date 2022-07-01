@@ -52,12 +52,124 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   pool, `Sendable` checking will be performed, so the compiler will emit a
   diagnostic in the call to `f` if `c` is not of `Sendable` type.
 
+* [SE-0350][]:
+
+  The standard library has a new `Regex<Output>` type.
+
+  This type represents an _extended regular expression_, allowing more fluent
+  string processing operations. A `Regex` may be created by
+  [initialization from a string][SE-0355]:
+
+  ```swift
+  let pattern = "a[bc]+" // matches "a" followed by one or more instances
+                         // of either "b" or "c"
+  let regex = try! Regex(pattern)
+  ```
+
+  Or via a [regex literal][SE-0354]:
+
+  ```swift
+  let regex = #/a[bc]+/#
+  ```
+
+  In Swift 6, `/` will also be supported as a delimiter for `Regex` literals.
+  You can enable this mode in Swift 5.7 with the `-enable-bare-slash-regex`
+  flag. Doing so will cause some existing expressions that use `/` as an 
+  operator to no longer compile; you can add parentheses or line breaks as a
+  workaround.
+
+  There are [new string-processing algorithms][SE-0357] that support
+  `String`, `Regex` and arbitrary `Collection` types.
+
+* [SE-0329][]:
+  New types representing time and clocks were introduced. This includes a protocol `Clock` defining clocks which allow for defining a concept of now and a way to wake up after a given instant. Additionally a new protocol `InstantProtocol` for defining instants in time was added. Furthermore a new protocol `DurationProtocol` was added to define an elapsed duration between two given `InstantProtocol` types. Most commonly the `Clock` types for general use are the `SuspendingClock` and `ContinuousClock` which represent the most fundamental clocks for the system. The `SuspendingClock` type does not progress while the machine is suspended whereas the `ContinuousClock` progresses no matter the state of the machine. 
+
+  ```swift
+    func delayedHello() async throws {
+      try await Task.sleep(until: .now + .milliseconds(123), clock: .continuous)
+      print("hello delayed world")
+    }
+  ```
+
+  `Clock` also has methods to measure the elapsed duration of the execution of work. In the case of the `SuspendingClock` and `ContinuousClock` this measures with high resolution and is suitable for benchmarks.
+
+  ```swift
+  let clock = ContinuousClock()
+  let elapsed = clock.measure {
+    someLongRunningWork()
+  }
+  ```
+
+* [SE-0309][]:
+
+  Protocols with associated types and `Self` requirements can now be used as the
+  types of values with the `any` keyword.
+
+  Protocol methods that return associated types can be called on an `any` type;
+  the result is type-erased to the associated type's upper bound, which is another
+  `any` type having the same constraints as the associated type. For example:
+
+  ```swift
+    protocol Surface {...}
+    
+    protocol Solid {
+      associatedtype SurfaceType: Surface
+      func boundary() -> SurfaceType
+    }
+    
+    let solid: any Solid = ...
+    
+    // Type of 'boundary' is 'any Surface'
+    let boundary = solid.boundary()
+  ```
+
+  Protocol methods that take an associated type or `Self` cannot be used with `any`,
+  however in conjunction with [SE-0352][], you can pass the `any` type to a function
+  taking a generic parameter constrained to the protocol. Within the generic context,
+  type relationships are explicit and all protocol methods can be used.
+
+* [SE-0346][]:
+
+  Protocols can now declare a list of one or more _primary associated types_, which enable writing same-type requirements on those associated types using angle bracket syntax:
+
+  ```swift
+    protocol Graph<Vertex, Edge> {
+      associatedtype Vertex
+      associatedtype Edge
+    }
+  ```
+
+  You can now write a protocol name followed by type arguments in angle brackets, like
+  `Graph<Int, String>`, anywhere that a protocol conformance requirement may appear:
+
+  ```swift
+    func shortestPath<V, E>(_: some Graph<V, E>, from: V, to: V) -> [E]
+
+    extension Graph<Int, String> {...}
+
+    func build() -> some Graph<Int, String> {}
+  ```
+
+  A protocol name followed by angle brackets is shorthand for a conformance requirement,
+  together with a same-type requirement for the protocol's primary associated types.
+  The first two examples above are equivalent to the following:
+
+  ```swift
+    func shortestPath<V, E, G>(_: G, from: V, to: V) -> [E]
+      where G: Graph, G.Vertex == V, G.Edge == E
+
+    extension Graph where Vertex == Int, Edge == String {...}
+  ```
+
+  The `build()` function returning `some Graph<Int, String>` can't be written using a
+  `where` clause; this is an example of a constrained opaque result type, which is new expressivity in Swift 5.7.
+
 * [SE-0353][]:
 
   Protocols with primary associated types can now be used in existential types,
   enabling same-type constraints on those associated types.
 
-  ```
+  ```swift
   let strings: any Collection<String> = [ "Hello" ]
   ```
 
@@ -75,34 +187,13 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
   let arrayOfCollections: [AnyCollection<T>] = [ /**/ ]
   ```
-  
-* [SE-0329][]:
-  New types representing time and clocks were introduced. This includes a protocol `Clock` defining clocks which allow for defining a concept of now and a way to wake up after a given instant. Additionally a new protocol `InstantProtocol` for defining instants in time was added. Furthermore a new protocol `DurationProtocol` was added to define an elapsed duration between two given `InstantProtocol` types. Most commonly the `Clock` types for general use are the `SuspendingClock` and `ContinuousClock` which represent the most fundamental clocks for the system. The `SuspendingClock` type does not progress while the machine is suspended whereas the `ContinuousClock` progresses no matter the state of the machine. 
 
-* [SE-0309][]:
+* [SE-0358][]:
 
-  Protocols with associated types and `Self` requirements can now be used as the
-  types of values with the `any` keyword.
-
-  Protocol methods that return associated types can be called on an `any` type;
-  the result is type-erased to the associated type's upper bound, which is another
-  `any` type having the same constraints as the associated type. For example:
-
-  ```swift
-    func delayedHello() async throws {
-      try await Task.sleep(until: .now + .milliseconds(123), clock: .continuous)
-      print("hello delayed world")
-    }
-  ```
-
-  `Clock` also has methods to measure the elapsed duration of the execution of work. In the case of the `SuspendingClock` and `ContinuousClock` this measures with high resolution and is suitable for benchmarks.
-
-  ```swift
-  let clock = ContinuousClock()
-  let elapsed = clock.measure {
-    someLongRunningWork()
-  }
-  ```
+  Various protocols in the standard library now declare primary associated types, for
+  example `Sequence` and `Collection` declare a single primary associated type `Element`.
+  For example, this allows writing down the types `some Collection<Int>` and
+  `any Collection<Int>`.
 
 * References to `optional` methods on a protocol metatype, as well as references to dynamically looked up methods on `AnyObject` are now supported on par with other function references. The type of such a reference (formerly an immediate optional by mistake) has been altered to that of a function that takes a single argument and returns an optional value of function type:
 
@@ -203,7 +294,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   in places that would previously fail because `any` types do not conform
   to their protocols. For example:
 
-  ```
+  ```swift
   protocol P {
     associatedtype A
     func getA() -> A
@@ -421,12 +512,12 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   struct S {
     @available(macOS 99, *) // error: stored properties cannot be marked potentially unavailable with '@available'
     lazy var a: Int = 42
-  
+
     @available(macOS 99, *) // error: stored properties cannot be marked potentially unavailable with '@available'
     @Wrapper var b: Int
   }
   ```
-  
+
 * The compiler now correctly emits warnings for more kinds of expressions where a protocol conformance is used and may be unavailable at runtime. Previously, member reference expressions and type erasing expressions that used potentially unavailable conformances were not diagnosed, leading to potential crashes at runtime.
 
   ```swift
@@ -452,7 +543,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
 * [SE-0328][]:
 
-  Opaque types (expressed with 'some') can now be used in structural positions
+  Opaque types (expressed with `some`) can now be used in structural positions
   within a result type, including having multiple opaque types in the same
   result. For example:
 
@@ -9367,6 +9458,7 @@ Swift 1.0
 [SE-0300]: <https://github.com/apple/swift-evolution/blob/main/proposals/0300-continuation.md>
 [SE-0302]: <https://github.com/apple/swift-evolution/blob/main/proposals/0302-concurrent-value-and-concurrent-closures.md>
 [SE-0306]: <https://github.com/apple/swift-evolution/blob/main/proposals/0306-actors.md>
+[SE-0309]: <https://github.com/apple/swift-evolution/blob/main/proposals/0309-unlock-existential-types-for-all-protocols.md>
 [SE-0310]: <https://github.com/apple/swift-evolution/blob/main/proposals/0310-effectful-readonly-properties.md>
 [SE-0311]: <https://github.com/apple/swift-evolution/blob/main/proposals/0311-task-locals.md>
 [SE-0313]: <https://github.com/apple/swift-evolution/blob/main/proposals/0313-actor-isolation-control.md>
@@ -9391,9 +9483,16 @@ Swift 1.0
 [SE-0341]: <https://github.com/apple/swift-evolution/blob/main/proposals/0341-opaque-parameters.md>
 [SE-0343]: <https://github.com/apple/swift-evolution/blob/main/proposals/0343-top-level-concurrency.md>
 [SE-0345]: <https://github.com/apple/swift-evolution/blob/main/proposals/0345-if-let-shorthand.md>
+[SE-0346]: <https://github.com/apple/swift-evolution/blob/main/proposals/0346-light-weight-same-type-syntax.md>
 [SE-0347]: <https://github.com/apple/swift-evolution/blob/main/proposals/0347-type-inference-from-default-exprs.md>
 [SE-0349]: <https://github.com/apple/swift-evolution/blob/main/proposals/0349-unaligned-loads-and-stores.md>
+[SE-0350]: <https://github.com/apple/swift-evolution/blob/main/proposals/0350-regex-type-overview.md>
 [SE-0352]: <https://github.com/apple/swift-evolution/blob/main/proposals/0352-implicit-open-existentials.md>
+[SE-0353]: <https://github.com/apple/swift-evolution/blob/main/proposals/0353-constrained-existential-types.md>
+[SE-0354]: <https://github.com/apple/swift-evolution/blob/main/proposals/0354-regex-literals.md>
+[SE-0355]: <https://github.com/apple/swift-evolution/blob/main/proposals/0355-regex-syntax-run-time-construction.md>
+[SE-0357]: <https://github.com/apple/swift-evolution/blob/main/proposals/0357-regex-string-processing-algorithms.md>
+[SE-0358]: <https://github.com/apple/swift-evolution/blob/main/proposals/0358-primary-associated-types-in-stdlib.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
