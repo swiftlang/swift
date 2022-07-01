@@ -116,7 +116,7 @@ SelectedOverloadInfo getSelectedOverloadInfo(const Solution &S,
 
     Result.FuncD = SelectedOverload->choice.getDeclOrNull();
     Result.FuncTy =
-        S.simplifyTypeForCodeCompletion(SelectedOverload->openedType);
+        S.simplifyTypeForCodeCompletion(SelectedOverload->adjustedOpenedType);
 
     // For completion as the arg in a call to the implicit [keypath: _]
     // subscript the solver can't know what kind of keypath is expected without
@@ -141,7 +141,7 @@ SelectedOverloadInfo getSelectedOverloadInfo(const Solution &S,
     break;
   }
   case OverloadChoiceKind::KeyPathDynamicMemberLookup: {
-    auto *fnType = SelectedOverload->openedType->castTo<FunctionType>();
+    auto *fnType = SelectedOverload->adjustedOpenedType->castTo<FunctionType>();
     assert(fnType->getParams().size() == 1 &&
            "subscript always has one argument");
     // Parameter type is KeyPath<T, U> where `T` is a root type

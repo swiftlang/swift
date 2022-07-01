@@ -1878,7 +1878,8 @@ const {
       if (conformingReplacementType->isTypeParameter())
         return ProtocolConformanceRef(conformedProtocol);
     
-      return TC.M.lookupConformance(conformingReplacementType, conformedProtocol);
+      return TC.M.lookupConformance(conformingReplacementType, conformedProtocol,
+                                    /*allowMissing*/ true);
     });
 
   auto yieldType = visitor.substYieldType;
