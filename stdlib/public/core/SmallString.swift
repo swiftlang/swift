@@ -241,20 +241,36 @@ extension _SmallString {
   fileprivate mutating func withMutableCapacity(
     _ f: (UnsafeMutableRawBufferPointer) throws -> Int
   ) rethrows {
-    let len = try withUnsafeMutableBytes(of: &self._storage) {
+    var tmp = self._storage
+    let len = try withUnsafeMutableBytes(of: &tmp) {
       (rawBufPtr: UnsafeMutableRawBufferPointer) -> Int in
-      let len = try f(rawBufPtr)
-      UnsafeMutableRawBufferPointer(
-        rebasing: rawBufPtr[len..<rawBufPtr.endIndex]
-      ).initializeMemory(as: UInt8.self, repeating: 0)
+      var len = try f(rawBufPtr)
+      
+      if len == 0 {
+        return 0
+      }
+      
+      _internalInvariant(len <= _SmallString.capacity)
+      
+      self._storage = (0, 0)
+      withUnsafeMutableBytes(of: &self._storage) { storagePtr in
+        var i = 0
+        while i < len {
+          storagePtr.storeBytes(
+            of: rawBufPtr.load(fromByteOffset: i, as: UInt8.self),
+            as: UInt8.self
+          )
+          i &+= 1
+        }
+      }
       return len
     }
+
     if len == 0 {
       self = _SmallString()
       return
     }
-    _internalInvariant(len <= _SmallString.capacity)
-
+    
     let (leading, trailing) = self.zeroTerminatedRawCodeUnits
     self = _SmallString(leading: leading, trailing: trailing, count: len)
   }
