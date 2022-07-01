@@ -25,3 +25,49 @@ bb2(%ld : @guaranteed $Klass):
   %6 = tuple ()
   return %6 : $()
 }
+
+// CHECK: Write:   destroy_addr %2 : $*Klass
+// CHECK: Begin Error in function test_multiple_loadborrows
+// CHECK: SIL verification failed: Found load borrow that is invalidated by a local write?!: loadBorrowImmutabilityAnalysis.isImmutable(LBI)
+// CHECK: Verifying instruction:
+// CHECK:      %2 = alloc_stack [lexical] $Klass
+// CHECK: ->   %14 = load_borrow %2 : $*Klass
+// CHECK:      br bb6(%14 : $Klass)
+// CHECK: End Error in function test_multiple_loadborrows
+sil [ossa] @test_multiple_loadborrows : $@convention(thin) (@owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %stk = alloc_stack [lexical] $Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  destroy_value %1 : $Klass
+  store %0 to [init] %stk : $*Klass
+  br bb3
+
+bb2:
+  destroy_value %0 : $Klass
+  store %1 to [init] %stk : $*Klass
+  br bb3
+
+bb3:
+  cond_br undef, bb4, bb5
+
+bb4:
+  %ld1 = load_borrow %stk : $*Klass
+  destroy_addr %stk : $*Klass
+  br bb6(%ld1 : $Klass)
+
+bb5:
+  %ld2 = load_borrow %stk : $*Klass
+  destroy_addr %stk : $*Klass
+  br bb6(%ld2 : $Klass)
+
+bb6(%ld : @guaranteed $Klass):
+  %3 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
+  %4 = apply %3(%ld) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %ld : $Klass
+  dealloc_stack %stk : $*Klass
+  %6 = tuple ()
+  return %6 : $()
+}
+

@@ -578,14 +578,19 @@ struct BorrowedValue {
   ///
   /// \p deadEndBlocks is optional during transition. It will be completely
   /// removed in an upcoming commit.
-  bool areUsesWithinLocalScope(ArrayRef<Operand *> uses,
-                               DeadEndBlocks *deadEndBlocks) const;
+  bool areUsesWithinTransitiveScope(ArrayRef<Operand *> uses,
+                                    DeadEndBlocks *deadEndBlocks) const;
 
   /// Given a local borrow scope introducer, visit all non-forwarding consuming
   /// users. This means that this looks through guaranteed block arguments. \p
   /// visitor is *not* called on Reborrows, only on final scope ending uses.
   bool
   visitExtendedScopeEndingUses(function_ref<bool(Operand *)> visitor) const;
+
+  /// Visit all lifetime ending operands of the entire borrow scope including
+  /// reborrows
+  bool
+  visitTransitiveLifetimeEndingUses(function_ref<bool(Operand *)> func) const;
 
   void print(llvm::raw_ostream &os) const;
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
