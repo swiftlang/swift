@@ -238,11 +238,11 @@ public:
   }
 
   void
-  visitConstrainedExistentialTypeRef(const ConstrainedExistentialTypeRef *CET) {
-    printHeader("constrained_existential_type");
-    printRec(CET->getBase());
-    for (auto req : CET->getRequirements())
-      visitTypeRefRequirement(req);
+  visitParameterizedProtocolTypeRef(const ParameterizedProtocolTypeRef *PPT) {
+    printHeader("parameterized_protocol");
+    printRec(PPT->getBase());
+    for (auto param : PPT->getArgs())
+      printRec(param);
     stream << ")";
   }
 
@@ -311,27 +311,6 @@ public:
     stream << ")";
   }
 
-  void visitTypeRefRequirement(const TypeRefRequirement &req) {
-    printHeader("requirement ");
-    switch (req.getKind()) {
-    case RequirementKind::Conformance:
-    case RequirementKind::Superclass:
-      printRec(req.getFirstType());
-      stream << " : ";
-      printRec(req.getSecondType());
-      break;
-    case RequirementKind::SameType:
-      printRec(req.getFirstType());
-      stream << " == ";
-      printRec(req.getSecondType());
-      break;
-    case RequirementKind::Layout:
-      stream << "layout requirement";
-      break;
-    }
-    stream << ")";
-  }
-
   void visitSILBoxTypeWithLayoutTypeRef(const SILBoxTypeWithLayoutTypeRef *SB) {
     printHeader("sil_box_with_layout\n");
     Indent += 2;
@@ -354,7 +333,24 @@ public:
     }
     Indent -= 2;
     for (auto &req : SB->getRequirements()) {
-      visitTypeRefRequirement(req);
+      printHeader("requirement ");
+      switch (req.getKind()) {
+      case RequirementKind::Conformance:
+      case RequirementKind::Superclass:
+        printRec(req.getFirstType());
+        stream << " : ";
+        printRec(req.getSecondType());
+        break;
+      case RequirementKind::SameType:
+        printRec(req.getFirstType());
+        stream << " == ";
+        printRec(req.getSecondType());
+        break;
+      case RequirementKind::Layout:
+        stream << "layout requirement";
+        break;
+      }
+      stream << ")";
     }
     stream << ")";
     stream << ")";
@@ -435,8 +431,8 @@ struct TypeRefIsConcrete
   }
 
   bool
-  visitConstrainedExistentialTypeRef(const ConstrainedExistentialTypeRef *CET) {
-    return visit(CET->getBase());
+  visitParameterizedProtocolTypeRef(const ParameterizedProtocolTypeRef *PPT) {
+    return visit(PPT->getBase());
   }
 
   bool visitMetatypeTypeRef(const MetatypeTypeRef *M) {
@@ -808,14 +804,13 @@ public:
   }
 
   Demangle::NodePointer
-  visitConstrainedExistentialTypeRef(const ConstrainedExistentialTypeRef *CET) {
-    auto node = Dem.createNode(Node::Kind::ConstrainedExistential);
-    node->addChild(visit(CET->getBase()), Dem);
-    auto constraintList =
-        Dem.createNode(Node::Kind::ConstrainedExistentialRequirementList);
-    for (auto req : CET->getRequirements())
-      constraintList->addChild(visitTypeRefRequirement(req), Dem);
-    node->addChild(constraintList, Dem);
+  visitParameterizedProtocolTypeRef(const ParameterizedProtocolTypeRef *PPT) {
+    auto node = Dem.createNode(Node::Kind::ParameterizedProtocol);
+    node->addChild(visit(PPT->getBase()), Dem);
+    auto genericArgsList = Dem.createNode(Node::Kind::TypeList);
+    for (auto param : PPT->getArgs())
+      genericArgsList->addChild(visit(param), Dem);
+    node->addChild(genericArgsList, Dem);
     return node;
   }
 
@@ -890,37 +885,6 @@ public:
     return node;
   }
 
-  Demangle::NodePointer visitTypeRefRequirement(const TypeRefRequirement &req) {
-    switch (req.getKind()) {
-    case RequirementKind::Conformance:
-    case RequirementKind::Superclass:
-    case RequirementKind::SameType: {
-      Node::Kind kind;
-      switch (req.getKind()) {
-      case RequirementKind::Conformance:
-        kind = Node::Kind::DependentGenericConformanceRequirement;
-        break;
-      case RequirementKind::Superclass:
-        // A DependentGenericSuperclasseRequirement kind seems to be missing.
-        kind = Node::Kind::DependentGenericConformanceRequirement;
-        break;
-      case RequirementKind::SameType:
-        kind = Node::Kind::DependentGenericSameTypeRequirement;
-        break;
-      default:
-        llvm_unreachable("Unhandled requirement kind");
-      }
-      auto r = Dem.createNode(kind);
-      r->addChild(visit(req.getFirstType()), Dem);
-      r->addChild(visit(req.getSecondType()), Dem);
-      return r;
-    }
-    case RequirementKind::Layout:
-      // Not implemented.
-      return nullptr;
-    }
-  }
-
   Demangle::NodePointer
   visitSILBoxTypeWithLayoutTypeRef(const SILBoxTypeWithLayoutTypeRef *SB) {
     auto node = Dem.createNode(Node::Kind::SILBoxTypeWithLayout);
@@ -951,10 +915,35 @@ public:
         ++index;
       }
     for (auto &req : SB->getRequirements()) {
-      auto *r = visitTypeRefRequirement(req);
-      if (!r)
-        continue;
-      signature->addChild(r, Dem);
+      switch (req.getKind()) {
+      case RequirementKind::Conformance:
+      case RequirementKind::Superclass:
+      case RequirementKind::SameType: {
+        Node::Kind kind;
+        switch (req.getKind()) {
+        case RequirementKind::Conformance:
+          kind = Node::Kind::DependentGenericConformanceRequirement;
+          break;
+        case RequirementKind::Superclass:
+          // A DependentGenericSuperclasseRequirement kind seems to be missing.
+          kind = Node::Kind::DependentGenericConformanceRequirement;
+          break;
+        case RequirementKind::SameType:
+          kind = Node::Kind::DependentGenericSameTypeRequirement;
+          break;
+        default:
+          llvm_unreachable("unreachable");
+        }
+        auto r = Dem.createNode(kind);
+        r->addChild(visit(req.getFirstType()), Dem);
+        r->addChild(visit(req.getSecondType()), Dem);
+        signature->addChild(r, Dem);
+        break;
+      }
+      case RequirementKind::Layout:
+        // Not implemented.
+        break;
+      }
     }
     node->addChild(signature, Dem);
     auto list = Dem.createNode(Node::Kind::TypeList);
@@ -1140,9 +1129,12 @@ public:
   }
 
   const TypeRef *
-  visitConstrainedExistentialTypeRef(const ConstrainedExistentialTypeRef *CET) {
-    return ConstrainedExistentialTypeRef::create(Builder, CET->getBase(),
-                                                 CET->getRequirements());
+  visitParameterizedProtocolTypeRef(const ParameterizedProtocolTypeRef *PPT) {
+    std::vector<const TypeRef *> ThickArgs;
+    for (auto Param : PPT->getArgs())
+      ThickArgs.push_back(visit(Param));
+    return ParameterizedProtocolTypeRef::create(Builder, PPT->getBase(),
+                                                ThickArgs);
   }
 
   const TypeRef *visitMetatypeTypeRef(const MetatypeTypeRef *M) {
@@ -1292,40 +1284,13 @@ public:
     return EM;
   }
 
-  llvm::Optional<TypeRefRequirement>
-  visitTypeRefRequirement(const TypeRefRequirement &req) {
-    auto newFirst = visit(req.getFirstType());
-    if (!newFirst)
-      return None;
-
-    switch (req.getKind()) {
-    case RequirementKind::Conformance:
-    case RequirementKind::Superclass:
-    case RequirementKind::SameType: {
-      auto newSecond = visit(req.getFirstType());
-      if (!newSecond)
-        return None;
-      return TypeRefRequirement(req.getKind(), newFirst, newSecond);
-    }
-    case RequirementKind::Layout:
-      return TypeRefRequirement(req.getKind(), newFirst,
-                                req.getLayoutConstraint());
-    }
-
-    llvm_unreachable("Unhandled RequirementKind in switch.");
-  }
-
   const TypeRef *
-  visitConstrainedExistentialTypeRef(const ConstrainedExistentialTypeRef *CET) {
-    std::vector<TypeRefRequirement> constraints;
-    for (auto Req : CET->getRequirements()) {
-      auto substReq = visitTypeRefRequirement(Req);
-      if (!substReq)
-        continue;
-      constraints.emplace_back(*substReq);
-    }
-    return ConstrainedExistentialTypeRef::create(Builder, CET->getBase(),
-                                                 constraints);
+  visitParameterizedProtocolTypeRef(const ParameterizedProtocolTypeRef *PPT) {
+    std::vector<const TypeRef *> substArg;
+    for (auto Param : PPT->getArgs())
+      substArg.push_back(visit(Param));
+    return ParameterizedProtocolTypeRef::create(Builder, PPT->getBase(),
+                                                substArg);
   }
 
   const TypeRef *

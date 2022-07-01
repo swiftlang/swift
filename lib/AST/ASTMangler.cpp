@@ -1233,12 +1233,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
 
     case TypeKind::ExistentialMetatype: {
       ExistentialMetatypeType *EMT = cast<ExistentialMetatypeType>(tybase);
-      if (EMT->getInstanceType()->isExistentialType() &&
-          EMT->hasParameterizedExistential())
-        appendConstrainedExistential(EMT->getInstanceType(), sig, forDecl);
-      else
-        appendType(EMT->getInstanceType(), sig, forDecl);
-
+      appendType(EMT->getInstanceType(), sig, forDecl);
       if (EMT->hasRepresentation()) {
         appendOperator("Xm",
                        getMetatypeRepresentationOp(EMT->getRepresentation()));
@@ -1288,16 +1283,17 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       return appendExistentialLayout(layout, sig, forDecl);
     }
 
-    case TypeKind::ParameterizedProtocol:
-      llvm_unreachable("Handled by generalized existential mangling!");
+    case TypeKind::ParameterizedProtocol: {
+      auto layout = type->getExistentialLayout();
+      appendExistentialLayout(layout, sig, forDecl);
+      bool isFirstArgList = true;
+      appendBoundGenericArgs(type, sig, isFirstArgList, forDecl);
+      return appendOperator("XP");
+    }
 
     case TypeKind::Existential: {
-      auto *ET = cast<ExistentialType>(tybase);
-      if (tybase->hasParameterizedExistential()) {
-        return appendConstrainedExistential(ET->getConstraintType(), sig,
-                                            forDecl);
-      }
-      return appendType(ET->getConstraintType(), sig, forDecl);
+      auto constraint = cast<ExistentialType>(tybase)->getConstraintType();
+      return appendType(constraint, sig, forDecl);
     }
 
     case TypeKind::UnboundGeneric:
@@ -1494,9 +1490,8 @@ GenericTypeParamType *ASTMangler::appendAssocType(DependentMemberType *DepTy,
   return nullptr;
 }
 
-void ASTMangler::appendOpWithGenericParamIndex(
-    StringRef Op, const GenericTypeParamType *paramTy,
-    bool baseIsProtocolSelf) {
+void ASTMangler::appendOpWithGenericParamIndex(StringRef Op,
+                                          const GenericTypeParamType *paramTy) {
   llvm::SmallVector<char, 8> OpBuf(Op.begin(), Op.end());
   if (paramTy->getDepth() > 0) {
     OpBuf.push_back('d');
@@ -1505,11 +1500,7 @@ void ASTMangler::appendOpWithGenericParamIndex(
                           Index(paramTy->getIndex()));
   }
   if (paramTy->getIndex() == 0) {
-    if (baseIsProtocolSelf) {
-      OpBuf.push_back('s');
-    } else {
-      OpBuf.push_back('z');
-    }
+    OpBuf.push_back('z');
     return appendOperator(StringRef(OpBuf.data(), OpBuf.size()));
   }
   appendOperator(Op, Index(paramTy->getIndex() - 1));
@@ -1609,6 +1600,9 @@ void ASTMangler::appendBoundGenericArgs(Type type, GenericSignature sig,
     if (Type parent = nominalType->getParent())
       appendBoundGenericArgs(parent->getDesugaredType(), sig, isFirstArgList,
                              forDecl);
+  } else if (auto *ppt = dyn_cast<ParameterizedProtocolType>(typePtr)) {
+    assert(!ppt->getBaseType()->getParent());
+    genericArgs = ppt->getArgs();
   } else {
     auto boundType = cast<BoundGenericType>(typePtr);
     genericArgs = boundType->getGenericArgs();
@@ -2803,8 +2797,7 @@ bool ASTMangler::appendGenericSignature(GenericSignature sig,
 }
 
 void ASTMangler::appendRequirement(const Requirement &reqt,
-                                   GenericSignature sig,
-                                   bool lhsBaseIsProtocolSelf) {
+                                   GenericSignature sig) {
 
   Type FirstTy = reqt.getFirstType()->getCanonicalType();
 
@@ -2827,6 +2820,7 @@ void ASTMangler::appendRequirement(const Requirement &reqt,
   }
 
   if (auto *DT = FirstTy->getAs<DependentMemberType>()) {
+    bool isAssocTypeAtDepth = false;
     if (tryMangleTypeSubstitution(DT, sig)) {
       switch (reqt.getKind()) {
         case RequirementKind::Conformance:
@@ -2842,7 +2836,6 @@ void ASTMangler::appendRequirement(const Requirement &reqt,
       }
       llvm_unreachable("bad requirement type");
     }
-    bool isAssocTypeAtDepth = false;
     GenericTypeParamType *gpBase = appendAssocType(DT, sig,
                                                    isAssocTypeAtDepth);
     addTypeSubstitution(DT, sig);
@@ -2850,18 +2843,17 @@ void ASTMangler::appendRequirement(const Requirement &reqt,
     switch (reqt.getKind()) {
       case RequirementKind::Conformance:
         return appendOpWithGenericParamIndex(isAssocTypeAtDepth ? "RP" : "Rp",
-                                             gpBase, lhsBaseIsProtocolSelf);
+                                             gpBase);
       case RequirementKind::Layout:
-        appendOpWithGenericParamIndex(isAssocTypeAtDepth ? "RM" : "Rm", gpBase,
-                                      lhsBaseIsProtocolSelf);
+        appendOpWithGenericParamIndex(isAssocTypeAtDepth ? "RM" : "Rm", gpBase);
         appendOpParamForLayoutConstraint(reqt.getLayoutConstraint());
         return;
       case RequirementKind::Superclass:
         return appendOpWithGenericParamIndex(isAssocTypeAtDepth ? "RC" : "Rc",
-                                             gpBase, lhsBaseIsProtocolSelf);
+                                             gpBase);
       case RequirementKind::SameType:
         return appendOpWithGenericParamIndex(isAssocTypeAtDepth ? "RT" : "Rt",
-                                             gpBase, lhsBaseIsProtocolSelf);
+                                             gpBase);
     }
     llvm_unreachable("bad requirement type");
   }
@@ -3523,60 +3515,4 @@ std::string ASTMangler::mangleDistributedThunk(const AbstractFunctionDecl *thunk
   }
 
   return mangleEntity(thunk, SymbolKind::DistributedThunk);
-}
-
-static void gatherExistentialRequirements(SmallVectorImpl<Requirement> &reqs,
-                                          ParameterizedProtocolType *PPT) {
-  auto protoTy = PPT->getBaseType();
-  PPT->getRequirements(protoTy->getDecl()->getSelfInterfaceType(), reqs);
-}
-
-void ASTMangler::appendConstrainedExistential(Type base, GenericSignature sig,
-                                              const ValueDecl *forDecl) {
-  auto layout = base->getExistentialLayout();
-  appendExistentialLayout(layout, sig, forDecl);
-  SmallVector<Requirement, 4> requirements;
-  assert(!base->is<ProtocolType>() &&
-         "plain protocol type constraint has no generalization structure");
-  if (auto *PCT = base->getAs<ProtocolCompositionType>()) {
-    for (auto memberTy : PCT->getMembers()) {
-      if (auto *PPT = memberTy->getAs<ParameterizedProtocolType>())
-        gatherExistentialRequirements(requirements, PPT);
-    }
-  } else {
-    auto *PPT = base->castTo<ParameterizedProtocolType>();
-    gatherExistentialRequirements(requirements, PPT);
-  }
-
-  assert(!requirements.empty() && "Unconstrained existential?");
-  // Sort the requirements to canonicalize their order.
-  llvm::array_pod_sort(
-      requirements.begin(), requirements.end(),
-      [](const Requirement *lhs, const Requirement *rhs) -> int {
-        return lhs->compare(*rhs);
-      });
-
-  bool firstRequirement = true;
-  for (const auto &reqt : requirements) {
-    switch (reqt.getKind()) {
-    case RequirementKind::Layout:
-    case RequirementKind::Conformance:
-    case RequirementKind::Superclass:
-      // The surface language cannot express these requirements yet, so
-      // we have no mangling for them.
-      assert(false && "Unexpected requirement in constrained existential!");
-      continue;
-
-    case RequirementKind::SameType: {
-      break;
-    }
-    }
-
-    appendRequirement(reqt, sig, /*baseIsProtocolSelf*/ true);
-    if (firstRequirement) {
-      appendOperator("_");
-      firstRequirement = false;
-    }
-  }
-  return appendOperator("XP");
 }

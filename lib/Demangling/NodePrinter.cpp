@@ -306,9 +306,7 @@ private:
     case Node::Kind::MetatypeRepresentation:
     case Node::Kind::Module:
     case Node::Kind::Tuple:
-    case Node::Kind::ConstrainedExistential:
-    case Node::Kind::ConstrainedExistentialRequirementList:
-    case Node::Kind::ConstrainedExistentialSelf:
+    case Node::Kind::ParameterizedProtocol:
     case Node::Kind::Protocol:
     case Node::Kind::ProtocolSymbolicReference:
     case Node::Kind::ReturnType:
@@ -2279,16 +2277,8 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     }
     return nullptr;
   }
-  case Node::Kind::ConstrainedExistential: {
-    Printer << "any ";
-    print(Node->getChild(0), depth + 1);
-    Printer << "<";
-    print(Node->getChild(1), depth + 1);
-    Printer << ">";
-    return nullptr;
-  }
-  case Node::Kind::ConstrainedExistentialRequirementList: {
-    printChildren(Node, depth, ", ");
+  case Node::Kind::ParameterizedProtocol: {
+    printBoundGeneric(Node, depth);
     return nullptr;
   }
   case Node::Kind::ExistentialMetatype: {
@@ -2305,9 +2295,6 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << ".Type";
     return nullptr;
   }
-  case Node::Kind::ConstrainedExistentialSelf:
-    Printer << "Self";
-    return nullptr;
   case Node::Kind::MetatypeRepresentation: {
     Printer << Node->getText();
     return nullptr;

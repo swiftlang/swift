@@ -58,17 +58,18 @@ struct MemberTypeSpecifier {
 struct ProtocolTypeSpecifier {
   ProtocolSpecifier protocol;
 };
-struct ConstrainedExistentialTypeSpecifier {
+struct ParameterizedProtocolTypeSpecifier {
   ProtocolSpecifier base;
   std::vector<std::pair<std::string, TypeSpecifier>> args;
 };
 struct ProtocolCompositionTypeSpecifier {
   std::vector<TypeSpecifier> components;
 };
-struct TypeSpecifier
-    : TaggedUnion<ParamTypeSpecifier, MemberTypeSpecifier,
-                  ProtocolTypeSpecifier, ProtocolCompositionTypeSpecifier,
-                  ConstrainedExistentialTypeSpecifier> {
+struct TypeSpecifier : TaggedUnion<ParamTypeSpecifier,
+                                   MemberTypeSpecifier,
+                                   ProtocolTypeSpecifier,
+                                   ProtocolCompositionTypeSpecifier,
+                                   ParameterizedProtocolTypeSpecifier> {
   using TaggedUnion::TaggedUnion;
 };
 
@@ -136,7 +137,8 @@ inline TypeSpecifier parameterizedProtocol(ProtocolSpecifier &&base,
                                            Specs &&...specs) {
   std::vector<std::pair<std::string, TypeSpecifier>> args;
   addParameterizedProtocolArguments(args, std::forward<Specs>(specs)...);
-  return ConstrainedExistentialTypeSpecifier{std::move(base), std::move(args)};
+  return ParameterizedProtocolTypeSpecifier{std::move(base),
+                                            std::move(args)};
 }
 
 /// A class which "demangles" various DSL specifiers into demangle
@@ -210,8 +212,8 @@ class Demangler {
                 {node(Kind::TypeList, components)});
   }
 
-  NodePointer demangleConstrainedExistentialType(
-      const ConstrainedExistentialTypeSpecifier &spec) {
+  NodePointer demangleParameterizedProtocolType(
+                      const ParameterizedProtocolTypeSpecifier &spec) {
     // Demangle the base protocol and then wrap it up like the tree expects,
     // which for some reason is this.
     auto base = demangleProtocol(spec.base);
@@ -220,29 +222,14 @@ class Demangler {
                       {node(Kind::Type,
                             {base})})});
 
-    std::vector<NodePointer> reqVector;
-    bool firstReq = false;
+    std::vector<NodePointer> argVector;
     for (auto &arg: spec.args) {
-      auto depType =
-          node(Kind::Type,
-               {node(Kind::DependentMemberType,
-                       {node(Kind::Type,
-                             {factory.createNode(Kind::ConstrainedExistentialSelf),
-                         node(Kind::DependentAssociatedTypeRef,
-                             {factory.createNode(Kind::Identifier, arg.first),
-                               node(Kind::Type,
-                                   {demangleProtocol(spec.base)})})})})});
-      auto constraintType = demangleType(arg.second);
-      reqVector.push_back(node(Kind::DependentGenericSameTypeRequirement,
-                               {depType, constraintType}));
-      if (firstReq) {
-        reqVector.push_back(node(Kind::FirstElementMarker, {}));
-        firstReq = false;
-      }
+      // TODO: also include the associated type names
+      argVector.push_back(demangleType(arg.second));
     }
-    NodePointer constraints =
-        node(Node::Kind::ConstrainedExistentialRequirementList, reqVector);
-    return node(Kind::ConstrainedExistential, {base, constraints});
+    auto args = node(Kind::TypeList, argVector);
+    return node(Kind::ParameterizedProtocol,
+                {base, args});
   }
 
   NodePointer demangleTypeImpl(const TypeSpecifier &spec) {
@@ -253,7 +240,7 @@ class Demangler {
     CASE(MemberType)
     CASE(ProtocolType)
     CASE(ProtocolCompositionType)
-    CASE(ConstrainedExistentialType)
+    CASE(ParameterizedProtocolType)
 #undef CASE
     swift_unreachable("unknown type specifier");
   }

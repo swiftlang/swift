@@ -713,7 +713,7 @@ protected:
                                                    forRequirement);
     }
 
-    case NodeKind::ConstrainedExistential: {
+    case NodeKind::ParameterizedProtocol: {
       if (Node->getNumChildren() < 2)
         return MAKE_NODE_TYPE_ERROR(Node,
                                     "fewer children (%zu) than required (2)",
@@ -723,20 +723,23 @@ protected:
       if (protocolType.isError())
         return protocolType;
 
-      llvm::SmallVector<BuiltRequirement, 8> requirements;
+      llvm::SmallVector<BuiltType, 8> args;
 
-      auto *reqts = Node->getChild(1);
-      if (reqts->getKind() != NodeKind::ConstrainedExistentialRequirementList)
-        return MAKE_NODE_TYPE_ERROR0(reqts, "is not requirement list");
+      const auto &genericArgs = Node->getChild(1);
+      if (genericArgs->getKind() != NodeKind::TypeList)
+        return MAKE_NODE_TYPE_ERROR0(genericArgs, "is not TypeList");
 
-      decodeRequirement<BuiltType, BuiltRequirement, BuiltLayoutConstraint,
-                        BuilderType>(reqts, requirements, Builder);
+      for (auto genericArg : *genericArgs) {
+        auto paramType = decodeMangledType(genericArg, depth + 1,
+                                           /*forRequirement=*/false);
+        if (paramType.isError())
+          return paramType;
+        args.push_back(paramType.getType());
+      }
 
-      return Builder.createConstrainedExistentialType(protocolType.getType(),
-                                                      requirements);
+      return Builder.createParameterizedProtocolType(protocolType.getType(),
+                                                     args);
     }
-    case NodeKind::ConstrainedExistentialSelf:
-      return Builder.createGenericTypeParameterType(/*depth*/ 0, /*index*/ 0);
 
     case NodeKind::Protocol:
     case NodeKind::ProtocolSymbolicReference: {

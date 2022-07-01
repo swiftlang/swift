@@ -638,7 +638,7 @@ Types
   type ::= protocol-list 'p'                 // existential type
   type ::= protocol-list superclass 'Xc'     // existential type with superclass
   type ::= protocol-list 'Xl'                // existential type with AnyObject
-  type ::= protocol-list requirement* '_' 'XP'   // constrained existential type
+  type ::= protocol-list 'y' (type* '_')* type* retroactive-conformance* 'XP'   // parameterized protocol type
   type ::= type-list 't'                     // tuple
   type ::= type generic-signature 'u'        // generic type
   type ::= 'x'                               // generic param, depth=0, idx=0
@@ -879,7 +879,6 @@ now codified into the ABI; the index 0 is therefore reserved.
   GENERIC-PARAM-INDEX ::= 'z'                // depth = 0,   idx = 0
   GENERIC-PARAM-INDEX ::= INDEX              // depth = 0,   idx = N+1
   GENERIC-PARAM-INDEX ::= 'd' INDEX INDEX    // depth = M+1, idx = N
-  GENERIC-PARAM-INDEX ::= 's'                // depth = 0,   idx = 0; Constrained existential 'Self' type
 
   LAYOUT-CONSTRAINT ::= 'N'  // NativeRefCountedObject
   LAYOUT-CONSTRAINT ::= 'R'  // RefCountedObject

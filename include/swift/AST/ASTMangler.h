@@ -343,8 +343,7 @@ protected:
                                         bool &isAssocTypeAtDepth);
 
   void appendOpWithGenericParamIndex(StringRef,
-                                     const GenericTypeParamType *paramTy,
-                                     bool baseIsProtocolSelf = false);
+                                     const GenericTypeParamType *paramTy);
 
   /// Mangles a sugared type iff we are mangling for the debugger.
   template <class T> void appendSugaredType(Type type,
@@ -445,17 +444,8 @@ protected:
   bool appendGenericSignature(GenericSignature sig,
                               GenericSignature contextSig = nullptr);
 
-  /// Append a requirement to the mangling.
-  ///
-  /// \param reqt The requirement to mangle
-  /// \param sig  The generic signature.
-  /// \param lhsBaseIsProtocolSelf If \c true, mangle the base of the left-hand
-  /// side of the constraint with a special protocol 'Self' sentinel node. This
-  /// supports distinguishing requirements rooted at 'Self' in constrained
-  /// existentials from ambient generic parameters that would otherwise be
-  /// at e.g. (0, 0) as well.
-  void appendRequirement(const Requirement &reqt, GenericSignature sig,
-                         bool lhsBaseIsProtocolSelf = false);
+  void appendRequirement(const Requirement &reqt,
+                         GenericSignature sig);
 
   void appendGenericSignatureParts(GenericSignature sig,
                                    ArrayRef<CanTypeWrapper<GenericTypeParamType>> params,
@@ -531,9 +521,6 @@ protected:
                                    Demangle::AutoDiffFunctionKind kind,
                                    const AutoDiffConfig &config);
   void appendIndexSubset(IndexSubset *indexSubset);
-
-  void appendConstrainedExistential(Type base, GenericSignature sig,
-                                    const ValueDecl *forDecl);
 };
 
 } // end namespace Mangle

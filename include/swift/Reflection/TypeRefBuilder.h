@@ -742,12 +742,13 @@ public:
                                               isClassBound);
   }
 
-  const ConstrainedExistentialTypeRef *createConstrainedExistentialType(
-      const TypeRef *base, llvm::ArrayRef<BuiltRequirement> constraints) {
+  const ParameterizedProtocolTypeRef *
+  createParameterizedProtocolType(const TypeRef *base,
+                                  llvm::ArrayRef<const TypeRef *> args) {
     auto *baseProto = llvm::dyn_cast<ProtocolCompositionTypeRef>(base);
     if (!baseProto)
       return nullptr;
-    return ConstrainedExistentialTypeRef::create(*this, baseProto, constraints);
+    return ParameterizedProtocolTypeRef::create(*this, baseProto, args);
   }
 
   const ExistentialMetatypeTypeRef *createExistentialMetatypeType(

@@ -2719,17 +2719,8 @@ ManglingError Remangler::mangleObjCAsyncCompletionHandlerImpl(Node *node,
                                                               unsigned depth) {
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
-ManglingError Remangler::mangleConstrainedExistential(Node *node,
-                                                      unsigned int depth) {
-  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
-}
-ManglingError
-Remangler::mangleConstrainedExistentialRequirementList(Node *node,
-                                                       unsigned int depth) {
-  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
-}
-ManglingError Remangler::mangleConstrainedExistentialSelf(Node *node,
-                                                          unsigned int depth) {
+ManglingError Remangler::mangleParameterizedProtocol(Node *node,
+                                                     unsigned int depth) {
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 ManglingError Remangler::mangleUniquable(Node *node, unsigned int depth) {
