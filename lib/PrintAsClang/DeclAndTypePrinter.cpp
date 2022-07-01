@@ -396,6 +396,11 @@ private:
       auto elementTagMapping =
           owningPrinter.interopContext.getIrABIDetails().getEnumTagMapping(ED);
 
+      if (elementTagMapping.empty()) {
+        os << "\n";
+        return;
+      }
+
       os << "  enum class cases {\n";
       for (const auto &pair : elementTagMapping) {
         os << "    ";
@@ -403,11 +408,6 @@ private:
         os << ",\n";
       }
       os << "  };\n"; // enum class cases' closing bracket
-
-      if (elementTagMapping.empty()) {
-        os << "\n";
-        return;
-      }
 
       // Printing operator cases()
       os << "  inline operator cases() const {\n";
