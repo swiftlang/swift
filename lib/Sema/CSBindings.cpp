@@ -1620,17 +1620,26 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
   PO.PrintTypesForDebugging = true;
 
   out.indent(indent);
+  std::vector<std::string> attributes;
   if (isDirectHole())
-    out << "hole ";
+    attributes.push_back("hole");
   if (isPotentiallyIncomplete())
-    out << "potentially_incomplete ";
+    attributes.push_back("potentially_incomplete");
   if (isDelayed())
-    out << "delayed ";
+    attributes.push_back("delayed");
   if (isSubtypeOfExistentialType())
-    out << "subtype_of_existential ";
+    attributes.push_back("subtype_of_existential");
   auto literalKind = getLiteralKind();
-  if (literalKind != LiteralBindingKind::None)
-    out << "literal=" << static_cast<int>(literalKind) << " ";
+  if (literalKind != LiteralBindingKind::None) {
+    auto literalAttrStr = ("[literal: " + getLiteralBindingKind(literalKind)
+                        + "]").str();
+    attributes.push_back(literalAttrStr);
+  }
+  if (!attributes.empty()) {
+    out << "[attributes: ";
+    interleave(attributes, out, ", ");
+    out << "] ";
+  }
   if (involvesTypeVariables()) {
     out << "involves_type_vars=[";
     interleave(AdjacentVars,
