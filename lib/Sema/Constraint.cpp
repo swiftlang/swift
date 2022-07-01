@@ -343,8 +343,21 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm, bool skipLocat
       Out << "]]";
     }
     Out << ":\n";
+    
+    // Sort constraints by favored, unmarked, disabled
+    // for printing only.
+    std::vector<Constraint *> sortedConstraints(getNestedConstraints().begin(),
+                                                getNestedConstraints().end());
+    llvm::sort(sortedConstraints,
+               [](const Constraint *lhs, const Constraint *rhs) {
+                 if (lhs->isFavored() != rhs->isFavored())
+                   return lhs->isFavored();
+                 if (lhs->isDisabled() != rhs->isDisabled())
+                   return rhs->isDisabled();
+                 return false;
+               });
 
-    interleave(getNestedConstraints(),
+    interleave(sortedConstraints,
                [&](Constraint *constraint) {
                  if (constraint->isDisabled())
                    Out << ">  [disabled] ";
