@@ -11,6 +11,11 @@ sil_stage canonical
 import Builtin
 import Swift
 
+public enum FakeOptional<T> {
+  case none
+  case some(T)
+}
+
 private var testGlobal: Int64
 
 sil_global private @globalinit_33_00F4D2139E6BDDFEC71E5005B67B5674_token0 : $Builtin.Word
@@ -173,3 +178,82 @@ bb2(%ld : @guaranteed $K):
   return %6 : $()
 }
 
+sil [ossa] @test_multiple_loadborrows : $@convention(thin) (@owned K, @owned K) -> () {
+ bb0(%0 : @owned $K, %1 : @owned $K):
+   %stk = alloc_stack [lexical] $K
+   cond_br undef, bb1, bb2
+
+ bb1:
+   destroy_value %1 : $K
+   store %0 to [init] %stk : $*K
+   br bb3
+
+ bb2:
+   destroy_value %0 : $K
+   store %1 to [init] %stk : $*K
+   br bb3
+
+ bb3:
+   cond_br undef, bb4, bb5
+
+ bb4:
+   %ld1 = load_borrow %stk : $*K
+   br bb6(%ld1 : $K)
+
+ bb5:
+   %ld2 = load_borrow %stk : $*K
+   br bb6(%ld2 : $K)
+
+ bb6(%ld : @guaranteed $K):
+   %3 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed K) -> ()
+   %4 = apply %3(%ld) : $@convention(thin) (@guaranteed K) -> ()
+   end_borrow %ld : $K
+   destroy_addr %stk : $*K
+   dealloc_stack %stk : $*K
+   %6 = tuple ()
+   return %6 : $()
+ }
+
+sil [ossa] @test_multi_bb : $@convention(thin) (@inout FakeOptional<K>) -> () {
+bb0(%0 : $*FakeOptional<K>):
+  %1 = begin_access [modify] [static] %0 : $*FakeOptional<K>
+  %2 = load_borrow %1 : $*FakeOptional<K>
+  %4 = copy_value %2 : $FakeOptional<K>
+  switch_enum %4 : $FakeOptional<K>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb1(%6 : @owned $K):
+  destroy_value %6 : $K
+  end_borrow %2 : $FakeOptional<K>
+  end_access %1 : $*FakeOptional<K>
+  br bb3
+
+bb2:
+  unreachable
+
+bb3:
+  %12 = tuple ()
+  return %12 : $()
+}
+
+sil [ossa] @test_write_reborrow_loop : $@convention(thin) (@owned K) -> () {
+bb0(%0 : @owned $K):
+  %stk = alloc_stack $K
+  store %0 to [init] %stk : $*K
+  %ld1 = load_borrow %stk : $*K
+  br bb1(%ld1 : $K)
+
+bb1(%ld2 : @guaranteed $K):
+  cond_br undef, bb2, bb3
+
+bb2:
+  %3 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed K) -> ()
+  %4 = apply %3(%ld2) : $@convention(thin) (@guaranteed K) -> ()
+  br bb1(%ld2 : $K)
+
+bb3:
+  end_borrow %ld2 : $K
+  destroy_addr %stk : $*K
+  dealloc_stack %stk : $*K
+  %9999 = tuple()
+  return %9999 : $()
+}

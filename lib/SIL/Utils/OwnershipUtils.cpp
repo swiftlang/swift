@@ -689,13 +689,20 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
 /// Add this scopes live blocks into the PrunedLiveness result.
 void BorrowedValue::computeLiveness(PrunedLiveness &liveness) const {
   liveness.initializeDefBlock(value->getParentBlock());
-  visitLocalScopeEndingUses([&](Operand *endOp) {
-    liveness.updateForUse(endOp->getUser(), true);
+  visitTransitiveLifetimeEndingUses([&](Operand *endOp) {
+    if (endOp->getOperandOwnership() == OperandOwnership::EndBorrow) {
+      liveness.updateForUse(endOp->getUser(), /*lifetimeEnding*/ true);
+      return true;
+    }
+    assert(endOp->getOperandOwnership() == OperandOwnership::Reborrow);
+    auto *succBlock = cast<BranchInst>(endOp->getUser())->getDestBB();
+    liveness.initializeDefBlock(succBlock);
+    liveness.updateForUse(endOp->getUser(), /*lifetimeEnding*/ false);
     return true;
   });
 }
 
-bool BorrowedValue::areUsesWithinLocalScope(
+bool BorrowedValue::areUsesWithinTransitiveScope(
     ArrayRef<Operand *> uses, DeadEndBlocks *deadEndBlocks) const {
   // First make sure that we actually have a local scope. If we have a non-local
   // scope, then we have something (like a SILFunctionArgument) where a larger
@@ -738,6 +745,38 @@ bool BorrowedValue::visitExtendedScopeEndingUses(
     if (!BorrowedValue(reborrows[idx]).visitLocalScopeEndingUses(visitEnd))
       return false;
   }
+  return true;
+}
+
+bool BorrowedValue::visitTransitiveLifetimeEndingUses(
+    function_ref<bool(Operand *)> visitor) const {
+  assert(isLocalScope());
+
+  SmallPtrSetVector<SILValue, 4> reborrows;
+
+  auto visitEnd = [&](Operand *scopeEndingUse) {
+    if (scopeEndingUse->getOperandOwnership() == OperandOwnership::Reborrow) {
+      BorrowingOperand(scopeEndingUse)
+          .visitBorrowIntroducingUserResults([&](BorrowedValue borrowedValue) {
+            reborrows.insert(borrowedValue.value);
+            return true;
+          });
+      // visitor on the reborrow
+      return visitor(scopeEndingUse);
+    }
+    // visitor on the end_borrow
+    return visitor(scopeEndingUse);
+  };
+
+  if (!visitLocalScopeEndingUses(visitEnd))
+    return false;
+
+  // reborrows grows in this loop.
+  for (unsigned idx = 0; idx < reborrows.size(); ++idx) {
+    if (!BorrowedValue(reborrows[idx]).visitLocalScopeEndingUses(visitEnd))
+      return false;
+  }
+
   return true;
 }
 
@@ -975,7 +1014,7 @@ bool AddressOwnership::areUsesWithinLifetime(
   SILValue root = base.getOwnershipReferenceRoot();
   BorrowedValue borrow(root);
   if (borrow)
-    return borrow.areUsesWithinLocalScope(uses, &deadEndBlocks);
+    return borrow.areUsesWithinTransitiveScope(uses, &deadEndBlocks);
 
   // --- A reference no borrow scope. Currently happens for project_box.
 

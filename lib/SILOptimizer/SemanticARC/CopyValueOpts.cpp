@@ -155,8 +155,8 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
   // TODO: There may be some way of sinking this into the loop below.
   //
   // FIXME: The haveAnyLocalScopes and destroy.empty() checks are relics of
-  // attempts to handle dead end blocks during areUsesWithinLocalScope. If we
-  // don't use dead end blocks at all, they should not be relevant.
+  // attempts to handle dead end blocks during areUsesWithinTransitiveScope. If
+  // we don't use dead end blocks at all, they should not be relevant.
   bool haveAnyLocalScopes =
       llvm::any_of(borrowScopeIntroducers, [](BorrowedValue borrowScope) {
         return borrowScope.isLocalScope();
@@ -182,15 +182,15 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
   //    need to insert an end_borrow since all of our borrow introducers are
   //    non-local scopes.
   //
-  // The call to areUsesWithinLocalScope cannot consider dead-end blocks. A
+  // The call to areUsesWithinTransitiveScope cannot consider dead-end blocks. A
   // local borrow scope requires all its inner uses to be inside the borrow
   // scope, regardless of whether the end of the scope is inside a dead-end
   // block.
   {
     SmallVector<Operand *, 8> scratchSpace;
     if (llvm::any_of(borrowScopeIntroducers, [&](BorrowedValue borrowScope) {
-      return !borrowScope.areUsesWithinLocalScope(lr.getAllConsumingUses(),
-                                                  nullptr);
+          return !borrowScope.areUsesWithinTransitiveScope(
+              lr.getAllConsumingUses(), nullptr);
         })) {
       return false;
     }
@@ -218,7 +218,7 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
       }
 
       if (llvm::any_of(borrowScopeIntroducers, [&](BorrowedValue borrowScope) {
-            return !borrowScope.areUsesWithinLocalScope(
+            return !borrowScope.areUsesWithinTransitiveScope(
                 phiArgLR.getAllConsumingUses(), nullptr);
           })) {
         return false;
