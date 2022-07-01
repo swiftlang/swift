@@ -554,7 +554,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
     // --- Mangle the thunk name
     Mangle::ASTMangler mangler;
     auto mangled =
-        C.AllocateCopy(mangler.mangleDistributedThunk(cast<FuncDecl>(thunk)));
+        C.AllocateCopy(mangler.mangleDistributedThunk(func));
     auto mangledTargetStringLiteral =
         new (C) StringLiteralExpr(mangled, SourceRange(), implicit);
 

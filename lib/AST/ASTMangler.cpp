@@ -3503,22 +3503,13 @@ std::string ASTMangler::mangleDistributedThunk(const AbstractFunctionDecl *thunk
   // of the thunk, we need to mangle distributed thunks of accessors
   // specially.
   if (auto *accessor = dyn_cast<AccessorDecl>(thunk)) {
-    // TODO: This needs to use accessor type instead of
-    //       distributed thunk after all SILDeclRefs are switched
-    //       to use "originator" instead of the thunk itself.
-    //
-    // ```
-    // beginMangling();
-    // appendContextOf(thunk);
-    // appendDeclName(accessor->getStorage());
-    // appendDeclType(accessor, FunctionMangling);
-    // appendOperator("F");
-    // appendSymbolKind(SymbolKind::DistributedThunk);
-    // return finalize();
-    // ```
-    auto *storage = accessor->getStorage();
-    thunk = storage->getDistributedThunk();
-    assert(thunk);
+    beginMangling();
+    appendContextOf(thunk);
+    appendDeclName(accessor->getStorage());
+    appendDeclType(accessor, FunctionMangling);
+    appendOperator("F");
+    appendSymbolKind(SymbolKind::DistributedThunk);
+    return finalize();
   }
 
   return mangleEntity(thunk, SymbolKind::DistributedThunk);

@@ -4289,7 +4289,8 @@ static WitnessDispatchKind getWitnessDispatchKind(SILDeclRef witness,
     return WitnessDispatchKind::Dynamic;
   }
 
-  bool isFinal = (decl->isFinal() || C->isFinal());
+  // Distributed thunks are always final.
+  bool isFinal = (decl->isFinal() || C->isFinal() || witness.isDistributedThunk());
   if (auto fnDecl = dyn_cast<AbstractFunctionDecl>(witness.getDecl()))
     isFinal |= fnDecl->hasForcedStaticDispatch();
 

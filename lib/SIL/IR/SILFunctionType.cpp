@@ -1933,6 +1933,11 @@ static CanSILFunctionType getSILFunctionType(
     isAsync = true;
   }
 
+  // A reference to a distributed thunk is always async.
+  if (constant && constant->isDistributedThunk()) {
+    isAsync = true;
+  }
+
   // Map 'throws' to the appropriate error convention.
   // Give the type an error argument whether the substituted type semantically
   // `throws` or if the abstraction pattern specifies a Swift function type
@@ -1952,7 +1957,12 @@ static CanSILFunctionType getSILFunctionType(
     errorResult = SILResultInfo(exnType.getASTType(),
                                 ResultConvention::Owned);
   }
-  
+
+  // A reference to a distributed thunk is always throwing.
+  if (constant && constant->isDistributedThunk()) {
+    isThrowing = true;
+  }
+
   // Get the yield type for an accessor coroutine.
   SILCoroutineKind coroutineKind = SILCoroutineKind::None;
   AbstractionPattern coroutineOrigYieldType = AbstractionPattern::getInvalid();

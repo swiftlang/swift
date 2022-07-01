@@ -859,9 +859,18 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
     f->setThunk(IsThunk);
     f->setIsDistributed();
 
+    auto *originator = constant.getDecl();
+    NullablePtr<FuncDecl> thunk;
+
+    if (auto *accessor = dyn_cast<AccessorDecl>(originator)) {
+      auto *storage = accessor->getStorage();
+      thunk = storage->getDistributedThunk();
+    } else {
+      thunk = cast<AbstractFunctionDecl>(originator)->getDistributedThunk();
+    }
+
     assert(constant.isDistributedThunk());
-    SILGenFunction(*this, *f, constant.getFuncDecl())
-        .emitFunction(constant.getFuncDecl());
+    SILGenFunction(*this, *f, dc).emitFunction(thunk.get());
 
     postEmitFunction(constant, f);
     return;
@@ -1411,9 +1420,8 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
   }
 
   if (auto thunkDecl = AFD->getDistributedThunk()) {
-    auto thunk = SILDeclRef(thunkDecl).asDistributed();
-    emitFunctionDefinition(SILDeclRef(thunkDecl).asDistributed(),
-                           getFunction(thunk, ForDefinition));
+    auto thunk = SILDeclRef(AFD).asDistributed();
+    emitFunctionDefinition(thunk, getFunction(thunk, ForDefinition));
   }
 
   if (AFD->isBackDeployed()) {

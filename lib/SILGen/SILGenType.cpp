@@ -709,9 +709,8 @@ SILFunction *SILGenModule::emitProtocolWitness(
        witnessRef.getFuncDecl() && witnessRef.getFuncDecl()->isDistributed());
 
   if (shouldUseDistributedThunkWitness) {
-    auto thunkDeclRef = SILDeclRef(
-        witnessRef.getFuncDecl()->getDistributedThunk(),
-        SILDeclRef::Kind::Func);
+    auto thunkDeclRef =
+        SILDeclRef(witnessRef.getFuncDecl(), SILDeclRef::Kind::Func);
     witnessRef = thunkDeclRef.asDistributed();
   }
 
@@ -1186,8 +1185,9 @@ public:
       SGM.emitPropertyWrapperBackingInitializer(vd);
     }
 
-    if (auto *thunk = vd->getDistributedThunk()) {
-      auto thunkRef = SILDeclRef(thunk).asDistributed();
+    if (vd->getDistributedThunk()) {
+      auto thunkRef =
+          SILDeclRef(vd->getAccessor(AccessorKind::Get)).asDistributed();
       SGM.emitFunctionDefinition(thunkRef,
                                  SGM.getFunction(thunkRef, ForDefinition));
     }
@@ -1319,8 +1319,9 @@ public:
       }
     }
 
-    if (auto *thunk = vd->getDistributedThunk()) {
-      auto thunkRef = SILDeclRef(thunk).asDistributed();
+    if (vd->getDistributedThunk()) {
+      auto thunkRef =
+          SILDeclRef(vd->getAccessor(AccessorKind::Get)).asDistributed();
       SGM.emitFunctionDefinition(thunkRef,
                                  SGM.getFunction(thunkRef, ForDefinition));
     }
