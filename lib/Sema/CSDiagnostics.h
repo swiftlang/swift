@@ -42,17 +42,19 @@ class FunctionArgApplyInfo;
 class FailureDiagnostic {
   const Solution &S;
   ConstraintLocator *Locator;
-  bool isWarning;
+  DiagnosticBehavior behaviorLimit;
 
 public:
   FailureDiagnostic(const Solution &solution, ConstraintLocator *locator,
-                    bool isWarning = false)
-      : S(solution), Locator(locator), isWarning(isWarning) {}
+                    DiagnosticBehavior behaviorLimit =
+                        DiagnosticBehavior::Unspecified)
+      : S(solution), Locator(locator), behaviorLimit(behaviorLimit) {}
 
   FailureDiagnostic(const Solution &solution, ASTNode anchor,
-                    bool isWarning = false)
+                    DiagnosticBehavior behaviorLimit =
+                        DiagnosticBehavior::Unspecified)
       : FailureDiagnostic(solution, solution.getConstraintLocator(anchor),
-                          isWarning) { }
+                          behaviorLimit) { }
 
   virtual ~FailureDiagnostic();
 
@@ -605,7 +607,9 @@ class ContextualFailure : public FailureDiagnostic {
 
 public:
   ContextualFailure(const Solution &solution, Type lhs, Type rhs,
-                    ConstraintLocator *locator, bool isWarning = false)
+                    ConstraintLocator *locator,
+                    DiagnosticBehavior behaviorLimit =
+                        DiagnosticBehavior::Unspecified)
       : ContextualFailure(
             solution,
             locator->isForContextualType()
@@ -613,12 +617,13 @@ public:
                       .getPurpose()
                 : solution.getConstraintSystem().getContextualTypePurpose(
                       locator->getAnchor()),
-            lhs, rhs, locator, isWarning) {}
+            lhs, rhs, locator, behaviorLimit) {}
 
   ContextualFailure(const Solution &solution, ContextualTypePurpose purpose,
                     Type lhs, Type rhs, ConstraintLocator *locator,
-                    bool isWarning = false)
-      : FailureDiagnostic(solution, locator, isWarning), CTP(purpose),
+                    DiagnosticBehavior behaviorLimit =
+                        DiagnosticBehavior::Unspecified)
+      : FailureDiagnostic(solution, locator, behaviorLimit), CTP(purpose),
         RawFromType(lhs), RawToType(rhs) {
     assert(lhs && "Expected a valid 'from' type");
     assert(rhs && "Expected a valid 'to' type");
@@ -759,8 +764,9 @@ public:
   AttributedFuncToTypeConversionFailure(const Solution &solution, Type fromType,
                                         Type toType, ConstraintLocator *locator,
                                         AttributeKind attributeKind,
-                                        bool isWarning = false)
-      : ContextualFailure(solution, fromType, toType, locator, isWarning),
+                                        DiagnosticBehavior behaviorLimit =
+                                            DiagnosticBehavior::Unspecified)
+      : ContextualFailure(solution, fromType, toType, locator, behaviorLimit),
         attributeKind(attributeKind) {}
 
   bool diagnoseAsError() override;
@@ -784,8 +790,8 @@ class DroppedGlobalActorFunctionAttr final : public ContextualFailure {
 public:
   DroppedGlobalActorFunctionAttr(const Solution &solution, Type fromType,
                                  Type toType, ConstraintLocator *locator,
-                                 bool isWarning)
-    : ContextualFailure(solution, fromType, toType, locator, isWarning) { }
+                                 DiagnosticBehavior behaviorLimit)
+    : ContextualFailure(solution, fromType, toType, locator, behaviorLimit) { }
 
   bool diagnoseAsError() override;
 };
@@ -1955,8 +1961,9 @@ class ArgumentMismatchFailure : public ContextualFailure {
 public:
   ArgumentMismatchFailure(const Solution &solution, Type argType,
                           Type paramType, ConstraintLocator *locator,
-                          bool warning = false)
-      : ContextualFailure(solution, argType, paramType, locator, warning),
+                          DiagnosticBehavior behaviorLimit =
+                              DiagnosticBehavior::Unspecified)
+      : ContextualFailure(solution, argType, paramType, locator, behaviorLimit),
         Info(*getFunctionArgApplyInfo(getLocator())) {}
 
   bool diagnoseAsError() override;
@@ -2135,8 +2142,9 @@ public:
                                 ConstraintLocator *locator, Type fromType,
                                 Type toType,
                                 ConversionRestrictionKind conversionKind,
-                                bool warning)
-      : ArgumentMismatchFailure(solution, fromType, toType, locator, warning),
+                                DiagnosticBehavior behaviorLimit)
+      : ArgumentMismatchFailure(
+            solution, fromType, toType, locator, behaviorLimit),
         ConversionKind(conversionKind) {
   }
 
