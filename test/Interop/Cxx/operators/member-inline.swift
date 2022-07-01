@@ -52,12 +52,14 @@ OperatorsTestSuite.test("LoadableIntWrapper.successor() (inline)") {
   expectEqual(42, wrapper.value)
 }
 
+#if !os(Windows)    // SR-13129
 OperatorsTestSuite.test("LoadableBoolWrapper.exclaim (inline)") {
   var wrapper = LoadableBoolWrapper(value: true)
 
   let resultExclaim = !wrapper
   expectEqual(false, resultExclaim.value)
 }
+#endif
 
 OperatorsTestSuite.test("AddressOnlyIntWrapper.call (inline)") {
   var wrapper = AddressOnlyIntWrapper(42)
