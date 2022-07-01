@@ -103,7 +103,7 @@ function(remove_sdk_unsupported_archs name os sdk_path architectures_var)
 endfunction()
 
 # Work out which threading package to use by consulting SWIFT_THREADING_PACKAGE
-function(find_threading_package sdk default package_var)
+function(get_threading_package sdk default package_var)
   set(global_override)
   foreach(elt ${SWIFT_THREADING_PACKAGE})
     string(REPLACE ":" ";" elt_list "${elt}")
@@ -208,7 +208,7 @@ macro(configure_sdk_darwin
   set(SWIFT_SDK_${prefix}_STATIC_LIBRARY_SUFFIX ".a")
   set(SWIFT_SDK_${prefix}_IMPORT_LIBRARY_PREFIX "")
   set(SWIFT_SDK_${prefix}_IMPORT_LIBRARY_SUFFIX "")
-  find_threading_package(${prefix} "darwin" SWIFT_SDK_${prefix}_THREADING_PACKAGE)
+  get_threading_package(${prefix} "darwin" SWIFT_SDK_${prefix}_THREADING_PACKAGE)
 
   set(SWIFT_SDK_${prefix}_ARCHITECTURES ${architectures})
   if(SWIFT_DARWIN_SUPPORTED_ARCHS)
@@ -333,7 +333,7 @@ macro(configure_sdk_unix name architectures)
   elseif("${prefix}" STREQUAL "WASI")
     set(_default_threading_package "none")
   endif()
-  find_threading_package(${prefix} ${_default_threading_package}
+  get_threading_package(${prefix} ${_default_threading_package}
     SWIFT_SDK_${prefix}_THREADING_PACKAGE)
 
   foreach(arch ${architectures})
@@ -462,7 +462,7 @@ macro(configure_sdk_windows name environment architectures)
   set(SWIFT_SDK_${prefix}_STATIC_LIBRARY_SUFFIX ".lib")
   set(SWIFT_SDK_${prefix}_IMPORT_LIBRARY_PREFIX "")
   set(SWIFT_SDK_${prefix}_IMPORT_LIBRARY_SUFFIX ".lib")
-  find_threading_package(${prefix} "win32" SWIFT_SDK_${prefix}_THREADING_PACKAGE)
+  get_threading_package(${prefix} "win32" SWIFT_SDK_${prefix}_THREADING_PACKAGE)
 
   foreach(arch ${architectures})
     if(arch STREQUAL armv7)
@@ -529,6 +529,6 @@ function(configure_target_variant prefix name sdk build_config lib_subdir)
   set(SWIFT_VARIANT_${prefix}_STATIC_LIBRARY_SUFFIX ${SWIFT_SDK_${sdk}_STATIC_LIBRARY_SUFFIX})
   set(SWIFT_VARIANT_${prefix}_IMPORT_LIBRARY_PREFIX ${SWIFT_SDK_${sdk}_IMPORT_LIBRARY_PREFIX})
   set(SWIFT_VARIANT_${prefix}_IMPORT_LIBRARY_SUFFIX ${SWIFT_SDK_${sdk}_IMPORT_LIBRARY_SUFFIX})
-  find_threading_package(${prefix} ${SWIFT_SDK_${sdk}_THREADING_PACKAGE} SWIFT_VARIANT_${prefix}_THREADING_PACKAGE)
+  get_threading_package(${prefix} ${SWIFT_SDK_${sdk}_THREADING_PACKAGE} SWIFT_VARIANT_${prefix}_THREADING_PACKAGE)
 endfunction()
 
