@@ -59,7 +59,8 @@ symbolgraphgen::emitSymbolGraphForModule(ModuleDecl *M,
   swift::getTopLevelDeclsForDisplay(M, ModuleDecls, /*recursive*/true);
   
   SmallPtrSet<ModuleDecl *, 4> ExportedImportedModules;
-  swift::collectParsedExportedImports(M, ExportedImportedModules);
+  swift::collectParsedExportedImports(M, ExportedImportedModules, ModuleDecls,
+                                      /*AddQualifiedImportModules*/ true);
 
   if (Options.PrintMessages)
     llvm::errs() << ModuleDecls.size()

@@ -788,15 +788,33 @@ bool ModuleDecl::shouldCollectDisplayDecls() const {
   return true;
 }
 
-void swift::collectParsedExportedImports(const ModuleDecl *M, SmallPtrSetImpl<ModuleDecl *> &Imports) {
+void swift::collectParsedExportedImports(const ModuleDecl *M,
+                                         SmallPtrSetImpl<ModuleDecl *> &Imports,
+                                         SmallVectorImpl<Decl *> &Decls,
+                                         bool AddQualifiedImportModules) {
   for (const FileUnit *file : M->getFiles()) {
     if (const SourceFile *source = dyn_cast<SourceFile>(file)) {
       if (source->hasImports()) {
         for (auto import : source->getImports()) {
           if (import.options.contains(ImportFlags::Exported) &&
-              !Imports.contains(import.module.importedModule) &&
               import.module.importedModule->shouldCollectDisplayDecls()) {
-            Imports.insert(import.module.importedModule);
+            if (import.module.getAccessPath().size() > 0) {
+              if (AddQualifiedImportModules &&
+                  !Imports.contains(import.module.importedModule)) {
+                Imports.insert(import.module.importedModule);
+              }
+              auto collectDecls = [&](ValueDecl *VD,
+                                      DeclVisibilityKind reason) {
+                if (reason == DeclVisibilityKind::VisibleAtTopLevel)
+                  Decls.push_back(VD);
+              };
+              auto consumer = makeDeclConsumer(std::move(collectDecls));
+              import.module.importedModule->lookupVisibleDecls(
+                  import.module.getAccessPath(), consumer,
+                  NLKind::UnqualifiedLookup);
+            } else if (!Imports.contains(import.module.importedModule)) {
+              Imports.insert(import.module.importedModule);
+            }
           }
         }
       }
@@ -952,7 +970,7 @@ SourceFile::getExternalRawLocsForDecl(const Decl *D) const {
 void ModuleDecl::getDisplayDecls(SmallVectorImpl<Decl*> &Results, bool Recursive) const {
   if (Recursive && isParsedModule(this)) {
     SmallPtrSet<ModuleDecl *, 4> Modules;
-    collectParsedExportedImports(this, Modules);
+    collectParsedExportedImports(this, Modules, Results);
     for (const ModuleDecl *import : Modules) {
       import->getDisplayDecls(Results, Recursive);
     }
