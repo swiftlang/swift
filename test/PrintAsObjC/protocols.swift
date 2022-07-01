@@ -25,7 +25,7 @@ import objc_generics
 
 // CHECK-LABEL: @protocol B <A>
 // CHECK-NEXT: @end
-@objc protocol B : A {}
+@objc protocol B : A, Sendable {}
 
 // CHECK-LABEL: @protocol CompletionAndAsync
 // CHECK-NEXT: - (void)helloWithCompletion:(void (^ _Nonnull)(BOOL))completion;
