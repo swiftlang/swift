@@ -14,23 +14,13 @@
 #define SWIFT_CLANG_INCLUDE_PATHS_H
 
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/SearchPathOptions.h"
 
 namespace swift {
-
-/// Finds the glibc.modulemap file relative to the provided resource dir.
-///
-/// Note that the module map used for Glibc depends on the target we're
-/// compiling for, and is not included in the resource directory with the other
-/// implicit module maps. It's at {freebsd|linux}/{arch}/glibc.modulemap.
-Optional<StringRef> getGlibcModuleMapPath(SearchPathOptions &Opts,
-                                          llvm::Triple triple,
-                                          SmallVectorImpl<char> &buffer);
 
 /// On Linux, some platform libraries (glibc, libstdc++) are not modularized.
 /// We inject modulemaps for those libraries into their include directories
 /// to allow using them from Swift.
-SmallVector<std::pair<std::string, std::string>, 16>
+SmallVector<std::pair<std::string, std::string>, 2>
 getClangInvocationFileMapping(ASTContext &ctx);
 
 } // namespace swift
