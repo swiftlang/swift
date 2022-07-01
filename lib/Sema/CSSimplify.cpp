@@ -2718,24 +2718,29 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       increaseScore(SK_SyncInAsync);
   }
 
-  /// Whether to downgrade to a concurrency warning.
-  auto isConcurrencyWarning = [&](bool forSendable) {
-    // Except for Sendable warnings, don't downgrade to an error in strict
-    // contexts without a preconcurrency callee.
-    if (!forSendable &&
-        contextRequiresStrictConcurrencyChecking(DC, GetClosureType{*this}) &&
-        !hasPreconcurrencyCallee(this, locator))
-      return false;
-
+  /// The behavior limit to apply to a concurrency check.
+  auto getConcurrencyDiagnosticBehavior = [&](bool forSendable) {
     // We can only handle the downgrade for conversions.
     switch (kind) {
     case ConstraintKind::Conversion:
     case ConstraintKind::ArgumentConversion:
-      return true;
+      break;
 
     default:
-      return false;
+      return DiagnosticBehavior::Unspecified;
     }
+
+    // For a @preconcurrency callee outside of a strict concurrency context,
+    // ignore.
+    if (hasPreconcurrencyCallee(this, locator) &&
+        !contextRequiresStrictConcurrencyChecking(DC, GetClosureType{*this}))
+      return DiagnosticBehavior::Ignore;
+
+    // Otherwise, warn until Swift 6.
+    if (!getASTContext().LangOpts.isSwiftVersionAtLeast(6))
+      return DiagnosticBehavior::Warning;
+
+    return DiagnosticBehavior::Unspecified;
   };
 
   // A @Sendable function can be a subtype of a non-@Sendable function.
@@ -2747,7 +2752,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
       auto *fix = AddSendableAttribute::create(
           *this, func1, func2, getConstraintLocator(locator),
-          isConcurrencyWarning(true));
+          getConcurrencyDiagnosticBehavior(true));
       if (recordFix(fix))
         return getTypeMatchFailure(locator);
     }
@@ -2782,7 +2787,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
       auto *fix = MarkGlobalActorFunction::create(
           *this, func1, func2, getConstraintLocator(locator),
-          isConcurrencyWarning(false));
+          getConcurrencyDiagnosticBehavior(false));
 
       if (recordFix(fix))
         return getTypeMatchFailure(locator);

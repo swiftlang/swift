@@ -201,28 +201,29 @@ MarkExplicitlyEscaping::create(ConstraintSystem &cs, Type lhs, Type rhs,
 }
 
 bool MarkGlobalActorFunction::diagnose(const Solution &solution,
-                                      bool asNote) const {
+                                       bool asNote) const {
   DroppedGlobalActorFunctionAttr failure(
-      solution, getFromType(), getToType(), getLocator(), isWarning());
+      solution, getFromType(), getToType(), getLocator(), diagBehaviorLimit());
   return failure.diagnose(asNote);
 }
 
 MarkGlobalActorFunction *
 MarkGlobalActorFunction::create(ConstraintSystem &cs, Type lhs, Type rhs,
-                               ConstraintLocator *locator, bool warning) {
+                                ConstraintLocator *locator,
+                                DiagnosticBehavior behaviorLimit) {
   if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>())
     locator = cs.getConstraintLocator(
         locator, LocatorPathElt::ArgumentAttribute::forGlobalActor());
 
   return new (cs.getAllocator()) MarkGlobalActorFunction(
-      cs, lhs, rhs, locator, warning);
+      cs, lhs, rhs, locator, behaviorLimit);
 }
 
 bool AddSendableAttribute::diagnose(const Solution &solution,
                                       bool asNote) const {
   AttributedFuncToTypeConversionFailure failure(
       solution, getFromType(), getToType(), getLocator(),
-      AttributedFuncToTypeConversionFailure::Concurrent, isWarning());
+      AttributedFuncToTypeConversionFailure::Concurrent, diagBehaviorLimit());
   return failure.diagnose(asNote);
 }
 
@@ -231,13 +232,13 @@ AddSendableAttribute::create(ConstraintSystem &cs,
                              FunctionType *fromType,
                              FunctionType *toType,
                              ConstraintLocator *locator,
-                             bool warning) {
+                             DiagnosticBehavior behaviorLimit) {
   if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>())
     locator = cs.getConstraintLocator(
         locator, LocatorPathElt::ArgumentAttribute::forConcurrent());
 
   return new (cs.getAllocator()) AddSendableAttribute(
-      cs, fromType, toType, locator, warning);
+      cs, fromType, toType, locator, behaviorLimit);
 }
 bool RelabelArguments::diagnose(const Solution &solution, bool asNote) const {
   LabelingFailure failure(solution, getLocator(), getLabels());
@@ -406,7 +407,7 @@ ContextualMismatch *ContextualMismatch::create(ConstraintSystem &cs, Type lhs,
                                                Type rhs,
                                                ConstraintLocator *locator) {
   return new (cs.getAllocator()) ContextualMismatch(
-      cs, lhs, rhs, locator, /*warning=*/false);
+      cs, lhs, rhs, locator, DiagnosticBehavior::Unspecified);
 }
 
 bool AllowWrappedValueMismatch::diagnose(const Solution &solution, bool asError) const {
@@ -1167,7 +1168,7 @@ NotCompileTimeConst::NotCompileTimeConst(ConstraintSystem &cs, Type paramTy,
                                          ConstraintLocator *locator):
   ContextualMismatch(cs, FixKind::NotCompileTimeConst, paramTy,
                      cs.getASTContext().TheEmptyTupleType, locator,
-                     /*warning*/true) {}
+                     DiagnosticBehavior::Warning) {}
 
 NotCompileTimeConst *
 NotCompileTimeConst::create(ConstraintSystem &cs, Type paramTy,
@@ -1598,7 +1599,7 @@ bool TreatEphemeralAsNonEphemeral::diagnose(const Solution &solution,
                                             bool asNote) const {
   NonEphemeralConversionFailure failure(solution, getLocator(), getFromType(),
                                         getToType(), ConversionKind,
-                                        isWarning());
+                                        diagBehaviorLimit());
   return failure.diagnose(asNote);
 }
 
@@ -1607,7 +1608,9 @@ TreatEphemeralAsNonEphemeral *TreatEphemeralAsNonEphemeral::create(
     Type dstType, ConversionRestrictionKind conversionKind,
     bool downgradeToWarning) {
   return new (cs.getAllocator()) TreatEphemeralAsNonEphemeral(
-      cs, locator, srcType, dstType, conversionKind, downgradeToWarning);
+      cs, locator, srcType, dstType, conversionKind,
+      downgradeToWarning ? DiagnosticBehavior::Warning
+                         : DiagnosticBehavior::Unspecified);
 }
 
 std::string TreatEphemeralAsNonEphemeral::getName() const {
