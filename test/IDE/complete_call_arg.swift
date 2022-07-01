@@ -1415,3 +1415,23 @@ func testRdar89773376(arry: [Int]) {
 // RDAR89773376-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ['(']{#intVal: Int#}[')'][#Rdar89773376#];
 // RDAR89773376: End completions
 }
+
+struct AmbiguousCallInResultBuilder {
+  @resultBuilder
+  struct MyResultBuilder {
+    static func buildBlock(_ value: Int) -> Int {
+      return value
+    }
+  }
+
+  func ttroke(_ content: Int, style: String) -> Int { 41 }
+  func ttroke(_ content: Int, lineWidth: Int = 1) -> Int { 42 }
+  
+  @MyResultBuilder var body: Int {
+    self.ttroke(1, #^AMBIGUOUS_IN_RESULT_BUILDER?xfail=TODO^#)
+// AMBIGUOUS_IN_RESULT_BUILDER: Begin completions, 2 items
+// AMBIGUOUS_IN_RESULT_BUILDER-DAG: Pattern/Local/Flair[ArgLabels]:     {#style: String#}[#String#];
+// AMBIGUOUS_IN_RESULT_BUILDER-DAG: Pattern/Local/Flair[ArgLabels]:     {#lineWidth: Int#}[#Int#];
+// AMBIGUOUS_IN_RESULT_BUILDER: End completions
+  }
+}
