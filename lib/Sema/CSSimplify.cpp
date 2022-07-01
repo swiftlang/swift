@@ -8359,12 +8359,16 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
 
       // Only try and favor monomorphic unary initializers.
       if (!ctor->isGenericContext()) {
-        auto args = ctor->getMethodInterfaceType()
-                        ->castTo<FunctionType>()->getParams();
-        if (args.size() == 1 && !args[0].hasLabel() &&
-            args[0].getPlainType()->isEqual(favoredType)) {
-          if (!isDeclUnavailable(decl, memberLocator))
-            result.FavoredChoice = result.ViableCandidates.size();
+        if (!ctor->getMethodInterfaceType()->is<ErrorType>()) {
+          // The constructor might have an error type because we don't skip
+          // invalid decls for code completion
+          auto args = ctor->getMethodInterfaceType()
+          ->castTo<FunctionType>()->getParams();
+          if (args.size() == 1 && !args[0].hasLabel() &&
+              args[0].getPlainType()->isEqual(favoredType)) {
+            if (!isDeclUnavailable(decl, memberLocator))
+              result.FavoredChoice = result.ViableCandidates.size();
+          }
         }
       }
     }
