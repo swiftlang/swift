@@ -343,6 +343,10 @@ enum class SymbolicReferenceKind : uint8_t {
   /// A symbolic reference to an accessor function, which can be executed in
   /// the process to get a pointer to the referenced entity.
   AccessorFunctionReference,
+  /// A symbolic reference to a unique extended existential type shape.
+  UniqueExtendedExistentialTypeShape,
+  /// A symbolic reference to a non-unique extended existential type shape.
+  NonUniqueExtendedExistentialTypeShape,
 };
 
 using SymbolicReferenceResolver_t = NodePointer (SymbolicReferenceKind,
@@ -516,6 +520,7 @@ protected:
                                     const Vector<NodePointer> &TypeLists,
                                     size_t TypeListIdx);
   NodePointer popAnyProtocolConformanceList();
+  NodePointer popRetroactiveConformances();
   NodePointer demangleRetroactiveConformance();
   NodePointer demangleInitializer();
   NodePointer demangleImplParamConvention(Node::Kind ConvKind);
@@ -530,6 +535,7 @@ protected:
   NodePointer demangleAssociatedTypeSimple(NodePointer GenericParamIdx);
   NodePointer demangleAssociatedTypeCompound(NodePointer GenericParamIdx);
   NodePointer demangleExtendedExistentialShape(char kind);
+  NodePointer demangleSymbolicExtendedExistentialType();
 
   NodePointer popAssocTypeName();
   NodePointer popAssocTypePath();

@@ -293,13 +293,6 @@ getTypeRefByFunction(IRGenModule &IGM,
 
 bool swift::irgen::mangledNameIsUnknownToDeployTarget(IRGenModule &IGM,
                                                       CanType type) {
-  // We don't currently support demangling extended existential types.
-  // FIXME: implement this and remove this logic
-  bool hasExtendedExistential = type.findIf([](CanType t) -> bool {
-    return isa<ParameterizedProtocolType>(t);
-  });
-  if (hasExtendedExistential) return true;
-
   if (auto runtimeCompatVersion = getSwiftRuntimeCompatibilityVersionForTarget(
           IGM.Context.LangOpts.Target)) {
     if (auto minimumSupportedRuntimeVersion =

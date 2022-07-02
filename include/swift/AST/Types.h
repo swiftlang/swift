@@ -6529,6 +6529,8 @@ inline bool TypeBase::isClassExistentialType() {
     return pt->requiresClass();
   if (auto pct = dyn_cast<ProtocolCompositionType>(T))
     return pct->requiresClass();
+  if (auto ppt = dyn_cast<ParameterizedProtocolType>(T))
+    return ppt->requiresClass();
   if (auto existential = dyn_cast<ExistentialType>(T))
     return existential->requiresClass();
   return false;

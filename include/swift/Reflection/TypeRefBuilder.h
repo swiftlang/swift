@@ -658,6 +658,13 @@ public:
     return ConstrainedExistentialTypeRef::create(*this, baseProto, constraints);
   }
 
+  const TypeRef *
+  createSymbolicExtendedExistentialType(NodePointer shapeNode,
+                                        llvm::ArrayRef<const TypeRef *> args) {
+    // Can't handle this here.
+    return nullptr;
+  }
+
   const ExistentialMetatypeTypeRef *createExistentialMetatypeType(
       const TypeRef *instance,
       llvm::Optional<Demangle::ImplMetatypeRepresentation> repr = None) {
