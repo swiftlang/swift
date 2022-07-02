@@ -214,6 +214,23 @@ extension _SmallString: RandomAccessCollection, MutableCollection {
   }
 }
 
+@inline(__always)
+private func zero(_ tuple: (UInt64, UInt64), from n: Int) -> (UInt64, UInt64) {
+    let mask0: UInt64
+    let mask1: UInt64
+    if n == 0 {
+        mask0 = 0
+        mask1 = 0
+    } else if n <= 8 {
+        mask0 = (~0) &>> (8 &* (8 &- n))
+        mask1 = 0
+    } else {
+        mask0 = ~0
+        mask1 = (~0) &>> (8 &* (16 &- n))
+    }
+    return (tuple.0 & mask0, tuple.1 & mask1)
+}
+
 extension _SmallString {
   @inlinable @inline(__always)
   internal func withUTF8<Result>(
@@ -241,71 +258,18 @@ extension _SmallString {
   fileprivate mutating func withMutableCapacity(
     _ f: (UnsafeMutableRawBufferPointer) throws -> Int
   ) rethrows {
-    let len = try withUnsafeMutableBytes(of: &_storage) {
-      (rawBufPtr: UnsafeMutableRawBufferPointer) -> Int in
-      let len = try f(rawBufPtr)
-      
-      _internalInvariant(len <= _SmallString.capacity)
-      _internalInvariant(rawBufPtr.count == MemoryLayout<(UInt64, UInt64)>.size)
-      
-      switch len {
-      case ...0:
-        return 0
-      case 1:
-        rawBufPtr.storeBytes(of: 0, toByteOffset: 1, as: UInt8.self)
-        fallthrough
-      case 2:
-        rawBufPtr.storeBytes(of: 0, toByteOffset: 2, as: UInt16.self)
-        rawBufPtr.storeBytes(of: 0, toByteOffset: 4, as: UInt32.self)
-        rawBufPtr.storeBytes(of: 0, toByteOffset: 8, as: UInt64.self)
-      case 3:
-        rawBufPtr.storeBytes(of: 0, toByteOffset: 3, as: UInt8.self)
-        fallthrough
-      case 4:
-        rawBufPtr.storeBytes(of: 0, toByteOffset: 4, as: UInt32.self)
-        rawBufPtr.storeBytes(of: 0, toByteOffset: 8, as: UInt64.self)
-      case 5:
-        rawBufPtr.storeBytes(of: 0, toByteOffset: 5, as: UInt8.self)
-        fallthrough
-      case 6:
-        rawBufPtr.storeBytes(of: 0, toByteOffset: 6, as: UInt16.self)
-        rawBufPtr.storeBytes(of: 0, toByteOffset: 8, as: UInt64.self)
-      case 7:
-        rawBufPtr.storeBytes(of: 0, toByteOffset: 7, as: UInt8.self)
-        fallthrough
-      case 8:
-        rawBufPtr.storeBytes(of: 0, toByteOffset: 8, as: UInt64.self)
-      case 9:
-        rawBufPtr.storeBytes(of: 0, toByteOffset: 9, as: UInt8.self)
-        fallthrough
-      case 10:
-        rawBufPtr.storeBytes(of: 0, toByteOffset: 10, as: UInt16.self)
-        rawBufPtr.storeBytes(of: 0, toByteOffset: 12, as: UInt32.self)
-      case 11:
-        rawBufPtr.storeBytes(of: 0, toByteOffset: 11, as: UInt8.self)
-        fallthrough
-      case 12:
-        rawBufPtr.storeBytes(of: 0, toByteOffset: 12, as: UInt32.self)
-      case 13:
-        rawBufPtr.storeBytes(of: 0, toByteOffset: 13, as: UInt8.self)
-        fallthrough
-      case 14:
-        rawBufPtr.storeBytes(of: 0, toByteOffset: 14, as: UInt16.self)
-      case 15:
-        rawBufPtr.storeBytes(of: 0, toByteOffset: 15, as: UInt8.self)
-      default:
-        Builtin.unreachable()
-      }
-      return len
+    let len = try withUnsafeMutableBytes(of: &self._storage) {
+        (rawBufPtr: UnsafeMutableRawBufferPointer) -> Int in
+            try f(rawBufPtr)
     }
-    
-    if len == 0 {
-      self = _SmallString()
-      return
+
+    if len <= 0 {
+        self = _SmallString()
+        return
     }
-    
-    let (leading, trailing) = self.zeroTerminatedRawCodeUnits
-    self = _SmallString(leading: leading, trailing: trailing, count: len)
+    _internalInvariant(len <= _SmallString.capacity)
+    self._storage = zero(self._storage, from: len)
+    self = _SmallString(leading: _storage.0, trailing: _storage.1, count: len)
   }
 }
 
