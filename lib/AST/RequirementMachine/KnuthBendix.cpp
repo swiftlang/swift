@@ -157,66 +157,8 @@ RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
       return false;
     }
 
-    // If X == TUW for some W, then the critical pair is (TUW, TYV),
-    // and we have
-    // - lhs == (TUV => TUW)
-    // - rhs == (U => Y).
-    //
-    // We explicitly apply the rewrite step (Y => U) to the beginning of the
-    // rewrite path, transforming the critical pair to (TYW, TYV).
-    //
-    // In particular, if V == W.[P] for some protocol P, then we in fact have
-    // a property rule and a same-type rule:
-    //
-    // - lhs == (TUW.[P] => TUW)
-    // - rhs == (U => Y)
-    //
-    // Without this hack, the critical pair would be:
-    //
-    // (TUW => TYW.[P])
-    //
-    // With this hack, the critical pair becomes:
-    //
-    // (TYW.[P] => TYW)
-    //
-    // This ensures that the newly-added rule is itself a property rule;
-    // otherwise, this would only be the case if addRule() reduced TUW
-    // into TYW without immediately reducing some subterm of TUW first.
-    //
-    // While completion will eventually simplify all such rules down into
-    // property rules, their existence in the first place breaks subtle
-    // invariants in the minimal conformances algorithm, which expects
-    // homotopy generators describing redundant protocol conformance rules
-    // to have a certain structure.
-    if (t.size() + rhs.getLHS().size() <= x.size() &&
-        std::equal(rhs.getLHS().begin(),
-                   rhs.getLHS().end(),
-                   x.begin() + t.size())) {
-      // We have a path from TUW to TYV. Invert to get a path from TYV to
-      // TUW.
-      path.invert();
-
-      // Compute the term W.
-      MutableTerm w(x.begin() + t.size() + rhs.getLHS().size(), x.end());
-
-      // Now add a rewrite step T.(U => Y).W to get a path from TYV to
-      // TYW.
-      path.add(RewriteStep::forRewriteRule(/*startOffset=*/t.size(),
-                                           /*endOffset=*/w.size(),
-                                           getRuleID(rhs),
-                                           /*inverse=*/false));
-
-      // Compute the term TYW.
-      MutableTerm tyw(t);
-      tyw.append(rhs.getRHS());
-      tyw.append(w);
-
-      // Add the pair (TYV, TYW).
-      pairs.emplace_back(tyv, tyw, path);
-    } else {
-      // Add the pair (X, TYV).
-      pairs.emplace_back(x, tyv, path);
-    }
+    // Add the pair (X, TYV).
+    pairs.emplace_back(x, tyv, path);
   } else {
     // lhs == TU -> X, rhs == UV -> Y.
 
@@ -270,56 +212,8 @@ RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
       return false;
     }
 
-    // If Y == UW for some W, then the critical pair is (XV, TUW),
-    // and we have
-    // - lhs == (TU -> X)
-    // - rhs == (UV -> UW).
-    //
-    // We explicitly apply the rewrite step (TU => X) to the rewrite path,
-    // transforming the critical pair to (XV, XW).
-    //
-    // In particular, if T == X, U == [P] for some protocol P, and
-    // V == W.[p] for some property symbol p, then we in fact have a pair
-    // of property rules:
-    //
-    // - lhs == (T.[P] => T)
-    // - rhs == ([P].W.[p] => [P].W)
-    //
-    // Without this hack, the critical pair would be:
-    //
-    // (T.W.[p] => T.[P].W)
-    //
-    // With this hack, the critical pair becomes:
-    //
-    // (T.W.[p] => T.W)
-    //
-    // This ensures that the newly-added rule is itself a property rule;
-    // otherwise, this would only be the case if addRule() reduced T.[P].W
-    // into T.W without immediately reducing some subterm of T first.
-    //
-    // While completion will eventually simplify all such rules down into
-    // property rules, their existence in the first place breaks subtle
-    // invariants in the minimal conformances algorithm, which expects
-    // homotopy generators describing redundant protocol conformance rules
-    // to have a certain structure.
-    if (lhs.getLHS().size() <= ty.size() &&
-        std::equal(lhs.getLHS().begin(),
-                   lhs.getLHS().end(),
-                   ty.begin())) {
-      unsigned endOffset = ty.size() - lhs.getLHS().size();
-      path.add(RewriteStep::forRewriteRule(/*startOffset=*/0,
-                                           endOffset,
-                                           getRuleID(lhs),
-                                           /*inverse=*/false));
-
-      // Compute the term XW.
-      MutableTerm xw(lhs.getRHS());
-      xw.append(ty.end() - endOffset, ty.end());
-
-      pairs.emplace_back(xv, xw, path);
-    } else {
-      pairs.emplace_back(xv, ty, path);
-    }
+    // Add the pair (XV, TY).
+    pairs.emplace_back(xv, ty, path);
   }
 
   return true;
@@ -347,7 +241,7 @@ RewriteSystem::computeConfluentCompletion(unsigned maxRuleCount,
   assert(!Minimized);
   assert(!Frozen);
 
-  // Complete might already be set, if we're re-running completion after
+  // 'Complete' might already be set, if we're re-running completion after
   // adding new rules in the property map's concrete type unification procedure.
   Complete = 1;
 
@@ -359,7 +253,7 @@ RewriteSystem::computeConfluentCompletion(unsigned maxRuleCount,
   do {
     ruleCount = Rules.size();
 
-    // For every rule, looking for other rules that overlap with this rule.
+    // For every rule, look for other rules that overlap with this rule.
     for (unsigned i = FirstLocalRule, e = Rules.size(); i < e; ++i) {
       const auto &lhs = getRule(i);
       if (lhs.isLHSSimplified() ||
