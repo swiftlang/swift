@@ -371,8 +371,20 @@ private:
 
   void performHomotopyReduction(EliminationPredicate isRedundantRuleFn);
 
+public:
+  // Utilities for minimal conformances algorithm, defined in
+  // MinimalConformances.cpp.
+
+  void decomposeTermIntoConformanceRuleLeftHandSides(
+      MutableTerm term,
+      SmallVectorImpl<unsigned> &result) const;
+  void decomposeTermIntoConformanceRuleLeftHandSides(
+      MutableTerm term, unsigned ruleID,
+      SmallVectorImpl<unsigned> &result) const;
+
+private:
   void computeMinimalConformances(
-      llvm::DenseSet<unsigned> &redundantConformances);
+      llvm::DenseSet<unsigned> &redundantConformances) const;
 
 public:
   void recordRewriteLoop(MutableTerm basepoint,

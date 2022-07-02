@@ -192,12 +192,6 @@ class MinimalConformances {
   // minimization domain.
   llvm::DenseSet<unsigned> &RedundantConformances;
 
-  void decomposeTermIntoConformanceRuleLeftHandSides(
-      MutableTerm term,
-      SmallVectorImpl<unsigned> &result) const;
-  void decomposeTermIntoConformanceRuleLeftHandSides(
-      MutableTerm term, unsigned ruleID,
-      SmallVectorImpl<unsigned> &result) const;
 
   bool isConformanceRuleRecoverable(
     llvm::SmallDenseSet<unsigned, 4> &visited,
@@ -252,7 +246,7 @@ public:
 ///
 /// The term should be irreducible, except for a protocol symbol at the end.
 void
-MinimalConformances::decomposeTermIntoConformanceRuleLeftHandSides(
+RewriteSystem::decomposeTermIntoConformanceRuleLeftHandSides(
     MutableTerm term, SmallVectorImpl<unsigned> &result) const {
   assert(term.back().getKind() == Symbol::Kind::Protocol);
 
@@ -260,10 +254,10 @@ MinimalConformances::decomposeTermIntoConformanceRuleLeftHandSides(
   // reduces to T in a single step, via a rule V.[P] => V, where
   // T == U.V.
   RewritePath steps;
-  bool simplified = System.simplify(term, &steps);
+  bool simplified = simplify(term, &steps);
   if (!simplified) {
     llvm::errs() << "Term does not conform to protocol: " << term << "\n";
-    System.dump(llvm::errs());
+    dump(llvm::errs());
     abort();
   }
 
@@ -273,7 +267,7 @@ MinimalConformances::decomposeTermIntoConformanceRuleLeftHandSides(
   const auto &step = *steps.begin();
 
 #ifndef NDEBUG
-  const auto &rule = System.getRule(step.getRuleID());
+  const auto &rule = getRule(step.getRuleID());
   assert(rule.isAnyConformanceRule());
   assert(!rule.isIdentityConformanceRule());
 #endif
@@ -296,13 +290,13 @@ MinimalConformances::decomposeTermIntoConformanceRuleLeftHandSides(
 }
 
 /// Given a term U and a rule (V.[P] => V), write U.[domain(V)] as a
-/// product of left hand sdies of conformance rules. The term U should
+/// product of left hand sides of conformance rules. The term U should
 /// be irreducible.
 void
-MinimalConformances::decomposeTermIntoConformanceRuleLeftHandSides(
+RewriteSystem::decomposeTermIntoConformanceRuleLeftHandSides(
     MutableTerm term, unsigned ruleID,
     SmallVectorImpl<unsigned> &result) const {
-  const auto &rule = System.getRule(ruleID);
+  const auto &rule = getRule(ruleID);
   assert(rule.isAnyConformanceRule());
   assert(!rule.isIdentityConformanceRule());
 
@@ -416,7 +410,8 @@ void MinimalConformances::collectConformanceRules() {
       mutTerm.add(Symbol::forProtocol(parentProto, Context));
 
       // Get a conformance path for X.[P] and record it.
-      decomposeTermIntoConformanceRuleLeftHandSides(mutTerm, ParentPaths[ruleID]);
+      System.decomposeTermIntoConformanceRuleLeftHandSides(
+          mutTerm, ParentPaths[ruleID]);
     }
   }
 
@@ -604,8 +599,8 @@ void MinimalConformances::computeCandidateConformancePaths() {
 
         // Write U'.[domain(V)] as a product of left hand sides of protocol
         // conformance rules.
-        decomposeTermIntoConformanceRuleLeftHandSides(term, pair.second,
-                                                      conformancePath);
+        System.decomposeTermIntoConformanceRuleLeftHandSides(
+            term, pair.second, conformancePath);
 
         // This decomposition defines a conformance access path for each
         // conformance rule we saw in empty context.
@@ -947,7 +942,7 @@ void MinimalConformances::dumpMinimalConformances(
 /// already eliminated all redundant rewrite rules that are not
 /// conformance rules.
 void RewriteSystem::computeMinimalConformances(
-    llvm::DenseSet<unsigned> &redundantConformances) {
+    llvm::DenseSet<unsigned> &redundantConformances) const {
   MinimalConformances builder(*this, redundantConformances);
 
   builder.collectConformanceRules();
