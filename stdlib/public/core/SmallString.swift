@@ -245,11 +245,11 @@ extension _SmallString {
     let len = try withUnsafeMutableBytes(of: &tmp) {
       (rawBufPtr: UnsafeMutableRawBufferPointer) -> Int in
       let len = try f(rawBufPtr)
-      
+
       if len <= 0 {
         return 0
       }
-      
+
       _internalInvariant(len <= _SmallString.capacity)
       
       self._storage = (0, 0)
@@ -261,12 +261,12 @@ extension _SmallString {
       }
       return len
     }
-    
+
     if len == 0 {
       self = _SmallString()
       return
     }
-    
+
     let (leading, trailing) = self.zeroTerminatedRawCodeUnits
     self = _SmallString(leading: leading, trailing: trailing, count: len)
   }
