@@ -3711,3 +3711,73 @@ internal func _instantiateKeyPathBuffer(
   }
 }
 
+@_silgen_name("swift_keypath_dladdr")
+internal func keypath_dladdr(_: UnsafeRawPointer) -> UnsafePointer<CChar>
+
+fileprivate func dynamicLibraryAddress(of pointer: UnsafeRawPointer) -> String {
+    String(cString: keypath_dladdr(pointer))
+}
+
+extension KeyPath: CustomDebugStringConvertible {
+        
+    public var debugDescription: String {
+        // TODO: For perf, we could use a local growable buffer instead of Any (see comment above)
+        var description = "\\\(String(describing: Root.self))."
+        return withBuffer {
+            var buffer = $0
+            if buffer.data.isEmpty {
+                _internalInvariantFailure("key path has no components")
+                return description
+            }
+            while true {
+                let (rawComponent, optNextType) = buffer.next()
+                let valueType = optNextType ?? Value.self
+                let isLast = optNextType == nil
+                func name(for offset: Int) -> String {
+                    let count = _getRecursiveChildCount(valueType)
+                    for i in 0..<count {
+                        if _getChildOffset(
+                            valueType,
+                            index: i
+                        ) == offset {
+                            var field = _FieldReflectionMetadata()
+                            _ = _getChildMetadata(
+                                valueType,
+                                index: i,
+                                fieldMetadata: &field
+                            )
+                            defer {
+                                field.freeFunc?(field.name)
+                            }
+                            return String(cString: field.name)
+                        }
+                    }
+                    _internalInvariantFailure("Type Metadata doesn't have  a field with an offset matching the one in this keypath segment")
+                    return ""
+                }
+                func name(for pointer: UnsafeRawPointer) -> String {
+                    dynamicLibraryAddress(of: pointer)
+                }
+                switch rawComponent.value {
+                case .class(let offset):
+                    description.append(name(for: offset))
+                case .get(_, let accessors, let argument):
+                    description.append(name(for: accessors.getterPtr))
+                case .mutatingGetSet(_, let accessors, _):
+                    description.append(name(for: accessors.getterPtr))
+                case .nonmutatingGetSet(_, let accessors, let argument):
+                    description.append(name(for: accessors.getterPtr))
+                case .optionalChain, .optionalWrap:
+                    description.append("?")
+                case .optionalForce:
+                    description.append("!")
+                case .struct(let offset):
+                    description.append(name(for: offset))
+                }
+                description.append(".")
+            }
+            return description
+        }
+    }
+    
+}

@@ -1118,6 +1118,17 @@ const char *swift_OpaqueSummary(const Metadata *T) {
   }
 }
 
+#include <dlfcn.h>
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
+const char *swift_keypath_dladdr(void *address) {
+    Dl_info dlinfo;
+    if (dladdr(address, &dlinfo) == 0) {
+      return 0;
+    }
+    return dlinfo.dli_sname;
+}
+
 #if SWIFT_OBJC_INTEROP
 // func _getQuickLookObject<T>(_: T) -> AnyObject?
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
