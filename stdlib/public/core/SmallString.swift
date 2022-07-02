@@ -241,34 +241,31 @@ extension _SmallString {
   fileprivate mutating func withMutableCapacity(
     _ f: (UnsafeMutableRawBufferPointer) throws -> Int
   ) rethrows {
-    var tmp = self._storage
-    let len = try withUnsafeMutableBytes(of: &tmp) {
-      (rawBufPtr: UnsafeMutableRawBufferPointer) -> Int in
-      let len = try f(rawBufPtr)
+    let len = try withUnsafeMutableBytes(of: &_storage, f)
 
-      if len <= 0 {
-        return 0
-      }
-
-      _internalInvariant(len <= _SmallString.capacity)
-      
-      self._storage = (0, 0)
-      withUnsafeMutablePointer(to: &self._storage) {
-        UnsafeMutableRawPointer($0).copyMemory(
-          from: rawBufPtr.baseAddress._unsafelyUnwrappedUnchecked,
-          byteCount: len
-        )
-      }
-      return len
-    }
-
-    if len == 0 {
+    if len <= 0 {
       self = _SmallString()
       return
     }
+    zeroTrailingBytes(of: &_storage, from: len)
+    self = _SmallString(leading: _storage.0, trailing: _storage.1, count: len)
+  }
+}
 
-    let (leading, trailing) = self.zeroTerminatedRawCodeUnits
-    self = _SmallString(leading: leading, trailing: trailing, count: len)
+@inline(__always)
+private func zeroTrailingBytes(
+  of storage: inout _SmallString.RawBitPattern, from len: Int
+) {
+  _internalInvariant(len > 0)
+  _internalInvariant(len <= _SmallString.capacity)
+  if len <= 0 {
+    storage.0 = 0
+    storage.1 = 0
+  } else if len <= 8 {
+    storage.0 &= ((~0) &>> (8 &* (8 &- len)))
+    storage.1 = 0
+  } else {
+    storage.1 &= ((~0) &>> (8 &* (16 &- len)))
   }
 }
 
