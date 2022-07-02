@@ -4723,9 +4723,10 @@ public:
         storageTy->getCaptureType());
   }
 
-  void visitSILMoveOnlyType(const SILMoveOnlyType *moveOnlyTy) {
+  void visitSILMoveOnlyWrappedType(const SILMoveOnlyWrappedType *moveOnlyTy) {
     using namespace decls_block;
-    serializeSimpleWrapper<SILMoveOnlyTypeLayout>(moveOnlyTy->getInnerType());
+    serializeSimpleWrapper<SILMoveOnlyWrappedTypeLayout>(
+        moveOnlyTy->getInnerType());
   }
 
   void visitSILBoxType(const SILBoxType *boxTy) {

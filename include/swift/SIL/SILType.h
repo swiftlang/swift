@@ -607,7 +607,7 @@ public:
   /// Canonical way to check if a SILType is move only. Using is/getAs/castTo
   /// will look through moveonly-ness.
   bool isMoveOnlyWrapped() const {
-    return getRawASTType()->is<SILMoveOnlyType>();
+    return getRawASTType()->is<SILMoveOnlyWrappedType>();
   }
 
   /// If this is already a move only wrapped type, return *this. Otherwise, wrap
@@ -615,7 +615,7 @@ public:
   SILType addingMoveOnlyWrapper() const {
     if (isMoveOnlyWrapped())
       return *this;
-    auto newType = SILMoveOnlyType::get(getRawASTType());
+    auto newType = SILMoveOnlyWrappedType::get(getRawASTType());
     return SILType::getPrimitiveType(newType, getCategory());
   }
 
@@ -624,7 +624,7 @@ public:
   SILType removingMoveOnlyWrapper() const {
     if (!isMoveOnlyWrapped())
       return *this;
-    auto moveOnly = getRawASTType()->castTo<SILMoveOnlyType>();
+    auto moveOnly = getRawASTType()->castTo<SILMoveOnlyWrappedType>();
     return SILType::getPrimitiveType(moveOnly->getInnerType(), getCategory());
   }
 

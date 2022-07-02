@@ -1208,7 +1208,7 @@ namespace decls_block {
     TypeIDField // capture type
   );
 
-  TYPE_LAYOUT(SILMoveOnlyTypeLayout,
+  TYPE_LAYOUT(SILMoveOnlyWrappedTypeLayout,
     SIL_MOVE_ONLY_TYPE,
     TypeIDField            // inner type
   );

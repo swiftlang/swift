@@ -1,4 +1,4 @@
-//===--- SILMoveOnlyTypeEliminator.cpp ------------------------------------===//
+//===--- SILMoveOnlyWrappedTypeEliminator.cpp -----------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -47,11 +47,11 @@ using namespace swift;
 
 namespace {
 
-struct SILMoveOnlyTypeEliminatorVisitor
-    : SILInstructionVisitor<SILMoveOnlyTypeEliminatorVisitor, bool> {
+struct SILMoveOnlyWrappedTypeEliminatorVisitor
+    : SILInstructionVisitor<SILMoveOnlyWrappedTypeEliminatorVisitor, bool> {
   const SmallSetVector<SILArgument *, 8> &touchedArgs;
 
-  SILMoveOnlyTypeEliminatorVisitor(
+  SILMoveOnlyWrappedTypeEliminatorVisitor(
       const SmallSetVector<SILArgument *, 8> &touchedArgs)
       : touchedArgs(touchedArgs) {}
 
@@ -194,11 +194,11 @@ struct SILMoveOnlyTypeEliminatorVisitor
 
 namespace {
 
-struct SILMoveOnlyTypeEliminator {
+struct SILMoveOnlyWrappedTypeEliminator {
   SILFunction *fn;
   bool trivialOnly;
 
-  SILMoveOnlyTypeEliminator(SILFunction *fn, bool trivialOnly)
+  SILMoveOnlyWrappedTypeEliminator(SILFunction *fn, bool trivialOnly)
       : fn(fn), trivialOnly(trivialOnly) {}
 
   bool process();
@@ -206,7 +206,7 @@ struct SILMoveOnlyTypeEliminator {
 
 } // namespace
 
-bool SILMoveOnlyTypeEliminator::process() {
+bool SILMoveOnlyWrappedTypeEliminator::process() {
   bool madeChange = true;
 
   SmallSetVector<SILArgument *, 8> touchedArgs;
@@ -258,7 +258,7 @@ bool SILMoveOnlyTypeEliminator::process() {
     }
   }
 
-  SILMoveOnlyTypeEliminatorVisitor visitor(touchedArgs);
+  SILMoveOnlyWrappedTypeEliminatorVisitor visitor(touchedArgs);
   while (!touchedInsts.empty()) {
     visitor.visit(touchedInsts.pop_back_val());
   }
@@ -272,10 +272,10 @@ bool SILMoveOnlyTypeEliminator::process() {
 
 namespace {
 
-struct SILMoveOnlyTypeEliminatorPass : SILFunctionTransform {
+struct SILMoveOnlyWrappedTypeEliminatorPass : SILFunctionTransform {
   bool trivialOnly;
 
-  SILMoveOnlyTypeEliminatorPass(bool trivialOnly)
+  SILMoveOnlyWrappedTypeEliminatorPass(bool trivialOnly)
       : SILFunctionTransform(), trivialOnly(trivialOnly) {}
 
   void run() override {
@@ -289,7 +289,8 @@ struct SILMoveOnlyTypeEliminatorPass : SILFunctionTransform {
     assert(fn->getModule().getStage() == SILStage::Raw &&
            "Should only run on Raw SIL");
 
-    if (SILMoveOnlyTypeEliminator(getFunction(), trivialOnly).process()) {
+    if (SILMoveOnlyWrappedTypeEliminator(getFunction(), trivialOnly)
+            .process()) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }
   }
@@ -298,9 +299,9 @@ struct SILMoveOnlyTypeEliminatorPass : SILFunctionTransform {
 } // anonymous namespace
 
 SILTransform *swift::createTrivialMoveOnlyTypeEliminator() {
-  return new SILMoveOnlyTypeEliminatorPass(true /*trivial only*/);
+  return new SILMoveOnlyWrappedTypeEliminatorPass(true /*trivial only*/);
 }
 
 SILTransform *swift::createMoveOnlyTypeEliminator() {
-  return new SILMoveOnlyTypeEliminatorPass(false /*trivial only*/);
+  return new SILMoveOnlyWrappedTypeEliminatorPass(false /*trivial only*/);
 }
