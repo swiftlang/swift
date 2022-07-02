@@ -103,10 +103,8 @@ template <typename... ArgTypes>
 InFlightDiagnostic
 FailureDiagnostic::emitDiagnosticAt(ArgTypes &&... Args) const {
   auto &DE = getASTContext().Diags;
-  auto behavior = isWarning ? DiagnosticBehavior::Warning
-                            : DiagnosticBehavior::Unspecified;
   return std::move(DE.diagnose(std::forward<ArgTypes>(Args)...)
-                     .limitBehavior(behavior));
+                     .limitBehavior(behaviorLimit));
 }
 
 Expr *FailureDiagnostic::findParentExpr(const Expr *subExpr) const {
