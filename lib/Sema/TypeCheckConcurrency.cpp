@@ -544,6 +544,10 @@ static bool isSendableClosure(
     if (forActorIsolation && explicitClosure->inheritsActorContext()) {
       return false;
     }
+
+    if (explicitClosure->isIsolatedByPreconcurrency() &&
+        !shouldDiagnoseExistingDataRaces(closure->getParent()))
+      return false;
   }
 
   if (auto type = closure->getType()) {
@@ -4032,11 +4036,18 @@ bool swift::contextRequiresStrictConcurrencyChecking(
 
   while (!dc->isModuleScopeContext()) {
     if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
-      // A closure with an explicit global actor or nonindependent
+      // A closure with an explicit global actor, async, or Sendable
       // uses concurrency features.
       if (auto explicitClosure = dyn_cast<ClosureExpr>(closure)) {
         if (getExplicitGlobalActor(const_cast<ClosureExpr *>(explicitClosure)))
           return true;
+
+        // Don't take any more cues if this only got its type information by
+        // being provided to a `@preconcurrency` operation.
+        if (explicitClosure->isIsolatedByPreconcurrency()) {
+          dc = dc->getParent();
+          continue;
+        }
 
         if (auto type = getType(closure)) {
           if (auto fnType = type->getAs<AnyFunctionType>())
@@ -4641,7 +4652,7 @@ static AnyFunctionType *applyUnsafeConcurrencyToFunctionType(
     if (addSendable || addMainActor) {
       newParamType = applyUnsafeConcurrencyToParameterType(
         param.getPlainType(), addSendable, addMainActor);
-    } else if (stripConcurrency) {
+    } else if (stripConcurrency && numApplies == 0) {
       newParamType = param.getPlainType()->stripConcurrency(
           /*recurse=*/false, /*dropGlobalActor=*/numApplies == 0);
     }

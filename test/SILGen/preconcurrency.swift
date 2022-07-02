@@ -14,8 +14,8 @@ func testModuleMethodWithSendable(any: Any) {
 
   // CHECK: function_ref @$s14preconcurrency1fyyypF : $@convention(thin) (@in_guaranteed Sendable) -> ()
   let _ = preconcurrency.f
-  // f(any)
-  // preconcurrency.f(any)
+  f(any)
+  preconcurrency.f(any)
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s14preconcurrency30testInstanceMethodWithSendable1c3anyyAA1CC_yptF : $@convention(thin) (@guaranteed C, @in_guaranteed Any) -> () {
@@ -25,5 +25,5 @@ func testInstanceMethodWithSendable(c: C, any: Any) {
   let _ = c.f
   let _ = C.f
   let _ = C.g
-//  c.f(any)
+  c.f(any)
 }
