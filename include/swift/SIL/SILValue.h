@@ -563,7 +563,7 @@ public:
   /// otherwise.
   ///
   /// NOTE: Please do not use this directly! It is only meant to be used by the
-  /// optimizer pass: SILMoveOnlyTypeEliminator.
+  /// optimizer pass: SILMoveOnlyWrappedTypeEliminator.
   bool unsafelyEliminateMoveOnlyWrapper() {
     if (!Type.isMoveOnlyWrapped())
       return false;
