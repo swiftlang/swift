@@ -1944,8 +1944,9 @@ namespace {
                                           DynamicMetadataRequest request) {
       llvm_unreachable("should not be asking for metadata of a SILToken type");
     }
-    MetadataResponse visitSILMoveOnlyType(CanSILMoveOnlyType type,
-                                          DynamicMetadataRequest request) {
+    MetadataResponse
+    visitSILMoveOnlyWrappedType(CanSILMoveOnlyWrappedType type,
+                                DynamicMetadataRequest request) {
       llvm_unreachable("should not be asking for metadata of a move only type");
     }
     MetadataResponse visitArchetypeType(CanArchetypeType type,

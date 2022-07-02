@@ -694,9 +694,9 @@ namespace {
           type, getReferenceRecursiveProperties(isSensitive));
     }
 
-    RetTy visitSILMoveOnlyType(CanSILMoveOnlyType type,
-                               AbstractionPattern origType,
-                               IsTypeExpansionSensitive_t isSensitive) {
+    RetTy visitSILMoveOnlyWrappedType(CanSILMoveOnlyWrappedType type,
+                                      AbstractionPattern origType,
+                                      IsTypeExpansionSensitive_t isSensitive) {
       AbstractionPattern innerAbstraction = origType.removingMoveOnlyWrapper();
       CanType innerType = type->getInnerType();
       auto &lowering =

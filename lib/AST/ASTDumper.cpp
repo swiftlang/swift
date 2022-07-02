@@ -3935,7 +3935,8 @@ namespace {
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
-    void visitSILMoveOnlyType(SILMoveOnlyType *T, StringRef label) {
+    void visitSILMoveOnlyWrappedType(SILMoveOnlyWrappedType *T,
+                                     StringRef label) {
       printCommon(label, "sil_move_only_type");
       printRec(T->getInnerType());
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
