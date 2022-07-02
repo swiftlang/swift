@@ -2323,17 +2323,32 @@ bool ContextualFailure::diagnoseAsError() {
   auto toType = getToType();
 
   Diag<Type, Type> diagnostic;
-  switch (path.back().getKind()) {
+
+  const auto lastPathEltKind = path.back().getKind();
+  switch (lastPathEltKind) {
   case ConstraintLocator::ClosureBody:
   case ConstraintLocator::ClosureResult: {
     auto *closure = castToExpr<ClosureExpr>(getRawAnchor());
     if (closure->hasExplicitResultType() &&
         closure->getExplicitResultTypeRepr()) {
       auto resultRepr = closure->getExplicitResultTypeRepr();
-      emitDiagnosticAt(resultRepr->getStartLoc(),
-                       diag::incorrect_explicit_closure_result, fromType,
-                       toType)
-          .fixItReplace(resultRepr->getSourceRange(), toType.getString());
+
+      if (lastPathEltKind == ConstraintLocator::ClosureBody) {
+        // The conflict is between the return type and the declared result type.
+        emitDiagnosticAt(resultRepr->getStartLoc(),
+                         diag::incorrect_explicit_closure_result_vs_return_type,
+                         toType, fromType)
+            .fixItReplace(resultRepr->getSourceRange(), fromType.getString());
+      } else {
+        // The conflict is between the declared result type and the
+        // contextual type.
+        emitDiagnosticAt(
+            resultRepr->getStartLoc(),
+            diag::incorrect_explicit_closure_result_vs_contextual_type,
+            fromType, toType)
+            .fixItReplace(resultRepr->getSourceRange(), toType.getString());
+      }
+
       return true;
     }
 
