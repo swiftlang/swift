@@ -699,17 +699,8 @@ sil @$ss23_ContiguousArrayStorageCfD : $@convention(method) <Element> (@owned _C
 bb0(%0 : $_ContiguousArrayStorage<Element>):
   %1 = ref_tail_addr %0 : $_ContiguousArrayStorage<Element>, $Element
   %2 = address_to_pointer %1 : $*Element to $Builtin.RawPointer
-  %3 = upcast %0 : $_ContiguousArrayStorage<Element> to $__ContiguousArrayStorageBase
-  %4 = ref_element_addr %3 : $__ContiguousArrayStorageBase, #__ContiguousArrayStorageBase.countAndCapacity
-  %5 = struct_element_addr %4 : $*_ArrayBody, #_ArrayBody._storage
-  %6 = struct_element_addr %5 : $*_SwiftArrayBodyStorage, #_SwiftArrayBodyStorage.count
-  %7 = struct_element_addr %6 : $*Int, #Int._value
-  %8 = load %7 : $*Builtin.Int64
-  %9 = builtin "assumeNonNegative_Int64"(%8 : $Builtin.Int64) : $Builtin.Int64
   %10 = metatype $@thick Element.Type
-  %11 = builtin "truncOrBitCast_Int64_Word"(%9 : $Builtin.Int64) : $Builtin.Word
-  %12 = builtin "destroyArray"<Element>(%10 : $@thick Element.Type, %2 : $Builtin.RawPointer, %11 : $Builtin.Word) : $()
-  fix_lifetime %0 : $_ContiguousArrayStorage<Element>
+  %12 = builtin "destroyArray"<Element>(%10 : $@thick Element.Type, %2 : $Builtin.RawPointer, undef : $Builtin.Word) : $()
   dealloc_ref %0 : $_ContiguousArrayStorage<Element>
   %15 = tuple ()
   return %15 : $()

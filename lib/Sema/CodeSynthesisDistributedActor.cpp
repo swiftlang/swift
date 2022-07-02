@@ -670,8 +670,13 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
   auto &C = func->getASTContext();
   auto DC = func->getDeclContext();
 
-  auto systemTy = getConcreteReplacementForProtocolActorSystemType(func);
-  assert(systemTy &&
+  // NOTE: So we don't need a thunk in the protocol, we should call the underlying
+  // thing instead, which MUST have a thunk, since it must be a distributed func as well...
+  if (dyn_cast<ProtocolDecl>(DC)) {
+    return nullptr;
+  }
+
+  assert(getConcreteReplacementForProtocolActorSystemType(func) &&
          "Thunk synthesis must have concrete actor system type available");
 
   DeclName thunkName;
@@ -725,18 +730,20 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
   }
   ParameterList *params = ParameterList::create(C, paramDecls); // = funcParams->clone(C);
 
-  auto thunk = FuncDecl::createImplicit(
+  FuncDecl *thunk = FuncDecl::createImplicit(
       C, swift::StaticSpellingKind::None, thunkName, SourceLoc(),
-      /*async=*/true, /*throws=*/true,
-      genericParamList, params,
+      /*async=*/true, /*throws=*/true, genericParamList, params,
       func->getResultInterfaceType(), DC);
+
+  assert(thunk && "couldn't create a distributed thunk");
+
   thunk->setSynthesized(true);
+  thunk->setDistributedThunk(true);
   thunk->getAttrs().add(new (C) NonisolatedAttr(/*isImplicit=*/true));
 
   if (isa<ClassDecl>(DC))
     thunk->getAttrs().add(new (C) FinalAttr(/*isImplicit=*/true));
 
-  thunk->getAttrs().add(new (C) DistributedThunkAttr(/*isImplicit=*/true));
   thunk->setGenericSignature(baseSignature);
   thunk->copyFormalAccessFrom(func, /*sourceIsParentContext=*/false);
   thunk->setBodySynthesizer(deriveBodyDistributed_thunk, func);
@@ -819,14 +826,18 @@ addDistributedActorCodableConformance(
 FuncDecl *GetDistributedThunkRequest::evaluate(Evaluator &evaluator,
                                                Originator originator) const {
   AbstractFunctionDecl *distributedTarget = nullptr;
-  if (auto *var = originator.dyn_cast<VarDecl *>()) {
-    if (!var->isDistributed())
+  if (auto *storage = originator.dyn_cast<AbstractStorageDecl *>()) {
+    if (!storage->isDistributed())
       return nullptr;
 
-    if (checkDistributedActorProperty(var, /*diagnose=*/false))
-      return nullptr;
+    if (auto *var = dyn_cast<VarDecl>(storage)) {
+      if (checkDistributedActorProperty(var, /*diagnose=*/false))
+        return nullptr;
 
-    distributedTarget = var->getAccessor(AccessorKind::Get);
+      distributedTarget = var->getAccessor(AccessorKind::Get);
+    } else {
+      llvm_unreachable("unsupported storage kind");
+    }
   } else {
     distributedTarget = originator.get<AbstractFunctionDecl *>();
     if (!distributedTarget->isDistributed())
@@ -836,7 +847,6 @@ FuncDecl *GetDistributedThunkRequest::evaluate(Evaluator &evaluator,
   assert(distributedTarget);
 
   auto &C = distributedTarget->getASTContext();
-  auto DC = distributedTarget->getDeclContext();
 
   if (!getConcreteReplacementForProtocolActorSystemType(distributedTarget)) {
     // Don't synthesize thunks, unless there is a *concrete* ActorSystem.
@@ -860,9 +870,6 @@ FuncDecl *GetDistributedThunkRequest::evaluate(Evaluator &evaluator,
     // we won't be emitting the offending decl after all.
     if (!C.getLoadedModule(C.Id_Distributed))
       return nullptr;
-
-    auto nominal = DC->getSelfNominalTypeDecl(); // NOTE: Always from DC
-    assert(nominal);
 
     // --- Prepare the "distributed thunk" which does the "maybe remote" dance:
     return createDistributedThunkFunction(func);

@@ -456,7 +456,10 @@ def full_target_name(repository, target):
     raise RuntimeError('Cannot determine if %s is a branch or a tag' % target)
 
 
-def skip_list_for_platform(config):
+def skip_list_for_platform(config, all_repos):
+    if all_repos:
+        return []  # Do not skip any platform-specific repositories
+
     # If there is a platforms key only include the repo if the
     # plaform is in the list
     skip_list = []
@@ -504,6 +507,11 @@ repositories.
         help="Skip the specified repository",
         dest='skip_repository_list',
         action="append")
+    parser.add_argument(
+        "--all-repositories",
+        help="""Includes repositories not required for current platform. 
+        This will not override '--skip-repositories'""",
+        action='store_true')
     parser.add_argument(
         "--scheme",
         help='Use branches from the specified branch-scheme. A "branch-scheme"'
@@ -578,6 +586,7 @@ repositories.
     skip_tags = args.skip_tags
     scheme = args.scheme
     github_comment = args.github_comment
+    all_repos = args.all_repositories
 
     with open(args.config) as f:
         config = json.load(f)
@@ -606,7 +615,7 @@ repositories.
         if scheme is None:
             scheme = config['default-branch-scheme']
 
-        skip_repo_list = skip_list_for_platform(config)
+        skip_repo_list = skip_list_for_platform(config, all_repos)
         skip_repo_list.extend(args.skip_repository_list)
         clone_results = obtain_all_additional_swift_sources(args, config,
                                                             clone_with_ssh,

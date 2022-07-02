@@ -28,4 +28,14 @@ struct Trivial {
   char test3(int, unsigned) { return 42; }
 };
 
+struct ReturnsNullableValue {
+  const int *returnPointer() { return nullptr; }
+};
+
+struct ReturnsNonNullValue {
+  const int *returnPointer() __attribute__((returns_nonnull)) {
+    return (int *)this;
+  }
+};
+
 #endif // TEST_INTEROP_CXX_CLASS_INPUTS_PROTOCOL_CONFORMANCE_H

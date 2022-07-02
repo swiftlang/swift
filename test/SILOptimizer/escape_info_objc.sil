@@ -4,6 +4,9 @@
 // REQUIRES: objc_interop
 // REQUIRES: PTRSIZE=64
 
+// Currently failing on arm: rdar://92963081
+// REQUIRES: CPU=x86_64
+
 sil_stage canonical
 
 import Builtin

@@ -240,6 +240,12 @@ public:
   }
   
   void forwardDeclare(const EnumDecl *ED) {
+    // TODO: skip for now; will overhaul the forward decals for c++ in the
+    // future
+    if (outputLangMode == swift::OutputLanguageMode::Cxx) {
+      return;
+    }
+
     assert(ED->isObjC() || ED->hasClangNode());
     
     forwardDeclare(ED, [&]{
@@ -433,8 +439,10 @@ public:
     bool allRequirementsSatisfied = true;
 
     for (auto proto : PD->getInheritedProtocols()) {
-      assert(proto->isObjC());
-      allRequirementsSatisfied &= require(proto);
+      if (printer.shouldInclude(proto)) {
+        assert(proto->isObjC());
+        allRequirementsSatisfied &= require(proto);
+      }
     }
 
     if (!allRequirementsSatisfied)
@@ -595,7 +603,9 @@ public:
       const Decl *D = declsToWrite.back();
       bool success = true;
 
-      if (outputLangMode == OutputLanguageMode::Cxx) {
+      if (auto ED = dyn_cast<EnumDecl>(D)) {
+        success = writeEnum(ED);
+      } else if (outputLangMode == OutputLanguageMode::Cxx) {
         if (auto FD = dyn_cast<FuncDecl>(D))
           success = writeFunc(FD);
         if (auto SD = dyn_cast<StructDecl>(D))
@@ -606,8 +616,6 @@ public:
           success = writeClass(CD);
         else if (auto PD = dyn_cast<ProtocolDecl>(D))
           success = writeProtocol(PD);
-        else if (auto ED = dyn_cast<EnumDecl>(D))
-          success = writeEnum(ED);
         else if (auto ED = dyn_cast<FuncDecl>(D))
           success = writeFunc(ED);
         else

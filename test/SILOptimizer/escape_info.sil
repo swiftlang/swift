@@ -2,8 +2,8 @@
 
 // REQUIRES: swift_in_compiler
 
-// rdar92963081
-// UNSUPPORTED: OS=linux-gnu
+// Currently failing on arm: rdar://92963081
+// REQUIRES: CPU=x86_64
 
 sil_stage canonical
 

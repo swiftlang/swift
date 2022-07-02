@@ -19,6 +19,15 @@ MoveOnlyTestSuite.test("MoveOnly") {
   expectEqual(x.test(), 42)
 }
 
+MoveOnlyTestSuite.test("NoCopyMove") {
+  var x = NoCopyMove.create()
+  expectEqual(x.test(), 42)
+  expectEqual(x.testMutable(), 42)
+
+  x = NoCopyMove.create()
+  expectEqual(x.test(), 42)
+}
+
 MoveOnlyTestSuite.test("PrivateCopyCtor") {
   var x = PrivateCopyCtor.create()
   expectEqual(x.test(), 42)

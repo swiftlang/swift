@@ -255,6 +255,7 @@ static StringRef getAccessSemanticsString(AccessSemantics value) {
     case AccessSemantics::Ordinary: return "ordinary";
     case AccessSemantics::DirectToStorage: return "direct_to_storage";
     case AccessSemantics::DirectToImplementation: return "direct_to_impl";
+    case AccessSemantics::DistributedThunk: return "distributed_thunk";
   }
 
   llvm_unreachable("Unhandled AccessSemantics in switch.");
@@ -1351,10 +1352,6 @@ void ValueDecl::dumpRef(raw_ostream &os) const {
 
   if (getAttrs().hasAttribute<KnownToBeLocalAttr>()) {
     os << " known-to-be-local";
-  }
-
-  if (getAttrs().hasAttribute<DistributedThunkAttr>()) {
-    os << " distributed-thunk";
   }
 
   // Print location.

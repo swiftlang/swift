@@ -77,3 +77,12 @@ cc(1) // Ok
 func SR12955() {
   let f: @convention(c) (T) -> Void // expected-error {{cannot find type 'T' in scope}}
 }
+
+// https://github.com/apple/swift/issues/42790
+do {
+  func foo<T>(block: () -> ()) -> T.Type { T.self } // expected-note {{in call to function 'foo(block:)'}}
+
+  let x = foo { // expected-error {{generic parameter 'T' could not be inferred}}
+    print("")
+  }
+}

@@ -201,6 +201,25 @@ bool swift::immediate::autolinkImportedModules(ModuleDecl *M,
 
   M->collectLinkLibraries(addLinkLibrary);
 
+  // Workaround for rdar://94645534.
+  //
+  // The framework layout of Foundation has changed in 13.0, causing unresolved symbol
+  // errors to libswiftFoundation in immediate mode when running on older OS versions
+  // with a 13.0 SDK. This workaround scans through the list of dependencies and
+  // manually adds libswiftFoundation if necessary.
+  auto &Target = M->getASTContext().LangOpts.Target;
+  if (Target.isMacOSX() && Target.getOSMajorVersion() < 13) {
+    bool linksFoundation = std::any_of(AllLinkLibraries.begin(),
+        AllLinkLibraries.end(), [](auto &Lib) {
+      return Lib.getName() == "Foundation";
+    });
+
+    if (linksFoundation) {
+      AllLinkLibraries.push_back(LinkLibrary("libswiftFoundation.dylib",
+                                             LibraryKind::Library));
+    }
+  }
+
   tryLoadLibraries(AllLinkLibraries, M->getASTContext().SearchPathOpts,
                    M->getASTContext().Diags);
   return false;

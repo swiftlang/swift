@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-experimental-opened-existential-types %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s | %FileCheck %s
 
 public protocol P { }
 

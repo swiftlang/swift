@@ -21,4 +21,10 @@
 -(void)myAsyncMethod:(void (^ _Nullable)(NSError * _Nullable, NSString * _Nullable))completionHandler;
 @end
 
+@interface Delegate (SwiftImpls)
+
+- (void)makeRequestFromSwift:(Request * _Nonnull)request completionHandler:(void (^ _Nullable)(void))handler;
+
+@end
+
 #endif

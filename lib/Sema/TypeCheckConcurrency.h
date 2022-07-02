@@ -427,7 +427,8 @@ Type adjustVarTypeForConcurrency(
 AnyFunctionType *adjustFunctionTypeForConcurrency(
     AnyFunctionType *fnType, ValueDecl *decl, DeclContext *dc,
     unsigned numApplies, bool isMainDispatchQueue,
-    llvm::function_ref<Type(const AbstractClosureExpr *)> getType);
+    llvm::function_ref<Type(const AbstractClosureExpr *)> getType,
+    llvm::function_ref<Type(Type)> openType);
 
 /// Determine whether the given name is that of a DispatchQueue operation that
 /// takes a closure to be executed on the queue.

@@ -2671,6 +2671,9 @@ namespace {
                                                  strategy.getWriteStrategy(),
                                                  typeData);
       }
+
+      case AccessStrategy::DispatchToDistributedThunk:
+        return asImpl().emitUsingDistributedThunk();
       }
       llvm_unreachable("unknown kind");
     }
@@ -2870,6 +2873,11 @@ void LValue::addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
       if (address.getType().is<ReferenceStorageType>())
         LV.add<OwnershipComponent>(typeData);
     }
+
+    void emitUsingDistributedThunk() {
+      llvm_unreachable("cannot dispatch non-member var via distributed thunk");
+    }
+
   } emitter(SGF, loc, var, subs, accessKind, formalRValueType, options,
             actorIso, *this);
 
@@ -3165,11 +3173,11 @@ static SGFAccessKind getBaseAccessKind(SILGenModule &SGM,
   }
 
   case AccessStrategy::DirectToAccessor:
-  case AccessStrategy::DispatchToAccessor: {
+  case AccessStrategy::DispatchToAccessor:
+  case AccessStrategy::DispatchToDistributedThunk: {
     auto accessor = member->getOpaqueAccessor(strategy.getAccessor());
     return getBaseAccessKindForAccessor(SGM, accessor, baseFormalType);
   }
-    
   }
   llvm_unreachable("bad access strategy");
 }
@@ -3375,6 +3383,19 @@ void LValue::addMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
         LV.add<OwnershipComponent>(typeData);
       }
     }
+
+    void emitUsingDistributedThunk() {
+      auto *var = cast<VarDecl>(Storage);
+      SILDeclRef accessor(var->getAccessor(AccessorKind::Get),
+                          SILDeclRef::Kind::Func,
+                          /*isForeign=*/false, /*isDistributed=*/true);
+
+      auto typeData = getLogicalStorageTypeData(
+          SGF.getTypeExpansionContext(), SGF.SGM, AccessKind, FormalRValueType);
+
+      asImpl().emitUsingGetterSetter(accessor, /*isDirect=*/true, typeData);
+    }
+
   } emitter(SGF, loc, var, subs, isSuper, accessKind,
             formalRValueType, options, *this,
             /*indices for diags*/ nullptr, /*indices*/ PreparedArguments(),
@@ -3549,6 +3570,10 @@ void LValue::addMemberSubscriptComponent(SILGenFunction &SGF, SILLocation loc,
 
     void emitUsingStorage(LValueTypeData typeData) {
       llvm_unreachable("subscripts never have storage");
+    }
+
+    void emitUsingDistributedThunk() {
+      llvm_unreachable("subscripts cannot be dispatch via distributed thunk");
     }
   } emitter(SGF, loc, decl, subs, isSuper, accessKind, formalRValueType,
             options, *this, argListForDiagnostics, std::move(indices),
@@ -3765,12 +3790,13 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc, SILValue addr,
                                       const TypeLowering &rvalueTL,
                                       SGFContext C, IsTake_t isTake,
                                       bool isAddrGuaranteed) {
+  SILType addrType = addr->getType();
   // Get the lowering for the address type.  We can avoid a re-lookup
   // in the very common case of this being equivalent to the r-value
   // type.
-  auto &addrTL =
-    (addr->getType() == rvalueTL.getLoweredType().getAddressType()
-       ? rvalueTL : getTypeLowering(addr->getType()));
+  auto &addrTL = (addrType == rvalueTL.getLoweredType().getAddressType()
+                      ? rvalueTL
+                      : getTypeLowering(addrType));
 
   // Never do a +0 load together with a take.
   bool isPlusZeroOk = (isTake == IsNotTake &&
@@ -3786,10 +3812,15 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc, SILValue addr,
 
     // Copy the address-only value.
     return B.bufferForExpr(
-        loc, rvalueTL.getLoweredType(), rvalueTL, C,
-        [&](SILValue newAddr) {
-          emitSemanticLoadInto(loc, addr, addrTL, newAddr, rvalueTL,
-                               isTake, IsInitialization);
+        loc, rvalueTL.getLoweredType(), rvalueTL, C, [&](SILValue newAddr) {
+          // If our dest address is a move only value from C, we can not reuse
+          // rvalueTL here.
+          SILType newAddrType = newAddr->getType();
+          auto &newAddrTL = newAddrType.isMoveOnlyWrapped()
+                                ? getTypeLowering(newAddrType)
+                                : rvalueTL;
+          return emitSemanticLoadInto(loc, addr, addrTL, newAddr, newAddrTL,
+                                      isTake, IsInitialization);
         });
   }
 
@@ -3840,8 +3871,15 @@ ManagedValue SILGenFunction::emitFormalAccessLoad(SILLocation loc,
     return B.formalAccessBufferForExpr(
         loc, rvalueTL.getLoweredType(), rvalueTL, C,
         [&](SILValue addressForCopy) {
-          emitSemanticLoadInto(loc, addr, addrTL, addressForCopy, rvalueTL,
-                               isTake, IsInitialization);
+          // If our dest address is a move only value from C, we can not reuse
+          // rvalueTL here.
+          SILType addressForCopyType = addressForCopy->getType();
+          auto &addressForCopyTL = addressForCopyType.isMoveOnlyWrapped()
+                                       ? getTypeLowering(addressForCopyType)
+                                       : rvalueTL;
+          return emitSemanticLoadInto(loc, addr, addrTL, addressForCopy,
+                                      addressForCopyTL, isTake,
+                                      IsInitialization);
         });
   }
 
@@ -4059,9 +4097,33 @@ SILValue SILGenFunction::emitSemanticLoad(SILLocation loc,
   assert(srcTL.getLoweredType().getAddressType() == src->getType());
   assert(rvalueTL.isLoadable() || !silConv.useLoweredAddresses());
 
-  // Easy case: the types match.
-  if (srcTL.getLoweredType() == rvalueTL.getLoweredType()) {
+  SILType srcType = srcTL.getLoweredType();
+  SILType rvalueType = rvalueTL.getLoweredType();
+
+  // Easy case: the types match exactly.
+  if (srcType == rvalueType) {
     return srcTL.emitLoadOfCopy(B, loc, src, isTake);
+  }
+
+  // Harder case: the srcTL and the rvalueTL match without move only.
+  if (srcType.removingMoveOnlyWrapper() ==
+      rvalueType.removingMoveOnlyWrapper()) {
+    // Ok, we know that one must be move only and the other must not be. Thus we
+    // perform one of two things:
+    //
+    // 1. If our source address is move only and our rvalue type is not move
+    // only, lets perform a load [copy] and a moveonly_to_copyable. We just need
+    // to insert something so that the move only checker knows that this copy of
+    // the move only address must be a last use.
+    //
+    // 2. If our dest value type is move only and our rvalue type is not move
+    // only, then we perform a load [copy] + copyable_to_moveonly.
+    SILValue newCopy = srcTL.emitLoadOfCopy(B, loc, src, isTake);
+    if (newCopy->getType().isMoveOnlyWrapped()) {
+      return B.createOwnedMoveOnlyWrapperToCopyableValue(loc, newCopy);
+    }
+
+    return B.createCopyableToMoveOnlyWrapperValue(loc, newCopy);
   }
 
   return emitLoadOfSemanticRValue(*this, loc, src, rvalueTL, isTake);
@@ -4085,6 +4147,23 @@ void SILGenFunction::emitSemanticLoadInto(SILLocation loc,
     return;
   }
 
+  // Then see if our source address was a move only type and our dest was
+  // not. In such a case, just cast away the move only and perform a
+  // copy_addr. We are going to error on this later after SILGen.
+  if (srcTL.getLoweredType().removingMoveOnlyWrapper() ==
+      destTL.getLoweredType().removingMoveOnlyWrapper()) {
+    // In such a case, for now emit B.createCopyAddr. In the future, insert the
+    // address version of moveonly_to_copyable.
+    if (src->getType().isMoveOnlyWrapped())
+      src = B.createUncheckedAddrCast(
+          loc, src, srcTL.getLoweredType().removingMoveOnlyWrapper());
+    if (dest->getType().isMoveOnlyWrapped())
+      dest = B.createUncheckedAddrCast(
+          loc, dest, destTL.getLoweredType().removingMoveOnlyWrapper());
+    B.createCopyAddr(loc, src, dest, isTake, isInit);
+    return;
+  }
+
   auto rvalue = emitLoadOfSemanticRValue(*this, loc, src, srcTL, isTake);
   emitUnloweredStoreOfCopy(B, loc, rvalue, dest, isInit);
 }
@@ -4096,6 +4175,20 @@ void SILGenFunction::emitSemanticStore(SILLocation loc,
                                        const TypeLowering &destTL,
                                        IsInitialization_t isInit) {
   assert(destTL.getLoweredType().getAddressType() == dest->getType());
+
+  // If our rvalue is a move only value, insert a moveonly_to_copyable
+  // instruction. This type must have come from the usage of an @_noImplicitCopy
+  // or @_isNoEscape. We rely on the relevant checkers at the SIL level to
+  // validate that this is safe to do. SILGen is just leaving in crumbs to be
+  // checked.
+  //
+  // TODO: For now we are only supporting objects since we are setup to handle
+  // lets when opaque values are enabled. We may also in the future support
+  // vars. If we do that before opaque values are enabled, we will use it to
+  // also handle address only lets.
+  if (rvalue->getType().isMoveOnlyWrapped() && rvalue->getType().isObject()) {
+    rvalue = B.createOwnedMoveOnlyWrapperToCopyableValue(loc, rvalue);
+  }
 
   // Easy case: the types match.
   if (rvalue->getType() == destTL.getLoweredType()) {

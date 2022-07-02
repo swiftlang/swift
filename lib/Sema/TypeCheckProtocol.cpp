@@ -754,7 +754,9 @@ swift::matchWitness(
           OptionalAdjustment(std::get<2>(types)));
       }
 
-      if (!req->isObjC() && reqTypeIsIUO != witnessTypeIsIUO)
+      if (!req->isObjC() &&
+          !isa_and_nonnull<clang::CXXMethodDecl>(witness->getClangDecl()) &&
+          reqTypeIsIUO != witnessTypeIsIUO)
         return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
 
       if (auto result = matchTypes(std::get<0>(types), std::get<1>(types))) {
@@ -1087,12 +1089,12 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     reqLocator = cs->getConstraintLocator(
         static_cast<Expr *>(nullptr), LocatorPathElt::ProtocolRequirement(req));
     OpenedTypeMap reqReplacements;
-    std::tie(std::ignore, reqType)
-      = cs->getTypeOfMemberReference(selfTy, req, dc,
-                                     /*isDynamicResult=*/false,
-                                     FunctionRefKind::DoubleApply,
-                                     reqLocator,
-                                     &reqReplacements);
+    reqType = cs->getTypeOfMemberReference(selfTy, req, dc,
+                                           /*isDynamicResult=*/false,
+                                           FunctionRefKind::DoubleApply,
+                                           reqLocator,
+                                           &reqReplacements)
+        .adjustedReferenceType;
     reqType = reqType->getRValueType();
 
     // For any type parameters we replaced in the witness, map them
@@ -1120,16 +1122,15 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     witnessLocator = cs->getConstraintLocator({},
                                               LocatorPathElt::Witness(witness));
     if (witness->getDeclContext()->isTypeContext()) {
-      std::tie(std::ignore, openWitnessType)
-        = cs->getTypeOfMemberReference(selfTy, witness, dc,
-                                       /*isDynamicResult=*/false,
-                                       FunctionRefKind::DoubleApply,
-                                       witnessLocator);
+      openWitnessType = cs->getTypeOfMemberReference(
+          selfTy, witness, dc, /*isDynamicResult=*/false,
+          FunctionRefKind::DoubleApply, witnessLocator)
+        .adjustedReferenceType;
     } else {
-      std::tie(std::ignore, openWitnessType)
-        = cs->getTypeOfReference(witness,
-                                 FunctionRefKind::DoubleApply,
-                                 witnessLocator, /*useDC=*/nullptr);
+      openWitnessType = cs->getTypeOfReference(
+          witness, FunctionRefKind::DoubleApply, witnessLocator,
+          /*useDC=*/nullptr)
+        .adjustedReferenceType;
     }
     openWitnessType = openWitnessType->getRValueType();
 
@@ -4588,7 +4589,10 @@ swift::checkTypeWitness(Type type, AssociatedTypeDecl *assocType,
 
   // Check protocol conformances.
   for (const auto reqProto : sig->getRequiredProtocols(depTy)) {
-    if (module->lookupConformance(contextType, reqProto)
+    if (module->lookupConformance(
+            contextType, reqProto,
+            /*allowMissing=*/reqProto->isSpecificProtocol(
+                KnownProtocolKind::Sendable))
             .isInvalid())
       return CheckTypeWitnessResult(reqProto->getDeclaredInterfaceType());
 

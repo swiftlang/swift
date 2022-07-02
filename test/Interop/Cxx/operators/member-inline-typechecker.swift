@@ -43,3 +43,9 @@ let diffTypesResultDoubleByVal: Double = diffTypesArrayByVal[0.5]
 
 let postIncrement = HasPostIncrementOperator()
 postIncrement.successor() // expected-error {{value of type 'HasPostIncrementOperator' has no member 'successor'}}
+
+let anotherReturnType = HasPreIncrementOperatorWithAnotherReturnType()
+let anotherReturnTypeResult: HasPreIncrementOperatorWithAnotherReturnType = anotherReturnType.successor()
+
+let voidReturnType = HasPreIncrementOperatorWithVoidReturnType()
+let voidReturnTypeResult: HasPreIncrementOperatorWithVoidReturnType = voidReturnType.successor()

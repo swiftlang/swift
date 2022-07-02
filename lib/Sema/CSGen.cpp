@@ -88,20 +88,12 @@ namespace {
   class LinkedExprCollector : public ASTWalker {
     
     llvm::SmallVectorImpl<Expr*> &LinkedExprs;
-    ConstraintSystem &CS;
 
   public:
-    LinkedExprCollector(llvm::SmallVectorImpl<Expr *> &linkedExprs,
-                        ConstraintSystem &cs)
-        : LinkedExprs(linkedExprs), CS(cs) {}
+    LinkedExprCollector(llvm::SmallVectorImpl<Expr *> &linkedExprs)
+        : LinkedExprs(linkedExprs) {}
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-
-      if (CS.shouldReusePrecheckedType() &&
-          !CS.getType(expr)->hasTypeVariable()) {
-        return { false, expr };
-      }
-
       if (isa<ClosureExpr>(expr))
         return {false, expr};
 
@@ -161,12 +153,6 @@ namespace {
         LTI(lti), CS(cs) {}
     
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-
-      if (CS.shouldReusePrecheckedType() &&
-          !CS.getType(expr)->hasTypeVariable()) {
-        return { false, expr };
-      }
-
       if (isa<LiteralExpr>(expr)) {
         LTI.hasLiteral = true;
         return { false, expr };
@@ -790,11 +776,6 @@ namespace {
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       if (CS.isArgumentIgnoredForCodeCompletion(expr)) {
         return {false, expr};
-      }
-
-      if (CS.shouldReusePrecheckedType() &&
-          !CS.getType(expr)->hasTypeVariable()) {
-        return { false, expr };
       }
       
       if (auto applyExpr = dyn_cast<ApplyExpr>(expr)) {
@@ -1558,7 +1539,7 @@ namespace {
       auto &ctx = CS.getASTContext();
       auto typeOperation = getTypeOperation(expr, ctx);
       if (typeOperation != TypeOperation::None)
-        return ctx.TheAnyType;
+        return ctx.getAnyExistentialType();
 
       // If this is `Builtin.trigger_fallback_diagnostic()`, fail
       // without producing any diagnostics, in order to test fallback error.
@@ -1901,7 +1882,7 @@ namespace {
 
       // The array element type defaults to 'Any'.
       CS.addConstraint(ConstraintKind::Defaultable, arrayElementTy,
-                       CS.getASTContext().TheAnyType, locator);
+                       CS.getASTContext().getAnyExistentialType(), locator);
 
       return arrayTy;
     }
@@ -2065,7 +2046,7 @@ namespace {
       // The dictionary value type defaults to 'Any'.
       if (dictionaryValueTy->isTypeVariableOrMember()) {
         CS.addConstraint(ConstraintKind::Defaultable, dictionaryValueTy,
-                         ctx.TheAnyType, locator);
+                         ctx.getAnyExistentialType(), locator);
       }
 
       return dictionaryTy;
@@ -3613,7 +3594,7 @@ namespace {
           llvm_unreachable("Unexpected result from join - it should not have been computable!");
 
         // The return value is unimportant.
-        return MetatypeType::get(ctx.TheAnyType)->getCanonicalType();
+        return MetatypeType::get(ctx.getAnyExistentialType())->getCanonicalType();
       }
       }
       llvm_unreachable("unhandled operation");
@@ -3652,15 +3633,6 @@ namespace {
       if (CS.isArgumentIgnoredForCodeCompletion(expr)) {
         CG.setTypeForArgumentIgnoredForCompletion(expr);
         return {false, expr};
-      }
-
-      if (CG.getConstraintSystem().shouldReusePrecheckedType()) {
-        if (expr->getType()) {
-          assert(!expr->getType()->hasTypeVariable());
-          assert(!expr->getType()->hasPlaceholder());
-          CG.getConstraintSystem().cacheType(expr);
-          return { false, expr };
-        }
       }
 
       // Note that the subexpression of a #selector expression is
@@ -4436,7 +4408,7 @@ void ConstraintSystem::optimizeConstraints(Expr *e) {
   SmallVector<Expr *, 16> linkedExprs;
   
   // Collect any linked expressions.
-  LinkedExprCollector collector(linkedExprs, *this);
+  LinkedExprCollector collector(linkedExprs);
   e->walk(collector);
   
   // Favor types, as appropriate.

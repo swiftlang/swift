@@ -3229,7 +3229,7 @@ public:
       maybeDiagParameterizedExistentialErasure(EE, Where);
     }
     if (auto *CC = dyn_cast<ExplicitCastExpr>(E)) {
-      if (!isa<CoerceExpr>(CC) &&
+      if (!isa<CoerceExpr>(CC) && CC->getCastType() &&
           CC->getCastType()->hasParameterizedExistential()) {
         SourceLoc loc = CC->getCastTypeRepr() ? CC->getCastTypeRepr()->getLoc()
                                               : E->getLoc();
@@ -3573,11 +3573,13 @@ diagnoseDeclUnavailableFromAsync(const ValueDecl *D, SourceRange R,
     return false;
 
   ASTContext &ctx = Where.getDeclContext()->getASTContext();
+  // @available(noasync) spelling
   if (const AvailableAttr *attr = D->getAttrs().getNoAsync(ctx)) {
     SourceLoc diagLoc = call ? call->getLoc() : R.Start;
     auto diag = ctx.Diags.diagnose(diagLoc, diag::async_unavailable_decl,
                                    D->getDescriptiveKind(), D->getBaseName(),
                                    attr->Message);
+    diag.warnUntilSwiftVersion(6);
 
     if (!attr->Rename.empty()) {
       fixItAvailableAttrRename(diag, R, D, attr, call);
@@ -3590,7 +3592,7 @@ diagnoseDeclUnavailableFromAsync(const ValueDecl *D, SourceRange R,
 
   if (!hasUnavailableAttr)
     return false;
-  // @available(noasync) spelling
+  // @_unavailableFromAsync spelling
   const UnavailableFromAsyncAttr *attr =
       D->getAttrs().getAttribute<UnavailableFromAsyncAttr>();
   SourceLoc diagLoc = call ? call->getLoc() : R.Start;

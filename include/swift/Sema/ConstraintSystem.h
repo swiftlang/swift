@@ -658,11 +658,19 @@ struct SelectedOverload {
   /// we're referencing a member.
   const Type openedFullType;
 
+  /// The opened type of the base of the reference to this overload, adjusted
+  /// for `@preconcurrency` or other contextual type-altering attributes.
+  const Type adjustedOpenedFullType;
+
   /// The opened type produced by referring to this overload.
   const Type openedType;
 
+  /// The opened type produced by referring to this overload, adjusted for
+  /// `@preconcurrency` or other contextual type-altering attributes.
+  const Type adjustedOpenedType;
+
   /// The type that this overload binds. Note that this may differ from
-  /// openedType, for example it will include any IUO unwrapping that has taken
+  /// adjustedOpenedType, for example it will include any IUO unwrapping that has taken
   /// place.
   const Type boundType;
 };
@@ -1530,10 +1538,6 @@ enum class ConstraintSystemFlags {
   /// left in-tact.
   AllowUnresolvedTypeVariables = 0x04,
 
-  /// If set, constraint system always reuses type of pre-typechecked
-  /// expression, and doesn't dig into its subexpressions.
-  ReusePrecheckedType = 0x08,
-
   /// If set, verbose output is enabled for this constraint system.
   ///
   /// Note that this flag is automatically applied to all constraint systems,
@@ -1542,16 +1546,16 @@ enum class ConstraintSystemFlags {
   /// \c DebugConstraintSolverAttempt. Finally, it can also be automatically
   /// enabled for a pre-configured set of expressions on line numbers by setting
   /// \c DebugConstraintSolverOnLines.
-  DebugConstraints = 0x10,
+  DebugConstraints = 0x08,
 
   /// Don't try to type check closure bodies, and leave them unchecked. This is
   /// used for source tooling functionalities.
-  LeaveClosureBodyUnchecked = 0x20,
+  LeaveClosureBodyUnchecked = 0x10,
 
   /// If set, we are solving specifically to determine the type of a
   /// CodeCompletionExpr, and should continue in the presence of errors wherever
   /// possible.
-  ForCodeCompletion = 0x40,
+  ForCodeCompletion = 0x20,
 
   /// Include Clang function types when checking equality for function types.
   ///
@@ -1562,10 +1566,10 @@ enum class ConstraintSystemFlags {
   /// should be treated as semantically different, as they may have different
   /// calling conventions, say due to Clang attributes such as
   /// `__attribute__((ns_consumed))`.
-  UseClangFunctionTypes = 0x80,
+  UseClangFunctionTypes = 0x40,
 
   /// When set, ignore async/sync mismatches
-  IgnoreAsyncSyncMismatch = 0x100,
+  IgnoreAsyncSyncMismatch = 0x80,
 };
 
 /// Options that affect the constraint system as a whole.
@@ -2513,6 +2517,31 @@ struct GetClosureType {
   ConstraintSystem &cs;
 
   Type operator()(const AbstractClosureExpr *expr) const;
+};
+
+/// Describes the type produced when referencing a declaration.
+struct DeclReferenceType {
+  /// The "opened" type, which is the type of the declaration where any
+  /// generic parameters have been replaced with type variables.
+  ///
+  /// The mapping from generic parameters to type variables will have been
+  /// recorded by \c recordOpenedTypes when this type is produced.
+  Type openedType;
+
+  /// The opened type, after performing contextual type adjustments such as
+  /// removing concurrency-related annotations for a `@preconcurrency`
+  /// operation.
+  Type adjustedOpenedType;
+
+  /// The type of the reference, based on the original opened type. This is the
+  /// type that the expression used to form the declaration reference would
+  /// have if no adjustments had been applied.
+  Type referenceType;
+
+  /// The type of the reference, which is the adjusted opened type after
+  /// (e.g.) applying the base of a member access. This is the type of the
+  /// expression used to form the declaration reference.
+  Type adjustedReferenceType;
 };
 
 /// Describes a system of constraints on type variables, the
@@ -3702,6 +3731,12 @@ public:
   ConstraintLocator *
   getConstraintLocator(const ConstraintLocatorBuilder &builder);
 
+  /// Compute a constraint locator for an implicit value-to-value
+  /// conversion rooted at the given location.
+  ConstraintLocator *
+  getImplicitValueConversionLocator(ConstraintLocatorBuilder root,
+                                    ConversionRestrictionKind restriction);
+
   /// Lookup and return parent associated with given expression.
   Expr *getParentExpr(Expr *expr) {
     if (auto result = getExprDepthAndParent(expr))
@@ -3790,10 +3825,6 @@ public:
 
   bool shouldSuppressDiagnostics() const {
     return Options.contains(ConstraintSystemFlags::SuppressDiagnostics);
-  }
-
-  bool shouldReusePrecheckedType() const {
-    return Options.contains(ConstraintSystemFlags::ReusePrecheckedType);
   }
 
   /// Whether we are solving to determine the possible types of a
@@ -4461,10 +4492,11 @@ public:
          const OpenedTypeMap &replacements);
 
   /// Wrapper over swift::adjustFunctionTypeForConcurrency that passes along
-  /// the appropriate closure-type extraction function.
+  /// the appropriate closure-type and opening extraction functions.
   AnyFunctionType *adjustFunctionTypeForConcurrency(
     AnyFunctionType *fnType, ValueDecl *decl, DeclContext *dc,
-    unsigned numApplies, bool isMainDispatchQueue);
+    unsigned numApplies, bool isMainDispatchQueue,
+    OpenedTypeMap &replacements);
 
   /// Retrieve the type of a reference to the given value declaration.
   ///
@@ -4474,9 +4506,8 @@ public:
   ///
   /// \param decl The declarations whose type is being computed.
   ///
-  /// \returns a pair containing the full opened type (if applicable) and
-  /// opened type of a reference to declaration.
-  std::pair<Type, Type> getTypeOfReference(
+  /// \returns a description of the type of this declaration reference.
+  DeclReferenceType getTypeOfReference(
                           ValueDecl *decl,
                           FunctionRefKind functionRefKind,
                           ConstraintLocatorBuilder locator,
@@ -4524,6 +4555,14 @@ public:
           return Type();
         });
 
+  /// Given the opened type and a pile of information about a member reference,
+  /// determine the reference type of the member reference.
+  Type getMemberReferenceTypeFromOpenedType(
+      Type &openedType, Type baseObjTy, ValueDecl *value, DeclContext *outerDC,
+      ConstraintLocator *locator, bool hasAppliedSelf,
+      bool isStaticMemberRefOnProtocol, bool isDynamicResult,
+      OpenedTypeMap &replacements);
+
   /// Retrieve the type of a reference to the given value declaration,
   /// as a member with a base of the given type.
   ///
@@ -4534,9 +4573,8 @@ public:
   /// \param isDynamicResult Indicates that this declaration was found via
   /// dynamic lookup.
   ///
-  /// \returns a pair containing the full opened type (which includes the opened
-  /// base) and opened type of a reference to this member.
-  std::pair<Type, Type> getTypeOfMemberReference(
+  /// \returns a description of the type of this declaration reference.
+  DeclReferenceType getTypeOfMemberReference(
                           Type baseTy, ValueDecl *decl, DeclContext *useDC,
                           bool isDynamicResult,
                           FunctionRefKind functionRefKind,

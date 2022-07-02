@@ -386,6 +386,31 @@ private:
 
   void visitEnumDecl(EnumDecl *ED) {
     printDocumentationComment(ED);
+
+    if (outputLang == OutputLanguageMode::Cxx) {
+      // FIXME: Print enum's availability
+      ClangValueTypePrinter printer(os, owningPrinter.prologueOS,
+                                    owningPrinter.typeMapping,
+                                    owningPrinter.interopContext);
+      printer.printValueTypeDecl(ED, /*bodyPrinter=*/[&]() {
+        ClangSyntaxPrinter syntaxPrinter(os);
+        os << "  enum class cases {";
+        llvm::interleaveComma(
+            ED->getAllCases(), os, [&](const EnumCaseDecl *caseDecl) {
+              llvm::interleaveComma(caseDecl->getElements(), os,
+                                    [&](const EnumElementDecl *elementDecl) {
+                                      os << "\n    ";
+                                      syntaxPrinter.printIdentifier(
+                                          elementDecl->getNameStr());
+                                    });
+            });
+        os << "\n  };\n";
+      });
+      os << outOfLineDefinitions;
+      outOfLineDefinitions.clear();
+      return;
+    }
+
     os << "typedef ";
     StringRef customName = getNameForObjC(ED, CustomNamesOnly);
     if (customName.empty()) {
@@ -1218,6 +1243,9 @@ private:
   /// Returns whether \p ty is the C type \c CFTypeRef, or some typealias
   /// thereof.
   bool isCFTypeRef(Type ty) {
+    if (auto existential = dyn_cast<ExistentialType>(ty.getPointer()))
+      ty = existential->getConstraintType();
+
     const TypeAliasDecl *TAD = nullptr;
     while (auto aliasTy = dyn_cast<TypeAliasType>(ty.getPointer())) {
       TAD = aliasTy->getDecl();
@@ -1909,8 +1937,7 @@ private:
 
   void visitExistentialType(ExistentialType *ET,
                             Optional<OptionalTypeKind> optionalKind) {
-    visitExistentialType(ET, optionalKind,
-        /*isMetatype=*/ET->getConstraintType()->is<AnyMetatypeType>());
+    visitPart(ET->getConstraintType(), optionalKind);
   }
 
   void visitExistentialMetatypeType(ExistentialMetatypeType *MT,

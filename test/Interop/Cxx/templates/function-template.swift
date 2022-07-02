@@ -1,6 +1,5 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xfrontend -enable-experimental-opened-existential-types)
-//
+
 // REQUIRES: executable_test
 
 import FunctionTemplates

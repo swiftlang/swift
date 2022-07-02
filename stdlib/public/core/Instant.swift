@@ -12,7 +12,7 @@
 
 // A type that defines a specific point in time for a given `Clock`.
 @available(SwiftStdlib 5.7, *)
-public protocol InstantProtocol: Comparable, Hashable, Sendable {
+public protocol InstantProtocol<Duration>: Comparable, Hashable, Sendable {
   associatedtype Duration: DurationProtocol
   func advanced(by duration: Duration) -> Self
   func duration(to other: Self) -> Duration

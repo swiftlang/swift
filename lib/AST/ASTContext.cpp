@@ -162,9 +162,6 @@ struct ASTContext::Implementation {
   /// DenseMap.
   llvm::MapVector<Identifier, ModuleDecl *> LoadedModules;
 
-  /// The set of top-level modules we have loaded, indexed by ABI name.
-  llvm::MapVector<Identifier, ModuleDecl *> LoadedModulesByABIName;
-
   // FIXME: This is a StringMap rather than a StringSet because StringSet
   // doesn't allow passing in a pre-existing allocator.
   llvm::StringMap<Identifier::Aligner, llvm::BumpPtrAllocator&>
@@ -959,7 +956,11 @@ ASTContext::getPointerPointeePropertyDecl(PointerTypeKind ptrKind) const {
   llvm_unreachable("bad pointer kind");
 }
 
-CanType ASTContext::getAnyObjectType() const {
+CanType ASTContext::getAnyExistentialType() const {
+  return ExistentialType::get(TheAnyType)->getCanonicalType();
+}
+
+CanType ASTContext::getAnyObjectConstraint() const {
   if (getImpl().AnyObjectType) {
     return getImpl().AnyObjectType;
   }
@@ -968,6 +969,11 @@ CanType ASTContext::getAnyObjectType() const {
     ProtocolCompositionType::get(
       *this, {}, /*HasExplicitAnyObject=*/true));
   return getImpl().AnyObjectType;
+}
+
+CanType ASTContext::getAnyObjectType() const {
+  return ExistentialType::get(getAnyObjectConstraint())
+      ->getCanonicalType();
 }
 
 #define KNOWN_SDK_TYPE_DECL(MODULE, NAME, DECLTYPE, GENERIC_ARGS) \
@@ -3066,10 +3072,14 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
     }
 
     // Convenience initializers have a dynamic 'self' in '-swift-version 5'.
+    //
+    // NOTE: it's important that we check if it's a convenience init only after
+    // confirming it's not semantically final, or else there can be a request
+    // evaluator cycle to determine the init kind for actors, which are final.
     if (Ctx.isSwiftVersionAtLeast(5)) {
-      if (wantDynamicSelf && CD->isConvenienceInit())
+      if (wantDynamicSelf)
         if (auto *classDecl = selfTy->getClassOrBoundGenericClass())
-          if (!classDecl->isSemanticallyFinal())
+          if (!classDecl->isSemanticallyFinal() && CD->isConvenienceInit())
             isDynamicSelf = true;
     }
   } else if (isa<DestructorDecl>(AFD)) {
@@ -4261,19 +4271,17 @@ ProtocolType::ProtocolType(ProtocolDecl *TheDecl, Type Parent,
                            RecursiveTypeProperties properties)
   : NominalType(TypeKind::Protocol, &Ctx, TheDecl, Parent, properties) { }
 
-Type ExistentialType::get(Type constraint, bool forceExistential) {
+Type ExistentialType::get(Type constraint) {
   auto &C = constraint->getASTContext();
-  if (!forceExistential) {
-    // FIXME: Any and AnyObject don't yet use ExistentialType.
-    if (constraint->isAny() || constraint->isAnyObject())
-      return constraint;
-
-    // ExistentialMetatypeType is already an existential type.
-    if (constraint->is<ExistentialMetatypeType>())
-      return constraint;
-  }
+  // ExistentialMetatypeType is already an existential type.
+  if (constraint->is<ExistentialMetatypeType>())
+    return constraint;
 
   assert(constraint->isConstraintType());
+
+  bool printWithAny = true;
+  if (constraint->isEqual(C.TheAnyType) || constraint->isAnyObject())
+    printWithAny = false;
 
   auto properties = constraint->getRecursiveProperties();
   if (constraint->is<ParameterizedProtocolType>())
@@ -4285,7 +4293,7 @@ Type ExistentialType::get(Type constraint, bool forceExistential) {
     return entry;
 
   const ASTContext *canonicalContext = constraint->isCanonical() ? &C : nullptr;
-  return entry = new (C, arena) ExistentialType(constraint,
+  return entry = new (C, arena) ExistentialType(constraint, printWithAny,
                                                 canonicalContext,
                                                 properties);
 }

@@ -102,6 +102,8 @@ private:
       Type type, StringRef name, bool isInOut, bool isIndirect = false,
       llvm::Optional<AdditionalParam::Role> paramRole = None);
 
+  bool hasKnownOptionalNullableCxxMapping(Type type);
+
   raw_ostream &os;
   raw_ostream &cPrologueOS;
   PrimitiveTypeMapping &typeMapping;
