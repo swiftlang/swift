@@ -3711,73 +3711,121 @@ internal func _instantiateKeyPathBuffer(
   }
 }
 
-@_silgen_name("swift_keypath_dladdr")
-internal func keypath_dladdr(_: UnsafeRawPointer) -> UnsafePointer<CChar>
+#if SWIFT_ENABLE_REFLECTION
 
-fileprivate func dynamicLibraryAddress(of pointer: UnsafeRawPointer) -> String {
-    String(cString: keypath_dladdr(pointer))
+@_silgen_name("swift_keyPath_dladdr")
+fileprivate func keypath_dladdr(_: UnsafeRawPointer) -> UnsafePointer<CChar>?
+
+@_silgen_name("swift_keyPathSourceString")
+fileprivate func demangle(
+  name: UnsafePointer<CChar>
+) -> UnsafeMutablePointer<CChar>?
+
+fileprivate func dynamicLibraryAddress<Base, Leaf>(
+  of pointer: ComputedAccessorsPtr,
+  _: Base.Type,
+  _ leaf: Leaf.Type
+) -> String {
+  let getter: ComputedAccessorsPtr.Getter<Base, Leaf> = pointer.getter()
+  let pointer = unsafeBitCast(getter, to: UnsafeRawPointer.self)
+  if let cString = keypath_dladdr(UnsafeRawPointer(pointer)) {
+    if let demangled = demangle(name: cString)
+      .map({ pointer in
+        defer {
+          pointer.deallocate()
+        }
+        return String(cString: pointer)
+    }) {
+      return demangled
+    }
+  }
+  return "<computed \(pointer) (\(leaf))>"
 }
 
-extension KeyPath: CustomDebugStringConvertible {
-        
-    public var debugDescription: String {
-        // TODO: For perf, we could use a local growable buffer instead of Any (see comment above)
-        var description = "\\\(String(describing: Root.self))."
-        return withBuffer {
-            var buffer = $0
-            if buffer.data.isEmpty {
-                _internalInvariantFailure("key path has no components")
-                return description
-            }
-            while true {
-                let (rawComponent, optNextType) = buffer.next()
-                let valueType = optNextType ?? Value.self
-                let isLast = optNextType == nil
-                func name(for offset: Int) -> String {
-                    let count = _getRecursiveChildCount(valueType)
-                    for i in 0..<count {
-                        if _getChildOffset(
-                            valueType,
-                            index: i
-                        ) == offset {
-                            var field = _FieldReflectionMetadata()
-                            _ = _getChildMetadata(
-                                valueType,
-                                index: i,
-                                fieldMetadata: &field
-                            )
-                            defer {
-                                field.freeFunc?(field.name)
-                            }
-                            return String(cString: field.name)
-                        }
-                    }
-                    _internalInvariantFailure("Type Metadata doesn't have  a field with an offset matching the one in this keypath segment")
-                    return ""
-                }
-                func name(for pointer: UnsafeRawPointer) -> String {
-                    dynamicLibraryAddress(of: pointer)
-                }
-                switch rawComponent.value {
-                case .class(let offset):
-                    description.append(name(for: offset))
-                case .get(_, let accessors, let argument):
-                    description.append(name(for: accessors.getterPtr))
-                case .mutatingGetSet(_, let accessors, _):
-                    description.append(name(for: accessors.getterPtr))
-                case .nonmutatingGetSet(_, let accessors, let argument):
-                    description.append(name(for: accessors.getterPtr))
-                case .optionalChain, .optionalWrap:
-                    description.append("?")
-                case .optionalForce:
-                    description.append("!")
-                case .struct(let offset):
-                    description.append(name(for: offset))
-                }
-                description.append(".")
-            }
-            return description
+#endif
+
+@available(SwiftStdlib 5.8, *)
+extension AnyKeyPath: CustomDebugStringConvertible {
+  
+#if SWIFT_ENABLE_REFLECTION
+  @available(SwiftStdlib 5.8, *)
+  public var debugDescription: String {
+    var description = "\\\(String(describing: Self.rootType))"
+    return withBuffer {
+      var buffer = $0
+      if buffer.data.isEmpty {
+        _internalInvariantFailure("key path has no components")
+      }
+      var valueType: Any.Type = Self.rootType
+      while true {
+        let (rawComponent, optNextType) = buffer.next()
+        let hasEnded = optNextType == nil
+        let nextType = optNextType ?? Self.valueType
+        switch rawComponent.value {
+        case .optionalForce, .optionalWrap, .optionalChain:
+          break
+        default:
+          description.append(".")
         }
+        switch rawComponent.value {
+        case .class(let offset),
+            .struct(let offset):
+          let count = _getRecursiveChildCount(valueType)
+          let index = (0..<count)
+            .first(where: { i in
+              _getChildOffset(
+                valueType,
+                index: i
+              ) == offset
+            })
+          if let index = index {
+            var field = _FieldReflectionMetadata()
+            _ = _getChildMetadata(
+              valueType,
+              index: index,
+              fieldMetadata: &field
+            )
+            defer {
+              field.freeFunc?(field.name)
+            }
+            description.append(String(cString: field.name))
+          } else {
+            description.append("<offset \(offset) (\(nextType))>")
+          }
+        case .get(_, let accessors, _),
+            .nonmutatingGetSet(_, let accessors, _),
+            .mutatingGetSet(_, let accessors, _):
+          func project<Base>(base: Base.Type) -> String {
+            func project2<Leaf>(leaf: Leaf.Type) -> String {
+              dynamicLibraryAddress(
+                of: accessors,
+                base,
+                leaf
+              )
+            }
+            return _openExistential(nextType, do: project2)
+          }
+          description.append(
+            _openExistential(valueType, do: project)
+          )
+        case .optionalChain, .optionalWrap:
+          description.append("?")
+        case .optionalForce:
+          description.append("!")
+        }
+        if hasEnded {
+          break
+        }
+        valueType = nextType
+      }
+      return description
     }
-    
+  }
+#else
+  @available(SwiftStdlib 5.8, *)
+  public var debugDescription: String {
+    "(value cannot be printed without reflection)"
+  }
+#endif
+  
 }
