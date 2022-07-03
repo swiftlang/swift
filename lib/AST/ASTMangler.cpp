@@ -2979,6 +2979,21 @@ void ASTMangler::appendGenericSignatureParts(
   appendOperator("r", StringRef(OpStorage.data(), OpStorage.size()));
 }
 
+/// Determine whether an associated type reference into the given set of
+/// protocols is unambiguous.
+static bool associatedTypeRefIsUnambiguous(ArrayRef<ProtocolDecl *> protocols) {
+  unsigned numProtocols = 0;
+  for (auto proto : protocols) {
+    // Skip marker protocols, which cannot have associated types.
+    if (proto->isMarkerProtocol())
+      continue;
+
+    ++numProtocols;
+  }
+
+  return numProtocols <= 1;
+}
+
 // If the base type is known to have a single protocol conformance
 // in the current generic context, then we don't need to disambiguate the
 // associated type name by protocol.
@@ -2988,7 +3003,7 @@ ASTMangler::dropProtocolFromAssociatedType(DependentMemberType *dmt,
   auto baseTy = dmt->getBase();
   bool unambiguous =
       (!dmt->getAssocType() ||
-       sig->getRequiredProtocols(baseTy).size() <= 1);
+       associatedTypeRefIsUnambiguous(sig->getRequiredProtocols(baseTy)));
 
   if (auto *baseDMT = baseTy->getAs<DependentMemberType>())
     baseTy = dropProtocolFromAssociatedType(baseDMT, sig);
@@ -3024,7 +3039,8 @@ void ASTMangler::appendAssociatedTypeName(DependentMemberType *dmt,
     // in the current generic context, then we don't need to disambiguate the
     // associated type name by protocol.
     if (!OptimizeProtocolNames || !sig ||
-        sig->getRequiredProtocols(dmt->getBase()).size() > 1) {
+        !associatedTypeRefIsUnambiguous(
+            sig->getRequiredProtocols(dmt->getBase()))) {
       appendAnyGenericType(assocTy->getProtocol());
     }
     return;
