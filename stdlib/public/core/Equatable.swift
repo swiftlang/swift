@@ -217,7 +217,7 @@ extension Equatable {
 ///         }
 ///     }
 ///
-///     func ==(lhs: IntegerRef, rhs: IntegerRef) -> Bool {
+///     func == (lhs: IntegerRef, rhs: IntegerRef) -> Bool {
 ///         return lhs.value == rhs.value
 ///     }
 ///
