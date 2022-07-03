@@ -333,8 +333,8 @@ public:
     return asImpl().visit(type1->getCaptureType(), type2->getCaptureType());
   }
 
-  bool visitSILMoveOnlyType(CanSILMoveOnlyType type1,
-                            CanSILMoveOnlyType type2) {
+  bool visitSILMoveOnlyWrappedType(CanSILMoveOnlyWrappedType type1,
+                                   CanSILMoveOnlyWrappedType type2) {
     return asImpl().visit(type1->getInnerType(), type2->getInnerType());
   }
 

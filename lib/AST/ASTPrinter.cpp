@@ -6203,7 +6203,7 @@ public:
     }
   }
 
-  void visitSILMoveOnlyType(SILMoveOnlyType *T) {
+  void visitSILMoveOnlyWrappedType(SILMoveOnlyWrappedType *T) {
     Printer << "@moveOnly ";
     printWithParensIfNotSimple(T->getInnerType());
   }

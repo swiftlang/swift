@@ -352,7 +352,7 @@ class TypeMatcher {
     TRIVIAL_CASE(SILFunctionType)
     TRIVIAL_CASE(SILBlockStorageType)
     TRIVIAL_CASE(SILBoxType)
-    TRIVIAL_CASE(SILMoveOnlyType)
+    TRIVIAL_CASE(SILMoveOnlyWrappedType)
 
     bool visitProtocolCompositionType(CanProtocolCompositionType firstProtocolComposition,
                                       Type secondType,

@@ -729,6 +729,9 @@ ERROR(sil_moveonlychecker_value_consumed_more_than_once, none,
       "'%0' consumed more than once", (StringRef))
 NOTE(sil_moveonlychecker_consuming_use_here, none,
      "consuming use", ())
+ERROR(sil_moveonlychecker_not_understand_mark_move, none,
+      "Usage of @noImplicitCopy that the move checker does not know how to "
+      "check!", ())
 
 // move kills copyable values checker diagnostics
 ERROR(sil_movekillscopyablevalue_value_consumed_more_than_once, none,

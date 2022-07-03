@@ -1867,6 +1867,8 @@ bool ExplicitSwiftModuleLoader::canImportModule(ImportPath::Module path,
                                                 llvm::VersionTuple version,
                                                 bool underlyingVersion) {
   // FIXME: Swift submodules?
+  if (path.hasSubmodule())
+    return false;
   ImportPath::Element mID = path.front();
   // Look up the module with the real name (physical name on disk);
   // in case `-module-alias` is used, the name appearing in source files

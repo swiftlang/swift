@@ -2237,23 +2237,18 @@ namespace {
 
       // The constructor was opened with the allocating type, not the
       // initializer type. Map the former into the latter.
-      auto resultTy = solution.simplifyType(openedFullType);
+      auto *resultTy =
+          solution.simplifyType(openedFullType)->castTo<FunctionType>();
 
-      auto selfTy = getBaseType(resultTy->castTo<FunctionType>());
-
-      // Also replace the result type with the base type, so that calls
-      // to constructors defined in a superclass will know to cast the
-      // result to the derived type.
-      resultTy = resultTy->replaceCovariantResultType(selfTy, 2);
+      const auto selfTy = getBaseType(resultTy);
 
       ParameterTypeFlags flags;
       if (!selfTy->hasReferenceSemantics())
         flags = flags.withInOut(true);
 
       auto selfParam = AnyFunctionType::Param(selfTy, Identifier(), flags);
-      resultTy = FunctionType::get({selfParam},
-                                   resultTy->castTo<FunctionType>()->getResult(),
-                                   resultTy->castTo<FunctionType>()->getExtInfo());
+      resultTy = FunctionType::get({selfParam}, resultTy->getResult(),
+                                   resultTy->getExtInfo());
 
       // Build the constructor reference.
       Expr *ctorRef = cs.cacheType(
@@ -5706,8 +5701,17 @@ ArgumentList *ExprRewriter::coerceCallArguments(
   // Quickly test if any further fix-ups for the argument types are necessary.
   auto matches = args->matches(params, [&](Expr *E) { return cs.getType(E); });
   if (matches && !shouldInjectWrappedValuePlaceholder &&
-      !paramInfo.anyContextualInfo())
+      !paramInfo.anyContextualInfo()) {
+    // Propagate preconcurrency to any closure arguments.
+    if (preconcurrency) {
+      for (const auto &arg : *args) {
+        Expr *argExpr = arg.getExpr();
+        applyContextualClosureFlags(argExpr, false, false, preconcurrency);
+      }
+    }
+
     return args;
+  }
 
   // Determine the parameter bindings that were applied.
   auto *locatorPtr = cs.getConstraintLocator(locator);

@@ -102,3 +102,8 @@ module ForwardDeclaredCxxRecord {
   header "forward-declared-cxx-record.h"
   requires cplusplus
 }
+
+module ReturnsLargeClass {
+  header "returns-large-class.h"
+  requires cplusplus
+}

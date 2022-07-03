@@ -447,7 +447,7 @@ public:
     if (SGF.getASTContext().LangOpts.Features.count(Feature::MoveOnly) &&
         vd->getAttrs().hasAttribute<NoImplicitCopyAttr>()) {
       lowering = &SGF.getTypeLowering(
-          SILMoveOnlyType::get(vd->getType()->getCanonicalType()));
+          SILMoveOnlyWrappedType::get(vd->getType()->getCanonicalType()));
     } else {
       lowering = &SGF.getTypeLowering(vd->getType());
     }
@@ -576,8 +576,9 @@ public:
               value->getOwnershipKind() == OwnershipKind::Owned) {
             assert(wasPlusOne);
             // NOTE: If our type is trivial when not wrapped in a
-            // SILMoveOnlyType, this will return a trivial value. We rely on the
-            // checker to determine if this is an acceptable use of the value.
+            // SILMoveOnlyWrappedType, this will return a trivial value. We rely
+            // on the checker to determine if this is an acceptable use of the
+            // value.
             value = SGF.B.createOwnedMoveOnlyWrapperToCopyableValue(PrologueLoc,
                                                                     value);
           }
