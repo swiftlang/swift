@@ -648,13 +648,6 @@ importer::getNormalInvocationArguments(
         break;
       }
     }
-
-    SmallString<128> buffer;
-    if (auto path = getGlibcModuleMapPath(searchPathOpts, triple, buffer)) {
-      invocationArgStrs.push_back((Twine("-fmodule-map-file=") + *path).str());
-    } else {
-      // FIXME: Emit a warning of some kind.
-    }
   }
 
   if (searchPathOpts.getSDKPath().empty()) {
