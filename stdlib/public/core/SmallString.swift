@@ -244,6 +244,7 @@ extension _SmallString {
     let len = try withUnsafeMutableBytes(of: &_storage, f)
 
     if len <= 0 {
+      _debugPrecondition(len == 0)
       self = _SmallString()
       return
     }
