@@ -19,6 +19,12 @@
 /// It's not named just Glibc so that it doesn't conflict in the event of a
 /// future official glibc modulemap.
 module SwiftGlibc [system] {
+  module __features {
+    header "stdc-predef.h"
+    header "features.h"
+    export *
+  }
+
 % if CMAKE_SDK in ["LINUX", "ANDROID", "OPENBSD"]:
       link "m"
 % end

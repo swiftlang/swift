@@ -1,8 +1,5 @@
 %{
 headers = [
-  'stdc-predef.h',
-  'features.h',
-
   # C standard library
   'complex.h',
   'ctype.h',
