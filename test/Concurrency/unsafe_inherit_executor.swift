@@ -21,7 +21,7 @@ struct A {
 }
 
 
-class NonSendableObject { // expected-note{{class 'NonSendableObject' does not conform to the 'Sendable' protocol}}
+class NonSendableObject {
   var property = 0
 }
 
@@ -31,7 +31,6 @@ func useNonSendable(object: NonSendableObject) async {}
 actor MyActor {
   var object = NonSendableObject()
   func foo() async {
-    // expected-warning@+1{{non-sendable type 'NonSendableObject' exiting actor-isolated context in call to non-isolated global function 'useNonSendable(object:)' cannot cross actor boundary}}
     await useNonSendable(object: self.object)
   }
 }
