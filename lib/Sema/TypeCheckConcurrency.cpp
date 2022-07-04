@@ -5053,7 +5053,9 @@ ActorReferenceResult ActorReferenceResult::forReference(
   if (!declIsolation.isActorIsolated()) {
     // If the declaration is asynchronous and we are in an actor-isolated
     // context (of any kind), then we exit the actor to the nonisolated context.
-    if (isAsyncDecl(declRef) && contextIsolation.isActorIsolated())
+    if (isAsyncDecl(declRef) && contextIsolation.isActorIsolated() &&
+        !declRef.getDecl()->getAttrs()
+            .hasAttribute<UnsafeInheritExecutorAttr>())
       return forExitsActorToNonisolated(contextIsolation);
 
     // Otherwise, we stay in the same concurrency domain, whether on an actor
