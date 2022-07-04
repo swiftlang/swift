@@ -1386,6 +1386,7 @@ void ConstraintSystem::print(raw_ostream &out, Expr *E) const {
   };
 
   E->dump(out, getTypeOfExpr, getTypeOfTypeRepr, getTypeOfKeyPathComponent);
+  out << "\n";
 }
 
 void ConstraintSystem::print(raw_ostream &out) const {
