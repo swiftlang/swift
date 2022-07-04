@@ -57,9 +57,11 @@ public:
       AutoDiffDerivativeFunctionIdentifier *derivativeId) {
     beginManglingWithAutoDiffOriginalFunction(func);
     auto kind = Demangle::getAutoDiffFunctionKind(derivativeId->getKind());
+    auto *resultIndices =
+        autodiff::getAllFunctionSemanticResultIndices(func);
     AutoDiffConfig config(
         derivativeId->getParameterIndices(),
-        IndexSubset::get(func->getASTContext(), 1, {0}),
+        resultIndices,
         derivativeId->getDerivativeGenericSignature());
     appendAutoDiffFunctionParts("TJ", kind, config);
     appendOperator("Tj");
@@ -86,9 +88,11 @@ public:
       AutoDiffDerivativeFunctionIdentifier *derivativeId) {
     beginManglingWithAutoDiffOriginalFunction(func);
     auto kind = Demangle::getAutoDiffFunctionKind(derivativeId->getKind());
+    auto *resultIndices =
+        autodiff::getAllFunctionSemanticResultIndices(func);
     AutoDiffConfig config(
         derivativeId->getParameterIndices(),
-        IndexSubset::get(func->getASTContext(), 1, {0}),
+        resultIndices,
         derivativeId->getDerivativeGenericSignature());
     appendAutoDiffFunctionParts("TJ", kind, config);
     appendOperator("Tq");

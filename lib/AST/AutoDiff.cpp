@@ -196,8 +196,16 @@ void autodiff::getFunctionSemanticResultTypes(
           functionType->getResult()->getAs<AnyFunctionType>()) {
     formalResultType = resultFunctionType->getResult();
   }
-  if (!formalResultType->isEqual(ctx.TheEmptyTupleType))
-    result.push_back({remap(formalResultType), /*isInout*/ false});
+  if (!formalResultType->isEqual(ctx.TheEmptyTupleType)) {
+    // Separate tuple elements into individual results.
+    if (formalResultType->is<TupleType>()) {
+      for (auto elt : formalResultType->castTo<TupleType>()->getElements()) {
+        result.push_back({remap(elt.getType()), /*isInout*/ false});
+      }
+    } else {
+      result.push_back({remap(formalResultType), /*isInout*/ false});
+    }
+  }
 
   // Collect `inout` parameters as semantic results.
   for (auto param : functionType->getParams())
@@ -209,6 +217,16 @@ void autodiff::getFunctionSemanticResultTypes(
       if (param.isInOut())
         result.push_back({remap(param.getPlainType()), /*isInout*/ true});
   }
+}
+
+IndexSubset *
+autodiff::getAllFunctionSemanticResultIndices(const AbstractFunctionDecl *AFD) {
+  auto originalFn = AFD->getInterfaceType()->castTo<AnyFunctionType>();
+  SmallVector<AutoDiffSemanticFunctionResultType, 1> semanticResults;
+  autodiff::getFunctionSemanticResultTypes(originalFn, semanticResults);
+  auto numResults = semanticResults.size();
+  return IndexSubset::getDefault(
+    AFD->getASTContext(), numResults, /*includeAll*/ true);
 }
 
 // TODO(TF-874): Simplify this helper. See TF-874 for WIP.
@@ -394,9 +412,6 @@ void DerivativeFunctionTypeError::log(raw_ostream &OS) const {
   switch (kind) {
   case Kind::NoSemanticResults:
     OS << "has no semantic results ('Void' result)";
-    break;
-  case Kind::MultipleSemanticResults:
-    OS << "has multiple semantic results";
     break;
   case Kind::NoDifferentiabilityParameters:
     OS << "has no differentiability parameters";

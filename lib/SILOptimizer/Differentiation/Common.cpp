@@ -492,10 +492,6 @@ findMinimalDerivativeConfiguration(AbstractFunctionDecl *original,
 SILDifferentiabilityWitness *getOrCreateMinimalASTDifferentiabilityWitness(
     SILModule &module, SILFunction *original, DifferentiabilityKind kind,
     IndexSubset *parameterIndices, IndexSubset *resultIndices) {
-  // AST differentiability witnesses always have a single result.
-  if (resultIndices->getCapacity() != 1 || !resultIndices->contains(0))
-    return nullptr;
-
   // Explicit differentiability witnesses only exist on SIL functions that come
   // from AST functions.
   auto *originalAFD = findAbstractFunctionDecl(original);

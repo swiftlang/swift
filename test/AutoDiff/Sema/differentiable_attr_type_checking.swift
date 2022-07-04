@@ -528,7 +528,6 @@ func two9(x: Float, y: Float) -> Float {
 func inout1(x: Float, y: inout Float) -> Void {
   let _ = x + y
 }
-// expected-error @+1 {{cannot differentiate functions with both an 'inout' parameter and a result}}
 @differentiable(reverse, wrt: y)
 func inout2(x: Float, y: inout Float) -> Float {
   let _ = x + y
@@ -670,11 +669,9 @@ final class FinalClass: Differentiable {
 @differentiable(reverse, wrt: y)
 func inoutVoid(x: Float, y: inout Float) {}
 
-// expected-error @+1 {{cannot differentiate functions with both an 'inout' parameter and a result}}
 @differentiable(reverse)
 func multipleSemanticResults(_ x: inout Float) -> Float { x }
 
-// expected-error @+1 {{cannot differentiate functions with both an 'inout' parameter and a result}}
 @differentiable(reverse, wrt: y)
 func swap(x: inout Float, y: inout Float) {}
 
@@ -687,7 +684,6 @@ extension InoutParameters {
   @differentiable(reverse)
   static func staticMethod(_ lhs: inout Self, rhs: Self) {}
 
-  // expected-error @+1 {{cannot differentiate functions with both an 'inout' parameter and a result}}
   @differentiable(reverse)
   static func multipleSemanticResults(_ lhs: inout Self, rhs: Self) -> Self {}
 }
@@ -696,9 +692,21 @@ extension InoutParameters {
   @differentiable(reverse)
   mutating func mutatingMethod(_ other: Self) {}
 
-  // expected-error @+1 {{cannot differentiate functions with both an 'inout' parameter and a result}}
   @differentiable(reverse)
   mutating func mutatingMethod(_ other: Self) -> Self {}
+}
+
+// Test tuple results.
+
+extension InoutParameters {
+  @differentiable(reverse)
+  static func tupleResults(_ x: Self) -> (Self, Self) {}
+
+  @differentiable(reverse)
+  static func tupleResultsInt(_ x: Self) -> (Int, Self) {}
+
+  @differentiable(reverse)
+  static func tupleResultsInt2(_ x: Self) -> (Self, Int) {}
 }
 
 // Test accessors: `set`, `_read`, `_modify`.

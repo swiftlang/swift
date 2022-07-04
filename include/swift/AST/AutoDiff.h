@@ -32,6 +32,7 @@
 
 namespace swift {
 
+class AbstractFunctionDecl;
 class AnyFunctionType;
 class SourceFile;
 class SILFunctionType;
@@ -398,9 +399,6 @@ public:
   enum class Kind {
     /// Original function type has no semantic results.
     NoSemanticResults,
-    /// Original function type has multiple semantic results.
-    // TODO(TF-1250): Support function types with multiple semantic results.
-    MultipleSemanticResults,
     /// Differentiability parmeter indices are empty.
     NoDifferentiabilityParameters,
     /// A differentiability parameter does not conform to `Differentiable`.
@@ -429,7 +427,6 @@ public:
   explicit DerivativeFunctionTypeError(AnyFunctionType *functionType, Kind kind)
       : functionType(functionType), kind(kind), value(Value()) {
     assert(kind == Kind::NoSemanticResults ||
-           kind == Kind::MultipleSemanticResults ||
            kind == Kind::NoDifferentiabilityParameters);
   };
 
@@ -578,6 +575,10 @@ void getFunctionSemanticResultTypes(
     AnyFunctionType *functionType,
     SmallVectorImpl<AutoDiffSemanticFunctionResultType> &result,
     GenericEnvironment *genericEnv = nullptr);
+
+/// Returns the indices of all semantic results for a given function.
+IndexSubset *getAllFunctionSemanticResultIndices(
+    const AbstractFunctionDecl *AFD);
 
 /// Returns the lowered SIL parameter indices for the given AST parameter
 /// indices and `AnyfunctionType`.

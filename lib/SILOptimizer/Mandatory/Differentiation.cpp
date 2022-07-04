@@ -752,7 +752,7 @@ static SILFunction *createEmptyVJP(ADContext &context,
   auto original = witness->getOriginalFunction();
   LLVM_DEBUG({
     auto &s = getADDebugStream();
-    s << "Creating VJP:\n\t";
+    s << "Creating VJP for " << original->getName() << ":\n\t";
     s << "Original type: " << original->getLoweredFunctionType() << "\n\t";
   });
 
@@ -796,7 +796,7 @@ static SILFunction *createEmptyJVP(ADContext &context,
   auto original = witness->getOriginalFunction();
   LLVM_DEBUG({
     auto &s = getADDebugStream();
-    s << "Creating JVP:\n\t";
+    s << "Creating JVP for " << original->getName() << ":\n\t";
     s << "Original type: " << original->getLoweredFunctionType() << "\n\t";
   });
 
