@@ -169,6 +169,48 @@ where Element: AdditiveArithmetic & Differentiable {
   }
 }
 
+extension Array.DifferentiableView:
+  BidirectionalCollection,
+  Collection,
+  MutableCollection,
+  RandomAccessCollection,
+  RangeReplaceableCollection,
+  Sequence
+where Element: Differentiable {
+  public typealias Element = Array<Element>.Element
+  public typealias Index = Array<Element>.Index
+  public typealias Indices = Array<Element>.Indices
+  public typealias SubSequence = Array<Element>.SubSequence
+
+  @inlinable
+  public subscript(position: Array<Element>.Index) -> Element {
+    _read { yield base[position] }
+    set { base[position] = newValue }
+  }
+
+  @inlinable
+  public subscript(bounds: Range<Array<Element>.Index>) -> Self.SubSequence {
+    _read { yield base[bounds] }
+    set { base[bounds] = newValue }
+  }
+
+  @inlinable
+  public mutating func replaceSubrange<C>(
+    _ subrange: Range<Self.Index>, with newElements: C
+  ) where C : Collection, Self.Element == C.Element {
+    self[subrange] = Self.SubSequence(newElements)
+  }
+
+  @inlinable
+  public var startIndex: Index { base.startIndex }
+
+  @inlinable
+  public var endIndex: Index { base.endIndex }
+
+  @inlinable
+  public init() { self.init(.init()) }
+}
+
 /// Makes `Array` differentiable as the product manifold of `Element`
 /// multiplied with itself `count` times.
 extension Array: Differentiable where Element: Differentiable {
