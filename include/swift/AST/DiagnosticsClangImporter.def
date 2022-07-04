@@ -117,6 +117,9 @@ WARNING(nonmutating_without_mutable_fields,none,
 
 ERROR(module_map_not_found, none, "module map file '%0' not found", (StringRef))
 
+WARNING(glibc_not_found, none,
+        "glibc not found for '%0'; C stdlib may be unavailable",
+        (StringRef))
 WARNING(libstdcxx_not_found, none,
         "libstdc++ not found for '%0'; C++ stdlib may be unavailable",
         (StringRef))
