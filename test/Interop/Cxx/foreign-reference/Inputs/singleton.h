@@ -2,10 +2,13 @@
 #define TEST_INTEROP_CXX_FOREIGN_REFERENCE_INPUTS_SINGLETON_H
 
 #include <stdlib.h>
+#if defined(_WIN32)
+inline void *operator new(size_t, void *p) { return p; }
+#else
+#include <new>
+#endif
 
 #include "visibility.h"
-
-inline void *operator new(size_t, void *p) { return p; }
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
