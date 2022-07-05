@@ -93,11 +93,11 @@ class SILParser;
 /// In addition to the Swift type system, SIL adds "address" types that can
 /// reference any Swift type (but cannot take the address of an address). *T
 /// is the type of an address pointing at T.
-///
 class SILType {
 public:
   /// The unsigned is a SILValueCategory.
   using ValueType = llvm::PointerIntPair<TypeBase *, 2, unsigned>;
+
 private:
   ValueType value;
 
@@ -194,7 +194,6 @@ public:
     return removingMoveOnlyWrapper().getRawASTType();
   }
 
-private:
   /// Returns the canonical AST type references by this SIL type without looking
   /// through move only. Should only be used by internal utilities of SILType.
   CanType getRawASTType() const { return CanType(value.getPointer()); }
