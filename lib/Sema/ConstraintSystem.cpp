@@ -429,6 +429,11 @@ ConstraintLocator *ConstraintSystem::getImplicitValueConversionLocator(
   SmallVector<LocatorPathElt, 4> path;
   auto anchor = root.getLocatorParts(path);
   {
+    if (isExpr<DictionaryExpr>(anchor) && path.size() > 1) {
+      // Drop everything except for first `tuple element #`.
+      path.pop_back_n(path.size() - 1);
+    }
+
     // Drop any value-to-optional conversions that were applied along the
     // way to reach this one.
     while (!path.empty()) {
