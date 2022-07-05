@@ -672,7 +672,7 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
 
   // NOTE: So we don't need a thunk in the protocol, we should call the underlying
   // thing instead, which MUST have a thunk, since it must be a distributed func as well...
-  if (dyn_cast<ProtocolDecl>(DC)) {
+  if (isa<ProtocolDecl>(DC)) {
     return nullptr;
   }
 
