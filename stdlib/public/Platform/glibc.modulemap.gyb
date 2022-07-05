@@ -18,7 +18,7 @@
 ///
 /// It's not named just Glibc so that it doesn't conflict in the event of a
 /// future official glibc modulemap.
-module SwiftGlibc [system] {
+module SwiftGlibc [system] [no_undeclared_includes] {
 % if CMAKE_SDK in ["LINUX", "ANDROID", "OPENBSD"]:
       link "m"
 % end
