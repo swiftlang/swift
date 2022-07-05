@@ -124,6 +124,7 @@ void swift_distributed_execute_target(
     void **decoderWitnessTable) {
   auto *accessor = findDistributedAccessor(targetNameStart, targetNameLength);
   if (!accessor) {
+    fprintf(stderr, "[%s:%d] (%s) FAILED TO ACCESS: %s\n", __FILE__, __LINE__, __FUNCTION__, llvm::StringRef(targetNameStart, targetNameLength));
     assert(false && "no distributed accessor");
     return; // FIXME(distributed): return -1 here so the lib can fail the call
   }
