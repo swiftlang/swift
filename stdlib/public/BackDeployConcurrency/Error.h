@@ -18,8 +18,8 @@
 #define SWIFT_CONCURRENCY_ERRORS_H
 
 #include "swift/Basic/Compiler.h"
+#include "swift/Basic/Visibility.h"
 
-#include "../SwiftShims/Visibility.h"
 #include <cstdarg>
 #include <cstdint>
 #include <cstdlib>

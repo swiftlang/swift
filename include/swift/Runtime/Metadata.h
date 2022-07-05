@@ -18,9 +18,9 @@
 #define SWIFT_RUNTIME_METADATA_H
 
 #include "swift/ABI/Metadata.h"
+#include "swift/Basic/Visibility.h"
 #include "swift/Reflection/Records.h"
 #include "swift/Runtime/Once.h"
-#include "../../../stdlib/public/SwiftShims/Visibility.h"
 
 namespace swift {
 

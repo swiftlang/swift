@@ -22,7 +22,7 @@
 #if SWIFT_HAVE_CRASHREPORTERCLIENT
 
 // For SWIFT_LIBRARY_VISIBILITY
-#include "../../stdlib/public/SwiftShims/Visibility.h"
+#include "swift/Basic/Visibility.h"
 
 #include <inttypes.h>
 

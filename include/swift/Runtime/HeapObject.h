@@ -28,7 +28,7 @@
 
 // Bring in the definition of HeapObject 
 #include "../../../stdlib/public/SwiftShims/HeapObject.h"
-#include "../../../stdlib/public/SwiftShims/Visibility.h"
+#include "swift/Basic/Visibility.h"
 
 namespace swift {
   

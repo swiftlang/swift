@@ -21,8 +21,8 @@
 #include <new>
 #include <utility>
 
+#include "swift/Basic/Visibility.h"
 #include "swift/Runtime/Config.h"
-#include "../../../stdlib/public/SwiftShims/Visibility.h"
 
 namespace swift {
 // Allocate plain old memory. This is the generalized entry point

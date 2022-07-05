@@ -17,7 +17,7 @@
 #include "swift/Runtime/Metadata.h"
 #include "swift/Threading/Mutex.h"
 
-#include "../SwiftShims/Visibility.h"
+#include "swift/Basic/Visibility.h"
 
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/STLExtras.h"

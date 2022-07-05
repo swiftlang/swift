@@ -19,11 +19,11 @@
 
 #include <functional>
 
+#include "swift/Basic/Visibility.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/TypeLookupError.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Metadata.h"
-#include "../SwiftShims/Visibility.h"
 
 #if defined(__APPLE__) && __has_include(<TargetConditionals.h>)
 #include <TargetConditionals.h>

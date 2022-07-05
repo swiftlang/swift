@@ -166,7 +166,7 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #endif
 
 // Bring in visibility attribute macros
-#include "../../../stdlib/public/SwiftShims/Visibility.h"
+#include "swift/Basic/Visibility.h"
 
 // Define mappings for calling conventions.
 

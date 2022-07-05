@@ -10,11 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "../SwiftShims/Visibility.h"
 #include "Private.h"
 #include "SwiftHashableSupport.h"
 #include "SwiftValue.h"
 #include "swift/Basic/Lazy.h"
+#include "swift/Basic/Visibility.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/Config.h"
