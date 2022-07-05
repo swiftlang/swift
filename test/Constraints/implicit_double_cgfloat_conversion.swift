@@ -216,3 +216,22 @@ func test_multi_argument_conversion_with_optional(d: Double, cgf: CGFloat) {
 
   test(cgf, d) // Ok (CGFloat -> Double and Double? -> CGFloat?)
 }
+
+func test_array_literal_as_call_argument() {
+  enum E {
+    case test_arr([CGFloat])
+  }
+
+  struct Container {
+    var prop: E
+  }
+
+  struct Point {
+    var x: Double
+    var y: Double
+  }
+
+  func test(cont: inout Container, point: Point) {
+    cont.prop = .test_arr([point.x]) // Ok
+  }
+}
