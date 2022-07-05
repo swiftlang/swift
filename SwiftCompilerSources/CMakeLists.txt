@@ -87,6 +87,10 @@ function(add_swift_compiler_modules_library name)
     list(APPEND swift_compile_options "-O" "-cross-module-optimization")
   endif()
 
+  if(NOT SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT)
+    list(APPEND swift_compile_options "-Xfrontend" "-disable-legacy-type-info")
+  endif()
+
   get_bootstrapping_path(build_dir ${CMAKE_CURRENT_BINARY_DIR} "${ALS_BOOTSTRAPPING}")
 
   set(sdk_option "")
@@ -267,7 +271,7 @@ else()
         list(APPEND b1_deps copy-libstdcxx-modulemap-bootstrapping1 copy-libstdcxx-header-bootstrapping1)
       endif()
     endif()
-    if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
+    if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS AND SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT)
       set(platform ${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR})
       set(compatibility_libs
           "swiftCompatibility50-${platform}"
