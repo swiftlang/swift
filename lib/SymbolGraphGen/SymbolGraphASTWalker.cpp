@@ -37,10 +37,12 @@ bool areModulesEqual(const ModuleDecl *lhs, const ModuleDecl *rhs, bool ignoreUn
 
 SymbolGraphASTWalker::SymbolGraphASTWalker(ModuleDecl &M,
                                            const SmallPtrSet<ModuleDecl *, 4> ExportedImportedModules,
+                                           const llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> QualifiedExportedImports,
                                            const SymbolGraphOptions &Options)
   : Options(Options),
     M(M),
     ExportedImportedModules(ExportedImportedModules),
+    QualifiedExportedImports(QualifiedExportedImports),
     MainGraph(*this, M, None, Ctx) {}
 
 /// Get a "sub" symbol graph for the parent module of a type that
@@ -48,12 +50,15 @@ SymbolGraphASTWalker::SymbolGraphASTWalker(ModuleDecl &M,
 SymbolGraph *SymbolGraphASTWalker::getModuleSymbolGraph(const Decl *D) {
   auto *M = D->getModuleContext();
   const auto *DC = D->getDeclContext();
+  const Decl *ExtendedNominal = nullptr;
   while (DC) {
     M = DC->getParentModule();
     if (const auto *NTD = dyn_cast_or_null<NominalTypeDecl>(DC->getAsDecl())) {
       DC = NTD->getDeclContext();
     } else if (const auto *Ext = dyn_cast_or_null<ExtensionDecl>(DC->getAsDecl())) {
       DC = Ext->getExtendedNominal()->getDeclContext();
+      if (!ExtendedNominal)
+        ExtendedNominal = Ext->getExtendedNominal();
     } else {
       DC = nullptr;
     }
@@ -67,8 +72,14 @@ SymbolGraph *SymbolGraphASTWalker::getModuleSymbolGraph(const Decl *D) {
     // should put actual extensions of that module into the main graph
     return &MainGraph;
   }
-  
-  if (isExportedImportedModule(M)) {
+
+  // Check the module and decl separately since the extension could be from a different module
+  // than the decl itself.
+  if (isExportedImportedModule(M) || isQualifiedExportedImport(D)) {
+    return &MainGraph;
+  }
+
+  if (ExtendedNominal && isFromExportedImportedModule(ExtendedNominal)) {
     return &MainGraph;
   }
   
@@ -232,7 +243,13 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
 
 bool SymbolGraphASTWalker::isFromExportedImportedModule(const Decl* D) const {
   auto *M = D->getModuleContext();
-  return isExportedImportedModule(M);
+  return isQualifiedExportedImport(D) || isExportedImportedModule(M);
+}
+
+bool SymbolGraphASTWalker::isQualifiedExportedImport(const Decl *D) const {
+  return llvm::any_of(QualifiedExportedImports, [&D](const auto &QI) {
+    return QI.getSecond().contains(D);
+  });
 }
 
 bool SymbolGraphASTWalker::isExportedImportedModule(const ModuleDecl *M) const {

@@ -59,14 +59,14 @@ symbolgraphgen::emitSymbolGraphForModule(ModuleDecl *M,
   swift::getTopLevelDeclsForDisplay(M, ModuleDecls, /*recursive*/true);
   
   SmallPtrSet<ModuleDecl *, 4> ExportedImportedModules;
-  swift::collectParsedExportedImports(M, ExportedImportedModules, ModuleDecls,
-                                      /*AddQualifiedImportModules*/ true);
+  llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> QualifiedImports;
+  swift::collectParsedExportedImports(M, ExportedImportedModules, QualifiedImports);
 
   if (Options.PrintMessages)
     llvm::errs() << ModuleDecls.size()
         << " top-level declarations in this module.\n";
     
-  SymbolGraphASTWalker Walker(*M, ExportedImportedModules, Options);
+  SymbolGraphASTWalker Walker(*M, ExportedImportedModules, QualifiedImports, Options);
 
   for (auto *Decl : ModuleDecls) {
     Walker.walk(Decl);
@@ -103,7 +103,8 @@ printSymbolGraphForDecl(const ValueDecl *D, Type BaseTy,
 
   llvm::json::OStream JOS(OS, Options.PrettyPrint ? 2 : 0);
   ModuleDecl *MD = D->getModuleContext();
-  SymbolGraphASTWalker Walker(*MD, {}, Options);
+  llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> QualifiedImports;
+  SymbolGraphASTWalker Walker(*MD, {}, QualifiedImports, Options);
   markup::MarkupContext MarkupCtx;
   SymbolGraph Graph(Walker, *MD, None, MarkupCtx, None,
                     /*IsForSingleNode=*/true);
