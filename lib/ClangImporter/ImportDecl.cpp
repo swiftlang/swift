@@ -2117,12 +2117,13 @@ namespace {
         }
 
         if (auto friendDecl = dyn_cast<clang::FriendDecl>(m)) {
-          m = friendDecl->getFriendDecl();
-
-          auto lookupTable = Impl.findLookupTable(m->getOwningModule());
-          addEntryToLookupTable(*lookupTable,
-                                friendDecl->getFriendDecl(),
-                                Impl.getNameImporter());
+          if (friendDecl->getFriendDecl() &&
+              isa<clang::FunctionDecl>(friendDecl->getFriendDecl())) {
+            m = friendDecl->getFriendDecl();
+            auto lookupTable = Impl.findLookupTable(m->getOwningModule());
+            addEntryToLookupTable(*lookupTable, friendDecl->getFriendDecl(),
+                                  Impl.getNameImporter());
+          }
         }
 
         auto nd = dyn_cast<clang::NamedDecl>(m);
@@ -2154,6 +2155,7 @@ namespace {
         }
 
         Decl *member = Impl.importDecl(nd, getActiveSwiftVersion());
+
         if (!member) {
           if (!isa<clang::TypeDecl>(nd) && !isa<clang::FunctionDecl>(nd)) {
             // We don't know what this member is.
