@@ -49,6 +49,8 @@ struct SymbolGraphASTWalker : public SourceEntityWalker {
     
   const SmallPtrSet<ModuleDecl *, 4> ExportedImportedModules;
 
+  const llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> QualifiedExportedImports;
+
   /// The symbol graph for the main module of interest.
   SymbolGraph MainGraph;
 
@@ -59,6 +61,7 @@ struct SymbolGraphASTWalker : public SourceEntityWalker {
   
   SymbolGraphASTWalker(ModuleDecl &M,
                        const SmallPtrSet<ModuleDecl *, 4> ExportedImportedModules,
+                       const llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> QualifiedExportedImports,
                        const SymbolGraphOptions &Options);
   virtual ~SymbolGraphASTWalker() {}
 
@@ -96,6 +99,9 @@ struct SymbolGraphASTWalker : public SourceEntityWalker {
   
   /// Returns whether the given declaration comes from an `@_exported import` module.
   virtual bool isFromExportedImportedModule(const Decl *D) const;
+
+  /// Returns whether the given declaration was imported via an `@_exported import <type>` declaration.
+  virtual bool isQualifiedExportedImport(const Decl *D) const;
 
   /// Returns whether the given module is an `@_exported import` module.
   virtual bool isExportedImportedModule(const ModuleDecl *M) const;
