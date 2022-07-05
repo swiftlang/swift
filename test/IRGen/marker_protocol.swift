@@ -78,3 +78,10 @@ struct Foo: SelfConstrainedProtocol {
     Foo(x: 123)
   }
 }
+
+protocol P2 {
+  associatedtype Foo
+}
+
+// CHECK: define{{.*}}$s15marker_protocol3fooyy3FooQz_xtAA1PRzAA2P2RzlF
+func foo<T: P & P2>(_: T.Foo, _: T) { }
