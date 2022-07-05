@@ -483,6 +483,7 @@ private:
           witness.getDerivativeGenericSignature(), witnessRef.getASTContext());
       witnessRef = witnessRef.asAutoDiffDerivativeFunction(witnessDerivativeId);
     }
+
     return witnessRef;
   }
 };
@@ -694,6 +695,29 @@ SILFunction *SILGenModule::emitProtocolWitness(
   auto requirementInfo =
       Types.getConstantInfo(TypeExpansionContext::minimal(), requirement);
 
+  auto shouldUseDistributedThunkWitness =
+      // always use a distributed thunk for distributed requirements:
+      requirement.isDistributedThunk() ||
+      // for non-distributed requirements, which are however async/throws,
+      // and have a proper witness (passed typechecking), we can still invoke
+      // them on the distributed actor; but must do so through the distributed
+      // thunk as the call "through an existential" we never statically know
+      // if the actor is local or not.
+      (requirement.hasDecl() && requirement.getFuncDecl() && requirement.hasAsync() &&
+       !requirement.getFuncDecl()->isDistributed() &&
+       witnessRef.hasDecl() && witnessRef.getFuncDecl() &&
+       witnessRef.getFuncDecl()->isDistributed());
+  // We only need to use thunks when we go cross-actor:
+  shouldUseDistributedThunkWitness = shouldUseDistributedThunkWitness &&
+                                     getActorIsolation(requirement.getDecl()) !=
+                                         getActorIsolation(witness.getDecl());
+  if (shouldUseDistributedThunkWitness) {
+    auto thunkDeclRef = SILDeclRef(
+        witnessRef.getFuncDecl()->getDistributedThunk(),
+        SILDeclRef::Kind::Func);
+    witnessRef = thunkDeclRef.asDistributed();
+  }
+
   // Work out the lowered function type of the SIL witness thunk.
   auto reqtOrigTy = cast<GenericFunctionType>(requirementInfo.LoweredType);
 
@@ -779,6 +803,10 @@ SILFunction *SILGenModule::emitProtocolWitness(
     }
     nameBuffer = "AD__" + nameBuffer + "_" + kindString + "_" +
                  derivativeId->getParameterIndices()->getString();
+  }
+
+  if (requirement.isDistributedThunk()) {
+    nameBuffer = nameBuffer + "TE";
   }
 
   // If the thunked-to function is set to be always inlined, do the
