@@ -3602,6 +3602,13 @@ AttributeChecker::visitImplementationOnlyAttr(ImplementationOnlyAttr *attr) {
         overrideInterfaceFuncTy->getResult(), overrideInterfaceInfo);
   }
 
+  // If @preconcurrency is involved, strip concurrency from the types before
+  // comparing them.
+  if (overridden->preconcurrency() || VD->preconcurrency()) {
+    derivedInterfaceTy = derivedInterfaceTy->stripConcurrency(true, false);
+    overrideInterfaceTy = overrideInterfaceTy->stripConcurrency(true, false);
+  }
+
   if (!derivedInterfaceTy->isEqual(overrideInterfaceTy)) {
     diagnose(VD, diag::implementation_only_override_changed_type,
              overrideInterfaceTy);
