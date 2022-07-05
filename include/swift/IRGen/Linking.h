@@ -17,6 +17,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolAssociations.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/RequirementSignature.h"
 #include "swift/AST/Types.h"
 #include "swift/IRGen/ValueWitness.h"
 #include "swift/SIL/SILFunction.h"
@@ -45,6 +46,7 @@ class UniversalLinkageInfo {
 public:
   bool IsELFObject;
   bool UseDLLStorage;
+  bool Internalize;
 
   /// True iff are multiple llvm modules.
   bool HasMultipleIGMs;
@@ -56,7 +58,7 @@ public:
   explicit UniversalLinkageInfo(IRGenModule &IGM);
 
   UniversalLinkageInfo(const llvm::Triple &triple, bool hasMultipleIGMs,
-                       bool forcePublicDecls);
+                       bool forcePublicDecls, bool isStaticLibrary);
 
   /// In case of multiple llvm modules (in multi-threaded compilation) all
   /// private decls must be visible from other files.
@@ -69,9 +71,9 @@ public:
   /// duplicate symbols.
   bool needLinkerToMergeDuplicateSymbols() const { return HasMultipleIGMs; }
 
-  /// This  is used  by  the  LLDB expression  evaluator  since an  expression's
-  /// llvm::Module  may   need  to  access   private  symbols  defined   in  the
-  /// expression's  context.  This  flag  ensures  that  private  accessors  are
+  /// This is used by the LLDB expression evaluator since an expression's
+  /// llvm::Module may need to access private symbols defined in the
+  /// expression's context. This flag ensures that private accessors are
   /// forward-declared as public external in the expression's module.
   bool forcePublicDecls() const { return ForcePublicDecls; }
 };
@@ -117,6 +119,12 @@ class LinkEntity {
     // This field appears in SILFunction.
     IsDynamicallyReplaceableImplShift = 8,
     IsDynamicallyReplaceableImplMask = ~KindMask,
+
+    // These fields appear in ExtendedExistentialTypeShape.
+    ExtendedExistentialIsUniqueShift = 8,
+    ExtendedExistentialIsUniqueMask = 0x100,
+    ExtendedExistentialIsSharedShift = 9,
+    ExtendedExistentialIsSharedMask = 0x200,
   };
 #define LINKENTITY_SET_FIELD(field, value) (value << field##Shift)
 #define LINKENTITY_GET_FIELD(value, field) ((value & field##Mask) >> field##Shift)
@@ -152,6 +160,10 @@ class LinkEntity {
     /// constructor.  The pointer is a ConstructorDecl* inside a protocol or
     /// a class.
     DispatchThunkAllocatorAsyncFunctionPointer,
+
+    /// An async function pointer for a distributed thunk.
+    /// The pointer is a FuncDecl* inside an actor (class).
+    DistributedThunkAsyncFunctionPointer,
 
     /// A method descriptor.  The pointer is a FuncDecl* inside a protocol
     /// or a class.
@@ -218,9 +230,17 @@ class LinkEntity {
     /// The pointer is a NominalTypeDecl*.
     NominalTypeDescriptor,
 
+    /// The nominal type descriptor runtime record for a nominal type.
+    /// The pointer is a NominalTypeDecl*.
+    NominalTypeDescriptorRecord,
+
     /// The descriptor for an opaque type.
     /// The pointer is an OpaqueTypeDecl*.
     OpaqueTypeDescriptor,
+
+    /// The runtime record for a descriptor for an opaque type.
+    /// The pointer is an OpaqueTypeDecl*.
+    OpaqueTypeDescriptorRecord,
 
     /// The descriptor accessor for an opaque type used for dynamic functions.
     /// The pointer is an OpaqueTypeDecl*.
@@ -267,6 +287,10 @@ class LinkEntity {
     /// The protocol descriptor for a protocol type.
     /// The pointer is a ProtocolDecl*.
     ProtocolDescriptor,
+
+    /// The protocol descriptor runtime record for a protocol type.
+    /// The pointer is a ProtocolDecl*.
+    ProtocolDescriptorRecord,
 
     /// The alias referring to the base of the requirements within the
     /// protocol descriptor, which is used to determine the offset of a
@@ -340,6 +364,9 @@ class LinkEntity {
     /// A SIL global variable. The pointer is a SILGlobalVariable*.
     SILGlobalVariable,
 
+    /// An outlined read-only global object. The pointer is a SILGlobalVariable*.
+    ReadOnlyGlobalObject,
+
     // These next few are protocol-conformance kinds.
 
     /// A direct protocol witness table. The secondary pointer is a
@@ -367,6 +394,10 @@ class LinkEntity {
     /// The protocol conformance descriptor for a conformance.
     /// The pointer is a RootProtocolConformance*.
     ProtocolConformanceDescriptor,
+
+    /// The protocol conformance descriptor runtime record for a conformance.
+    /// The pointer is a RootProtocolConformance*.
+    ProtocolConformanceDescriptorRecord,
 
     // These are both type kinds and protocol-conformance kinds.
 
@@ -461,6 +492,21 @@ class LinkEntity {
     /// name is known.
     /// The pointer is a const char* of the name.
     KnownAsyncFunctionPointer,
+
+    /// The pointer is SILFunction*
+    DistributedAccessor,
+    /// An async function pointer for a distributed accessor (method or property).
+    /// The pointer is a SILFunction*.
+    DistributedAccessorAsyncPointer,
+
+    /// Accessible function record, which describes a function that can be
+    /// looked up by name by the runtime.
+    AccessibleFunctionRecord,
+
+    /// Extended existential type shape.
+    /// Pointer is the (generalized) existential type.
+    /// SecondaryPointer is the GenericSignatureImpl*.
+    ExtendedExistentialTypeShape,
   };
   friend struct llvm::DenseMapInfo<LinkEntity>;
 
@@ -477,6 +523,7 @@ class LinkEntity {
 
   static bool isRootProtocolConformanceKind(Kind k) {
     return (k == Kind::ProtocolConformanceDescriptor ||
+            k == Kind::ProtocolConformanceDescriptorRecord ||
             k == Kind::ProtocolWitnessTable);
   }
 
@@ -576,7 +623,7 @@ class LinkEntity {
                                                 CanType associatedType,
                                                 ProtocolDecl *requirement) {
     unsigned index = 0;
-    for (const auto &reqt : proto->getRequirementSignature()) {
+    for (const auto &reqt : proto->getRequirementSignature().getRequirements()) {
       if (reqt.getKind() == RequirementKind::Conformance &&
           reqt.getFirstType()->getCanonicalType() == associatedType &&
           reqt.getProtocolDecl() == requirement) {
@@ -600,7 +647,7 @@ class LinkEntity {
   static std::pair<CanType, ProtocolDecl*>
   getAssociatedConformanceByIndex(const ProtocolDecl *proto,
                                   unsigned index) {
-    auto &reqt = proto->getRequirementSignature()[index];
+    auto &reqt = proto->getRequirementSignature().getRequirements()[index];
     assert(reqt.getKind() == RequirementKind::Conformance);
     return { reqt.getFirstType()->getCanonicalType(),
              reqt.getProtocolDecl() };
@@ -830,9 +877,21 @@ public:
     return entity;
   }
 
+  static LinkEntity forNominalTypeDescriptorRecord(NominalTypeDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::NominalTypeDescriptorRecord, decl);
+    return entity;
+  }
+
   static LinkEntity forOpaqueTypeDescriptor(OpaqueTypeDecl *decl) {
     LinkEntity entity;
     entity.setForDecl(Kind::OpaqueTypeDescriptor, decl);
+    return entity;
+  }
+
+  static LinkEntity forOpaqueTypeDescriptorRecord(OpaqueTypeDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::OpaqueTypeDescriptorRecord, decl);
     return entity;
   }
 
@@ -898,6 +957,12 @@ public:
     return entity;
   }
 
+  static LinkEntity forProtocolDescriptorRecord(ProtocolDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::ProtocolDescriptorRecord, decl);
+    return entity;
+  }
+
   static LinkEntity forProtocolRequirementsBaseDescriptor(ProtocolDecl *decl) {
     LinkEntity entity;
     entity.setForDecl(Kind::ProtocolRequirementsBaseDescriptor, decl);
@@ -931,13 +996,7 @@ public:
     return entity;
   }
 
-  static LinkEntity forSILGlobalVariable(SILGlobalVariable *G) {
-    LinkEntity entity;
-    entity.Pointer = G;
-    entity.SecondaryPointer = nullptr;
-    entity.Data = LINKENTITY_SET_FIELD(Kind, unsigned(Kind::SILGlobalVariable));
-    return entity;
-  }
+  static LinkEntity forSILGlobalVariable(SILGlobalVariable *G, IRGenModule &IGM);
 
   static LinkEntity
   forDifferentiabilityWitness(const SILDifferentiabilityWitness *witness) {
@@ -1066,6 +1125,14 @@ public:
     return entity;
   }
 
+  static LinkEntity
+  forProtocolConformanceDescriptorRecord(const RootProtocolConformance *C) {
+    LinkEntity entity;
+    entity.setForProtocolConformance(Kind::ProtocolConformanceDescriptorRecord,
+                                     C);
+    return entity;
+  }
+
   static LinkEntity forCoroutineContinuationPrototype(CanSILFunctionType type) {
     LinkEntity entity;
     entity.setForType(Kind::CoroutineContinuationPrototype, type);
@@ -1189,6 +1256,13 @@ public:
           Kind, unsigned(LinkEntity::Kind::PartialApplyForwarderAsyncFunctionPointer));
       break;
 
+    case LinkEntity::Kind::DistributedAccessor: {
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind,
+          unsigned(LinkEntity::Kind::DistributedAccessorAsyncPointer));
+      break;
+    }
+
     default:
       llvm_unreachable("Link entity kind cannot have an async function pointer");
     }
@@ -1198,7 +1272,9 @@ public:
 
   static LinkEntity forAsyncFunctionPointer(SILDeclRef declRef) {
     LinkEntity entity;
-    entity.setForDecl(Kind::AsyncFunctionPointerAST,
+    entity.setForDecl(declRef.isDistributedThunk()
+                          ? Kind::DistributedThunkAsyncFunctionPointer
+                          : Kind::AsyncFunctionPointerAST,
                       declRef.getAbstractFunctionDecl());
     entity.SecondaryPointer =
         reinterpret_cast<void *>(static_cast<uintptr_t>(declRef.kind));
@@ -1211,6 +1287,24 @@ public:
     entity.SecondaryPointer = nullptr;
     entity.Data =
         LINKENTITY_SET_FIELD(Kind, unsigned(Kind::KnownAsyncFunctionPointer));
+    return entity;
+  }
+
+  static LinkEntity forDistributedTargetAccessor(SILFunction *target) {
+    LinkEntity entity;
+    entity.Pointer = target;
+    entity.SecondaryPointer = nullptr;
+    entity.Data =
+        LINKENTITY_SET_FIELD(Kind, unsigned(Kind::DistributedAccessor));
+    return entity;
+  }
+
+  static LinkEntity forAccessibleFunctionRecord(SILFunction *func) {
+    LinkEntity entity;
+    entity.Pointer = func;
+    entity.SecondaryPointer = nullptr;
+    entity.Data =
+        LINKENTITY_SET_FIELD(Kind, unsigned(Kind::AccessibleFunctionRecord));
     return entity;
   }
 
@@ -1245,6 +1339,11 @@ public:
           Kind, unsigned(LinkEntity::Kind::PartialApplyForwarder));
       break;
 
+    case LinkEntity::Kind::DistributedAccessorAsyncPointer:
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind, unsigned(LinkEntity::Kind::DistributedAccessor));
+      break;
+
     default:
       llvm_unreachable("Link entity is not an async function pointer");
     }
@@ -1261,10 +1360,31 @@ public:
     return entity;
   }
 
+  static LinkEntity forExtendedExistentialTypeShape(CanGenericSignature genSig,
+                                                    CanType existentialType,
+                                                    bool isUnique,
+                                                    bool isShared) {
+    LinkEntity entity;
+    entity.Pointer = existentialType.getPointer();
+    entity.SecondaryPointer =
+      const_cast<GenericSignatureImpl*>(genSig.getPointer());
+    entity.Data =
+        LINKENTITY_SET_FIELD(Kind, unsigned(Kind::ExtendedExistentialTypeShape))
+      | LINKENTITY_SET_FIELD(ExtendedExistentialIsUnique, unsigned(isUnique))
+      | LINKENTITY_SET_FIELD(ExtendedExistentialIsShared, unsigned(isShared));
+    return entity;
+  }
+
   void mangle(llvm::raw_ostream &out) const;
   void mangle(SmallVectorImpl<char> &buffer) const;
   std::string mangleAsString() const;
+
+  SILDeclRef getSILDeclRef() const;
   SILLinkage getLinkage(ForDefinition_t isDefinition) const;
+
+  bool hasDecl() const {
+    return isDeclKind(getKind());
+  }
 
   const ValueDecl *getDecl() const {
     assert(isDeclKind(getKind()));
@@ -1286,7 +1406,9 @@ public:
     return getKind() == Kind::AsyncFunctionPointer ||
            getKind() == Kind::DynamicallyReplaceableFunctionVariable ||
            getKind() == Kind::DynamicallyReplaceableFunctionKey ||
-           getKind() == Kind::SILFunction;
+           getKind() == Kind::SILFunction ||
+           getKind() == Kind::DistributedAccessor ||
+           getKind() == Kind::AccessibleFunctionRecord;
   }
 
   SILFunction *getSILFunction() const {
@@ -1295,7 +1417,8 @@ public:
   }
 
   SILGlobalVariable *getSILGlobalVariable() const {
-    assert(getKind() == Kind::SILGlobalVariable);
+    assert(getKind() == Kind::SILGlobalVariable ||
+           getKind() == Kind::ReadOnlyGlobalObject);
     return reinterpret_cast<SILGlobalVariable*>(Pointer);
   }
 
@@ -1344,6 +1467,27 @@ public:
            getKind() == Kind::MethodDescriptorDerivative);
     return reinterpret_cast<AutoDiffDerivativeFunctionIdentifier*>(
         SecondaryPointer);
+  }
+
+  CanGenericSignature getExtendedExistentialTypeShapeGenSig() const {
+    assert(getKind() == Kind::ExtendedExistentialTypeShape);
+    return CanGenericSignature(
+             reinterpret_cast<const GenericSignatureImpl*>(SecondaryPointer));
+  }
+
+  CanType getExtendedExistentialTypeShapeType() const {
+    assert(getKind() == Kind::ExtendedExistentialTypeShape);
+    return CanType(reinterpret_cast<TypeBase*>(Pointer));
+  }
+
+  bool isExtendedExistentialTypeShapeUnique() const {
+    assert(getKind() == Kind::ExtendedExistentialTypeShape);
+    return LINKENTITY_GET_FIELD(Data, ExtendedExistentialIsUnique);
+  }
+
+  bool isExtendedExistentialTypeShapeShared() const {
+    assert(getKind() == Kind::ExtendedExistentialTypeShape);
+    return LINKENTITY_GET_FIELD(Data, ExtendedExistentialIsShared);
   }
 
   bool isDynamicallyReplaceable() const {

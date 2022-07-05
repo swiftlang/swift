@@ -20,6 +20,10 @@
 // RUN: cd %t.dir && %swift_driver_plain -### t.swift 2>&1 | %FileCheck -check-prefix=CHECK-SWIFT-INVOKES-INTERPRETER %s
 // RUN: cd %t.dir && %swift_driver_plain -### subpath/build 2>&1 | %FileCheck -check-prefix=CHECK-SWIFT-INVOKES-INTERPRETER %s
 
+// swift-frontend cannot be copied to another location with bootstrapping because
+// it will not find the libswiftCore library with its relative RPATH.
+// UNSUPPORTED: bootstrapping_mode
+
 // CHECK-SWIFT-INVOKES-INTERPRETER: {{.*}}/swift-frontend -frontend -interpret
 
 

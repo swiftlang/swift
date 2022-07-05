@@ -340,16 +340,12 @@ UnresolvedMemberExpr *TypeChecker::getUnresolvedMemberChainBase(Expr *expr) {
     return dyn_cast<UnresolvedMemberExpr>(expr);
 }
 
-/// Whether this expression is a member of a member chain.
-static bool isMemberChainMember(Expr *expr) {
-  return getMemberChainSubExpr(expr) != nullptr;
-}
 /// Whether this expression sits at the end of a chain of member accesses.
 static bool isMemberChainTail(Expr *expr, Expr *parent) {
   assert(expr && "isMemberChainTail called with null expr!");
   // If this expression's parent is not itself part of a chain (or, this expr
   // has no parent expr), this must be the tail of the chain.
-  return parent == nullptr || !isMemberChainMember(parent);
+  return !parent || getMemberChainSubExpr(parent) != expr;
 }
 
 static bool isValidForwardReference(ValueDecl *D, DeclContext *DC,
@@ -590,10 +586,23 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     }
 
     auto emitBasicError = [&] {
-      Context.Diags
-          .diagnose(Loc, diag::cannot_find_in_scope, Name,
-                    Name.isOperator())
-          .highlight(UDRE->getSourceRange());
+      
+      if (Name.isSimpleName(Context.Id_self)) {
+        // `self` gets diagnosed with a different error when it can't be found.
+        Context.Diags
+            .diagnose(Loc, diag::cannot_find_self_in_scope)
+            .highlight(UDRE->getSourceRange());
+      } else {
+        Context.Diags
+            .diagnose(Loc, diag::cannot_find_in_scope, Name,
+                      Name.isOperator())
+            .highlight(UDRE->getSourceRange());
+      }
+
+      if (!Context.LangOpts.DisableExperimentalClangImporterDiagnostics) {
+        Context.getClangModuleLoader()->diagnoseTopLevelValue(
+            Name.getFullName());
+      }
     };
 
     if (!isConfused) {
@@ -603,7 +612,6 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
 
           if (typeContext->getSelfClassDecl())
             SelfType = DynamicSelfType::get(SelfType, Context);
-          SelfType = DC->mapTypeIntoContext(SelfType);
           return new (Context)
               TypeExpr(new (Context) FixedTypeRepr(SelfType, Loc));
         }
@@ -668,7 +676,11 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     if (UDRE->isImplicit()) {
       return TypeExpr::createImplicitForDecl(
           UDRE->getNameLoc(), D, LookupDC,
-          LookupDC->mapTypeIntoContext(D->getInterfaceType()));
+          // It might happen that LookupDC is null if this is checking
+          // synthesized code, in that case, don't map the type into context,
+          // but return as is -- the synthesis should ensure the type is correct.
+          LookupDC ? LookupDC->mapTypeIntoContext(D->getInterfaceType())
+                   : D->getInterfaceType());
     } else {
       return TypeExpr::createForDecl(UDRE->getNameLoc(), D, LookupDC);
     }
@@ -754,10 +766,27 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
                                            /*Implicit=*/true);
     }
 
+    auto isInClosureContext = [&](ValueDecl *decl) -> bool {
+      auto *DC = decl->getDeclContext();
+      do {
+        if (dyn_cast<ClosureExpr>(DC))
+          return true;
+      } while ((DC = DC->getParent()));
+
+      return false;
+    };
+
     llvm::SmallVector<ValueDecl *, 4> outerAlternatives;
     (void)findNonMembers(Lookup.outerResults(), UDRE->getRefKind(),
                          /*breakOnMember=*/false, outerAlternatives,
-                         /*isValid=*/[](ValueDecl *choice) -> bool {
+                         /*isValid=*/[&](ValueDecl *choice) -> bool {
+                           // Values that are defined in a closure
+                           // that hasn't been type-checked yet,
+                           // cannot be outer candidates.
+                           if (isInClosureContext(choice)) {
+                             return choice->hasInterfaceType() &&
+                                    !choice->isInvalid();
+                           }
                            return !choice->isInvalid();
                          });
 
@@ -898,6 +927,8 @@ namespace {
     /// implicit `ErrorExpr` in place of invalid references.
     bool UseErrorExprs;
 
+    bool LeaveClosureBodiesUnchecked;
+
     /// A stack of expressions being walked, used to determine where to
     /// insert RebindSelfInConstructorExpr nodes.
     llvm::SmallVector<Expr *, 8> ExprStack;
@@ -908,9 +939,6 @@ namespace {
     /// The expression that will be wrapped by a RebindSelfInConstructorExpr
     /// node when visited.
     Expr *UnresolvedCtorRebindTarget = nullptr;
-
-    /// The expressions that are direct arguments of call expressions.
-    llvm::SmallPtrSet<Expr *, 4> CallArgs;
 
     /// Keep track of acceptable DiscardAssignmentExpr's.
     llvm::SmallPtrSet<DiscardAssignmentExpr*, 2> CorrectDiscardAssignmentExprs;
@@ -933,6 +961,9 @@ namespace {
 
     /// Simplify constructs like `UInt32(1)` into `1 as UInt32` if
     /// the type conforms to the expected literal protocol.
+    ///
+    /// \returns Either a transformed expression, or `ErrorExpr` upon type
+    /// resolution failure, or `nullptr` if transformation is not applicable.
     Expr *simplifyTypeConstructionWithLiteralArg(Expr *E);
 
     /// Whether the current expression \p E is in a context that might turn out
@@ -948,11 +979,12 @@ namespace {
     bool canSimplifyDiscardAssignmentExpr(DiscardAssignmentExpr *DAE);
 
     /// In Swift < 5, diagnose and correct invalid multi-argument or
-    /// argument-labeled interpolations.
-    void correctInterpolationIfStrange(InterpolatedStringLiteralExpr *ISLE) {
+    /// argument-labeled interpolations. Returns \c true if the AST walk should
+    /// continue, or \c false if it should be aborted.
+    bool correctInterpolationIfStrange(InterpolatedStringLiteralExpr *ISLE) {
       // These expressions are valid in Swift 5+.
       if (getASTContext().isSwiftVersionAtLeast(5))
-        return;
+        return true;
 
       /// Diagnoses appendInterpolation(...) calls with multiple
       /// arguments or argument labels and corrects them.
@@ -978,20 +1010,19 @@ namespace {
           if (!isa<CallExpr>(E))
             return { true, E };
 
-          auto call = cast<CallExpr>(E);
+          auto *call = cast<CallExpr>(E);
+          auto *args = call->getArgs();
+
+          auto lParen = args->getLParenLoc();
+          auto rParen = args->getRParenLoc();
+
           if (auto callee = dyn_cast<UnresolvedDotExpr>(call->getFn())) {
             if (callee->getName().getBaseName() ==
                 Context.Id_appendInterpolation) {
-              Expr *newArg = nullptr;
-              SourceLoc lParen, rParen;
 
-              if (call->getNumArguments() > 1) {
-                auto *args = cast<TupleExpr>(call->getArg());
-
-                lParen = args->getLParenLoc();
-                rParen = args->getRParenLoc();
-                Expr *secondArg = args->getElement(1);
-
+              Optional<Argument> newArg;
+              if (args->size() > 1) {
+                auto *secondArg = args->get(1).getExpr();
                 Context.Diags
                     .diagnose(secondArg->getLoc(),
                               diag::string_interpolation_list_changing)
@@ -1002,18 +1033,27 @@ namespace {
                     .fixItInsertAfter(lParen, "(")
                     .fixItInsert(rParen, ")");
 
-                newArg = args;
-              }
-              else if(call->getNumArguments() == 1 &&
-                      call->getArgumentLabels().front() != Identifier()) {
-                auto *args = cast<TupleExpr>(call->getArg());
-                newArg = args->getElement(0);
+                // Make sure we don't have an inout arg somewhere, as that's
+                // invalid even with the compatibility fix.
+                for (auto arg : *args) {
+                  if (arg.isInOut()) {
+                    Context.Diags.diagnose(arg.getExpr()->getStartLoc(),
+                                           diag::extraneous_address_of);
+                    return {false, nullptr};
+                  }
+                }
 
-                lParen = args->getLParenLoc();
-                rParen = args->getRParenLoc();
+                // Form a new argument tuple from the argument list.
+                auto *packed = args->packIntoImplicitTupleOrParen(Context);
+                newArg = Argument::unlabeled(packed);
+              } else if (args->size() == 1 &&
+                         args->front().getLabel() != Identifier()) {
+                // Form a new argument that drops the label.
+                auto *argExpr = args->front().getExpr();
+                newArg = Argument::unlabeled(argExpr);
 
-                SourceLoc argLabelLoc = call->getArgumentLabelLoc(0),
-                          argLoc = newArg->getStartLoc();
+                SourceLoc argLabelLoc = args->front().getLabelLoc(),
+                          argLoc = argExpr->getStartLoc();
 
                 Context.Diags
                     .diagnose(argLabelLoc,
@@ -1022,7 +1062,7 @@ namespace {
                 Context.Diags
                     .diagnose(argLabelLoc,
                               diag::string_interpolation_remove_label,
-                              call->getArgumentLabels().front())
+                              args->front().getLabel())
                     .fixItRemoveChars(argLabelLoc, argLoc);
               }
 
@@ -1035,9 +1075,11 @@ namespace {
                     DeclNameRef(Context.Id_appendInterpolation),
                     /*nameloc=*/DeclNameLoc(), /*Implicit=*/true);
 
-                E = CallExpr::create(Context, newCallee, lParen, {newArg},
-                                     {Identifier()}, {SourceLoc()}, rParen,
-                                     /*trailingClosures=*/{},
+                auto *newArgList =
+                    ArgumentList::create(Context, lParen, {*newArg}, rParen,
+                                         /*trailingClosureIdx*/ None,
+                                         /*implicit*/ false);
+                E = CallExpr::create(Context, newCallee, newArgList,
                                      /*implicit=*/false);
               }
             }
@@ -1050,7 +1092,7 @@ namespace {
         }
       };
 
-      ISLE->getAppendingExpr()->walk(
+      return ISLE->getAppendingExpr()->walk(
           StrangeInterpolationRewriter(getASTContext()));
     }
 
@@ -1077,9 +1119,11 @@ namespace {
 
   public:
     PreCheckExpression(DeclContext *dc, Expr *parent,
-                       bool replaceInvalidRefsWithErrors)
-        : Ctx(dc->getASTContext()), DC(dc), ParentExpr(parent),
-          UseErrorExprs(replaceInvalidRefsWithErrors) {}
+                       bool replaceInvalidRefsWithErrors,
+                       bool leaveClosureBodiesUnchecked)
+        : Ctx(dc->getASTContext()), DC(dc),
+          ParentExpr(parent), UseErrorExprs(replaceInvalidRefsWithErrors),
+          LeaveClosureBodiesUnchecked(leaveClosureBodiesUnchecked) {}
 
     ASTContext &getASTContext() const { return Ctx; }
 
@@ -1111,34 +1155,13 @@ namespace {
     }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      // If this is a call or subscript, record the argument expression.
-      {
-        if (auto call = dyn_cast<ApplyExpr>(expr)) {
-          if (!isa<SelfApplyExpr>(expr)) {
-            CallArgs.insert(call->getArg());
-          }
-        }
-
-        if (auto *subscript = dyn_cast<SubscriptExpr>(expr)) {
-          CallArgs.insert(subscript->getIndex());
-        }
-
-        if (auto *dynamicSubscript = dyn_cast<DynamicSubscriptExpr>(expr)) {
-          CallArgs.insert(dynamicSubscript->getIndex());
-        }
-
-        if (auto *OLE = dyn_cast<ObjectLiteralExpr>(expr)) {
-          CallArgs.insert(OLE->getArg());
-        }
-      }
-
       // FIXME(diagnostics): `InOutType` could appear here as a result
       // of successful re-typecheck of the one of the sub-expressions e.g.
       // `let _: Int = { (s: inout S) in s.bar() }`. On the first
       // attempt to type-check whole expression `s.bar()` - is going
       // to have a base which points directly to declaration of `S`.
       // But when diagnostics attempts to type-check `s.bar()` standalone
-      // its base would be tranformed into `InOutExpr -> DeclRefExr`,
+      // its base would be transformed into `InOutExpr -> DeclRefExr`,
       // and `InOutType` is going to be recorded in constraint system.
       // One possible way to fix this (if diagnostics still use typecheck)
       // might be to make it so self is not wrapped into `InOutExpr`
@@ -1215,55 +1238,34 @@ namespace {
 
           SourceLoc lastInnerParenLoc;
           // Unwrap to the outermost paren in the sequence.
-          if (isa<ParenExpr>(parent)) {
-            for (;;) {
-              auto nextParent = parents.find(parent);
-              if (nextParent == parents.end())
-                break;
-
-              // e.g. `foo((&bar), x: ...)`
-              if (isa<TupleExpr>(nextParent->second)) {
-                lastInnerParenLoc = cast<ParenExpr>(parent)->getLParenLoc();
-                parent = nextParent->second;
-                break;
-              }
-
-              // e.g. `foo(((&bar))`
-              if (isa<ParenExpr>(nextParent->second)) {
-                lastInnerParenLoc = cast<ParenExpr>(parent)->getLParenLoc();
-                parent = nextParent->second;
-                continue;
-              }
-
+          // e.g. `foo(((&bar))`
+          while (auto *PE = dyn_cast<ParenExpr>(parent)) {
+            auto nextParent = parents.find(parent);
+            if (nextParent == parents.end())
               break;
-            }
+
+            lastInnerParenLoc = PE->getLParenLoc();
+            parent = nextParent->second;
           }
 
-          if (isa<TupleExpr>(parent) || isa<ParenExpr>(parent)) {
-            auto call = parents.find(parent);
-            if (call != parents.end()) {
-              if (isa<ApplyExpr>(call->getSecond()) ||
-                  isa<UnresolvedMemberExpr>(call->getSecond())) {
-                // If outermost paren is associated with a call or
-                // a member reference, it might be valid to have `&`
-                // before all of the parens.
-                if (lastInnerParenLoc.isValid()) {
-                  auto &DE = getASTContext().Diags;
-                  auto diag = DE.diagnose(expr->getStartLoc(),
-                                          diag::extraneous_address_of);
-                  diag.fixItExchange(expr->getLoc(), lastInnerParenLoc);
-                }
-
-                return finish(true, expr);
-              }
-
-              if (isa<SubscriptExpr>(call->getSecond())) {
-                getASTContext().Diags.diagnose(
-                    expr->getStartLoc(),
-                    diag::cannot_pass_inout_arg_to_subscript);
-                return finish(false, nullptr);
-              }
+          if (isa<ApplyExpr>(parent) || isa<UnresolvedMemberExpr>(parent)) {
+            // If outermost paren is associated with a call or
+            // a member reference, it might be valid to have `&`
+            // before all of the parens.
+            if (lastInnerParenLoc.isValid()) {
+              auto &DE = getASTContext().Diags;
+              auto diag = DE.diagnose(expr->getStartLoc(),
+                                      diag::extraneous_address_of);
+              diag.fixItExchange(expr->getLoc(), lastInnerParenLoc);
             }
+            return finish(true, expr);
+          }
+
+          if (isa<SubscriptExpr>(parent)) {
+            getASTContext().Diags.diagnose(
+                expr->getStartLoc(),
+                diag::cannot_pass_inout_arg_to_subscript);
+            return finish(false, nullptr);
           }
         }
 
@@ -1272,8 +1274,10 @@ namespace {
         return finish(false, nullptr);
       }
 
-      if (auto *ISLE = dyn_cast<InterpolatedStringLiteralExpr>(expr))
-        correctInterpolationIfStrange(ISLE);
+      if (auto *ISLE = dyn_cast<InterpolatedStringLiteralExpr>(expr)) {
+        if (!correctInterpolationIfStrange(ISLE))
+          return finish(false, nullptr);
+      }
 
       if (auto *assignment = dyn_cast<AssignExpr>(expr))
         markAcceptableDiscardExprs(assignment->getDest());
@@ -1352,11 +1356,9 @@ namespace {
             if (isa<IdentityExpr>(ancestor) ||
                 isa<ForceValueExpr>(ancestor) ||
                 isa<AnyTryExpr>(ancestor)) {
-              if (!CallArgs.count(ancestor)) {
-                if (target)
-                  target = ancestor;
-                continue;
-              }
+              if (target)
+                target = ancestor;
+              continue;
             }
 
             // No other expression kinds are permitted.
@@ -1432,8 +1434,9 @@ namespace {
         return KPE;
       }
 
-      if (auto *simplified = simplifyTypeConstructionWithLiteralArg(expr))
-        return simplified;
+      if (auto *result = simplifyTypeConstructionWithLiteralArg(expr)) {
+        return isa<ErrorExpr>(result) ? nullptr : result;
+      }
 
       // If we find an unresolved member chain, wrap it in an
       // UnresolvedMemberChainResultExpr (unless this has already been done).
@@ -1449,6 +1452,16 @@ namespace {
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
       return { true, stmt };
     }
+
+    bool walkToDeclPre(Decl *D) override { return isa<PatternBindingDecl>(D); }
+
+    std::pair<bool, Pattern *> walkToPatternPre(Pattern *pattern) override {
+      // Constraint generation is responsible for pattern verification and
+      // type-checking in the body of the closure, so there is no need to
+      // walk into patterns.
+      bool walkIntoPatterns = !isa<ClosureExpr>(DC);
+      return {walkIntoPatterns, pattern};
+    }
   };
 } // end anonymous namespace
 
@@ -1456,8 +1469,10 @@ namespace {
 /// true when we want the body to be considered part of this larger expression.
 bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   // If we won't be checking the body of the closure, don't walk into it here.
-  if (!shouldTypeCheckInEnclosingExpression(closure))
-    return false;
+  if (!closure->hasSingleExpressionBody()) {
+    if (LeaveClosureBodiesUnchecked)
+      return false;
+  }
 
   // Update the current DeclContext to be the closure we're about to
   // recurse into.
@@ -1522,10 +1537,8 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
   // Fold 'T.U' into a nested type.
   if (auto *ITR = dyn_cast<IdentTypeRepr>(InnerTypeRepr)) {
     // Resolve the TypeRepr to get the base type for the lookup.
-    const auto options =
-        TypeResolutionOptions(TypeResolverContext::InExpression);
-    const auto resolution = TypeResolution::forContextual(
-        DC, options,
+    const auto BaseTy = TypeResolution::resolveContextualType(
+        InnerTypeRepr, DC, TypeResolverContext::InExpression,
         [](auto unboundTy) {
           // FIXME: Don't let unbound generic types escape type resolution.
           // For now, just return the unbound generic type.
@@ -1533,10 +1546,7 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
         },
         // FIXME: Don't let placeholder types escape type resolution.
         // For now, just return the placeholder type.
-        [](auto &ctx, auto *originator) {
-          return Type();
-        });
-    const auto BaseTy = resolution.resolveType(InnerTypeRepr);
+        PlaceholderType::get);
 
     if (BaseTy->mayHaveMembers()) {
       // See if there is a member type with this name.
@@ -1583,7 +1593,7 @@ bool PreCheckExpression::possiblyInTypeContext(Expr *E) {
     if (ParentExpr->isValidParentOfTypeExpr(E))
       return true;
 
-    if (!exprLooksLikeAType(ParentExpr) || CallArgs.count(ParentExpr))
+    if (!exprLooksLikeAType(ParentExpr))
       return false;
 
     E = ParentExpr;
@@ -1603,10 +1613,6 @@ bool PreCheckExpression::canSimplifyDiscardAssignmentExpr(
 /// as expressions due to the parser not knowing which identifiers are
 /// type names.
 TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
-  // Don't try simplifying a call argument, because we don't want to
-  // simplify away the required ParenExpr/TupleExpr.
-  if (CallArgs.count(E) > 0) return nullptr;
-
   // Fold member types.
   if (auto *UDE = dyn_cast<UnresolvedDotExpr>(E)) {
     return simplifyNestedTypeExpr(UDE);
@@ -1681,9 +1687,8 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
   
   // Fold a tuple expr like (T1,T2) into a tuple type (T1,T2).
   if (auto *TE = dyn_cast<TupleExpr>(E)) {
-    if (TE->hasTrailingClosure() ||
-        // FIXME: Decide what to do about ().  It could be a type or an expr.
-        TE->getNumElements() == 0)
+    // FIXME: Decide what to do about ().  It could be a type or an expr.
+    if (TE->getNumElements() == 0)
       return nullptr;
 
     SmallVector<TupleTypeReprElement, 4> Elts;
@@ -1965,10 +1970,8 @@ void PreCheckExpression::resolveKeyPathExpr(KeyPathExpr *KPE) {
         }
       } else if (auto SE = dyn_cast<SubscriptExpr>(expr)) {
         // .[0] or just plain [0]
-        components.push_back(
-            KeyPathExpr::Component::forUnresolvedSubscriptWithPrebuiltIndexExpr(
-                getASTContext(), SE->getIndex(), SE->getArgumentLabels(),
-                SE->getLoc()));
+        components.push_back(KeyPathExpr::Component::forUnresolvedSubscript(
+            getASTContext(), SE->getArgs()));
 
         expr = SE->getBase();
       } else if (auto BOE = dyn_cast<BindOptionalExpr>(expr)) {
@@ -2044,7 +2047,7 @@ void PreCheckExpression::resolveKeyPathExpr(KeyPathExpr *KPE) {
   std::reverse(components.begin(), components.end());
 
   KPE->setRootType(rootType);
-  KPE->resolveComponents(getASTContext(), components);
+  KPE->setComponents(getASTContext(), components);
 }
 
 Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
@@ -2059,15 +2062,18 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
   }
 
   auto *call = dyn_cast<CallExpr>(E);
-  if (!call || call->getNumArguments() != 1)
+  if (!call)
     return nullptr;
 
   auto *typeExpr = dyn_cast<TypeExpr>(call->getFn());
   if (!typeExpr)
     return nullptr;
 
-  auto *argExpr = call->getArg()->getSemanticsProvidingExpr();
-  auto *literal = dyn_cast<LiteralExpr>(argExpr);
+  auto *unaryArg = call->getArgs()->getUnlabeledUnaryExpr();
+  if (!unaryArg)
+    return nullptr;
+
+  auto *literal = dyn_cast<LiteralExpr>(unaryArg->getSemanticsProvidingExpr());
   if (!literal)
     return nullptr;
 
@@ -2079,12 +2085,8 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
   if (auto precheckedTy = typeExpr->getInstanceType()) {
     castTy = precheckedTy;
   } else {
-    const auto options =
-        TypeResolutionOptions(TypeResolverContext::InExpression) |
-        TypeResolutionFlags::SilenceErrors;
-
-    const auto resolution = TypeResolution::forContextual(
-        DC, options,
+    const auto result = TypeResolution::resolveContextualType(
+        typeExpr->getTypeRepr(), DC, TypeResolverContext::InExpression,
         [](auto unboundTy) {
           // FIXME: Don't let unbound generic types escape type resolution.
           // For now, just return the unbound generic type.
@@ -2092,16 +2094,16 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
         },
         // FIXME: Don't let placeholder types escape type resolution.
         // For now, just return the placeholder type.
-        [](auto &ctx, auto *originator) {
-          return Type();
-        });
-    const auto result = resolution.resolveType(typeExpr->getTypeRepr());
+        PlaceholderType::get);
+
     if (result->hasError())
-      return nullptr;
+      return new (getASTContext())
+          ErrorExpr(typeExpr->getSourceRange(), result, typeExpr);
+
     castTy = result;
   }
 
-  if (!castTy || !castTy->getAnyNominal())
+  if (!castTy->getAnyNominal())
     return nullptr;
 
   // Don't bother to convert deprecated selector syntax.
@@ -2112,20 +2114,66 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
 
   SmallVector<ProtocolConformance *, 2> conformances;
   return castTy->getAnyNominal()->lookupConformance(protocol, conformances)
-             ? CoerceExpr::forLiteralInit(getASTContext(), argExpr,
+             ? CoerceExpr::forLiteralInit(getASTContext(), literal,
                                           call->getSourceRange(),
                                           typeExpr->getTypeRepr())
              : nullptr;
 }
 
+bool ConstraintSystem::preCheckTarget(SolutionApplicationTarget &target,
+                                      bool replaceInvalidRefsWithErrors,
+                                      bool leaveClosureBodiesUnchecked) {
+  auto *DC = target.getDeclContext();
+
+  bool hadErrors = false;
+
+  if (auto *expr = target.getAsExpr()) {
+    hadErrors |= preCheckExpression(expr, DC, replaceInvalidRefsWithErrors,
+                                    leaveClosureBodiesUnchecked);
+    // Even if the pre-check fails, expression still has to be re-set.
+    target.setExpr(expr);
+  }
+
+  if (target.isForEachStmt()) {
+    auto *stmt = target.getAsForEachStmt();
+
+    auto *sequenceExpr = stmt->getParsedSequence();
+    auto *whereExpr = stmt->getWhere();
+
+    hadErrors |= preCheckExpression(sequenceExpr, DC,
+                                    /*replaceInvalidRefsWithErrors=*/true,
+                                    /*leaveClosureBodiesUnchecked=*/false);
+
+    if (whereExpr) {
+      hadErrors |= preCheckExpression(whereExpr, DC,
+                                      /*replaceInvalidRefsWithErrors=*/true,
+                                      /*leaveClosureBodiesUnchecked=*/false);
+    }
+
+    // Update sequence and where expressions to pre-checked versions.
+    if (!hadErrors) {
+      stmt->setParsedSequence(sequenceExpr);
+
+      if (whereExpr)
+        stmt->setWhere(whereExpr);
+    }
+  }
+
+  return hadErrors;
+}
+
 /// Pre-check the expression, validating any types that occur in the
 /// expression and folding sequence expressions.
 bool ConstraintSystem::preCheckExpression(Expr *&expr, DeclContext *dc,
-                                          bool replaceInvalidRefsWithErrors) {
+                                          bool replaceInvalidRefsWithErrors,
+                                          bool leaveClosureBodiesUnchecked) {
   auto &ctx = dc->getASTContext();
   FrontendStatsTracer StatsTracer(ctx.Stats, "precheck-expr", expr);
 
-  PreCheckExpression preCheck(dc, expr, replaceInvalidRefsWithErrors);
+  PreCheckExpression preCheck(dc, expr,
+                              replaceInvalidRefsWithErrors,
+                              leaveClosureBodiesUnchecked);
+
   // Perform the pre-check.
   if (auto result = expr->walk(preCheck)) {
     expr = result;

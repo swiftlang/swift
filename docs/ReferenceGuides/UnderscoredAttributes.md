@@ -39,6 +39,20 @@ Most notably, default argument expressions are implicitly
 `@_alwaysEmitIntoClient`, which means that adding a default argument to a
 function which did not have one previously does not break ABI.
 
+## `@_backDeploy(before: ...)`
+
+Causes the body of a function to be emitted into the module interface to be
+available for emission into clients with deployment targets lower than the
+ABI availability of the function. When the client's deployment target is
+before the function's ABI availability, the compiler replaces calls to that
+function with a call to a thunk that checks at runtime whether the original
+library function is available. If the original is available then it is
+called. Otherwise, the fallback copy of the function that was emitted into the
+client is called instead.
+
+For more details, see the [pitch thread](https://forums.swift.org/t/pitch-function-back-deployment/55769/)
+in the forums.
+
 ## `@_assemblyVision`
 
 Forces emission of assembly vision remarks for a function or method, showing
@@ -113,14 +127,6 @@ library), instead of at an arbitrary point in time.
 For more details, see the forum post on
 [dynamic method replacement](https://forums.swift.org/t/dynamic-method-replacement/16619).
 
-## `@_distributedActorIndependent`
-
-Marks a specific property of a distributed actor to be available even if the
-actor is remote.
-
-This only applies to two distributed actor properties `address` and `transport`.
-It cannot be safely declared on any properties defined by ordinary Swift code.
-
 ## `@_effects(effectname)`
 
 Tells the compiler that the implementation of the defined function is limited
@@ -132,7 +138,184 @@ already infer from static analysis.
 Changing the implementation in a way that violates the optimizer's assumptions
 about the effects results in undefined behavior.
 
-For more details, see [OptimizerEffects.rst](/docs/proposals/OptimizerEffects.rst).
+### `@_effects(readnone)`
+
+Defines that the function does not have any observable memory reads or writes
+or any other observable side effects.
+
+This does not mean that the function cannot read or write memory at all.
+For example, it’s allowed to allocate and write to local objects inside the
+function. For example, the following `readnone` function allocates an array and
+writes to the array buffer
+
+```swift
+@_effects(readnone)
+func lookup(_ i: Int) -> Int {
+  let a = [7, 3 ,6, 9]
+  return a[i]
+}
+```
+
+A function can be marked as readnone if two calls of the same function with the
+same parameters can be simplified to one call (e.g. by the CSE optimization)
+without changing the semantics of the program.
+For example,
+
+```swift
+  let a = lookup(i)
+  // some other code, including memory writes
+  let b = lookup(i)
+```
+is equivalent to
+
+```swift
+  let a = lookup(i)
+  // some other code, including memory writes
+  let b = a
+```
+
+Some conclusions:
+
+* A `readnone` function must not return a newly allocated class instance.
+
+* A `readnone` function can return a newly allocated copy-on-write object, like
+  an Array, because COW data types conceptually behave like value types.
+
+* A `readnone` function must not release any parameter or any object indirectly
+  referenced from a parameter.
+
+* Any kind of observable side-effects are not allowed, like `print`, file IO, etc.
+
+### `@_effects(readonly)`
+
+Defines that the function does not have any observable memory writes or any
+other observable side effects, beside reading of memory.
+
+Similar to `readnone`, a `readonly` function is allowed to write to local objects.
+
+A function can be marked as `readonly` if it’s save to eliminate a call to such
+a function in case its return value is not used.
+Example:
+
+```swift
+@_effects(readonly)
+func lookup2(_ instance: SomeClass) -> Int {
+  let a = [7, 3 ,6, 9]
+  return a[instance.i]
+}
+```
+
+It is legal to eliminate an unused call to this function:
+
+```
+_ = lookup2(i)  // can be completely eliminated
+```
+
+Note that it would not be legal to CSE two calls to this function, because
+between those calls the member `i` of the class instance could be modified:
+
+```swift
+  let a = lookup2(instance)
+  instance.i += 1
+  let b = lookup2(instance)   // cannot be CSE'd with the first call
+```
+
+The same conclusions as for `readnone` also apply to `readonly`.
+
+### `@_effects(releasenone)`
+
+Defines that the function does not release any class instance.
+
+This effect must be used with care.
+There are several code patterns which release objects in a non-obvious way.
+For example:
+
+* A parameter which is passed to an “owned” argument (and not stored), like
+  initializer arguments.
+
+* Assignments, because they release the old value
+
+* COW data types, e.g. Strings. Conceptually they are value types, but
+  internally the keep a reference counted buffer.
+
+* Class references deep inside a hierarchy of value types.
+
+### `@_effects(readwrite)`
+
+This effect is not used by the compiler.
+
+### `@_effects(notEscaping <selection>)`
+
+Tells the compiler that a function argument does not escape.
+The _selection_ specifies which argument or which "projection" of an argument
+does not escape. The _selection_ consists of the argument name or `self` and
+an optional projection path.
+
+The projection path consists of field names or one of the following wildcards:
+
+* `class*`: selects any class field, including tail allocated elements
+* `value**`: selects any number and any kind of struct, tuple or enum
+             fields/payload-cases.
+* `**`: selects any number of any fields
+
+For example:
+
+```swift
+struct Inner {
+  let i: Class
+}
+struct Str {
+	let a: Inner
+	let b: Class
+}
+
+@_effects(notEscaping s.b)    // s.b does not escape, but s.a.i can escape
+func foo1(_ s: Str) { ... }
+
+@_effects(notEscaping s.v**)  // s.b and s.a.i do not escape
+func foo2(_ s: Str) { ... }
+
+@_effects(notEscaping s.**)   // s.b, s.a.i and all transitively reachable
+                              // references from there do not escape
+func foo3(_ s: Str) { ... }
+```
+
+### `@_effects(escaping <from-selection> => <to-selection>)`
+
+Defines that an argument escapes to another argument or to the return value,
+but not otherwise.
+The _to-selection_ can also refer to `return`.
+
+For example:
+
+```swift
+@_effects(escapes s.b => return)
+func foo1(_ s: Str) -> Class {
+  return s.b
+}
+
+@_effects(escapes s.b => o.a.i)
+func foo2(_ s: Str, o: inout Str) {
+  o.a.i = s.b
+}
+```
+
+### `@_effects(escaping <from-selection> -> <to-selection>)`
+
+This variant of an escaping effect defines a "non-exclusive" escape. This means
+that not only the _from-selection_, but also other values
+can escape to the _to-selection_.
+
+For example:
+
+```swift
+var g: Class
+
+@_effects(escapes s.b -> return)
+func foo1(_ s: Str, _ cond: Bool) -> Class {
+  return cond ? s.b : g
+}
+```
 
 ## `@_exported`
 
@@ -259,7 +442,7 @@ even when `Self` is a reference type.
 ```swift
 class C {
   func f() {}
-  func g(_: @escaping () -> Void {
+  func g(_: @escaping () -> Void) {
     g({ f() }) // error: call to method 'f' in closure requires explicit use of 'self'
   }
   func h(@_implicitSelfCapture _: @escaping () -> Void) {
@@ -384,6 +567,22 @@ override.
 This attribute and the corresponding `-warn-implicit-overrides` flag are
 used when compiling the standard library and overlays.
 
+## `@_nonSendable`
+
+There is no clang attribute to add a Swift conformance to an imported type, but
+there *is* a clang attribute to add a Swift attribute to an imported type. So
+`@Sendable` (which is not normally allowed on types) is used from clang headers
+to indicate that an unconstrained, fully available `Sendable` conformance should
+be added to a given type, while `@_nonSendable` indicates that an unavailable
+`Sendable` conformance should be added to it.
+
+`@_nonSendable` can have no options after it, in which case it "beats"
+`@Sendable` if both are applied to the same declaration, or it can have
+`(_assumed)` after it, in which case `@Sendable` "beats" it.
+`@_nonSendable(_assumed)` is intended to be used when mass-marking whole regions
+of a header as non-`Sendable` so that you can make spot exceptions with
+`@Sendable`.   
+
 ## `@_objc_non_lazy_realization`
 
 Marks a class as being non-lazily (i.e. eagerly) [realized](/docs/Lexicon.md#realization).
@@ -441,7 +640,7 @@ Here are the necessary changes:
    This ensures when an app is built for deployment targets prior to the symbols' move,
    the app will look for these symbols in ToasterKit instead of ToasterKitCore.
 
-More generally, mutliple availabilities can be specified, like so:
+More generally, multiple availabilities can be specified, like so:
 
 ```swift
 @available(toasterOS 42, bowlOS 54, mugOS 54, *)
@@ -612,3 +811,44 @@ within Swift 5 code that has adopted concurrency, but non-`@MainActor`
 
 See the forum post on [Concurrency in Swift 5 and 6](https://forums.swift.org/t/concurrency-in-swift-5-and-6/49337)
 for more details.
+
+## `@_noImplicitCopy`
+
+Marks a var decl as a variable that must be copied explicitly using the builtin
+function Builtin.copy.
+
+## `@_noAllocation`, `@_noLocks`
+
+These attributes are performance annotations. If a function is annotated with
+such an attribute, the compiler issues a diagnostic message if the function
+calls a runtime function which allocates memory or locks, respectively.
+The `@_noLocks` attribute implies `@_noAllocation` because a memory allocation
+also locks.
+
+## `@_unavailableFromAsync`
+
+Marks a synchronous API as being unavailable from asynchronous contexts. Direct
+usage of annotated API from asynchronous contexts will result in a warning from
+the compiler.
+
+## `@_unsafeInheritExecutor`
+
+This `async` function uses the pre-SE-0338 semantics of unsafely inheriting the caller's executor.  This is an underscored feature because the right way of inheriting an executor is to pass in the required executor and switch to it.  Unfortunately, there are functions in the standard library which need to inherit their caller's executor but cannot change their ABI because they were not defined as `@_alwaysEmitIntoClient` in the initial release.
+
+
+## `@_spi_available(platform, version)`
+
+Like `@available`, this attribute indicates a decl is available only as an SPI.
+This implies several behavioral changes comparing to regular `@available`:
+1. Type checker diagnoses when a client accidently exposes such a symbol in library APIs.
+2. When emitting public interfaces, `@_spi_available` is printed as `@available(platform, unavailable)`.
+3. ClangImporter imports ObjC macros `SPI_AVAILABLE` and `__SPI_AVAILABLE` to this attribute.
+
+
+## `_local`
+
+A distributed actor can be marked as "known to be local" which allows avoiding 
+the distributed actor isolation checks. This is used for things like `whenLocal`
+where the actor passed to the closure is known-to-be-local, and similarly a 
+`self` of obtained from an _isolated_ function inside a distributed actor is 
+also guaranteed to be local by construction.

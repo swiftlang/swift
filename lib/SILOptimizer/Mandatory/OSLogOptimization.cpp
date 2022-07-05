@@ -76,11 +76,12 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/OptimizationMode.h"
-#include "swift/AST/SemanticAttrs.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Demangling/Demangler.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/InstructionUtils.h"
@@ -93,12 +94,12 @@
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
-#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/CompileTimeInterpolationUtils.h"
 #include "swift/SILOptimizer/Utils/ConstExpr.h"
-#include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/ValueLifetime.h"
@@ -135,7 +136,7 @@ static SILFunction *getStringMakeUTF8Init(SILInstruction *inst) {
 }
 
 // A cache of string-related, SIL information that is needed to create and
-// initalize strings from raw string literals. This information is
+// initialize strings from raw string literals. This information is
 // extracted from instructions while they are constant evaluated. Though the
 // information contained here can be constructed from scratch, extracting it
 // from existing instructions is more efficient.
@@ -243,38 +244,6 @@ static bool isIntegerOrBoolType(SILType silType, ASTContext &astContext) {
   }
   NominalTypeDecl *nominalDecl = silType.getNominalOrBoundGenericNominal();
   return nominalDecl && isStdlibIntegerOrBoolDecl(nominalDecl, astContext);
-}
-
-/// Decide if the given instruction (which could possibly be a call) should
-/// be constant evaluated.
-///
-/// \returns true iff the given instruction is not a call or if it is, it calls
-/// a known constant-evaluable function such as string append etc., or calls
-/// a function annotate as "constant_evaluable".
-static bool shouldAttemptEvaluation(SILInstruction *inst) {
-  auto *apply = dyn_cast<ApplyInst>(inst);
-  if (!apply)
-    return true;
-  SILFunction *calleeFun = apply->getCalleeFunction();
-  if (!calleeFun)
-    return false;
-  return isConstantEvaluable(calleeFun);
-}
-
-/// Skip or evaluate the given instruction based on the evaluation policy and
-/// handle errors. The policy is to evaluate all non-apply instructions as well
-/// as apply instructions that are marked as "constant_evaluable".
-static std::pair<Optional<SILBasicBlock::iterator>, Optional<SymbolicValue>>
-evaluateOrSkip(ConstExprStepEvaluator &stepEval,
-               SILBasicBlock::iterator instI) {
-  SILInstruction *inst = &(*instI);
-
-  // Note that skipping a call conservatively approximates its effects on the
-  // interpreter state.
-  if (shouldAttemptEvaluation(inst)) {
-    return stepEval.tryEvaluateOrElseMakeEffectsNonConstant(instI);
-  }
-  return stepEval.skipByMakingEffectsNonConstant(instI);
 }
 
 /// Return true iff the given value is a stdlib Int or Bool and it not a direct
@@ -527,7 +496,8 @@ static SILValue emitCodeForConstantArray(ArrayRef<SILValue> elements,
   std::string allocatorMangledName =
       SILDeclRef(arrayAllocateDecl, SILDeclRef::Kind::Func).mangle();
   SILFunction *arrayAllocateFun =
-      module.findFunction(allocatorMangledName, SILLinkage::PublicExternal);
+      module.loadFunction(allocatorMangledName,
+                          SILModule::LinkingMode::LinkNormal);
   assert(arrayAllocateFun);
 
   SILFunction *arrayFinalizeFun = nullptr;
@@ -536,9 +506,9 @@ static SILValue emitCodeForConstantArray(ArrayRef<SILValue> elements,
       std::string finalizeMangledName =
           SILDeclRef(arrayFinalizeDecl, SILDeclRef::Kind::Func).mangle();
       arrayFinalizeFun =
-          module.findFunction(finalizeMangledName, SILLinkage::SharedExternal);
+          module.loadFunction(finalizeMangledName,
+                              SILModule::LinkingMode::LinkNormal);
       assert(arrayFinalizeFun);
-      module.linkFunction(arrayFinalizeFun);
     }
   }
 
@@ -818,31 +788,6 @@ static SILValue emitCodeForSymbolicValue(SymbolicValue symVal,
   }
 }
 
-/// Given a SILValue \p value, compute the set of transitive users of the value
-/// (excluding value itself) by following the use-def chain starting at value.
-/// Note that this function does not follow use-def chains though branches.
-static void getTransitiveUsers(SILValue value,
-                               SmallVectorImpl<SILInstruction *> &users) {
-  // Collect the instructions that are data dependent on the value using a
-  // fix point iteration.
-  SmallPtrSet<SILInstruction *, 16> visitedUsers;
-  SmallVector<SILValue, 16> worklist;
-  worklist.push_back(value);
-
-  while (!worklist.empty()) {
-    SILValue currVal = worklist.pop_back_val();
-    for (Operand *use : currVal->getUses()) {
-      SILInstruction *user = use->getUser();
-      if (visitedUsers.count(user))
-        continue;
-      visitedUsers.insert(user);
-      llvm::copy(user->getResults(), std::back_inserter(worklist));
-    }
-  }
-  // At this point, visitedUsers have all the transitive, data-dependent uses.
-  users.append(visitedUsers.begin(), visitedUsers.end());
-}
-
 /// Collect the end points of the instructions that are data dependent on \c
 /// value. A instruction is data dependent on \c value if its result may
 /// transitively depends on \c value. Note that data dependencies through
@@ -853,7 +798,7 @@ static void getTransitiveUsers(SILValue value,
 /// \param endUsers buffer for storing the found end points of the data
 /// dependence chain.
 static void
-getEndPointsOfDataDependentChain(SILValue value, SILFunction *fun,
+getEndPointsOfDataDependentChain(SingleValueInstruction *value, SILFunction *fun,
                                  SmallVectorImpl<SILInstruction *> &endUsers) {
   assert(!value->getType().isAddress());
 
@@ -950,6 +895,10 @@ static void replaceAllUsesAndFixLifetimes(SILValue foldedVal,
   // destroy foldedVal at the end of the borrow scope.
   assert(originalVal.getOwnershipKind() == OwnershipKind::Guaranteed);
 
+  // FIXME: getUniqueBorrowScopeIntroducingValue may look though various storage
+  // casts. There's no reason to think that it's valid to replace uses of
+  // originalVal with a new borrow of the the "introducing value". All casts
+  // potentially need to be cloned.
   Optional<BorrowedValue> originalScopeBegin =
       getUniqueBorrowScopeIntroducingValue(originalVal);
   assert(originalScopeBegin &&
@@ -1246,7 +1195,7 @@ static bool tryEliminateOSLogMessage(SingleValueInstruction *oslogMessage) {
         }
         (void)deletedInstructions.insert(deadInst);
       });
-  InstructionDeleter deleter(callbacks);
+  InstructionDeleter deleter(std::move(callbacks));
 
   unsigned startIndex = 0;
   while (startIndex < worklist.size()) {
@@ -1510,8 +1459,8 @@ static ApplyInst *getAsOSLogMessageInit(SILInstruction *inst) {
 }
 
 /// Return true iff the SIL function \c fun is a method of the \c OSLogMessage
-/// type.
-bool isMethodOfOSLogMessage(SILFunction &fun) {
+/// type or a type that has the @_semantics("oslog.message.type") annotation.
+static bool isMethodOfOSLogMessage(SILFunction &fun) {
   DeclContext *declContext = fun.getDeclContext();
   if (!declContext)
     return false;
@@ -1527,7 +1476,8 @@ bool isMethodOfOSLogMessage(SILFunction &fun) {
   NominalTypeDecl *typeDecl = parentContext->getSelfNominalTypeDecl();
   if (!typeDecl)
     return false;
-  return typeDecl->getName() == fun.getASTContext().Id_OSLogMessage;
+  return typeDecl->getName() == fun.getASTContext().Id_OSLogMessage
+    || typeDecl->hasSemanticsAttr(semantics::OSLOG_MESSAGE_TYPE);
 }
 
 class OSLogOptimization : public SILFunctionTransform {

@@ -15,14 +15,10 @@
 # ----------------------------------------------------------------------------
 
 
-from __future__ import absolute_import, unicode_literals
-
 import os
 import platform
 import re
 from numbers import Number
-
-import six
 
 from . import shell
 
@@ -46,7 +42,7 @@ class CMakeOptions(object):
             value = self.true_false(value)
         if value is None:
             value = ""
-        elif not isinstance(value, six.string_types + (Number,)):
+        elif not isinstance(value, (str, Number)):
             raise ValueError('define: invalid value for key %s: %s (%s)' %
                              (var, value, type(value)))
         self._options.append('-D%s=%s' % (var, value))
@@ -141,16 +137,18 @@ class CMake(object):
 
         if self.prefer_just_built_toolchain and product:
             toolchain_path = product.install_toolchain_path(args.host_target)
+            cmake_swiftc_path = os.getenv('CMAKE_Swift_COMPILER',
+                                          os.path.join(toolchain_path, 'bin', 'swiftc'))
             define("CMAKE_C_COMPILER:PATH", os.path.join(toolchain_path,
                                                          'bin', 'clang'))
             define("CMAKE_CXX_COMPILER:PATH", os.path.join(toolchain_path,
                                                            'bin', 'clang++'))
-            define("CMAKE_Swift_COMPILER:PATH", os.path.join(toolchain_path,
-                                                             'bin', 'swiftc'))
+            define("CMAKE_Swift_COMPILER:PATH", cmake_swiftc_path)
         else:
+            cmake_swiftc_path = os.getenv('CMAKE_Swift_COMPILER', toolchain.swiftc)
             define("CMAKE_C_COMPILER:PATH", toolchain.cc)
             define("CMAKE_CXX_COMPILER:PATH", toolchain.cxx)
-            define("CMAKE_Swift_COMPILER:PATH", toolchain.swiftc)
+            define("CMAKE_Swift_COMPILER:PATH", cmake_swiftc_path)
         define("CMAKE_LIBTOOL:PATH", toolchain.libtool)
         define("CMAKE_AR:PATH", toolchain.ar)
         define("CMAKE_RANLIB:PATH", toolchain.ranlib)
@@ -200,7 +198,7 @@ class CMake(object):
 
         elif args.cmake_generator == 'Xcode':
             build_args += ['-parallelizeTargets',
-                           '-jobs', six.text_type(jobs)]
+                           '-jobs', str(jobs)]
 
         return build_args
 

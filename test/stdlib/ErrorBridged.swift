@@ -771,7 +771,7 @@ ErrorBridgingTests.test("@objc error domains for nested types") {
 ErrorBridgingTests.test("error-to-NSObject casts") {
   let error = MyCustomizedError(code: 12345)
 
-  if #available(macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4, *) {
+  if #available(SwiftStdlib 5.2, *) {
     // Unconditional cast
     let nsErrorAsObject1 = unconditionalCast(error, to: NSObject.self)
     let nsError1 = unconditionalCast(nsErrorAsObject1, to: NSError.self)
@@ -801,7 +801,7 @@ ErrorBridgingTests.test("NSError-to-Error casts") {
     expectTrue(something is Error)
   }
 
-  if #available(macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4, *) {
+  if #available(SwiftStdlib 5.2, *) {
     // TODO: Wrap some leak checking around this
     // Until then, this is a helpful debug tool
 		should_not_leak_nserror()
@@ -814,7 +814,7 @@ ErrorBridgingTests.test("CFError-to-Error casts") {
     expectTrue(something is Error)
   }
 
-  if #available(macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4, *) {
+  if #available(SwiftStdlib 5.2, *) {
     // TODO: Wrap some leak checking around this
     // Until then, this is a helpful debug tool
 		should_not_leak_cferror()
@@ -827,7 +827,7 @@ enum MyError: Error {
 
 ErrorBridgingTests.test("SR-9207 crash in failed cast to NSError") {
 
-  if #available(macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4, *) {
+  if #available(SwiftStdlib 5.2, *) {
     let error = MyError.someThing
     let foundationError = error as NSError
 
@@ -850,7 +850,7 @@ ErrorBridgingTests.test("Swift Error bridged to NSError description") {
     expectEqual("Something", bridgedError.description)
   }
 
-  if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
+  if #available(SwiftStdlib 5.3, *) {
     checkDescription()
   }
 }
@@ -881,7 +881,7 @@ ErrorBridgingTests.test("Swift Error description memory management") {
     }
   }
 
-  if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
+  if #available(SwiftStdlib 5.3, *) {
     checkDescription()
   }
 }

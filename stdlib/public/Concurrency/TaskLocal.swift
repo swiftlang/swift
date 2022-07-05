@@ -94,7 +94,7 @@ import Swift
 /// This type must be a `class` so it has a stable identity, that is used as key
 /// value for lookups in the task local storage.
 @propertyWrapper
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible {
   let defaultValue: Value
 
@@ -136,7 +136,7 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   /// the operation closure.
   @discardableResult
   public func withValue<R>(_ valueDuringOperation: Value, operation: () async throws -> R,
-                           file: String = #file, line: UInt = #line) async rethrows -> R {
+                           file: String = #fileID, line: UInt = #line) async rethrows -> R {
     // check if we're not trying to bind a value from an illegal context; this may crash
     _checkIllegalTaskLocalBindingWithinWithTaskGroup(file: file, line: line)
 
@@ -161,7 +161,7 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   /// the operation closure.
   @discardableResult
   public func withValue<R>(_ valueDuringOperation: Value, operation: () throws -> R,
-                           file: String = #file, line: UInt = #line) rethrows -> R {
+                           file: String = #fileID, line: UInt = #line) rethrows -> R {
     // check if we're not trying to bind a value from an illegal context; this may crash
     _checkIllegalTaskLocalBindingWithinWithTaskGroup(file: file, line: line)
 
@@ -211,24 +211,24 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
 
 // ==== ------------------------------------------------------------------------
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_localValuePush")
 func _taskLocalValuePush<Value>(
   key: Builtin.RawPointer/*: Key*/,
   value: __owned Value
 ) // where Key: TaskLocal
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_localValuePop")
 func _taskLocalValuePop()
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_localValueGet")
 func _taskLocalValueGet(
   key: Builtin.RawPointer/*Key*/
 ) -> UnsafeMutableRawPointer? // where Key: TaskLocal
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_localsCopyTo")
 func _taskLocalsCopy(
   to target: Builtin.NativeObject
@@ -236,7 +236,7 @@ func _taskLocalsCopy(
 
 // ==== Checks -----------------------------------------------------------------
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @usableFromInline
 func _checkIllegalTaskLocalBindingWithinWithTaskGroup(file: String, line: UInt) {
   if _taskHasTaskGroupStatusRecord() {
@@ -247,7 +247,7 @@ func _checkIllegalTaskLocalBindingWithinWithTaskGroup(file: String, line: UInt) 
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @usableFromInline
 @_silgen_name("swift_task_reportIllegalTaskLocalBindingWithinWithTaskGroup")
 func _reportIllegalTaskLocalBindingWithinWithTaskGroup(

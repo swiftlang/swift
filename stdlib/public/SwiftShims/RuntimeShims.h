@@ -18,6 +18,7 @@
 #ifndef SWIFT_STDLIB_SHIMS_RUNTIMESHIMS_H
 #define SWIFT_STDLIB_SHIMS_RUNTIMESHIMS_H
 
+#include "SwiftStdbool.h"
 #include "SwiftStddef.h"
 #include "SwiftStdint.h"
 #include "Visibility.h"
@@ -80,6 +81,54 @@ __swift_size_t _swift_stdlib_getHardwareConcurrency(void);
 /// This value is inlined (and constant propagated) in user code. On Windows,
 /// the Swift runtime and user binaries need to agree on this value.
 #define _swift_MinAllocationAlignment (__swift_size_t) 16
+
+/// Checks if the @em current thread's stack has room for an allocation with
+/// the specified size and alignment.
+///
+/// @param byteCount The size of the desired allocation in bytes.
+/// @param alignment The alignment of the desired allocation in bytes.
+///
+/// @returns Whether or not the desired allocation can be safely performed on
+///   the current thread's stack.
+///
+/// This function is used by
+/// @c withUnsafeTemporaryAllocation(byteCount:alignment:_:).
+SWIFT_RUNTIME_STDLIB_API
+#if defined(__APPLE__) && defined(__MACH__)
+SWIFT_WEAK_IMPORT
+#endif
+__swift_bool swift_stdlib_isStackAllocationSafe(__swift_size_t byteCount,
+                                                __swift_size_t alignment);
+
+/// Get the bounds of the current thread's stack.
+///
+/// @param outBegin On successful return, the beginning (lower bound) of the
+///   current thread's stack.
+/// @param outEnd On successful return, the end (upper bound) of the current
+///   thread's stack.
+///
+/// @returns Whether or not the stack bounds could be read. Not all platforms
+///   support reading these values.
+///
+/// This function is used by the stdlib test suite when testing
+/// @c withUnsafeTemporaryAllocation(byteCount:alignment:_:).
+SWIFT_RUNTIME_STDLIB_SPI
+__swift_bool _swift_stdlib_getCurrentStackBounds(__swift_uintptr_t *outBegin,
+                                                 __swift_uintptr_t *outEnd);
+
+/// A value representing a version number for the Standard Library.
+typedef struct {
+  __swift_uint32_t _value;
+} _SwiftStdlibVersion;
+
+/// Checks if the currently running executable was built using a Swift release
+/// matching or exceeding the specified Standard Library version number. This
+/// can be used to stage behavioral changes in the Standard Library, preventing
+/// them from causing compatibility issues with existing binaries.
+SWIFT_RUNTIME_STDLIB_INTERNAL
+__swift_bool _swift_stdlib_isExecutableLinkedOnOrAfter(
+  _SwiftStdlibVersion version
+) __attribute__((const));
 
 #ifdef __cplusplus
 } // extern "C"

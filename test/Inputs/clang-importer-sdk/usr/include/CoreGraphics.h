@@ -1,3 +1,4 @@
+#ifndef CGFLOAT_IN_COREFOUNDATION
 #if defined(__LP64__) && __LP64__
 # define CGFLOAT_TYPE double
 # define CGFLOAT_IS_DOUBLE 1
@@ -32,7 +33,12 @@ struct CGRect {
 typedef struct CGRect CGRect;
 
 typedef CGRect CGRectTy;
+#else
+#import "CoreFoundation.h"
+#endif //CGFLOAT_IN_COREFOUNDATION
 
 typedef struct CGColor *CGColorRef;
 
 CGColorRef CGColorCreateGenericGray(CGFloat gray, CGFloat alpha);
+
+CGFloat *CGColorGetComponents(CGColorRef color);

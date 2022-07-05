@@ -222,9 +222,10 @@ public:
 
   StackAddress emitDynamicAlloca(SILType type, const llvm::Twine &name = "");
   StackAddress emitDynamicAlloca(llvm::Type *eltTy, llvm::Value *arraySize,
-                                 Alignment align,
+                                 Alignment align, bool allowTaskAlloc = true,
                                  const llvm::Twine &name = "");
-  void emitDeallocateDynamicAlloca(StackAddress address);
+  void emitDeallocateDynamicAlloca(StackAddress address,
+                                   bool allowTaskDealloc = true);
 
   llvm::BasicBlock *createBasicBlock(const llvm::Twine &Name);
   const TypeInfo &getTypeInfoForUnlowered(Type subst);
@@ -265,6 +266,10 @@ public:
   llvm::Value *emitLoadOfRelativePointer(Address addr, bool isFar,
                                          llvm::PointerType *expectedType,
                                          const llvm::Twine &name = "");
+  llvm::Value *
+  emitLoadOfCompactFunctionPointer(Address addr, bool isFar,
+                                   llvm::PointerType *expectedType,
+                                   const llvm::Twine &name = "");
 
   llvm::Value *emitAllocObjectCall(llvm::Value *metadata, llvm::Value *size,
                                    llvm::Value *alignMask,
@@ -293,6 +298,10 @@ public:
   void emitDeallocBoxCall(llvm::Value *box, llvm::Value *typeMetadata);
 
   void emitTSanInoutAccessCall(llvm::Value *address);
+
+  llvm::Value *emitTargetOSVersionAtLeastCall(llvm::Value *major,
+                                              llvm::Value *minor,
+                                              llvm::Value *patch);
 
   llvm::Value *emitProjectBoxCall(llvm::Value *box, llvm::Value *typeMetadata);
 

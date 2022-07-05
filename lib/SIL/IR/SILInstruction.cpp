@@ -103,6 +103,16 @@ SILModule &SILInstruction::getModule() const {
   return getFunction()->getModule();
 }
 
+SILInstruction *SILInstruction::getPreviousInstruction() {
+  auto pos = getIterator();
+  return pos == getParent()->begin() ? nullptr : &*std::prev(pos);
+}
+
+SILInstruction *SILInstruction::getNextInstruction() {
+  auto nextPos = std::next(getIterator());
+  return nextPos == getParent()->end() ? nullptr : &*nextPos;
+}
+
 void SILInstruction::removeFromParent() {
 #ifndef NDEBUG
   for (auto result : getResults()) {
@@ -230,7 +240,7 @@ SILInstructionKind swift::getSILInstructionKind(StringRef name) {
   llvm::errs() << "Unknown SIL instruction name\n";
   abort();
 #endif
-  llvm_unreachable("Unknown SIL insruction name");
+  llvm_unreachable("Unknown SIL instruction name");
 }
 
 /// Map SILInstructionKind to a corresponding SILInstruction name.
@@ -361,6 +371,10 @@ namespace {
       return true;
     }
 
+    bool visitDeallocStackRefInst(const DeallocStackRefInst *RHS) {
+      return true;
+    }
+
     bool visitAllocStackInst(const AllocStackInst *RHS) {
       return true;
     }
@@ -424,11 +438,6 @@ namespace {
 
     bool visitAllocRefDynamicInst(const AllocRefDynamicInst *RHS) {
       return true;
-    }
-
-    bool visitProjectValueBufferInst(const ProjectValueBufferInst *RHS) {
-      auto *X = cast<ProjectValueBufferInst>(LHS);
-      return X->getValueType() == RHS->getValueType();
     }
 
     bool visitProjectBoxInst(const ProjectBoxInst *RHS) {
@@ -835,12 +844,6 @@ namespace {
     bool visitClassifyBridgeObjectInst(ClassifyBridgeObjectInst *X) {
       return true;
     }
-    bool visitThinFunctionToPointerInst(ThinFunctionToPointerInst *X) {
-      return true;
-    }
-    bool visitPointerToThinFunctionInst(PointerToThinFunctionInst *X) {
-      return true;
-    }
 
     bool visitObjCProtocolInst(ObjCProtocolInst *RHS) {
       auto *X = cast<ObjCProtocolInst>(LHS);
@@ -1015,12 +1018,12 @@ SILInstruction::MemoryBehavior SILInstruction::getMemoryBehavior() const {
     if (IInfo.ID != llvm::Intrinsic::not_intrinsic) {
       auto IAttrs = IInfo.getOrCreateAttributes(getModule().getASTContext());
       // Read-only.
-      if (IAttrs.hasFnAttribute(llvm::Attribute::ReadOnly) &&
-          IAttrs.hasFnAttribute(llvm::Attribute::NoUnwind))
+      if (IAttrs.hasFnAttr(llvm::Attribute::ReadOnly) &&
+          IAttrs.hasFnAttr(llvm::Attribute::NoUnwind))
         return MemoryBehavior::MayRead;
       // Read-none?
-      return IAttrs.hasFnAttribute(llvm::Attribute::ReadNone) &&
-                     IAttrs.hasFnAttribute(llvm::Attribute::NoUnwind)
+      return IAttrs.hasFnAttr(llvm::Attribute::ReadNone) &&
+                     IAttrs.hasFnAttr(llvm::Attribute::NoUnwind)
                  ? MemoryBehavior::None
                  : MemoryBehavior::MayHaveSideEffects;
     }
@@ -1107,10 +1110,7 @@ bool SILInstruction::mayHaveSideEffects() const {
   if (mayTrap())
     return true;
 
-  MemoryBehavior B = getMemoryBehavior();
-  return B == MemoryBehavior::MayWrite ||
-    B == MemoryBehavior::MayReadWrite ||
-    B == MemoryBehavior::MayHaveSideEffects;
+  return mayWriteToMemory();
 }
 
 bool SILInstruction::mayRelease() const {
@@ -1156,7 +1156,6 @@ bool SILInstruction::mayRelease() const {
     return true;
 
   case SILInstructionKind::UnconditionalCheckedCastAddrInst:
-  case SILInstructionKind::UnconditionalCheckedCastValueInst:
   case SILInstructionKind::UncheckedOwnershipConversionInst:
     return true;
 
@@ -1172,6 +1171,10 @@ bool SILInstruction::mayRelease() const {
     return CopyAddr->isInitializationOfDest() ==
            IsInitialization_t::IsNotInitialization;
   }
+  // mark_unresolved_move_addr is equivalent to a copy_addr [init], so a release
+  // does not occur.
+  case SILInstructionKind::MarkUnresolvedMoveAddrInst:
+    return false;
 
   case SILInstructionKind::BuiltinInst: {
     auto *BI = cast<BuiltinInst>(this);
@@ -1261,7 +1264,7 @@ bool SILInstruction::isAllocatingStack() const {
   if (isa<AllocStackInst>(this))
     return true;
 
-  if (auto *ARI = dyn_cast<AllocRefInst>(this)) {
+  if (auto *ARI = dyn_cast<AllocRefInstBase>(this)) {
     if (ARI->canAllocOnStack())
       return true;
   }
@@ -1269,17 +1272,25 @@ bool SILInstruction::isAllocatingStack() const {
   if (auto *PA = dyn_cast<PartialApplyInst>(this))
     return PA->isOnStack();
 
+  if (auto *BI = dyn_cast<BuiltinInst>(this)) {
+    if (BI->getBuiltinKind() == BuiltinValueKind::StackAlloc) {
+      return true;
+    }
+  }
+
   return false;
 }
 
 bool SILInstruction::isDeallocatingStack() const {
-  if (isa<DeallocStackInst>(this))
+  if (isa<DeallocStackInst>(this) || isa<DeallocStackRefInst>(this))
     return true;
 
-  if (auto *DRI = dyn_cast<DeallocRefInst>(this)) {
-    if (DRI->canAllocOnStack())
+  if (auto *BI = dyn_cast<BuiltinInst>(this)) {
+    if (BI->getBuiltinKind() == BuiltinValueKind::StackDealloc) {
       return true;
+    }
   }
+
   return false;
 }
 
@@ -1300,10 +1311,6 @@ bool SILInstruction::isTriviallyDuplicatable() const {
   if (isAllocatingStack())
     return false;
 
-  if (auto *ARI = dyn_cast<AllocRefInst>(this)) {
-    if (ARI->canAllocOnStack())
-      return false;
-  }
   if (isa<OpenExistentialAddrInst>(this) || isa<OpenExistentialRefInst>(this) ||
       isa<OpenExistentialMetatypeInst>(this) ||
       isa<OpenExistentialValueInst>(this) || isa<OpenExistentialBoxInst>(this) ||
@@ -1354,11 +1361,17 @@ bool SILInstruction::mayTrap() const {
   case SILInstructionKind::CondFailInst:
   case SILInstructionKind::UnconditionalCheckedCastInst:
   case SILInstructionKind::UnconditionalCheckedCastAddrInst:
-  case SILInstructionKind::UnconditionalCheckedCastValueInst:
     return true;
   default:
     return false;
   }
+}
+
+bool SILInstruction::maySynchronize() const {
+  // TODO: We need side-effect analysis and library annotation for this to be
+  //       a reasonable API.  For now, this is just a placeholder.
+  return isa<FullApplySite>(this) || isa<EndApplyInst>(this) ||
+         isa<AbortApplyInst>(this);
 }
 
 bool SILInstruction::isMetaInstruction() const {
@@ -1372,6 +1385,15 @@ bool SILInstruction::isMetaInstruction() const {
     return false;
   }
   llvm_unreachable("Instruction not handled in isMetaInstruction()!");
+}
+
+unsigned SILInstruction::getCachedFieldIndex(NominalTypeDecl *decl,
+                                             VarDecl *property) {
+  return getModule().getFieldIndex(decl, property);
+}
+
+unsigned SILInstruction::getCachedCaseIndex(EnumElementDecl *enumElement) {
+  return getModule().getCaseIndex(enumElement);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1431,7 +1453,7 @@ SILInstructionResultArray::SILInstructionResultArray(
   auto *Value = static_cast<const ValueBase *>(SVI);
   assert(uintptr_t(Value) != uintptr_t(SVI) &&
          "Expected value to be offset from SVI since it is not the first "
-         "multi-inheritence parent");
+         "multi-inheritance parent");
   Pointer = reinterpret_cast<const uint8_t *>(Value);
 
 #ifndef NDEBUG
@@ -1547,7 +1569,8 @@ const ValueBase *SILInstructionResultArray::back() const {
 //                           SingleValueInstruction
 //===----------------------------------------------------------------------===//
 
-CanArchetypeType SingleValueInstruction::getOpenedArchetype() const {
+CanOpenedArchetypeType
+SingleValueInstruction::getDefinedOpenedArchetype() const {
   switch (getKind()) {
   case SILInstructionKind::OpenExistentialAddrInst:
   case SILInstructionKind::OpenExistentialRefInst:
@@ -1555,13 +1578,12 @@ CanArchetypeType SingleValueInstruction::getOpenedArchetype() const {
   case SILInstructionKind::OpenExistentialBoxValueInst:
   case SILInstructionKind::OpenExistentialMetatypeInst:
   case SILInstructionKind::OpenExistentialValueInst: {
-    auto Ty = getOpenedArchetypeOf(getType().getASTType());
-    assert(Ty && Ty->isOpenedExistential() &&
-           "Type should be an opened archetype");
+    const auto Ty = getOpenedArchetypeOf(getType().getASTType());
+    assert(Ty && Ty->isRoot() && "Type should be a root opened archetype");
     return Ty;
   }
   default:
-    return CanArchetypeType();
+    return CanOpenedArchetypeType();
   }
 }
 
@@ -1632,6 +1654,10 @@ MultipleValueInstruction *MultipleValueInstructionResult::getParentImpl() const 
 bool SILInstruction::maySuspend() const {
   // await_async_continuation always suspends the current task.
   if (isa<AwaitAsyncContinuationInst>(this))
+    return true;
+
+  // hop_to_executor also may cause a suspension
+  if (isa<HopToExecutorInst>(this))
     return true;
   
   // Fully applying an async function may suspend the caller.

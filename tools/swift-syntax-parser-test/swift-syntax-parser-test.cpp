@@ -18,9 +18,10 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Format.h"
 #include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/Timer.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/Timer.h"
 
 using namespace swift;
 using namespace llvm;
@@ -53,6 +54,15 @@ Filename(cl::Positional, cl::desc("source file"), cl::Required);
 static cl::opt<unsigned>
 NumParses("n", cl::desc("number of invocations"), cl::init(1));
 
+static cl::opt<std::string>
+    SwiftVersion("swift-version",
+                 cl::desc("Interpret input according to a specific Swift "
+                          "language version number"));
+
+static cl::opt<bool>
+    EnableBareSlashRegex("enable-bare-slash-regex",
+                         cl::desc("Enable or disable the use of forward slash "
+                                  "regular-expression literal syntax"));
 }
 
 namespace {
@@ -135,8 +145,14 @@ makeNode(const swiftparse_syntax_node_t *raw_node, StringRef source) {
 
 static swiftparse_client_node_t
 parse(StringRef source, swiftparse_node_handler_t node_handler,
+      StringRef swift_version, bool enable_bare_slash_regex,
       swiftparse_diagnostic_handler_t diag_handler = nullptr) {
   swiftparse_parser_t parser = swiftparse_parser_create();
+  if (!swift_version.empty()) {
+    swiftparse_parser_set_language_version(parser, swift_version.str().c_str());
+  }
+  swiftparse_parser_set_enable_bare_slash_regex_literal(
+      parser, enable_bare_slash_regex);
   swiftparse_parser_set_node_handler(parser, node_handler);
   swiftparse_parser_set_diagnostic_handler(parser, diag_handler);
   swiftparse_client_node_t top =
@@ -145,13 +161,15 @@ parse(StringRef source, swiftparse_node_handler_t node_handler,
   return top;
 }
 
-static int dumpTree(StringRef source) {
+static int dumpTree(StringRef source, StringRef swiftVersion,
+                    bool enableBareSlashRegex) {
   swiftparse_node_handler_t nodeHandler =
     ^swiftparse_client_node_t(const swiftparse_syntax_node_t *raw_node) {
       return makeNode(raw_node, source);
     };
 
-  std::unique_ptr<SPNode> top = convertClientNode(parse(source, nodeHandler));
+  std::unique_ptr<SPNode> top = convertClientNode(
+      parse(source, nodeHandler, swiftVersion, enableBareSlashRegex));
   top->dump(outs());
 
   return 0;
@@ -216,16 +234,18 @@ static void printDiagInfo(const swiftparser_diagnostic_t diag,
 }
 
 static int dumpDiagnostics(StringRef source, llvm::SourceMgr &SM,
-                           unsigned BufferId) {
+                           unsigned BufferId, StringRef swiftVersion,
+                           bool enableBareSlashRegex) {
   swiftparse_node_handler_t nodeHandler =
   ^swiftparse_client_node_t(const swiftparse_syntax_node_t *raw_node) {
     return makeNode(raw_node, source);
   };
   std::shared_ptr<PrintDiagData> pData = std::make_shared<PrintDiagData>();
-  convertClientNode(parse(source, nodeHandler,
+  convertClientNode(parse(
+      source, nodeHandler, swiftVersion, enableBareSlashRegex,
       ^(const swiftparser_diagnostic_t diag) {
-    printDiagInfo(diag, SM, BufferId, const_cast<PrintDiagData&>(*pData));
-  }));
+        printDiagInfo(diag, SM, BufferId, const_cast<PrintDiagData &>(*pData));
+      }));
   return 0;
 }
 
@@ -254,7 +274,8 @@ static void printTimeRecord(unsigned numInvoks, const TimeRecord &total,
   OS << '\n';
 }
 
-static int timeParsing(StringRef source, unsigned numInvoks) {
+static int timeParsing(StringRef source, unsigned numInvoks,
+                       StringRef swiftVersion, bool enableBareSlashRegex) {
   swiftparse_node_handler_t nodeHandler =
     ^swiftparse_client_node_t(const swiftparse_syntax_node_t *raw_node) {
       return nullptr;
@@ -263,7 +284,7 @@ static int timeParsing(StringRef source, unsigned numInvoks) {
   Timer timer;
   timer.startTimer();
   for (unsigned i = 0; i != numInvoks; ++i) {
-    parse(source, nodeHandler);
+    parse(source, nodeHandler, swiftVersion, enableBareSlashRegex);
   }
   timer.stopTimer();
 
@@ -287,10 +308,13 @@ int main(int argc, char *argv[]) {
   auto BufferId = SM.AddNewSourceBuffer(std::move(*fileBufOrErr), SMLoc());
   switch (options::Action) {
   case ActionType::DumpTree:
-    return dumpTree(source);
+    return dumpTree(source, options::SwiftVersion,
+                    options::EnableBareSlashRegex);
   case ActionType::Time:
-    return timeParsing(source, options::NumParses);
+    return timeParsing(source, options::NumParses, options::SwiftVersion,
+                       options::EnableBareSlashRegex);
   case ActionType::Diagnostics:
-    return dumpDiagnostics(source, SM, BufferId);
+    return dumpDiagnostics(source, SM, BufferId, options::SwiftVersion,
+                           options::EnableBareSlashRegex);
   }
 }

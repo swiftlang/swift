@@ -31,7 +31,7 @@ public enum Result<Success, Failure: Error> {
   ///
   ///     let integerResult = getNextInteger()
   ///     // integerResult == .success(5)
-  ///     let stringResult = integerResult.map({ String($0) })
+  ///     let stringResult = integerResult.map { String($0) }
   ///     // stringResult == .success("5")
   ///
   /// - Parameter transform: A closure that takes the success value of this
@@ -69,7 +69,7 @@ public enum Result<Success, Failure: Error> {
   ///
   ///     let result: Result<Int, Error> = // ...
   ///     // result == .failure(<error value>)
-  ///     let resultWithDatedError = result.mapError({ e in DatedError(e) })
+  ///     let resultWithDatedError = result.mapError { DatedError($0) }
   ///     // result == .failure(DatedError(error: <error value>, date: <date>))
   ///
   /// - Parameter transform: A closure that takes the failure value of the
@@ -104,10 +104,10 @@ public enum Result<Success, Failure: Error> {
   ///         .success(n + 1)
   ///     }
   ///
-  ///     let result = getNextInteger().map({ getNextAfterInteger($0) })
+  ///     let result = getNextInteger().map { getNextAfterInteger($0) }
   ///     // result == .success(.success(5))
   ///
-  ///     let result = getNextInteger().flatMap({ getNextAfterInteger($0) })
+  ///     let result = getNextInteger().flatMap { getNextAfterInteger($0) }
   ///     // result == .success(5)
   ///
   /// - Parameter transform: A closure that takes the success value of the
@@ -191,4 +191,4 @@ extension Result: Equatable where Success: Equatable, Failure: Equatable { }
 
 extension Result: Hashable where Success: Hashable, Failure: Hashable { }
 
-extension Result: Sendable where Success: Sendable, Failure: Sendable { }
+extension Result: Sendable where Success: Sendable { }

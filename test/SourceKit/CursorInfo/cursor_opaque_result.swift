@@ -23,6 +23,7 @@ func test(value: MyStruct) {
 // OPAQUE-NEXT: (MyStruct) -> () -> some Comparable
 // OPAQUE-NEXT: $sQrycD
 // OPAQUE-NEXT: <Container>$s8MyModule0A6StructVD</Container>
+// OPAQUE-NEXT: MyModule{{$}}
 // OPAQUE-NEXT: <Declaration>public func foo() -&gt; some <Type usr="s:SL">Comparable</Type></Declaration>
 // OPAQUE-NEXT: <decl.function.method.instance><syntaxtype.keyword>public</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo</decl.name>() -&gt; <decl.function.returntype><syntaxtype.keyword>some</syntaxtype.keyword> <ref.protocol usr="s:SL">Comparable</ref.protocol></decl.function.returntype></decl.function.method.instance>
 
@@ -33,5 +34,6 @@ func test(value: MyStruct) {
 // ASSOC-NEXT: <Self where Self : P> (Self) -> () -> Self.Assoc
 // ASSOC-NEXT: $s5AssocQzycD
 // ASSOC-NEXT: <Container>$s8MyModule0A6StructVD</Container>
+// ASSOC-NEXT: MyModule{{$}}
 // ASSOC-NEXT: <Declaration>func bar() -&gt; <Type usr="s:8MyModule0A6StructV5Assoca">Assoc</Type></Declaration>
 // ASSOC-NEXT: <decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>bar</decl.name>() -&gt; <decl.function.returntype><ref.typealias usr="s:8MyModule0A6StructV5Assoca">Assoc</ref.typealias></decl.function.returntype></decl.function.method.instance>

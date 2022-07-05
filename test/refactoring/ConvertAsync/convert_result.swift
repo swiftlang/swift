@@ -381,7 +381,6 @@ func testResultConversion() async throws {
   // NESTEDBREAK-COMMENT-NEXT: // l
   // NESTEDBREAK-COMMENT-NEXT: print("after")
   // NESTEDBREAK-COMMENT-NEXT: // m
-  // NESTEDBREAK-COMMENT-NEXT: {{ }}
   // NESTEDBREAK-COMMENT-NOT: }
 
   // RUN: %refactor-check-compiles -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=ERROR-BLOCK-COMMENT %s
@@ -416,13 +415,11 @@ func testResultConversion() async throws {
   // ERROR-BLOCK-COMMENT-NEXT:   // h
   // ERROR-BLOCK-COMMENT-NEXT:   print("after")
   // ERROR-BLOCK-COMMENT-NEXT:   // i
-  // ERROR-BLOCK-COMMENT-NEXT:   {{ }}
   // ERROR-BLOCK-COMMENT-NEXT: } catch {
   // ERROR-BLOCK-COMMENT-NEXT:   // e
   // ERROR-BLOCK-COMMENT-NEXT:   print("fail")
   // ERROR-BLOCK-COMMENT-NEXT:   // f
   // ERROR-BLOCK-COMMENT-NEXT:   // g
-  // ERROR-BLOCK-COMMENT-NEXT:   {{ }}
   // ERROR-BLOCK-COMMENT-NEXT: }
   // ERROR-BLOCK-COMMENT-NOT: }
 

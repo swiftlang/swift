@@ -1,16 +1,13 @@
 # These were found by fuzzing getObjCClassByMangledName
 
 # rdar://63485806
-# This results in an abort(), whereas it should be an error; rdar://79725187
-# covers improving error handling; until that's done, disable this test case
-
-# 3…KySSyGSkySySSGiG3(KˇˇˇˇˇˇˇˇˇˇˇˇˇˇCwKySSiKySS
-# SSmSySyySGGSGyGSyySyySySSGGSGyS78iSLccSGSyySSySSGGccLcV1yVS~^§!zzzzzzzzzzzzhzzzzzSLzSEzzzzzzzzzzzzzzzzzxxxxx8K_S0ttnIx4_
-# ˇyySySyySySyGnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnSgZ1laSgSg
-# SSx3…KySyySGSSG_S2ItLHPˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇMd7KLPlKSSFTc•OSgS
-# 3…KySSiGSeySySSGiGSiySySSGiG3(KˇˇˇˇˇˇˇˇˇˇˇˇˇˇCwKySSiKySS
-# 3…KySSiGSyySySSGiG3(KˇˇˇˇˇˇˇˇˇˇˇˇˇˇCwKySSiKySS
-# SyySyySSySyyGSyySyyGGSGyGSyySySyySySSGGSGGˇˇˇˇˇS4S_SmˇˇAGmmmmmmmmmtLHPL(LHPTVdLHV
+3…KySSyGSkySySSGiG3(KˇˇˇˇˇˇˇˇˇˇˇˇˇˇCwKySSiKySS
+SSmSySyySGGSGyGSyySyySySSGGSGyS78iSLccSGSyySSySSGGccLcV1yVS~^§!zzzzzzzzzzzzhzzzzzSLzSEzzzzzzzzzzzzzzzzzxxxxx8K_S0ttnIx4_
+ˇyySySyySySyGnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnSgZ1laSgSg
+SSx3…KySyySGSSG_S2ItLHPˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇMd7KLPlKSSFTc•OSgS
+3…KySSiGSeySySSGiGSiySySSGiG3(KˇˇˇˇˇˇˇˇˇˇˇˇˇˇCwKySSiKySS
+3…KySSiGSyySySSGiG3(KˇˇˇˇˇˇˇˇˇˇˇˇˇˇCwKySSiKySS
+SyySyySSySyyGSyySyyGGSGyGSyySySyySySSGGSGGˇˇˇˇˇS4S_SmˇˇAGmmmmmmmmmtLHPL(LHPTVdLHV
 
 # rdar://63488139
 1_SxSt_S4KSgS9OSgRSLAPALÂ

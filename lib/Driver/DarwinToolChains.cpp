@@ -22,10 +22,10 @@
 #include "swift/Basic/TaskQueue.h"
 #include "swift/Config.h"
 #include "swift/Driver/Compilation.h"
-#include "clang/Driver/DarwinSDKInfo.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
 #include "swift/Option/Options.h"
+#include "clang/Basic/DarwinSDKInfo.h"
 #include "clang/Basic/Version.h"
 #include "clang/Driver/Util.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -471,7 +471,7 @@ toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
       Arguments.push_back("-rpath");
       Arguments.push_back(context.Args.MakeArgString(path));
     }
-  } else if (!tripleRequiresRPathForSwiftInOS(getTriple()) ||
+  } else if (!tripleRequiresRPathForSwiftLibrariesInOS(getTriple()) ||
              context.Args.hasArg(options::OPT_no_stdlib_rpath)) {
     // If targeting an OS with Swift in /usr/lib/swift, the LC_ID_DYLIB
     // install_name the stdlib will be an absolute path like
@@ -499,9 +499,11 @@ toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
     // package isn't installed.
     Arguments.push_back("-rpath");
     Arguments.push_back(context.Args.MakeArgString("/usr/lib/swift"));
-    // We don't need an rpath for /System/iOSSupport/usr/lib/swift because...
-    assert(!tripleIsMacCatalystEnvironment(getTriple())
-           && "macCatalyst not supported without Swift-in-the-OS");
+    // We don’t need an rpath for /System/iOSSupport/usr/lib/swift because:
+    // 1. The standard library and overlays were part of the OS before
+    //    Catalyst was introduced, so they are always available for Catalyst.
+    // 2. The _Concurrency back-deployment library is zippered, whereas only
+    //    unzippered frameworks need an unzippered twin in /System/iOSSupport.
   }
 }
 
@@ -598,11 +600,11 @@ toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
         micro = 0;
       }
 
-      // Mac Catalyst was introduced with an iOS deployment target of 13.0;
+      // Mac Catalyst was introduced with an iOS deployment target of 13.1;
       // the linker doesn't want to see a deployment target before that.
       if (major < 13) {
         major = 13;
-        minor = 0;
+        minor = 1;
         micro = 0;
       }
     } else {
@@ -857,6 +859,14 @@ bool toolchains::Darwin::shouldStoreInvocationInDebugInfo() const {
   return false;
 }
 
+std::string toolchains::Darwin::getGlobalDebugPathRemapping() const {
+  // This matches the behavior in Clang (see
+  // clang/lib/driver/ToolChains/Darwin.cpp).
+  if (const char *S = ::getenv("RC_DEBUG_PREFIX_MAP"))
+    return S;
+  return {};
+}
+
 static void validateLinkObjcRuntimeARCLiteLib(const toolchains::Darwin &TC,
                                               DiagnosticEngine &diags,
                                               const llvm::opt::ArgList &args) {
@@ -958,7 +968,7 @@ toolchains::Darwin::validateOutputInfo(DiagnosticEngine &diags,
                                        const OutputInfo &outputInfo) const {
   // If we have been provided with an SDK, go read the SDK information.
   if (!outputInfo.SDKPath.empty()) {
-    auto SDKInfoOrErr = clang::driver::parseDarwinSDKInfo(
+    auto SDKInfoOrErr = clang::parseDarwinSDKInfo(
         *llvm::vfs::getRealFileSystem(), outputInfo.SDKPath);
     if (SDKInfoOrErr) {
       SDKInfo = *SDKInfoOrErr;

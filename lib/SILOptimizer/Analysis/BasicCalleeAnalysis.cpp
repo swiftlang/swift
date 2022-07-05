@@ -57,8 +57,8 @@ bool CalleeList::allCalleesVisible() const {
     // TODO: exclude functions which are deserialized from modules in the same
     // resilience domain.
     if (Callee->isAvailableExternally() &&
-        // shared_external functions are always emitted in the client.
-        Callee->getLinkage() != SILLinkage::SharedExternal)
+        // shared functions are always emitted in the client.
+        Callee->getLinkage() != SILLinkage::Shared)
       return false;
   }
   return true;
@@ -214,7 +214,7 @@ CalleeCache::getSingleCalleeForWitnessMethod(WitnessMethodInst *WMI) const {
 
   // Attempt to find a specific callee for the given conformance and member.
   std::tie(CalleeFn, WT) = WMI->getModule().lookUpFunctionInWitnessTable(
-      WMI->getConformance(), WMI->getMember());
+      WMI->getConformance(), WMI->getMember(), SILModule::LinkingMode::LinkNormal);
 
   return CalleeFn;
 }
@@ -287,19 +287,28 @@ CalleeList CalleeCache::getCalleeList(FullApplySite FAS) const {
   return getCalleeListForCalleeKind(FAS.getCalleeOrigin());
 }
 
-// Return the list of functions that can be called via the given instruction.
-CalleeList CalleeCache::getCalleeList(SILInstruction *I) const {
-  // We support only deallocation instructions at the moment.
-  assert((isa<StrongReleaseInst>(I) || isa<ReleaseValueInst>(I)) &&
-         "A deallocation instruction expected");
-  auto Ty = I->getOperand(0)->getType();
-  while (auto payloadTy = Ty.getOptionalObjectType())
-    Ty = payloadTy;
-  auto Class = Ty.getClassOrBoundGenericClass();
-  if (!Class || Class->hasClangNode())
+/// Return the list of destructors of the class type \p type.
+///
+/// If \p type is an optional, look through that optional.
+/// If \p exactType is true, then \p type is treated like a final class type.
+CalleeList CalleeCache::getDestructors(SILType type, bool isExactType) const {
+  while (auto payloadTy = type.getOptionalObjectType()) {
+    type = payloadTy;
+  }
+  ClassDecl *classDecl = type.getClassOrBoundGenericClass();
+  if (!classDecl || classDecl->hasClangNode())
     return CalleeList();
-  SILDeclRef Destructor = SILDeclRef(Class->getDestructor());
-  return getCalleeList(Destructor);
+
+  if (isExactType || classDecl->isFinal()) {
+    // In case of a final class, just pick the deinit of the class.
+    SILDeclRef destructor = SILDeclRef(classDecl->getDestructor());
+    if (SILFunction *destrImpl = M.lookUpFunction(destructor))
+      return CalleeList(destrImpl);
+    return CalleeList();
+  }
+  // If all that doesn't help get the list of deinits as we do for regular class
+  // methods.
+  return getCalleeList(SILDeclRef(classDecl->getDestructor()));
 }
 
 void BasicCalleeAnalysis::dump() const {
@@ -329,6 +338,14 @@ BridgedCalleeList CalleeAnalysis_getCallees(BridgedCalleeAnalysis calleeAnalysis
                                             BridgedValue callee) {
   BasicCalleeAnalysis *bca = static_cast<BasicCalleeAnalysis *>(calleeAnalysis.bca);
   CalleeList cl = bca->getCalleeListOfValue(castToSILValue(callee));
+  return {cl.getOpaquePtr(), cl.getOpaqueKind(), cl.isIncomplete()};
+}
+
+BridgedCalleeList CalleeAnalysis_getDestructors(BridgedCalleeAnalysis calleeAnalysis,
+                                                BridgedType type,
+                                                SwiftInt isExactType) {
+  BasicCalleeAnalysis *bca = static_cast<BasicCalleeAnalysis *>(calleeAnalysis.bca);
+  CalleeList cl = bca->getDestructors(castToSILType(type), isExactType != 0);
   return {cl.getOpaquePtr(), cl.getOpaqueKind(), cl.isIncomplete()};
 }
 

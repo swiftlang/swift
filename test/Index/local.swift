@@ -2,9 +2,13 @@
 // RUN: %target-swift-ide-test -print-indexed-symbols -include-locals  -source-filename %s | %FileCheck -check-prefix=LOCAL %s
 
 func foo(a: Int, b: Int, c: Int) {
+  // CHECK-NOT: [[@LINE-1]]:10 | function/acc-get/Swift | getter:a
+  // CHECK-NOT: [[@LINE-1]]:10 | function/acc-set/Swift | setter:a
+
     let x = a + b
     // LOCAL: [[@LINE-1]]:9 | variable(local)/Swift | x | [[x_USR:.*]] | Def,RelChild | rel: 1
     // CHECK-NOT: [[@LINE-2]]:9 | variable(local)/Swift | x | {{.*}} | Def,RelChild | rel: 1
+    // LOCAL-NOT: [[@LINE-3]]:13 | function/acc-get/Swift | getter:a
 
     let y = x + c
     // LOCAL: [[@LINE-1]]:9 | variable(local)/Swift | y | [[y_USR:.*]] | Def,RelChild | rel: 1
@@ -35,7 +39,7 @@ func foo(a: Int, b: Int, c: Int) {
     let _ = LocalEnum.foo(x: LocalStruct())
     // LOCAL: [[@LINE-1]]:13 | enum(local)/Swift | LocalEnum | [[LocalEnum_USR]] | Ref,RelCont | rel: 1
     // CHECK-NOT: [[@LINE-2]]:13 | enum(local)/Swift | LocalEnum | {{.*}} | Ref,RelCont | rel: 1
-    // LOCAL: [[@LINE-3]]:23 | enumerator(local)/Swift | foo(x:) | [[LocalEnum_foo_USR]] | Ref,RelCont | rel: 1
+    // LOCAL: [[@LINE-3]]:23 | enumerator(local)/Swift | foo(x:) | [[LocalEnum_foo_USR]] | Ref,Call,RelCall,RelCont | rel: 1
     // CHECK-NOT: [[@LINE-4]]:23 | enumerator(local)/Swift | foo(x:) | {{.*}} | Ref,RelCont | rel: 1
     // LOCAL: [[@LINE-5]]:30 | struct(local)/Swift | LocalStruct | [[LocalStruct_USR]] | Ref,RelCont | rel: 1
     // CHECK-NOT: [[@LINE-6]]:30 | struct(local)/Swift | LocalStruct | {{.*}} | Ref,RelCont | rel: 1

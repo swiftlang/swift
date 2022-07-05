@@ -81,7 +81,7 @@ PolymorphicEffectRequirementsRequest::evaluate(Evaluator &evaluator,
   }
 
   // check associated conformances of associated types or inheritance
-  for (auto requirement : proto->getRequirementSignature()) {
+  for (auto requirement : proto->getRequirementSignature().getRequirements()) {
     if (requirement.getKind() != RequirementKind::Conformance)
       continue;
 
@@ -326,17 +326,7 @@ public:
     return Substitutions;
   }
 
-  static AbstractFunction decomposeApply(ApplyExpr *apply,
-                                         SmallVectorImpl<Expr *> &args) {
-    auto *argExpr = apply->getArg();
-    if (auto *tupleExpr = dyn_cast<TupleExpr>(argExpr)) {
-      auto elts = tupleExpr->getElements();
-      args.append(elts.begin(), elts.end());
-    } else {
-      auto *parenExpr = cast<ParenExpr>(argExpr);
-      args.push_back(parenExpr->getSubExpr());
-    }
-
+  static AbstractFunction getAppliedFn(ApplyExpr *apply) {
     Expr *fn = apply->getFn()->getValueProvidingExpr();
 
     if (auto *selfCall = dyn_cast<SelfApplyExpr>(fn))
@@ -734,6 +724,12 @@ public:
   DeclContext *RethrowsDC = nullptr;
   DeclContext *ReasyncDC = nullptr;
 
+  // Indicates if `classifyApply` will attempt to classify SelfApplyExpr
+  // because that should be done only in certain contexts like when infering
+  // if "async let" implicit auto closure wrapping initialize expression can
+  // throw.
+  bool ClassifySelfApplyExpr = false;
+
   DeclContext *getPolymorphicEffectDeclContext(EffectKind kind) const {
     switch (kind) {
     case EffectKind::Throws: return RethrowsDC;
@@ -755,15 +751,28 @@ public:
 
   /// Check to see if the given function application throws or is async.
   Classification classifyApply(ApplyExpr *E) {
-    if (isa<SelfApplyExpr>(E)) {
-      assert(!E->isImplicitlyAsync());
-      return Classification();
-    }
-
     // An apply expression is a potential throw site if the function throws.
     // But if the expression didn't type-check, suppress diagnostics.
     if (!E->getType() || E->getType()->hasError())
       return Classification::forInvalidCode();
+
+    if (auto *SAE = dyn_cast<SelfApplyExpr>(E)) {
+      assert(!E->isImplicitlyAsync());
+
+      if (ClassifySelfApplyExpr) {
+        // Do not consider throw properties in SelfAssignExpr with an implicit
+        // conversion base.
+        if (isa<ImplicitConversionExpr>(SAE->getBase()))
+          return Classification();
+
+        auto fnType = E->getType()->getAs<AnyFunctionType>();
+        if (fnType && fnType->isThrowing()) {
+          return Classification::forUnconditional(
+              EffectKind::Throws, PotentialEffectReason::forApply());
+        }
+      }
+      return Classification();
+    }
 
     auto type = E->getFn()->getType();
     if (!type) return Classification::forInvalidCode();
@@ -779,12 +788,13 @@ public:
     }
 
     // Decompose the application.
-    SmallVector<Expr *, 2> args;
-    auto fnRef = AbstractFunction::decomposeApply(E, args);
+    auto *args = E->getArgs();
+    auto fnRef = AbstractFunction::getAppliedFn(E);
 
     // If any of the arguments didn't type check, fail.
-    for (auto *arg : args) {
-      if (!arg->getType() || arg->getType()->hasError())
+    for (auto arg : *args) {
+      auto *argExpr = arg.getExpr();
+      if (!argExpr->getType() || argExpr->getType()->hasError())
         return Classification::forInvalidCode();
     }
 
@@ -822,13 +832,13 @@ public:
 
         // Use the most significant result from the arguments.
         auto params = origType->getParams();
-        if (params.size() != args.size()) {
+        if (params.size() != args->size()) {
           result.merge(Classification::forInvalidCode());
           return;
         }
 
         for (unsigned i = 0, e = params.size(); i < e; ++i) {
-          result.merge(classifyArgument(args[i],
+          result.merge(classifyArgument(args->getExpr(i),
                                         params[i].getParameterType(),
                                         kind));
         }
@@ -1500,8 +1510,8 @@ public:
 
   static Context forTopLevelCode(TopLevelCodeDecl *D) {
     // Top-level code implicitly handles errors.
-    // TODO: Eventually, it will handle async as well.
-    return Context(/*handlesErrors=*/true, /*handlesAsync=*/false, None);
+    return Context(/*handlesErrors=*/true,
+                   /*handlesAsync=*/D->isAsyncContext(), None);
   }
 
   static Context forFunction(AbstractFunctionDecl *D) {
@@ -1777,6 +1787,9 @@ public:
   void diagnoseUnhandledThrowSite(DiagnosticEngine &Diags, ASTNode E,
                                   bool isTryCovered,
                                   const PotentialEffectReason &reason) {
+    if (E.isImplicit())
+      return;
+
     switch (getKind()) {
     case Kind::PotentiallyHandled:
       if (IsNonExhaustiveCatch) {
@@ -1956,6 +1969,9 @@ public:
   void diagnoseUnhandledAsyncSite(DiagnosticEngine &Diags, ASTNode node,
                                   Optional<PotentialEffectReason> maybeReason,
                                   bool forAwait = false) {
+    if (node.isImplicit())
+      return;
+
     switch (getKind()) {
     case Kind::PotentiallyHandled: {
       Diags.diagnose(node.getStartLoc(), diag::async_in_nonasync_function,
@@ -2080,7 +2096,8 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
   llvm::DenseMap<Expr *, Expr *> parentMap;
 
   static bool isEffectAnchor(Expr *e) {
-    return isa<AbstractClosureExpr>(e) || isa<DiscardAssignmentExpr>(e) || isa<AssignExpr>(e);
+    return isa<AbstractClosureExpr>(e) || isa<DiscardAssignmentExpr>(e) ||
+           isa<AssignExpr>(e);
   }
 
   static bool isAnchorTooEarly(Expr *e) {
@@ -2100,25 +2117,13 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
     if (parent && !isAnchorTooEarly(parent)) {
       return parent;
     }
-
     if (isInterpolatedString) {
-      // TODO: I'm being gentle with the casts to avoid breaking things
-      //       If we see incorrect fix-it locations in string interpolations
-      //       we need to change how this behaves
-      //       Assert builds will crash giving us a bug to fix, non-asserts will
-      //       quietly "just work".
       assert(parent == nullptr && "Expected to be at top of expression");
-      assert(isa<CallExpr>(lastParent) &&
-             "Expected top of string interpolation to be CalExpr");
-      assert(isa<ParenExpr>(dyn_cast<CallExpr>(lastParent)->getArg()) &&
-             "Expected paren expr in string interpolation call");
-      if (CallExpr *callExpr = dyn_cast<CallExpr>(lastParent)) {
-        if (ParenExpr *body = dyn_cast<ParenExpr>(callExpr->getArg())) {
-          return body->getSubExpr();
-        }
+      if (ArgumentList *args = lastParent->getArgs()) {
+        if (Expr *unaryArg = args->getUnlabeledUnaryExpr())
+          return unaryArg;
       }
     }
-
     return lastParent;
   }
 
@@ -2221,7 +2226,7 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
       // in the Context itself, used to postpone diagnostic emission
       // to a parent "try" expression. If something was diagnosed
       // during this ContextScope, the flag may have been set, and
-      // we need to preseve its value when restoring the old Context.
+      // we need to preserve its value when restoring the old Context.
       bool DiagnoseErrorOnTry = Self.CurContext.shouldDiagnoseErrorOnTry();
       OldContext.setDiagnoseErrorOnTry(DiagnoseErrorOnTry);
     }
@@ -2871,9 +2876,15 @@ private:
          if (call && call->isImplicitlyAsync()) {
            // Emit a tailored note if the call is implicitly async, meaning the
            // callee is isolated to an actor.
-           auto callee = call->getCalledValue();
-           Ctx.Diags.diagnose(diag.expr.getStartLoc(), diag::actor_isolated_sync_func,
-                              callee->getDescriptiveKind(), callee->getName());
+           auto callee = call->getCalledValue(/*skipFunctionConversions=*/true);
+           if (callee) {
+             Ctx.Diags.diagnose(diag.expr.getStartLoc(), diag::actor_isolated_sync_func,
+                                callee->getDescriptiveKind(), callee->getName());
+           } else {
+             Ctx.Diags.diagnose(
+                 diag.expr.getStartLoc(), diag::actor_isolated_sync_func_value,
+                 call->getFn()->getType());
+           }
          } else {
            Ctx.Diags.diagnose(diag.expr.getStartLoc(),
                               diag::async_access_without_await, 0);
@@ -2971,6 +2982,8 @@ void TypeChecker::checkPropertyWrapperEffects(
 }
 
 bool TypeChecker::canThrow(Expr *expr) {
-  return (ApplyClassifier().classifyExpr(expr, EffectKind::Throws)
-          == ConditionalEffectKind::Always);
+  ApplyClassifier classifier;
+  classifier.ClassifySelfApplyExpr = true;
+  return (classifier.classifyExpr(expr, EffectKind::Throws) ==
+          ConditionalEffectKind::Always);
 }

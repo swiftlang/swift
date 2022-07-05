@@ -12,7 +12,7 @@
 ///
 /// \file
 /// This file contains the table used by SILDIExprInfo to map from
-/// SILDIExprOperator to suppliment information like the operator string.
+/// SILDIExprOperator to supplement information like the operator string.
 ///
 //===----------------------------------------------------------------------===//
 
@@ -37,7 +37,13 @@ const SILDIExprInfo *SILDIExprInfo::get(SILDIExprOperator Op) {
   static const std::unordered_map<SILDIExprOperator, SILDIExprInfo> Infos = {
       {SILDIExprOperator::Fragment,
        {"op_fragment", {SILDIExprElement::DeclKind}}},
-      {SILDIExprOperator::Dereference, {"op_deref", {}}}};
+      {SILDIExprOperator::Dereference, {"op_deref", {}}},
+      {SILDIExprOperator::Plus, {"op_plus", {}}},
+      {SILDIExprOperator::Minus, {"op_minus", {}}},
+      {SILDIExprOperator::ConstUInt,
+       {"op_constu", {SILDIExprElement::ConstIntKind}}},
+      {SILDIExprOperator::ConstSInt,
+       {"op_consts", {SILDIExprElement::ConstIntKind}}}};
 
   return Infos.count(Op) ? &Infos.at(Op) : nullptr;
 }

@@ -38,6 +38,7 @@ class SemaTestBase : public ::testing::Test {
 public:
   LangOptions LangOpts;
   TypeCheckerOptions TypeCheckerOpts;
+  SILOptions SILOpts;
   SearchPathOptions SearchPathOpts;
   ClangImporterOptions ClangImporterOpts;
   symbolgraphgen::SymbolGraphOptions SymbolGraphOpts;
@@ -52,8 +53,7 @@ public:
 
     SearchPathOpts.RuntimeResourcePath = SWIFTLIB_DIR;
     SearchPathOpts.RuntimeLibraryPaths.push_back(std::string(libDir.str()));
-    SearchPathOpts.RuntimeLibraryImportPaths.push_back(
-        std::string(libDir.str()));
+    SearchPathOpts.setRuntimeLibraryImportPaths({libDir.str().str()});
   }
 };
 

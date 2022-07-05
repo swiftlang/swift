@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 %{
-from __future__ import division
 from SwiftIntTypes import all_integer_types
 word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 storagescalarCounts = [2,4,8,16,32,64]
@@ -264,7 +263,7 @@ extension ${Self}: SIMDScalar {
 %for (Self, bits) in [('Float16',16), ('Float',32), ('Double',64)]:
 % if bits == 16:
 #if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
-@available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+@available(SwiftStdlib 5.3, *)
 % end
 extension ${Self} : SIMDScalar {
 

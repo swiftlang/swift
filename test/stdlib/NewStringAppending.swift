@@ -11,7 +11,7 @@
 // REQUIRES: CPU=x86_64, OS=macosx
 // UNSUPPORTED: use_os_stdlib
 
-// TODO: Adapt capacity checks into a non-FileCheck more exhuastive test that
+// TODO: Adapt capacity checks into a non-FileCheck more exhaustive test that
 // can run on older OSes and match their behavior...
 
 import Foundation
@@ -143,7 +143,7 @@ print("\(repr(s1))")
 print("(expect copy to trigger reallocation without growth)")
 
 //  CHECK-NEXT: String(Native(owner: @[[storage4:[x0-9a-f]+]], count: 73, capacity: 87)) = "{{.*}}X"
-// CHECK-NOT: @[[storage3]],
+// xCHECK-NOT: @[[storage3]],
 s1 += "X"
 print("\(repr(s1))")
 

@@ -150,7 +150,7 @@ Compilation::Compilation(DiagnosticEngine &Diags,
     EmitFineGrainedDependencyDotFileAfterEveryImport(
       EmitFineGrainedDependencyDotFileAfterEveryImport),
     EnableCrossModuleIncrementalBuild(EnableCrossModuleIncrementalBuild)
-    { };
+    { }
 // clang-format on
 
 static bool writeFilelistIfNecessary(const Job *job, const ArgList &args,
@@ -902,7 +902,7 @@ namespace driver {
         }
 
         const Optional<std::pair<bool, bool>> shouldSchedAndIsCascading =
-            computeShouldInitiallyScheduleJobAndDependendents(cmd);
+            computeShouldInitiallyScheduleJobAndDependents(cmd);
         if (!shouldSchedAndIsCascading)
           return getEveryCompileJob(); // Load error, just run them all
         const bool &shouldSchedule = shouldSchedAndIsCascading->first;
@@ -934,7 +934,7 @@ namespace driver {
     /// the job is cascading. Or if there was a dependency-read error, return
     /// \c None to indicate don't-know.
     Optional<std::pair<bool, bool>>
-    computeShouldInitiallyScheduleJobAndDependendents(const Job *Cmd) {
+    computeShouldInitiallyScheduleJobAndDependents(const Job *Cmd) {
       auto CondAndHasDepsIfNoError =
           loadDependenciesAndComputeCondition(Cmd);
       if (!CondAndHasDepsIfNoError)
@@ -1148,7 +1148,7 @@ namespace driver {
 
     /// Create \c NumberOfParallelCommands batches and assign each job to a
     /// batch either filling each partition in order or, if seeded with a
-    /// nonzero value, pseudo-randomly (but determinstically and nearly-evenly).
+    /// nonzero value, pseudo-randomly (but deterministically and nearly-evenly).
     void partitionIntoBatches(std::vector<const Job *> Batchable,
                               BatchPartition &Partition) {
       if (Comp.getShowJobLifecycle()) {
@@ -1447,7 +1447,7 @@ namespace driver {
     /// \c loadDependenciesAndComputeCondition .
     /// Then, the cascading predicate is returned from
     /// \c isCompileJobInitiallyNeededForDependencyBasedIncrementalCompilation.
-    /// Then, in \c computeShouldInitiallyScheduleJobAndDependendents
+    /// Then, in \c computeShouldInitiallyScheduleJobAndDependents
     /// if the job needs a cascading build, it's dependents will be scheduled
     /// immediately. After the job finishes, it's dependencies will be processed
     /// again. If a non-cascading job failed, the driver will schedule all of
@@ -1614,7 +1614,7 @@ static void writeCompilationRecord(StringRef path, StringRef argsHash,
   llvm::sys::fs::rename(path, path + "~");
 
   std::error_code error;
-  llvm::raw_fd_ostream out(path, error, llvm::sys::fs::F_None);
+  llvm::raw_fd_ostream out(path, error, llvm::sys::fs::OF_None);
   if (out.has_error()) {
     // FIXME: How should we report this error?
     out.clear_error();
@@ -1705,8 +1705,8 @@ static void writeIndexUnitOutputPathsToFilelist(llvm::raw_fd_ostream &out,
   for (auto &output : outputInfo.getIndexUnitOutputFilenames())
     out << output << "\n";
 }
-static void writeSupplementarOutputToFilelist(llvm::raw_fd_ostream &out,
-                                              const Job *job) {
+static void writeSupplementaryOutputToFilelist(llvm::raw_fd_ostream &out,
+                                               const Job *job) {
   job->getOutput().writeOutputFileMap(out);
 }
 
@@ -1718,7 +1718,7 @@ static bool writeFilelistIfNecessary(const Job *job, const ArgList &args,
       return true;
 
     std::error_code error;
-    llvm::raw_fd_ostream out(filelistInfo.path, error, llvm::sys::fs::F_None);
+    llvm::raw_fd_ostream out(filelistInfo.path, error, llvm::sys::fs::OF_None);
     if (out.has_error()) {
       out.clear_error();
       diags.diagnose(SourceLoc(), diag::error_unable_to_make_temporary_file,
@@ -1745,7 +1745,7 @@ static bool writeFilelistIfNecessary(const Job *job, const ArgList &args,
       writeIndexUnitOutputPathsToFilelist(out, job);
       break;
     case FilelistInfo::WhichFiles::SupplementaryOutput:
-      writeSupplementarOutputToFilelist(out, job);
+      writeSupplementaryOutputToFilelist(out, job);
       break;
     }
   }
@@ -1826,7 +1826,7 @@ Compilation::Result Compilation::performSingleCommand(const Job *Cmd) {
 static bool writeAllSourcesFile(DiagnosticEngine &diags, StringRef path,
                                 ArrayRef<InputPair> inputFiles) {
   std::error_code error;
-  llvm::raw_fd_ostream out(path, error, llvm::sys::fs::F_None);
+  llvm::raw_fd_ostream out(path, error, llvm::sys::fs::OF_None);
   if (out.has_error()) {
     out.clear_error();
     diags.diagnose(SourceLoc(), diag::error_unable_to_make_temporary_file,
@@ -1923,7 +1923,7 @@ void Compilation::addDependencyPathOrCreateDummy(
   } else if (!depPath.empty()) {
     // Create dummy empty file
     std::error_code EC;
-    llvm::raw_fd_ostream(depPath, EC, llvm::sys::fs::F_None);
+    llvm::raw_fd_ostream(depPath, EC, llvm::sys::fs::OF_None);
   }
 }
 

@@ -73,6 +73,7 @@ namespace swift {
   class PrefixOperatorDecl;
   class ProtocolConformance;
   class ValueDecl;
+  class VarDecl;
   class Initializer;
   class ClassDecl;
   class SerializedAbstractClosureExpr;
@@ -200,6 +201,7 @@ struct FragileFunctionKind {
     AlwaysEmitIntoClient,
     DefaultArgument,
     PropertyInitializer,
+    BackDeploy,
     None
   };
 
@@ -210,6 +212,9 @@ struct FragileFunctionKind {
     return (lhs.kind == rhs.kind &&
             lhs.allowUsableFromInline == rhs.allowUsableFromInline);
   }
+
+  /// Casts to `unsigned` for diagnostic %selects.
+  unsigned getSelector() { return static_cast<unsigned>(kind); }
 };
 
 /// A DeclContext is an AST object which acts as a semantic container
@@ -296,6 +301,9 @@ public:
   /// Returns the kind of context this is.
   DeclContextKind getContextKind() const;
 
+  /// Returns whether this context asynchronous
+  bool isAsyncContext() const;
+
   /// Returns whether this context has value semantics.
   bool hasValueSemantics() const;
 
@@ -351,6 +359,11 @@ public:
   /// If this DeclContext is a protocol extension, return the extended protocol.
   LLVM_READONLY
   ProtocolDecl *getExtendedProtocolDecl() const;
+
+  /// If this DeclContext is the initializer expression of a global or instance
+  /// property, return the VarDecl, otherwise return null.
+  LLVM_READONLY
+  VarDecl *getNonLocalVarDecl() const;
 
   /// Retrieve the generic parameter 'Self' from a protocol or
   /// protocol extension.
@@ -824,6 +837,9 @@ public:
 
   /// Setup the loader for lazily-loaded members.
   void setMemberLoader(LazyMemberLoader *loader, uint64_t contextData);
+
+  /// Externally tell this context that it has no more lazy members, i.e. all lazy member loading is complete.
+  void setHasLazyMembers(bool hasLazyMembers) const;
 
   /// Load all of the members of this context.
   void loadAllMembers() const;

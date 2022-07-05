@@ -21,10 +21,26 @@
 using namespace swift;
 using namespace symbolgraphgen;
 
+namespace {
+
+/// Compare the two \c ModuleDecl instances to see whether they are the same.
+///
+/// Pass \c true to the \c ignoreUnderlying argument to consider two modules the same even if
+/// one is a Swift module and the other a non-Swift module. This allows a Swift module and its
+/// underlying Clang module to compare as equal.
+bool areModulesEqual(const ModuleDecl *lhs, const ModuleDecl *rhs, bool ignoreUnderlying = false) {
+  return lhs->getNameStr() == rhs->getNameStr()
+    && (ignoreUnderlying || lhs->isNonSwiftModule() == rhs->isNonSwiftModule());
+}
+
+} // anonymous namespace
+
 SymbolGraphASTWalker::SymbolGraphASTWalker(ModuleDecl &M,
+                                           const SmallPtrSet<ModuleDecl *, 4> ExportedImportedModules,
                                            const SymbolGraphOptions &Options)
   : Options(Options),
     M(M),
+    ExportedImportedModules(ExportedImportedModules),
     MainGraph(*this, M, None, Ctx) {}
 
 /// Get a "sub" symbol graph for the parent module of a type that
@@ -43,14 +59,19 @@ SymbolGraph *SymbolGraphASTWalker::getModuleSymbolGraph(const Decl *D) {
     }
   }
 
-  if (this->M.getNameStr().equals(M->getNameStr())) {
+  if (areModulesEqual(&this->M, M, true)) {
     return &MainGraph;
   } else if (MainGraph.DeclaringModule.hasValue() &&
-      MainGraph.DeclaringModule.getValue()->getNameStr().equals(M->getNameStr())) {
+             areModulesEqual(MainGraph.DeclaringModule.getValue(), M, true)) {
     // Cross-import overlay modules already appear as "extensions" of their declaring module; we
     // should put actual extensions of that module into the main graph
     return &MainGraph;
   }
+  
+  if (isExportedImportedModule(M)) {
+    return &MainGraph;
+  }
+  
   auto Found = ExtendedModuleGraphs.find(M->getNameStr());
   if (Found != ExtendedModuleGraphs.end()) {
     return Found->getValue();
@@ -207,4 +228,15 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
   SG->recordNode(Symbol(SG, VD, nullptr));
 
   return true;
+}
+
+bool SymbolGraphASTWalker::isFromExportedImportedModule(const Decl* D) const {
+  auto *M = D->getModuleContext();
+  return isExportedImportedModule(M);
+}
+
+bool SymbolGraphASTWalker::isExportedImportedModule(const ModuleDecl *M) const {
+  return llvm::any_of(ExportedImportedModules, [&M](const auto *MD) {
+    return areModulesEqual(M, MD->getModuleContext());
+  });
 }

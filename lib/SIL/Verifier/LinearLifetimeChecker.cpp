@@ -503,7 +503,7 @@ void State::checkDataflowEndState(DeadEndBlocks &deBlocks) {
       }
       llvm::errs() << "Post Dominating Failure Blocks:\n";
       for (auto *succBlock : successorBlocksThatMustBeVisited) {
-        llvm::errs() << "bb" << succBlock->getDebugID();
+        llvm::errs() << " bb" << succBlock->getDebugID();
       }
       llvm::errs() << '\n';
     });

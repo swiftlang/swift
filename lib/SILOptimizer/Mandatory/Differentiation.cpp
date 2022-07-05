@@ -171,7 +171,6 @@ static bool diagnoseUnsupportedControlFlow(ADContext &context,
     if (isa<BranchInst>(term) || isa<CondBranchInst>(term) ||
         isa<SwitchEnumInst>(term) || isa<SwitchEnumAddrInst>(term) ||
         isa<CheckedCastBranchInst>(term) ||
-        isa<CheckedCastValueBranchInst>(term) ||
         isa<CheckedCastAddrBranchInst>(term) || isa<TryApplyInst>(term))
       continue;
     // If terminator is an unsupported branching terminator, emit an error.
@@ -795,7 +794,8 @@ static SILFunction *createEmptyVJP(ADContext &context,
       witness->getLinkage(),
       context.getASTContext().getIdentifier(vjpName).str(), vjpType,
       vjpGenericEnv, original->getLocation(), original->isBare(),
-      IsNotTransparent, isSerialized, original->isDynamicallyReplaceable());
+      IsNotTransparent, isSerialized, original->isDynamicallyReplaceable(),
+      original->isDistributed());
   vjp->setDebugScope(new (module) SILDebugScope(original->getLocation(), vjp));
 
   LLVM_DEBUG(llvm::dbgs() << "VJP type: " << vjp->getLoweredFunctionType()
@@ -836,7 +836,8 @@ static SILFunction *createEmptyJVP(ADContext &context,
       witness->getLinkage(),
       context.getASTContext().getIdentifier(jvpName).str(), jvpType,
       jvpGenericEnv, original->getLocation(), original->isBare(),
-      IsNotTransparent, isSerialized, original->isDynamicallyReplaceable());
+      IsNotTransparent, isSerialized, original->isDynamicallyReplaceable(),
+      original->isDistributed());
   jvp->setDebugScope(new (module) SILDebugScope(original->getLocation(), jvp));
 
   LLVM_DEBUG(llvm::dbgs() << "JVP type: " << jvp->getLoweredFunctionType()
@@ -870,7 +871,7 @@ static void emitFatalError(ADContext &context, SILFunction *f,
   auto *fatalErrorFn = fnBuilder.getOrCreateFunction(
       loc, fatalErrorFuncName, SILLinkage::PublicExternal, fatalErrorFnType,
       IsNotBare, IsNotTransparent, IsNotSerialized, IsNotDynamic,
-      ProfileCounter(), IsNotThunk);
+      IsNotDistributed, ProfileCounter(), IsNotThunk);
   auto *fatalErrorFnRef = builder.createFunctionRef(loc, fatalErrorFn);
   builder.createApply(loc, fatalErrorFnRef, SubstitutionMap(), {});
   builder.createUnreachable(loc);
@@ -897,7 +898,7 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
     // - Functions with no return.
     // - Functions with unsupported control flow.
     if (context.getASTContext()
-            .LangOpts.EnableExperimentalForwardModeDifferentiation &&
+            .LangOpts.hasFeature(Feature::ForwardModeDifferentiation) &&
         (diagnoseNoReturn(context, witness->getOriginalFunction(), invoker) ||
          diagnoseUnsupportedControlFlow(
              context, witness->getOriginalFunction(), invoker)))
@@ -913,7 +914,7 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
     // generation because generated JVP may not match semantics of custom VJP.
     // Instead, create an empty JVP.
     if (context.getASTContext()
-            .LangOpts.EnableExperimentalForwardModeDifferentiation &&
+            .LangOpts.hasFeature(Feature::ForwardModeDifferentiation) &&
         !witness->getVJP()) {
       // JVP and differential generation do not currently support functions with
       // multiple basic blocks.
@@ -1029,7 +1030,8 @@ static SILValue promoteCurryThunkApplicationToDifferentiableFunction(
   auto *newThunk = fb.getOrCreateFunction(
       loc, newThunkName, getSpecializedLinkage(thunk, thunk->getLinkage()),
       thunkType, thunk->isBare(), thunk->isTransparent(), thunk->isSerialized(),
-      thunk->isDynamicallyReplaceable(), ProfileCounter(), thunk->isThunk());
+      thunk->isDynamicallyReplaceable(), thunk->isDistributed(),
+      ProfileCounter(), thunk->isThunk());
   // If new thunk is newly created: clone the old thunk body, wrap the
   // returned function value with an `differentiable_function`
   // instruction, and process the `differentiable_function` instruction.

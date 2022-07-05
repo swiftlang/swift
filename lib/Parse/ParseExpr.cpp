@@ -177,7 +177,7 @@ ParserResult<Expr> Parser::parseExprArrow() {
 ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
                                              bool isExprBasic,
                                              bool isForConditionalDirective) {
-  SyntaxParsingContext ExprSequnceContext(SyntaxContext, SyntaxContextKind::Expr);
+  SyntaxParsingContext ExprSequenceContext(SyntaxContext, SyntaxContextKind::Expr);
 
   SmallVector<Expr*, 8> SequencedExprs;
   SourceLoc startLoc = Tok.getLoc();
@@ -380,8 +380,8 @@ done:
   if (SequencedExprs.size() == 1)
     return makeParserResult(SequenceStatus, SequencedExprs[0]);
 
-  ExprSequnceContext.createNodeInPlace(SyntaxKind::ExprList);
-  ExprSequnceContext.setCreateSyntax(SyntaxKind::SequenceExpr);
+  ExprSequenceContext.createNodeInPlace(SyntaxKind::ExprList);
+  ExprSequenceContext.setCreateSyntax(SyntaxKind::SequenceExpr);
   return makeParserResult(SequenceStatus,
                           SequenceExpr::create(Context, SequencedExprs));
 }
@@ -501,17 +501,6 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
   return sub;
 }
 
-static Expr *formUnaryArgument(ASTContext &context, Expr *argument) {
-  if (isa<ParenExpr>(argument))
-    return argument;
-
-  auto *arg = new (context)
-      ParenExpr(argument->getStartLoc(), argument, argument->getEndLoc(),
-                /*hasTrailingClosure*/ false);
-  arg->setImplicit();
-  return arg;
-}
-
 /// parseExprUnary
 ///
 ///   expr-unary(Mode):
@@ -522,6 +511,10 @@ static Expr *formUnaryArgument(ASTContext &context, Expr *argument) {
 ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   SyntaxParsingContext UnaryContext(SyntaxContext, SyntaxContextKind::Expr);
   UnresolvedDeclRefExpr *Operator;
+
+  // First check to see if we have the start of a regex literal `/.../`.
+  tryLexRegexLiteral(/*forUnappliedOperator*/ false);
+
   switch (Tok.getKind()) {
   default:
     // If the next token is not an operator, just parse this as expr-postfix.
@@ -543,16 +536,19 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   case tok::backslash:
     return parseExprKeyPath();
 
-  case tok::oper_postfix:
+  case tok::oper_postfix: {
     // Postfix operators cannot start a subexpression, but can happen
     // syntactically because the operator may just follow whatever precedes this
     // expression (and that may not always be an expression).
     diagnose(Tok, diag::invalid_postfix_operator);
     Tok.setKind(tok::oper_prefix);
-    LLVM_FALLTHROUGH;
-  case tok::oper_prefix:
     Operator = parseExprOperator();
     break;
+  }
+  case tok::oper_prefix: {
+    Operator = parseExprOperator();
+    break;
+  }
   case tok::oper_binary_spaced:
   case tok::oper_binary_unspaced: {
     // For recovery purposes, accept an oper_binary here.
@@ -574,7 +570,7 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   if (SubExpr.isNull())
     return Status;
 
-  // We are sure we can create a prefix prefix operator expr now.
+  // We are sure we can create a prefix operator expr now.
   UnaryContext.setCreateSyntax(SyntaxKind::PrefixOperatorExpr);
 
   // Check if we have a unary '-' with number literal sub-expression, for
@@ -586,8 +582,7 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
     }
   }
 
-  auto *opCall = PrefixUnaryExpr::create(
-      Context, Operator, formUnaryArgument(Context, SubExpr.get()));
+  auto *opCall = PrefixUnaryExpr::create(Context, Operator, SubExpr.get());
   return makeParserResult(Status, opCall);
 }
 
@@ -668,17 +663,17 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
     // Add the code completion expression to the path result.
     CodeCompletionExpr *CC = new (Context)
         CodeCompletionExpr(pathResult.getPtrOrNull(), Tok.getLoc());
-    auto keypath = new (Context)
-        KeyPathExpr(backslashLoc, rootResult.getPtrOrNull(), CC, hasLeadingDot);
+    auto *keypath = KeyPathExpr::createParsed(
+        Context, backslashLoc, rootResult.getPtrOrNull(), CC, hasLeadingDot);
     if (CodeCompletion)
       CodeCompletion->completeExprKeyPath(keypath, DotLoc);
     consumeToken(tok::code_complete);
     return makeParserCodeCompletionResult(keypath);
   }
 
-  auto keypath =
-      new (Context) KeyPathExpr(backslashLoc, rootResult.getPtrOrNull(),
-                                pathResult.getPtrOrNull(), hasLeadingDot);
+  auto *keypath = KeyPathExpr::createParsed(
+      Context, backslashLoc, rootResult.getPtrOrNull(),
+      pathResult.getPtrOrNull(), hasLeadingDot);
   return makeParserResult(parseStatus, keypath);
 }
 
@@ -702,8 +697,8 @@ ParserResult<Expr> Parser::parseExprKeyPathObjC() {
   auto handleCodeCompletion = [&](SourceLoc DotLoc) -> ParserResult<Expr> {
     KeyPathExpr *expr = nullptr;
     if (!components.empty()) {
-      expr = new (Context)
-          KeyPathExpr(Context, keywordLoc, lParenLoc, components, Tok.getLoc());
+      expr = KeyPathExpr::createParsedPoundKeyPath(
+          Context, keywordLoc, lParenLoc, components, Tok.getLoc());
     }
 
     if (CodeCompletion)
@@ -776,7 +771,7 @@ ParserResult<Expr> Parser::parseExprKeyPathObjC() {
   }
 
   // We're done: create the key-path expression.
-  return makeParserResult<Expr>(new (Context) KeyPathExpr(
+  return makeParserResult<Expr>(KeyPathExpr::createParsedPoundKeyPath(
       Context, keywordLoc, lParenLoc, components, rParenLoc));
 }
 
@@ -885,6 +880,70 @@ UnresolvedDeclRefExpr *Parser::parseExprOperator() {
   return new (Context) UnresolvedDeclRefExpr(name, refKind, DeclNameLoc(loc));
 }
 
+void Parser::tryLexRegexLiteral(bool forUnappliedOperator) {
+  if (!Context.LangOpts.hasFeature(Feature::BareSlashRegexLiterals) ||
+      !Context.LangOpts.EnableExperimentalStringProcessing)
+    return;
+
+  // Check to see if we have a regex literal `/.../`, optionally with a prefix
+  // operator e.g `!/.../`.
+  // NOTE: If you change this logic you must also change the logic in
+  // isPotentialUnskippableBareSlashRegexLiteral.
+  bool mustBeRegex = false;
+  switch (Tok.getKind()) {
+  case tok::oper_prefix:
+    // Prefix operators may contain `/` characters, so this may not be a regex,
+    // and as such need to make sure we have a closing `/`.
+    break;
+  case tok::oper_binary_spaced:
+  case tok::oper_binary_unspaced:
+    // When re-lexing for a unary expression, binary operators are always
+    // invalid, so we can be confident in always lexing a regex literal.
+    mustBeRegex = !forUnappliedOperator;
+    break;
+  default:
+    // We only re-lex regex literals for operator tokens.
+    return;
+  }
+
+  // Check to see if we have an operator containing '/'.
+  auto slashIdx = Tok.getText().find("/");
+  if (slashIdx == StringRef::npos)
+    return;
+
+  CancellableBacktrackingScope backtrack(*this);
+  {
+    Optional<Lexer::ForwardSlashRegexRAII> regexScope;
+    regexScope.emplace(*L, mustBeRegex);
+
+    // Try re-lex as a `/.../` regex literal, this will split an operator if
+    // necessary.
+    L->restoreState(getParserPosition().LS, /*enableDiagnostics*/ true);
+
+    // If we didn't split a prefix operator, reset the regex lexing scope.
+    // Otherwise, we want to keep it in place for the next token.
+    auto didSplit = L->peekNextToken().getLength() == slashIdx;
+    if (!didSplit)
+      regexScope.reset();
+
+    // Discard the current token, which will be replaced by the re-lexed
+    // token, which will either be a regex literal token, a prefix operator,
+    // or the original unchanged token.
+    discardToken();
+
+    // If we split a prefix operator from the regex literal, and are not sure
+    // whether this should be a regex, backtrack if we didn't end up lexing a
+    // regex literal.
+    if (didSplit && !mustBeRegex &&
+        !L->peekNextToken().is(tok::regex_literal)) {
+      return;
+    }
+
+    // Otherwise, accept the result.
+    backtrack.cancelBacktrack();
+  }
+}
+
 /// parseExprSuper
 ///
 ///   expr-super:
@@ -941,9 +1000,9 @@ StringRef Parser::copyAndStripUnderscores(StringRef orig) {
 /// possibly preceded by attributes.  If so, we disambiguate the parse as the
 /// start of a get-set block in a variable definition (not as a trailing
 /// closure).
-static bool isStartOfGetSetAccessor(Parser &P) {
-  assert(P.Tok.is(tok::l_brace) && "not checking a brace?");
-  
+bool Parser::isStartOfGetSetAccessor() {
+  assert(Tok.is(tok::l_brace) && "not checking a brace?");
+
   // The only case this can happen is if the accessor label is immediately after
   // a brace (possibly preceded by attributes).  "get" is implicit, so it can't
   // be checked for.  Conveniently however, get/set properties are not allowed
@@ -952,7 +1011,7 @@ static bool isStartOfGetSetAccessor(Parser &P) {
   //
   // If we have a 'didSet' or a 'willSet' label, disambiguate immediately as
   // an accessor block.
-  Token NextToken = P.peekToken();
+  Token NextToken = peekToken();
   if (NextToken.isContextualKeyword("didSet") ||
       NextToken.isContextualKeyword("willSet"))
     return true;
@@ -961,21 +1020,23 @@ static bool isStartOfGetSetAccessor(Parser &P) {
   if (NextToken.isNot(tok::at_sign))
     return false;
 
-  Parser::BacktrackingScope Backtrack(P);
+  Parser::BacktrackingScope Backtrack(*this);
 
   // Eat the "{".
-  P.consumeToken(tok::l_brace);
+  consumeToken(tok::l_brace);
 
   // Eat attributes, if present.
-  while (P.consumeIf(tok::at_sign)) {
-    if (!P.consumeIf(tok::identifier)) return false;
+  while (consumeIf(tok::at_sign)) {
+    if (!consumeIf(tok::identifier))
+      return false;
     // Eat paren after attribute name; e.g. @foo(x)
-    if (P.Tok.is(tok::l_paren)) P.skipSingle();
+    if (Tok.is(tok::l_paren))
+      skipSingle();
   }
 
   // Check if we have 'didSet'/'willSet' after attributes.
-  return P.Tok.isContextualKeyword("didSet") ||
-         P.Tok.isContextualKeyword("willSet");
+  return Tok.isContextualKeyword("didSet") ||
+         Tok.isContextualKeyword("willSet");
 }
 
 /// Recover invalid uses of trailing closures in a situation
@@ -987,7 +1048,7 @@ static bool isValidTrailingClosure(bool isExprBasic, Parser &P){
   
   // If this is the start of a get/set accessor, then it isn't a trailing
   // closure.
-  if (isStartOfGetSetAccessor(P))
+  if (P.isStartOfGetSetAccessor())
     return false;
 
   // If this is a normal expression (not an expr-basic) then trailing closures
@@ -1056,7 +1117,7 @@ getMagicIdentifierLiteralKind(tok Kind, const LangOptions &Opts) {
   switch (Kind) {
   case tok::pound_file:
     // TODO: Enable by default at the next source break. (SR-13199)
-    return Opts.EnableConcisePoundFile
+    return Opts.hasFeature(Feature::ConciseMagicFile)
          ? MagicIdentifierLiteralExpr::FileIDSpelledAsFile
          : MagicIdentifierLiteralExpr::FilePathSpelledAsFile;
 #define MAGIC_IDENTIFIER_TOKEN(NAME, TOKEN) \
@@ -1154,18 +1215,6 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
         continue;
       }
 
-      // Handle the deprecated 'x.dynamicType' and migrate it to `type(of: x)`
-      if (Tok.getText() == "dynamicType") {
-        auto range = Result.get()->getSourceRange();
-        auto dynamicTypeExprRange = SourceRange(TokLoc, Tok.getLoc());
-        diagnose(TokLoc, diag::expr_dynamictype_deprecated)
-            .highlight(dynamicTypeExprRange)
-            .fixItReplace(dynamicTypeExprRange, ")")
-            .fixItInsert(range.Start, "type(of: ");
-
-        // fallthrough to an UnresolvedDotExpr.
-      }
-
       // Handle "x.<tab>" for code completion.
       if (Tok.is(tok::code_complete)) {
         assert(!InSwiftKeyPath);
@@ -1237,23 +1286,10 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
     // Check for a [expr] suffix.
     // Note that this cannot be the start of a new line.
     if (Tok.isFollowingLSquare()) {
-      SourceLoc lSquareLoc, rSquareLoc;
-      SmallVector<Expr *, 2> indexArgs;
-      SmallVector<Identifier, 2> indexArgLabels;
-      SmallVector<SourceLoc, 2> indexArgLabelLocs;
-      SmallVector<TrailingClosure, 2> trailingClosures;
-
-      ParserStatus status = parseExprList(
-          tok::l_square, tok::r_square,
-          /*isPostfix=*/true, isExprBasic, lSquareLoc, indexArgs,
-          indexArgLabels, indexArgLabelLocs, rSquareLoc,
-          trailingClosures, SyntaxKind::TupleExprElementList);
-      Result = makeParserResult(
-          status | Result,
-          SubscriptExpr::create(Context, Result.get(), lSquareLoc, indexArgs,
-                                indexArgLabels, indexArgLabelLocs, rSquareLoc,
-                                trailingClosures, ConcreteDeclRef(),
-                                /*implicit=*/false));
+      auto args = parseArgumentList(tok::l_square, tok::r_square,  isExprBasic);
+      auto *subscript = SubscriptExpr::create(Context, Result.get(),
+                                              args.get());
+      Result = makeParserResult(ParserStatus(args) | Result, subscript);
       SyntaxContext->createNodeInPlace(SyntaxKind::SubscriptExpr);
       continue;
     }
@@ -1275,7 +1311,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
                 leadingTriviaLoc(), *SyntaxContext));
       }
 
-      SmallVector<TrailingClosure, 2> trailingClosures;
+      SmallVector<Argument, 2> trailingClosures;
       auto trailingResult =
           parseTrailingClosures(isExprBasic, callee->getSourceRange(),
                                 trailingClosures);
@@ -1283,11 +1319,12 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
         return nullptr;
 
       // Trailing closure implicitly forms a call.
+      auto *argList = ArgumentList::createParsed(Context, SourceLoc(),
+                                                 trailingClosures, SourceLoc(),
+                                                 /*trailingClosureIdx*/ 0);
       Result = makeParserResult(
           ParserStatus(Result) | trailingResult,
-          CallExpr::create(Context, Result.get(), SourceLoc(), {}, {}, {},
-                           SourceLoc(), trailingClosures,
-                           /*implicit=*/false));
+          CallExpr::create(Context, Result.get(), argList, /*implicit*/ false));
       SyntaxContext->createNodeInPlace(SyntaxKind::FunctionCallExpr);
 
       // We only allow a single trailing closure on a call.  This could be
@@ -1323,9 +1360,8 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
 
       Expr *oper = parseExprOperator();
 
-      auto *opCall = PostfixUnaryExpr::create(
-          Context, oper, formUnaryArgument(Context, Result.get()));
-      Result = makeParserResult(Result, opCall);
+      Result = makeParserResult(
+          Result, PostfixUnaryExpr::create(Context, oper, Result.get()));
       SyntaxContext->createNodeInPlace(SyntaxKind::PostfixUnaryExpr);
       continue;
     }
@@ -1580,7 +1616,10 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
       
   case tok::string_literal:  // "foo"
     return parseExprStringLiteral();
-  
+
+  case tok::regex_literal:
+    return parseExprRegexLiteral();
+
   case tok::kw_nil:
     ExprContext.setCreateSyntax(SyntaxKind::NilLiteralExpr);
     return makeParserResult(new (Context)
@@ -1655,6 +1694,15 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
         SyntaxContext->addSyntax(std::move(ExprNode));
       }
       return makeParserResult(new (Context) UnresolvedPatternExpr(pattern));
+    }
+
+    // 'any' followed by another identifier is an existential type.
+    if (Tok.isContextualKeyword("any") &&
+        peekToken().is(tok::identifier) &&
+        !peekToken().isAtStartOfLine()) {
+      ParserResult<TypeRepr> ty = parseType();
+      auto *typeExpr = new (Context) TypeExpr(ty.get());
+      return makeParserResult(typeExpr);
     }
 
     LLVM_FALLTHROUGH;
@@ -1743,8 +1791,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     // differentiation. A tuple expression node in libSyntax can have a single
     // element without label.
     ExprContext.setCreateSyntax(SyntaxKind::TupleExpr);
-    return parseExprList(tok::l_paren, tok::r_paren,
-                         SyntaxKind::TupleExprElementList);
+    return parseTupleOrParenExpr(tok::l_paren, tok::r_paren);
 
   case tok::l_square:
     return parseExprCollection();
@@ -1784,6 +1831,11 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
       }
     }
     consumeToken(tok::code_complete);
+    if (canParseAsGenericArgumentList()) {
+      SmallVector<TypeRepr*, 8> args;
+      SourceLoc LAngleLoc, RAngleLoc;
+      parseGenericArguments(args, LAngleLoc, RAngleLoc);
+    }
     return Result;
   }
 
@@ -1873,8 +1925,9 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
                                         appendLiteral,
                                         /*nameloc=*/DeclNameLoc(), 
                                         /*Implicit=*/true);
+      auto *ArgList = ArgumentList::forImplicitUnlabeled(Context, {Literal});
       auto AppendLiteralCall =
-        CallExpr::createImplicit(Context, AppendLiteralRef, {Literal}, {});
+          CallExpr::createImplicit(Context, AppendLiteralRef, ArgList);
       Stmts.push_back(AppendLiteralCall);
 
       // Since the string is already parsed, Tok already points to the first
@@ -2600,7 +2653,8 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
             diagnose(Tok, diag::attr_unowned_expected_rparen);
         }
       } else if (Tok.isAny(tok::identifier, tok::kw_self, tok::code_complete) &&
-                 peekToken().isAny(tok::equal, tok::comma, tok::r_square)) {
+                 peekToken().isAny(tok::equal, tok::comma, tok::r_square,
+                                   tok::period)) {
         // "x = 42", "x," and "x]" are all strong captures of x.
       } else {
         diagnose(Tok, diag::expected_capture_specifier);
@@ -2644,8 +2698,20 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
         // It is a common error to try to capture a nested field instead of just
         // a local name, reject it with a specific error message.
         if (Tok.isAny(tok::period, tok::exclaim_postfix,tok::question_postfix)){
-          diagnose(Tok, diag::cannot_capture_fields);
-          skipUntil(tok::comma, tok::r_square);
+          auto diag = diagnose(Tok, diag::cannot_capture_fields);
+          while (peekToken().isNot(tok::comma, tok::r_square, tok::eof,
+                                   tok::kw_in, tok::r_brace,
+                                   tok::pound_endif, tok::pound_else,
+                                   tok::pound_elseif))
+            consumeToken();
+          if (Tok.isKeyword() || Tok.isContextualDeclKeyword()) {
+            StringRef name = Tok.getText();
+            diag.fixItInsert(nameLoc, ("`" + name + "` = ").str());
+          } else if (Tok.is(tok::identifier)) {
+            StringRef name = Tok.getRawText();
+            diag.fixItInsert(nameLoc, (name + " = ").str());
+          }
+          skipSingle(); // Advance to the comma or r_square
           continue;
         }
 
@@ -2869,7 +2935,10 @@ ParserResult<Expr> Parser::parseExprClosure() {
   // reset our state to not be in a pattern for any recursive pattern parses.
   llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
   T(InVarOrLetPattern, IVOLP_NotInVarOrLet);
-  
+
+  // Reset async attribute in parser context.
+  llvm::SaveAndRestore<bool> AsyncAttr(InPatternWithAsyncAttribute, false);
+
   // Parse the opening left brace.
   SourceLoc leftBrace = consumeToken();
 
@@ -3066,95 +3135,122 @@ Expr *Parser::parseExprAnonClosureArg() {
                                    /*Implicit=*/false);
 }
 
-
-/// parseExprList - Parse a list of expressions.
+/// parseTupleOrParenExpr - Parse a tuple or paren expression.
 ///
 ///   expr-paren:
 ///     lparen-any ')'
-///     lparen-any binary-op ')'
 ///     lparen-any expr-paren-element (',' expr-paren-element)* ')'
 ///
 ///   expr-paren-element:
 ///     (identifier ':')? expr
 ///
-ParserResult<Expr>
-Parser::parseExprList(tok leftTok, tok rightTok, SyntaxKind Kind) {
-  SmallVector<Expr*, 8> subExprs;
-  SmallVector<Identifier, 8> subExprNames;
-  SmallVector<SourceLoc, 8> subExprNameLocs;
-  SmallVector<TrailingClosure, 2> trailingClosures;
-
+ParserResult<Expr> Parser::parseTupleOrParenExpr(tok leftTok, tok rightTok) {
+  SmallVector<ExprListElt, 8> elts;
   SourceLoc leftLoc, rightLoc;
-  ParserStatus status = parseExprList(leftTok, rightTok, /*isPostfix=*/false,
-                                      /*isExprBasic=*/true,
-                                      leftLoc,
-                                      subExprs,
-                                      subExprNames,
-                                      subExprNameLocs,
-                                      rightLoc,
-                                      trailingClosures,
-                                      Kind);
+  auto status =
+      parseExprList(leftTok, rightTok, /*isArgumentList*/ false, leftLoc, elts,
+                    rightLoc, SyntaxKind::TupleExprElementList);
 
   // A tuple with a single, unlabeled element is just parentheses.
-  if (subExprs.size() == 1 &&
-      (subExprNames.empty() || subExprNames[0].empty())) {
+  if (elts.size() == 1 && elts[0].Label.empty()) {
     return makeParserResult(
-        status, new (Context) ParenExpr(leftLoc, subExprs[0], rightLoc,
-                                        /*hasTrailingClosure=*/false));
+        status, new (Context) ParenExpr(leftLoc, elts[0].E, rightLoc));
   }
 
-  return makeParserResult(
-      status,
-      TupleExpr::create(Context, leftLoc, subExprs, subExprNames,
-                        subExprNameLocs, rightLoc, /*HasTrailingClosure=*/false,
-                        /*Implicit=*/false));
+  SmallVector<Expr *, 8> exprs;
+  SmallVector<Identifier, 8> labels;
+  SmallVector<SourceLoc, 8> labelLocs;
+  for (auto &elt : elts) {
+    exprs.push_back(elt.E);
+    labels.push_back(elt.Label);
+    labelLocs.push_back(elt.LabelLoc);
+  }
+  return makeParserResult(status, TupleExpr::create(Context, leftLoc, exprs,
+                                                    labels, labelLocs, rightLoc,
+                                                    /*implicit*/ false));
+}
+
+/// parseArgumentList - Parse an argument list.
+///
+///   arg-list:
+///     lparen-any ')'
+///     lparen-any argument (',' argument)* ')'
+///
+///   argument:
+///     (identifier ':')? '&'? expr
+///
+ParserResult<ArgumentList>
+Parser::parseArgumentList(tok leftTok, tok rightTok, bool isExprBasic,
+                          bool allowTrailingClosure) {
+  SourceLoc leftLoc, rightLoc;
+  SmallVector<ExprListElt, 8> elts;
+
+  // FIXME: Introduce new SyntaxKind for ArgumentList (rdar://81786229)
+  auto status =
+      parseExprList(leftTok, rightTok, /*isArgumentList*/ true, leftLoc, elts,
+                    rightLoc, SyntaxKind::TupleExprElementList);
+
+  SmallVector<Argument, 8> args;
+  for (auto &elt : elts)
+    args.emplace_back(elt.LabelLoc, elt.Label, elt.E);
+
+  auto numNonTrailing = args.size();
+  Optional<unsigned> trailingClosureIndex;
+
+  // If we can parse trailing closures, do so.
+  if (allowTrailingClosure && Tok.is(tok::l_brace) &&
+      isValidTrailingClosure(isExprBasic, *this)) {
+    status |= parseTrailingClosures(isExprBasic, SourceRange(leftLoc, rightLoc),
+                                    args);
+    if (args.size() > numNonTrailing)
+      trailingClosureIndex = numNonTrailing;
+  }
+  auto *argList = ArgumentList::createParsed(Context, leftLoc, args, rightLoc,
+                                             trailingClosureIndex);
+  return makeParserResult(status, argList);
 }
 
 /// parseExprList - Parse a list of expressions.
 ///
-///   expr-paren:
+///   expr-list:
 ///     lparen-any ')'
-///     lparen-any binary-op ')'
-///     lparen-any expr-paren-element (',' expr-paren-element)* ')'
+///     lparen-any expr-list-element (',' expr-list-element)* ')'
 ///
-///   expr-paren-element:
-///     (identifier ':')? expr
+///   expr-list-element:
+///     (identifier ':')? '&'? expr
 ///
 ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
-                                   bool isPostfix,
-                                   bool isExprBasic,
-                                   SourceLoc &leftLoc,
-                                   SmallVectorImpl<Expr *> &exprs,
-                                   SmallVectorImpl<Identifier> &exprLabels,
-                                   SmallVectorImpl<SourceLoc> &exprLabelLocs,
-                                   SourceLoc &rightLoc,
-                                   SmallVectorImpl<TrailingClosure> &trailingClosures,
-                                   SyntaxKind Kind) {
+                                   bool isArgumentList, SourceLoc &leftLoc,
+                                   SmallVectorImpl<ExprListElt> &elts,
+                                   SourceLoc &rightLoc, SyntaxKind Kind) {
   StructureMarkerRAII ParsingExprList(*this, Tok);
   
-  if (ParsingExprList.isFailed()) {
-    return makeParserError();
-  }
-
   leftLoc = consumeToken(leftTok);
-  ParserStatus status = parseList(rightTok, leftLoc, rightLoc,
-                                  /*AllowSepAfterLast=*/false,
-                                  rightTok == tok::r_paren
-                                    ? diag::expected_rparen_expr_list
-                                    : diag::expected_rsquare_expr_list,
-                                  Kind,
-                                  [&] () -> ParserStatus {
+  return parseList(rightTok, leftLoc, rightLoc, /*AllowSepAfterLast=*/false,
+                   rightTok == tok::r_paren ? diag::expected_rparen_expr_list
+                                            : diag::expected_rsquare_expr_list,
+                   Kind, [&] () -> ParserStatus {
     Identifier FieldName;
     SourceLoc FieldNameLoc;
-    if (Kind != SyntaxKind::YieldStmt)
-      parseOptionalArgumentLabel(FieldName, FieldNameLoc);
+    parseOptionalArgumentLabel(FieldName, FieldNameLoc);
 
     // See if we have an operator decl ref '(<op>)'. The operator token in
     // this case lexes as a binary operator because it neither leads nor
     // follows a proper subexpression.
+    auto isUnappliedOperator = [&]() {
+      return Tok.isBinaryOperator() && peekToken().isAny(rightTok, tok::comma);
+    };
+
+    if (isUnappliedOperator()) {
+      // Check to see if we have the start of a regex literal `/.../`. We need
+      // to do this for an unapplied operator reference, as e.g `(/, /)` might
+      // be a regex literal.
+      tryLexRegexLiteral(/*forUnappliedOperator*/ true);
+    }
+
     ParserStatus Status;
     Expr *SubExpr = nullptr;
-    if (Tok.isBinaryOperator() && peekToken().isAny(rightTok, tok::comma)) {
+    if (isUnappliedOperator()) {
       SyntaxParsingContext operatorContext(SyntaxContext,
                                            SyntaxKind::IdentifierExpr);
       DeclNameLoc Loc;
@@ -3168,7 +3264,7 @@ ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
       // context.
       SubExpr = new(Context) UnresolvedDeclRefExpr(OperName,
                                                    DeclRefKind::Ordinary, Loc);
-    } else if (isPostfix && Tok.is(tok::code_complete)) {
+    } else if (isArgumentList && Tok.is(tok::code_complete)) {
       // Handle call arguments specially because it may need argument labels.
       auto CCExpr = new (Context) CodeCompletionExpr(Tok.getLoc());
       if (CodeCompletion)
@@ -3183,37 +3279,11 @@ ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
     }
 
     // If we got a subexpression, add it.
-    if (SubExpr) {
-      // Update names and locations.
-      if (!exprLabels.empty()) {
-        exprLabels.push_back(FieldName);
-        exprLabelLocs.push_back(FieldNameLoc);
-      } else if (FieldNameLoc.isValid()) {
-        exprLabels.resize(exprs.size());
-        exprLabels.push_back(FieldName);
-
-        exprLabelLocs.resize(exprs.size());
-        exprLabelLocs.push_back(FieldNameLoc);
-      }
-
-      // Add the subexpression.
-      exprs.push_back(SubExpr);
-    }
+    if (SubExpr)
+      elts.push_back({FieldNameLoc, FieldName, SubExpr});
 
     return Status;
   });
-
-  // If we aren't interested in trailing closures, or there isn't a valid one,
-  // we're done.
-  if (!isPostfix || Tok.isNot(tok::l_brace) ||
-      !isValidTrailingClosure(isExprBasic, *this))
-    return status;
-
-  // Parse the closure.
-  status |=
-      parseTrailingClosures(isExprBasic, SourceRange(leftLoc, rightLoc),
-                            trailingClosures);
-  return status;
 }
 
 static bool isStartOfLabelledTrailingClosure(Parser &P) {
@@ -3244,7 +3314,7 @@ static bool isStartOfLabelledTrailingClosure(Parser &P) {
 
 ParserStatus
 Parser::parseTrailingClosures(bool isExprBasic, SourceRange calleeRange,
-                              SmallVectorImpl<TrailingClosure> &closures) {
+                              SmallVectorImpl<Argument> &closures) {
   SourceLoc braceLoc = Tok.getLoc();
 
   // Record the line numbers for the diagnostics below.
@@ -3262,7 +3332,7 @@ Parser::parseTrailingClosures(bool isExprBasic, SourceRange calleeRange,
 
   result |= closure;
 
-  closures.push_back({closure.get()});
+  closures.push_back(Argument::unlabeled(closure.get()));
 
   // Warn if the trailing closure is separated from its callee by more than
   // one line. A single-line separation is acceptable for a trailing closure
@@ -3271,7 +3341,7 @@ Parser::parseTrailingClosures(bool isExprBasic, SourceRange calleeRange,
     diagnose(braceLoc, diag::trailing_closure_after_newlines);
     diagnose(calleeRange.Start, diag::trailing_closure_callee_here);
 
-    auto *CE = dyn_cast<ClosureExpr>(closures[0].ClosureExpr);
+    auto *CE = dyn_cast<ClosureExpr>(closures[0].getExpr());
     if (CE && CE->hasAnonymousClosureVars() &&
         CE->getParameters()->size() == 0) {
       diagnose(braceLoc, diag::brace_stmt_suggest_do)
@@ -3308,7 +3378,7 @@ Parser::parseTrailingClosures(bool isExprBasic, SourceRange calleeRange,
         CodeCompletion->completeLabeledTrailingClosure(CCExpr, Tok.isAtStartOfLine());
       consumeToken(tok::code_complete);
       result.setHasCodeCompletionAndIsError();
-      closures.push_back({Identifier(), SourceLoc(), CCExpr});
+      closures.emplace_back(SourceLoc(), Identifier(), CCExpr);
       continue;
     }
 
@@ -3340,7 +3410,7 @@ Parser::parseTrailingClosures(bool isExprBasic, SourceRange calleeRange,
       return makeParserError();
 
     result |= closure;
-    closures.push_back({label, labelLoc, closure.get()});
+    closures.emplace_back(labelLoc, label, closure.get());
 
     // Don't diagnose whitespace gaps before labelled closures.
   }
@@ -3367,28 +3437,15 @@ Parser::parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LitKind,
   }
 
   // Parse the argument list.
-  SourceLoc lParenLoc, rParenLoc;
-  SmallVector<Expr *, 2> args;
-  SmallVector<Identifier, 2> argLabels;
-  SmallVector<SourceLoc, 2> argLabelLocs;
-  SmallVector<TrailingClosure, 2> trailingClosures;
-
-  ParserStatus status = parseExprList(tok::l_paren, tok::r_paren,
-                                      /*isPostfix=*/true, isExprBasic,
-                                      lParenLoc, args, argLabels,
-                                      argLabelLocs,
-                                      rParenLoc,
-                                      trailingClosures,
-                                      SyntaxKind::TupleExprElementList);
-  if (status.hasCodeCompletion())
+  auto argList = parseArgumentList(tok::l_paren, tok::r_paren, isExprBasic);
+  if (argList.hasCodeCompletion())
     return makeParserCodeCompletionResult<Expr>();
-  if (status.isErrorOrHasCompletion())
+  if (argList.isParseErrorOrHasCompletion())
     return makeParserError();
 
-  return makeParserResult(
-    ObjectLiteralExpr::create(Context, PoundLoc, LitKind, lParenLoc, args,
-                              argLabels, argLabelLocs, rParenLoc,
-                              trailingClosures, /*implicit=*/false));
+  return makeParserResult(ObjectLiteralExpr::create(Context, PoundLoc, LitKind,
+                                                    argList.get(),
+                                                    /*implicit*/ false));
 }
 
 /// Parse and diagnose unknown pound expression
@@ -3409,22 +3466,16 @@ ParserResult<Expr> Parser::parseExprPoundUnknown(SourceLoc LSquareLoc) {
   SourceLoc NameLoc = consumeIdentifier(Name, /*diagnoseDollarPrefix=*/false);
 
   // Parse arguments if exist.
-  SourceLoc LParenLoc, RParenLoc;
-  SmallVector<SourceLoc, 2> argLabelLocs;
-  SmallVector<Expr *, 2> args;
-  SmallVector<Identifier, 2> argLabels;
-  SmallVector<TrailingClosure, 2> trailingClosures;
+  ArgumentList *ArgList = nullptr;
   if (Tok.isFollowingLParen()) {
     // Parse arguments.
-    ParserStatus status =
-        parseExprList(tok::l_paren, tok::r_paren,
-                      /*isPostfix=*/true, /*isExprBasic*/ true, LParenLoc,
-                      args, argLabels, argLabelLocs, RParenLoc,
-                      trailingClosures, SyntaxKind::TupleExprElementList);
-    if (status.hasCodeCompletion())
+    auto result = parseArgumentList(tok::l_paren, tok::r_paren,
+                                    /*isExprBasic*/ true);
+    if (result.hasCodeCompletion())
       return makeParserCodeCompletionResult<Expr>();
-    if (status.isErrorOrHasCompletion())
+    if (result.isParseErrorOrHasCompletion())
       return makeParserError();
+    ArgList = result.get();
   }
 
   std::pair<StringRef, StringRef> NewNameArgPair =
@@ -3443,7 +3494,7 @@ ParserResult<Expr> Parser::parseExprPoundUnknown(SourceLoc LSquareLoc) {
   // Diagnose legacy object literal.
 
   // Didn't have arguments.
-  if (LParenLoc.isInvalid()) {
+  if (!ArgList || ArgList->getLParenLoc().isInvalid()) {
     diagnose(Tok.getLoc(), diag::expected_arg_list_in_object_literal);
     return makeParserError();
   }
@@ -3463,8 +3514,8 @@ ParserResult<Expr> Parser::parseExprPoundUnknown(SourceLoc LSquareLoc) {
   // Replace the literal name.
   diag.fixItReplace(NameLoc, NewNameArgPair.first);
   // Replace the first argument.
-  if (!argLabelLocs.empty() && argLabelLocs[0].isValid())
-    diag.fixItReplace(argLabelLocs[0], NewNameArgPair.second);
+  if (!ArgList->empty() && ArgList->front().getLabelLoc().isValid())
+    diag.fixItReplace(ArgList->front().getLabelLoc(), NewNameArgPair.second);
   // Remove '#]' if exist.
   if (RPoundLoc.isValid())
     diag.fixItRemove(
@@ -3476,7 +3527,7 @@ ParserResult<Expr> Parser::parseExprPoundUnknown(SourceLoc LSquareLoc) {
 /// Handle code completion after pound in expression position.
 ///
 /// In case it's in a stmt condition position, specify \p ParentKind to
-/// decide the position accepts #available(...) condtion.
+/// decide the position accepts #available(...) condition.
 ///
 /// expr-pound-codecompletion:
 ///   '#' code-completion-token
@@ -3501,26 +3552,17 @@ ParserResult<Expr>
 Parser::parseExprCallSuffix(ParserResult<Expr> fn, bool isExprBasic) {
   assert(Tok.isFollowingLParen() && "Not a call suffix?");
 
-  SourceLoc lParenLoc, rParenLoc;
-  SmallVector<Expr *, 2> args;
-  SmallVector<Identifier, 2> argLabels;
-  SmallVector<SourceLoc, 2> argLabelLocs;
-  SmallVector<TrailingClosure, 2> trailingClosures;
-
   // If there is a code completion token right after the '(', do a special case
   // callback.
   if (peekToken().is(tok::code_complete) && CodeCompletion) {
-    lParenLoc = consumeToken(tok::l_paren);
+    auto lParenLoc = consumeToken(tok::l_paren);
     auto CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
-    rParenLoc = Tok.getLoc();
-    auto Result = makeParserResult(fn,
-      CallExpr::create(Context, fn.get(), lParenLoc,
-                       { CCE },
-                       { Identifier() },
-                       { },
-                       rParenLoc,
-                       /*trailingClosures=*/{},
-                       /*implicit=*/false));
+    auto rParenLoc = Tok.getLoc();
+    auto *argList = ArgumentList::createParsed(
+        Context, lParenLoc, {Argument::unlabeled(CCE)}, rParenLoc,
+        /*trailingClosureIdx*/ None);
+    auto Result = makeParserResult(
+        fn, CallExpr::create(Context, fn.get(), argList, /*implicit*/ false));
     CodeCompletion->completePostfixExprParen(fn.get(), CCE);
     // Eat the code completion token because we handled it.
     consumeToken(tok::code_complete);
@@ -3529,19 +3571,11 @@ Parser::parseExprCallSuffix(ParserResult<Expr> fn, bool isExprBasic) {
   }
 
   // Parse the argument list.
-  ParserStatus status = parseExprList(tok::l_paren, tok::r_paren,
-                                      /*isPostfix=*/true, isExprBasic,
-                                      lParenLoc, args, argLabels,
-                                      argLabelLocs,
-                                      rParenLoc,
-                                      trailingClosures,
-                                      SyntaxKind::TupleExprElementList);
+  auto argList = parseArgumentList(tok::l_paren, tok::r_paren, isExprBasic);
 
   // Form the call.
-  return makeParserResult(status | fn,
-                          CallExpr::create(Context, fn.get(), lParenLoc, args,
-                                           argLabels, argLabelLocs, rParenLoc,
-                                           trailingClosures,
+  return makeParserResult(ParserStatus(argList) | fn,
+                          CallExpr::create(Context, fn.get(), argList.get(),
                                            /*implicit=*/false));
 }
 
@@ -3749,7 +3783,7 @@ void Parser::validateCollectionElement(ParserResult<Expr> element) {
 
   auto arrayExpr = cast<ArrayExpr>(subscriptExpr->getBase());
 
-  auto startLocOfSubscript = subscriptExpr->getIndex()->getStartLoc();
+  auto startLocOfSubscript = subscriptExpr->getArgs()->getStartLoc();
   auto endLocOfArray = arrayExpr->getEndLoc();
   auto locForEndOfTokenArray = L->getLocForEndOfToken(SourceMgr, endLocOfArray);
 

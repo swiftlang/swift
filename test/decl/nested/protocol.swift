@@ -31,8 +31,7 @@ protocol OuterProtocol {
 struct ConformsToOuterProtocol : OuterProtocol {
   typealias Hen = Int
 
-  func f() { let _ = InnerProtocol.self }
-  // expected-error@-1 {{protocol 'InnerProtocol' can only be used as a generic constraint because it has Self or associated type requirements}}
+  func f() { let _ = InnerProtocol.self } // expected-error {{use of protocol 'InnerProtocol' as a type must be written 'any InnerProtocol'}}
 }
 
 protocol Racoon {
@@ -69,10 +68,14 @@ class OuterClass {
   // expected-error@-1{{protocol 'InnerProtocol' cannot be nested inside another declaration}}
 }
 
-class OtherGenericClass<T> {
+// 'InnerProtocol' does not inherit the generic parameters of
+// 'OtherGenericClass', so the occurrence of 'OtherGenericClass'
+// in 'InnerProtocol' is not "in context" with implicitly
+// inferred generic arguments <T, U>.
+class OtherGenericClass<T, U> { // expected-note {{generic type 'OtherGenericClass' declared here}}
   protocol InnerProtocol : OtherGenericClass { }
   // expected-error@-1{{protocol 'InnerProtocol' cannot be nested inside another declaration}}
-  // expected-error@-2{{superclass constraint 'Self' : 'OtherGenericClass<Self>' is recursive}}
+  // expected-error@-2{{reference to generic type 'OtherGenericClass' requires arguments in <...>}}
 }
 
 protocol SelfDotTest {

@@ -65,9 +65,6 @@
 // CHECK:         function_ref
 // CHECK:         thin_to_thick_function
 // CHECK:         convert_function
-// CHECK:         function_ref
-// CHECK:         thin_to_thick_function
-// CHECK:         convert_function
 // CHECK:         object {{.*}} ({{[^,]*}}, [tail_elems]
 // CHECK-NEXT:  }
 
@@ -94,7 +91,7 @@
 // CHECK:         object {{.*}} ({{[^,]*}}, [tail_elems] {{[^,]*}}, {{[^,]*}}, {{[^,]*}})
 // CHECK-NEXT:  }
 
-// CHECK-LABEL: sil @main
+// CHECK-LABEL: sil {{.*}}@main
 // CHECK:   global_value @{{.*}}main{{.*}}
 // CHECK:   return
 public let globalVariable = [ 100, 101, 102 ]
@@ -240,7 +237,7 @@ func takeUnsafePointer(ptr : UnsafePointer<SwiftClass>, len: Int) {
 // CHECK-LABEL: sil @{{.*}}passArrayOfClasses
 // CHECK: bb0(%0 : $SwiftClass, %1 : $SwiftClass, %2 : $SwiftClass):
 // CHECK-NOT: bb1(
-// CHECK: alloc_ref {{.*}}[tail_elems $SwiftClass *
+// CHECK: alloc_ref{{(_dynamic)?}} {{.*}}[tail_elems $SwiftClass *
 // CHECK-NOT: bb1(
 // CHECK:   return
 public func passArrayOfClasses(a: SwiftClass, b: SwiftClass, c: SwiftClass) {

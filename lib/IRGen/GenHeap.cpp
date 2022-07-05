@@ -517,7 +517,7 @@ static llvm::Constant *buildPrivateMetadata(IRGenModule &IGM,
     llvm::ConstantInt::get(IGM.Int32Ty, 2)
   };
   return llvm::ConstantExpr::getInBoundsGetElementPtr(
-      /*Ty=*/nullptr, var, indices);
+      var->getType()->getPointerElementType(), var, indices);
 }
 
 llvm::Constant *
@@ -534,6 +534,9 @@ llvm::Value *IRGenFunction::emitUnmanagedAlloc(const HeapLayout &layout,
                                                const llvm::Twine &name,
                                            llvm::Constant *captureDescriptor,
                                            const HeapNonFixedOffsets *offsets) {
+  if (layout.isKnownEmpty())
+    return IGM.RefCountedNull;
+
   llvm::Value *metadata = layout.getPrivateMetadata(IGM, captureDescriptor);
   llvm::Value *size, *alignMask;
   if (offsets) {
@@ -584,6 +587,7 @@ unsigned IRGenModule::getReferenceStorageExtraInhabitantCount(
     return getHeapObjectExtraInhabitantCount(*this);
   case ReferenceCounting::Block:
   case ReferenceCounting::ObjC:
+  case ReferenceCounting::None:
   case ReferenceCounting::Unknown:
     break;
   case ReferenceCounting::Bridge:
@@ -613,6 +617,7 @@ SpareBitVector IRGenModule::getReferenceStorageSpareBits(
     return getHeapObjectSpareBits();
   case ReferenceCounting::Block:
   case ReferenceCounting::ObjC:
+  case ReferenceCounting::None:
   case ReferenceCounting::Unknown:
     break;
   case ReferenceCounting::Bridge:
@@ -642,6 +647,7 @@ APInt IRGenModule::getReferenceStorageExtraInhabitantValue(unsigned bits,
     return getHeapObjectFixedExtraInhabitantValue(*this, bits, index, 0);
   case ReferenceCounting::Block:
   case ReferenceCounting::ObjC:
+  case ReferenceCounting::None:
   case ReferenceCounting::Unknown:
     break;
   case ReferenceCounting::Bridge:
@@ -662,6 +668,7 @@ APInt IRGenModule::getReferenceStorageExtraInhabitantMask(
   case ReferenceCounting::Native:
   case ReferenceCounting::Block:
   case ReferenceCounting::ObjC:
+  case ReferenceCounting::None:
   case ReferenceCounting::Unknown:
     break;
   case ReferenceCounting::Bridge:
@@ -681,6 +688,7 @@ llvm::Value *IRGenFunction::getReferenceStorageExtraInhabitantIndex(Address src,
     return getHeapObjectExtraInhabitantIndex(*this, src);
   case ReferenceCounting::Block:
   case ReferenceCounting::ObjC:
+  case ReferenceCounting::None:
   case ReferenceCounting::Unknown:
     break;
   case ReferenceCounting::Bridge:
@@ -717,6 +725,7 @@ void IRGenFunction::storeReferenceStorageExtraInhabitant(llvm::Value *index,
     return storeHeapObjectExtraInhabitant(*this, index, dest);
   case ReferenceCounting::Block:
   case ReferenceCounting::ObjC:
+  case ReferenceCounting::None:
   case ReferenceCounting::Unknown:
     break;
   case ReferenceCounting::Bridge:
@@ -738,35 +747,30 @@ void IRGenFunction::storeReferenceStorageExtraInhabitant(llvm::Value *index,
   Builder.CreateStore(null, dest);
 }
 
-#define SOMETIMES_UNKNOWN(Name) \
-  const TypeInfo * \
-  TypeConverter::create##Name##StorageType(llvm::Type *valueType, \
-                                           ReferenceCounting style, \
-                                           bool isOptional) { \
-    auto &&spareBits = IGM.getReferenceStorageSpareBits( \
-                                             ReferenceOwnership::Name, style); \
-    switch (style) { \
-    case ReferenceCounting::Native: \
-      return new Native##Name##ReferenceTypeInfo(valueType, \
-                                   IGM.Name##ReferencePtrTy->getElementType(), \
-                                   IGM.getPointerSize(), \
-                                   IGM.getPointerAlignment(), \
-                                   std::move(spareBits), \
-                                   isOptional); \
-    case ReferenceCounting::ObjC: \
-    case ReferenceCounting::Block: \
-    case ReferenceCounting::Unknown: \
-      return new Unknown##Name##ReferenceTypeInfo(valueType, \
-                                   IGM.Name##ReferencePtrTy->getElementType(), \
-                                   IGM.getPointerSize(), \
-                                   IGM.getPointerAlignment(), \
-                                   std::move(spareBits), \
-                                   isOptional); \
-    case ReferenceCounting::Bridge: \
-    case ReferenceCounting::Error: \
-      llvm_unreachable("not supported!"); \
-    } \
-    llvm_unreachable("bad reference-counting style"); \
+#define SOMETIMES_UNKNOWN(Name)                                                \
+  const TypeInfo *TypeConverter::create##Name##StorageType(                    \
+      llvm::Type *valueType, ReferenceCounting style, bool isOptional) {       \
+    auto &&spareBits =                                                         \
+        IGM.getReferenceStorageSpareBits(ReferenceOwnership::Name, style);     \
+    switch (style) {                                                           \
+    case ReferenceCounting::Native:                                            \
+      return new Native##Name##ReferenceTypeInfo(                              \
+          valueType, IGM.Name##ReferencePtrTy->getElementType(),               \
+          IGM.getPointerSize(), IGM.getPointerAlignment(),                     \
+          std::move(spareBits), isOptional);                                   \
+    case ReferenceCounting::ObjC:                                              \
+    case ReferenceCounting::None:                                              \
+    case ReferenceCounting::Block:                                             \
+    case ReferenceCounting::Unknown:                                           \
+      return new Unknown##Name##ReferenceTypeInfo(                             \
+          valueType, IGM.Name##ReferencePtrTy->getElementType(),               \
+          IGM.getPointerSize(), IGM.getPointerAlignment(),                     \
+          std::move(spareBits), isOptional);                                   \
+    case ReferenceCounting::Bridge:                                            \
+    case ReferenceCounting::Error:                                             \
+      llvm_unreachable("not supported!");                                      \
+    }                                                                          \
+    llvm_unreachable("bad reference-counting style");                          \
   }
 #define ALWAYS_NATIVE(Name) \
   const TypeInfo * \
@@ -1011,6 +1015,8 @@ void IRGenFunction::emitStrongRelease(llvm::Value *value,
     return emitBridgeStrongRelease(value, atomicity);
   case ReferenceCounting::Error:
     return emitErrorStrongRelease(value);
+  case ReferenceCounting::None:
+    return; // This is a no-op if we don't have any ref-counting.
   }
 }
 
@@ -1036,6 +1042,8 @@ void IRGenFunction::emitStrongRetain(llvm::Value *value,
   case ReferenceCounting::Error:
     emitErrorStrongRetain(value);
     return;
+  case ReferenceCounting::None:
+    return; // This is a no-op if we don't have any ref-counting.
   }
 }
 
@@ -1053,43 +1061,47 @@ llvm::Type *IRGenModule::getReferenceType(ReferenceCounting refcounting) {
     return UnknownRefCountedPtrTy;
   case ReferenceCounting::Error:
     return ErrorPtrTy;
+  case ReferenceCounting::None:
+    return OpaquePtrTy;
   }
 
   llvm_unreachable("Not a valid ReferenceCounting.");
 }
 
 #define DEFINE_BINARY_OPERATION(KIND, RESULT, TYPE1, TYPE2)                    \
-RESULT IRGenFunction::emit##KIND(TYPE1 val1, TYPE2 val2,                       \
-                                 ReferenceCounting style) {                    \
-  switch (style) {                                                             \
-  case ReferenceCounting::Native:                                              \
-    return emitNative##KIND(val1, val2);                                       \
-  case ReferenceCounting::ObjC:                                                \
-  case ReferenceCounting::Unknown:                                             \
-    return emitUnknown##KIND(val1, val2);                                      \
-  case ReferenceCounting::Bridge:                                              \
-  case ReferenceCounting::Block:                                               \
-  case ReferenceCounting::Error:                                               \
-    llvm_unreachable("unsupported reference kind with reference storage");     \
-  }                                                                            \
-  llvm_unreachable("bad refcounting style");                                   \
-}
+  RESULT IRGenFunction::emit##KIND(TYPE1 val1, TYPE2 val2,                     \
+                                   ReferenceCounting style) {                  \
+    switch (style) {                                                           \
+    case ReferenceCounting::Native:                                            \
+      return emitNative##KIND(val1, val2);                                     \
+    case ReferenceCounting::ObjC:                                              \
+    case ReferenceCounting::Unknown:                                           \
+      return emitUnknown##KIND(val1, val2);                                    \
+    case ReferenceCounting::Bridge:                                            \
+    case ReferenceCounting::Block:                                             \
+    case ReferenceCounting::Error:                                             \
+    case ReferenceCounting::None:                                              \
+      llvm_unreachable("unsupported reference kind with reference storage");   \
+    }                                                                          \
+    llvm_unreachable("bad refcounting style");                                 \
+  }
 
 #define DEFINE_UNARY_OPERATION(KIND, RESULT, TYPE1)                            \
-RESULT IRGenFunction::emit##KIND(TYPE1 val1, ReferenceCounting style) {        \
-  switch (style) {                                                             \
-  case ReferenceCounting::Native:                                              \
-    return emitNative##KIND(val1);                                             \
-  case ReferenceCounting::ObjC:                                                \
-  case ReferenceCounting::Unknown:                                             \
-    return emitUnknown##KIND(val1);                                            \
-  case ReferenceCounting::Bridge:                                              \
-  case ReferenceCounting::Block:                                               \
-  case ReferenceCounting::Error:                                               \
-    llvm_unreachable("unsupported reference kind with reference storage");     \
-  }                                                                            \
-  llvm_unreachable("bad refcounting style");                                   \
-}
+  RESULT IRGenFunction::emit##KIND(TYPE1 val1, ReferenceCounting style) {      \
+    switch (style) {                                                           \
+    case ReferenceCounting::Native:                                            \
+      return emitNative##KIND(val1);                                           \
+    case ReferenceCounting::ObjC:                                              \
+    case ReferenceCounting::Unknown:                                           \
+      return emitUnknown##KIND(val1);                                          \
+    case ReferenceCounting::Bridge:                                            \
+    case ReferenceCounting::Block:                                             \
+    case ReferenceCounting::Error:                                             \
+    case ReferenceCounting::None:                                              \
+      llvm_unreachable("unsupported reference kind with reference storage");   \
+    }                                                                          \
+    llvm_unreachable("bad refcounting style");                                 \
+  }
 
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   DEFINE_BINARY_OPERATION(Name##CopyInit, void, Address, Address) \
@@ -1237,8 +1249,7 @@ llvm::Constant *IRGenModule::getFixLifetimeFn() {
   // Don't inline the function, so it stays as a signal to the ARC passes.
   // The ARC passes will remove references to the function when they're
   // no longer needed.
-  fixLifetime->addAttribute(llvm::AttributeList::FunctionIndex,
-                            llvm::Attribute::NoInline);
+  fixLifetime->addFnAttr(llvm::Attribute::NoInline);
 
   // Give the function an empty body.
   auto entry = llvm::BasicBlock::Create(getLLVMContext(), "", fixLifetime);
@@ -1497,7 +1508,10 @@ class FixedBoxTypeInfoBase : public BoxTypeInfo {
 public:
   FixedBoxTypeInfoBase(IRGenModule &IGM, HeapLayout &&layout)
     : BoxTypeInfo(IGM), layout(std::move(layout))
-  {}
+  {
+    // Empty layouts should always use EmptyBoxTypeInfo instead
+    assert(!layout.isKnownEmpty());
+  }
 
   OwnedAddress
   allocate(IRGenFunction &IGF, SILType boxedType, GenericEnvironment *env,
@@ -1784,6 +1798,7 @@ llvm::Value *IRGenFunction::getDynamicSelfMetadata() {
     SelfValue = emitDynamicTypeOfHeapObject(*this, SelfValue,
                                 MetatypeRepresentation::Thick,
                                 SILType::getPrimitiveObjectType(SelfType),
+                                GenericSignature(),
                                 /*allow artificial*/ false);
     SelfKind = SwiftMetatype;
     break;
@@ -1852,7 +1867,9 @@ static llvm::Value *emitLoadOfHeapMetadataRef(IRGenFunction &IGF,
         structTy = dyn_cast<llvm::StructType>(eltTy);
       } while (structTy != nullptr);
 
-      slot = IGF.Builder.CreateInBoundsGEP(object, indexes);
+      slot = IGF.Builder.CreateInBoundsGEP(
+          object->getType()->getScalarType()->getPointerElementType(), object,
+          indexes);
 
       if (!suppressCast) {
         slot = IGF.Builder.CreateBitCast(slot,
@@ -1883,12 +1900,15 @@ static llvm::Value *emitLoadOfHeapMetadataRef(IRGenFunction &IGF,
 llvm::Value *irgen::emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
                                                      llvm::Value *object,
                                                      CanType objectType,
+                                                     GenericSignature sig,
                                                      bool suppressCast) {
   ClassDecl *theClass = objectType.getClassOrBoundGenericClass();
-  if (theClass && isKnownNotTaggedPointer(IGF.IGM, theClass))
+  if (theClass && isKnownNotTaggedPointer(IGF.IGM, theClass)) {
+    auto isaEncoding = getIsaEncodingForType(IGF.IGM, objectType, sig);
     return emitLoadOfHeapMetadataRef(IGF, object,
-                                     getIsaEncodingForType(IGF.IGM, objectType),
+                                     isaEncoding,
                                      suppressCast);
+  }
 
   // OK, ask the runtime for the class pointer of this potentially-ObjC object.
   return emitHeapMetadataRefForUnknownHeapObject(IGF, object);
@@ -1897,9 +1917,11 @@ llvm::Value *irgen::emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
 llvm::Value *irgen::emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
                                                      llvm::Value *object,
                                                      SILType objectType,
+                                                     GenericSignature sig,
                                                      bool suppressCast) {
   return emitHeapMetadataRefForHeapObject(IGF, object,
                                           objectType.getASTType(),
+                                          sig,
                                           suppressCast);
 }
 
@@ -1956,8 +1978,7 @@ emitHeapMetadataRefForUnknownHeapObject(IRGenFunction &IGF,
                                          object->getName() + ".Type");
   metadata->setCallingConv(llvm::CallingConv::C);
   metadata->setDoesNotThrow();
-  metadata->addAttribute(llvm::AttributeList::FunctionIndex,
-                         llvm::Attribute::ReadOnly);
+  metadata->addFnAttr(llvm::Attribute::ReadOnly);
   return metadata;
 }
 
@@ -1967,9 +1988,10 @@ llvm::Value *irgen::emitDynamicTypeOfHeapObject(IRGenFunction &IGF,
                                                 llvm::Value *object,
                                                 MetatypeRepresentation repr,
                                                 SILType objectType,
+                                                GenericSignature sig,
                                                 bool allowArtificialSubclasses){
   switch (auto isaEncoding =
-            getIsaEncodingForType(IGF.IGM, objectType.getASTType())) {
+            getIsaEncodingForType(IGF.IGM, objectType.getASTType(), sig)) {
   case IsaEncoding::Pointer:
     // Directly load the isa pointer from a pure Swift class.
     return emitLoadOfHeapMetadataRef(IGF, object, isaEncoding,
@@ -1996,7 +2018,8 @@ llvm::Value *irgen::emitDynamicTypeOfHeapObject(IRGenFunction &IGF,
 
 /// What isa encoding mechanism does a type have?
 IsaEncoding irgen::getIsaEncodingForType(IRGenModule &IGM,
-                                         CanType type) {
+                                         CanType type,
+                                         GenericSignature outerSignature) {
   if (!IGM.ObjCInterop) return IsaEncoding::Pointer;
 
   // This needs to be kept up-to-date with hasKnownSwiftMetadata.
@@ -2011,13 +2034,16 @@ IsaEncoding irgen::getIsaEncodingForType(IRGenModule &IGM,
   
   // Existentials use the encoding of the enclosed dynamic type.
   if (type->isAnyExistentialType()) {
-    return getIsaEncodingForType(IGM, OpenedArchetypeType::getAny(type));
+    return getIsaEncodingForType(
+        IGM, OpenedArchetypeType::getAny(type, outerSignature),
+        outerSignature);
   }
 
   if (auto archetype = dyn_cast<ArchetypeType>(type)) {
     // If we have a concrete superclass constraint, just recurse.
     if (auto superclass = archetype->getSuperclass()) {
-      return getIsaEncodingForType(IGM, superclass->getCanonicalType());
+      return getIsaEncodingForType(IGM, superclass->getCanonicalType(),
+                                   outerSignature);
     }
 
     // Otherwise, we must just have a class constraint.  Use the

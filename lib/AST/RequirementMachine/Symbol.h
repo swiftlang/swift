@@ -10,7 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/StringRef.h"
 
 #ifndef SWIFT_RQM_SYMBOL_H
 #define SWIFT_RQM_SYMBOL_H
@@ -30,27 +33,31 @@ class LayoutConstraint;
 namespace rewriting {
 
 class MutableTerm;
-class ProtocolGraph;
 class RewriteContext;
 class Term;
 
 /// The smallest element in the rewrite system.
 ///
 /// enum Symbol {
-///   case name(Identifier)
+///   case conformance(CanType, substitutions: [Term], proto: Protocol)
 ///   case protocol(Protocol)
-///   case type([Protocol], Identifier)
+///   case associatedType(Protocol, Identifier)
 ///   case genericParam(index: Int, depth: Int)
+///   case name(Identifier)
 ///   case layout(LayoutConstraint)
 ///   case superclass(CanType, substitutions: [Term])
 ///   case concrete(CanType, substitutions: [Term])
 /// }
 ///
-/// For the concrete type symbols (`superclass` and `concrete`),
-/// the type's structural components must either be concrete, or
-/// generic parameters. All generic parameters must have a depth
-/// of 0; the generic parameter index corresponds to an index in
-/// the `substitutions` array.
+/// For the concrete type symbol kinds (`superclass`, `concrete` and
+/// `conformance`), arbitrary type parameters are replaced with generic
+/// parameters with depth 0. The index is the generic parameter is an
+/// index into the `substitutions` array.
+///
+/// This transformation allows DependentMemberTypes to be manipulated as
+/// terms, with the actual concrete type structure remaining opaque to
+/// the requirement machine. This transformation is implemented in
+/// RewriteContext::getConcreteSubstitutionSchema().
 ///
 /// For example, the superclass requirement
 /// "T : MyClass<U.X, (Int) -> V.A.B>" is denoted with a symbol
@@ -69,6 +76,19 @@ public:
     ////// Special symbol kind that is both type-like and property-like:
     //////
 
+    /// When appearing at the end of a term, denotes that the term's
+    /// concrete type or superclass conforms concretely to a protocol.
+    ///
+    /// Introduced by property map construction when a term has both
+    /// a concrete type or superclass requirement and a protocol
+    /// conformance requirement.
+    ///
+    /// This orders before Kind::Protocol, so that a rule of the form
+    /// T.[concrete: C : P] => T orders before T.[P] => T. This ensures
+    /// that homotopy reduction will try to eliminate the latter rule
+    /// first, if possible.
+    ConcreteConformance,
+
     /// When appearing at the start of a term, denotes a nested
     /// type of a protocol 'Self' type.
     ///
@@ -80,8 +100,8 @@ public:
     ////// "Type-like" symbol kinds:
     //////
 
-    /// An associated type [P:T] or [P&Q&...:T]. The parent term
-    /// must be known to conform to P (or P, Q, ...).
+    /// An associated type [P:T]. The parent term must be known to
+    /// conform to P.
     AssociatedType,
 
     /// A generic parameter, uniquely identified by depth and
@@ -110,7 +130,7 @@ public:
     ConcreteType,
   };
 
-  static const unsigned NumKinds = 7;
+  static const unsigned NumKinds = 8;
 
   static const StringRef Kinds[];
 
@@ -132,28 +152,27 @@ public:
   /// constraint.
   bool isProperty() const {
     auto kind = getKind();
-    return (kind == Symbol::Kind::Protocol ||
+    return (kind == Symbol::Kind::ConcreteConformance ||
+            kind == Symbol::Kind::Protocol ||
             kind == Symbol::Kind::Layout ||
             kind == Symbol::Kind::Superclass ||
             kind == Symbol::Kind::ConcreteType);
   }
 
-  bool isSuperclassOrConcreteType() const {
+  bool hasSubstitutions() const {
     auto kind = getKind();
-    return (kind == Kind::Superclass || kind == Kind::ConcreteType);
+    return (kind == Kind::Superclass ||
+            kind == Kind::ConcreteType ||
+            kind == Kind::ConcreteConformance);
   }
 
   Identifier getName() const;
 
   const ProtocolDecl *getProtocol() const;
 
-  ArrayRef<const ProtocolDecl *> getProtocols() const;
-
   GenericTypeParamType *getGenericParam() const;
 
   LayoutConstraint getLayoutConstraint() const;
-
-  CanType getSuperclass() const;
 
   CanType getConcreteType() const;
 
@@ -178,10 +197,6 @@ public:
                                   Identifier name,
                                   RewriteContext &ctx);
 
-  static Symbol forAssociatedType(ArrayRef<const ProtocolDecl *> protos,
-                                  Identifier name,
-                                  RewriteContext &ctx);
-
   static Symbol forGenericParam(GenericTypeParamType *param,
                                 RewriteContext &ctx);
 
@@ -196,9 +211,18 @@ public:
                                 ArrayRef<Term> substitutions,
                                 RewriteContext &ctx);
 
-  ArrayRef<const ProtocolDecl *> getRootProtocols() const;
+  static Symbol forConcreteConformance(CanType type,
+                                       ArrayRef<Term> substitutions,
+                                       const ProtocolDecl *proto,
+                                       RewriteContext &ctx);
 
-  int compare(Symbol other, const ProtocolGraph &protos) const;
+  const ProtocolDecl *getRootProtocol() const;
+
+  Optional<int> compare(Symbol other, RewriteContext &ctx) const;
+
+  Symbol withConcreteSubstitutions(
+      ArrayRef<Term> substitutions,
+      RewriteContext &ctx) const;
 
   Symbol transformConcreteSubstitutions(
       llvm::function_ref<Term(Term)> fn,
@@ -245,6 +269,18 @@ namespace llvm {
                         swift::rewriting::Symbol RHS) {
       return LHS == RHS;
     }
+  };
+
+  template<>
+  struct PointerLikeTypeTraits<swift::rewriting::Symbol> {
+  public:
+    static inline void *getAsVoidPointer(swift::rewriting::Symbol Val) {
+      return const_cast<void *>(Val.getOpaquePointer());
+    }
+    static inline swift::rewriting::Symbol getFromVoidPointer(void *Ptr) {
+      return swift::rewriting::Symbol::fromOpaquePointer(Ptr);
+    }
+    enum { NumLowBitsAvailable = 1 };
   };
 } // end namespace llvm
 

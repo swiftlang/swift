@@ -18,9 +18,10 @@
 
 #define DEBUG_TYPE "sil-temp-rvalue-opt"
 
-#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/BasicBlockUtils.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
@@ -276,9 +277,24 @@ collectLoads(Operand *addressUse, CopyAddrInst *originalCopy,
     loadInsts.insert(user);
     return true;
   }
-  case SILInstructionKind::LoadBorrowInst:
+  case SILInstructionKind::LoadBorrowInst: {
     loadInsts.insert(user);
-    return true;
+    BorrowedValue borrow(cast<LoadBorrowInst>(user));
+    auto visitEndScope = [&](Operand *op) -> bool {
+      auto *opUser = op->getUser();
+      if (auto *endBorrow = dyn_cast<EndBorrowInst>(opUser)) {
+        if (endBorrow->getParent() != block)
+          return false;
+        loadInsts.insert(endBorrow);
+        return true;
+      }
+      // Don't look further if we see a reborrow.
+      assert(cast<BranchInst>(opUser));
+      return false;
+    };
+    auto res = borrow.visitLocalScopeEndingUses(visitEndScope);
+    return res;
+  }
   case SILInstructionKind::FixLifetimeInst:
     // If we have a fixed lifetime on our alloc_stack, we can just treat it like
     // a load and re-write it so that it is on the old memory or old src object.
@@ -387,6 +403,11 @@ bool TempRValueOptPass::extendAccessScopes(
         assert(endAccess->getBeginAccess()->getAccessKind() ==
                  SILAccessKind::Read &&
                "a may-write end_access should not be in the copysrc lifetime");
+
+        // Don't move instructions beyond the block's terminator.
+        if (isa<TermInst>(lastUseInst))
+          return false;
+
         endAccessToMove = endAccess;
       }
     } else if (endAccessToMove) {
@@ -477,6 +498,12 @@ void TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
 
   auto *tempObj = dyn_cast<AllocStackInst>(copyInst->getDest());
   if (!tempObj)
+    return;
+
+  // If the storage corresponds to a source-level var, do not optimize here.
+  // Mem2Reg will transform the lexical alloc_stack into a lexical begin_borrow
+  // which will ensure that the value's lifetime isn't observably shortened.
+  if (tempObj->isLexical())
     return;
 
   bool isOSSA = copyInst->getFunction()->hasOwnership();
@@ -617,12 +644,21 @@ TempRValueOptPass::tryOptimizeStoreIntoTemp(StoreInst *si) {
     return std::next(si->getIterator());
   }
 
+  // If the storage corresponds to a source-level var, do not optimize here.
+  // Mem2Reg will transform the lexical alloc_stack into a lexical begin_borrow
+  // which will ensure that the value's lifetime isn't observably shortened.
+  if (tempObj->isLexical()) {
+    return std::next(si->getIterator());
+  }
+
   // If our tempObj has a dynamic lifetime (meaning it is conditionally
   // initialized, conditionally taken, etc), we can not convert its uses to SSA
   // while eliminating it simply. So bail.
   if (tempObj->hasDynamicLifetime()) {
     return std::next(si->getIterator());
   }
+
+  bool isOrHasEnum = tempObj->getType().isOrHasEnum();
 
   // Scan all uses of the temporary storage (tempObj) to verify they all refer
   // to the value initialized by this copy. It is sufficient to check that the
@@ -634,6 +670,16 @@ TempRValueOptPass::tryOptimizeStoreIntoTemp(StoreInst *si) {
 
     if (user == si)
       continue;
+
+    // For enums we require that all uses are in the same block.
+    // Otherwise it could be a switch_enum of an optional where the none-case
+    // does not have a destroy of the enum value.
+    // After transforming such an alloc_stack the value would leak in the none-
+    // case block.
+    if (isOrHasEnum && user->getParent() != si->getParent() &&
+        !isa<DeallocStackInst>(user)) {
+      return std::next(si->getIterator());
+    }
 
     // Bail if there is any kind of user which is not handled in the code below.
     switch (user->getKind()) {

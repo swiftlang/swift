@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -14,7 +14,7 @@
 // collections.
 import TestsUtils
 
-public let LazyFilter = [
+public let benchmarks = [
   BenchmarkInfo(name: "LazilyFilteredArrays2",
     runFunction: run_LazilyFilteredArrays,
     tags: [.validation, .api, .Array],
@@ -35,39 +35,39 @@ public let LazyFilter = [
 ]
 
 @inline(never)
-public func run_LazilyFilteredRange(_ N: Int) {
+public func run_LazilyFilteredRange(_ n: Int) {
   var res = 123
   let c = (1..<100_000).lazy.filter { $0 % 7 == 0 }
-  for _ in 1...N {
+  for _ in 1...n {
     res += Array(c).count
     res -= Array(c).count
   }
-  CheckResults(res == 123)
+  check(res == 123)
 }
 
 let filteredRange = (1..<1_000).map({[$0]}).lazy.filter { $0.first! % 7 == 0 }
 
 @inline(never)
-public func run_LazilyFilteredArrays(_ N: Int) {
+public func run_LazilyFilteredArrays(_ n: Int) {
   var res = 123
   let c = filteredRange
-  for _ in 1...N {
+  for _ in 1...n {
     res += Array(c).count
     res -= Array(c).count
   }
-  CheckResults(res == 123)
+  check(res == 123)
 }
 
 fileprivate var multiplesOfThree: LazyFilterCollection<Array<Int>>?
 
 @inline(never)
-fileprivate func run_LazilyFilteredArrayContains(_ N: Int) {
+fileprivate func run_LazilyFilteredArrayContains(_ n: Int) {
   let xs = multiplesOfThree!
-  for _ in 1...N {
+  for _ in 1...n {
     var filteredCount = 0
     for candidate in 1..<500 {
       filteredCount += xs.contains(candidate) ? 1 : 0
     }
-    CheckResults(filteredCount == 166)
+    check(filteredCount == 166)
   }
 }

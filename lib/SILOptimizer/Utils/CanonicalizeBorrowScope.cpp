@@ -29,14 +29,11 @@
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/CanonicalOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
-#include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 #include "swift/SILOptimizer/Utils/ValueLifetime.h"
 #include "llvm/ADT/Statistic.h"
 
 using namespace swift;
-
-STATISTIC(NumOuterCopies, "number of copy_value instructions added for a "
-                          "borrow scope");
 
 //===----------------------------------------------------------------------===//
 //                           MARK: Local utilities
@@ -212,6 +209,8 @@ SILValue CanonicalizeBorrowScope::findDefInBorrowScope(SILValue value) {
 ///
 /// \p innerValue is either the initial begin_borrow, or a forwarding operation
 /// within the borrow scope.
+///
+/// Note: This must always return true when innerValue is a function argument.
 template <typename Visitor>
 bool CanonicalizeBorrowScope::visitBorrowScopeUses(SILValue innerValue,
                                                    Visitor &visitor) {
@@ -262,17 +261,26 @@ bool CanonicalizeBorrowScope::visitBorrowScopeUses(SILValue innerValue,
       case OperandOwnership::ForwardingUnowned:
       case OperandOwnership::PointerEscape:
         // Pointer escapes are only allowed if they use the guaranteed value,
-        // which means that the escaped value must be confied to the current
-        // borrow scope.
-        if (use->get().getOwnershipKind() != OwnershipKind::Guaranteed)
+        // which means that the escaped value must be confined to the current
+        // borrow scope. visitBorrowScopeUses must never return false when
+        // borrowedValue is a SILFunctionArgument.
+        if (use->get().getOwnershipKind() != OwnershipKind::Guaranteed
+            && !isa<SILFunctionArgument>(borrowedValue.value)) {
           return false;
+        }
+        if (!visitor.visitUse(use)) {
+          assert(!isa<SILFunctionArgument>(borrowedValue.value));
+          return false;
+        }
         break;
 
       case OperandOwnership::ForwardingBorrow:
       case OperandOwnership::ForwardingConsume:
         if (CanonicalizeBorrowScope::isRewritableOSSAForward(user)) {
-          if (!visitor.visitForwardingUse(use))
+          if (!visitor.visitForwardingUse(use)) {
+            assert(!isa<SILFunctionArgument>(borrowedValue.value));
             return false;
+          }
           break;
         }
         LLVM_FALLTHROUGH;
@@ -282,8 +290,10 @@ bool CanonicalizeBorrowScope::visitBorrowScopeUses(SILValue innerValue,
       case OperandOwnership::UnownedInstantaneousUse:
       case OperandOwnership::BitwiseEscape:
       case OperandOwnership::DestroyingConsume:
-        if (!visitor.visitUse(use))
+        if (!visitor.visitUse(use)) {
+          assert(!isa<SILFunctionArgument>(borrowedValue.value));
           return false;
+        }
         break;
       } // end switch OperandOwnership
     }
@@ -330,13 +340,18 @@ public:
       // For borrows, record the scope-ending instructions to outer use
       // points. Note: The logic in filterOuterBorrowUseInsts that checks
       // whether a borrow scope is an outer use must visit the same set of uses.
-      borrowingOper.visitExtendedScopeEndingUses([&](Operand *endBorrow) {
+      //
+      // FIXME: visitExtendedScopeEndingUses can't return false here once dead
+      // borrows are disallowed.
+      if (!borrowingOper.visitExtendedScopeEndingUses([&](Operand *endBorrow) {
         auto *endInst = endBorrow->getUser();
         if (!isUserInLiveOutBlock(endInst)) {
           useInsts.insert(endInst);
         }
         return true;
-      });
+      })) {
+        useInsts.insert(user);
+      }
     }
     return true;
   }
@@ -401,6 +416,8 @@ void CanonicalizeBorrowScope::filterOuterBorrowUseInsts(
 namespace {
 
 /// Remove redundant copies/destroys within a borrow scope.
+///
+/// The visitor callbacks must always return true since this rewrites in-place.
 class RewriteInnerBorrowUses {
   CanonicalizeBorrowScope &scope;
 
@@ -455,7 +472,8 @@ public:
     // Update this operand bypassing any copies.
     SILValue value = use->get();
     use->set(scope.findDefInBorrowScope(value));
-    ForwardingOperand(use).setOwnershipKind(OwnershipKind::Guaranteed);
+    ForwardingOperand(use).setForwardingOwnershipKind(
+        OwnershipKind::Guaranteed);
     deleteCopyChain(value, scope.getDeleter());
     return true;
   }
@@ -469,6 +487,8 @@ public:
 /// visitor. They are rewritten separately.
 ///
 /// Implements visitBorrowScopeUses<Visitor>
+///
+/// The visitor callbacks must always return true since this rewrites in-place.
 class RewriteOuterBorrowUses {
   CanonicalizeBorrowScope &scope;
 
@@ -570,7 +590,8 @@ public:
       LLVM_DEBUG(llvm::dbgs() << "  Deleted " << *user);
     } else {
       use->set(scope.findDefInBorrowScope(use->get()));
-      ForwardingOperand(use).setOwnershipKind(OwnershipKind::Guaranteed);
+      ForwardingOperand(use).setForwardingOwnershipKind(
+          OwnershipKind::Guaranteed);
     }
     deleteCopyChain(innerValue, scope.getDeleter());
     return true;
@@ -659,7 +680,7 @@ SILValue RewriteOuterBorrowUses::createOuterValues(SILValue innerValue) {
   scope.getCallbacks().createdNewInst(clone);
   Operand *use = &clone->getOperandRef(0);
   use->set(incomingOuterVal);
-  ForwardingOperand(use).setOwnershipKind(OwnershipKind::Owned);
+  ForwardingOperand(use).setForwardingOwnershipKind(OwnershipKind::Owned);
 
   LLVM_DEBUG(llvm::dbgs() << "  Hoisted forward " << *clone);
 
@@ -790,8 +811,9 @@ bool CanonicalizeBorrowScope::canonicalizeFunctionArgument(
 
   RewriteInnerBorrowUses innerRewriter(*this);
   beginVisitBorrowScopeUses(); // reset the def/use worklist
+
   bool succeed = visitBorrowScopeUses(borrowedValue.value, innerRewriter);
-  assert(succeed && "should be filtered by FindBorrowScopeUses");
+  assert(succeed && "must always succeed for function arguments");
   return true;
 }
 

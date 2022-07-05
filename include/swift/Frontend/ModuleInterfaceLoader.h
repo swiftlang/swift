@@ -139,7 +139,8 @@ class ExplicitSwiftModuleLoader: public SerializedModuleLoaderBase {
                   std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
-                  bool &isFramework, bool &isSystemModule) override;
+                  bool skipBuildingInterface, bool &isFramework,
+                  bool &isSystemModule) override;
 
   std::error_code findModuleFilesInDirectory(
                   ImportPath::Element ModuleID,
@@ -148,9 +149,9 @@ class ExplicitSwiftModuleLoader: public SerializedModuleLoaderBase {
                   std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-                  bool IsFramework) override;
+                  bool skipBuildingInterface, bool IsFramework) override;
 
-  bool canImportModule(ImportPath::Element mID, llvm::VersionTuple version,
+  bool canImportModule(ImportPath::Module named, llvm::VersionTuple version,
                        bool underlyingVersion) override;
 
   bool isCached(StringRef DepPath) override { return false; };
@@ -298,17 +299,22 @@ struct ModuleInterfaceLoaderOptions {
   bool disableInterfaceLock = false;
   bool disableImplicitSwiftModule = false;
   bool disableBuildingInterface = false;
+  bool downgradeInterfaceVerificationError = false;
   std::string mainExecutablePath;
   ModuleInterfaceLoaderOptions(const FrontendOptions &Opts):
     remarkOnRebuildFromInterface(Opts.RemarkOnRebuildFromModuleInterface),
     disableInterfaceLock(Opts.DisableInterfaceFileLock),
     disableImplicitSwiftModule(Opts.DisableImplicitModules),
     disableBuildingInterface(Opts.DisableBuildingInterface),
+    downgradeInterfaceVerificationError(Opts.DowngradeInterfaceVerificationError),
     mainExecutablePath(Opts.MainExecutablePath)
   {
     switch (Opts.RequestedAction) {
     case FrontendOptions::ActionType::TypecheckModuleFromInterface:
       requestedAction = FrontendOptions::ActionType::Typecheck;
+      break;
+    case FrontendOptions::ActionType::ScanDependencies:
+      requestedAction = Opts.RequestedAction;
       break;
     default:
       requestedAction = FrontendOptions::ActionType::EmitModuleOnly;
@@ -400,7 +406,7 @@ class ModuleInterfaceLoader : public SerializedModuleLoaderBase {
      std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
      std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
      std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-     bool IsFramework) override;
+     bool skipBuildingInterface, bool IsFramework) override;
 
   bool isCached(StringRef DepPath) override;
 public:

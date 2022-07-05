@@ -1,0 +1,26 @@
+// RUN: %target-sil-opt %s -serialize -o /dev/null
+
+sil_stage canonical
+
+import Builtin
+
+// Check that we don't crash if a serializable function is referenced from the
+// initializer of a global variable.
+
+sil_global [serialized] @globalFuncPtr : $@callee_guaranteed () -> () = {
+  %0 = function_ref @calledFromFuncPtr : $@convention(thin) () -> ()
+  %initval = thin_to_thick_function %0 : $@convention(thin) () -> () to $@callee_guaranteed () -> ()
+}
+
+sil @caller : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalFuncPtr : $*@callee_guaranteed () -> ()
+  %7 = tuple ()
+  return %7 : $()
+}
+
+sil shared [serialized] @calledFromFuncPtr : $@convention(thin) () -> () {
+bb0:
+  %6 = tuple ()
+  return %6 : $()
+}

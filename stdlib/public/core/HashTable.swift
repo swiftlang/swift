@@ -42,7 +42,7 @@ internal struct _HashTable {
   @inlinable
   internal var bucketCount: Int {
     @inline(__always) get {
-      return bucketMask &+ 1
+      return _assumeNonNegative(bucketMask &+ 1)
     }
   }
 
@@ -51,6 +51,17 @@ internal struct _HashTable {
     @inline(__always) get {
       return _UnsafeBitset.wordCount(forCapacity: bucketCount)
     }
+  }
+
+  /// Return a bitset representation of the occupied buckets in this table.
+  ///
+  /// Note that if we have only a single partial word in the hash table's
+  /// bitset, then its out-of-bounds bits are guaranteed to be all set. These
+  /// filler bits are there to speed up finding holes -- they don't correspond
+  /// to occupied buckets in the table.
+  @_alwaysEmitIntoClient
+  internal var bitset: _UnsafeBitset {
+    _UnsafeBitset(words: words, wordCount: wordCount)
   }
 }
 

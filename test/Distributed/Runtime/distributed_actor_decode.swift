@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-distributed -parse-as-library) | %FileCheck %s
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -7,10 +7,11 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-import _Distributed
+import Distributed
 
-@available(SwiftStdlib 5.5, *)
 distributed actor DA: CustomStringConvertible {
+  typealias ActorSystem = FakeActorSystem
+
   nonisolated var description: String {
     "DA(\(self.id))"
   }
@@ -18,8 +19,7 @@ distributed actor DA: CustomStringConvertible {
 
 // ==== Fake Transport ---------------------------------------------------------
 
-@available(SwiftStdlib 5.5, *)
-struct ActorAddress: ActorIdentity {
+struct ActorAddress: Hashable, Sendable, Codable {
   let address: String
   init(parse address : String) {
     self.address = address
@@ -39,48 +39,100 @@ struct ActorAddress: ActorIdentity {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
-struct FakeTransport: ActorTransport {
-  func decodeIdentity(from decoder: Decoder) throws -> AnyActorIdentity {
-    print("FakeTransport.decodeIdentity from:\(decoder)")
-    let address = try ActorAddress(from: decoder)
-    return AnyActorIdentity(address)
-  }
+final class FakeActorSystem: DistributedActorSystem {
+  typealias ActorID = ActorAddress
+  typealias InvocationDecoder = FakeInvocation
+  typealias InvocationEncoder = FakeInvocation
+  typealias SerializationRequirement = Codable
+  typealias ResultHandler = FakeResultHandler
 
-  func resolve<Act>(_ identity: AnyActorIdentity, as actorType: Act.Type) throws -> Act?
-      where Act: DistributedActor {
-    print("resolve type:\(actorType), address:\(identity)")
+  func resolve<Act>(id: ActorID, as actorType: Act.Type) throws -> Act?
+      where Act: DistributedActor,
+            Act.ID == ActorID  {
+    print("resolve type:\(actorType), address:\(id)")
     return nil
   }
 
-  func assignIdentity<Act>(_ actorType: Act.Type) -> AnyActorIdentity
-      where Act: DistributedActor {
+  func assignID<Act>(_ actorType: Act.Type) -> ActorID
+      where Act: DistributedActor, Act.ID == ActorID {
     let address = ActorAddress(parse: "xxx")
     print("assign type:\(actorType), address:\(address)")
-    return .init(address)
+    return address
   }
 
-  public func actorReady<Act>(_ actor: Act) where Act: DistributedActor {
+  func actorReady<Act>(_ actor: Act)
+      where Act: DistributedActor,
+      Act.ID == ActorID {
     print("ready actor:\(actor), address:\(actor.id)")
   }
 
-  func resignIdentity(_ identity: AnyActorIdentity) {
-    print("resign address:\(identity)")
+  func resignID(_ id: ActorID) {
+    print("resign address:\(id)")
   }
+
+  func makeInvocationEncoder() -> InvocationEncoder {
+    .init()
+  }
+
+  func remoteCall<Act, Err, Res>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation invocationEncoder: inout InvocationEncoder,
+    throwing: Err.Type,
+    returning: Res.Type
+  ) async throws -> Res
+    where Act: DistributedActor,
+          Act.ID == ActorID,
+          Err: Error,
+          Res: SerializationRequirement {
+      fatalError("not implemented: \(#function)")
+  }
+
+  func remoteCallVoid<Act, Err>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation invocationEncoder: inout InvocationEncoder,
+    throwing: Err.Type
+  ) async throws
+    where Act: DistributedActor,
+          Act.ID == ActorID,
+          Err: Error {
+      fatalError("not implemented: \(#function)")
+  }
+
 }
+
+final class FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvocationDecoder {
+  typealias SerializationRequirement = Codable
+
+  func recordGenericSubstitution<T>(_ type: T.Type) throws {}
+  func recordArgument<Value: SerializationRequirement>(_ argument: RemoteCallArgument<Value>) throws {}
+  func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
+  func recordErrorType<E: Error>(_ type: E.Type) throws {}
+  func doneRecording() throws {}
+
+  // === Receiving / decoding -------------------------------------------------
+
+  func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
+  func decodeNextArgument<Argument: SerializationRequirement>() throws -> Argument { fatalError() }
+  func decodeReturnType() throws -> Any.Type? { nil }
+  func decodeErrorType() throws -> Any.Type? { nil }
+}
+
+@available(SwiftStdlib 5.5, *)
+typealias DefaultDistributedActorSystem = FakeActorSystem
 
 // ==== Test Coding ------------------------------------------------------------
 
-@available(SwiftStdlib 5.5, *)
 class TestEncoder: Encoder {
   var codingPath: [CodingKey]
   var userInfo: [CodingUserInfoKey: Any]
 
   var data: String? = nil
 
-  init(transport: ActorTransport) {
+  init(system: FakeActorSystem) {
     self.codingPath = []
-    self.userInfo = [.actorTransportKey: transport]
+    self.userInfo = [.actorSystemKey: system]
   }
 
   func container<Key>(keyedBy type: Key.Type) -> KeyedEncodingContainer<Key> {
@@ -122,27 +174,42 @@ class TestEncoder: Encoder {
     func encode(_ value: UInt64) throws { fatalError("Not implemented: \(#function)") }
     func encode<T: Encodable>(_ value: T) throws {
       print("encode: \(value)")
-      if let identity = value as? AnyActorIdentity {
-        self.parent.data =
-            (identity.underlying as! ActorAddress).address
+      if let address = value as? ActorAddress {
+        self.parent.data = address.address
       }
     }
   }
 
-  func encode<Act: DistributedActor>(_ actor: Act) throws -> String {
+  func encode<Act: DistributedActor>(_ actor: Act) throws -> String where Act.ID: Codable {
     try actor.encode(to: self)
     return self.data!
   }
 }
 
 @available(SwiftStdlib 5.5, *)
+public struct FakeResultHandler: DistributedTargetInvocationResultHandler {
+  public typealias SerializationRequirement = Codable
+
+  public func onReturn<Success: SerializationRequirement>(value: Success) async throws {
+    fatalError("Not implemented: \(#function)")
+  }
+
+  public func onReturnVoid() async throws {
+    fatalError("Not implemented: \(#function)")
+  }
+
+  public func onThrow<Err: Error>(error: Err) async throws {
+    fatalError("Not implemented: \(#function)")
+  }
+}
+
 class TestDecoder: Decoder {
   let encoder: TestEncoder
   let data: String
 
-  init(encoder: TestEncoder, transport: ActorTransport, data: String) {
+  init(encoder: TestEncoder, system: FakeActorSystem, data: String) {
     self.encoder = encoder
-    self.userInfo = [.actorTransportKey: transport]
+    self.userInfo = [.actorSystemKey: system]
     self.data = data
   }
 
@@ -190,27 +257,25 @@ class TestDecoder: Decoder {
 
 // ==== Execute ----------------------------------------------------------------
 
-@available(SwiftStdlib 5.5, *)
 func test() {
-  let transport = FakeTransport()
+  let system = DefaultDistributedActorSystem()
 
   // CHECK: assign type:DA, address:ActorAddress(address: "xxx")
-  let da = DA(transport: transport)
+  // CHECK: ready actor:DA(ActorAddress(address: "xxx"))
+  let da = DA(actorSystem: system)
 
-  // CHECK: encode: AnyActorIdentity(ActorAddress(address: "xxx"))
-  // CHECK: FakeTransport.decodeIdentity from:main.TestDecoder
-  let encoder = TestEncoder(transport: transport)
+  // CHECK: encode: ActorAddress(address: "xxx")
+  let encoder = TestEncoder(system: system)
   let data = try! encoder.encode(da)
 
   // CHECK: decode String -> xxx
   // CHECK: decode ActorAddress -> ActorAddress(address: "xxx")
-  let da2 = try! DA(from: TestDecoder(encoder: encoder, transport: transport, data: data))
+  let da2 = try! DA(from: TestDecoder(encoder: encoder, system: system, data: data))
 
-  // CHECK: decoded da2: DA(AnyActorIdentity(ActorAddress(address: "xxx")))
+  // CHECK: decoded da2: DA(ActorAddress(address: "xxx"))
   print("decoded da2: \(da2)")
 }
 
-@available(SwiftStdlib 5.5, *)
 @main struct Main {
   static func main() async {
     test()

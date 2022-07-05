@@ -86,6 +86,20 @@ enum class PrintStructureKind {
   TupleElement,
   NumberLiteral,
   StringLiteral,
+  /// ' = defaultValue'.
+  DefaultArgumentClause,
+  /// '<T, U: Requirement>'.
+  DeclGenericParameterClause,
+  /// 'where T: Collection, T.Element: Equitable'.
+  DeclGenericRequirementClause,
+  /// ' async throws'.
+  EffectsSpecifiers,
+  /// ' -> ResultTy' or ': ResultTy'.
+  DeclResultTypeClause,
+  /// '(a: Int, b param: String)' in function declarations.
+  FunctionParameterList,
+  /// '@attribute ParamTy...' in parameter declarations.
+  FunctionParameterType,
 };
 
 /// An abstract class used to print an AST.
@@ -280,10 +294,10 @@ public:
 
   // MARK: Callback interface wrappers that perform ASTPrinter bookkeeping.
 
-   /// Make a callback to printDeclPre(), performing any necessary bookeeping.
+   /// Make a callback to printDeclPre(), performing any necessary bookkeeping.
   void callPrintDeclPre(const Decl *D, Optional<BracketOptions> Bracket);
 
-  /// Make a callback to printDeclPost(), performing any necessary bookeeping.
+  /// Make a callback to printDeclPost(), performing any necessary bookkeeping.
   void callPrintDeclPost(const Decl *D, Optional<BracketOptions> Bracket) {
     printDeclPost(D, Bracket);
   }
@@ -294,13 +308,13 @@ public:
     avoidPrintDeclPost(D);
   }
 
-   /// Make a callback to printDeclLoc(), performing any necessary bookeeping.
+   /// Make a callback to printDeclLoc(), performing any necessary bookkeeping.
   void callPrintDeclLoc(const Decl *D) {
     forceNewlines();
     printDeclLoc(D);
   }
 
-   /// Make a callback to printNamePre(), performing any necessary bookeeping.
+   /// Make a callback to printNamePre(), performing any necessary bookkeeping.
   void callPrintNamePre(PrintNameContext Context) {
     forceNewlines();
     printNamePre(Context);
@@ -312,9 +326,6 @@ public:
     forceNewlines();
     printStructurePre(Kind, D);
   }
-
-  /// To sanitize a malformed utf8 string to a well-formed one.
-  static std::string sanitizeUtf8(StringRef Text);
 
 private:
   virtual void anchor();
@@ -371,8 +382,14 @@ void getInheritedForPrinting(
 
 StringRef getAccessorKindString(AccessorKind value);
 
-bool printCompatibilityFeatureChecksPre(ASTPrinter &printer, Decl *decl);
-void printCompatibilityFeatureChecksPost(ASTPrinter &printer);
+/// Call the given function nested appropriately within #if checks
+/// for the compiler features that it uses.  Note that printBody
+/// may be called multiple times if the declaration uses suppressible
+/// features.
+void printWithCompatibilityFeatureChecks(ASTPrinter &printer,
+                                         PrintOptions &options,
+                                         Decl *decl,
+                                         llvm::function_ref<void()> printBody);
 
 } // namespace swift
 

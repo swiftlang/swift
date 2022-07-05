@@ -23,7 +23,7 @@
 
 using namespace swift::dependencies;
 
-DEFINE_SIMPLE_CONVERSION_FUNCTIONS(DependencyScanningTool, swiftscan_scanner_t);
+DEFINE_SIMPLE_CONVERSION_FUNCTIONS(DependencyScanningTool, swiftscan_scanner_t)
 
 //=== Private Cleanup Functions -------------------------------------------===//
 
@@ -74,6 +74,7 @@ void swiftscan_dependency_info_details_dispose(
     swiftscan_string_dispose(details_impl->clang_details.module_map_path);
     swiftscan_string_dispose(details_impl->clang_details.context_hash);
     swiftscan_string_set_dispose(details_impl->clang_details.command_line);
+    swiftscan_string_set_dispose(details_impl->clang_details.captured_pcm_args);
     break;
   }
   delete details_impl;
@@ -133,7 +134,7 @@ swiftscan_dependency_graph_create(swiftscan_scanner_t scanner,
   int argc = invocation->argv->count;
   std::vector<const char *> Compilation;
   for (int i = 0; i < argc; ++i)
-    Compilation.push_back(get_C_string(invocation->argv->strings[i]));
+    Compilation.push_back(swift::c_string_utils::get_C_string(invocation->argv->strings[i]));
 
   // Execute the scan and bridge the result
   auto ScanResult = ScanningTool->getDependencies(Compilation, {});
@@ -151,13 +152,13 @@ swiftscan_batch_scan_result_create(swiftscan_scanner_t scanner,
   int argc = invocation->argv->count;
   std::vector<const char *> Compilation;
   for (int i = 0; i < argc; ++i)
-    Compilation.push_back(get_C_string(invocation->argv->strings[i]));
+    Compilation.push_back(swift::c_string_utils::get_C_string(invocation->argv->strings[i]));
 
   std::vector<BatchScanInput> BatchInput;
   for (size_t i = 0; i < batch_input->count; ++i) {
     swiftscan_batch_scan_entry_s *Entry = batch_input->modules[i];
-    BatchInput.push_back({get_C_string(Entry->module_name),
-                          get_C_string(Entry->arguments),
+    BatchInput.push_back({swift::c_string_utils::get_C_string(Entry->module_name),
+        swift::c_string_utils::get_C_string(Entry->arguments),
                           /*outputPath*/ "", Entry->is_swift});
   }
 
@@ -188,7 +189,7 @@ swiftscan_import_set_create(swiftscan_scanner_t scanner,
   int argc = invocation->argv->count;
   std::vector<const char *> Compilation;
   for (int i = 0; i < argc; ++i)
-    Compilation.push_back(get_C_string(invocation->argv->strings[i]));
+    Compilation.push_back(swift::c_string_utils::get_C_string(invocation->argv->strings[i]));
 
   // Execute the scan and bridge the result
   auto PreScanResult = ScanningTool->getImports(Compilation);
@@ -346,6 +347,11 @@ swiftscan_clang_detail_get_command_line(swiftscan_module_details_t details) {
   return details->clang_details.command_line;
 }
 
+swiftscan_string_set_t *
+swiftscan_clang_detail_get_captured_pcm_args(swiftscan_module_details_t details) {
+  return details->clang_details.captured_pcm_args;
+}
+
 //=== Batch Scan Input Functions ------------------------------------------===//
 
 swiftscan_batch_scan_input_t *swiftscan_batch_scan_input_create() {
@@ -367,12 +373,12 @@ swiftscan_batch_scan_entry_t swiftscan_batch_scan_entry_create() {
 
 void swiftscan_batch_scan_entry_set_module_name(
     swiftscan_batch_scan_entry_t entry, const char *name) {
-  entry->module_name = create_clone(name);
+  entry->module_name = swift::c_string_utils::create_clone(name);
 }
 
 void swiftscan_batch_scan_entry_set_arguments(
     swiftscan_batch_scan_entry_t entry, const char *arguments) {
-  entry->arguments = create_clone(arguments);
+  entry->arguments = swift::c_string_utils::create_clone(arguments);
 }
 
 void swiftscan_batch_scan_entry_set_is_swift(swiftscan_batch_scan_entry_t entry,
@@ -410,13 +416,13 @@ swiftscan_scan_invocation_t swiftscan_scan_invocation_create() {
 
 void swiftscan_scan_invocation_set_working_directory(
     swiftscan_scan_invocation_t invocation, const char *working_directory) {
-  invocation->working_directory = create_clone(working_directory);
+  invocation->working_directory = swift::c_string_utils::create_clone(working_directory);
 }
 
 SWIFTSCAN_PUBLIC void
 swiftscan_scan_invocation_set_argv(swiftscan_scan_invocation_t invocation,
                                    int argc, const char **argv) {
-  invocation->argv = create_set(argc, argv);
+  invocation->argv = swift::c_string_utils::create_set(argc, argv);
 }
 
 swiftscan_string_ref_t swiftscan_scan_invocation_get_working_directory(
@@ -438,7 +444,8 @@ swiftscan_scan_invocation_get_argv(swiftscan_scan_invocation_t invocation) {
 void swiftscan_string_set_dispose(swiftscan_string_set_t *set) {
   for (unsigned SI = 0, SE = set->count; SI < SE; ++SI)
     swiftscan_string_dispose(set->strings[SI]);
-  delete[] set->strings;
+  if (set->count > 0)
+    delete[] set->strings;
   delete set;
 }
 
@@ -494,6 +501,19 @@ static void addFrontendFlagOption(llvm::opt::OptTable &table,
   }
 }
 
+swiftscan_string_ref_t
+swiftscan_compiler_target_info_query(swiftscan_scan_invocation_t invocation) {
+  int argc = invocation->argv->count;
+  std::vector<const char *> Compilation;
+  for (int i = 0; i < argc; ++i)
+    Compilation.push_back(swift::c_string_utils::get_C_string(invocation->argv->strings[i]));
+
+  auto TargetInfo = getTargetInfo(Compilation);
+  if (TargetInfo.getError())
+    return swift::c_string_utils::create_null();
+  return TargetInfo.get();
+}
+
 swiftscan_string_set_t *
 swiftscan_compiler_supported_arguments_query() {
   std::unique_ptr<llvm::opt::OptTable> table = swift::createSwiftOptTable();
@@ -503,14 +523,18 @@ swiftscan_compiler_supported_arguments_query() {
   addFrontendFlagOption(*table, swift::options::OPT_##ID, frontendFlags);
 #include "swift/Option/Options.inc"
 #undef OPTION
-  return create_set(frontendFlags);
+  return swift::c_string_utils::create_set(frontendFlags);
 }
 
 swiftscan_string_set_t *
 swiftscan_compiler_supported_features_query() {
-  // TODO: We are yet to figure out how "Features" will be organized.
-  return nullptr;
+  std::vector<std::string> allFeatures;
+  allFeatures.emplace_back("library-level");
+  allFeatures.emplace_back("emit-abi-descriptor");
+  return swift::c_string_utils::create_set(allFeatures);
 }
+
+//=== Experimental Compiler Invocation Functions ------------------------===//
 
 int invoke_swift_compiler(int argc, const char **argv) {
   return swift::mainEntry(argc, argv);

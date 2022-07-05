@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -13,7 +13,7 @@
 import TestsUtils
 
 let t: [BenchmarkCategory] = [.api]
-public let Diffing = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "Diffing.Same",
     runFunction: { diff($0, from: longPangram, to: longPangram) },
@@ -60,9 +60,9 @@ let loremIpsum = Array("Lorem ipsum dolor sit amet, consectetur adipiscing elit,
 let unabridgedLorem = Array("Lorem ipsum, quia dolor sit amet consectetur adipisci[ng] velit, sed quia non-numquam [do] eius modi tempora inci[di]dunt, ut labore et dolore magnam aliqua.")
 let loremReversed = Array(loremIpsum.reversed())
 
-@inline(never) func diff(_ N: Int, from older: [Character], to newer: [Character]) {
+@inline(never) func diff(_ n: Int, from older: [Character], to newer: [Character]) {
   if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
-    for _ in 1...N {
+    for _ in 1...n {
       blackHole(newer.difference(from: older))
     }
   }

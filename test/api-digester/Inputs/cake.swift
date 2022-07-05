@@ -142,3 +142,14 @@ extension SwiftObjcClass {
 
 @_alwaysEmitIntoClient
 public func emitIntoClientFunc() {}
+
+@_silgen_name("silgenName")
+public func silgenNamedFunc() {}
+
+@available(OSX 10.7, *)
+@_originallyDefinedIn(module: "Bread", OSX 10.9)
+@_spi(top_secret_1)
+@_spi(top_secret_2)
+public class SinkingClass {
+  public init() {}
+}

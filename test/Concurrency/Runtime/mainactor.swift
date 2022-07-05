@@ -5,8 +5,9 @@
 // REQUIRES: libdispatch
 
 // rdar://76038845
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
+// UNSUPPORTED: single_threaded_concurrency
 
 import Dispatch
 
@@ -67,6 +68,22 @@ actor A {
   return await enterMainActor(0) + 1
 }
 
+@MainActor func mainActorFn() -> Int {
+  checkIfMainQueue(expectedAnswer: true)
+  return 10
+}
+
+@MainActor
+struct S {
+  static var bacteria: Int = mainActorFn()
+}
+
+@MainActor
+class C {
+  static var bacteria: Int = mainActorFn()
+  lazy var amoeba: Int = mainActorFn()
+  nonisolated init() {}
+}
 
 // CHECK: starting
 // CHECK-NOT: ERROR
@@ -80,6 +97,10 @@ actor A {
 // CHECK-NOT: ERROR
 // CHECK: finished with return counter = 4
 
+// CHECK: detached task not on main queue
+// CHECK: on main queue again
+// CHECK: detached task hopped back
+
 @main struct RunIt {
   static func main() async {
     print("starting")
@@ -90,5 +111,35 @@ actor A {
     }
     let result = await someFunc()
     print("finished with return counter = \(result)")
+
+    // Check actor hopping with MainActor.run.
+    let task = Task.detached {
+      if checkIfMainQueue(expectedAnswer: false) {
+        print("detached task not on main queue")
+      } else {
+        print("ERROR: detached task is on the main queue?")
+      }
+
+      _ = await MainActor.run {
+        checkAnotherFn(1)
+      }
+
+      if checkIfMainQueue(expectedAnswer: false) {
+        print("detached task hopped back")
+      } else {
+        print("ERROR: detached task is on the main queue?")
+      }
+    }
+    _ = await task.value
+
+    // Check that initializers for stored properties are on the right actor
+    let t1 = Task.detached { () -> Int in
+      let c = C()
+      return await c.amoeba
+    }
+    let t2 = Task.detached { () -> Int in
+      return await S.bacteria + C.bacteria
+    }
+    _ = await t1.value + t2.value
   }
 }

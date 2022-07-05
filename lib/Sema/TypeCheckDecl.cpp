@@ -32,7 +32,6 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/OperatorNameLookup.h"
@@ -41,7 +40,6 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeWalker.h"
-#include "swift/Basic/Statistic.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Sema/IDETypeChecking.h"
@@ -53,6 +51,7 @@
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/APSInt.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/Twine.h"
@@ -61,12 +60,6 @@
 
 using namespace swift;
 
-#define DEBUG_TYPE "Serialization"
-
-STATISTIC(NumLazyRequirementSignaturesLoaded,
-          "# of lazily-deserialized requirement signatures loaded");
-
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "TypeCheckDecl"
 
 namespace {
@@ -329,7 +322,7 @@ static bool inferFinalAndDiagnoseIfNeeded(ValueDecl *D, ClassDecl *cls,
   return true;
 }
 
-/// Runtime-replacable accessors are dynamic when their storage declaration
+/// Runtime-replaceable accessors are dynamic when their storage declaration
 /// is dynamic and they were explicitly defined or they are implicitly defined
 /// getter/setter because no accessor was defined.
 static bool doesAccessorNeedDynamicAttribute(AccessorDecl *accessor) {
@@ -386,68 +379,105 @@ CtorInitializerKind
 InitKindRequest::evaluate(Evaluator &evaluator, ConstructorDecl *decl) const {
   auto &diags = decl->getASTContext().Diags;
 
-  // Convenience inits are only allowed on classes and in extensions thereof.
-  if (decl->getAttrs().hasAttribute<ConvenienceAttr>()) {
-    if (auto nominal = decl->getDeclContext()->getSelfNominalTypeDecl()) {
-      auto classDecl = dyn_cast<ClassDecl>(nominal);
+  if (auto nominal = decl->getDeclContext()->getSelfNominalTypeDecl()) {
 
-      // Forbid convenience inits on Foreign CF types, as Swift does not yet
-      // support user-defined factory inits.
-      if (classDecl &&
-          classDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
-        diags.diagnose(decl->getLoc(), diag::cfclass_convenience_init);
-      }
+    // Convenience inits are only allowed on classes and in extensions thereof.
+    if (auto convenAttr = decl->getAttrs().getAttribute<ConvenienceAttr>()) {
+      if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
+        if (classDecl->isAnyActor()) {
+          // For an actor "convenience" is not required, but we'll honor it.
+          diags.diagnose(decl->getLoc(),
+                diag::no_convenience_keyword_init, "actors")
+            .fixItRemove(convenAttr->getLocation())
+            .warnUntilSwiftVersion(6);
 
-      if (!classDecl) {
-        auto ConvenienceLoc =
-          decl->getAttrs().getAttribute<ConvenienceAttr>()->getLocation();
+        } else { // not an actor
+          // Forbid convenience inits on Foreign CF types, as Swift does not yet
+          // support user-defined factory inits.
+          if (classDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType)
+            diags.diagnose(decl->getLoc(), diag::cfclass_convenience_init);
+        }
 
-        // Produce a tailored diagnostic for structs and enums.
+      } else { // not a ClassDecl
+        auto ConvenienceLoc = convenAttr->getLocation();
+
+        // Produce a tailored diagnostic for structs and enums. They should
+        // not have `convenience`.
         bool isStruct = dyn_cast<StructDecl>(nominal) != nullptr;
         if (isStruct || dyn_cast<EnumDecl>(nominal)) {
-          diags.diagnose(decl->getLoc(), diag::enumstruct_convenience_init,
+          diags.diagnose(decl->getLoc(), diag::no_convenience_keyword_init,
                          isStruct ? "structs" : "enums")
             .fixItRemove(ConvenienceLoc);
         } else {
-          diags.diagnose(decl->getLoc(), diag::nonclass_convenience_init,
-                         nominal->getName())
+          diags.diagnose(decl->getLoc(), diag::no_convenience_keyword_init,
+                         nominal->getName().str())
             .fixItRemove(ConvenienceLoc);
         }
         return CtorInitializerKind::Designated;
       }
-    }
 
-    return CtorInitializerKind::Convenience;
-
-  } else if (auto nominal = decl->getDeclContext()->getSelfNominalTypeDecl()) {
-    // A designated init for a class must be written within the class itself.
-    //
-    // This is because designated initializers of classes get a vtable entry,
-    // and extensions cannot add vtable entries to the extended type.
-    //
-    // If we implement the ability for extensions defined in the same module
-    // (or the same file) to add vtable entries, we can re-evaluate this
-    // restriction.
-    if (isa<ClassDecl>(nominal) && !decl->isSynthesized() &&
-        isa<ExtensionDecl>(decl->getDeclContext()) &&
-        !(decl->getAttrs().hasAttribute<DynamicReplacementAttr>())) {
-      if (cast<ClassDecl>(nominal)->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
-        diags.diagnose(decl->getLoc(),
-                       diag::cfclass_designated_init_in_extension,
-                       nominal->getName());
-        return CtorInitializerKind::Designated;
-      } else {
-        diags.diagnose(decl->getLoc(),
-                       diag::designated_init_in_extension,
-                       nominal->getName())
-            .fixItInsert(decl->getLoc(), "convenience ");
-        return CtorInitializerKind::Convenience;
-      }
-    }
-
-    if (decl->getDeclContext()->getExtendedProtocolDecl()) {
       return CtorInitializerKind::Convenience;
     }
+
+    // if there's no `convenience` attribute...
+
+    if (auto classDcl = dyn_cast<ClassDecl>(nominal)) {
+
+      // actors infer whether they are `convenience` from their body kind.
+      if (classDcl->isAnyActor()) {
+        auto kind = decl->getDelegatingOrChainedInitKind();
+        switch (kind.initKind) {
+          case BodyInitKind::ImplicitChained:
+          case BodyInitKind::Chained:
+          case BodyInitKind::None:
+            break; // it's designated, we need more checks.
+
+          case BodyInitKind::Delegating:
+            return CtorInitializerKind::Convenience;
+        }
+      }
+
+      // A designated init for a class must be written within the class itself.
+      //
+      // This is because designated initializers of classes get a vtable entry,
+      // and extensions cannot add vtable entries to the extended type.
+      //
+      // If we implement the ability for extensions defined in the same module
+      // (or the same file) to add vtable entries, we can re-evaluate this
+      // restriction.
+      if (!decl->isSynthesized() &&
+          isa<ExtensionDecl>(decl->getDeclContext()) &&
+          !(decl->getAttrs().hasAttribute<DynamicReplacementAttr>())) {
+
+        if (classDcl->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
+          diags.diagnose(decl->getLoc(),
+                         diag::designated_init_in_extension_no_convenience_tip,
+                         nominal->getName());
+
+          // despite having reported it as an error, say that it is designated.
+          return CtorInitializerKind::Designated;
+
+        } else if (classDcl->isAnyActor()) {
+          // tailor the diagnostic to not mention `convenience`
+          diags.diagnose(decl->getLoc(),
+                         diag::designated_init_in_extension_no_convenience_tip,
+                         nominal->getName());
+
+        } else {
+          diags.diagnose(decl->getLoc(),
+                             diag::designated_init_in_extension,
+                             nominal->getName())
+                 .fixItInsert(decl->getLoc(), "convenience ");
+        }
+
+        return CtorInitializerKind::Convenience;
+      }
+    } // end of Class context
+  } // end of Nominal context
+
+  // initializers in protocol extensions must be convenience inits
+  if (decl->getDeclContext()->getExtendedProtocolDecl()) {
+    return CtorInitializerKind::Convenience;
   }
 
   return CtorInitializerKind::Designated;
@@ -482,14 +512,16 @@ BodyInitKindRequest::evaluate(Evaluator &evaluator,
       if (!apply)
         return { true, E };
 
+      auto *argList = apply->getArgs();
       auto Callee = apply->getSemanticFn();
       
       Expr *arg;
 
       if (isa<OtherConstructorDeclRefExpr>(Callee)) {
-        arg = apply->getArg();
+        arg = argList->getUnaryExpr();
+        assert(arg);
       } else if (auto *CRE = dyn_cast<ConstructorRefCallExpr>(Callee)) {
-        arg = CRE->getArg();
+        arg = CRE->getBase();
       } else if (auto *dotExpr = dyn_cast<UnresolvedDotExpr>(Callee)) {
         if (dotExpr->getName().getBaseName() != DeclBaseName::createConstructor())
           return { true, E };
@@ -673,31 +705,93 @@ ExistentialConformsToSelfRequest::evaluate(Evaluator &evaluator,
 }
 
 bool
-ExistentialTypeSupportedRequest::evaluate(Evaluator &evaluator,
-                                          ProtocolDecl *decl) const {
-  // ObjC protocols can always be existential.
+ExistentialRequiresAnyRequest::evaluate(Evaluator &evaluator,
+                                        ProtocolDecl *decl) const {
+  // ObjC protocols do not require `any`.
   if (decl->isObjC())
-    return true;
+    return false;
 
   for (auto member : decl->getMembers()) {
-    // Existential types cannot be used if the protocol has an associated type.
+    // Existential types require `any` if the protocol has an associated type.
     if (isa<AssociatedTypeDecl>(member))
-      return false;
+      return true;
 
     // For value members, look at their type signatures.
     if (auto valueMember = dyn_cast<ValueDecl>(member)) {
-      if (!decl->isAvailableInExistential(valueMember))
-        return false;
+      const auto info = valueMember->findExistentialSelfReferences(
+          decl->getDeclaredInterfaceType(),
+          /*treatNonResultCovariantSelfAsInvariant=*/false);
+      if (info.selfRef > TypePosition::Covariant || info.assocTypeRef) {
+        return true;
+      }
     }
   }
 
-  // Check whether all of the inherited protocols support existential types.
+  // Check whether any of the inherited protocols require `any`.
   for (auto proto : decl->getInheritedProtocols()) {
-    if (!proto->existentialTypeSupported())
-      return false;
+    if (proto->existentialRequiresAny())
+      return true;
   }
 
-  return true;
+  return false;
+}
+
+ArrayRef<AssociatedTypeDecl *>
+PrimaryAssociatedTypesRequest::evaluate(Evaluator &evaluator,
+                                        ProtocolDecl *decl) const {
+  SmallVector<AssociatedTypeDecl *, 2> assocTypes;
+
+  if (decl->hasLazyPrimaryAssociatedTypes()) {
+    auto &ctx = decl->getASTContext();
+    auto contextData = static_cast<LazyProtocolData *>(
+        ctx.getOrCreateLazyContextData(decl, nullptr));
+
+    contextData->loader->loadPrimaryAssociatedTypes(
+        decl, contextData->primaryAssociatedTypesData, assocTypes);
+
+    return decl->getASTContext().AllocateCopy(assocTypes);
+  }
+
+  llvm::SmallDenseSet<Identifier, 2> assocTypeNames;
+
+  for (auto pair : decl->getPrimaryAssociatedTypeNames()) {
+    if (!assocTypeNames.insert(pair.first).second) {
+      auto &ctx = decl->getASTContext();
+      ctx.Diags.diagnose(pair.second,
+                         diag::protocol_declares_duplicate_primary_assoc_type,
+                         pair.first);
+      continue;
+    }
+
+    SmallVector<ValueDecl *, 2> result;
+
+    decl->lookupQualified(ArrayRef<NominalTypeDecl *>(decl),
+                          DeclNameRef(pair.first),
+                          NL_QualifiedDefault | NL_OnlyTypes,
+                          result);
+
+    AssociatedTypeDecl *bestAssocType = nullptr;
+    for (auto *decl : result) {
+      if (auto *assocType = dyn_cast<AssociatedTypeDecl>(decl)) {
+        if (bestAssocType == nullptr ||
+            TypeDecl::compare(assocType, bestAssocType) < 0) {
+          bestAssocType = assocType;
+        }
+      }
+    }
+
+    if (bestAssocType == nullptr) {
+      auto &ctx = decl->getASTContext();
+      ctx.Diags.diagnose(pair.second,
+                         diag::protocol_declares_unknown_primary_assoc_type,
+                         pair.first, decl->getDeclaredInterfaceType());
+      continue;
+    }
+
+    assocTypes.push_back(bestAssocType);
+  }
+
+  return decl->getASTContext().AllocateCopy(assocTypes);
 }
 
 bool
@@ -850,7 +944,7 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   }
 
   if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
-    // Runtime-replacable accessors are dynamic when their storage declaration
+    // Runtime-replaceable accessors are dynamic when their storage declaration
     // is dynamic and they were explicitly defined or they are implicitly defined
     // getter/setter because no accessor was defined.
     return doesAccessorNeedDynamicAttribute(accessor);
@@ -893,54 +987,6 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   }
 
   return false;
-}
-
-ArrayRef<Requirement>
-RequirementSignatureRequest::evaluate(Evaluator &evaluator,
-                                      ProtocolDecl *proto) const {
-  ASTContext &ctx = proto->getASTContext();
-
-  // First check if we have a deserializable requirement signature.
-  if (proto->hasLazyRequirementSignature()) {
-    ++NumLazyRequirementSignaturesLoaded;
-    // FIXME: (transitional) increment the redundant "always-on" counter.
-    if (ctx.Stats)
-      ++ctx.Stats->getFrontendCounters().NumLazyRequirementSignaturesLoaded;
-
-    auto contextData = static_cast<LazyProtocolData *>(
-        ctx.getOrCreateLazyContextData(proto, nullptr));
-
-    SmallVector<Requirement, 8> requirements;
-    contextData->loader->loadRequirementSignature(
-        proto, contextData->requirementSignatureData, requirements);
-    if (requirements.empty())
-      return None;
-    return ctx.AllocateCopy(requirements);
-  }
-
-  GenericSignatureBuilder builder(proto->getASTContext());
-
-  // Add all of the generic parameters.
-  for (auto gp : *proto->getGenericParams())
-    builder.addGenericParameter(gp);
-
-  // Add the conformance of 'self' to the protocol.
-  auto selfType =
-    proto->getSelfInterfaceType()->castTo<GenericTypeParamType>();
-  auto requirement =
-    Requirement(RequirementKind::Conformance, selfType,
-                proto->getDeclaredInterfaceType());
-
-  builder.addRequirement(
-          requirement,
-          GenericSignatureBuilder::RequirementSource::forRequirementSignature(
-                                                      builder, selfType, proto),
-          nullptr);
-
-  auto reqSignature = std::move(builder).computeGenericSignature(
-                        /*allowConcreteGenericParams=*/false,
-                        /*requirementSignatureSelfProto=*/proto);
-  return reqSignature.getRequirements();
 }
 
 Type
@@ -1137,6 +1183,14 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
   if (!rawTy) {
     return std::make_tuple<>();
   }
+  
+  // Avoid computing raw values for enum cases in swiftinterface files since raw
+  // values are intentionally omitted from them (unless the enum is @objc).
+  // Without bailing here, incorrect raw values can be automatically generated
+  // and incorrect diagnostics may be omitted for some decls.
+  SourceFile *Parent = ED->getDeclContext()->getParentSourceFile();
+  if (Parent && Parent->Kind == SourceFileKind::Interface && !ED->isObjC())
+    return std::make_tuple<>();
 
   if (!computeAutomaticEnumValueKind(ED)) {
     return std::make_tuple<>();
@@ -1640,7 +1694,7 @@ bool TypeChecker::isAvailabilitySafeForConformance(
   return requirementInfo.isContainedIn(witnessInfo);
 }
 
-// Returns 'nullptr' if this is the setter's 'newValue' parameter;
+// Returns 'nullptr' if this is the 'newValue' or 'oldValue' parameter;
 // otherwise, returns the corresponding parameter of the subscript
 // declaration.
 static ParamDecl *getOriginalParamFromAccessor(AbstractStorageDecl *storage,
@@ -1652,11 +1706,9 @@ static ParamDecl *getOriginalParamFromAccessor(AbstractStorageDecl *storage,
   switch (accessor->getAccessorKind()) {
   case AccessorKind::DidSet:
   case AccessorKind::WillSet:
-      return nullptr;
-
   case AccessorKind::Set:
     if (param == accessorParams->get(0)) {
-      // This is the 'newValue' parameter.
+      // This is the 'newValue' or 'oldValue' parameter.
       return nullptr;
     }
 
@@ -1896,7 +1948,7 @@ FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
       for (DeclContext *CurContext = FD->getLocalContext();
            !isa<SourceFile>(CurContext);
            CurContext = CurContext->getParent()) {
-        // Skip over non-decl contexts (e.g. closure expresssions)
+        // Skip over non-decl contexts (e.g. closure expressions)
         if (auto *D = CurContext->getAsDecl())
             insertionLoc = D->getStartLoc();
       }
@@ -1953,6 +2005,14 @@ bool swift::isMemberOperator(FuncDecl *decl, Type type) {
     }
 
     if (isProtocol) {
+      // FIXME: Source compatibility hack for Swift 5. The compiler
+      // accepts member operators on protocols with existential
+      // type arguments. We should consider banning this in Swift 6.
+      if (auto existential = paramType->getAs<ExistentialType>()) {
+        if (selfNominal == existential->getConstraintType()->getAnyNominal())
+          return true;
+      }
+
       // For a protocol, is it the 'Self' type parameter?
       if (auto genericParam = paramType->getAs<GenericTypeParamType>())
         if (genericParam->isEqual(DC->getSelfInterfaceType()))
@@ -2015,6 +2075,13 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     resultTyRepr = cast<SubscriptDecl>(decl)->getElementTypeRepr();
   }
 
+  if (!resultTyRepr && decl->getClangDecl() &&
+      isa<clang::FunctionDecl>(decl->getClangDecl())) {
+    auto clangFn = cast<clang::FunctionDecl>(decl->getClangDecl());
+    return ctx.getClangModuleLoader()->importFunctionReturnType(
+        clangFn, decl->getDeclContext());
+  }
+
   // Nothing to do if there's no result type.
   if (resultTyRepr == nullptr)
     return TupleType::getEmpty(ctx);
@@ -2030,8 +2097,9 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   const auto options =
       TypeResolutionOptions(TypeResolverContext::FunctionResult);
   auto *const dc = decl->getInnermostDeclContext();
-  return TypeResolution::forInterface(dc, options, /*unboundTyOpener*/ nullptr,
-                                      /*placeholderHandler*/ nullptr)
+  return TypeResolution::forInterface(dc, options,
+                                      /*unboundTyOpener*/ nullptr,
+                                      PlaceholderType::get)
       .resolveType(resultTyRepr);
 }
 
@@ -2076,15 +2144,9 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
   assert(typeRepr != nullptr && "Should call setSpecifier() on "
          "synthesized parameter declarations");
 
-  auto *nestedRepr = typeRepr;
-
   // Look through parens here; other than parens, specifiers
   // must appear at the top level of a parameter type.
-  while (auto *tupleRepr = dyn_cast<TupleTypeRepr>(nestedRepr)) {
-    if (!tupleRepr->isParenType())
-      break;
-    nestedRepr = tupleRepr->getElementType(0);
-  }
+  auto *nestedRepr = typeRepr->getWithoutParens();
 
   if (auto isolated = dyn_cast<IsolatedTypeRepr>(nestedRepr))
     nestedRepr = isolated->getBase();
@@ -2115,7 +2177,6 @@ static Type validateParameterType(ParamDecl *decl) {
 
   TypeResolutionOptions options(None);
   OpenUnboundGenericTypeFn unboundTyOpener = nullptr;
-  HandlePlaceholderTypeReprFn placeholderHandler = nullptr;
   if (isa<AbstractClosureExpr>(dc)) {
     options = TypeResolutionOptions(TypeResolverContext::ClosureExpr);
     options |= TypeResolutionFlags::AllowUnspecifiedTypes;
@@ -2126,9 +2187,6 @@ static Type validateParameterType(ParamDecl *decl) {
     };
     // FIXME: Don't let placeholder types escape type resolution.
     // For now, just return the placeholder type.
-    placeholderHandler = [](auto &ctx, auto *originator) {
-      return Type();
-    };
   } else if (isa<AbstractFunctionDecl>(dc)) {
     options = TypeResolutionOptions(TypeResolverContext::AbstractFunctionDecl);
   } else if (isa<SubscriptDecl>(dc)) {
@@ -2151,7 +2209,7 @@ static Type validateParameterType(ParamDecl *decl) {
 
   const auto resolution =
       TypeResolution::forInterface(dc, options, unboundTyOpener,
-                                   placeholderHandler);
+                                   PlaceholderType::get);
   auto Ty = resolution.resolveType(decl->getTypeRepr());
 
   if (Ty->hasError()) {
@@ -2160,7 +2218,14 @@ static Type validateParameterType(ParamDecl *decl) {
   }
 
   if (decl->isVariadic()) {
-    Ty = VariadicSequenceType::get(Ty);
+    // Handle the monovariadic/polyvariadic interface type split.
+    if (Ty->hasTypeSequence()) {
+      // Polyvariadic types (T...) for <T...> resolve to pack expansions.
+      Ty = PackExpansionType::get(Ty);
+    } else {
+      // Monovariadic types (T...) for <T> resolve to [T].
+      Ty = VariadicSequenceType::get(Ty);
+    }
     if (!ctx.getArrayDecl()) {
       ctx.Diags.diagnose(decl->getTypeRepr()->getLoc(),
                          diag::sugar_type_not_found, 0);
@@ -2425,7 +2490,8 @@ NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
     // and TypeCheckPattern handle the others. But that's all really gross.
     unsigned i = PBD->getPatternEntryIndexForVarDecl(VD);
     (void)evaluateOrDefault(evaluator,
-                            PatternBindingEntryRequest{PBD, i},
+                            PatternBindingEntryRequest{
+                                PBD, i, /*LeaveClosureBodiesUnchecked=*/false},
                             nullptr);
     if (PBD->isInvalid()) {
       VD->getParentPattern()->setType(ErrorType::get(Context));
@@ -2637,10 +2703,6 @@ static ArrayRef<Decl *> evaluateMembersRequest(
         (void) var->getPropertyWrapperAuxiliaryVariables();
         (void) var->getPropertyWrapperInitializerInfo();
       }
-
-      if (auto *func = dyn_cast<FuncDecl>(member)) {
-        (void) func->getDistributedActorRemoteFuncDecl();
-      }
     }
   }
 
@@ -2766,9 +2828,7 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
       },
       // FIXME: Don't let placeholder types escape type resolution.
       // For now, just return the placeholder type.
-      [](auto &ctx, auto *originator) {
-        return Type();
-      });
+      PlaceholderType::get);
 
   const auto extendedType = resolution.resolveType(extendedRepr);
 
@@ -2809,15 +2869,25 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   }
 
   // Cannot extend function types, tuple types, etc.
-  if (!extendedType->getAnyNominal()) {
+  if (!extendedType->getAnyNominal() &&
+      !extendedType->is<ParameterizedProtocolType>()) {
     diags.diagnose(ext->getLoc(), diag::non_nominal_extension, extendedType)
          .highlight(extendedRepr->getSourceRange());
     return error();
   }
 
-  // Cannot extend a bound generic type, unless it's referenced via a
-  // non-generic typealias type.
-  if (extendedType->isSpecialized() &&
+  // Cannot extend types who contain placeholders.
+  if (extendedType->hasPlaceholder()) {
+    diags.diagnose(ext->getLoc(), diag::extension_placeholder)
+      .highlight(extendedRepr->getSourceRange());
+    return error();
+  }
+
+  // By default, the user cannot extend a bound generic type, unless it's
+  // referenced via a non-generic typealias type.
+  if (!ext->getASTContext().LangOpts.hasFeature(
+          Feature::BoundGenericExtensions) &&
+      extendedType->isSpecialized() &&
       !isNonGenericTypeAliasType(extendedType)) {
     diags.diagnose(ext->getLoc(), diag::extension_specialization,
                    extendedType->getAnyNominal()->getName())

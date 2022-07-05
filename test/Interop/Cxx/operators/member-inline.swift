@@ -1,16 +1,14 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-cxx-interop)
-//
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
+
 // REQUIRES: executable_test
-//
-// We can't yet call member functions correctly on Windows (SR-13129).
-// XFAIL: OS=windows-msvc
 
 import MemberInline
 import StdlibUnittest
 
 var OperatorsTestSuite = TestSuite("Operators")
 
-OperatorsTestSuite.test("LoadableIntWrapper.plus (inline)") {
+#if !os(Windows)    // SR-13129
+OperatorsTestSuite.test("LoadableIntWrapper.minus (inline)") {
   var lhs = LoadableIntWrapper(value: 42)
   let rhs = LoadableIntWrapper(value: 23)
 
@@ -18,6 +16,16 @@ OperatorsTestSuite.test("LoadableIntWrapper.plus (inline)") {
 
   expectEqual(19, result.value)
 }
+
+OperatorsTestSuite.test("AddressOnlyIntWrapper.minus") {
+   let lhs = AddressOnlyIntWrapper(42)
+   let rhs = AddressOnlyIntWrapper(23)
+
+   let result = lhs - rhs
+
+   expectEqual(19, result.value)
+}
+#endif
 
 OperatorsTestSuite.test("LoadableIntWrapper.call (inline)") {
   var wrapper = LoadableIntWrapper(value: 42)
@@ -31,6 +39,28 @@ OperatorsTestSuite.test("LoadableIntWrapper.call (inline)") {
   expectEqual(57, resultTwoArgs)
 }
 
+OperatorsTestSuite.test("LoadableIntWrapper.successor() (inline)") {
+  var wrapper = LoadableIntWrapper(value: 42)
+
+  let result1 = wrapper.successor()
+  expectEqual(43, result1.value)
+  expectEqual(42, wrapper.value) // Calling `successor()` should not mutate `wrapper`.
+
+  let result2 = result1.successor()
+  expectEqual(44, result2.value)
+  expectEqual(43, result1.value)
+  expectEqual(42, wrapper.value)
+}
+
+#if !os(Windows)    // SR-13129
+OperatorsTestSuite.test("LoadableBoolWrapper.exclaim (inline)") {
+  var wrapper = LoadableBoolWrapper(value: true)
+
+  let resultExclaim = !wrapper
+  expectEqual(false, resultExclaim.value)
+}
+#endif
+
 OperatorsTestSuite.test("AddressOnlyIntWrapper.call (inline)") {
   var wrapper = AddressOnlyIntWrapper(42)
 
@@ -43,8 +73,71 @@ OperatorsTestSuite.test("AddressOnlyIntWrapper.call (inline)") {
   expectEqual(57, resultTwoArgs)
 }
 
+OperatorsTestSuite.test("AddressOnlyIntWrapper.successor() (inline)") {
+  var wrapper = AddressOnlyIntWrapper(0)
+
+  let result1 = wrapper.successor()
+  expectEqual(1, result1.value)
+  expectEqual(0, wrapper.value) // Calling `successor()` should not mutate `wrapper`.
+
+  let result2 = result1.successor()
+  expectEqual(2, result2.value)
+  expectEqual(1, result1.value)
+  expectEqual(0, wrapper.value)
+}
+
+OperatorsTestSuite.test("HasPreIncrementOperatorWithAnotherReturnType.successor() (inline)") {
+  var wrapper = HasPreIncrementOperatorWithAnotherReturnType()
+
+  let result1 = wrapper.successor()
+  expectEqual(1, result1.value)
+  expectEqual(0, wrapper.value) // Calling `successor()` should not mutate `wrapper`.
+
+  let result2 = result1.successor()
+  expectEqual(2, result2.value)
+  expectEqual(1, result1.value)
+  expectEqual(0, wrapper.value)
+}
+
+OperatorsTestSuite.test("HasPreIncrementOperatorWithVoidReturnType.successor() (inline)") {
+  var wrapper = HasPreIncrementOperatorWithVoidReturnType()
+
+  let result1 = wrapper.successor()
+  expectEqual(1, result1.value)
+  expectEqual(0, wrapper.value) // Calling `successor()` should not mutate `wrapper`.
+
+  let result2 = result1.successor()
+  expectEqual(2, result2.value)
+  expectEqual(1, result1.value)
+  expectEqual(0, wrapper.value)
+}
+
+OperatorsTestSuite.test("DerivedFromAddressOnlyIntWrapper.call (inline, base class)") {
+  var wrapper = DerivedFromAddressOnlyIntWrapper(42)
+
+  let resultNoArgs = wrapper()
+  let resultOneArg = wrapper(23)
+  let resultTwoArgs = wrapper(3, 5)
+
+  expectEqual(42, resultNoArgs)
+  expectEqual(65, resultOneArg)
+  expectEqual(57, resultTwoArgs)
+}
+
 OperatorsTestSuite.test("ReadWriteIntArray.subscript (inline)") {
   var arr = ReadWriteIntArray()
+
+  let resultBefore = arr[1]
+  expectEqual(2, resultBefore)
+
+  arr[1] = 234
+
+  let resultAfter = arr[1]
+  expectEqual(234, resultAfter)
+}
+
+OperatorsTestSuite.test("DerivedFromReadWriteIntArray.subscript (inline, base class)") {
+  var arr = DerivedFromReadWriteIntArray()
 
   let resultBefore = arr[1]
   expectEqual(2, resultBefore)
@@ -132,6 +225,7 @@ OperatorsTestSuite.test("DifferentTypesArrayByVal.subscript (inline)") {
   expectEqual(1.5.rounded(.up), resultDouble.rounded(.up))
 }
 
+#if !os(Windows)    // SR-13129
 OperatorsTestSuite.test("NonTrivialArrayByVal.subscript (inline)") {
   var arr = NonTrivialArrayByVal()
   let NonTrivialByVal = arr[0];
@@ -145,6 +239,21 @@ OperatorsTestSuite.test("NonTrivialArrayByVal.subscript (inline)") {
   expectEqual(5, NonTrivialByVal.e)
   expectEqual(6, NonTrivialByVal.f)
 }
+
+OperatorsTestSuite.test("DerivedFromNonTrivialArrayByVal.subscript (inline, base class)") {
+  var arr = DerivedFromNonTrivialArrayByVal()
+  let NonTrivialByVal = arr[0];
+  let cStr = NonTrivialByVal.Str!
+  expectEqual("Non-Trivial", String(cString: cStr))
+
+  expectEqual(1, NonTrivialByVal.a)
+  expectEqual(2, NonTrivialByVal.b)
+  expectEqual(3, NonTrivialByVal.c)
+  expectEqual(4, NonTrivialByVal.d)
+  expectEqual(5, NonTrivialByVal.e)
+  expectEqual(6, NonTrivialByVal.f)
+}
+#endif
 
 OperatorsTestSuite.test("PtrByVal.subscript (inline)") {
   var arr = PtrByVal()
@@ -183,6 +292,33 @@ OperatorsTestSuite.test("PtrToPtr.subscript (inline)") {
   expectEqual(64, arr[0]![0]![0])
   arr[0]![0] = ptr
   expectEqual(23, arr[0]![0]![0])
+}
+
+// TODO: this causes a crash (does it also crash on main?)
+//OperatorsTestSuite.test("TemplatedSubscriptArrayByVal.subscript (inline)") {
+//  let ptr: UnsafeMutablePointer<Int32> =
+//    UnsafeMutablePointer<Int32>.allocate(capacity: 64)
+//  ptr[0] = 23
+//  var arr = TemplatedSubscriptArrayByVal(ptr: ptr)
+//  expectEqual(23, arr[0])
+//}
+
+OperatorsTestSuite.test("Iterator.pointee") {
+  var iter = Iterator()
+  let res = iter.pointee
+  expectEqual(123, res)
+}
+
+OperatorsTestSuite.test("ConstIterator.pointee") {
+  let iter = ConstIterator()
+  let res = iter.pointee
+  expectEqual(234, res)
+}
+
+OperatorsTestSuite.test("ConstIteratorByVal.pointee") {
+  let iter = ConstIteratorByVal()
+  let res = iter.pointee
+  expectEqual(456, res)
 }
 
 runAllTests()

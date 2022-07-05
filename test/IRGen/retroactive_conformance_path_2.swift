@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir -g -primary-file %s -requirement-machine=verify
+// RUN: %target-swift-frontend -emit-ir -g -primary-file %s
 
 public struct TestType<T: Error> { }
 

@@ -30,7 +30,6 @@
 
 namespace swift {
 
-class GenericSignatureBuilder;
 class ProtocolConformanceRef;
 class ProtocolType;
 class SubstitutionMap;
@@ -84,7 +83,6 @@ private:
   ConformanceAccessPath(ArrayRef<Entry> path) : path(path) {}
 
   friend class GenericSignatureImpl;
-  friend class GenericSignatureBuilder;
   friend class rewriting::RequirementMachine;
 
 public:
@@ -114,13 +112,19 @@ class GenericSignature {
 
 public:
   /// Create a new generic signature with the given type parameters and
-  /// requirements.
+  /// requirements. The requirements must already be minimal and canonical;
+  /// to build a signature from an arbitrary set of requirements, use
+  /// swift::buildGenericSignature() instead.
   static GenericSignature get(ArrayRef<GenericTypeParamType *> params,
                               ArrayRef<Requirement> requirements,
                               bool isKnownCanonical = false);
   static GenericSignature get(TypeArrayView<GenericTypeParamType> params,
                               ArrayRef<Requirement> requirements,
                               bool isKnownCanonical = false);
+
+  /// Produce a new generic signature which drops all of the marker
+  /// protocol conformance requirements associated with this one.
+  GenericSignature withoutMarkerProtocols() const;
 
 public:
   static ASTContext &getASTContext(TypeArrayView<GenericTypeParamType> params,
@@ -200,6 +204,27 @@ public:
   /// (archetypes) that correspond to the interface types in this generic
   /// signature.
   GenericEnvironment *getGenericEnvironment() const;
+
+  /// Return the requirements of this generic signature that are not also
+  /// satisfied by \c otherSig.
+  ///
+  /// \param otherSig Another generic signature whose generic parameters are
+  /// equivalent to or a subset of the generic parameters in this signature.
+  SmallVector<Requirement, 4>
+  requirementsNotSatisfiedBy(GenericSignature otherSig) const;
+
+  /// Return the canonical version of the given type under this generic
+  /// signature.
+  CanType getCanonicalTypeInContext(Type type) const;
+
+  /// Check invariants.
+  void verify() const;
+
+  /// Check invariants for a list of requirements that are understood to
+  /// be valid in the given signature; used to verify a protocol's
+  /// requirement signature against the protocol generic signature
+  /// <Self where Self : P>.
+  void verify(ArrayRef<Requirement> reqts) const;
 };
 
 /// A reference to a canonical generic signature.
@@ -249,6 +274,8 @@ class alignas(1 << TypeAlignInBits) GenericSignatureImpl final
   const unsigned NumRequirements;
 
   GenericEnvironment *GenericEnv = nullptr;
+
+  rewriting::RequirementMachine *Machine = nullptr;
 
   // Make vanilla new/delete illegal.
   void *operator new(size_t Bytes) = delete;
@@ -313,9 +340,6 @@ public:
   
   ASTContext &getASTContext() const;
 
-  /// Retrieve the generic signature builder for the given generic signature.
-  GenericSignatureBuilder *getGenericSignatureBuilder() const;
-
   /// Retrieve the requirement machine for the given generic signature.
   rewriting::RequirementMachine *getRequirementMachine() const;
 
@@ -360,8 +384,6 @@ public:
   ///
   /// The type parameters must be known to not be concrete within the context.
   bool areSameTypeParameterInContext(Type type1, Type type2) const;
-  bool areSameTypeParameterInContext(Type type1, Type type2,
-                                     GenericSignatureBuilder &builder) const;
 
   /// Determine if \c sig can prove \c requirement, meaning that it can deduce
   /// T: Foo or T == U (etc.) with the information it knows. This includes
@@ -370,21 +392,11 @@ public:
   bool isRequirementSatisfied(
       Requirement requirement, bool allowMissing = false) const;
 
-  /// Return the requirements of this generic signature that are not also
-  /// satisfied by \c otherSig.
-  ///
-  /// \param otherSig Another generic signature whose generic parameters are
-  /// equivalent to or a subset of the generic parameters in this signature.
-  SmallVector<Requirement, 4> requirementsNotSatisfiedBy(
-                                  GenericSignature otherSig) const;
-
-  /// Return the canonical version of the given type under this generic
-  /// signature.
-  CanType getCanonicalTypeInContext(Type type) const;
-
   bool isCanonicalTypeInContext(Type type) const;
-  bool isCanonicalTypeInContext(Type type,
-                                GenericSignatureBuilder &builder) const;
+
+  /// Determine whether the given type parameter is defined under this generic
+  /// signature.
+  bool isValidTypeInContext(Type type) const;
 
   /// Retrieve the conformance access path used to extract the conformance of
   /// interface \c type to the given \c protocol.
@@ -421,6 +433,13 @@ public:
   /// Get the sugared form of a type by substituting any
   /// generic parameter types by their sugared form.
   Type getSugaredType(Type type) const;
+
+  /// Given a type parameter, compute the most specific supertype (upper bound)
+  /// that is not dependent on other type parameters.
+  ///
+  /// \note If the upper bound is a protocol or protocol composition,
+  /// will return an instance of \c ExistentialType.
+  Type getNonDependentUpperBounds(Type type) const;
 
   static void Profile(llvm::FoldingSetNodeID &ID,
                       TypeArrayView<GenericTypeParamType> genericParams,
@@ -459,6 +478,18 @@ private:
   /// (archetypes) that correspond to the interface types in this generic
   /// signature.
   GenericEnvironment *getGenericEnvironment() const;
+
+  /// Return the requirements of this generic signature that are not also
+  /// satisfied by \c otherSig.
+  ///
+  /// \param otherSig Another generic signature whose generic parameters are
+  /// equivalent to or a subset of the generic parameters in this signature.
+  SmallVector<Requirement, 4>
+  requirementsNotSatisfiedBy(GenericSignature otherSig) const;
+
+  /// Return the canonical version of the given type under this generic
+  /// signature.
+  CanType getCanonicalTypeInContext(Type type) const;
 };
 
 void simple_display(raw_ostream &out, GenericSignature sig);
@@ -476,6 +507,57 @@ int compareAssociatedTypes(AssociatedTypeDecl *assocType1,
                            AssociatedTypeDecl *assocType2);
 
 int compareDependentTypes(Type type1, Type type2);
+
+/// Verify the correctness of the given generic signature.
+///
+/// This routine will test that the given generic signature is both minimal
+/// and canonical, emitting errors if it is not.
+void validateGenericSignature(ASTContext &context,
+                              GenericSignature sig);
+
+/// Verify all of the generic signatures in the given module.
+void validateGenericSignaturesInModule(ModuleDecl *module);
+
+/// Build a generic signature from the given requirements, which are not
+/// required to be minimal or canonical, and may contain unresolved
+/// DependentMemberTypes.
+///
+/// If \p baseSignature is non-null, the new parameters and requirements
+/// are added on; existing requirements of the base signature might become
+/// redundant.
+///
+/// If \p baseSignature is null, build a new signature from scratch.
+GenericSignature buildGenericSignature(
+    ASTContext &ctx,
+    GenericSignature baseSignature,
+    SmallVector<GenericTypeParamType *, 2> addedParameters,
+    SmallVector<Requirement, 2> addedRequirements);
+
+/// Summary of error conditions detected by the Requirement Machine.
+enum class GenericSignatureErrorFlags {
+  /// The original requirements referenced a non-existent type parameter,
+  /// or the original requirements were in conflict with each other, meaning
+  /// there are no possible concrete substitutions which satisfy the
+  /// generic signature.
+  HasInvalidRequirements = (1<<0),
+
+  /// The generic signature had non-redundant concrete conformance
+  /// requirements, which means the rewrite system used for minimization
+  /// must be discarded and a new one built for queries.
+  HasConcreteConformances = (1<<1),
+
+  /// The Knuth-Bendix completion procedure failed to construct a confluent
+  /// rewrite system.
+  CompletionFailed = (1<<2)
+};
+
+using GenericSignatureErrors = OptionSet<GenericSignatureErrorFlags>;
+
+/// AbstractGenericSignatureRequest and InferredGenericSignatureRequest
+/// return this type, which stores a GenericSignature together with the
+/// above set of error flags.
+using GenericSignatureWithError = llvm::PointerIntPair<GenericSignature, 3,
+                                                       GenericSignatureErrors>;
 
 } // end namespace swift
 

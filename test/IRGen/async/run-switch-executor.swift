@@ -5,11 +5,10 @@
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 
 // FIXME: both of these should work, need to figure out why
 // UNSUPPORTED: CPU=arm64e
-// UNSUPPORTED: OS=windows-msvc
 
 // REQUIRES: rdar72893124
 

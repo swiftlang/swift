@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-ir -I %S/Inputs -enable-cxx-interop %s | %FileCheck %s
+// RUN: %target-swift-emit-ir -I %S/Inputs -enable-experimental-cxx-interop %s | %FileCheck %s
 
 import Reference
 
@@ -32,40 +32,32 @@ public func getConstCxxRvalueRef() -> UnsafePointer<CInt> {
 
 public func setCxxRef() {
   var val: CInt = 21
-  withUnsafeMutablePointer(to: &val) {
-    setStaticIntRef($0)
-  }
+  setStaticIntRef(&val)
 }
 
 // CHECK: define {{(protected |dllexport )?}}swiftcc void @"$s4main9setCxxRefyyF"()
-// CHECK: call void @{{_Z15setStaticIntRefRi|"\?setStaticIntRef@@YAXAEAH@Z"}}(i32* {{nonnull %val|%2}})
+// CHECK: call void @{{_Z15setStaticIntRefRi|"\?setStaticIntRef@@YAXAEAH@Z"}}(i32* %{{.*}})
 
 public func setCxxConstRef() {
-  var val: CInt = 21
-  withUnsafePointer(to: &val) {
-    setConstStaticIntRef($0)
-  }
+  let val: CInt = 21
+  setConstStaticIntRef(val)
 }
 
 // CHECK: define {{(protected |dllexport )?}}swiftcc void @"$s4main14setCxxConstRefyyF"()
-// CHECK: call void @{{_Z20setConstStaticIntRefRKi|"\?setConstStaticIntRef@@YAXAEBH@Z"}}(i32* {{nonnull %val|%2}})
+// CHECK: call void @{{_Z20setConstStaticIntRefRKi|"\?setConstStaticIntRef@@YAXAEBH@Z"}}(i32* %{{.*}})
 
 public func setCxxRvalueRef() {
   var val: CInt = 21
-  withUnsafeMutablePointer(to: &val) {
-    setStaticIntRvalueRef($0)
-  }
+  setStaticIntRvalueRef(&val)
 }
 
 // CHECK: define {{(protected |dllexport )?}}swiftcc void @"$s4main15setCxxRvalueRefyyF"()
-// CHECK: call void @{{_Z21setStaticIntRvalueRefOi|"\?setStaticIntRvalueRef@@YAX\$\$QEAH@Z"}}(i32* {{nonnull %val|%2}})
+// CHECK: call void @{{_Z21setStaticIntRvalueRefOi|"\?setStaticIntRvalueRef@@YAX\$\$QEAH@Z"}}(i32* %{{.*}})
 
 public func setCxxConstRvalueRef() {
-  var val: CInt = 21
-  withUnsafePointer(to: &val) {
-    setConstStaticIntRvalueRef($0)
-  }
+  let val: CInt = 21
+  setConstStaticIntRvalueRef(val)
 }
 
 // CHECK: define {{(protected |dllexport )?}}swiftcc void @"$s4main20setCxxConstRvalueRefyyF"()
-// CHECK: call void @{{_Z26setConstStaticIntRvalueRefOKi|"\?setConstStaticIntRvalueRef@@YAX\$\$QEBH@Z"}}(i32* {{nonnull %val|%2}})
+// CHECK: call void @{{_Z26setConstStaticIntRvalueRefOKi|"\?setConstStaticIntRvalueRef@@YAX\$\$QEBH@Z"}}(i32* %{{.*}})

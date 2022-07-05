@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5 -requirement-machine=verify
+// RUN: %target-typecheck-verify-swift -swift-version 5
 
 @override // expected-error {{'override' can only be specified on class members}} {{1-11=}} expected-error {{'override' is a declaration modifier, not an attribute}} {{1-2=}}
 func virtualAttributeCanNotBeUsedInSource() {}
@@ -391,7 +391,7 @@ class MismatchOptional : MismatchOptionalBase {
 
   override func functionParam(x: @escaping (Int) -> Int) {} // expected-error {{cannot override instance method parameter of type '((Int) -> Int)?' with non-optional type '(Int) -> Int'}} {{34-34=(}} {{56-56=)?}}
   override func tupleParam(x: (Int, Int)) {} // expected-error {{cannot override instance method parameter of type '(Int, Int)?' with non-optional type '(Int, Int)'}} {{41-41=?}}
-  override func compositionParam(x: P1 & P2) {} // expected-error {{cannot override instance method parameter of type '(P1 & P2)?' with non-optional type 'P1 & P2'}} {{37-37=(}} {{44-44=)?}}
+  override func compositionParam(x: P1 & P2) {} // expected-error {{cannot override instance method parameter of type '(any P1 & P2)?' with non-optional type 'any P1 & P2'}} {{37-37=(}} {{44-44=)?}}
 
   override func nameAndTypeMismatch(_: Int) {}
   // expected-error@-1 {{argument labels for method 'nameAndTypeMismatch' do not match those of overridden method 'nameAndTypeMismatch(label:)'}} {{37-37=label }}

@@ -78,7 +78,15 @@ enum class DestructorEffects {
 // Analyzing the body of this class destructor is valid because the object is
 // dead. This means that the object is never passed to objc_setAssociatedObject,
 // so its destructor cannot be extended at runtime.
-static SILFunction *getDestructor(AllocRefInst *ARI) {
+static SILFunction *getDestructor(AllocRefInstBase *ARI) {
+
+  // We can't know the destructor for an alloc_ref_dynamic instruction in
+  // general.
+  auto *dynamicAllocRef = dyn_cast<AllocRefDynamicInst>(ARI);
+  if (dynamicAllocRef &&
+      !dynamicAllocRef->isDynamicTypeDeinitAndSizeKnownEquivalentToBaseType())
+    return nullptr;
+
   // We only support classes.
   ClassDecl *ClsDecl = ARI->getType().getClassOrBoundGenericClass();
   if (!ClsDecl)
@@ -119,7 +127,7 @@ static bool isDestroyArray(SILInstruction *inst) {
 /// Analyze the destructor for the class of ARI to see if any instructions in it
 /// could have side effects on the program outside the destructor. If it does
 /// not, then we can eliminate the destructor.
-static DestructorEffects doesDestructorHaveSideEffects(AllocRefInst *ARI) {
+static DestructorEffects doesDestructorHaveSideEffects(AllocRefInstBase *ARI) {
   SILFunction *Fn = getDestructor(ARI);
   // If we can't find a constructor then assume it has side effects.
   if (!Fn)
@@ -287,7 +295,7 @@ static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts,
 /// \p allocRef, which are destroyed by the \p destroyArray builtin.
 static bool onlyStoresToTailObjects(BuiltinInst *destroyArray,
                                     const UserList &users,
-                                    AllocRefInst *allocRef) {
+                                    AllocRefInstBase *allocRef) {
   // Get the number of destroyed elements.
   auto *literal = dyn_cast<IntegerLiteralInst>(destroyArray->getArguments()[2]);
   if (!literal || literal->getValue().getMinSignedBits() > 32)
@@ -360,16 +368,6 @@ static bool onlyStoresToTailObjects(BuiltinInst *destroyArray,
   return true;
 }
 
-/// Inserts releases of all stores in \p users.
-static void insertCompensatingReleases(SILInstruction *before,
-                                       const UserList &users) {
-  for (SILInstruction *user : users) {
-    if (auto *store = dyn_cast<StoreInst>(user)) {
-      createDecrementBefore(store->getSrc(), before);
-    }
-  }
-}
-
 /// Analyze the use graph of AllocRef for any uses that would prevent us from
 /// zapping it completely.
 static bool
@@ -383,7 +381,7 @@ hasUnremovableUsers(SILInstruction *allocation, UserList *Users,
   SmallVector<RefElementAddrInst *, 8> refElementAddrs;
   bool deallocationMaybeInlined = false;
   BuiltinInst *destroyArray = nullptr;
-  AllocRefInst *allocRef = dyn_cast<AllocRefInst>(allocation);
+  auto *allocRef = dyn_cast<AllocRefInstBase>(allocation);
 
   while (!Worklist.empty()) {
     SILInstruction *I = Worklist.pop_back_val();
@@ -728,14 +726,18 @@ class DeadObjectElimination : public SILFunctionTransform {
   llvm::DenseMap<SILType, DestructorEffects> DestructorAnalysisCache;
 
   InstructionDeleter deleter;
+  DominanceInfo *domInfo = nullptr;
 
   void removeInstructions(ArrayRef<SILInstruction*> toRemove);
 
-  bool processAllocRef(AllocRefInst *ARI);
+  bool processAllocRef(AllocRefInstBase *ARI);
   bool processAllocStack(AllocStackInst *ASI);
   bool processKeyPath(KeyPathInst *KPI);
   bool processAllocBox(AllocBoxInst *ABI){ return false;}
   bool processAllocApply(ApplyInst *AI, DeadEndBlocks &DEBlocks);
+
+  bool insertCompensatingReleases(SILInstruction *before,
+                                  const UserList &users);
 
   bool getDeadInstsAfterInitializerRemoved(
     ApplyInst *AI, llvm::SmallVectorImpl<SILInstruction *> &ToDestroy);
@@ -751,7 +753,7 @@ class DeadObjectElimination : public SILFunctionTransform {
     for (auto &BB : Fn) {
 
       for (SILInstruction *inst : deleter.updatingRange(&BB)) {
-        if (auto *A = dyn_cast<AllocRefInst>(inst))
+        if (auto *A = dyn_cast<AllocRefInstBase>(inst))
           Changed |= processAllocRef(A);
         else if (auto *A = dyn_cast<AllocStackInst>(inst))
           Changed |= processAllocStack(A);
@@ -772,9 +774,12 @@ class DeadObjectElimination : public SILFunctionTransform {
     if (getFunction()->hasOwnership())
       return;
 
+    assert(!domInfo);
+
     if (processFunction(*getFunction())) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
     }
+    domInfo = nullptr;
   }
 
 };
@@ -789,7 +794,7 @@ DeadObjectElimination::removeInstructions(ArrayRef<SILInstruction*> toRemove) {
   }
 }
 
-bool DeadObjectElimination::processAllocRef(AllocRefInst *ARI) {
+bool DeadObjectElimination::processAllocRef(AllocRefInstBase *ARI) {
   // Ok, we have an alloc_ref. Check the cache to see if we have already
   // computed the destructor behavior for its SILType.
   DestructorEffects destructorEffects;
@@ -833,8 +838,11 @@ bool DeadObjectElimination::processAllocRef(AllocRefInst *ARI) {
       releaseOfTailElems = user;
     }
   }
-  if (releaseOfTailElems)
-    insertCompensatingReleases(releaseOfTailElems, UsersToRemove);
+  if (releaseOfTailElems) {
+    if (!insertCompensatingReleases(releaseOfTailElems, UsersToRemove)) {
+      return false;
+    }
+  }
 
   // Remove the AllocRef and all of its users.
   removeInstructions(
@@ -911,7 +919,7 @@ bool DeadObjectElimination::getDeadInstsAfterInitializerRemoved(
     return false;
   }
 
-  if (auto *ARI = dyn_cast<AllocRefInst>(Arg0)) {
+  if (auto *ARI = dyn_cast<AllocRefInstBase>(Arg0)) {
     if (all_of(ARI->getUses(), [&](Operand *Op) -> bool {
           if (Op->getUser() == AI)
             return true;
@@ -1043,6 +1051,33 @@ bool DeadObjectElimination::processAllocApply(ApplyInst *AI,
   ++DeadAllocApplyEliminated;
   return true;
 }
+
+/// Inserts releases of all stores in \p users.
+/// Returns false, if this is not possible.
+bool DeadObjectElimination::insertCompensatingReleases(SILInstruction *before,
+                                                       const UserList &users) {
+
+  // First check if all stored values dominate the release-point.
+  for (SILInstruction *user : users) {
+    if (auto *store = dyn_cast<StoreInst>(user)) {
+      if (!domInfo) {
+        domInfo = getAnalysis<DominanceAnalysis>()->get(before->getFunction());
+      }
+      SILBasicBlock *srcBlock = store->getSrc()->getParentBlock();
+      if (!domInfo->dominates(srcBlock, before->getParent()))
+        return false;
+    }
+  }
+
+  // Second, create the releases.
+  for (SILInstruction *user : users) {
+    if (auto *store = dyn_cast<StoreInst>(user)) {
+      createDecrementBefore(store->getSrc(), before);
+    }
+  }
+  return true;
+}
+
 
 //===----------------------------------------------------------------------===//
 //                              Top Level Driver

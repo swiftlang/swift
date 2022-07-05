@@ -4,22 +4,23 @@
 
 import TestsUtils
 
-public var RangeReplaceableCollectionPlusDefault = BenchmarkInfo(
-  name: "RangeReplaceableCollectionPlusDefault",
-  runFunction: run_RangeReplaceableCollectionPlusDefault,
-  tags: [.validation],
-  legacyFactor: 4
-)
+public let benchmarks =
+  BenchmarkInfo(
+    name: "RangeReplaceableCollectionPlusDefault",
+    runFunction: run_RangeReplaceableCollectionPlusDefault,
+    tags: [.validation],
+    legacyFactor: 4
+  )
 
 @inline(never)
-public func run_RangeReplaceableCollectionPlusDefault(_ N: Int) {
+public func run_RangeReplaceableCollectionPlusDefault(_ n: Int) {
   let stringsRef = [1, 2, 3]
   let strings = ["1", "2", "3"]
   let toInt = { (s: String) -> Int? in Int(s) }
   var a = [Int]()
   var b = [Int]()
 
-  for _ in 1...250*N {
+  for _ in 1...250*n {
     let a2: Array = mapSome(strings, toInt)
     let b2 = mapSome(strings, toInt)
     a = a2
@@ -30,7 +31,7 @@ public func run_RangeReplaceableCollectionPlusDefault(_ N: Int) {
     }
   }
 
-  CheckResults(compareRef(a, b, stringsRef))
+  check(compareRef(a, b, stringsRef))
 }
 
 func compareRef(_ a: [Int], _ b: [Int], _ ref: [Int]) -> Bool {

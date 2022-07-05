@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-structural-opaque-types -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -disable-availability-checking
 
 // Tests for experimental extensions to opaque return type support.
 
@@ -12,21 +12,17 @@ class C {}
 class D: P, Q { func paul() {}; func d() {} }
 
 
-// TODO: cases that we should support, but don't yet:
+func asUnwrappedOptionalBase() -> (some P)! { return 1 } // expected-warning{{using '!' is not allowed here; treating this as '?' instead}}
 //
-// WARNING: using '!' is not allowed here; treating this as '?' instead
-// func asUnwrappedOptionalBase() -> (some P)! { return 1 }
+// FIXME: We should be able to support this
+func asHOFRetRet() -> () -> some P { return { 1 } } // expected-error{{cannot convert value of type 'Int' to closure result type 'some P'}}
 //
-// ERROR: generic parameter 'τ_0_0' could not be inferred
-// func asHOFRetRet() -> () -> some P { return { 1 } }
-//
-// ERROR: function declares an opaque return type, but has no return statements in its body from which to infer an underlying type
-// func asHOFRetArg() -> (some P) -> () { return { (x: Int) -> () in } }
+func asHOFRetArg() -> (some P) -> () { return { (x: Int) -> () in } } // expected-error{{'some' cannot appear in parameter position in result type '(some P) -> ()'}}
 //
 // ERROR: 'some' types are only implemented for the declared type of properties and subscripts and the return type of functions
 // let x = { () -> some P in return 1 }
 
-func twoOpaqueTypes() -> (some P, some P) { return (1, 2) } // expected-error{{only one 'opaque' type is supported}}
+func twoOpaqueTypes() -> (some P, some P) { return (1, 2) }
 func asTupleElemBad() -> (P, some Q) { return (1, C()) } // expected-note{{opaque return type declared here}} expected-error{{requires that 'C' conform to 'Q'}}
 
 func asTupleElem() -> (P, some Q) { return (1, 2) }
@@ -70,7 +66,7 @@ func funcToAnyOpaqueCoercion() -> S1<some Any> {
 }
 
 // TODO: We should give better error messages here. The opaque types have
-// underlying types 'Int' and 'String', but the return statments have underlying
+// underlying types 'Int' and 'String', but the return statements have underlying
 // types '(Int, Int)' and '(String, Int)'.
 func structuralMismatchedReturnTypes(_ x: Bool, _ y: Int, _ z: String) -> (some P, Int) { // expected-error{{do not have matching underlying types}}
   if x {
@@ -84,4 +80,49 @@ func structuralMemberLookupBad() {
   var tup: (some P, Int) = (D(), 1)
   tup.0.paul();
   tup.0.d(); // expected-error{{value of type 'some P' has no member 'd'}}
+}
+
+// expected-error@+1 {{'some' cannot appear in parameter position in result type '(some P) -> Void'}}
+func opaqueParameter() -> (some P) -> Void {}
+
+// expected-error@+1 {{'some' cannot appear in parameter position in result type '((some P) -> Void) -> Void'}}
+func opaqueParameter() -> ((some P) -> Void) -> Void {}
+
+typealias Takes<T> = (T) -> Void
+
+// expected-error@+1 {{'some' cannot appear in parameter position in result type 'Takes<some P>' (aka '(some P) -> ()')}}
+func indirectOpaqueParameter() -> Takes<some P> {}
+
+struct X<T, U> { }
+
+struct StructuralMethods {
+  func f1() -> X<(some P)?, [some Q]> {
+    return X<Int?, [String]>()
+  }
+
+  func f2(cond: Bool) -> X<(some P)?, [some Q]> {
+    if cond {
+      return X<Int?, [String]>()
+    } else {
+      return X<Int?, [String]>()
+    }
+  }
+
+  // TODO: Diagnostics here should be more clear about which "some" is the
+  // problem.
+  func f3(cond: Bool) -> X<(some P)?, [some Q]> { // expected-error{{function declares an opaque return type 'some P', but the return statements in its body do not have matching underlying types}}
+    if cond {
+      return X<String?, [String]>() // expected-note{{return statement has underlying type 'String'}}
+    } else {
+      return X<Int?, [String]>() // expected-note{{return statement has underlying type 'Int'}}
+    }
+  }
+
+  func f4(cond: Bool) -> X<(some P)?, [some Q]> { // expected-error{{function declares an opaque return type 'some Q', but the return statements in its body do not have matching underlying types}}
+    if cond {
+      return X<Int?, [String]>() // expected-note{{return statement has underlying type 'String'}}
+    } else {
+      return X<Int?, [Int]>() // expected-note{{return statement has underlying type 'Int'}}
+    }
+  }
 }

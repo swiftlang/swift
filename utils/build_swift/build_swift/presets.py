@@ -12,14 +12,10 @@ Swift preset parsing and handling functionality.
 """
 
 
-from __future__ import absolute_import, unicode_literals
-
+import configparser
 import functools
 import io
 from collections import OrderedDict, namedtuple
-
-from six import StringIO
-from six.moves import configparser
 
 from . import class_utils
 
@@ -313,14 +309,9 @@ class PresetParser(object):
         """Reads and parses a string containing preset definintions.
         """
 
-        fp = StringIO(string)
+        fp = io.StringIO(string)
 
-        # ConfigParser changes drastically from Python 2 to 3
-        if hasattr(self._parser, 'read_file'):
-            self._parser.read_file(fp)
-        else:
-            self._parser.readfp(fp)
-
+        self._parser.read_file(fp)
         self._parse_raw_presets()
 
     # -------------------------------------------------------------------------
@@ -361,11 +352,23 @@ class PresetParser(object):
     def _interpolate_preset_vars(self, preset, vars):
         interpolated_options = []
         for (name, value) in preset.options:
-            try:
-                value = _interpolate_string(value, vars)
-            except KeyError as e:
-                raise InterpolationError(
-                    preset.name, name, value, e.args[0])
+            # If the option is a key-value pair, e.g. 
+            # install-destdir=%(install_dir)s
+            # interpolate the value. If it is a raw option, e.g. 
+            # %(some_flag)s
+            # is a raw option without a value, expand the name.
+            if value:
+                try:
+                    value = _interpolate_string(value, vars)
+                except KeyError as e:
+                    raise InterpolationError(
+                        preset.name, name, value, e.args[0])
+            else:
+                try:
+                    name = _interpolate_string(name, vars)
+                except KeyError as e:
+                    raise InterpolationError(
+                        preset.name, name, name, e.args[0])
 
             interpolated_options.append((name, value))
 

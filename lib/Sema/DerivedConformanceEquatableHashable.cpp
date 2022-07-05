@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "CodeSynthesis.h"
 #include "TypeChecker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Stmt.h"
@@ -45,9 +46,16 @@ static bool canDeriveConformance(DeclContext *DC,
   if (auto structDecl = dyn_cast<StructDecl>(target)) {
     // All stored properties of the struct must conform to the protocol. If
     // there are no stored properties, we will vaccously return true.
-    return DerivedConformance::storedPropertiesNotConformingToProtocol(
-               DC, structDecl, protocol)
-        .empty();
+    if (!DerivedConformance::storedPropertiesNotConformingToProtocol(
+               DC, structDecl, protocol).empty())
+      return false;
+
+    // If the struct is actor-isolated, we cannot derive Equatable/Hashable
+    // conformance if any of the stored properties are mutable.
+    if (memberwiseAccessorsRequireActorIsolation(structDecl))
+      return false;
+
+    return true;
   }
 
   return false;
@@ -75,10 +83,8 @@ deriveBodyEquatable_enum_uninhabited_eq(AbstractFunctionDecl *eqDecl, void *) {
                                   AccessSemantics::Ordinary,
                                   bParam->getType());
   TupleTypeElt abTupleElts[2] = { aParam->getType(), bParam->getType() };
-  auto abExpr = TupleExpr::create(C, SourceLoc(), {aRef, bRef}, {}, {},
-                                  SourceLoc(), /*HasTrailingClosure*/ false,
-                                  /*implicit*/ true,
-                                  TupleType::get(abTupleElts, C));
+  auto abExpr = TupleExpr::createImplicit(C, {aRef, bRef}, /*labels*/ {});
+  abExpr->setType(TupleType::get(abTupleElts, C));
   auto switchStmt =
       SwitchStmt::createImplicit(LabeledStmtInfo(), abExpr, cases, C);
   statements.push_back(switchStmt);
@@ -267,9 +273,7 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
   // switch (a, b) { <case statements> }
   auto aRef = new (C) DeclRefExpr(aParam, DeclNameLoc(), /*implicit*/true);
   auto bRef = new (C) DeclRefExpr(bParam, DeclNameLoc(), /*implicit*/true);
-  auto abExpr = TupleExpr::create(C, SourceLoc(), { aRef, bRef }, {}, {},
-                                  SourceLoc(), /*HasTrailingClosure*/ false,
-                                  /*implicit*/ true);
+  auto abExpr = TupleExpr::createImplicit(C, {aRef, bRef}, /*labels*/ {});
   auto switchStmt =
       SwitchStmt::createImplicit(LabeledStmtInfo(), abExpr, cases, C);
   statements.push_back(switchStmt);
@@ -430,6 +434,8 @@ deriveEquatable_eq(
     return nullptr;
   }
 
+  addNonIsolatedToSynthesized(derived.Nominal, eqDecl);
+
   eqDecl->setBodySynthesizer(bodySynthesizer);
 
   eqDecl->copyFormalAccessFrom(derived.Nominal, /*sourceIsParentContext*/ true);
@@ -498,7 +504,8 @@ static CallExpr *createHasherCombineCall(ASTContext &C,
       C, hasherExpr, C.Id_combine, {Identifier()});
   
   // hasher.combine(hashable)
-  return CallExpr::createImplicit(C, combineCall, {hashable}, {Identifier()});
+  auto *argList = ArgumentList::forImplicitUnlabeled(C, {hashable});
+  return CallExpr::createImplicit(C, combineCall, argList);
 }
 
 static FuncDecl *
@@ -547,7 +554,7 @@ deriveHashable_hashInto(
       /*Throws=*/false,
       /*GenericParams=*/nullptr, params, returnType, parentDC);
   hashDecl->setBodySynthesizer(bodySynthesizer);
-
+  addNonIsolatedToSynthesized(derived.Nominal, hashDecl);
   hashDecl->copyFormalAccessFrom(derived.Nominal,
                                  /*sourceIsParentContext=*/true);
 
@@ -840,8 +847,8 @@ deriveBodyHashable_hashValue(AbstractFunctionDecl *hashValueDecl, void *) {
                                       hashFuncType);
   Type hashFuncResultType =
       hashFuncType->castTo<AnyFunctionType>()->getResult();
-  auto callExpr = CallExpr::createImplicit(C, hashExpr,
-                                           { selfRef }, { C.Id_for });
+  auto *argList = ArgumentList::forImplicitSingle(C, C.Id_for, selfRef);
+  auto *callExpr = CallExpr::createImplicit(C, hashExpr, argList);
   callExpr->setType(hashFuncResultType);
   callExpr->setThrows(false);
 
@@ -884,6 +891,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
                     SourceLoc(), C.Id_hashValue, parentDC);
   hashValueDecl->setInterfaceType(intType);
   hashValueDecl->setSynthesized();
+  addNonIsolatedToSynthesized(derived.Nominal, hashValueDecl);
 
   ParameterList *params = ParameterList::createEmpty(C);
 
@@ -899,7 +907,6 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   getterDecl->setBodySynthesizer(&deriveBodyHashable_hashValue);
   getterDecl->setSynthesized();
   getterDecl->setIsTransparent(false);
-
   getterDecl->copyFormalAccessFrom(derived.Nominal,
                                    /*sourceIsParentContext*/ true);
 
@@ -1014,7 +1021,7 @@ ValueDecl *DerivedConformance::deriveHashable(ValueDecl *requirement) {
         // Hashable because DerivedConformance::canDeriveHashable returns true
         // even if the conformance can't be derived. See the note there for
         // details.
-        auto *dc = ConformanceDecl->getDeclContext();
+        auto *dc = cast<DeclContext>(ConformanceDecl);
         tryDiagnoseFailedHashableDerivation(dc, Nominal);
         return nullptr;
       }

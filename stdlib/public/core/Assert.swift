@@ -100,19 +100,15 @@ public func precondition(
 
 /// Indicates that an internal sanity check failed.
 ///
-/// Use this function to stop the program, without impacting the performance of
-/// shipping code, when control flow is not expected to reach the call---for
-/// example, in the `default` case of a `switch` where you have knowledge that
-/// one of the other cases must be satisfied. To protect code from invalid
-/// usage in Release builds, see `preconditionFailure(_:file:line:)`.
+/// This function's effect varies depending on the build flag used:
 ///
-/// * In playgrounds and -Onone builds (the default for Xcode's Debug
+/// * In playgrounds and `-Onone` builds (the default for Xcode's Debug
 ///   configuration), stop program execution in a debuggable state after
 ///   printing `message`.
 ///
-/// * In -O builds, has no effect.
+/// * In `-O` builds, has no effect.
 ///
-/// * In -Ounchecked builds, the optimizer may assume that this function is
+/// * In `-Ounchecked` builds, the optimizer may assume that this function is
 ///   never called. Failure to satisfy that assumption is a serious
 ///   programming error.
 ///
@@ -141,8 +137,11 @@ public func assertionFailure(
 /// Indicates that a precondition was violated.
 ///
 /// Use this function to stop the program when control flow can only reach the
-/// call if your API was improperly used. This function's effects vary
-/// depending on the build flag used:
+/// call if your API was improperly used and execution flow is not expected to
+/// reach the call---for example, in the `default` case of a `switch` where
+/// you have knowledge that one of the other cases must be satisfied.
+///
+/// This function's effect varies depending on the build flag used:
 ///
 /// * In playgrounds and `-Onone` builds (the default for Xcode's Debug
 ///   configuration), stops program execution in a debuggable state after
@@ -261,6 +260,9 @@ internal func _debugPrecondition(
   _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
+#if SWIFT_STDLIB_ENABLE_DEBUG_PRECONDITIONS_IN_RELEASE
+  _precondition(condition(), message, file: file, line: line)
+#else
   // Only check in debug mode.
   if _slowPath(_isDebugAssertConfiguration()) {
     if !_fastPath(condition()) {
@@ -268,6 +270,7 @@ internal func _debugPrecondition(
         flags: _fatalErrorFlags())
     }
   }
+#endif
 }
 
 @usableFromInline @_transparent
@@ -275,10 +278,14 @@ internal func _debugPreconditionFailure(
   _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) -> Never {
+#if SWIFT_STDLIB_ENABLE_DEBUG_PRECONDITIONS_IN_RELEASE
+  _preconditionFailure(message, file: file, line: line)
+#else
   if _slowPath(_isDebugAssertConfiguration()) {
     _precondition(false, message, file: file, line: line)
   }
   _conditionallyUnreachable()
+#endif
 }
 
 /// Internal checks.
@@ -311,10 +318,45 @@ internal func _internalInvariant_5_1(
   // FIXME: The below won't run the assert on 5.1 stdlib if testing on older
   // OSes, which means that testing may not test the assertion. We need a real
   // solution to this.
-  guard #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) else { return }
+  guard #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) //SwiftStdlib 5.1
+  else { return }
   _internalInvariant(condition(), message, file: file, line: line)
 #endif
 }
+
+/// Library precondition checks with a linked-on-or-after check, allowing the
+/// addition of new preconditions while maintaining compatibility with older
+/// binaries.
+///
+/// This version of `_precondition` only traps if the condition returns false
+/// **and** the current executable was built with a Swift Standard Library
+/// version equal to or greater than the supplied version.
+@_transparent
+internal func _precondition(
+  ifLinkedOnOrAfter version: _SwiftStdlibVersion,
+  _ condition: @autoclosure () -> Bool,
+  _ message: StaticString = StaticString(),
+  file: StaticString = #file, line: UInt = #line
+) {
+  // Delay the linked-on-or-after check until after we know we have a failed
+  // condition, so that we don't slow down the usual case too much.
+
+  // Note: this is an internal function, so `_isDebugAssertConfiguration` is
+  // expected to evaluate (at compile time) to true in production builds of the
+  // stdlib. The other branches are kept in case the stdlib is built with an
+  // unusual configuration.
+  if _isDebugAssertConfiguration() {
+    if _slowPath(!condition()) {
+      guard _isExecutableLinkedOnOrAfter(version) else { return }
+      _assertionFailure("Fatal error", message, file: file, line: line,
+        flags: _fatalErrorFlags())
+    }
+  } else if _isReleaseAssertConfiguration() {
+    let error = (!condition() && _isExecutableLinkedOnOrAfter(version))
+    Builtin.condfail_message(error._value, message.unsafeRawPointer)
+  }
+}
+
 
 @usableFromInline @_transparent
 internal func _internalInvariantFailure(

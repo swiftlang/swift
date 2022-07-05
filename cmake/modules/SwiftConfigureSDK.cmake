@@ -63,16 +63,7 @@ function(_report_sdk prefix)
   if(NOT prefix IN_LIST SWIFT_DARWIN_PLATFORMS)
     foreach(arch ${SWIFT_SDK_${prefix}_ARCHITECTURES})
       message(STATUS "  ${arch} libc header path: ${SWIFT_SDK_${prefix}_ARCH_${arch}_LIBC_INCLUDE_DIRECTORY}")
-      message(STATUS "  ${arch} libc architecture specific header path: ${SWIFT_SDK_${prefix}_ARCH_${arch}_LIBC_ARCHITECTURE_INCLUDE_DIRECTORY}")
     endforeach()
-    if(SWIFT_BUILD_STDLIB)
-      foreach(arch ${SWIFT_SDK_${prefix}_ARCHITECTURES})
-        message(STATUS "  ${arch} ICU i18n INCLUDE: ${SWIFT_${prefix}_${arch}_ICU_I18N_INCLUDE}")
-        message(STATUS "  ${arch} ICU i18n LIB: ${SWIFT_${prefix}_${arch}_ICU_I18N}")
-        message(STATUS "  ${arch} ICU unicode INCLUDE: ${SWIFT_${prefix}_${arch}_ICU_UC_INCLUDE}")
-        message(STATUS "  ${arch} ICU unicode LIB: ${SWIFT_${prefix}_${arch}_ICU_UC}")
-      endforeach()
-    endif()
   endif()
 
   message(STATUS "")
@@ -99,7 +90,7 @@ function(remove_sdk_unsupported_archs name os sdk_path architectures_var)
       message(STATUS "Assuming ${name} SDK at ${sdk_path} supports architecture ${arch}")
       list(APPEND architectures ${arch})
     elseif(arch STREQUAL "i386" AND os STREQUAL "iphonesimulator")
-      # 32-bit iOS simulatoris not listed explicitly in SDK settings.
+      # 32-bit iOS simulator is not listed explicitly in SDK settings.
       message(STATUS "Assuming ${name} SDK at ${sdk_path} supports architecture ${arch}")
       list(APPEND architectures ${arch})
     else()
@@ -291,12 +282,26 @@ macro(configure_sdk_unix name architectures)
   endif()
   set(SWIFT_SDK_${prefix}_USE_ISYSROOT FALSE)
 
+  # GCC on Linux is usually located under `/usr`.
+  # However, Ubuntu 20.04 ships with another GCC installation under `/`, which
+  # does not include libstdc++. Swift build scripts pass `--sysroot=/` to
+  # Clang. By default, Clang tries to find GCC installation under sysroot, and
+  # if it doesn't exist, under `{sysroot}/usr`. On Ubuntu 20.04 and newer, it
+  # attempts to use the GCC without the C++ stdlib, which causes a build
+  # failure. To fix that, we tell Clang explicitly to use GCC from `/usr`.
+  # FIXME: This is a compromise. The value might depend on the architecture
+  # but add_swift_target_library does not allow passing different values
+  # depending on the architecture, so having a single value is the only
+  # possibility right now.
+  set(SWIFT_SDK_${prefix}_CXX_OVERLAY_SWIFT_COMPILE_FLAGS
+      -Xcc --gcc-toolchain=/usr
+    CACHE STRING "Extra flags for compiling the C++ overlay")
+
   foreach(arch ${architectures})
     if("${prefix}" STREQUAL "ANDROID")
       swift_android_sysroot(android_sysroot)
       set(SWIFT_SDK_ANDROID_ARCH_${arch}_PATH "${android_sysroot}")
       set(SWIFT_SDK_ANDROID_ARCH_${arch}_LIBC_INCLUDE_DIRECTORY "${android_sysroot}/usr/include" CACHE STRING "Path to C library headers")
-      set(SWIFT_SDK_ANDROID_ARCH_${arch}_LIBC_ARCHITECTURE_INCLUDE_DIRECTORY "${android_sysroot}/usr/include" CACHE STRING "Path to C library architecture headers")
 
       if("${arch}" STREQUAL "armv7")
         set(SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_TRIPLE "arm-linux-androideabi")
@@ -328,16 +333,16 @@ macro(configure_sdk_unix name architectures)
 
       if("${prefix}" STREQUAL "HAIKU")
         set(SWIFT_SDK_HAIKU_ARCH_${arch}_LIBC_INCLUDE_DIRECTORY "/system/develop/headers/posix" CACHE STRING "Path to C library headers")
-        set(SWIFT_SDK_HAIKU_ARCH_${arch}_LIBC_ARCHITECTURE_INCLUDE_DIRECTORY "/system/develop/headers" CACHE STRING "Path to C library architecture headers")
       else()
         set(SWIFT_SDK_${prefix}_ARCH_${arch}_LIBC_INCLUDE_DIRECTORY "/usr/include" CACHE STRING "Path to C library headers")
-        set(SWIFT_SDK_${prefix}_ARCH_${arch}_LIBC_ARCHITECTURE_INCLUDE_DIRECTORY "${SWIFT_SDK_${prefix}_ARCH_${arch}_LIBC_INCLUDE_DIRECTORY}/${CMAKE_LIBRARY_ARCHITECTURE}" CACHE STRING "Path to C library architecture headers")
       endif()
 
       if("${prefix}" STREQUAL "LINUX")
-        if(arch MATCHES "(armv6|armv7)")
+        if(arch MATCHES "(armv5)")
+          set(SWIFT_SDK_LINUX_ARCH_${arch}_TRIPLE "${arch}-unknown-linux-gnueabi")
+        elseif(arch MATCHES "(armv6|armv7)")
           set(SWIFT_SDK_LINUX_ARCH_${arch}_TRIPLE "${arch}-unknown-linux-gnueabihf")
-        elseif(arch MATCHES "(aarch64|i686|powerpc64|powerpc64le|s390x|x86_64)")
+        elseif(arch MATCHES "(aarch64|i686|powerpc|powerpc64|powerpc64le|s390x|x86_64)")
           set(SWIFT_SDK_LINUX_ARCH_${arch}_TRIPLE "${arch}-unknown-linux-gnu")
         else()
           message(FATAL_ERROR "unknown arch for ${prefix}: ${arch}")
@@ -378,10 +383,9 @@ macro(configure_sdk_unix name architectures)
         if(NOT arch STREQUAL wasm32)
           message(FATAL_ERROR "unsupported arch for WebAssembly: ${arch}")
         endif()
-        set(SWIFT_SDK_WASI_ARCH_wasm32_PATH "${SWIFT_WASI_SDK_PATH}/share/wasi-sysroot")
+        set(SWIFT_SDK_WASI_ARCH_wasm32_PATH "${SWIFT_WASI_SYSROOT_PATH}")
         set(SWIFT_SDK_WASI_ARCH_wasm32_TRIPLE "wasm32-unknown-wasi")
-        set(SWIFT_SDK_WASI_ARCH_wasm32_LIBC_INCLUDE_DIRECTORY "${SWIFT_WASI_SDK_PATH}/share/wasi-sysroot/include")
-        set(SWIFT_SDK_WASI_ARCH_wasm32_LIBC_ARCHITECTURE_INCLUDE_DIRECTORY "${SWIFT_WASI_SDK_PATH}/share/wasi-sysroot/include")
+        set(SWIFT_SDK_WASI_ARCH_wasm32_LIBC_INCLUDE_DIRECTORY "${SWIFT_WASI_SYSROOT_PATH}/include")
       else()
         message(FATAL_ERROR "unknown Unix OS: ${prefix}")
       endif()

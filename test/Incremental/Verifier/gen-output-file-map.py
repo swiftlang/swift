@@ -1,19 +1,10 @@
-#!/usr/bin/env python
-
-from __future__ import print_function
+#!/usr/bin/env python3
 
 import argparse
 import io
 import json
 import os
 import sys
-
-
-# Python 2 `unicode` was renamed `str` in Python 3.  To consistently support
-# both, define `unicode` to be `str` when using Python 3.  Once we can drop
-# Python 2 support, delete this and change all uses of `unicode` to `str`.
-if sys.version_info[0] >= 3:
-    unicode = str
 
 
 def fatal(msg):
@@ -70,13 +61,13 @@ def main(arguments):
     }
 
     with io.open(output_path, 'w', encoding='utf-8', newline='\n') as f:
-        f.write(unicode(json.dumps(all_records, ensure_ascii=False)))
+        f.write(str(json.dumps(all_records, ensure_ascii=False)))
 
     if args.response_output_file is not None:
         with io.open(args.response_output_file, 'w',
                      encoding='utf-8', newline='\n') as f:
             for line in response_file_contents:
-                f.write(unicode(line + " "))
+                f.write(str(line + " "))
 
 
 if __name__ == '__main__':

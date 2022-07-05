@@ -21,6 +21,8 @@
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/HeapObject.h"
 
+#include <new>
+
 using namespace swift;
 using namespace swift::hashable_support;
 
@@ -103,7 +105,7 @@ findHashableBaseTypeImpl(const Metadata *type) {
   HashableConformances.getOrInsert(key, [&](HashableConformanceEntry *entry,
                                             bool created) {
     if (created)
-      new (entry) HashableConformanceEntry(key, baseTypeThatConformsToHashable);
+      ::new (entry) HashableConformanceEntry(key, baseTypeThatConformsToHashable);
     return true; // Keep the new entry.
   });
   return baseTypeThatConformsToHashable;
@@ -153,7 +155,8 @@ void _swift_makeAnyHashableUpcastingToHashableBaseType(
   switch (type->getKind()) {
   case MetadataKind::Class:
   case MetadataKind::ObjCClassWrapper:
-  case MetadataKind::ForeignClass: {
+  case MetadataKind::ForeignClass:
+  case MetadataKind::ForeignReferenceType: {
 #if SWIFT_OBJC_INTEROP
     id srcObject;
     memcpy(&srcObject, value, sizeof(id));

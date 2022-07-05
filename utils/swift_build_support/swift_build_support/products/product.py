@@ -65,7 +65,7 @@ class Product(object):
     def is_before_build_script_impl_product(cls):
         """is_before_build_script_impl_product -> bool
 
-        Whether this product is build before any build-script-impl products.
+        Whether this product is built before any build-script-impl products.
         Such products must be non-build_script_impl products.
         Because such products are built ahead of the compiler, they are
         built using the host toolchain.
@@ -195,17 +195,22 @@ class Product(object):
         """toolchain_path() -> string
 
         Returns the path to the toolchain that is being created as part of this
-        build, or to a native prebuilt toolchain that was passed in.
+        build
         """
-        if self.args.native_swift_tools_path is not None:
-            return os.path.split(self.args.native_swift_tools_path)[0]
-
         install_destdir = self.args.install_destdir
         if self.args.cross_compile_hosts:
-            build_root = os.path.dirname(self.build_dir)
-            install_destdir = '%s/intermediate-install/%s' % (build_root, host_target)
+            if self.is_darwin_host(host_target):
+                install_destdir = self.host_install_destdir(host_target)
+            else:
+                install_destdir = os.path.join(install_destdir, self.args.host_target)
         return targets.toolchain_path(install_destdir,
                                       self.args.install_prefix)
+
+    def native_toolchain_path(self, host_target):
+        if self.args.native_swift_tools_path is not None:
+            return os.path.split(self.args.native_swift_tools_path)[0]
+        else:
+            return self.install_toolchain_path(host_target)
 
     def is_darwin_host(self, host_target):
         return host_target.startswith("macosx") or \
@@ -224,9 +229,11 @@ class Product(object):
                 # If this is one of the hosts we should lipo,
                 # install in to a temporary subdirectory.
                 return '%s/intermediate-install/%s' % \
-                    (self.args.install_destdir, host_target)
-            elif host_target == "merged-hosts":
-                # This assumes that all hosts are merged to the lipo.
+                    (os.path.dirname(self.build_dir), host_target)
+            elif host_target == "merged-hosts" or \
+                    not self.args.cross_compile_append_host_target_to_destdir:
+                # This assumes that all hosts are merged to the lipo, or the build
+                # was told not to append anything.
                 return self.args.install_destdir
             else:
                 return '%s/%s' % (self.args.install_destdir, host_target)
@@ -236,6 +243,9 @@ class Product(object):
     def is_cross_compile_target(self, host_target):
         return self.args.cross_compile_hosts and \
             host_target in self.args.cross_compile_hosts
+
+    def has_cross_compile_hosts(self):
+        return self.args.cross_compile_hosts
 
     def generate_darwin_toolchain_file(self, platform, arch):
         shell.makedirs(self.build_dir)

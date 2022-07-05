@@ -26,7 +26,7 @@ bb3(%13 : $Optional<SelfCasts>):
   return %13 : $Optional<SelfCasts>
 }
 
-// CHECK-LABEL: sil @$dynamic_self_cast_2 : $@convention(method) (@guaranteed SelfCasts, @thick SelfCasts.Type) -> @owned Optional<SelfCasts>
+// CHECK-LABEL: sil {{.*}}@$dynamic_self_cast_2 : $@convention(method) (@guaranteed SelfCasts, @thick SelfCasts.Type) -> @owned Optional<SelfCasts>
 sil @$dynamic_self_cast_2 : $@convention(method) (@guaranteed SelfCasts, @thick SelfCasts.Type) -> @owned Optional<SelfCasts> {
 bb0(%0 : $SelfCasts, %1 : $@thick SelfCasts.Type):
   strong_retain %0 : $SelfCasts

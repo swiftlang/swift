@@ -13,6 +13,7 @@
 #include "swift/IDE/CodeCompletionResultPrinter.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/StringExtras.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/Markup/XMLUtils.h"
 #include "llvm/Support/raw_ostream.h"
@@ -21,6 +22,14 @@ using namespace swift;
 using namespace swift::ide;
 
 using ChunkKind = CodeCompletionString::Chunk::ChunkKind;
+using ChunkIter = ArrayRef<CodeCompletionString::Chunk>::iterator;
+
+/// Advance \p i to just the past the group \i currently points.
+void skipToEndOfCurrentNestedGroup(ChunkIter &i, const ChunkIter e) {
+  auto level = i->getNestingLevel();
+  assert(i != e);
+  do { ++i; } while (i != e && !i->endsPreviousNestedGroup(level));
+}
 
 void swift::ide::printCodeCompletionResultDescription(
     const CodeCompletionResult &result,
@@ -33,7 +42,8 @@ void swift::ide::printCodeCompletionResultDescription(
   int TextSize = 0;
   if (FirstTextChunk.hasValue()) {
     auto Chunks = str->getChunks().slice(*FirstTextChunk);
-    for (auto I = Chunks.begin(), E = Chunks.end(); I != E; ++I) {
+    auto I = Chunks.begin(), E = Chunks.end();
+    while (I != E) {
       const auto &C = *I;
 
       using ChunkKind = CodeCompletionString::Chunk::ChunkKind;
@@ -41,23 +51,41 @@ void swift::ide::printCodeCompletionResultDescription(
       if (C.is(ChunkKind::TypeAnnotation) ||
           C.is(ChunkKind::CallArgumentClosureType) ||
           C.is(ChunkKind::CallArgumentClosureExpr) ||
-          C.is(ChunkKind::Whitespace))
-        continue;
-
-      // Skip TypeAnnotation group.
-      if (C.is(ChunkKind::TypeAnnotationBegin)) {
-        auto level = I->getNestingLevel();
-        do { ++I; } while (I != E && !I->endsPreviousNestedGroup(level));
-        --I;
+          C.is(ChunkKind::DeclIntroducer) ||
+          C.is(ChunkKind::Whitespace)) {
+        ++I;
         continue;
       }
 
-      if (isOperator && C.is(ChunkKind::CallArgumentType))
+      // Skip the attribute/modifier list.
+      if (I->is(ChunkKind::AttributeAndModifierListBegin)) {
+        skipToEndOfCurrentNestedGroup(I, E);
         continue;
+      }
+
+      // Skip the declaration introducer and the following ' '.
+      if (I->is(ChunkKind::DeclIntroducer)) {
+        ++I;
+        continue;
+      }
+      if (I->is(ChunkKind::Text) && I->getText() == " " &&
+          I != Chunks.begin() && (I-1)->is(ChunkKind::DeclIntroducer)) {
+        ++I;
+        continue;
+      }
+
+      // Skip TypeAnnotation group.
+      if (C.is(ChunkKind::TypeAnnotationBegin)) {
+        skipToEndOfCurrentNestedGroup(I, E);
+        continue;
+      }
+
+      if (isOperator && C.is(ChunkKind::CallArgumentType)) {
+        ++I;
+        continue;
+      }
       if (isOperator && C.is(ChunkKind::CallArgumentTypeBegin)) {
-        auto level = I->getNestingLevel();
-        do { ++I; } while (I != E && !I->endsPreviousNestedGroup(level));
-        --I;
+        skipToEndOfCurrentNestedGroup(I, E);
         continue;
       }
       
@@ -65,6 +93,7 @@ void swift::ide::printCodeCompletionResultDescription(
         TextSize += C.getText().size();
         OS << C.getText();
       }
+      ++I;
     }
   }
   assert((TextSize > 0) &&
@@ -123,6 +152,12 @@ class AnnotatingResultPrinter {
     case ChunkKind::CallArgumentInternalName:
       printWithTag("callarg.param", C.getText());
       break;
+    case ChunkKind::ParameterDeclExternalName:
+      printWithTag("param.label", C.getText());
+      break;
+    case ChunkKind::ParameterDeclLocalName:
+      printWithTag("param.param", C.getText());
+      break;
     case ChunkKind::TypeAnnotation:
     case ChunkKind::CallArgumentClosureType:
     case ChunkKind::CallArgumentClosureExpr:
@@ -135,29 +170,43 @@ class AnnotatingResultPrinter {
     }
   }
 
-  void printCallArg(ArrayRef<CodeCompletionString::Chunk> chunks) {
-    OS << "<callarg>";
-    for (auto i = chunks.begin(), e = chunks.end(); i != e; ++i) {
-      using ChunkKind = CodeCompletionString::Chunk::ChunkKind;
+  /// Print the current chunk group \p i currently points. Advances \p i to
+  /// just past the group.
+  void printNestedGroup(StringRef tag, ChunkIter &i, const ChunkIter e) {
+    assert(i != e && !i->hasText() &&
+           CodeCompletionString::Chunk::chunkStartsNestedGroup(i->getKind()));
+    auto nestingLevel = i->getNestingLevel();
 
-      if (i->is(ChunkKind::CallArgumentTypeBegin)) {
-        OS << "<callarg.type>";
-        auto nestingLevel = i->getNestingLevel();
-        ++i;
-        for (; i != e; ++i) {
-          if (i->endsPreviousNestedGroup(nestingLevel))
-            break;
-          if (i->hasText())
-            printTextChunk(*i);
-        }
-        OS << "</callarg.type>";
-        if (i == e)
-          break;
-      }
+    // Skip the "Begin" chunk.
+    ++i;
 
-      printTextChunk(*i);
+    // Self-closing tag for an empty element.
+    if (i == e || i->endsPreviousNestedGroup(nestingLevel)) {
+      if (!tag.empty())
+        OS << "<" << tag << "/>";
+      return;
     }
-    OS << "</callarg>";
+
+    if (!tag.empty())
+      OS << "<" << tag << ">";
+    do {
+      if (i->is(ChunkKind::CallArgumentTypeBegin)) {
+        printNestedGroup("callarg.type", i, e);
+        continue;
+      }
+      if (i->is(ChunkKind::CallArgumentDefaultBegin)) {
+        printNestedGroup("callarg.default", i, e);
+        continue;
+      }
+      if (i->is(ChunkKind::ParameterDeclTypeBegin)) {
+        printNestedGroup("param.type", i, e);
+        continue;
+      }
+      printTextChunk(*i);
+      ++i;
+    } while (i != e && !i->endsPreviousNestedGroup(nestingLevel));
+    if (!tag.empty())
+      OS << "</" << tag << ">";
   }
 
 public:
@@ -170,31 +219,55 @@ public:
     auto FirstTextChunk = str->getFirstTextChunkIndex(leadingPunctuation);
     if (FirstTextChunk.hasValue()) {
       auto chunks = str->getChunks().slice(*FirstTextChunk);
-      for (auto i = chunks.begin(), e = chunks.end(); i != e; ++i) {
-        using ChunkKind = CodeCompletionString::Chunk::ChunkKind;
+      auto i = chunks.begin(), e = chunks.end();
+      while (i != e) {
+
+        // Skip the attribute/modifier list.
+        if (i->is(ChunkKind::AttributeAndModifierListBegin)) {
+          skipToEndOfCurrentNestedGroup(i, e);
+          continue;
+        }
+
+        // Skip the declaration introducer and the following ' '.
+        if (i->is(ChunkKind::DeclIntroducer)) {
+          ++i;
+          continue;
+        }
+        if (i->is(ChunkKind::Text) && i->getText() == " " &&
+            i != chunks.begin() && (i-1)->is(ChunkKind::DeclIntroducer)) {
+          ++i;
+          continue;
+        }
 
         // Skip the type annotation.
         if (i->is(ChunkKind::TypeAnnotationBegin)) {
-          auto level = i->getNestingLevel();
-          do { ++i; } while (i != e && !i->endsPreviousNestedGroup(level));
-          --i;
+          skipToEndOfCurrentNestedGroup(i, e);
           continue;
         }
 
         // Print call argument group.
         if (i->is(ChunkKind::CallArgumentBegin)) {
-          auto start = i;
-          auto level = i->getNestingLevel();
-          do { ++i; } while (i != e && !i->endsPreviousNestedGroup(level));
-          if (!isOperator)
-            printCallArg({start, i});
-          --i;
+          if (isOperator) {
+            // Don't print call argument clause for operators.
+            skipToEndOfCurrentNestedGroup(i, e);
+            continue;
+          }
+          printNestedGroup("callarg", i, e);
+          continue;
+        }
+        // Print call argument group.
+        if (i->is(ChunkKind::ParameterDeclBegin)) {
+          printNestedGroup("param", i, e);
           continue;
         }
 
-        if (isOperator && i->is(ChunkKind::CallArgumentType))
+        if (isOperator && i->is(ChunkKind::CallArgumentType)) {
+          ++i;
           continue;
+        }
+
         printTextChunk(*i);
+        ++i;
       }
     }
   }
@@ -202,20 +275,20 @@ public:
   void printTypeName(const CodeCompletionResult &result) {
     auto Chunks = result.getCompletionString()->getChunks();
 
-    for (auto i = Chunks.begin(), e = Chunks.end(); i != e; ++i) {
-
-      if (i->is(CodeCompletionString::Chunk::ChunkKind::TypeAnnotation))
+    auto i = Chunks.begin(), e = Chunks.end();
+    while (i != e) {
+      if (i->is(ChunkKind::TypeAnnotation)) {
         OS << i->getText();
-
-      if (i->is(CodeCompletionString::Chunk::ChunkKind::TypeAnnotationBegin)) {
-        auto nestingLevel = i->getNestingLevel();
         ++i;
-        for (; i != e && !i->endsPreviousNestedGroup(nestingLevel); ++i) {
-          if (i->hasText())
-            printTextChunk(*i);
-        }
-        --i;
+        continue;
       }
+      if (i->is(ChunkKind::TypeAnnotationBegin)) {
+        printNestedGroup("", i, e);
+        continue;
+      }
+
+      // Ignore others.
+      ++i;
     }
   }
 };
@@ -229,25 +302,31 @@ void swift::ide::printCodeCompletionResultDescriptionAnnotated(
   printer.printDescription(Result, leadingPunctuation);
 }
 
-
 void swift::ide::printCodeCompletionResultTypeName(const CodeCompletionResult &Result,
                                                    llvm::raw_ostream &OS) {
   auto Chunks = Result.getCompletionString()->getChunks();
+  auto i = Chunks.begin(), e = Chunks.end();
 
-  for (auto i = Chunks.begin(), e = Chunks.end(); i != e; ++i) {
-
-    if (i->is(CodeCompletionString::Chunk::ChunkKind::TypeAnnotation))
+  while (i != e) {
+    if (i->is(CodeCompletionString::Chunk::ChunkKind::TypeAnnotation)) {
       OS << i->getText();
+      ++i;
+      continue;
+    }
 
     if (i->is(CodeCompletionString::Chunk::ChunkKind::TypeAnnotationBegin)) {
       auto nestingLevel = i->getNestingLevel();
       ++i;
-      for (; i != e && !i->endsPreviousNestedGroup(nestingLevel); ++i) {
+      while (i != e && !i->endsPreviousNestedGroup(nestingLevel)) {
         if (i->hasText())
           OS << i->getText();
+        ++i;
       }
-      --i;
+      continue;
     }
+
+    // Ignore others.
+    ++i;
   }
 }
 
@@ -331,7 +410,7 @@ constructTextForCallParam(ArrayRef<CodeCompletionString::Chunk> ParamGroup,
   OS << "<#T##" << Display;
   if (Display == Type && Display == ExpansionType) {
     // Short version, display and type are the same.
-  } else {
+  } else if (!Type.empty()) {
     OS << "##" << Type;
     if (ExpansionType != Type)
       OS << "##" << ExpansionType;
@@ -372,9 +451,8 @@ void swift::ide::printCodeCompletionResultSourceText(
   }
 }
 
-void swift::ide::printCodeCompletionResultFilterName(
-    const CodeCompletionResult &Result, llvm::raw_ostream &OS) {
-  auto str = Result.getCompletionString();
+static void printCodeCompletionResultFilterName(
+    const CodeCompletionString *str, llvm::raw_ostream &OS) {
   // FIXME: we need a more uniform way to handle operator completions.
   if (str->getChunks().size() == 1 && str->getChunks()[0].is(ChunkKind::Dot)) {
     OS << ".";
@@ -389,7 +467,8 @@ void swift::ide::printCodeCompletionResultFilterName(
   auto FirstTextChunk = str->getFirstTextChunkIndex();
   if (FirstTextChunk.hasValue()) {
     auto chunks = str->getChunks().slice(*FirstTextChunk);
-    for (auto i = chunks.begin(), e = chunks.end(); i != e; ++i) {
+    auto i = chunks.begin(), e = chunks.end();
+    while (i != e) {
       auto &C = *i;
 
       if (C.is(ChunkKind::BraceStmtWithCursor))
@@ -407,34 +486,65 @@ void swift::ide::printCodeCompletionResultFilterName(
       case ChunkKind::CallArgumentClosureType:
       case ChunkKind::CallArgumentClosureExpr:
       case ChunkKind::CallArgumentType:
+      case ChunkKind::ParameterDeclLocalName:
       case ChunkKind::DeclAttrParamColon:
       case ChunkKind::Comma:
       case ChunkKind::Whitespace:
       case ChunkKind::Ellipsis:
       case ChunkKind::Ampersand:
       case ChunkKind::OptionalMethodCallTail:
+      case ChunkKind::DeclIntroducer:
+        ++i;
         continue;
+      case ChunkKind::ParameterDeclExternalName:
+        // Skip '_' parameter external name.
+        shouldPrint = shouldPrint && C.hasText() && C.getText() != "_";
+        break;
       case ChunkKind::CallArgumentTypeBegin:
-      case ChunkKind::TypeAnnotationBegin: {
+      case ChunkKind::ParameterDeclTypeBegin:
+      case ChunkKind::TypeAnnotationBegin:
+      case ChunkKind::DefaultArgumentClauseBegin:
+      case ChunkKind::GenericParameterClauseBegin:
+      case ChunkKind::EffectsSpecifierClauseBegin:
+      case ChunkKind::GenericRequirementClauseBegin:
+      case ChunkKind::DeclResultTypeClauseBegin:
+      case ChunkKind::AttributeAndModifierListBegin: {
         // Skip call parameter type or type annotation structure.
-        auto nestingLevel = C.getNestingLevel();
-        do {
-          ++i;
-        } while (i != e && !i->endsPreviousNestedGroup(nestingLevel));
-        --i;
+        skipToEndOfCurrentNestedGroup(i, e);
         continue;
       }
       case ChunkKind::CallArgumentColon:
+      case ChunkKind::ParameterDeclColon:
         // Since we don't add the type, also don't add the space after ':'.
         if (shouldPrint)
           OS << ":";
+        ++i;
         continue;
+      case ChunkKind::Text:
+        // Ignore " " after call argument labels.
+        if (i->getText() == " " && i != chunks.begin() &&
+            ((i-1)->is(ChunkKind::CallArgumentName) ||
+             (i-1)->is(ChunkKind::ParameterDeclExternalName) ||
+             (i-1)->is(ChunkKind::DeclIntroducer))) {
+          ++i;
+          continue;
+        }
+        break;
       default:
         break;
       }
 
       if (C.hasText() && shouldPrint)
         OS << C.getText();
+      ++i;
     }
   }
+}
+
+NullTerminatedStringRef swift::ide::getCodeCompletionResultFilterName(
+    const CodeCompletionString *Str, llvm::BumpPtrAllocator &Allocator) {
+  SmallString<32> buf;
+  llvm::raw_svector_ostream OS(buf);
+  printCodeCompletionResultFilterName(Str, OS);
+  return NullTerminatedStringRef(buf, Allocator);
 }

@@ -10,6 +10,7 @@
 #
 # ===---------------------------------------------------------------------===#
 
+
 class StageArgs(object):
     def __init__(self, stage, args):
         self.__dict__['postfix'] = stage.postfix

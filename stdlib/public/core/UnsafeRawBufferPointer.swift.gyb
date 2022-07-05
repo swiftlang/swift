@@ -30,11 +30,12 @@
 /// a raw buffer are untyped operations. Accessing this collection's bytes
 /// does not bind the underlying memory to `UInt8`.
 ///
-/// In addition to its collection interface, an `${Self}` instance also supports
-/// the following methods provided by `UnsafeMutableRawPointer`, including
-/// bounds checks in debug mode:
+/// In addition to its collection interface, an `${Self}`
+/// instance also supports the following methods provided by
+/// `UnsafeMutableRawPointer`, including bounds checks in debug mode:
 ///
 /// - `load(fromByteOffset:as:)`
+/// - `loadUnaligned(fromByteOffset:as:)`
 /// - `storeBytes(of:toByteOffset:as:)`
 /// - `copyMemory(from:)`
 %  else:
@@ -43,9 +44,10 @@
 /// of values held in that memory. Reading from memory through a raw buffer is
 /// an untyped operation.
 ///
-/// In addition to its collection interface, an `${Self}` instance also supports
-/// the `load(fromByteOffset:as:)` method provided by `UnsafeRawPointer`,
-/// including bounds checks in debug mode.
+/// In addition to its collection interface, an `${Self}`
+/// instance also supports the `load(fromByteOffset:as:)`
+/// and `loadUnaligned(fromByteOffset:as:)` methods provided by
+/// `UnsafeRawPointer`, including bounds checks in debug mode.
 %  end
 ///
 /// To access the underlying memory through typed operations, the memory must
@@ -96,6 +98,26 @@
 public struct Unsafe${Mutable}RawBufferPointer {
   @usableFromInline
   internal let _position, _end: Unsafe${Mutable}RawPointer?
+
+  /// Creates a buffer over the specified number of contiguous bytes starting
+  /// at the given pointer.
+  ///
+  /// - Parameters:
+  ///   - start: The address of the memory that starts the buffer. If `starts`
+  ///     is `nil`, `count` must be zero. However, `count` may be zero even
+  ///     for a non-`nil` `start`.
+  ///   - count: The number of bytes to include in the buffer. `count` must not
+  ///     be negative.
+  @inlinable
+  public init(
+    @_nonEphemeral start: Unsafe${Mutable}RawPointer?, count: Int
+  ) {
+    _debugPrecondition(count >= 0, "${Self} with negative count")
+    _debugPrecondition(count == 0 || start != nil,
+      "${Self} has a nil start and nonzero count")
+    _position = start
+    _end = start.map { $0 + _assumeNonNegative(count) }
+  }
 }
 
 %if not mutable:
@@ -161,7 +183,7 @@ extension Unsafe${Mutable}RawBufferPointer: Sequence {
     }
     let destinationAddress = destination.baseAddress._unsafelyUnwrappedUnchecked
     let d = UnsafeMutableRawPointer(destinationAddress)
-    let n = Swift.min(destination.count, self.count)
+    let n = Swift.min(destination.count, s.distance(to: e))
     d.copyMemory(from: s, byteCount: n)
     return (Iterator(_position: s.advanced(by: n), _end: e), n)
   }
@@ -192,7 +214,8 @@ extension Unsafe${Mutable}RawBufferPointer: ${Mutable}Collection {
 
   @inlinable
   public var indices: Indices {
-    return startIndex..<endIndex
+    // Not checked because init forbids negative count.
+    return Indices(uncheckedBounds: (startIndex, endIndex))
   }
 
   /// Accesses the byte at the given offset in the memory region as a `UInt8`
@@ -273,7 +296,10 @@ extension Unsafe${Mutable}RawBufferPointer: ${Mutable}Collection {
   @inlinable
   public var count: Int {
     if let pos = _position {
-      return _assumeNonNegative(_end! - pos)
+      // Unsafely unwrapped because init forbids end being nil if _position
+      // isn't.
+      _internalInvariant(_end != nil)
+      return _assumeNonNegative(_end._unsafelyUnwrappedUnchecked - pos)
     }
     return 0
   }
@@ -326,6 +352,10 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// Returns a new instance of the given type, read from the buffer pointer's
   /// raw memory at the specified byte offset.
   ///
+  /// The memory at `offset` bytes from this buffer pointer's `baseAddress`
+  /// must be properly aligned for accessing `T` and initialized to `T` or
+  /// another type that is layout compatible with `T`.
+  ///
   /// You can use this method to create new values from the buffer pointer's
   /// underlying bytes. The following example creates two new `Int32`
   /// instances from the memory referenced by the buffer pointer `someBytes`.
@@ -357,6 +387,47 @@ extension Unsafe${Mutable}RawBufferPointer {
     return baseAddress!.load(fromByteOffset: offset, as: T.self)
   }
 
+  /// Returns a new instance of the given type, constructed from the raw memory
+  /// at the specified offset.
+  ///
+  /// This function only supports loading trivial types.
+  /// A trivial type does not contain any reference-counted property
+  /// within its in-memory stored representation.
+  /// The memory at `offset` bytes into the buffer must be laid out
+  /// identically to the in-memory representation of `T`.
+  ///
+  /// You can use this method to create new values from the buffer pointer's
+  /// underlying bytes. The following example creates two new `Int32`
+  /// instances from the memory referenced by the buffer pointer `someBytes`.
+  /// The bytes for `a` are copied from the first four bytes of `someBytes`,
+  /// and the bytes for `b` are copied from the fourth through seventh bytes.
+  ///
+  ///     let a = someBytes.loadUnaligned(as: Int32.self)
+  ///     let b = someBytes.loadUnaligned(fromByteOffset: 3, as: Int32.self)
+  ///
+  /// The memory to read for the new instance must not extend beyond the buffer
+  /// pointer's memory region---that is, `offset + MemoryLayout<T>.size` must
+  /// be less than or equal to the buffer pointer's `count`.
+  ///
+  /// - Parameters:
+  ///   - offset: The offset, in bytes, into the buffer pointer's memory at
+  ///     which to begin reading data for the new instance. The default is zero.
+  ///   - type: The type to use for the newly constructed instance. The memory
+  ///     must be initialized to a value of a type that is layout compatible
+  ///     with `type`.
+  /// - Returns: A new instance of type `T`, copied from the buffer pointer's
+  ///   memory.
+  @_alwaysEmitIntoClient
+  public func loadUnaligned<T>(
+    fromByteOffset offset: Int = 0,
+    as type: T.Type
+  ) -> T {
+    _debugPrecondition(offset >= 0, "${Self}.load with negative offset")
+    _debugPrecondition(offset + MemoryLayout<T>.size <= self.count,
+      "${Self}.load out of bounds")
+    return baseAddress!.loadUnaligned(fromByteOffset: offset, as: T.self)
+  }
+
 %  if mutable:
   /// Stores a value's bytes into the buffer pointer's raw memory at the
   /// specified byte offset.
@@ -375,23 +446,53 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// type `U`. Calling `storeBytes(of:toByteOffset:as:)` does not change the
   /// bound type of the memory.
   ///
+  /// - Note: A trivial type can be copied with just a bit-for-bit copy without
+  ///   any indirection or reference-counting operations. Generally, native
+  ///   Swift types that do not contain strong or weak references or other
+  ///   forms of indirection are trivial, as are imported C structs and enums.
+  ///
+  /// If you need to store into memory a copy of a value of a type that isn't
+  /// trivial, you cannot use the `storeBytes(of:toByteOffset:as:)` method.
+  /// Instead, you must know either initialize the memory or,
+  /// if you know the memory was already bound to `type`, assign to the memory.
+  ///
   /// - Parameters:
+  ///   - value: The value to store as raw bytes.
   ///   - offset: The offset in bytes into the buffer pointer's memory to begin
-  ///     reading data for the new instance. The buffer pointer plus `offset`
-  ///     must be properly aligned for accessing an instance of type `T`. The
-  ///     default is zero.
+  ///     writing bytes from the value. The default is zero.
   ///   - type: The type to use for the newly constructed instance. The memory
   ///     must be initialized to a value of a type that is layout compatible
   ///     with `type`.
   @inlinable
+  @_alwaysEmitIntoClient
+  // This custom silgen name is chosen to not interfere with the old ABI
+  @_silgen_name("_swift_se0349_UnsafeMutableRawBufferPointer_storeBytes")
   public func storeBytes<T>(
-    of value: T, toByteOffset offset: Int = 0, as: T.Type
+    of value: T, toByteOffset offset: Int = 0, as type: T.Type
   ) {
     _debugPrecondition(offset >= 0, "${Self}.storeBytes with negative offset")
     _debugPrecondition(offset + MemoryLayout<T>.size <= self.count,
       "${Self}.storeBytes out of bounds")
 
-    baseAddress!.storeBytes(of: value, toByteOffset: offset, as: T.self)
+    let pointer = baseAddress._unsafelyUnwrappedUnchecked
+    pointer.storeBytes(of: value, toByteOffset: offset, as: T.self)
+  }
+
+  // This unavailable implementation uses the expected mangled name
+  // of `storeBytes<T>(of:toByteOffset:as:)`, and provides an entry point for
+  // any binary linked against the stdlib binary for Swift 5.6 and older.
+  @available(*, unavailable)
+  @_silgen_name("$sSw10storeBytes2of12toByteOffset2asyx_SixmtlF")
+  @usableFromInline func _legacy_se0349_storeBytes<T>(
+    of value: T, toByteOffset offset: Int = 0, as type: T.Type
+  ) {
+    _debugPrecondition(offset >= 0, "${Self}.storeBytes with negative offset")
+    _debugPrecondition(offset + MemoryLayout<T>.size <= self.count,
+      "${Self}.storeBytes out of bounds")
+
+    baseAddress!._legacy_se0349_storeBytes_internal(
+      of: value, toByteOffset: offset, as: T.self
+    )
   }
 
   /// Copies the bytes from the given buffer to this buffer's memory.
@@ -414,7 +515,9 @@ extension Unsafe${Mutable}RawBufferPointer {
   public func copyMemory(from source: UnsafeRawBufferPointer) {
     _debugPrecondition(source.count <= self.count,
       "${Self}.copyMemory source has too many elements")
-    baseAddress?.copyMemory(from: source.baseAddress!, byteCount: source.count)
+    if let baseAddress = baseAddress, let sourceAddress = source.baseAddress {
+      baseAddress.copyMemory(from: sourceAddress, byteCount: source.count)
+    }
   }
 
   /// Copies from a collection of `UInt8` into this buffer's memory.
@@ -454,26 +557,6 @@ extension Unsafe${Mutable}RawBufferPointer {
     }
   }
 %  end # mutable
-
-  /// Creates a buffer over the specified number of contiguous bytes starting
-  /// at the given pointer.
-  ///
-  /// - Parameters:
-  ///   - start: The address of the memory that starts the buffer. If `starts`
-  ///     is `nil`, `count` must be zero. However, `count` may be zero even
-  ///     for a non-`nil` `start`.
-  ///   - count: The number of bytes to include in the buffer. `count` must not
-  ///     be negative.
-  @inlinable
-  public init(
-    @_nonEphemeral start: Unsafe${Mutable}RawPointer?, count: Int
-  ) {
-    _debugPrecondition(count >= 0, "${Self} with negative count")
-    _debugPrecondition(count == 0 || start != nil,
-      "${Self} has a nil start and nonzero count")
-    _position = start
-    _end = start.map { $0 + _assumeNonNegative(count) }
-  }
 
   /// Creates a new buffer over the same memory as the given buffer.
   ///
@@ -631,7 +714,7 @@ extension Unsafe${Mutable}RawBufferPointer {
       return UnsafeMutableBufferPointer<T>(start: nil, count: 0)
     }
     
-    let count = (_end! - base) / MemoryLayout<T>.stride
+    let count = (_end._unsafelyUnwrappedUnchecked - base) / MemoryLayout<T>.stride
     let typed = base.initializeMemory(
       as: type, repeating: repeatedValue, count: count)
     return UnsafeMutableBufferPointer<T>(start: typed, count: count)
@@ -680,9 +763,10 @@ extension Unsafe${Mutable}RawBufferPointer {
       return (it, UnsafeMutableBufferPointer(start: nil, count: 0))
     }  
 
+    _internalInvariant(_end != nil)
     for p in stride(from: base, 
       // only advance to as far as the last element that will fit
-      to: base + count - elementStride + 1, 
+      to: _end._unsafelyUnwrappedUnchecked - elementStride + 1, 
       by: elementStride
     ) {
       // underflow is permitted -- e.g. a sequence into
@@ -728,6 +812,131 @@ extension Unsafe${Mutable}RawBufferPointer {
     Builtin.bindMemory(base._rawValue, capacity._builtinWordValue, type)
     return Unsafe${Mutable}BufferPointer<T>(
       start: Unsafe${Mutable}Pointer<T>(base._rawValue), count: capacity)
+  }
+
+  /// Executes the given closure while temporarily binding the buffer to
+  /// instances of type `T`.
+  ///
+  /// Use this method when you have a buffer to raw memory and you need
+  /// to access that memory as instances of a given type `T`. Accessing
+  /// memory as a type `T` requires that the memory be bound to that type.
+  /// A memory location may only be bound to one type at a time, so accessing
+  /// the same memory as an unrelated type without first rebinding the memory
+  /// is undefined.
+  ///
+  /// Any instance of `T` within the re-bound region may be initialized or
+  /// uninitialized. The memory underlying any individual instance of `T`
+  /// must have the same initialization state (i.e.  initialized or
+  /// uninitialized.) Accessing a `T` whose underlying memory
+  /// is in a mixed initialization state shall be undefined behaviour.
+  ///
+  /// If the byte count of the original buffer is not a multiple of
+  /// the stride of `T`, then the re-bound buffer is shorter
+  /// than the original buffer.
+  ///
+  /// After executing `body`, this method rebinds memory back to its original
+  /// binding state. This can be unbound memory, or bound to a different type.
+  ///
+  /// - Note: The buffer's base address must match the
+  ///   alignment of `T` (as reported by `MemoryLayout<T>.alignment`).
+  ///   That is, `Int(bitPattern: self.baseAddress) % MemoryLayout<T>.alignment`
+  ///   must equal zero.
+  ///
+  /// - Note: A raw buffer may represent memory that has been bound to a type.
+  ///   If that is the case, then `T` must be layout compatible with the
+  ///   type to which the memory has been bound. This requirement does not
+  ///   apply if the raw buffer represents memory that has not been bound
+  ///   to any type.
+  ///
+  /// - Parameters:
+  ///   - type: The type to temporarily bind the memory referenced by this
+  ///     pointer. This pointer must be a multiple of this type's alignment.
+  ///   - body: A closure that takes a typed pointer to the
+  ///     same memory as this pointer, only bound to type `T`. The closure's
+  ///     pointer argument is valid only for the duration of the closure's
+  ///     execution. If `body` has a return value, that value is also used as
+  ///     the return value for the `withMemoryRebound(to:capacity:_:)` method.
+  ///   - buffer: The buffer temporarily bound to instances of `T`.
+  /// - Returns: The return value, if any, of the `body` closure parameter.
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func withMemoryRebound<T, Result>(
+    to type: T.Type,
+    _ body: (_ buffer: Unsafe${Mutable}BufferPointer<T>) throws -> Result
+  ) rethrows -> Result {
+    guard let s = _position else {
+      return try body(.init(start: nil, count: 0))
+    }
+    _debugPrecondition(
+      Int(bitPattern: s) & (MemoryLayout<T>.alignment-1) == 0
+    )
+    // initializer ensures _end is nil only when _position is nil.
+    _internalInvariant(_end != nil)
+    let c = _assumeNonNegative(s.distance(to: _end._unsafelyUnwrappedUnchecked))
+    let n = c / MemoryLayout<T>.stride
+    let binding = Builtin.bindMemory(s._rawValue, n._builtinWordValue, T.self)
+    defer { Builtin.rebindMemory(s._rawValue, binding) }
+    return try body(.init(start: .init(s._rawValue), count: n))
+  }
+
+  /// Returns a typed buffer to the memory referenced by this buffer,
+  /// assuming that the memory is already bound to the specified type.
+  ///
+  /// Use this method when you have a raw buffer to memory that has already
+  /// been bound to the specified type. The memory starting at this pointer
+  /// must be bound to the type `T`. Accessing memory through the returned
+  /// pointer is undefined if the memory has not been bound to `T`. To bind
+  /// memory to `T`, use `bindMemory(to:capacity:)` instead of this method.
+  ///
+  /// - Note: The buffer's base address must match the
+  ///   alignment of `T` (as reported by `MemoryLayout<T>.alignment`).
+  ///   That is, `Int(bitPattern: self.baseAddress) % MemoryLayout<T>.alignment`
+  ///   must equal zero.
+  ///
+  /// - Parameter to: The type `T` that the memory has already been bound to.
+  /// - Returns: A typed pointer to the same memory as this raw pointer.
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func assumingMemoryBound<T>(
+    to: T.Type
+  ) -> Unsafe${Mutable}BufferPointer<T> {
+    guard let s = _position else {
+      return .init(start: nil, count: 0)
+    }
+    // initializer ensures _end is nil only when _position is nil.
+    _internalInvariant(_end != nil)
+    let c = _assumeNonNegative(s.distance(to: _end._unsafelyUnwrappedUnchecked))
+    let n = c / MemoryLayout<T>.stride
+    return .init(start: .init(s._rawValue), count: n)
+  }
+
+%  if Mutable:
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func withContiguousMutableStorageIfAvailable<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    try withMemoryRebound(to: Element.self) { b in
+      var buffer = b
+      defer {
+        _debugPrecondition(
+          (b.baseAddress, b.count) == (buffer.baseAddress, buffer.count),
+          "UnsafeMutableRawBufferPointer.withContiguousMutableStorageIfAvailable: replacing the buffer is not allowed"
+        )
+      }
+      return try body(&buffer)
+    }
+  }
+
+%  end
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    try withMemoryRebound(to: Element.self) {
+      try body(${ 'UnsafeBufferPointer<Element>($0)' if Mutable else '$0' })
+    }
   }
 }
 
@@ -855,11 +1064,6 @@ public func withUnsafeBytes<T, Result>(
   let buffer = UnsafeRawBufferPointer(start: addr, count: MemoryLayout<T>.size)
   return try body(buffer)
 }
-
-extension UnsafeRawBufferPointer: Sendable { }
-extension UnsafeRawBufferPointer.Iterator: Sendable { }
-extension UnsafeMutableRawBufferPointer: Sendable { }
-
 
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)

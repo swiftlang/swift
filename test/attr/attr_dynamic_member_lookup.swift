@@ -36,10 +36,10 @@ struct NonMutSettable {
 
 func test(a: Gettable, b: Settable, c: MutGettable, d: NonMutSettable) {
   global = a.wyverns
-  a.flavor = global // expected-error {{cannot assign to property: 'a' is a 'let' constant}}
+  a.flavor = global // expected-error {{cannot assign through dynamic lookup property: 'a' is a 'let' constant}}
 
   global = b.flavor
-  b.universal = global // expected-error {{cannot assign to property: 'b' is a 'let' constant}}
+  b.universal = global // expected-error {{cannot assign through dynamic lookup property: 'b' is a 'let' constant}}
   b.thing += 1 // expected-error {{left side of mutating operator isn't mutable: 'b' is a 'let' constant}}
 
   var bm = b
@@ -318,7 +318,7 @@ class DerivedClassWithSetter : BaseClass {
 func testOverrideSubscript(a: BaseClass, b: DerivedClassWithSetter) {
   let x = a.frotz + b.garbalaz
   b.baranozo = x
-  a.balboza = 12 // expected-error {{cannot assign to property}}
+  a.balboza = 12 // expected-error {{cannot assign through dynamic lookup property: 'a' is a 'let' constant}}
 }
 
 //===----------------------------------------------------------------------===//
@@ -763,7 +763,7 @@ func test_infinite_self_recursion() {
   // expected-error@-1 {{value of type 'Recurse<Int>' has no dynamic member 'foo' using key path from root type 'Recurse<Int>'}}
 }
 
-// rdar://problem/60225883 - crash during solution application (ExprRewritter::buildKeyPathDynamicMemberIndexExpr)
+// rdar://problem/60225883 - crash during solution application (ExprRewriter::buildKeyPathDynamicMemberIndexExpr)
 func test_combination_of_keypath_and_string_lookups() {
   @dynamicMemberLookup
   struct Outer {

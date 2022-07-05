@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "CodeSynthesis.h"
 #include "TypeChecker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Stmt.h"
@@ -202,9 +203,7 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
   // switch (a, b) { <case statements> }
   auto aRef = new (C) DeclRefExpr(aParam, DeclNameLoc(), /*implicit*/true);
   auto bRef = new (C) DeclRefExpr(bParam, DeclNameLoc(), /*implicit*/true);
-  auto abExpr = TupleExpr::create(C, SourceLoc(), { aRef, bRef }, {}, {},
-                                  SourceLoc(), /*HasTrailingClosure*/ false,
-                                  /*implicit*/ true);
+  auto abExpr = TupleExpr::createImplicit(C, {aRef, bRef}, /*labels*/ {});
   auto switchStmt =
       SwitchStmt::createImplicit(LabeledStmtInfo(), abExpr, cases, C);
   statements.push_back(switchStmt);
@@ -276,6 +275,8 @@ deriveComparable_lt(
     derived.ConformanceDecl->diagnose(diag::no_less_than_overload_for_int);
     return nullptr;
   }
+
+  addNonIsolatedToSynthesized(derived.Nominal, comparableDecl);
 
   comparableDecl->setBodySynthesizer(bodySynthesizer);
 

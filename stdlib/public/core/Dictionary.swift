@@ -608,15 +608,19 @@ extension Dictionary {
   public __consuming func filter(
     _ isIncluded: (Element) throws -> Bool
   ) rethrows -> [Key: Value] {
-    // FIXME(performance): Try building a bitset of elements to keep, so that we
-    // eliminate rehashings during insertion.
-    var result = _NativeDictionary<Key, Value>()
-    for element in self {
-      if try isIncluded(element) {
-        result.insertNew(key: element.key, value: element.value)
+  #if _runtime(_ObjC)
+    guard _variant.isNative else {
+      // Slow path for bridged dictionaries
+      var result = _NativeDictionary<Key, Value>()
+      for element in self {
+        if try isIncluded(element) {
+          result.insertNew(key: element.key, value: element.value)
+        }
       }
+      return Dictionary(_native: result)
     }
-    return Dictionary(_native: result)
+  #endif
+    return Dictionary(_native: try _variant.asNative.filter(isIncluded))
   }
 }
 
@@ -1677,6 +1681,7 @@ extension Collection {
   internal func _makeKeyValuePairDescription<K, V>(
     withTypeName type: String? = nil
   ) -> String where Element == (key: K, value: V) {
+#if !SWIFT_STDLIB_STATIC_PRINT
     if self.isEmpty {
       return "[:]"
     }
@@ -1695,6 +1700,9 @@ extension Collection {
     }
     result += "]"
     return result
+#else
+    return "(collection printing not available)"
+#endif
   }
 }
 
@@ -2033,6 +2041,7 @@ extension Dictionary.Iterator: IteratorProtocol {
   }
 }
 
+#if SWIFT_ENABLE_REFLECTION
 extension Dictionary.Iterator: CustomReflectable {
   /// A mirror that reflects the iterator.
   public var customMirror: Mirror {
@@ -2049,6 +2058,7 @@ extension Dictionary: CustomReflectable {
     return Mirror(self, unlabeledChildren: self, displayStyle: style)
   }
 }
+#endif
 
 extension Dictionary {
   /// Removes and returns the first key-value pair of the dictionary if the
@@ -2099,17 +2109,17 @@ public typealias DictionaryIndex<Key: Hashable, Value> =
 public typealias DictionaryIterator<Key: Hashable, Value> =
   Dictionary<Key, Value>.Iterator
 
-extension Dictionary: Sendable, UnsafeSendable
+extension Dictionary: @unchecked Sendable
   where Key: Sendable, Value: Sendable { }
-extension Dictionary.Keys: Sendable, UnsafeSendable
+extension Dictionary.Keys: @unchecked Sendable
   where Key: Sendable, Value: Sendable { }
-extension Dictionary.Values: Sendable, UnsafeSendable
+extension Dictionary.Values: @unchecked Sendable
   where Key: Sendable, Value: Sendable { }
-extension Dictionary.Keys.Iterator: Sendable, UnsafeSendable
+extension Dictionary.Keys.Iterator: @unchecked Sendable
   where Key: Sendable, Value: Sendable { }
-extension Dictionary.Values.Iterator: Sendable, UnsafeSendable
+extension Dictionary.Values.Iterator: @unchecked Sendable
   where Key: Sendable, Value: Sendable { }
-extension Dictionary.Index: Sendable, UnsafeSendable
+extension Dictionary.Index: @unchecked Sendable
   where Key: Sendable, Value: Sendable { }
-extension Dictionary.Iterator: Sendable, UnsafeSendable
+extension Dictionary.Iterator: @unchecked Sendable
   where Key: Sendable, Value: Sendable { }

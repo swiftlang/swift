@@ -225,7 +225,8 @@ static bool makeParserAST(CompilerInstance &CI, StringRef Text,
   Invocation.getFrontendOptions().InputsAndOutputs.addInput(
       InputFile(Buf.get()->getBufferIdentifier(), /*isPrimary*/false, Buf.get(),
                 file_types::TY_Swift));
-  return CI.setup(Invocation);
+  std::string InstanceSetupError;
+  return CI.setup(Invocation, InstanceSetupError);
 }
 
 static void reportSyntacticAnnotations(CompilerInstance &CI,
@@ -373,19 +374,17 @@ SwiftInterfaceGenContext::create(StringRef DocumentName,
   CI.addDiagnosticConsumer(&IFaceGenCtx->Impl.DiagConsumer);
 
   Invocation.getFrontendOptions().InputsAndOutputs.clearInputs();
-  if (CI.setup(Invocation)) {
-    ErrMsg = "Error during invocation setup";
+  if (CI.setup(Invocation, ErrMsg)) {
     return nullptr;
   }
 
   ASTContext &Ctx = CI.getASTContext();
   CloseClangModuleFiles scopedCloseFiles(*Ctx.getClangModuleLoader());
 
-  // Load standard library so that Clang importer can use it.
-  auto *Stdlib = Ctx.getModuleByIdentifier(Ctx.StdlibModuleName);
-  if (!Stdlib) {
-    ErrMsg = "Could not load the stdlib module";
-    return nullptr;
+  // Load implict imports so that Clang importer can use them.
+  for (auto unloadedImport :
+       CI.getMainModule()->getImplicitImportInfo().AdditionalUnloadedImports) {
+    (void)Ctx.getModule(unloadedImport.module.getModulePath());
   }
 
   if (IsModule) {
@@ -432,8 +431,7 @@ SwiftInterfaceGenContext::createForTypeInterface(CompilerInvocation Invocation,
   // Display diagnostics to stderr.
   CI.addDiagnosticConsumer(&IFaceGenCtx->Impl.DiagConsumer);
 
-  if (CI.setup(Invocation)) {
-    ErrorMsg = "Error during invocation setup";
+  if (CI.setup(Invocation, ErrorMsg)) {
     return nullptr;
   }
   registerIDETypeCheckRequestFunctions(CI.getASTContext().evaluator);
@@ -488,7 +486,7 @@ bool SwiftInterfaceGenContext::isModule() const {
 
 ModuleDecl *SwiftInterfaceGenContext::getModuleDecl() const {
   return Impl.Mod;
-};
+}
 
 bool SwiftInterfaceGenContext::matches(StringRef ModuleName,
                                        const swift::CompilerInvocation &Invok) {
@@ -511,9 +509,9 @@ bool SwiftInterfaceGenContext::matches(StringRef ModuleName,
 
   const SearchPathOptions &SPOpts = Invok.getSearchPathOptions();
   const SearchPathOptions &ImplSPOpts = Impl.Invocation.getSearchPathOptions();
-  if (SPOpts.ImportSearchPaths != ImplSPOpts.ImportSearchPaths)
+  if (SPOpts.getImportSearchPaths() != ImplSPOpts.getImportSearchPaths())
     return false;
-  if (SPOpts.FrameworkSearchPaths != ImplSPOpts.FrameworkSearchPaths)
+  if (SPOpts.getFrameworkSearchPaths() != ImplSPOpts.getFrameworkSearchPaths())
     return false;
 
   if (Invok.getClangImporterOptions().ExtraArgs !=
@@ -635,8 +633,9 @@ void SwiftLangSupport::editorOpenTypeInterface(EditorConsumer &Consumer,
 
   CompilerInvocation Invocation;
   std::string Error;
-  if (getASTManager()->initCompilerInvocation(Invocation, Args, CI.getDiags(),
-                                             StringRef(), Error)) {
+  if (getASTManager()->initCompilerInvocation(
+          Invocation, Args, FrontendOptions::ActionType::Typecheck,
+          CI.getDiags(), StringRef(), Error)) {
     Consumer.handleRequestError(Error.c_str());
     return;
   }
@@ -675,8 +674,9 @@ void SwiftLangSupport::editorOpenInterface(EditorConsumer &Consumer,
 
   CompilerInvocation Invocation;
   std::string Error;
-  if (getASTManager()->initCompilerInvocationNoInputs(Invocation, Args,
-                                                     CI.getDiags(), Error)) {
+  if (getASTManager()->initCompilerInvocationNoInputs(
+          Invocation, Args, FrontendOptions::ActionType::Typecheck,
+          CI.getDiags(), Error)) {
     Consumer.handleRequestError(Error.c_str());
     return;
   }
@@ -736,12 +736,12 @@ public:
   }
 };
 
-void SwiftLangSupport::editorOpenSwiftSourceInterface(StringRef Name,
-                                                      StringRef SourceName,
-                                                      ArrayRef<const char *> Args,
-                                                      std::shared_ptr<EditorConsumer> Consumer) {
+void SwiftLangSupport::editorOpenSwiftSourceInterface(
+    StringRef Name, StringRef SourceName, ArrayRef<const char *> Args,
+    SourceKitCancellationToken CancellationToken,
+    std::shared_ptr<EditorConsumer> Consumer) {
   std::string Error;
-  auto Invocation = ASTMgr->getInvocation(Args, SourceName, Error);
+  auto Invocation = ASTMgr->getTypecheckInvocation(Args, SourceName, Error);
   if (!Invocation) {
     Consumer->handleRequestError(Error.c_str());
     return;
@@ -750,6 +750,7 @@ void SwiftLangSupport::editorOpenSwiftSourceInterface(StringRef Name,
     SourceName, IFaceGenContexts, Consumer, Invocation);
   static const char OncePerASTToken = 0;
   getASTManager()->processASTAsync(Invocation, AstConsumer, &OncePerASTToken,
+                                   CancellationToken,
                                    llvm::vfs::getRealFileSystem());
 }
 
@@ -769,8 +770,9 @@ void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
   std::string Error;
 
   ArrayRef<const char *> SwiftArgs = UsingSwiftArgs ? Args : llvm::None;
-  if (getASTManager()->initCompilerInvocationNoInputs(Invocation, SwiftArgs,
-                                                     CI.getDiags(), Error)) {
+  if (getASTManager()->initCompilerInvocationNoInputs(
+          Invocation, SwiftArgs, FrontendOptions::ActionType::Typecheck,
+          CI.getDiags(), Error)) {
     Consumer.handleRequestError(Error.c_str());
     return;
   }
@@ -819,8 +821,9 @@ void SwiftLangSupport::findInterfaceDocument(StringRef ModuleName,
 
   CompilerInvocation Invocation;
   std::string Error;
-  if (getASTManager()->initCompilerInvocation(Invocation, Args, CI.getDiags(),
-                                             StringRef(), Error)) {
+  if (getASTManager()->initCompilerInvocation(
+          Invocation, Args, FrontendOptions::ActionType::Typecheck,
+          CI.getDiags(), StringRef(), Error)) {
     return Receiver(RequestResult<InterfaceDocInfo>::fromError(Error));
   }
 
@@ -853,14 +856,14 @@ void SwiftLangSupport::findInterfaceDocument(StringRef ModuleName,
   addArgPair("-target", Invocation.getTargetTriple());
 
   const auto &SPOpts = Invocation.getSearchPathOptions();
-  addArgPair("-sdk", SPOpts.SDKPath);
-  for (auto &FramePath : SPOpts.FrameworkSearchPaths) {
+  addArgPair("-sdk", SPOpts.getSDKPath());
+  for (const auto &FramePath : SPOpts.getFrameworkSearchPaths()) {
     if (FramePath.IsSystem)
       addArgPair("-Fsystem", FramePath.Path);
     else
       addArgPair("-F", FramePath.Path);
   }
-  for (auto &Path : SPOpts.ImportSearchPaths)
+  for (const auto &Path : SPOpts.getImportSearchPaths())
     addArgPair("-I", Path);
 
   const auto &ClangOpts = Invocation.getClangImporterOptions();

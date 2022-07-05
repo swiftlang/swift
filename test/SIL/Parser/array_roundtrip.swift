@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-sil -Ounchecked | %target-sil-opt
+// RUN: %target-swift-frontend %s -emit-sil -Ounchecked -Xllvm -sil-disable-pass=cmo | %target-sil-opt -parse-serialized-sil
 
 // Fails if the positions of the two Collection subscript requirements are
 // reversed. rdar://problem/46650834

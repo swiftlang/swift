@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 # utils/rusage.py - Utility to measure resource usage -*- python -*-
 #
 # This source file is part of the Swift.org open source project

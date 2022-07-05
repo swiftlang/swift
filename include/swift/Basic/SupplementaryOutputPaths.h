@@ -20,7 +20,8 @@
 
 namespace swift {
 struct SupplementaryOutputPaths {
-  /// The path to which we should emit an Objective-C header for the module.
+  /// The path to which we should emit a header file that exposes the Swift
+  /// declarations to C, Objective-C and C++ clients for the module.
   ///
   /// Currently only makes sense when the compiler has whole module knowledge.
   /// The modes for which it makes sense incuide both WMO and the "merge
@@ -28,8 +29,8 @@ struct SupplementaryOutputPaths {
   /// the header is emitted in single-file mode, since it needs whole-module
   /// information.
   ///
-  /// \sa swift::printAsObjC
-  std::string ObjCHeaderOutputPath;
+  /// \sa swift::printAsClangHeader
+  std::string ClangHeaderOutputPath;
 
   /// The path to which we should emit a serialized module.
   /// It is valid whenever there are any inputs.
@@ -146,13 +147,21 @@ struct SupplementaryOutputPaths {
   /// The output path to generate ABI baseline.
   std::string ABIDescriptorOutputPath;
 
+  /// The output path of Swift semantic info for this module.
+  std::string ModuleSemanticInfoOutputPath;
+
+  /// The output path for YAML optimization record file.
+  std::string YAMLOptRecordPath;
+
+  /// The output path for bitstream optimization record file.
+  std::string BitstreamOptRecordPath;
+
   SupplementaryOutputPaths() = default;
-  SupplementaryOutputPaths(const SupplementaryOutputPaths &) = default;
 
   /// Apply a given function for each existing (non-empty string) supplementary output
   void forEachSetOutput(llvm::function_ref<void(const std::string&)> fn) const {
-    if (!ObjCHeaderOutputPath.empty())
-      fn(ObjCHeaderOutputPath); 
+    if (!ClangHeaderOutputPath.empty())
+      fn(ClangHeaderOutputPath);
     if (!ModuleOutputPath.empty())
       fn(ModuleOutputPath); 
     if (!ModuleSourceInfoOutputPath.empty())
@@ -179,15 +188,24 @@ struct SupplementaryOutputPaths {
       fn(ModuleSummaryOutputPath);
     if (!ABIDescriptorOutputPath.empty())
       fn(ABIDescriptorOutputPath);
+    if (!YAMLOptRecordPath.empty())
+      fn(YAMLOptRecordPath);
+    if (!BitstreamOptRecordPath.empty())
+      fn(BitstreamOptRecordPath);
+    if (!ModuleSemanticInfoOutputPath.empty())
+      fn(ModuleSemanticInfoOutputPath);
   }
 
   bool empty() const {
-    return ObjCHeaderOutputPath.empty() && ModuleOutputPath.empty() &&
+    return ClangHeaderOutputPath.empty() && ModuleOutputPath.empty() &&
            ModuleDocOutputPath.empty() && DependenciesFilePath.empty() &&
            ReferenceDependenciesFilePath.empty() &&
            SerializedDiagnosticsPath.empty() && LoadedModuleTracePath.empty() &&
            TBDPath.empty() && ModuleInterfaceOutputPath.empty() &&
-           ModuleSourceInfoOutputPath.empty() && ABIDescriptorOutputPath.empty();
+           ModuleSourceInfoOutputPath.empty() &&
+           ABIDescriptorOutputPath.empty() &&
+           ModuleSemanticInfoOutputPath.empty() && YAMLOptRecordPath.empty() &&
+           BitstreamOptRecordPath.empty();
   }
 };
 } // namespace swift

@@ -28,6 +28,7 @@ using ValueIDField = DeclIDField;
 
 using SILInstOpCodeField = BCFixed<8>;
 using SILTypeCategoryField = BCFixed<2>;
+using SILValueOwnershipField = BCFixed<2>;
 
 enum SILStringEncoding : uint8_t {
   SIL_UTF8,
@@ -43,8 +44,6 @@ enum SILLinkageEncoding : uint8_t {
   SIL_LINKAGE_PRIVATE,
   SIL_LINKAGE_PUBLIC_EXTERNAL,
   SIL_LINKAGE_HIDDEN_EXTERNAL,
-  SIL_LINKAGE_SHARED_EXTERNAL,
-  SIL_LINKAGE_PRIVATE_EXTERNAL,
 };
 using SILLinkageField = BCFixed<4>;
 
@@ -126,6 +125,7 @@ namespace sil_block {
     SIL_ONE_OPERAND,
     SIL_ONE_TYPE_ONE_OPERAND,
     SIL_ONE_TYPE_VALUES,
+    SIL_ONE_TYPE_OWNERSHIP_VALUES,
     SIL_TWO_OPERANDS,
     SIL_TAIL_ADDR,
     SIL_INST_APPLY,
@@ -145,25 +145,15 @@ namespace sil_block {
     SIL_DIFFERENTIABILITY_WITNESS,
     SIL_INST_WITNESS_METHOD,
     SIL_SPECIALIZE_ATTR,
+    SIL_ARG_EFFECTS_ATTR,
     SIL_PROPERTY,
     SIL_ONE_OPERAND_EXTRA_ATTR,
+    SIL_ONE_TYPE_ONE_OPERAND_EXTRA_ATTR,
     SIL_TWO_OPERANDS_EXTRA_ATTR,
     SIL_INST_DIFFERENTIABLE_FUNCTION,
     SIL_INST_LINEAR_FUNCTION,
     SIL_INST_DIFFERENTIABLE_FUNCTION_EXTRACT,
     SIL_INST_LINEAR_FUNCTION_EXTRACT,
-
-    // We also share these layouts from the decls block. Their enumerators must
-    // not overlap with ours.
-    ABSTRACT_PROTOCOL_CONFORMANCE = decls_block::ABSTRACT_PROTOCOL_CONFORMANCE,
-    NORMAL_PROTOCOL_CONFORMANCE = decls_block::NORMAL_PROTOCOL_CONFORMANCE,
-    SPECIALIZED_PROTOCOL_CONFORMANCE
-      = decls_block::SPECIALIZED_PROTOCOL_CONFORMANCE,
-    INHERITED_PROTOCOL_CONFORMANCE
-      = decls_block::INHERITED_PROTOCOL_CONFORMANCE,
-    INVALID_PROTOCOL_CONFORMANCE = decls_block::INVALID_PROTOCOL_CONFORMANCE,
-    GENERIC_REQUIREMENT = decls_block::GENERIC_REQUIREMENT,
-    LAYOUT_REQUIREMENT = decls_block::LAYOUT_REQUIREMENT,
   };
 
   using SILInstNoOperandLayout = BCRecordLayout<
@@ -200,8 +190,8 @@ namespace sil_block {
     BCFixed<1>,          // Is this a declaration. We represent this separately
                          // from whether or not we have entries since we can
                          // have empty witness tables.
-    BCFixed<1>           // IsSerialized.
-    // Conformance follows
+    BCFixed<1>,          // IsSerialized.
+    ProtocolConformanceIDField   // conformance
     // Witness table entries will be serialized after.
   >;
 
@@ -213,15 +203,15 @@ namespace sil_block {
 
   using WitnessBaseEntryLayout = BCRecordLayout<
     SIL_WITNESS_BASE_ENTRY,
-    DeclIDField  // ID of protocol decl
-    // Trailed by the conformance itself.
+    DeclIDField,               // ID of protocol decl
+    ProtocolConformanceIDField // ID of conformance
   >;
 
   using WitnessAssocProtocolLayout = BCRecordLayout<
     SIL_WITNESS_ASSOC_PROTOCOL,
     TypeIDField, // ID of associated type
-    DeclIDField  // ID of ProtocolDecl
-    // Trailed by the conformance itself if appropriate.
+    DeclIDField, // ID of ProtocolDecl
+    ProtocolConformanceIDField
   >;
 
   using WitnessAssocEntryLayout = BCRecordLayout<
@@ -232,8 +222,8 @@ namespace sil_block {
 
   using WitnessConditionalConformanceLayout = BCRecordLayout<
     SIL_WITNESS_CONDITIONAL_CONFORMANCE,
-    TypeIDField // ID of associated type
-    // Trailed by the conformance itself if appropriate.
+    TypeIDField, // ID of associated type
+    ProtocolConformanceIDField // ID of conformance
   >;
 
   using DefaultWitnessTableLayout = BCRecordLayout<
@@ -275,12 +265,13 @@ namespace sil_block {
   using SILFunctionLayout =
       BCRecordLayout<SIL_FUNCTION, SILLinkageField,
                      BCFixed<1>,  // transparent
-                     BCFixed<2>,  // serialized
+                     BCFixed<1>,  // serialized
                      BCFixed<2>,  // thunks: signature optimized/reabstraction
                      BCFixed<1>,  // without_actually_escaping
                      BCFixed<3>,  // specialPurpose
                      BCFixed<2>,  // inlineStrategy
                      BCFixed<2>,  // optimizationMode
+                     BCFixed<3>,  // perfConstraints
                      BCFixed<2>,  // classSubclassScope
                      BCFixed<1>,  // hasCReferences
                      BCFixed<3>,  // side effect info.
@@ -290,12 +281,14 @@ namespace sil_block {
                      BC_AVAIL_TUPLE, // availability for weak linking
                      BCFixed<1>,  // is dynamically replacable
                      BCFixed<1>,  // exact self class
+                     BCFixed<1>,  // is distributed
                      TypeIDField, // SILFunctionType
                      DeclIDField,  // SILFunction name or 0 (replaced function)
+                     DeclIDField,  // SILFunction name or 0 (used ad-hoc requirement witness function)
                      GenericSignatureIDField,
                      DeclIDField, // ClangNode owner
                      BCArray<IdentifierIDField> // Semantics Attribute
-                     // followed by specialize attributes
+                     // followed by specialize and argument effects attributes
                      // followed by generic param list, if any
                      >;
 
@@ -306,7 +299,14 @@ namespace sil_block {
                      GenericSignatureIDField, // specialized signature
                      DeclIDField, // Target SILFunction name or 0.
                      DeclIDField,  // SPIGroup or 0.
-                     DeclIDField // SPIGroup Module name id.
+                     DeclIDField, // SPIGroup Module name id.
+                     BC_AVAIL_TUPLE // Availability
+                     >;
+
+  using SILArgEffectsAttrLayout =
+      BCRecordLayout<SIL_ARG_EFFECTS_ATTR,
+                     IdentifierIDField, // argument effects string
+                     BCFixed<1>         // isDerived
                      >;
 
   // Has an optional argument list where each argument is a typed valueref.
@@ -331,7 +331,7 @@ namespace sil_block {
   using SILOneTypeOneOperandLayout = BCRecordLayout<
     SIL_ONE_TYPE_ONE_OPERAND,
     SILInstOpCodeField,
-    BCFixed<2>,          // Optional attributes
+    BCFixed<2>,          // Optional attribute
     TypeIDField,
     SILTypeCategoryField,
     TypeIDField,
@@ -349,8 +349,7 @@ namespace sil_block {
     SILTypeCategoryField, // operand type category
     ValueIDField,         // operand id
     TypeIDField,          // formal concrete type
-    BCVBR<5>              // # of protocol conformances
-    // Trailed by protocol conformance info (if any)
+    BCArray<ProtocolConformanceIDField> // protocol conformances
   >;
 
   // SIL instructions with one type and a list of values.
@@ -361,6 +360,16 @@ namespace sil_block {
     SILTypeCategoryField,
     BCArray<ValueIDField>
   >;
+
+  // SIL instructions with one type, forwarding ownership, and a list of values.
+  // For OwnershipForwardingTermInst.
+  using SILOneTypeOwnershipValuesLayout = BCRecordLayout<
+    SIL_ONE_TYPE_OWNERSHIP_VALUES,
+    SILInstOpCodeField,
+    SILValueOwnershipField,
+    TypeIDField,
+    SILTypeCategoryField,
+    BCArray<ValueIDField>>;
 
   enum ApplyKind : unsigned {
     SIL_APPLY = 0,
@@ -385,7 +394,7 @@ namespace sil_block {
   using SILOneTypeLayout = BCRecordLayout<
     SIL_ONE_TYPE,
     SILInstOpCodeField,
-    BCFixed<2>,          // Optional attributes
+    BCFixed<3>,          // Optional attributes
     TypeIDField,
     SILTypeCategoryField
   >;
@@ -406,6 +415,13 @@ namespace sil_block {
     BCFixed<6>, // Optional attributes
     TypeIDField, SILTypeCategoryField, ValueIDField
   >;
+
+  // SIL instructions with one type, one typed valueref, and extra bits.
+  using SILOneTypeOneOperandExtraAttributeLayout =
+      BCRecordLayout<SIL_ONE_TYPE_ONE_OPERAND_EXTRA_ATTR, SILInstOpCodeField,
+                     BCFixed<10>, // Optional attributes
+                     TypeIDField, SILTypeCategoryField, TypeIDField,
+                     SILTypeCategoryField, ValueIDField>;
 
   // SIL instructions with two typed values.
   using SILTwoOperandsLayout = BCRecordLayout<
@@ -453,8 +469,8 @@ namespace sil_block {
     TypeIDField,           // Optional
     SILTypeCategoryField,  // opened
     ValueIDField,          // existential
+    ProtocolConformanceIDField,    // conformance
     BCArray<ValueIDField>  // SILDeclRef
-    // may be trailed by an inline protocol conformance
   >;
 
   using SILInstDifferentiableFunctionLayout = BCRecordLayout<

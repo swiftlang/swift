@@ -1,9 +1,8 @@
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking %import-libdispatch)
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking)
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
-// REQUIRES: libdispatch
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
 actor Page {

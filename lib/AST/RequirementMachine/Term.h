@@ -50,11 +50,11 @@ class Term final {
 public:
   size_t size() const;
 
-  ArrayRef<Symbol>::iterator begin() const;
-  ArrayRef<Symbol>::iterator end() const;
+  const Symbol *begin() const;
+  const Symbol *end() const;
 
-  ArrayRef<Symbol>::reverse_iterator rbegin() const;
-  ArrayRef<Symbol>::reverse_iterator rend() const;
+  std::reverse_iterator<const Symbol *> rbegin() const;
+  std::reverse_iterator<const Symbol *> rend() const;
 
   Symbol back() const;
 
@@ -65,13 +65,21 @@ public:
     return Ptr;
   }
 
-  static Term get(const MutableTerm &term, RewriteContext &ctx);
-
-  ArrayRef<const ProtocolDecl *> getRootProtocols() const {
-    return begin()->getRootProtocols();
+  static Term fromOpaquePointer(void *ptr) {
+    return Term((Storage *) ptr);
   }
 
+  static Term get(const MutableTerm &term, RewriteContext &ctx);
+
+  const ProtocolDecl *getRootProtocol() const {
+    return begin()->getRootProtocol();
+  }
+
+  bool containsUnresolvedSymbols() const;
+
   void dump(llvm::raw_ostream &out) const;
+
+  Optional<int> compare(Term other, RewriteContext &ctx) const;
 
   friend bool operator==(Term lhs, Term rhs) {
     return lhs.Ptr == rhs.Ptr;
@@ -107,8 +115,8 @@ public:
   /// to become valid.
   MutableTerm() {}
 
-  explicit MutableTerm(decltype(Symbols)::const_iterator begin,
-                       decltype(Symbols)::const_iterator end)
+  explicit MutableTerm(const Symbol *begin,
+                       const Symbol *end)
     : Symbols(begin, end) {}
 
   explicit MutableTerm(llvm::SmallVector<Symbol, 3> &&symbols)
@@ -132,32 +140,31 @@ public:
     Symbols.append(other.begin(), other.end());
   }
 
-  void append(decltype(Symbols)::const_iterator from,
-              decltype(Symbols)::const_iterator to) {
+  void append(const Symbol *from, const Symbol *to) {
     Symbols.append(from, to);
   }
 
-  int compare(const MutableTerm &other, const ProtocolGraph &protos) const;
+  Optional<int> compare(const MutableTerm &other, RewriteContext &ctx) const;
 
   bool empty() const { return Symbols.empty(); }
 
   size_t size() const { return Symbols.size(); }
 
-  ArrayRef<const ProtocolDecl *> getRootProtocols() const {
-    return begin()->getRootProtocols();
+  const ProtocolDecl *getRootProtocol() const {
+    return begin()->getRootProtocol();
   }
 
-  decltype(Symbols)::const_iterator begin() const { return Symbols.begin(); }
-  decltype(Symbols)::const_iterator end() const { return Symbols.end(); }
+  const Symbol *begin() const { return Symbols.begin(); }
+  const Symbol *end() const { return Symbols.end(); }
 
-  decltype(Symbols)::iterator begin() { return Symbols.begin(); }
-  decltype(Symbols)::iterator end() { return Symbols.end(); }
+  Symbol *begin() { return Symbols.begin(); }
+  Symbol *end() { return Symbols.end(); }
 
-  decltype(Symbols)::const_reverse_iterator rbegin() const { return Symbols.rbegin(); }
-  decltype(Symbols)::const_reverse_iterator rend() const { return Symbols.rend(); }
+  std::reverse_iterator<const Symbol *> rbegin() const { return Symbols.rbegin(); }
+  std::reverse_iterator<const Symbol *> rend() const { return Symbols.rend(); }
 
-  decltype(Symbols)::reverse_iterator rbegin() { return Symbols.rbegin(); }
-  decltype(Symbols)::reverse_iterator rend() { return Symbols.rend(); }
+  std::reverse_iterator<Symbol *> rbegin() { return Symbols.rbegin(); }
+  std::reverse_iterator<Symbol *> rend() { return Symbols.rend(); }
 
   Symbol back() const {
     return Symbols.back();
@@ -175,9 +182,7 @@ public:
     return Symbols[index];
   }
 
-  void rewriteSubTerm(decltype(Symbols)::iterator from,
-                      decltype(Symbols)::iterator to,
-                      Term rhs);
+  void rewriteSubTerm(Symbol *from, Symbol *to, Term rhs);
 
   void dump(llvm::raw_ostream &out) const;
 
@@ -202,5 +207,37 @@ public:
 } // end namespace rewriting
 
 } // end namespace swift
+
+namespace llvm {
+  template<> struct DenseMapInfo<swift::rewriting::Term> {
+    static swift::rewriting::Term getEmptyKey() {
+      return swift::rewriting::Term::fromOpaquePointer(
+        llvm::DenseMapInfo<void *>::getEmptyKey());
+    }
+    static swift::rewriting::Term getTombstoneKey() {
+      return swift::rewriting::Term::fromOpaquePointer(
+        llvm::DenseMapInfo<void *>::getTombstoneKey());
+    }
+    static unsigned getHashValue(swift::rewriting::Term Val) {
+      return DenseMapInfo<void *>::getHashValue(Val.getOpaquePointer());
+    }
+    static bool isEqual(swift::rewriting::Term LHS,
+                        swift::rewriting::Term RHS) {
+      return LHS == RHS;
+    }
+  };
+
+  template<>
+  struct PointerLikeTypeTraits<swift::rewriting::Term> {
+  public:
+    static inline void *getAsVoidPointer(swift::rewriting::Term Val) {
+      return const_cast<void *>(Val.getOpaquePointer());
+    }
+    static inline swift::rewriting::Term getFromVoidPointer(void *Ptr) {
+      return swift::rewriting::Term::fromOpaquePointer(Ptr);
+    }
+    enum { NumLowBitsAvailable = 1 };
+  };
+} // end namespace llvm
 
 #endif

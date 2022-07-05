@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s -requirement-machine=verify
+// RUN: %target-swift-emit-silgen %s
 
 // The substituted type of SS.x.x is computed by taking the type of S.x,
 // which is T.T in the generic signature <T where T : P>, and then

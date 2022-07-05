@@ -20,7 +20,7 @@
 #include "swift/AST/SILOptions.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVMInitialize.h"
-#include "swift/Basic/InitializeLibSwift.h"
+#include "swift/Basic/InitializeSwiftModules.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -31,6 +31,7 @@
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/Serialization/SerializationOptions.h"
+#include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "swift/IRGen/IRGenPublic.h"
 #include "swift/IRGen/IRGenSILPasses.h"
 #include "llvm/ADT/Statistic.h"
@@ -56,6 +57,18 @@ enum class OptGroup {
   Performance,
   Lowering
 };
+
+Optional<bool> toOptionalBool(llvm::cl::boolOrDefault defaultable) {
+  switch (defaultable) {
+  case llvm::cl::BOU_TRUE:
+    return true;
+  case llvm::cl::BOU_FALSE:
+    return false;
+  case llvm::cl::BOU_UNSET:
+    return None;
+  }
+  llvm_unreachable("Bad case for llvm::cl::boolOrDefault!");
+}
 
 } // end anonymous namespace
 
@@ -104,6 +117,21 @@ static llvm::cl::opt<bool>
 EnableExperimentalConcurrency("enable-experimental-concurrency",
                    llvm::cl::desc("Enable experimental concurrency model."));
 
+static llvm::cl::opt<llvm::cl::boolOrDefault> EnableLexicalLifetimes(
+    "enable-lexical-lifetimes", llvm::cl::init(llvm::cl::BOU_UNSET),
+    llvm::cl::desc("Enable lexical lifetimes. Mutually exclusive with "
+                   "enable-lexical-borrow-scopes and "
+                   "disable-lexical-lifetimes."));
+
+static llvm::cl::opt<llvm::cl::boolOrDefault>
+    EnableLexicalBorrowScopes("enable-lexical-borrow-scopes",
+                              llvm::cl::init(llvm::cl::BOU_UNSET),
+                              llvm::cl::desc("Enable lexical borrow scopes."));
+
+static llvm::cl::opt<llvm::cl::boolOrDefault> EnableExperimentalMoveOnly(
+    "enable-experimental-move-only", llvm::cl::init(llvm::cl::BOU_UNSET),
+    llvm::cl::desc("Enable experimental move-only semantics."));
+
 static llvm::cl::opt<bool>
 EnableExperimentalDistributed("enable-experimental-distributed",
                    llvm::cl::desc("Enable experimental distributed actors."));
@@ -122,13 +150,97 @@ static llvm::cl::opt<bool> EnableOSSAModules(
                    "this is disabled we do not serialize in OSSA "
                    "form when optimizing."));
 
-static llvm::cl::opt<bool> EnableCopyPropagation(
-    "enable-copy-propagation",
-    llvm::cl::desc("Enable the copy propagation pass."));
+namespace llvm {
 
-static llvm::cl::opt<bool> DisableCopyPropagation(
-    "disable-copy-propagation",
-    llvm::cl::desc("Disable the copy propagation pass."));
+inline raw_ostream &operator<<(raw_ostream &os,
+                               const Optional<CopyPropagationOption> option) {
+  if (option) {
+    switch (*option) {
+    case CopyPropagationOption::Off:
+      os << "off";
+      break;
+    case CopyPropagationOption::RequestedPassesOnly:
+      os << "requested-passes-only";
+      break;
+    case CopyPropagationOption::On:
+      os << "on";
+      break;
+    }
+  } else {
+    os << "<none>";
+  }
+  return os;
+}
+
+namespace cl {
+template <>
+class parser<::Optional<CopyPropagationOption>>
+    : public basic_parser<::Optional<CopyPropagationOption>> {
+public:
+  parser(Option &O) : basic_parser<::Optional<CopyPropagationOption>>(O) {}
+
+  // parse - Return true on error.
+  bool parse(Option &O, StringRef ArgName, StringRef Arg,
+             ::Optional<CopyPropagationOption> &Value) {
+    if (Arg == "" || Arg == "true" || Arg == "TRUE" || Arg == "True" ||
+        Arg == "1") {
+      Value = CopyPropagationOption::On;
+      return false;
+    }
+    if (Arg == "false" || Arg == "FALSE" || Arg == "False" || Arg == "0") {
+      Value = CopyPropagationOption::Off;
+      return false;
+    }
+    if (Arg == "requested-passes-only" || Arg == "REQUESTED-PASSES-ONLY" ||
+        Arg == "Requested-Passes-Only") {
+      Value = CopyPropagationOption::RequestedPassesOnly;
+      return false;
+    }
+
+    return O.error("'" + Arg +
+                   "' is invalid for CopyPropagationOption! Try true, false, "
+                   "or requested-passes-only.");
+  }
+
+  void initialize() {}
+
+  enum ValueExpected getValueExpectedFlagDefault() const {
+    return ValueOptional;
+  }
+
+  StringRef getValueName() const override { return "CopyPropagationOption"; }
+
+  // Instantiate the macro PRINT_OPT_DIFF of llvm_project's CommandLine.cpp at
+  // ::Optional<CopyPropagationOption>.
+  void printOptionDiff(const Option &O, ::Optional<CopyPropagationOption> V,
+                       OptionValue<::Optional<CopyPropagationOption>> D,
+                       size_t GlobalWidth) const {
+    size_t MaxOptWidth = 8;
+    printOptionName(O, GlobalWidth);
+    std::string Str;
+    {
+      raw_string_ostream SS(Str);
+      SS << V;
+    }
+    outs() << "= " << Str;
+    size_t NumSpaces = MaxOptWidth > Str.size() ? MaxOptWidth - Str.size() : 0;
+    outs().indent(NumSpaces) << " (default:";
+    if (D.hasValue())
+      outs() << D.getValue();
+    else
+      outs() << "*no default*";
+    outs() << ")\n";
+  }
+};
+} // end namespace cl
+} // end namespace llvm
+
+static llvm::cl::opt<Optional<CopyPropagationOption>, /*ExternalStorage*/ false,
+                     llvm::cl::parser<Optional<CopyPropagationOption>>>
+    CopyPropagationState(
+        "enable-copy-propagation",
+        llvm::cl::desc("Whether to run the copy propagation pass: "
+                       "'true', 'false', or 'requested-passes-only'."));
 
 namespace {
 enum class EnforceExclusivityMode {
@@ -164,6 +276,37 @@ SDKPath("sdk", llvm::cl::desc("The path to the SDK for use with the clang "
 static llvm::cl::opt<std::string>
 Target("target", llvm::cl::desc("target triple"),
        llvm::cl::init(llvm::sys::getDefaultTargetTriple()));
+
+// This primarily determines semantics of debug information. The compiler does
+// not directly expose a "preserve debug info mode". It is derived from the
+// optimization level. At -Onone, all debug info must be preserved. At higher
+// levels, debug info cannot change the compiler output.
+//
+// Diagnostics should be "equivalent" at all levels. For example, programs that
+// compile at -Onone should compile at -O. However, it is difficult to guarantee
+// identical diagnostic output given the changes in SIL caused by debug info
+// preservation.
+static llvm::cl::opt<OptimizationMode> OptModeFlag(
+    "opt-mode", llvm::cl::desc("optimization mode"),
+    llvm::cl::values(clEnumValN(OptimizationMode::NoOptimization, "none",
+                                "preserve debug info"),
+                     clEnumValN(OptimizationMode::ForSize, "size",
+                                "ignore debug info, reduce size"),
+                     clEnumValN(OptimizationMode::ForSpeed, "speed",
+                                "ignore debug info, reduce runtime")),
+    llvm::cl::init(OptimizationMode::NotSet));
+
+static llvm::cl::opt<IRGenDebugInfoLevel> IRGenDebugInfoLevelArg(
+    "irgen-debuginfo-level", llvm::cl::desc("IRGen debug info level"),
+    llvm::cl::values(clEnumValN(IRGenDebugInfoLevel::None, "none",
+                                "No debug info"),
+                     clEnumValN(IRGenDebugInfoLevel::LineTables, "line-tables",
+                                "Line tables only"),
+                     clEnumValN(IRGenDebugInfoLevel::ASTTypes, "ast-types",
+                                "Line tables + AST type references"),
+                     clEnumValN(IRGenDebugInfoLevel::DwarfTypes, "dwarf-types",
+                                "Line tables + AST type refs + Dwarf types")),
+    llvm::cl::init(IRGenDebugInfoLevel::ASTTypes));
 
 static llvm::cl::opt<OptGroup> OptimizationGroup(
     llvm::cl::desc("Predefined optimization groups:"),
@@ -241,6 +384,9 @@ EmitVerboseSIL("emit-verbose-sil",
 static llvm::cl::opt<bool>
 EmitSIB("emit-sib", llvm::cl::desc("Emit serialized AST + SIL file(s)"));
 
+static llvm::cl::opt<bool>
+Serialize("serialize", llvm::cl::desc("Emit serialized AST + SIL file(s)"));
+
 static llvm::cl::opt<std::string>
 ModuleCachePath("module-cache-path", llvm::cl::desc("Clang module cache path"));
 
@@ -315,7 +461,7 @@ static cl::opt<std::string> RemarksFormat(
     cl::value_desc("format"), cl::init("yaml"));
 
 static llvm::cl::opt<bool>
-    EnableCxxInterop("enable-cxx-interop",
+    EnableCxxInterop("enable-experimental-cxx-interop",
                      llvm::cl::desc("Enable C++ interop."),
                      llvm::cl::init(false));
 
@@ -324,17 +470,15 @@ static llvm::cl::opt<bool>
                        llvm::cl::desc("Ignore [always_inline] attribute."),
                        llvm::cl::init(false));
 
-static llvm::cl::opt<std::string> EnableRequirementMachine(
-    "requirement-machine",
-    llvm::cl::desc("Control usage of experimental generics implementation: "
-                   "'on', 'off', or 'verify'."));
-
 static void runCommandLineSelectedPasses(SILModule *Module,
                                          irgen::IRGenModule *IRGenMod) {
-  auto &opts = Module->getOptions();
+  const SILOptions &opts = Module->getOptions();
+  // If a specific pass was requested with -opt-mode=None, run the pass as a
+  // mandatory pass.
+  bool isMandatory = opts.OptMode == OptimizationMode::NoOptimization;
   executePassPipelinePlan(
       Module, SILPassPipelinePlan::getPassPipelineForKinds(opts, Passes),
-      /*isMandatory*/ false, IRGenMod);
+      isMandatory, IRGenMod);
 
   if (Module->getOptions().VerifyAll)
     Module->verify();
@@ -371,7 +515,7 @@ int main(int argc, char **argv) {
 
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift SIL optimizer\n");
 
-  initializeLibSwift();
+  initializeSwiftModules();
 
   if (PrintStats)
     llvm::EnableStatistics();
@@ -415,47 +559,32 @@ int main(int argc, char **argv) {
   }
   Invocation.getLangOptions().EnableExperimentalConcurrency =
     EnableExperimentalConcurrency;
-  Invocation.getLangOptions().EnableExperimentalDistributed =
-    EnableExperimentalDistributed;
+  Optional<bool> enableExperimentalMoveOnly =
+      toOptionalBool(EnableExperimentalMoveOnly);
+  if (enableExperimentalMoveOnly && *enableExperimentalMoveOnly)
+    Invocation.getLangOptions().Features.insert(Feature::MoveOnly);
 
   Invocation.getLangOptions().EnableObjCInterop =
     EnableObjCInterop ? true :
     DisableObjCInterop ? false : llvm::Triple(Target).isOSDarwin();
-
-  Invocation.getLangOptions().EnableSILOpaqueValues = EnableSILOpaqueValues;
 
   Invocation.getLangOptions().OptimizationRemarkPassedPattern =
       createOptRemarkRegex(PassRemarksPassed);
   Invocation.getLangOptions().OptimizationRemarkMissedPattern =
       createOptRemarkRegex(PassRemarksMissed);
 
-  Invocation.getLangOptions().EnableExperimentalStaticAssert =
-      EnableExperimentalStaticAssert;
+  if (EnableExperimentalStaticAssert)
+    Invocation.getLangOptions().Features.insert(Feature::StaticAssert);
 
-  Invocation.getLangOptions().EnableExperimentalDifferentiableProgramming =
-      EnableExperimentalDifferentiableProgramming;
+  if (EnableExperimentalDifferentiableProgramming) {
+    Invocation.getLangOptions().Features.insert(
+        Feature::DifferentiableProgramming);
+  }
 
   Invocation.getLangOptions().EnableCXXInterop = EnableCxxInterop;
 
   Invocation.getDiagnosticOptions().VerifyMode =
       VerifyMode ? DiagnosticOptions::Verify : DiagnosticOptions::NoVerify;
-
-  if (EnableRequirementMachine.size()) {
-    auto value = llvm::StringSwitch<Optional<RequirementMachineMode>>(
-        EnableRequirementMachine)
-      .Case("off", RequirementMachineMode::Disabled)
-      .Case("on", RequirementMachineMode::Enabled)
-      .Case("verify", RequirementMachineMode::Verify)
-      .Default(None);
-
-    if (value)
-      Invocation.getLangOptions().EnableRequirementMachine = *value;
-    else {
-      fprintf(stderr, "Invalid value for -requirement-machine flag: %s\n",
-              EnableRequirementMachine.c_str());
-      exit(-1);
-    }
-  }
 
   // Setup the SIL Options.
   SILOptions &SILOpts = Invocation.getSILOptions();
@@ -464,11 +593,11 @@ int main(int argc, char **argv) {
   SILOpts.VerifyNone = SILVerifyNone;
   SILOpts.RemoveRuntimeAsserts = RemoveRuntimeAsserts;
   SILOpts.AssertConfig = AssertConfId;
-  if (OptimizationGroup != OptGroup::Diagnostics)
-    SILOpts.OptMode = OptimizationMode::ForSpeed;
   SILOpts.VerifySILOwnership = !DisableSILOwnershipVerifier;
   SILOpts.OptRecordFile = RemarksFilename;
   SILOpts.OptRecordPasses = RemarksPasses;
+  SILOpts.checkSILModuleLeaks = true;
+  SILOpts.EnablePerformanceAnnotations = true;
 
   SILOpts.VerifyExclusivity = VerifyExclusivity;
   if (EnforceExclusivity.getNumOccurrences() != 0) {
@@ -502,8 +631,73 @@ int main(int argc, char **argv) {
   SILOpts.EnableSpeculativeDevirtualization = EnableSpeculativeDevirtualization;
   SILOpts.IgnoreAlwaysInline = IgnoreAlwaysInline;
   SILOpts.EnableOSSAModules = EnableOSSAModules;
-  SILOpts.EnableCopyPropagation = EnableCopyPropagation;
-  SILOpts.DisableCopyPropagation = DisableCopyPropagation;
+  SILOpts.EnableSILOpaqueValues = EnableSILOpaqueValues;
+
+  if (CopyPropagationState) {
+    SILOpts.CopyPropagation = *CopyPropagationState;
+  }
+
+  // Unless overridden below, enabling copy propagation means enabling lexical
+  // lifetimes.
+  if (SILOpts.CopyPropagation == CopyPropagationOption::On)
+    SILOpts.LexicalLifetimes = LexicalLifetimesOption::On;
+
+  // Unless overridden below, disable copy propagation means disabling lexical
+  // lifetimes.
+  if (SILOpts.CopyPropagation == CopyPropagationOption::Off)
+    SILOpts.LexicalLifetimes = LexicalLifetimesOption::DiagnosticMarkersOnly;
+
+  Optional<bool> enableLexicalLifetimes =
+      toOptionalBool(EnableLexicalLifetimes);
+  Optional<bool> enableLexicalBorrowScopes =
+      toOptionalBool(EnableLexicalBorrowScopes);
+
+  // Enable lexical lifetimes if it is set or if experimental move only is
+  // enabled. This is because move only depends on lexical lifetimes being
+  // enabled and it saved some typing ; ).
+  bool specifiedLexicalLifetimesEnabled =
+      enableExperimentalMoveOnly && *enableExperimentalMoveOnly &&
+      enableLexicalLifetimes && *enableLexicalLifetimes;
+  if (specifiedLexicalLifetimesEnabled && enableLexicalBorrowScopes &&
+      !*enableLexicalBorrowScopes) {
+    fprintf(
+        stderr,
+        "Error! Cannot specify both -enable-lexical-borrow-scopes=false and "
+        "either -enable-lexical-lifetimes or -enable-experimental-move-only.");
+    exit(-1);
+  }
+  if (enableLexicalLifetimes)
+    SILOpts.LexicalLifetimes =
+        *enableLexicalLifetimes ? LexicalLifetimesOption::On
+                                : LexicalLifetimesOption::DiagnosticMarkersOnly;
+  if (enableLexicalBorrowScopes)
+    SILOpts.LexicalLifetimes =
+        *enableLexicalBorrowScopes
+            ? LexicalLifetimesOption::DiagnosticMarkersOnly
+            : LexicalLifetimesOption::Off;
+
+  if (OptModeFlag == OptimizationMode::NotSet) {
+    if (OptimizationGroup == OptGroup::Diagnostics)
+      SILOpts.OptMode = OptimizationMode::NoOptimization;
+    else
+      SILOpts.OptMode = OptimizationMode::ForSpeed;
+  } else {
+    SILOpts.OptMode = OptModeFlag;
+  }
+
+  auto &IRGenOpts = Invocation.getIRGenOptions();
+  if (OptModeFlag == OptimizationMode::NotSet) {
+    if (OptimizationGroup == OptGroup::Diagnostics)
+      IRGenOpts.OptMode = OptimizationMode::NoOptimization;
+    else
+      IRGenOpts.OptMode = OptimizationMode::ForSpeed;
+  } else {
+    IRGenOpts.OptMode = OptModeFlag;
+  }
+  IRGenOpts.DebugInfoLevel = IRGenDebugInfoLevelArg;
+
+  // Note: SILOpts, LangOpts, and IRGenOpts must be set before the
+  // CompilerInstance is initializer below based on Invocation.
 
   serialization::ExtendedValidationInfo extendedInfo;
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
@@ -544,8 +738,11 @@ int main(int argc, char **argv) {
     return retValue ? retValue : diagnosticsError;
   };
 
-  if (CI.setup(Invocation))
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    llvm::errs() << InstanceSetupError << '\n';
     return finishDiagProcessing(1);
+  }
 
   CI.performSema();
 
@@ -598,14 +795,15 @@ int main(int argc, char **argv) {
   case OptGroup::Unknown: {
     auto T = irgen::createIRGenModule(
         SILMod.get(), Invocation.getOutputFilenameForAtMostOnePrimary(),
-        Invocation.getMainInputFilenameForDebugInfoForAtMostOnePrimary(), "");
+        Invocation.getMainInputFilenameForDebugInfoForAtMostOnePrimary(), "",
+        IRGenOpts);
     runCommandLineSelectedPasses(SILMod.get(), T.second);
     irgen::deleteIRGenModule(T);
     break;
   }
   }
 
-  if (EmitSIB) {
+  if (EmitSIB || Serialize) {
     llvm::SmallString<128> OutputFile;
     if (OutputFilename.size()) {
       OutputFile = OutputFilename;
@@ -621,10 +819,12 @@ int main(int argc, char **argv) {
 
     SerializationOptions serializationOpts;
     serializationOpts.OutputPath = OutputFile.c_str();
-    serializationOpts.SerializeAllSIL = true;
-    serializationOpts.IsSIB = true;
+    serializationOpts.SerializeAllSIL = EmitSIB;
+    serializationOpts.IsSIB = EmitSIB;
 
-    serialize(CI.getMainModule(), serializationOpts, SILMod.get());
+    symbolgraphgen::SymbolGraphOptions symbolGraphOptions;
+
+    serialize(CI.getMainModule(), serializationOpts, symbolGraphOptions, SILMod.get());
   } else {
     const StringRef OutputFile = OutputFilename.size() ?
                                    StringRef(OutputFilename) : "-";
@@ -635,7 +835,7 @@ int main(int argc, char **argv) {
       SILMod->print(llvm::outs(), CI.getMainModule(), SILOpts, !DisableASTDump);
     } else {
       std::error_code EC;
-      llvm::raw_fd_ostream OS(OutputFile, EC, llvm::sys::fs::F_None);
+      llvm::raw_fd_ostream OS(OutputFile, EC, llvm::sys::fs::OF_None);
       if (EC) {
         llvm::errs() << "while opening '" << OutputFile << "': "
                      << EC.message() << '\n';

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -12,7 +12,7 @@
 
 import TestsUtils
 
-public let ReversedCollections = [
+public let benchmarks = [
   BenchmarkInfo(name: "ReversedArray2", runFunction: run_ReversedArray, tags: [.validation, .api, .Array],
       setUpFunction: { blackHole(arrayInput) },
       tearDownFunction: { arrayInput = nil }),
@@ -29,12 +29,12 @@ let length = 100_000
 var arrayInput: [Int]! = Array(repeating: 1, count: length).reversed()
 
 @inline(never)
-public func run_ReversedArray(_ N: Int) {
+public func run_ReversedArray(_ n: Int) {
   let reversedArray: [Int] = arrayInput
 
   // Iterate over the underlying type
   // ReversedRandomAccessCollection<Array<Int>>
-  for _ in 1...N {
+  for _ in 1...n {
     for item in reversedArray {
       blackHole(item)
     }
@@ -42,10 +42,10 @@ public func run_ReversedArray(_ N: Int) {
 }
 
 @inline(never)
-public func run_ReversedBidirectional(_ N: Int) {
+public func run_ReversedBidirectional(_ n: Int) {
   // Iterate over the underlying type
   // ReversedCollection<AnyBidirectionalCollection<Int>>
-  for _ in 1...N {
+  for _ in 1...n {
     let bidirectional = AnyBidirectionalCollection(0..<length)
     let reversedBidirectional = bidirectional.reversed()
     for item in reversedBidirectional {
@@ -63,12 +63,12 @@ var dictionaryInput: [(Int, Int)]! = {
 }()
 
 @inline(never)
-public func run_ReversedDictionary(_ N: Int) {
+public func run_ReversedDictionary(_ n: Int) {
   let reversedDictionary: [(Int, Int)] = dictionaryInput
 
   // Iterate over the underlying type
   // Array<(Int, Int)>
-  for _ in 1...N {
+  for _ in 1...n {
     for (key, value) in reversedDictionary {
       blackHole(key)
       blackHole(value)

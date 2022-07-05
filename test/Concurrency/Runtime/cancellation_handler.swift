@@ -3,8 +3,9 @@
 // REQUIRES: executable_test
 
 // rdar://76038845
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
+// UNSUPPORTED: single_threaded_concurrency
 
 // for sleep
 #if canImport(Darwin)
@@ -21,7 +22,7 @@ class Canary {
   }
 }
 
-if #available(SwiftStdlib 5.5, *) {
+if #available(SwiftStdlib 5.1, *) {
   let task = detach {
     let canary = Canary()
     _ = await Task.withCancellationHandler {

@@ -22,7 +22,6 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#include "llvm/Support/ErrorHandling.h"
 #define DEBUG_TYPE "sil-ownership-model-eliminator"
 
 #include "swift/Basic/BlotSetVector.h"
@@ -36,6 +35,7 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/ErrorHandling.h"
 
 using namespace swift;
 
@@ -132,6 +132,7 @@ struct OwnershipModelEliminatorVisitor
   bool visitStoreInst(StoreInst *si);
   bool visitStoreBorrowInst(StoreBorrowInst *si);
   bool visitCopyValueInst(CopyValueInst *cvi);
+  bool visitExplicitCopyValueInst(ExplicitCopyValueInst *cvi);
   bool visitDestroyValueInst(DestroyValueInst *dvi);
   bool visitLoadBorrowInst(LoadBorrowInst *lbi);
   bool visitBeginBorrowInst(BeginBorrowInst *bbi) {
@@ -180,6 +181,7 @@ struct OwnershipModelEliminatorVisitor
     return true;                                                               \
   }
   HANDLE_FORWARDING_INST(ConvertFunction)
+  HANDLE_FORWARDING_INST(MoveOnlyWrapperToCopyableValue)
   HANDLE_FORWARDING_INST(Upcast)
   HANDLE_FORWARDING_INST(UncheckedRefCast)
   HANDLE_FORWARDING_INST(RefToBridgeObject)
@@ -275,6 +277,21 @@ bool OwnershipModelEliminatorVisitor::visitLoadBorrowInst(LoadBorrowInst *lbi) {
 }
 
 bool OwnershipModelEliminatorVisitor::visitCopyValueInst(CopyValueInst *cvi) {
+  // A copy_value of an address-only type cannot be replaced.
+  if (cvi->getType().isAddressOnly(*cvi->getFunction()))
+    return false;
+
+  // Now that we have set the unqualified ownership flag, destroy value
+  // operation will delegate to the appropriate strong_release, etc.
+  withBuilder<void>(cvi, [&](SILBuilder &b, SILLocation loc) {
+    b.emitCopyValueOperation(loc, cvi->getOperand());
+  });
+  eraseInstructionAndRAUW(cvi, cvi->getOperand());
+  return true;
+}
+
+bool OwnershipModelEliminatorVisitor::visitExplicitCopyValueInst(
+    ExplicitCopyValueInst *cvi) {
   // A copy_value of an address-only type cannot be replaced.
   if (cvi->getType().isAddressOnly(*cvi->getFunction()))
     return false;
@@ -650,10 +667,4 @@ SILTransform *swift::createOwnershipModelEliminator() {
 SILTransform *swift::createNonTransparentFunctionOwnershipModelEliminator() {
   return new OwnershipModelEliminator(true /*skip transparent*/,
                                       false /*ignore stdlib*/);
-}
-
-SILTransform *
-swift::createNonStdlibNonTransparentFunctionOwnershipModelEliminator() {
-  return new OwnershipModelEliminator(true /*skip transparent*/,
-                                      true /*ignore stdlib*/);
 }

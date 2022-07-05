@@ -1,4 +1,3 @@
-
 // RUN: %target-swift-emit-silgen -module-name generic_closures  -parse-stdlib %s | %FileCheck %s
 
 import Swift
@@ -207,7 +206,7 @@ class Class {}
 protocol HasClassAssoc { associatedtype Assoc : Class }
 
 // CHECK-LABEL: sil hidden [ossa] @$s16generic_closures027captures_class_constrained_A0_1fyx_5AssocQzAEctAA08HasClassF0RzlF
-// CHECK: bb0([[ARG1:%.*]] : $*T, [[ARG2:%.*]] : @guaranteed $@callee_guaranteed @substituted <τ_0_0, τ_0_1 where τ_0_0 : _RefCountedObject, τ_0_1 : _RefCountedObject> (@guaranteed τ_0_0) -> @owned τ_0_1 for <T.Assoc, T.Assoc>):
+// CHECK: bb0([[ARG1:%.*]] : $*T, [[ARG2:%.*]] : @guaranteed $@callee_guaranteed @substituted <τ_0_0, τ_0_1 where τ_0_0 : _NativeClass, τ_0_1 : _NativeClass> (@guaranteed τ_0_0) -> @owned τ_0_1 for <T.Assoc, T.Assoc>):
 // CHECK: [[GENERIC_FN:%.*]] = function_ref @$s16generic_closures027captures_class_constrained_A0_1fyx_5AssocQzAEctAA08HasClassF0RzlFA2EcycfU_
 // CHECK: [[ARG2_COPY:%.*]] = copy_value [[ARG2]]
 // CHECK: [[CONCRETE_FN:%.*]] = partial_apply [callee_guaranteed] [[GENERIC_FN]]<T>([[ARG2_COPY]])

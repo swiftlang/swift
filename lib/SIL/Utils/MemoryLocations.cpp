@@ -67,34 +67,6 @@ static bool allUsesInSameBlock(AllocStackInst *ASI) {
   return numDeallocStacks == 1;
 }
 
-/// We don't handle empty tuples and empty structs.
-///
-/// Locations with empty types don't even need a store to count as
-/// "initialized". We don't handle such cases.
-static bool isEmptyType(SILType ty, SILFunction *function) {
-  if (auto tupleTy = ty.getAs<TupleType>()) {
-    // A tuple is empty if it either has no elements or if all elements are
-    // empty.
-    for (unsigned idx = 0, num = tupleTy->getNumElements(); idx < num; ++idx) {
-      if (!isEmptyType(ty.getTupleElementType(idx), function))
-        return false;
-    }
-    return true;
-  }
-  if (StructDecl *structDecl = ty.getStructOrBoundGenericStruct()) {
-    // Also, a struct is empty if it either has no fields or if all fields are
-    // empty.
-    SILModule &module = function->getModule();
-    TypeExpansionContext typeEx = function->getTypeExpansionContext();
-    for (VarDecl *field : structDecl->getStoredProperties()) {
-      if (!isEmptyType(ty.getFieldType(field, module, typeEx), function))
-        return false;
-    }
-    return true;
-  }
-  return false;
-}
-
 } // anonymous namespace
 } // namespace swift
 
@@ -117,7 +89,7 @@ MemoryLocations::Location::Location(SILValue val, unsigned index, int parentIdx)
 
 void MemoryLocations::Location::updateFieldCounters(SILType ty, int increment) {
   SILFunction *function = representativeValue->getFunction();
-  if (!isEmptyType(ty, function)) {
+  if (!ty.isEmpty(*function)) {
     numFieldsNotCoveredBySubfields += increment;
     if (!ty.isTrivial(*function))
       numNonTrivialFieldsNotCovered += increment;
@@ -215,7 +187,11 @@ void MemoryLocations::analyzeLocation(SILValue loc) {
   if (!handleTrivialLocations && loc->getType().isTrivial(*function))
     return;
 
-  if (isEmptyType(loc->getType(), function))
+  /// We don't handle empty tuples and empty structs.
+  ///
+  /// Locations with empty types don't even need a store to count as
+  /// "initialized". We don't handle such cases.
+  if (loc->getType().isEmpty(*function))
     return;
 
   unsigned currentLocIdx = locations.size();
@@ -224,7 +200,7 @@ void MemoryLocations::analyzeLocation(SILValue loc) {
   SubLocationMap subLocationMap;
   if (!analyzeLocationUsesRecursively(loc, currentLocIdx, collectedVals,
                                       subLocationMap)) {
-    locations.set_size(currentLocIdx);
+    locations.truncate(currentLocIdx);
     for (SILValue V : collectedVals) {
       addr2LocIdx.erase(V);
     }
@@ -389,6 +365,11 @@ bool MemoryLocations::analyzeLocationUsesRecursively(SILValue V, unsigned locIdx
       case SILInstructionKind::SwitchEnumAddrInst:
       case SILInstructionKind::WitnessMethodInst:
         break;
+      case SILInstructionKind::MarkUnresolvedMoveAddrInst:
+        // We do not want the memory lifetime verifier to verify move_addr inst
+        // since the MarkUnresolvedMoveAddrChecker will validate that its uses
+        // are correct.
+        return false;
       default:
         return false;
     }
@@ -400,7 +381,7 @@ bool MemoryLocations::analyzeAddrProjection(
     SingleValueInstruction *projection, unsigned parentLocIdx,unsigned fieldNr,
     SmallVectorImpl<SILValue> &collectedVals, SubLocationMap &subLocationMap) {
 
-  if (isEmptyType(projection->getType(), projection->getFunction()))
+  if (projection->getType().isEmpty(*projection->getFunction()))
     return false;
 
   auto key = std::make_pair(parentLocIdx, fieldNr);
@@ -441,7 +422,7 @@ bool MemoryLocations::analyzeAddrProjection(
              isa<InitExistentialAddrInst>(projection));
              
       // We can only handle a single enum payload type for a location or or a
-      // single concrete existential type. Mismatching types can have a differnt
+      // single concrete existential type. Mismatching types can have a different
       // number of (non-trivial) sub-locations and we cannot handle this.
       // But we ignore opened existential types, because those cannot have
       // sub-locations (there cannot be an address projection on an

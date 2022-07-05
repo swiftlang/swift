@@ -1,15 +1,11 @@
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library)
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library)
 
 // REQUIRES: concurrency
-// REQUIRES: libdispatch
 // REQUIRES: executable_test
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 
 // rdar://78109470
 // UNSUPPORTED: back_deployment_runtime
-
-// https://bugs.swift.org/browse/SR-14466
-// UNSUPPORTED: OS=windows-msvc
 
 // Race condition
 // REQUIRES: rdar78033828
@@ -26,8 +22,8 @@ var tests = TestSuite("AsyncStream")
 
 @main struct Main {
   static func main() async {
-    if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
-      final class Expectation: UnsafeSendable {
+    if #available(SwiftStdlib 5.5, *) {
+      final class Expectation: @unchecked Sendable {
         var fulfilled = false
       }
 

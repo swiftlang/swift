@@ -13,11 +13,13 @@
 #ifndef SWIFT_AST_ASTWALKER_H
 #define SWIFT_AST_ASTWALKER_H
 
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerUnion.h"
 #include <utility>
 
 namespace swift {
 
+class ArgumentList;
 class Decl;
 class Expr;
 class ClosureExpr;
@@ -215,7 +217,7 @@ public:
   /// TapExpr.
   virtual bool shouldWalkIntoTapExpression() { return true; }
 
-  /// This method configures whether the the walker should visit the underlying
+  /// This method configures whether the walker should visit the underlying
   /// value of a property wrapper placeholder.
   virtual bool shouldWalkIntoPropertyWrapperPlaceholderValue() { return true; }
 
@@ -233,6 +235,11 @@ public:
   /// until eventually we can remove this altogether.
   virtual bool shouldWalkAccessorsTheOldWay() { return false; }
 
+  /// Whether to walk internal top level decls in serialized modules.
+  ///
+  /// TODO: Consider changing this to false by default.
+  virtual bool shouldWalkSerializedTopLevelInternalDecls() { return true; }
+
   /// walkToParameterListPre - This method is called when first visiting a
   /// ParameterList, before walking into its parameters.  If it returns false,
   /// the subtree is skipped.
@@ -244,6 +251,30 @@ public:
   /// traversal is terminated and returns failure.
   virtual bool walkToParameterListPost(ParameterList *PL) { return true; }
 
+  /// This method is called when first visiting an argument list before walking
+  /// into its arguments.
+  ///
+  /// \param ArgList The argument list to walk.
+  ///
+  /// \returns a pair indicating whether to visit the arguments, along with
+  /// the argument list that should replace this argument list in the tree. If
+  /// the latter is null, the traversal will be terminated.
+  ///
+  /// The default implementation returns \c {true, ArgList}.
+  virtual std::pair<bool, ArgumentList *>
+  walkToArgumentListPre(ArgumentList *ArgList) {
+    return {true, ArgList};
+  }
+
+  /// This method is called after visiting the arguments in an argument list.
+  /// If it returns null, the walk is terminated; otherwise, the
+  /// returned argument list is spliced in where the old argument list
+  /// previously appeared.
+  ///
+  /// The default implementation always returns the argument list.
+  virtual ArgumentList *walkToArgumentListPost(ArgumentList *ArgList) {
+    return ArgList;
+  }
 
 protected:
   ASTWalker() = default;

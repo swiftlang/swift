@@ -90,6 +90,9 @@ static StringRef getScoreKindName(ScoreKind kind) {
 
   case SK_ImplicitValueConversion:
     return "value-to-value conversion";
+
+  case SK_UnappliedFunction:
+    return "overloaded unapplied function";
   }
 }
 
@@ -763,6 +766,94 @@ static void addKeyPathDynamicMemberOverloads(
   }
 }
 
+namespace {
+/// A set of type variable bindings to compare for ranking.
+struct TypeBindingsToCompare {
+  Type Type1;
+  Type Type2;
+
+  // These bits are used in the case where we need to compare a lone unlabeled
+  // parameter with a labeled parameter, and allow us to prefer the unlabeled
+  // one.
+  bool Type1WasLabeled = false;
+  bool Type2WasLabeled = false;
+
+  TypeBindingsToCompare(Type type1, Type type2)
+      : Type1(type1), Type2(type2) {}
+
+  /// Whether the type bindings to compare are known to be the same.
+  bool areSameTypes() const {
+    return !Type1WasLabeled && !Type2WasLabeled && Type1->isEqual(Type2);
+  }
+};
+} // end anonymous namespace
+
+/// Given the bound types of two constructor overloads, returns their parameter
+/// list types as tuples to compare for solution ranking, or \c None if they
+/// shouldn't be compared.
+static Optional<TypeBindingsToCompare>
+getConstructorParamsAsTuples(ASTContext &ctx, Type boundTy1, Type boundTy2) {
+  auto choiceTy1 =
+      boundTy1->lookThroughAllOptionalTypes()->getAs<FunctionType>();
+  auto choiceTy2 =
+      boundTy2->lookThroughAllOptionalTypes()->getAs<FunctionType>();
+
+  // If the type variables haven't been bound to functions yet, let's not try
+  // and rank them.
+  if (!choiceTy1 || !choiceTy2)
+    return None;
+
+  auto initParams1 = choiceTy1->getParams();
+  auto initParams2 = choiceTy2->getParams();
+  if (initParams1.size() != initParams2.size())
+    return None;
+
+  // Don't compare if there are variadic differences. This preserves the
+  // behavior of when we'd compare through matchTupleTypes with the parameter
+  // flags intact.
+  for (auto idx : indices(initParams1)) {
+    if (initParams1[idx].isVariadic() != initParams2[idx].isVariadic())
+      return None;
+  }
+
+  // Awful hack needed to preserve source compatibility: If we have single
+  // variadic parameters to compare, where one has a label and the other does
+  // not, e.g (x: Int...) and (Int...), compare the parameter types by
+  // themselves, and make a note of which one has the label.
+  //
+  // This is needed because previously we would build a TupleType for a single
+  // unlabeled variadic parameter (Int...), which would let us compare it with
+  // a labeled parameter (x: Int...) and prefer the unlabeled version. With the
+  // parameter flags stripped however, (Int...) would become a paren type,
+  // which we wouldn't compare with the tuple type (x: Int...). To preserve the
+  // previous behavior in this case, just do a type comparison for the param
+  // types, and record where we stripped a label. The ranking logic can then use
+  // this to prefer the unlabeled variant. This is only needed in the single
+  // parameter case, as other cases will compare as tuples the same as before.
+  // In cases where variadics aren't used, we may end up trying to compare
+  // parens with tuples, but that's consistent with what we previously did.
+  //
+  // Note we can just do checks on initParams1, as we've already established
+  // sizes and variadic bits are consistent.
+  if (initParams1.size() == 1 && initParams1[0].isVariadic() &&
+      initParams1[0].hasLabel() != initParams2[0].hasLabel()) {
+    TypeBindingsToCompare bindings(initParams1[0].getParameterType(),
+                                   initParams2[0].getParameterType());
+    if (initParams1[0].hasLabel()) {
+      bindings.Type1WasLabeled = true;
+    } else {
+      bindings.Type2WasLabeled = true;
+    }
+    return bindings;
+  }
+
+  auto tuple1 = AnyFunctionType::composeTuple(ctx, initParams1,
+                                              /*wantParamFlags*/ false);
+  auto tuple2 = AnyFunctionType::composeTuple(ctx, initParams2,
+                                              /*wantParamFlags*/ false);
+  return TypeBindingsToCompare(tuple1, tuple2);
+}
+
 SolutionCompareResult ConstraintSystem::compareSolutions(
     ConstraintSystem &cs, ArrayRef<Solution> solutions,
     const SolutionDiff &diff, unsigned idx1, unsigned idx2) {
@@ -1117,18 +1208,30 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
   }
 
   // Compare the type variable bindings.
-  llvm::DenseMap<TypeVariableType *, std::pair<Type, Type>> typeDiff;
+  llvm::DenseMap<TypeVariableType *, TypeBindingsToCompare> typeDiff;
 
   const auto &bindings1 = solutions[idx1].typeBindings;
   const auto &bindings2 = solutions[idx2].typeBindings;
 
   for (const auto &binding1 : bindings1) {
     auto *typeVar = binding1.first;
+    auto *loc = typeVar->getImpl().getLocator();
+
+    // Check whether this is the overload type for a short-form init call
+    // 'X(...)' or 'self.init(...)' call.
+    auto isShortFormOrSelfDelegatingConstructorBinding = false;
+    if (auto initMemberTypeElt =
+            loc->getLastElementAs<LocatorPathElt::ConstructorMemberType>()) {
+      isShortFormOrSelfDelegatingConstructorBinding =
+          initMemberTypeElt->isShortFormOrSelfDelegatingConstructor();
+    }
 
     // If the type variable isn't one for which we should be looking at the
     // bindings, don't.
-    if (!typeVar->getImpl().prefersSubtypeBinding())
+    if (!typeVar->getImpl().prefersSubtypeBinding() &&
+        !isShortFormOrSelfDelegatingConstructorBinding) {
       continue;
+    }
 
     // If both solutions have a binding for this type variable
     // let's consider it.
@@ -1136,17 +1239,32 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     if (binding2 == bindings2.end())
       continue;
 
-    auto concreteType1 = binding1.second;
-    auto concreteType2 = binding2->second;
+    TypeBindingsToCompare typesToCompare(binding1.second, binding2->second);
 
-    if (!concreteType1->isEqual(concreteType2)) {
-      typeDiff.insert({typeVar, {concreteType1, concreteType2}});
+    // For short-form and self-delegating init calls, we want to prefer
+    // parameter lists with subtypes over supertypes. To do this, compose tuples
+    // for the bound parameter lists, and compare them in the type diff. This
+    // logic preserves the behavior of when we used to bind the parameter list
+    // as a tuple to a TVO_PrefersSubtypeBinding type variable for such calls.
+    // FIXME: We should come up with a better way of doing this, though note we
+    // have some ranking and subtyping rules specific to tuples that we may need
+    // to preserve to avoid breaking source.
+    if (isShortFormOrSelfDelegatingConstructorBinding) {
+      auto diffs = getConstructorParamsAsTuples(
+          cs.getASTContext(), typesToCompare.Type1, typesToCompare.Type2);
+      if (!diffs)
+        continue;
+      typesToCompare = *diffs;
     }
+
+    if (!typesToCompare.areSameTypes())
+      typeDiff.insert({typeVar, typesToCompare});
   }
 
   for (auto &binding : typeDiff) {
-    auto type1 = binding.second.first;
-    auto type2 = binding.second.second;
+    auto types = binding.second;
+    auto type1 = types.Type1;
+    auto type2 = types.Type2;
 
     // If either of the types still contains type variables, we can't
     // compare them.
@@ -1187,11 +1305,11 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
       auto unlabeled1 = getUnlabeledType(type1, cs.getASTContext());
       auto unlabeled2 = getUnlabeledType(type2, cs.getASTContext());
       if (unlabeled1->isEqual(unlabeled2)) {
-        if (type1->isEqual(unlabeled1)) {
+        if (type1->isEqual(unlabeled1) && !types.Type1WasLabeled) {
           ++score1;
           continue;
         }
-        if (type2->isEqual(unlabeled2)) {
+        if (type2->isEqual(unlabeled2) && !types.Type2WasLabeled) {
           ++score2;
           continue;
         }
@@ -1204,13 +1322,16 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // The systems are not considered equivalent.
     identical = false;
 
-    // A concrete type is better than an archetype.
+    // Archetypes are worse than concrete types (i.e. non-placeholder and
+    // non-archetype)
     // FIXME: Total hack.
-    if (type1->is<ArchetypeType>() != type2->is<ArchetypeType>()) {
-      if (type1->is<ArchetypeType>())
-        ++score2;
-      else
-        ++score1;
+    if (type1->is<ArchetypeType>() && !type2->is<ArchetypeType>() &&
+        !type2->is<PlaceholderType>()) {
+      ++score2;
+      continue;
+    } else if (type2->is<ArchetypeType>() && !type1->is<ArchetypeType>() &&
+               !type1->is<PlaceholderType>()) {
+      ++score1;
       continue;
     }
 
@@ -1304,8 +1425,14 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
 
   // Find a potential best.
   SmallVector<bool, 16> losers(viable.size(), false);
+  Score bestScore = viable.front().getFixedScore();
   unsigned bestIdx = 0;
   for (unsigned i = 1, n = viable.size(); i != n; ++i) {
+    auto currScore = viable[i].getFixedScore();
+
+    if (currScore < bestScore)
+      bestScore = currScore;
+
     switch (compareSolutions(*this, viable, diff, i, bestIdx)) {
     case SolutionCompareResult::Identical:
       // FIXME: Might want to warn about this in debug builds, so we can
@@ -1360,52 +1487,14 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
     return bestIdx;
   }
 
-  // If there is not a single "better" than others
-  // solution, which probably means that solutions
-  // were incomparable, let's just keep the original
-  // list instead of removing everything, even if we
-  // are asked to "minimize" the result.
-  if (losers.size() == viable.size())
+  if (!minimize)
     return None;
-
-  // The comparison was ambiguous. Identify any solutions that are worse than
-  // any other solution.
-  for (unsigned i = 0, n = viable.size(); i != n; ++i) {
-    // If the first solution has already lost once, don't bother looking
-    // further.
-    if (losers[i])
-      continue;
-
-    for (unsigned j = i + 1; j != n; ++j) {
-      // If the second solution has already lost once, don't bother looking
-      // further.
-      if (losers[j])
-        continue;
-
-      switch (compareSolutions(*this, viable, diff, i, j)) {
-      case SolutionCompareResult::Identical:
-        // FIXME: Dub one of these the loser arbitrarily?
-        break;
-
-      case SolutionCompareResult::Better:
-        losers[j] = true;
-        break;
-
-      case SolutionCompareResult::Worse:
-        losers[i] = true;
-        break;
-
-      case SolutionCompareResult::Incomparable:
-        break;
-      }
-    }
-  }
 
   // Remove any solution that is worse than some other solution.
   unsigned outIndex = 0;
   for (unsigned i = 0, n = viable.size(); i != n; ++i) {
     // Skip over the losing solutions.
-    if (losers[i])
+    if (viable[i].getFixedScore() > bestScore)
       continue;
 
     // If we have skipped any solutions, move this solution into the next
@@ -1415,6 +1504,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
 
     ++outIndex;
   }
+
   viable.erase(viable.begin() + outIndex, viable.end());
   NumDiscardedSolutions += viable.size() - outIndex;
 

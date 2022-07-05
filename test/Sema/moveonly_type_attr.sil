@@ -1,0 +1,18 @@
+// RUN: %target-sil-opt -verify %s | %FileCheck %s
+
+sil_stage raw
+
+class Klass {}
+
+// Make sure that we just ignore this type attribute.
+
+// CHECK-LABEL: sil [ossa] @foo : $@convention(thin) (@owned @moveOnly Klass) -> () {
+// CHECK: bb0(%0 : @owned $@moveOnly Klass):
+// CHECK: destroy_value %0 : $@moveOnly Klass
+// CHECK: } // end sil function 'foo'
+sil [ossa] @foo : $@convention(thin) (@owned @moveOnly Klass) -> () {
+bb0(%0 : @owned $@moveOnly Klass):
+  destroy_value %0 : $@moveOnly Klass
+  %9999 = tuple()
+  return %9999 : $()
+}

@@ -43,7 +43,7 @@
 //    INDEX_WITH_NEGATIVE-NOT: main_out.o
 //    INDEX_WITH_NEGATIVE-NOT: different.o
 //
-//    Run with a diferent -index-unit-output-path
+//    Run with a different -index-unit-output-path
 //    RUN: %target-swift-frontend -typecheck -parse-stdlib \
 //    RUN:     -module-name mod_name -index-store-path %t/idx_with \
 //    RUN:     -primary-file %t/main.swift %t/second.swift \
@@ -239,12 +239,8 @@
 //    RUN:     -output-filelist %t/outputlist -index-unit-output-path-filelist %t/index-outputlist 2>&1 \
 //    RUN: | %FileCheck --check-prefixes=ERROR_MISMATCH %s
 //
-// C) Check -index-unit-output-path without -index-store warns
-//    RUN: %target-swift-frontend -typecheck -parse-stdlib \
+// C) Check -index-unit-output-path without -index-store-path does not cause a warning/error
+//    RUN: %target-typecheck-verify-swift -parse-stdlib \
 //    RUN:     -module-name mod_name \
 //    RUN:     -primary-file %t/main.swift %t/second.swift \
-//    RUN:     -o %t/main_out.o -index-unit-output-path %t/custom_output.o 2>&1 \
-//    RUN: | %FileCheck --check-prefixes=ERROR_IGNORED %s
-//
-//    ERROR_IGNORED: warning: -index-unit-output-path is ignored without -index-store-path
-
+//    RUN:     -o %t/main_out.o -index-unit-output-path %t/custom_output.o

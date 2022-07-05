@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -14,17 +14,18 @@
 // <rdar://problem/17384894>
 import TestsUtils
 
-public let Histogram = BenchmarkInfo(
-  name: "Histogram",
-  runFunction: run_Histogram,
-  tags: [.validation, .algorithm])
+public let benchmarks =
+  BenchmarkInfo(
+    name: "Histogram",
+    runFunction: run_Histogram,
+    tags: [.validation, .algorithm])
 
 typealias rrggbb_t = UInt32
 
-func output_sorted_sparse_rgb_histogram<S: Sequence>(_ samples: S, _ N: Int)
+func output_sorted_sparse_rgb_histogram<S: Sequence>(_ samples: S, _ n: Int)
   where S.Element == rrggbb_t {
   var histogram = Dictionary<rrggbb_t, Int>()
-  for  _ in 1...50*N {
+  for  _ in 1...50*n {
     for sample in samples {   // This part is really awful, I agree
       let i = histogram.index(forKey: sample)
       histogram[sample] = (i != nil ? histogram[i!].1 : 0) + 1
@@ -115,6 +116,6 @@ let samples: [rrggbb_t] = [
 ]
 
 @inline(never)
-public func run_Histogram(_ N: Int) {
-  output_sorted_sparse_rgb_histogram(samples, N)
+public func run_Histogram(_ n: Int) {
+  output_sorted_sparse_rgb_histogram(samples, n)
 }

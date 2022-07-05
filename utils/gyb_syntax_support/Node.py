@@ -1,4 +1,3 @@
-from __future__ import print_function
 import sys  # noqa: I201
 
 from .kinds import SYNTAX_BASE_KINDS, kind_to_type, lowercase_first_word
@@ -22,8 +21,10 @@ class Node(object):
                  element_choices=None, omit_when_empty=False, 
                  elements_separated_by_newline=False):
         self.syntax_kind = name
+        self.element_name = element_name
         self.swift_syntax_kind = lowercase_first_word(name)
         self.name = kind_to_type(self.syntax_kind)
+        self.kind = kind
         self.description = description
 
         self.traits = traits or []

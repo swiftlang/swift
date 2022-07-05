@@ -6,6 +6,7 @@
 @class NSString;
 
 @protocol NSObject
+- (instancetype)self;
 @property (readonly, copy) NSString *description;
 - (instancetype)retain OBJC_ARC_UNAVAILABLE;
 - (Class)class;

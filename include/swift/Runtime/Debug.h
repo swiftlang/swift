@@ -82,18 +82,27 @@ static inline void crash(const char *message) {
   swift_unreachable("Expected compiler to crash.");
 }
 
-// swift::fatalError() halts with a crash log message, 
+// swift::fatalErrorv() halts with a crash log message,
 // but makes no attempt to preserve register state.
 SWIFT_RUNTIME_ATTRIBUTE_NORETURN
+SWIFT_VFORMAT(2)
+extern void fatalErrorv(uint32_t flags, const char *format, va_list args);
+
+// swift::fatalError() halts with a crash log message,
+// but makes no attempt to preserve register state.
+SWIFT_RUNTIME_ATTRIBUTE_NORETURN
+SWIFT_FORMAT(2, 3)
 extern void
 fatalError(uint32_t flags, const char *format, ...);
 
 /// swift::warning() emits a warning from the runtime.
 extern void
+SWIFT_VFORMAT(2)
 warningv(uint32_t flags, const char *format, va_list args);
 
 /// swift::warning() emits a warning from the runtime.
 extern void
+SWIFT_FORMAT(2, 3)
 warning(uint32_t flags, const char *format, ...);
 
 // swift_dynamicCastFailure halts using fatalError()
@@ -139,6 +148,10 @@ void swift_abortDynamicReplacementEnabling();
 SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_RUNTIME_ATTRIBUTE_NOINLINE
 void swift_abortDynamicReplacementDisabling();
 
+// Halt due to trying to use unicode data on platforms that don't have it.
+SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_RUNTIME_ATTRIBUTE_NOINLINE
+void swift_abortDisabledUnicodeSupport();
+
 /// This function dumps one line of a stack trace. It is assumed that \p framePC
 /// is the address of the stack frame at index \p index. If \p shortOutput is
 /// true, this functions prints only the name of the symbol and offset, ignores
@@ -170,7 +183,7 @@ struct RuntimeErrorDetails {
   const char *currentStackDescription;
 
   // Number of frames in the current stack that should be ignored when reporting
-  // the issue (exluding the reportToDebugger/_swift_runtime_on_report frame).
+  // the issue (excluding the reportToDebugger/_swift_runtime_on_report frame).
   // The remaining top frame should point to user's code where the bug is.
   uintptr_t framesToSkip;
 
@@ -246,6 +259,9 @@ std::atomic<const void *> _swift_debug_metadataAllocationBacktraceList;
 
 SWIFT_RUNTIME_STDLIB_SPI
 const void * const _swift_debug_protocolConformanceStatePointer;
+
+SWIFT_RUNTIME_STDLIB_SPI
+const uint64_t _swift_debug_multiPayloadEnumPointerSpareBitsMask;
 
 // namespace swift
 }

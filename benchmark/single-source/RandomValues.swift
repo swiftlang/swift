@@ -18,7 +18,7 @@ import TestsUtils
 // and floating-point values.
 //
 
-public let RandomValues = [
+public let benchmarks = [
   BenchmarkInfo(name: "RandomIntegersDef", runFunction: run_RandomIntegersDef,
     tags: [.api], legacyFactor: 100),
   BenchmarkInfo(name: "RandomIntegersLCG", runFunction: run_RandomIntegersLCG,
@@ -61,8 +61,8 @@ struct LCRNG: RandomNumberGenerator {
 }
 
 @inline(never)
-public func run_RandomIntegersDef(_ N: Int) {
-  for _ in 0 ..< N {
+public func run_RandomIntegersDef(_ n: Int) {
+  for _ in 0 ..< n {
     var x = 0
     for _ in 0 ..< 1_000 {
       x &+= .random(in: 0...10_000)
@@ -72,8 +72,8 @@ public func run_RandomIntegersDef(_ N: Int) {
 }
 
 @inline(never)
-public func run_RandomIntegersLCG(_ N: Int) {
-  for _ in 0 ..< N {
+public func run_RandomIntegersLCG(_ n: Int) {
+  for _ in 0 ..< n {
     var x = 0
     var generator = LCRNG(seed: 0)
     for _ in 0 ..< 100_000 {
@@ -84,8 +84,8 @@ public func run_RandomIntegersLCG(_ N: Int) {
 }
 
 @inline(never)
-public func run_RandomInt8Def(_ N: Int) {
-  for _ in 0 ..< N {
+public func run_RandomInt8Def(_ n: Int) {
+  for _ in 0 ..< n {
     var x: Int8 = 0
     for _ in 0 ..< 1_000 {
       x &+= .random(in: -65 ... identity(65))
@@ -95,8 +95,8 @@ public func run_RandomInt8Def(_ N: Int) {
 }
 
 @inline(never)
-public func run_RandomInt8LCG(_ N: Int) {
-  for _ in 0 ..< N {
+public func run_RandomInt8LCG(_ n: Int) {
+  for _ in 0 ..< n {
     var x: Int8 = 0
     var generator = LCRNG(seed: 0)
     for _ in 0 ..< 100_000 {
@@ -107,8 +107,8 @@ public func run_RandomInt8LCG(_ N: Int) {
 }
 
 @inline(never)
-public func run_RandomInt64Def(_ N: Int) {
-  for _ in 0 ..< N {
+public func run_RandomInt64Def(_ n: Int) {
+  for _ in 0 ..< n {
     var x: Int64 = 0
     for _ in 0 ..< 1_000 {
       x &+= .random(in:
@@ -120,8 +120,8 @@ public func run_RandomInt64Def(_ N: Int) {
 }
 
 @inline(never)
-public func run_RandomInt64LCG(_ N: Int) {
-  for _ in 0 ..< N {
+public func run_RandomInt64LCG(_ n: Int) {
+  for _ in 0 ..< n {
     var x: Int64 = 0
     var generator = LCRNG(seed: 0)
     for _ in 0 ..< 100_000 {
@@ -135,8 +135,8 @@ public func run_RandomInt64LCG(_ N: Int) {
 }
 
 @inline(never)
-public func run_RandomDoubleDef(_ N: Int) {
-  for _ in 0 ..< N {
+public func run_RandomDoubleDef(_ n: Int) {
+  for _ in 0 ..< n {
     var x = 0.0
     for _ in 0 ..< 1_000 {
       x += .random(in: -1000 ... 1000)
@@ -146,8 +146,8 @@ public func run_RandomDoubleDef(_ N: Int) {
 }
 
 @inline(never)
-public func run_RandomDoubleLCG(_ N: Int) {
-  for _ in 0 ..< N {
+public func run_RandomDoubleLCG(_ n: Int) {
+  for _ in 0 ..< n {
     var x = 0.0
     var generator = LCRNG(seed: 0)
     for _ in 0 ..< 100_000 {
@@ -158,8 +158,8 @@ public func run_RandomDoubleLCG(_ N: Int) {
 }
 
 @inline(never)
-public func run_RandomDoubleOpaqueDef(_ N: Int) {
-  for _ in 0 ..< N {
+public func run_RandomDoubleOpaqueDef(_ n: Int) {
+  for _ in 0 ..< n {
     var x = 0.0
     for _ in 0 ..< 1_000 {
       x += .random(in: -1000 ... identity(1000))
@@ -169,8 +169,8 @@ public func run_RandomDoubleOpaqueDef(_ N: Int) {
 }
 
 @inline(never)
-public func run_RandomDoubleOpaqueLCG(_ N: Int) {
-  for _ in 0 ..< N {
+public func run_RandomDoubleOpaqueLCG(_ n: Int) {
+  for _ in 0 ..< n {
     var x = 0.0
     var generator = LCRNG(seed: 0)
     for _ in 0 ..< 100_000 {
@@ -181,8 +181,8 @@ public func run_RandomDoubleOpaqueLCG(_ N: Int) {
 }
 
 @inline(never)
-public func run_RandomDouble01Def(_ N: Int) {
-  for _ in 0 ..< N {
+public func run_RandomDouble01Def(_ n: Int) {
+  for _ in 0 ..< n {
     var x = 0.0
     for _ in 0 ..< 1_000 {
       x += .random(in: 0 ..< 1)
@@ -192,8 +192,8 @@ public func run_RandomDouble01Def(_ N: Int) {
 }
 
 @inline(never)
-public func run_RandomDouble01LCG(_ N: Int) {
-  for _ in 0 ..< N {
+public func run_RandomDouble01LCG(_ n: Int) {
+  for _ in 0 ..< n {
     var x = 0.0
     var generator = LCRNG(seed: 0)
     for _ in 0 ..< 100_000 {

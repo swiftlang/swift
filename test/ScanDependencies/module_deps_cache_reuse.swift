@@ -57,6 +57,9 @@ import SubE
 // CHECK-NEXT:     "swift": "_Concurrency"
 // CHECK-NEXT:   },
 // CHECK-NEXT:   {
+// CHECK-NEXT:     "swift": "_StringProcessing"
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
 // CHECK-NEXT:     "swift": "_cross_import_E"
 // CHECK-NEXT:   }
 // CHECK-NEXT: ],
@@ -109,9 +112,8 @@ import SubE
 
 // CHECK: "commandLine": [
 // CHECK-NEXT: "-frontend"
-// CHECK-NEXT: "-only-use-extra-clang-opts"
-// CHECK-NEXT: "-Xcc"
-// CHECK-NEXT: "clang"
+// CHECK-NEXT: "-only-use-extra-clang-opts
+// CHECK-NOT: "BUILD_DIR/bin/clang"
 // CHECK-NEXT: "-Xcc"
 // CHECK-NEXT: "-fsyntax-only",
 // CHECK:      "-fsystem-module",

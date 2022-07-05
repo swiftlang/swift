@@ -19,6 +19,7 @@
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Subsystems.h"
 
 using namespace swift;
@@ -211,22 +212,31 @@ void GetDestructorRequest::cacheResult(DestructorDecl *value) const {
 //----------------------------------------------------------------------------//
 
 Optional<GenericParamList *> GenericParamListRequest::getCachedResult() const {
+  using GenericParamsState = GenericContext::GenericParamsState;
   auto *decl = std::get<0>(getStorage());
-  if (auto *params = decl->GenericParamsAndBit.getPointer())
-    return params;
+  switch (decl->GenericParamsAndState.getInt()) {
+  case GenericParamsState::TypeChecked:
+  case GenericParamsState::ParsedAndTypeChecked:
+    return decl->GenericParamsAndState.getPointer();
 
-  if (decl->GenericParamsAndBit.getInt())
-    return nullptr;
-
-  return None;
+  case GenericParamsState::Parsed:
+    return None;
+  }
 }
 
 void GenericParamListRequest::cacheResult(GenericParamList *params) const {
+  using GenericParamsState = GenericContext::GenericParamsState;
   auto *context = std::get<0>(getStorage());
   if (params)
     params->setDeclContext(context);
 
-  context->GenericParamsAndBit.setPointerAndInt(params, true);
+  assert(context->GenericParamsAndState.getInt() == GenericParamsState::Parsed);
+  bool hadParsedGenericParams =
+  context->GenericParamsAndState.getPointer() != nullptr;
+  auto newState = hadParsedGenericParams
+      ? GenericParamsState::ParsedAndTypeChecked
+      : GenericParamsState::TypeChecked;
+  context->GenericParamsAndState.setPointerAndInt(params, newState);
 }
 
 //----------------------------------------------------------------------------//
@@ -410,6 +420,68 @@ void UnqualifiedLookupRequest::writeDependencySink(
   auto &desc = std::get<0>(getStorage());
   track.addTopLevelName(desc.Name.getBaseName());
 }
+
+// The following clang importer requests have some definitions here to prevent
+// linker errors when building lib syntax parser (which doesn't link with the
+// clang importer).
+
+//----------------------------------------------------------------------------//
+// ClangDirectLookupRequest computation.
+//----------------------------------------------------------------------------//
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const ClangDirectLookupDescriptor &desc) {
+  out << "Looking up ";
+  simple_display(out, desc.name);
+  out << " in ";
+  simple_display(out, desc.decl);
+}
+
+SourceLoc
+swift::extractNearestSourceLoc(const ClangDirectLookupDescriptor &desc) {
+  return extractNearestSourceLoc(desc.decl);
+}
+
+//----------------------------------------------------------------------------//
+// CXXNamespaceMemberLookup computation.
+//----------------------------------------------------------------------------//
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const CXXNamespaceMemberLookupDescriptor &desc) {
+  out << "Looking up ";
+  simple_display(out, desc.name);
+  out << " in ";
+  simple_display(out, desc.namespaceDecl);
+}
+
+SourceLoc
+swift::extractNearestSourceLoc(const CXXNamespaceMemberLookupDescriptor &desc) {
+  return extractNearestSourceLoc(desc.namespaceDecl);
+}
+
+//----------------------------------------------------------------------------//
+// ClangRecordMemberLookup computation.
+//----------------------------------------------------------------------------//
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const ClangRecordMemberLookupDescriptor &desc) {
+  out << "Looking up ";
+  simple_display(out, desc.name);
+  out << " in ";
+  simple_display(out, desc.recordDecl);
+}
+
+SourceLoc
+swift::extractNearestSourceLoc(const ClangRecordMemberLookupDescriptor &desc) {
+  return extractNearestSourceLoc(desc.recordDecl);
+}
+
+// Implement the clang importer type zone.
+#define SWIFT_TYPEID_ZONE ClangImporter
+#define SWIFT_TYPEID_HEADER "swift/ClangImporter/ClangImporterTypeIDZone.def"
+#include "swift/Basic/ImplementTypeIDZone.h"
+#undef SWIFT_TYPEID_ZONE
+#undef SWIFT_TYPEID_HEADER
 
 // Define request evaluation functions for each of the name lookup requests.
 static AbstractRequestFunction *nameLookupRequestFunctions[] = {

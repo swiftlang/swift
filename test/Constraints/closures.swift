@@ -89,14 +89,14 @@ func test13811882() {
 // <rdar://problem/21544303> QoI: "Unexpected trailing closure" should have a fixit to insert a 'do' statement
 // <https://bugs.swift.org/browse/SR-3671>
 func r21544303() {
-  var inSubcall = true
-  {
-  }  // expected-error {{computed property must have accessors specified}}
+  var inSubcall = true 
+  {  // expected-error {{closure expression is unused}} expected-note {{did you mean to use a 'do' statement?}}
+  }  
   inSubcall = false
 
   // This is a problem, but isn't clear what was intended.
-  var somethingElse = true {
-  }  // expected-error {{computed property must have accessors specified}}
+  var somethingElse = true { // expected-error {{unexpected '{' in declaration}}
+  }  
   inSubcall = false
 
   var v2 : Bool = false
@@ -252,7 +252,7 @@ struct CC {}
 func callCC<U>(_ f: (CC) -> U) -> () {}
 
 func typeCheckMultiStmtClosureCrash() {
-  callCC { // expected-error {{cannot infer return type for closure with multiple statements; add explicit type to disambiguate}} {{none}}
+  callCC {
     _ = $0
     return 1
   }
@@ -312,9 +312,8 @@ func testAcceptNothingToInt(ac1: @autoclosure () -> Int) {
 struct Thing {
   init?() {}
 }
-// This throws a compiler error
-let things = Thing().map { thing in  // expected-error {{cannot infer return type for closure with multiple statements; add explicit type to disambiguate}} {{34-34=-> <#Result#> }}
-  // Commenting out this makes it compile
+
+let things = Thing().map { thing in
   _ = thing
   return thing
 }
@@ -322,14 +321,14 @@ let things = Thing().map { thing in  // expected-error {{cannot infer return typ
 
 // <rdar://problem/21675896> QoI: [Closure return type inference] Swift cannot find members for the result of inlined lambdas with branches
 func r21675896(file : String) {
-  let x: String = { // expected-error {{cannot infer return type for closure with multiple statements; add explicit type to disambiguate}} {{20-20= () -> <#Result#> in }}
+  let x: String = {
     if true {
       return "foo"
     }
     else {
       return file
     }
-  }().pathExtension
+  }().pathExtension // expected-error {{value of type 'String' has no member 'pathExtension'}}
 }
 
 
@@ -360,7 +359,7 @@ func someGeneric19997471<T>(_ x: T) {
 
 
 // <rdar://problem/20921068> Swift fails to compile: [0].map() { _ in let r = (1,2).0; return r }
-[0].map {  // expected-error {{cannot infer return type for closure with multiple statements; add explicit type to disambiguate}} {{5-5=-> <#Result#> }}
+let _ = [0].map {
   _ in
   let r =  (1,2).0
   return r
@@ -372,6 +371,7 @@ func rdar21078316() {
   var foo : [String : String]?
   var bar : [(String, String)]?
   bar = foo.map { ($0, $1) }  // expected-error {{contextual closure type '([String : String]) throws -> [(String, String)]' expects 1 argument, but 2 were used in closure body}}
+  // expected-error@-1{{cannot convert value of type '(Dictionary<String, String>, _)' to closure result type '[(String, String)]'}}
 }
 
 
@@ -408,7 +408,7 @@ func r20789423() {
   print(p.f(p)())  // expected-error {{cannot convert value of type 'C' to expected argument type 'Int'}}
   // expected-error@-1:11 {{cannot call value of non-function type '()'}}
   
-  let _f = { (v: Int) in  // expected-error {{cannot infer return type for closure with multiple statements; add explicit type to disambiguate}} {{23-23=-> <#Result#> }}
+  let _f = { (v: Int) in
     print("a")
     return "hi"
   }
@@ -997,7 +997,7 @@ func rdar52204414() {
   let _: () -> Void = { return 42 }
   // expected-error@-1 {{cannot convert value of type 'Int' to closure result type 'Void'}}
   let _ = { () -> Void in return 42 }
-  // expected-error@-1 {{declared closure result 'Int' is incompatible with contextual type 'Void'}}
+  // expected-error@-1 {{declared closure result 'Void' is incompatible with return type 'Int'}} {{19-23=Int}}
 }
 
 // SR-12291 - trailing closure is used as an argument to the last (positionally) parameter.
@@ -1072,11 +1072,11 @@ func rdar_74435602(error: Error?) {
 // SR-14280
 let _: (@convention(block) () -> Void)? = Bool.random() ? nil : {} // OK
 let _: (@convention(thin) () -> Void)? = Bool.random() ? nil : {} // OK
-let _: (@convention(c) () -> Void)? = Bool.random() ? nil : {} // OK on type checking, diagnostics are deffered to SIL
+let _: (@convention(c) () -> Void)? = Bool.random() ? nil : {} // OK on type checking, diagnostics are deferred to SIL
 
 let _: (@convention(block) () -> Void)? = Bool.random() ? {} : {} // OK
 let _: (@convention(thin) () -> Void)? = Bool.random() ? {} : {} // OK
-let _: (@convention(c) () -> Void)? = Bool.random() ? {} : {} // OK on type checking, diagnostics are deffered to SIL
+let _: (@convention(c) () -> Void)? = Bool.random() ? {} : {} // OK on type checking, diagnostics are deferred to SIL
 
 // Make sure that diagnostic is attached to the closure even when body is empty (implicitly returns `Void`)
 var emptyBodyMismatch: () -> Int {
@@ -1127,7 +1127,7 @@ func rdar76058892() {
   func experiment(arr: [S]?) {
     test { // expected-error {{contextual closure type '() -> String' expects 0 arguments, but 1 was used in closure body}}
       if let arr = arr {
-        arr.map($0.test) // expected-note {{anonymous closure parameter '$0' is used here}}
+        arr.map($0.test) // expected-note {{anonymous closure parameter '$0' is used here}} // expected-error {{generic parameter 'T' could not be inferred}}
       }
     }
   }
@@ -1161,5 +1161,26 @@ func rdar78917861() {
       // Since contextual type `DataCollection` doesn't specify generic parameters they have to be inferred
       // but that has to wait until the closure is resolved because types can flow both ways
     }()
+  }
+}
+
+// rdar://81228501 - type-checker crash due to applied invalid solution
+func test(arr: [[Int]]) {
+  struct A {
+    init(arg: [Int]) {}
+  }
+
+  arr.map { ($0 as? [Int]).map { A($0) } } // expected-error {{missing argument label 'arg:' in call}} {{36-36=arg: }}
+}
+
+func closureWithCaseArchetype<T>(_: T.Type) {
+  let _ = { (any: Any) throws -> Any? in
+    switch any {
+    case let type as T:
+      return type
+
+    default:
+      return any
+    }
   }
 }

@@ -1,11 +1,10 @@
 // rdar://81481317
-// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library) | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -parse-as-library) | %FileCheck %s
 // REQUIRES: executable_test
 // REQUIRES: concurrency
-// REQUIRES: libdispatch
 
 // rdar://82123254
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
 struct Bad: Error {}
@@ -26,8 +25,8 @@ func zim(y: Bar, x: Foo, z: Baz) { print("hooray") }
 
       return try await zim(y: y, x: x, z: z)
     } catch {
-      // CHECK: oopsie woopsie
-      print("oopsie woopsie")
+      // CHECK: oopsie whoopsie
+      print("oopsie whoopsie")
     }
   }
 }

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-structural-opaque-types -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -disable-availability-checking
 
 @resultBuilder
 struct TupleBuilder {

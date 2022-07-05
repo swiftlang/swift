@@ -123,7 +123,7 @@ collectExistentialConformances(ModuleDecl *M, CanType openedType,
 
   SmallVector<ProtocolConformanceRef, 4> conformances;
   for (auto proto : protocols) {
-    auto conformance = M->lookupConformance(openedType, proto->getDecl());
+    auto conformance = M->lookupConformance(openedType, proto);
     assert(conformance);
     conformances.push_back(conformance);
   }
@@ -304,11 +304,17 @@ void ExistentialTransform::convertExistentialArgTypesToGenericArgTypes(
     auto &param = params[Idx];
     auto PType = param.getArgumentType(M, FTy, F->getTypeExpansionContext());
     assert(PType.isExistentialType());
+
+    CanType constraint = PType;
+    if (auto existential = PType->getAs<ExistentialType>())
+      constraint = existential->getConstraintType()->getCanonicalType();
+
     /// Generate new generic parameter.
-    auto *NewGenericParam = GenericTypeParamType::get(Depth, GPIdx++, Ctx);
+    auto *NewGenericParam =
+        GenericTypeParamType::get(/*type sequence*/ false, Depth, GPIdx++, Ctx);
     genericParams.push_back(NewGenericParam);
     Requirement NewRequirement(RequirementKind::Conformance, NewGenericParam,
-                               PType);
+                               constraint);
     requirements.push_back(NewRequirement);
     ArgToGenericTypeMap.insert(
         std::pair<int, GenericTypeParamType *>(Idx, NewGenericParam));
@@ -335,12 +341,9 @@ ExistentialTransform::createExistentialSpecializedFunctionType() {
   convertExistentialArgTypesToGenericArgTypes(GenericParams, Requirements);
 
   /// Compute the updated generic signature.
-  NewGenericSig = evaluateOrDefault(
-      Ctx.evaluator,
-      AbstractGenericSignatureRequest{
-        OrigGenericSig.getPointer(), std::move(GenericParams),
-        std::move(Requirements)},
-      GenericSignature());
+  NewGenericSig = buildGenericSignature(Ctx, OrigGenericSig,
+                                        std::move(GenericParams),
+                                        std::move(Requirements));
 
   /// Create a lambda for GenericParams.
   auto getCanonicalType = [&](Type t) -> CanType {
@@ -444,7 +447,9 @@ void ExistentialTransform::populateThunkBody() {
       auto OrigOperand = ThunkBody->getArgument(ArgDesc.Index);
       auto SwiftType = ArgDesc.Arg->getType().getASTType();
       auto OpenedType =
-          SwiftType->openAnyExistentialType(Opened)->getCanonicalType();
+          SwiftType
+              ->openAnyExistentialType(Opened, F->getGenericSignature())
+              ->getCanonicalType();
       auto OpenedSILType = NewF->getLoweredType(OpenedType);
       SILValue archetypeValue;
       auto ExistentialRepr =
@@ -633,9 +638,9 @@ void ExistentialTransform::createExistentialSpecializedFunction() {
 
     NewF = FunctionBuilder.createFunction(
       linkage, Name, NewFTy, NewFGenericEnv, F->getLocation(), F->isBare(),
-      F->isTransparent(), F->isSerialized(), IsNotDynamic, F->getEntryCount(),
-      F->isThunk(), F->getClassSubclassScope(), F->getInlineStrategy(),
-      F->getEffectsKind(), nullptr, F->getDebugScope());
+      F->isTransparent(), F->isSerialized(), IsNotDynamic, IsNotDistributed,
+      F->getEntryCount(), F->isThunk(), F->getClassSubclassScope(),
+      F->getInlineStrategy(), F->getEffectsKind(), nullptr, F->getDebugScope());
 
     /// Set the semantics attributes for the new function.
     for (auto &Attr : F->getSemanticsAttrs())

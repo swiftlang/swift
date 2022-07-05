@@ -110,7 +110,7 @@ static_assert(alignof(HeapObject) == alignof(void*),
               "HeapObject must be pointer-aligned");
 
 } // end namespace swift
-#endif // __cplusplus
+#endif // __swift__
 
 /// Global bit masks
 
@@ -157,12 +157,22 @@ static_assert(alignof(HeapObject) == alignof(void*),
 #endif
 #define _swift_abi_SwiftSpareBitsMask                                          \
   (__swift_uintptr_t) SWIFT_ABI_ARM64_SWIFT_SPARE_BITS_MASK
+#if defined(__ANDROID__)
+#define _swift_abi_ObjCReservedBitsMask                                        \
+  (__swift_uintptr_t) SWIFT_ABI_ANDROID_ARM64_OBJC_RESERVED_BITS_MASK
+#else
 #define _swift_abi_ObjCReservedBitsMask                                        \
   (__swift_uintptr_t) SWIFT_ABI_ARM64_OBJC_RESERVED_BITS_MASK
+#endif
 #define _swift_abi_ObjCReservedLowBits                                         \
   (unsigned) SWIFT_ABI_ARM64_OBJC_NUM_RESERVED_LOW_BITS
+#if defined(__ANDROID__)
+#define _swift_BridgeObject_TaggedPointerBits                                  \
+  (__swift_uintptr_t) SWIFT_ABI_DEFAULT_BRIDGEOBJECT_TAG_64 >> 8
+#else
 #define _swift_BridgeObject_TaggedPointerBits                                  \
   (__swift_uintptr_t) SWIFT_ABI_DEFAULT_BRIDGEOBJECT_TAG_64
+#endif
 
 #elif defined(__powerpc64__)
 
@@ -190,6 +200,22 @@ static_assert(alignof(HeapObject) == alignof(void*),
 #define _swift_BridgeObject_TaggedPointerBits                                  \
   (__swift_uintptr_t) SWIFT_ABI_DEFAULT_BRIDGEOBJECT_TAG_64
 
+#elif defined(__wasm32__)
+
+#define _swift_abi_LeastValidPointerValue                                      \
+  (__swift_uintptr_t) SWIFT_ABI_WASM32_LEAST_VALID_POINTER
+
+#define _swift_abi_SwiftSpareBitsMask                                          \
+  (__swift_uintptr_t) SWIFT_ABI_DEFAULT_SWIFT_SPARE_BITS_MASK
+
+#define _swift_abi_ObjCReservedBitsMask                                        \
+  (__swift_uintptr_t) SWIFT_ABI_DEFAULT_OBJC_RESERVED_BITS_MASK
+#define _swift_abi_ObjCReservedLowBits                                         \
+  (unsigned) SWIFT_ABI_DEFAULT_OBJC_NUM_RESERVED_LOW_BITS
+
+#define _swift_BridgeObject_TaggedPointerBits                                  \
+  (__swift_uintptr_t) SWIFT_ABI_DEFAULT_BRIDGEOBJECT_TAG_32
+
 #else
 
 #define _swift_abi_LeastValidPointerValue                                      \
@@ -202,6 +228,9 @@ static_assert(alignof(HeapObject) == alignof(void*),
       (defined(__arm64__) && (__POINTER_WIDTH__ == 32))
 #define _swift_abi_SwiftSpareBitsMask                                          \
   (__swift_uintptr_t) SWIFT_ABI_ARM_SWIFT_SPARE_BITS_MASK
+#elif defined(__ppc__)
+#define _swift_abi_SwiftSpareBitsMask                                          \
+  (__swift_uintptr_t) SWIFT_ABI_POWERPC_SWIFT_SPARE_BITS_MASK
 #else
 #define _swift_abi_SwiftSpareBitsMask                                          \
   (__swift_uintptr_t) SWIFT_ABI_DEFAULT_SWIFT_SPARE_BITS_MASK

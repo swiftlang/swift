@@ -311,7 +311,7 @@ public func double_generic_concrete<X: P2>(_: X.Type) {
 // CHECK-SAME:        @"$s42conditional_conformance_basic_conformances6DoubleVyxq_GAA2P1A2A2P2RzAA2P3R_rlMc" 
 // CHECK-SAME:        to %swift.protocol_conformance_descriptor*
 // CHECK-SAME:      ), 
-// CHECK-SAME:      %swift.type* %2, 
+// CHECK-SAME:      %swift.type* %3,
 // CHECK-SAME:      i8*** [[CONDITIONAL_REQUIREMENTS]]
 // CHECK-SAME:    )
 

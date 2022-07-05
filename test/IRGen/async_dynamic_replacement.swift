@@ -23,3 +23,10 @@ internal func _replacement_number() async -> Int {
 public func calls_number() async -> Int {
   await number()
 }
+
+// CHECK-LABEL: define {{.*}}swifttailcc void @"$s25async_dynamic_replacement32indirectReturnDynamicReplaceableSi_S6ityYaKF"(<{ %TSi, %TSi, %TSi, %TSi, %TSi, %TSi, %TSi }>* {{.*}}%0, %swift.context* swiftasync %1)
+// CHECK: forward_to_replaced:
+// CHECK: musttail call swifttailcc void {{.*}}(<{ %TSi, %TSi, %TSi, %TSi, %TSi, %TSi, %TSi }>* noalias nocapture %0, %swift.context* swiftasync {{.*}})
+public dynamic func indirectReturnDynamicReplaceable() async throws -> (Int, Int, Int, Int, Int, Int, Int) {
+    return (0, 0, 0, 0, 0, 0, 0)
+}

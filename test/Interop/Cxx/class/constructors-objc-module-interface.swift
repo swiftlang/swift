@@ -1,7 +1,7 @@
 // Test that Objective-C types passed to a C++ constructor are bridged
 // correctly.
 
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -print-module -module-to-print=ConstructorsObjC -I %S/Inputs/ -source-filename=x -enable-cxx-interop | %FileCheck %s
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -print-module -module-to-print=ConstructorsObjC -I %S/Inputs/ -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
 
 // REQUIRES: objc_interop
 

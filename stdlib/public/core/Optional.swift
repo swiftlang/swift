@@ -262,6 +262,32 @@ public enum Optional<Wrapped>: ExpressibleByNilLiteral {
       _internalInvariantFailure("_unsafelyUnwrappedUnchecked of nil optional")
     }
   }
+
+  /// Takes the wrapped value being stored in this instance and returns it while
+  /// also setting the instance to `nil`. If there is no value being stored in
+  /// this instance, this returns `nil` instead.
+  ///
+  ///     var numberOfShoes: Int? = 34
+  ///
+  ///     if let numberOfShoes = numberOfShoes.take() {
+  ///       print(numberOfShoes)
+  ///       // Prints "34"
+  ///     }
+  ///
+  ///     print(numberOfShoes)
+  ///     // Prints "nil"
+  ///
+  /// - Returns: The wrapped value being stored in this instance. If this
+  ///   instance is `nil`, returns `nil`.
+  internal mutating func _take() -> Wrapped? {
+    switch self {
+    case .some(let wrapped):
+      self = nil
+      return wrapped
+    case .none:
+      return nil
+    }
+  }
 }
 
 extension Optional: CustomDebugStringConvertible {
@@ -269,16 +295,21 @@ extension Optional: CustomDebugStringConvertible {
   public var debugDescription: String {
     switch self {
     case .some(let value):
+#if !SWIFT_STDLIB_STATIC_PRINT
       var result = "Optional("
       debugPrint(value, terminator: "", to: &result)
       result += ")"
       return result
+#else
+    return "(optional printing not available)"
+#endif
     case .none:
       return "nil"
     }
   }
 }
 
+#if SWIFT_ENABLE_REFLECTION
 extension Optional: CustomReflectable {
   public var customMirror: Mirror {
     switch self {
@@ -292,6 +323,7 @@ extension Optional: CustomReflectable {
     }
   }
 }
+#endif
 
 @_transparent
 public // COMPILER_INTRINSIC
@@ -343,9 +375,9 @@ extension Optional: Equatable where Wrapped: Equatable {
   /// `numberToMatch` constant is wrapped as an optional before comparing to the
   /// optional `numberFromString`:
   ///
-  ///     let numberToFind: Int = 23
+  ///     let numberToMatch: Int = 23
   ///     let numberFromString: Int? = Int("23")      // Optional(23)
-  ///     if numberToFind == numberFromString {
+  ///     if numberToMatch == numberFromString {
   ///         print("It's a match!")
   ///     }
   ///     // Prints "It's a match!"
@@ -364,7 +396,7 @@ extension Optional: Equatable where Wrapped: Equatable {
   /// - Parameters:
   ///   - lhs: An optional value to compare.
   ///   - rhs: Another optional value to compare.
-  @inlinable
+  @_transparent
   public static func ==(lhs: Wrapped?, rhs: Wrapped?) -> Bool {
     switch (lhs, rhs) {
     case let (l?, r?):

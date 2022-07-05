@@ -110,6 +110,10 @@ public:
     /// separately performing a Read into a temporary variable followed by
     /// a Write access back into the storage.
     MaterializeToTemporary,
+
+    /// The access is to a computed distributed property, and thus the
+    /// get-accessor is a distributed thunk which may perform a remote call.
+    DispatchToDistributedThunk,
   };
 
 private:
@@ -149,6 +153,10 @@ public:
     return { dispatched ? DispatchToAccessor : DirectToAccessor, accessor };
   }
 
+  static AccessStrategy getDistributedThunkDispatchStrategy() {
+    return {DispatchToDistributedThunk, AccessorKind::Get};
+  }
+
   static AccessStrategy getMaterializeToTemporary(AccessStrategy read,
                                                   AccessStrategy write) {
     return { read, write };
@@ -157,7 +165,8 @@ public:
   Kind getKind() const { return TheKind; }
 
   bool hasAccessor() const {
-    return TheKind == DirectToAccessor || TheKind == DispatchToAccessor;
+    return TheKind == DirectToAccessor || TheKind == DispatchToAccessor ||
+           TheKind == DispatchToDistributedThunk;
   }
 
   AccessorKind getAccessor() const {

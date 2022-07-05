@@ -12,6 +12,7 @@
 
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
+// REQUIRES: reflection
 
 @_spi(Reflection) import Swift
 import StdlibUnittest
@@ -106,7 +107,7 @@ struct LetKeyPaths {
   let double: Double
 }
 
-protocol TestExisential {}
+protocol TestExistential {}
 
 struct KeyPathTypes {
   weak var weakObj: TestClass?
@@ -117,7 +118,7 @@ struct KeyPathTypes {
   var function: (Int) -> (Int)
   var optionalFunction: (Int) -> (Int)?
   var enumField: TestEnum
-  var existential: TestExisential
+  var existential: TestExistential
   var existentialMetatype: Any.Type
   var metatype: Int.Type
 }
@@ -136,7 +137,7 @@ class NSObjectSubclass: NSObject {
 class EmptyNSObject: NSObject {}
 #endif
 
-@available(macOS 10.15.4, iOS 13.4, tvOS 13.4, watchOS 6.2, *)
+@available(SwiftStdlib 5.2, *)
 func checkFields<T>(
   of type: T.Type,
   options: _EachFieldOptions = [],
@@ -162,7 +163,7 @@ func checkFields<T>(
   expectEqual(fields.count, count)
 }
 
-@available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
+@available(SwiftStdlib 5.5, *)
 func checkFieldsWithKeyPath<T>(
   of type: T.Type,
   options: _EachFieldOptions = [],
@@ -193,7 +194,7 @@ extension TestStruct: ExistentialProtocol {}
 extension GenericStruct: ExistentialProtocol {}
 extension GenericSubclass: ExistentialProtocol {}
 
-@available(macOS 10.15.4, iOS 13.4, tvOS 13.4, watchOS 6.2, *)
+@available(SwiftStdlib 5.2, *)
 extension ExistentialProtocol {
   static func doCheckFields(
     options: _EachFieldOptions = [],
@@ -203,7 +204,7 @@ extension ExistentialProtocol {
   }
 }
 
-@available(macOS 10.15.4, iOS 13.4, tvOS 13.4, watchOS 6.2, *)
+@available(SwiftStdlib 5.2, *)
 func checkFieldsAsExistential(
   of type: ExistentialProtocol.Type,
   options: _EachFieldOptions = [],
@@ -212,7 +213,7 @@ func checkFieldsAsExistential(
   type.doCheckFields(options: options, fields: fields)
 }
 
-@available(macOS 10.15.4, iOS 13.4, tvOS 13.4, watchOS 6.2, *)
+@available(SwiftStdlib 5.2, *)
 func _withTypeEncodingCallback(encoding: inout String, name: UnsafePointer<CChar>, offset: Int, type: Any.Type, kind: _MetadataKind) -> Bool {
   if type == Bool.self {
     encoding += "B"
@@ -246,7 +247,7 @@ func _withTypeEncodingCallback(encoding: inout String, name: UnsafePointer<CChar
   return true
 }
 
-@available(macOS 10.15.4, iOS 13.4, tvOS 13.4, watchOS 6.2, *)
+@available(SwiftStdlib 5.2, *)
 func getTypeEncoding<T>(_ type: T.Type) -> String? {
   var encoding = ""
   _ = _forEachField(of: type) { name, offset, type, kind in
@@ -259,7 +260,7 @@ func getTypeEncoding<T>(_ type: T.Type) -> String? {
 
 var tests = TestSuite("ForEachField")
 
-if #available(macOS 10.15.4, iOS 13.4, tvOS 13.4, watchOS 6.2, *) {
+if #available(SwiftStdlib 5.2, *) {
 
   tests.test("TestTuple") {
     checkFields(
@@ -298,7 +299,7 @@ if #available(macOS 10.15.4, iOS 13.4, tvOS 13.4, watchOS 6.2, *) {
     })
   }
 
-  if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
+  if #available(SwiftStdlib 5.5, *) {
     tests.test("StructKeyPath") {
       checkFieldsWithKeyPath(
         of: TestStruct.self,

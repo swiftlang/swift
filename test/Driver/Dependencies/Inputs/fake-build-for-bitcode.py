@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # fake-build-for-bitcode.py - Fake build with -embed-bitcode -*- python -*-
 #
 # This source file is part of the Swift.org open source project
@@ -15,8 +15,6 @@
 # -emit-bc and -c actions.
 #
 # ----------------------------------------------------------------------------
-
-from __future__ import print_function
 
 import os
 import sys

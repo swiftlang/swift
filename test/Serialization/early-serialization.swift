@@ -28,7 +28,7 @@ public struct Array<T> {
 }
 
 // Check that a specialized version of a function is produced
-// CHECK: sil shared [serializable] [_semantics "array.get_capacity"] [canonical] [ossa] @$sSa12_getCapacitySiyFSi_Tgq5 : $@convention(method) (Array<Int>) -> Int
+// CHECK: sil shared [serialized] [_semantics "array.get_capacity"] [canonical] [ossa] @$sSa12_getCapacitySiyFSi_Tgq5 : $@convention(method) (Array<Int>) -> Int
 
 // Check that a call of a @_semantics function was not inlined if early-serialization is enabled.
 // CHECK: sil [serialized] [canonical] [ossa] @$ss28userOfSemanticsAnnotatedFuncySiSaySiGF

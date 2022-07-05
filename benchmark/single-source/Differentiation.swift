@@ -15,7 +15,7 @@
 import TestsUtils
 import _Differentiation
 
-public let Differentiation = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "DifferentiationIdentity",
     runFunction: run_DifferentiationIdentity,
@@ -35,21 +35,21 @@ public let Differentiation = [
 ]
 
 @inline(never)
-public func run_DifferentiationIdentity(N: Int) {
+public func run_DifferentiationIdentity(n: Int) {
   func f(_ x: Float) -> Float {
     x
   }
-  for _ in 0..<1000*N {
+  for _ in 0..<1000*n {
     blackHole(valueWithGradient(at: 1, of: f))
   }
 }
 
 @inline(never)
-public func run_DifferentiationSquare(N: Int) {
+public func run_DifferentiationSquare(n: Int) {
   func f(_ x: Float) -> Float {
     x * x
   }
-  for _ in 0..<1000*N {
+  for _ in 0..<1000*n {
     blackHole(valueWithGradient(at: 1, of: f))
   }
 }
@@ -57,7 +57,7 @@ public func run_DifferentiationSquare(N: Int) {
 let onesArray: [Float] = Array(repeating: 1, count: 50)
 
 @inline(never)
-public func run_DifferentiationArraySum(N: Int) {
+public func run_DifferentiationArraySum(n: Int) {
   func sum(_ array: [Float]) -> Float {
     var result: Float = 0
     for i in withoutDerivative(at: 0..<array.count) {
@@ -65,7 +65,7 @@ public func run_DifferentiationArraySum(N: Int) {
     }
     return result
   }
-  for _ in 0..<N {
+  for _ in 0..<n {
     blackHole(valueWithGradient(at: onesArray, of: sum))
   }
 }

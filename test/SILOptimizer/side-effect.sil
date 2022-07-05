@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -module-name Swift -side-effects-dump -o /dev/null | %FileCheck %s
+// RUN: %target-sil-opt %s -parse-serialized-sil -module-name Swift -side-effects-dump -o /dev/null | %FileCheck %s
 
 // REQUIRES: asserts
 
@@ -215,15 +215,6 @@ bb0(%0 : $Builtin.NativeObject):
 sil @checkedaddr : $@convention(thin) (Builtin.NativeObject, X) -> () {
 bb0(%0 : $Builtin.NativeObject, %1 : $X):
   unconditional_checked_cast_addr Builtin.NativeObject in %0 : $Builtin.NativeObject to X in %1 : $X
-  %r = tuple ()
-  return %r : $()
-}
-
-// CHECK-LABEL: sil @checkedcastvalue
-// CHECK: <func=r,param0=;trap>
-sil @checkedcastvalue : $@convention(thin) (Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject):
-  %1 = unconditional_checked_cast_value Builtin.NativeObject in %0 : $Builtin.NativeObject to X
   %r = tuple ()
   return %r : $()
 }
@@ -530,22 +521,6 @@ bb0:
 sil @call_public_external_func : $@convention(thin) () -> () {
 bb0:
   %u = function_ref @public_external_func : $@convention(thin) () -> ()
-  %a = apply %u() : $@convention(thin) () -> ()
-  %r = tuple ()
-  return %r : $()
-}
-
-sil shared_external @shared_external_func : $@convention(thin) () -> () {
-bb0:
-  %r = tuple ()
-  return %r : $()
-}
-
-// CHECK-LABEL: sil @call_shared_external_func
-// CHECK-NEXT: <func=>
-sil @call_shared_external_func : $@convention(thin) () -> () {
-bb0:
-  %u = function_ref @shared_external_func : $@convention(thin) () -> ()
   %a = apply %u() : $@convention(thin) () -> ()
   %r = tuple ()
   return %r : $()

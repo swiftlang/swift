@@ -184,11 +184,15 @@ const ValueWitnessTable swift::VALUE_WITNESS_SYM(Symbol) =                     \
 const ValueWitnessTable swift::VALUE_WITNESS_SYM(Symbol) =     \
   ValueWitnessTableForBox<pointer_types::Symbol>::table;
 
+#if SWIFT_STDLIB_ENABLE_VECTOR_TYPES
 #define BUILTIN_VECTOR_TYPE(ElementSymbol, _, Width)                           \
   const ValueWitnessTable                                                      \
   swift::VALUE_WITNESS_SYM(VECTOR_BUILTIN_SYMBOL_NAME(ElementSymbol,Width)) =  \
   ValueWitnessTableForBox<NativeBox<SIMDVectorType<ctypes::ElementSymbol,      \
                                                    Width>>>::table;
+#else
+#define BUILTIN_VECTOR_TYPE(ElementSymbol, ElementName, Width)
+#endif
 
 #include "swift/Runtime/BuiltinTypes.def"
 
@@ -262,6 +266,9 @@ const ValueWitnessTable swift::VALUE_WITNESS_SYM(EMPTY_TUPLE_MANGLING) =
   };
 #define BUILTIN_TYPE(Symbol, Name) \
   OPAQUE_METADATA(Symbol)
+#if !SWIFT_STDLIB_ENABLE_VECTOR_TYPES
+#define BUILTIN_VECTOR_TYPE(ElementSymbol, ElementName, Width)
+#endif
 #include "swift/Runtime/BuiltinTypes.def"
 
 /// The standard metadata for the empty tuple.

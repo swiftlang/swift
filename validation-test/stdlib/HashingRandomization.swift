@@ -10,12 +10,15 @@
 
 // REQUIRES: executable_test
 
+// Freestanding doesn't support environment variables, and this test depends on SWIFT_DETERMINISTIC_HASHING=1
+// UNSUPPORTED: freestanding
+
 // This check verifies that the hash seed is randomly generated on every
 // execution of a Swift program unless the SWIFT_DETERMINISTIC_HASHING
 // environment variable is set.
 
 print("Deterministic: \(Hasher._isDeterministic)")
-print("Seed: \(Hasher._executionSeed)")
+print("Seed: (\(Hasher._executionSeed.0), \(Hasher._executionSeed.1))")
 print("Hash values: <\(0.hashValue), \(1.hashValue)>")
 
 // With randomized hashing, we get a new seed and a new set of hash values on

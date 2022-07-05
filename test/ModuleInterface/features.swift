@@ -1,13 +1,24 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -typecheck -swift-version 5 -module-name FeatureTest -emit-module-interface-path - -enable-library-evolution  -disable-availability-checking %s | %FileCheck %s
-// REQUIRES: concurrency
+// RUN: %target-swift-emit-module-interface(%t/FeatureTest.swiftinterface) %s -module-name FeatureTest -disable-availability-checking
+// RUN: %target-swift-typecheck-module-from-interface(%t/FeatureTest.swiftinterface) -module-name FeatureTest -disable-availability-checking
+// RUN: %FileCheck %s < %t/FeatureTest.swiftinterface
 
 // REQUIRES: concurrency
 
 // Ensure that when we emit a Swift interface that makes use of new features,
 // the uses of those features are guarded by appropriate #if's that allow older
 // compilers to skip over the uses of newer features.
+
+// CHECK: #if compiler(>=5.3) && $SpecializeAttributeWithAvailability
+// CHECK: @_specialize(exported: true, kind: full, availability: macOS, introduced: 12; where T == Swift.Int)
+// CHECK: public func specializeWithAvailability<T>(_ t: T)
+// CHECK: #else
+// CHECK: public func specializeWithAvailability<T>(_ t: T)
+// CHECK: #endif
+@_specialize(exported: true, availability: macOS 12, *; where T == Int)
+public func specializeWithAvailability<T>(_ t: T) {
+}
 
 // CHECK: #if compiler(>=5.3) && $Actors
 // CHECK-NEXT: public actor MyActor
@@ -78,7 +89,7 @@ public class OldSchool2: MP {
 // CHECK: public struct UsesRP {
 public struct UsesRP {
   // CHECK: #if compiler(>=5.3) && $RethrowsProtocol
-  // CHECK-NEXT:  public var value: FeatureTest.RP? {
+  // CHECK-NEXT:  public var value: (any FeatureTest.RP)? {
   // CHECK-NOT: #if compiler(>=5.3) && $RethrowsProtocol
   // CHECK: get
   public var value: RP? {
@@ -142,4 +153,50 @@ public func stage(with actor: MyActor) { }
 // CHECK-NEXT: #endif
 public func asyncIsh(@_inheritActorContext operation: @Sendable @escaping () async -> Void) { }
 
+// CHECK:      #if compiler(>=5.3) && $AsyncAwait
+// CHECK-NEXT: #if $UnsafeInheritExecutor
+// CHECK-NEXT: @_unsafeInheritExecutor public func unsafeInheritExecutor() async
+// CHECK-NEXT: #else
+// CHECK-NEXT: public func unsafeInheritExecutor() async
+// CHECK-NEXT: #endif
+// CHECK-NEXT: #endif
+@_unsafeInheritExecutor
+public func unsafeInheritExecutor() async {}
+
+// CHECK:      #if compiler(>=5.3) && $AsyncAwait
+// CHECK-NEXT: #if $UnsafeInheritExecutor
+// CHECK-NEXT: @_specialize{{.*}}
+// CHECK-NEXT: @_unsafeInheritExecutor public func multipleSuppressible<T>(value: T) async
+// CHECK-NEXT: #elseif $SpecializeAttributeWithAvailability
+// CHECK-NEXT: @_specialize{{.*}}
+// CHECK-NEXT: public func multipleSuppressible<T>(value: T) async
+// CHECK-NEXT: #else
+// CHECK-NEXT: public func multipleSuppressible<T>(value: T) async
+// CHECK-NEXT: #endif
+// CHECK-NEXT: #endif
+@_unsafeInheritExecutor
+@_specialize(exported: true, availability: SwiftStdlib 5.1, *; where T == Int)
+public func multipleSuppressible<T>(value: T) async {}
+
+// CHECK:      #if compiler(>=5.3) && $UnavailableFromAsync
+// CHECK-NEXT: @_unavailableFromAsync(message: "Test") public func unavailableFromAsyncFunc()
+// CHECK-NEXT: #else
+// CHECK-NEXT: public func unavailableFromAsyncFunc()
+// CHECK-NEXT: #endif
+@_unavailableFromAsync(message: "Test")
+public func unavailableFromAsyncFunc() { }
+
+// CHECK:      #if compiler(>=5.3) && $NoAsyncAvailability
+// CHECK-NEXT: @available(*, noasync, message: "Test")
+// CHECK-NEXT: public func noAsyncFunc()
+// CHECK-NEXT: #else
+// CHECK-NEXT: public func noAsyncFunc()
+// CHECK-NEXT: #endif
+@available(*, noasync, message: "Test")
+public func noAsyncFunc() { }
+
 // CHECK-NOT: extension FeatureTest.MyActor : Swift.Sendable
+
+// CHECK: #if compiler(>=5.3) && $GlobalActors
+// CHECK-NEXT: extension FeatureTest.SomeGlobalActor : _Concurrency.GlobalActor {}
+// CHECK-NEXT: #endif

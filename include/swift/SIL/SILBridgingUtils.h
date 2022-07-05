@@ -22,30 +22,6 @@
 
 namespace swift {
 
-inline BridgedStringRef getBridgedStringRef(llvm::StringRef str) {
-  return { (const unsigned char *)str.data(), str.size() };
-}
-
-inline StringRef getStringRef(BridgedStringRef str) {
-  return StringRef((const char *)str.data, str.length);
-}
-
-/// Copies the string in an malloc'ed memory and the caller is responsible for
-/// freeing it.
-inline BridgedStringRef getCopiedBridgedStringRef(std::string str,
-                                           bool removeTrailingNewline = false) {
-  // A couple of mallocs are needed for passing a std::string to libswift. But
-  // it's currently only used or debug descriptions. So, its' maybe not so bad -
-  // for now.
-  // TODO: find a better way to pass std::strings to libswift.
-  StringRef strRef(str);
-  if (removeTrailingNewline)
-    strRef.consume_back("\n");
-  llvm::MallocAllocator allocator;
-  StringRef copy = strRef.copy(allocator);
-  return getBridgedStringRef(copy);
-}
-
 inline SILLocation getSILLocation(BridgedLocation loc) {
   return reinterpret_cast<SILDebugLocation *>(&loc)->getLocation();
 }
@@ -74,12 +50,30 @@ inline SILType castToSILType(BridgedType type) {
   return SILType::getFromOpaqueValue(type.typePtr);
 }
 
+inline SubstitutionMap castToSubstitutionMap(BridgedSubstitutionMap subMap) {
+  return SubstitutionMap::getFromOpaqueValue(subMap.op);
+}
+
 template <class I = SILInstruction> I *castToInst(BridgedInstruction inst) {
+  return cast<I>(static_cast<SILNode *>(inst.obj)->castToInstruction());
+}
+
+template <class I = SILInstruction> I *castToInst(OptionalBridgedInstruction inst) {
+  if (!inst.obj)
+    return nullptr;
   return cast<I>(static_cast<SILNode *>(inst.obj)->castToInstruction());
 }
 
 inline SILBasicBlock *castToBasicBlock(BridgedBasicBlock block) {
   return static_cast<SILBasicBlock *>(block.obj);
+}
+
+inline SILBasicBlock *castToBasicBlock(OptionalBridgedBasicBlock block) {
+  return block.obj ? static_cast<SILBasicBlock *>(block.obj) : nullptr;
+}
+
+template <class A = SILArgument> A *castToArgument(BridgedArgument argument) {
+  return cast<A>(static_cast<SILArgument *>(argument.obj));
 }
 
 inline SILFunction *castToFunction(BridgedFunction function) {
@@ -88,6 +82,15 @@ inline SILFunction *castToFunction(BridgedFunction function) {
 
 inline SILGlobalVariable *castToGlobal(BridgedGlobalVar global) {
   return static_cast<SILGlobalVariable *>(global.obj);
+}
+
+inline ValueOwnershipKind castToOwnership(BridgedOwnership ownership) {
+  switch (ownership) {
+    case Ownership_Unowned:    return OwnershipKind::Unowned;
+    case Ownership_Owned:      return OwnershipKind::Owned;
+    case Ownership_Guaranteed: return OwnershipKind::Guaranteed;
+    case Ownership_None:       return OwnershipKind::None;
+  }
 }
 
 ArrayRef<SILValue> getSILValues(BridgedValueArray values,

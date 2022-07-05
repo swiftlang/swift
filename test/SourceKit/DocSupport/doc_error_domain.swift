@@ -4,7 +4,7 @@
 // RUN: %FileCheck -input-file=%t.response %s
 
 // CHECK: struct MyError : CustomNSError, Hashable, Error {
-// CHECK:     enum Code : Int32, Equatable {
+// CHECK:     enum Code : Int32, @unchecked Sendable, Equatable {
 // CHECK:         case errFirst
 // CHECK:         case errSecond
 // CHECK:     }

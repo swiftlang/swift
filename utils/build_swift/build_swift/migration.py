@@ -8,17 +8,12 @@
 
 
 """
-Temporary module with functionaly used to migrate away from build-script-impl.
+Temporary module with functionality used to migrate away from build-script-impl.
 """
 
 
-from __future__ import absolute_import, unicode_literals
-
 import itertools
 import subprocess
-
-import six
-from six.moves import map
 
 from swift_build_support.swift_build_support.targets import \
     StdlibDeploymentTarget
@@ -137,4 +132,4 @@ def check_impl_args(build_script_impl, args):
     _, err = pipe.communicate()
 
     if pipe.returncode != 0:
-        raise ValueError(six.text_type(err.splitlines()[0].decode()))
+        raise ValueError(str(err.splitlines()[0].decode()))

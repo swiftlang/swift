@@ -22,7 +22,7 @@ let t: [BenchmarkCategory] = [.validation, .api, .Dictionary]
 // We run the test at a spread of sizes between 1*x and 2*x, because the
 // quadratic behavior only happens at certain load factors.
 
-public let DictionaryCopy = [
+public let benchmarks = [
   BenchmarkInfo(name:"Dict.CopyKeyValue.16k",
     runFunction: copyKeyValue, tags: t, setUpFunction: { dict(16_000) }),
   BenchmarkInfo(name:"Dict.CopyKeyValue.20k",
@@ -49,22 +49,22 @@ func dict(_ size: Int) {
 }
 
 @inline(never)
-func copyKeyValue(N: Int) {
-  for _ in 1...N {
+func copyKeyValue(n: Int) {
+  for _ in 1...n {
     var copy = [Int: Int]()
     for (key, value) in dict! {
       copy[key] = value
     }
-    CheckResults(copy.count == dict!.count)
+    check(copy.count == dict!.count)
   }
 }
 
 // Filter with a predicate returning true is essentially the same loop as the
 // one in copyKeyValue above.
 @inline(never)
-func filterAllMatch(N: Int) {
-  for _ in 1...N {
+func filterAllMatch(n: Int) {
+  for _ in 1...n {
     let copy = dict!.filter { _ in true }
-    CheckResults(copy.count == dict!.count)
+    check(copy.count == dict!.count)
   }
 }

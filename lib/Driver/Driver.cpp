@@ -223,17 +223,16 @@ static void validateDebugInfoArgs(DiagnosticEngine &diags,
     }
   }
 
-  // Check for any -debug-prefix-map options that aren't of the form
+  // Check for any -*-prefix-map options that aren't of the form
   // 'original=remapped' (either side can be empty, however).
-  for (auto A : args.getAllArgValues(options::OPT_debug_prefix_map))
-    if (A.find('=') == StringRef::npos)
-      diags.diagnose(SourceLoc(), diag::error_invalid_debug_prefix_map, A);
-
-  // Check for any -coverage-prefix-map options that aren't of the form
-  // 'original=remapped' (either side can be empty, however).
-  for (auto A : args.getAllArgValues(options::OPT_coverage_prefix_map))
-    if (A.find('=') == StringRef::npos)
-      diags.diagnose(SourceLoc(), diag::error_invalid_coverage_prefix_map, A);
+  for (const Arg *A : args.filtered(options::OPT_debug_prefix_map,
+                                    options::OPT_coverage_prefix_map,
+                                    options::OPT_file_prefix_map)) {
+    StringRef val = A->getValue();
+    if (val.find('=') == StringRef::npos)
+      diags.diagnose(SourceLoc(), diag::error_opt_invalid_mapping,
+                     A->getOption().getPrefixedName(), val);
+  }
 }
 
 static void validateVerifyIncrementalDependencyArgs(DiagnosticEngine &diags,
@@ -283,6 +282,28 @@ static void validateSearchPathArgs(DiagnosticEngine &diags,
   }
 }
 
+static void validateLinkArgs(DiagnosticEngine &diags, const ArgList &args) {
+  if (args.hasArg(options::OPT_experimental_hermetic_seal_at_link)) {
+    if (args.hasArg(options::OPT_enable_library_evolution)) {
+      diags.diagnose(SourceLoc(),
+                     diag::error_hermetic_seal_cannot_have_library_evolution);
+    }
+
+    bool ltoOk = false;
+    if (const Arg *A = args.getLastArg(options::OPT_lto)) {
+      StringRef name = A->getValue();
+      if (name == "llvm-thin" || name == "llvm-full") {
+        ltoOk = true;
+      }
+    }
+
+    if (!ltoOk) {
+      diags.diagnose(SourceLoc(),
+                     diag::error_hermetic_seal_requires_lto);
+    }
+  }
+}
+
 /// Perform miscellaneous early validation of arguments.
 static void validateArgs(DiagnosticEngine &diags, const ArgList &args,
                          const llvm::Triple &T) {
@@ -294,6 +315,7 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &args,
   validateCompilationConditionArgs(diags, args);
   validateSearchPathArgs(diags, args);
   validateVerifyIncrementalDependencyArgs(diags, args);
+  validateLinkArgs(diags, args);
 }
 
 std::unique_ptr<ToolChain>
@@ -789,7 +811,8 @@ static bool computeIncremental(const llvm::opt::InputArgList *ArgList,
 
   if (ShowIncrementalBuildDecisions) {
     llvm::outs() << "Incremental compilation has been disabled, because it "
-                 << ReasonToDisable;
+                 << ReasonToDisable
+                 << "\n";
   }
   return false;
 }
@@ -956,7 +979,7 @@ Driver::buildCompilation(const ToolChain &TC,
   computeArgsHash(ArgsHash, *TranslatedArgList);
   llvm::sys::TimePoint<> LastBuildTime = llvm::sys::TimePoint<>::min();
   InputInfoMap outOfDateMap;
-  std::string whyIgnoreIncrementallity =
+  std::string whyIgnoreIncrementality =
       !Incremental
           ? ""
           : buildRecordPath.empty()
@@ -1055,7 +1078,7 @@ Driver::buildCompilation(const ToolChain &TC,
   // Construct the graph of Actions.
   SmallVector<const Action *, 8> TopLevelActions;
   buildActions(TopLevelActions, TC, OI,
-               whyIgnoreIncrementallity.empty() ? &outOfDateMap : nullptr, *C);
+               whyIgnoreIncrementality.empty() ? &outOfDateMap : nullptr, *C);
 
   if (Diags.hadAnyError() && !AllowErrors)
     return nullptr;
@@ -1086,8 +1109,8 @@ Driver::buildCompilation(const ToolChain &TC,
 
   // This has to happen after building jobs, because otherwise we won't even
   // emit .swiftdeps files for the next build.
-  if (!whyIgnoreIncrementallity.empty())
-    C->disableIncrementalBuild(whyIgnoreIncrementallity);
+  if (!whyIgnoreIncrementality.empty())
+    C->disableIncrementalBuild(whyIgnoreIncrementality);
 
   if (Diags.hadAnyError() && !AllowErrors)
     return nullptr;
@@ -1134,7 +1157,8 @@ parseArgsUntil(const llvm::opt::OptTable& Opts,
     }
 
     unsigned Prev = Index;
-    Arg *A = Opts.ParseOneArg(*Args, Index, FlagsToInclude, FlagsToExclude);
+    Arg *A = Opts.ParseOneArg(*Args, Index, FlagsToInclude, FlagsToExclude)
+                 .release();
     assert(Index > Prev && "Parser failed to consume argument.");
 
     // Check for missing argument error.
@@ -1791,7 +1815,7 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
 
   if (const Arg *A = Args.getLastArg(options::OPT_sanitize_recover_EQ)) {
     // Just validate the args. The frontend will parse these again and actually
-    // use them. To avoid emitting warnings multiple times we surpress warnings
+    // use them. To avoid emitting warnings multiple times we suppress warnings
     // here but not in the frontend.
     (void)parseSanitizerRecoverArgValues(A, OI.SelectedSanitizers, Diags,
                                          /*emitWarnings=*/false);
@@ -1956,7 +1980,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       if (Arg *A = Args.getLastArg(options::OPT_import_objc_header)) {
         StringRef Value = A->getValue();
         auto Ty = TC.lookupTypeForExtension(llvm::sys::path::extension(Value));
-        if (Ty == file_types::TY_ObjCHeader) {
+        if (Ty == file_types::TY_ClangHeader) {
           auto *HeaderInput = C.createAction<InputAction>(*A, Ty);
           StringRef PersistentPCHDir;
           if (const Arg *A = Args.getLastArg(options::OPT_pch_output_dir)) {
@@ -2039,7 +2063,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_LLVM_IR:
       case file_types::TY_LLVM_BC:
       case file_types::TY_SerializedDiagnostics:
-      case file_types::TY_ObjCHeader:
+      case file_types::TY_ClangHeader:
       case file_types::TY_ClangModuleFile:
       case file_types::TY_SwiftDeps:
       case file_types::TY_ExternalSwiftDeps:
@@ -2057,6 +2081,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_SwiftOverlayFile:
       case file_types::TY_JSONDependencies:
       case file_types::TY_JSONFeatures:
+      case file_types::TY_SwiftABIDescriptor:
         // We could in theory handle assembly or LLVM input, but let's not.
         // FIXME: What about LTO?
         Diags.diagnose(SourceLoc(), diag::error_unexpected_input_file,
@@ -2761,7 +2786,7 @@ static void addDiagFileOutputForPersistentPCHAction(
     llvm::sys::path::append(outPathBuf, stem);
     outPathBuf += '-';
     auto code = llvm::hash_value(ModuleOutPath);
-    outPathBuf += llvm::APInt(64, code).toString(36, /*Signed=*/false);
+    llvm::APInt(64, code).toString(outPathBuf, 36, /*Signed=*/false);
     llvm::sys::path::replace_extension(outPathBuf, suffix);
   }
 
@@ -3452,12 +3477,12 @@ void Driver::chooseObjectiveCHeaderOutputPath(Compilation &C,
                                               StringRef workingDirectory,
                                               CommandOutput *Output) const {
 
-  if (hasExistingAdditionalOutput(*Output, file_types::TY_ObjCHeader))
+  if (hasExistingAdditionalOutput(*Output, file_types::TY_ClangHeader))
     return;
 
   StringRef ObjCHeaderPath;
   if (OutputMap) {
-    auto iter = OutputMap->find(file_types::TY_ObjCHeader);
+    auto iter = OutputMap->find(file_types::TY_ClangHeader);
     if (iter != OutputMap->end())
       ObjCHeaderPath = iter->second;
   }
@@ -3467,13 +3492,13 @@ void Driver::chooseObjectiveCHeaderOutputPath(Compilation &C,
       ObjCHeaderPath = A->getValue();
 
   if (!ObjCHeaderPath.empty()) {
-    Output->setAdditionalOutputForType(file_types::TY_ObjCHeader,
+    Output->setAdditionalOutputForType(file_types::TY_ClangHeader,
                                        ObjCHeaderPath);
   } else {
     // Put the header next to the primary output file.
     // FIXME: That's not correct if the user /just/ passed -emit-header
     // and not -emit-module.
-    addAuxiliaryOutput(C, *Output, file_types::TY_ObjCHeader,
+    addAuxiliaryOutput(C, *Output, file_types::TY_ClangHeader,
                        /*output file map*/ nullptr, workingDirectory);
   }
 }
@@ -3540,7 +3565,7 @@ void Driver::printHelp(bool ShowHidden) const {
   if (!ShowHidden)
     ExcludedFlagsBitmask |= HelpHidden;
 
-  getOpts().PrintHelp(llvm::outs(), Name.c_str(), "Swift compiler",
+  getOpts().printHelp(llvm::outs(), Name.c_str(), "Swift compiler",
                       IncludedFlagsBitmask, ExcludedFlagsBitmask,
                       /*ShowAllAliases*/false);
 

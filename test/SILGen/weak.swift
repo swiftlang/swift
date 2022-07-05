@@ -16,16 +16,19 @@ func test0(c c: C) {
   var c = c
 // CHECK:    bb0(%0 : @guaranteed $C):
 // CHECK:      [[C:%.*]] = alloc_box ${ var C }
-// CHECK-NEXT: [[PBC:%.*]] = project_box [[C]]
+// CHECK:      [[C_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[C]]
+// CHECK-NEXT: [[PBC:%.*]] = project_box [[C_LIFETIME]]
 
   var a: A
 // CHECK:      [[A1:%.*]] = alloc_box ${ var A }
 // CHECK:      [[MARKED_A1:%.*]] = mark_uninitialized [var] [[A1]]
-// CHECK-NEXT: [[PBA:%.*]] = project_box [[MARKED_A1]]
+// CHECK:      [[A1_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[MARKED_A1]]
+// CHECK-NEXT: [[PBA:%.*]] = project_box [[A1_LIFETIME]]
 
   weak var x = c
 // CHECK:      [[X:%.*]] = alloc_box ${ var @sil_weak Optional<C> }, var, name "x"
-// CHECK-NEXT: [[PBX:%.*]] = project_box [[X]]
+// CHECK:      [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[X]]
+// CHECK-NEXT: [[PBX:%.*]] = project_box [[X_LIFETIME]]
 //   Implicit conversion
 // CHECK-NEXT: [[READ:%.*]] = begin_access [read] [unknown] [[PBC]]
 // CHECK-NEXT: [[TMP:%.*]] = load [copy] [[READ]] : $*C
@@ -71,13 +74,15 @@ class CC {
   // CHECK:  bb0([[SELF:%.*]] : @owned $CC):
   // CHECK:    [[UNINIT_SELF:%.*]] = mark_uninitialized [rootself] [[SELF]] : $CC
   // CHECK:    [[FOO:%.*]] = alloc_box ${ var Optional<CC> }, var, name "foo"
-  // CHECK:    [[PB:%.*]] = project_box [[FOO]]
+  // CHECK:    [[FOO_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[FOO]]
+  // CHECK:    [[PB:%.*]] = project_box [[FOO_LIFETIME]]
   // CHECK:    [[BORROWED_UNINIT_SELF:%.*]] = begin_borrow [[UNINIT_SELF]]
   // CHECK:    [[X:%.*]] = ref_element_addr [[BORROWED_UNINIT_SELF]] : $CC, #CC.x
   // CHECK:    [[READ:%.*]] = begin_access [read] [dynamic] [[X]] : $*@sil_weak Optional<CC>
   // CHECK:    [[VALUE:%.*]] = load_weak [[READ]] : $*@sil_weak Optional<CC>
   // CHECK:    store [[VALUE]] to [init] [[PB]] : $*Optional<CC>
   // CHECK:    end_borrow [[BORROWED_UNINIT_SELF]]
+  // CHECK:    end_borrow [[FOO_LIFETIME]]
   // CHECK:    destroy_value [[FOO]]
   // CHECK: } // end sil function '$s4weak2CCC{{[_0-9a-zA-Z]*}}fc'
   init() {

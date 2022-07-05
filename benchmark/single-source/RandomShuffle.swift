@@ -17,7 +17,7 @@ import TestsUtils
 // shuffling large arrays.
 //
 
-public let RandomShuffle = [
+public let benchmarks = [
   BenchmarkInfo(name: "RandomShuffleDef2", runFunction: run_RandomShuffleDef,
     tags: [.api], setUpFunction: { blackHole(numbersDef) }, legacyFactor: 4),
   BenchmarkInfo(name: "RandomShuffleLCG2", runFunction: run_RandomShuffleLCG,
@@ -43,17 +43,17 @@ var numbersDef: [Int] = Array(0...2_500)
 var numbersLCG: [Int] = Array(0...6_250)
 
 @inline(never)
-public func run_RandomShuffleDef(_ N: Int) {
-  for _ in 0 ..< N {
+public func run_RandomShuffleDef(_ n: Int) {
+  for _ in 0 ..< n {
     numbersDef.shuffle()
     blackHole(numbersDef.first!)
   }
 }
 
 @inline(never)
-public func run_RandomShuffleLCG(_ N: Int) {
+public func run_RandomShuffleLCG(_ n: Int) {
   var generator = LCRNG(seed: 0)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     numbersLCG.shuffle(using: &generator)
     blackHole(numbersLCG.first!)
   }

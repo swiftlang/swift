@@ -21,15 +21,11 @@
 
 // RUN: %target-swift-frontend -typecheck -sdk '%t/SDK' -prebuilt-module-cache-path '%t/PreBuiltSDKModules' -module-cache-path %t/TempModuleCacheOther -resource-dir '' -parse-stdlib -Rmodule-interface-rebuild %S/Inputs/sdk-test-stdlib-no-ossa-referent-no-rebuild-remark.swift -verify
 
-// In this case, we should rebuild.
+// In this case also, we should not rebuild.
 
-// RUN: %target-swift-frontend -typecheck -sdk '%t/SDK' -prebuilt-module-cache-path '%t/PreBuiltSDKModules' -module-cache-path %t/TempModuleCacheOther -resource-dir '' -parse-stdlib -Rmodule-interface-rebuild %S/Inputs/sdk-test-stdlib-no-ossa-referent-with-rebuild-remark.swift -verify -enable-ossa-modules
+// RUN: %target-swift-frontend -typecheck -sdk '%t/SDK' -prebuilt-module-cache-path '%t/PreBuiltSDKModules' -module-cache-path %t/TempModuleCacheOther -resource-dir '' -parse-stdlib -Rmodule-interface-rebuild %S/Inputs/sdk-test-stdlib-no-ossa-referent-no-rebuild-remark.swift -verify -enable-ossa-modules
 
-// Make sure the rebuild is in OSSA.
-
-// RUN: %target-sil-opt -module-name Swift %t/PreBuiltSDKModules/Swift.swiftmodule/*.swiftmodule | grep '@$ss3foos5KlassCyF' | grep '[[]ossa[]]'
-
-// Flacky hangs: rdar://77288690
+// Flaky hangs: rdar://77288690
 // UNSUPPORTED: CPU=arm64, CPU=arm64e
 
 @_fixed_layout

@@ -42,7 +42,7 @@ func testUnresolvedMember(i: Int) -> X {
 func test_member_filtering() {
   struct S {
     // Result types here are different intentionally,
-    // if there were the same simplication logic would
+    // if there were the same simplification logic would
     // trigger and disable overloads during constraint
     // generation.
     func foo(_: Int) -> S { S() }

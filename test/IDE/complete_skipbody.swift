@@ -77,6 +77,6 @@ default:
 
 // CHECK: Begin completions, 3 items
 // CHECK-DAG: Keyword[self]/CurrNominal:          self[#MyStruct#]; name=self
-// CHECK-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]:      x[#Int#]; name=x
-// CHECK-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]:      y[#Int#]; name=y
+// CHECK-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]:      x[#Int#]; name=x
+// CHECK-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]:      y[#Int#]; name=y
 // CHECK: End completions

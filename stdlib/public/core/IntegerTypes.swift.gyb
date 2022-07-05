@@ -14,7 +14,6 @@
 # Utility code for later in this template
 #
 
-from __future__ import division
 from SwiftIntTypes import all_integer_types, int_max_bits, should_define_truncating_bit_pattern_init
 from SwiftFloatingPointTypes import getFtoIBounds
 
@@ -1093,6 +1092,7 @@ public struct ${Self}
   /// A type that represents an integer literal.
   public typealias IntegerLiteralType = ${Self}
 
+  public var _value: Builtin.Int${bits}
 
   @_transparent
   public init(_builtinIntegerLiteral x: Builtin.IntLiteral) {
@@ -1154,7 +1154,7 @@ public struct ${Self}
   ///   `source` must be representable in this type after rounding toward
   ///   zero.
 %     if FloatType == 'Float16':
-  @available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+  @available(SwiftStdlib 5.3, *)
 %     end
   @_transparent
   public init(_ source: ${FloatType}) {
@@ -1192,7 +1192,7 @@ public struct ${Self}
   ///
   /// - Parameter source: A floating-point value to convert to an integer.
 %     if FloatType == 'Float16':
-  @available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+  @available(SwiftStdlib 5.3, *)
 %     end
   @_transparent
   public init?(exactly source: ${FloatType}) {
@@ -1625,8 +1625,6 @@ ${assignmentOperatorComment(x.operator, True)}
   }
 
   // Implementation details
-
-  public var _value: Builtin.Int${bits}
 
 % if self_type.is_word:
   @_transparent

@@ -13,34 +13,17 @@
 #ifndef SWIFT_SIL_SILBRIDGING_H
 #define SWIFT_SIL_SILBRIDGING_H
 
-#include "BridgedSwiftObject.h"
+#include "swift/Basic/BasicBridging.h"
+#include "swift/Basic/BridgedSwiftObject.h"
+#include <stdbool.h>
 #include <stddef.h>
+#include <string>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-typedef struct {
-  const unsigned char * _Nullable data;
-  size_t length;
-} BridgedStringRef;
-
-typedef struct {
-  const unsigned char * _Nonnull data;
-  size_t numElements;
-} BridgedArrayRef;
+SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 enum {
   BridgedOperandSize = 4 * sizeof(uintptr_t),
   BridgedSuccessorSize = 4 * sizeof(uintptr_t) + sizeof(uint64_t)
-};
-
-typedef struct {
-  void * _Nullable data;
-} BridgedSlab;
-
-enum {
-  BridgedSlabCapacity = 64 * sizeof(uintptr_t)
 };
 
 enum ChangeNotificationKind {
@@ -89,6 +72,10 @@ typedef struct {
 } BridgedFunction;
 
 typedef struct {
+  OptionalSwiftObject obj;
+} OptionalBridgedFunction;
+
+typedef struct {
   SwiftObject obj;
 } BridgedGlobalVar;
 
@@ -117,6 +104,10 @@ typedef struct {
 } BridgedValue;
 
 typedef struct {
+  OptionalSwiftObject obj;
+} OptionalBridgedValue;
+
+typedef struct {
   SwiftObject obj;
 } BridgedInstruction;
 
@@ -128,6 +119,17 @@ typedef struct {
   SwiftObject obj;
 } BridgedMultiValueResult;
 
+typedef struct {
+  const unsigned char * _Nullable message;
+  SwiftInt position;
+} BridgedParsingError;
+
+typedef struct {
+  OptionalBridgedInstruction insertBefore;
+  OptionalBridgedBasicBlock insertAtEnd;
+  BridgedLocation loc;
+} BridgedBuilder;
+
 // Must be in sync with SILInstruction::MemoryBehavior
 // TODO: do this less hacky.
 typedef enum {
@@ -138,38 +140,98 @@ typedef enum {
   MayHaveSideEffectsBehavior
 } BridgedMemoryBehavior;
 
-typedef long SwiftInt;
+typedef enum {
+  Ownership_Unowned,
+  Ownership_Owned,
+  Ownership_Guaranteed,
+  Ownership_None
+} BridgedOwnership;
+
+typedef enum {
+  ArgumentConvention_Indirect_In,
+  ArgumentConvention_Indirect_In_Constant,
+  ArgumentConvention_Indirect_In_Guaranteed,
+  ArgumentConvention_Indirect_Inout,
+  ArgumentConvention_Indirect_InoutAliasable,
+  ArgumentConvention_Indirect_Out,
+  ArgumentConvention_Direct_Owned,
+  ArgumentConvention_Direct_Unowned,
+  ArgumentConvention_Direct_Guaranteed,
+} BridgedArgumentConvention;
+
+// AST bridging
+
+typedef struct {
+  const void * _Nonnull op;
+} BridgedSubstitutionMap;
+
+typedef enum {
+  UnknownBuiltin = 0,
+#define BUILTIN(Id, Name, Attrs) Id##Builtin,
+#include "swift/AST/Builtins.def"
+} BridgedBuiltinID;
+
+enum {
+  EffectsFlagEscape = 0x1,
+  EffectsFlagDerived = 0x2
+};
 
 void registerBridgedClass(BridgedStringRef className, SwiftMetatype metatype);
 
-void freeBridgedStringRef(BridgedStringRef str);
+typedef void (* _Nonnull FunctionRegisterFn)(BridgedFunction f,
+                                        void * _Nonnull data,
+                                        SwiftInt size);
+typedef void (* _Nonnull FunctionWriteFn)(BridgedFunction,
+                                          BridgedOStream, SwiftInt);
+typedef BridgedParsingError (* _Nonnull FunctionParseFn)(BridgedFunction,
+                         BridgedStringRef, SwiftInt, SwiftInt, BridgedArrayRef);
+typedef SwiftInt (* _Nonnull FunctionCopyEffectsFn)(BridgedFunction,
+                                                    BridgedFunction);
+typedef SwiftInt (* _Nonnull FunctionGetEffectFlagsFn)(BridgedFunction, SwiftInt);
 
+void Function_register(SwiftMetatype metatype,
+            FunctionRegisterFn initFn, FunctionRegisterFn destroyFn,
+            FunctionWriteFn writeFn, FunctionParseFn parseFn,
+            FunctionCopyEffectsFn copyEffectsFn,
+            FunctionGetEffectFlagsFn hasEffectsFn);
+
+SwiftInt PassContext_continueWithNextSubpassRun(BridgedPassContext passContext,
+                                                OptionalBridgedInstruction inst);
 void PassContext_notifyChanges(BridgedPassContext passContext,
                                enum ChangeNotificationKind changeKind);
+BridgedBasicBlock PassContext_splitBlock(BridgedInstruction bridgedInst);
 void PassContext_eraseInstruction(BridgedPassContext passContext,
                                   BridgedInstruction inst);
-BridgedSlab PassContext_getNextSlab(BridgedSlab slab);
-BridgedSlab PassContext_allocSlab(BridgedPassContext passContext,
-                                  BridgedSlab afterSlab);
-BridgedSlab PassContext_freeSlab(BridgedPassContext passContext,
-                                 BridgedSlab slab);
 
 BridgedStringRef SILFunction_getName(BridgedFunction function);
-BridgedStringRef SILFunction_debugDescription(BridgedFunction function);
+std::string SILFunction_debugDescription(BridgedFunction function);
+SwiftInt SILFunction_hasOwnership(BridgedFunction function);
 OptionalBridgedBasicBlock SILFunction_firstBlock(BridgedFunction function);
 OptionalBridgedBasicBlock SILFunction_lastBlock(BridgedFunction function);
+SwiftInt SILFunction_numIndirectResultArguments(BridgedFunction function);
+SwiftInt SILFunction_getSelfArgumentIndex(BridgedFunction function);
+SwiftInt SILFunction_getNumSILArguments(BridgedFunction function);
+BridgedType SILFunction_getSILArgumentType(BridgedFunction function, SwiftInt idx);
+BridgedType SILFunction_getSILResultType(BridgedFunction function);
+SwiftInt SILFunction_isSwift51RuntimeAvailable(BridgedFunction function);
+SwiftInt SILFunction_hasSemanticsAttr(BridgedFunction function,
+                                      BridgedStringRef attrName);
 
 BridgedStringRef SILGlobalVariable_getName(BridgedGlobalVar global);
-BridgedStringRef SILGlobalVariable_debugDescription(BridgedGlobalVar global);
+std::string SILGlobalVariable_debugDescription(BridgedGlobalVar global);
 
 OptionalBridgedBasicBlock SILBasicBlock_next(BridgedBasicBlock block);
 OptionalBridgedBasicBlock SILBasicBlock_previous(BridgedBasicBlock block);
 BridgedFunction SILBasicBlock_getFunction(BridgedBasicBlock block);
-BridgedStringRef SILBasicBlock_debugDescription(BridgedBasicBlock block);
+std::string SILBasicBlock_debugDescription(BridgedBasicBlock block);
 OptionalBridgedInstruction SILBasicBlock_firstInst(BridgedBasicBlock block);
 OptionalBridgedInstruction SILBasicBlock_lastInst(BridgedBasicBlock block);
 SwiftInt SILBasicBlock_getNumArguments(BridgedBasicBlock block);
 BridgedArgument SILBasicBlock_getArgument(BridgedBasicBlock block, SwiftInt index);
+BridgedArgument SILBasicBlock_addBlockArgument(BridgedBasicBlock block,
+                                               BridgedType type,
+                                               BridgedOwnership ownership);
+void SILBasicBlock_eraseArgument(BridgedBasicBlock block, SwiftInt index);
 OptionalBridgedSuccessor SILBasicBlock_getFirstPred(BridgedBasicBlock block);
 OptionalBridgedSuccessor SILSuccessor_getNext(BridgedSuccessor succ);
 BridgedBasicBlock SILSuccessor_getTargetBlock(BridgedSuccessor succ);
@@ -178,14 +240,37 @@ BridgedInstruction SILSuccessor_getContainingInst(BridgedSuccessor succ);
 BridgedValue Operand_getValue(BridgedOperand);
 OptionalBridgedOperand Operand_nextUse(BridgedOperand);
 BridgedInstruction Operand_getUser(BridgedOperand);
+SwiftInt Operand_isTypeDependent(BridgedOperand);
 
-BridgedStringRef SILNode_debugDescription(BridgedNode node);
+std::string SILNode_debugDescription(BridgedNode node);
 OptionalBridgedOperand SILValue_firstUse(BridgedValue value);
 BridgedType SILValue_getType(BridgedValue value);
+BridgedOwnership SILValue_getOwnership(BridgedValue value);
 
+BridgedStringRef SILType_debugDescription(BridgedType);
 SwiftInt SILType_isAddress(BridgedType);
+SwiftInt SILType_isTrivial(BridgedType, BridgedFunction);
+SwiftInt SILType_isReferenceCounted(BridgedType type, BridgedFunction);
+SwiftInt SILType_isNonTrivialOrContainsRawPointer(BridgedType, BridgedFunction);
+SwiftInt SILType_isNominal(BridgedType type);
+SwiftInt SILType_isClass(BridgedType type);
+SwiftInt SILType_isStruct(BridgedType type);
+SwiftInt SILType_isTuple(BridgedType type);
+SwiftInt SILType_isEnum(BridgedType type);
+SwiftInt SILType_getNumTupleElements(BridgedType type);
+BridgedType SILType_getTupleElementType(BridgedType type, SwiftInt elementIdx);
+SwiftInt SILType_getNumNominalFields(BridgedType type);
+BridgedType SILType_getNominalFieldType(BridgedType type, SwiftInt index,
+                                        BridgedFunction function);
+SwiftInt SILType_getFieldIdxOfNominalType(BridgedType type,
+                                          BridgedStringRef fieldName);
+SwiftInt SILType_getCaseIdxOfEnumType(BridgedType type,
+                                      BridgedStringRef caseName);
+
+BridgedSubstitutionMap SubstitutionMap_getEmpty();
 
 BridgedBasicBlock SILArgument_getParent(BridgedArgument argument);
+SwiftInt SILArgument_isExclusiveIndirectParameter(BridgedArgument argument);
 
 OptionalBridgedInstruction SILInstruction_next(BridgedInstruction inst);
 OptionalBridgedInstruction SILInstruction_previous(BridgedInstruction inst);
@@ -195,8 +280,10 @@ void SILInstruction_setOperand(BridgedInstruction inst, SwiftInt index,
                                BridgedValue value);
 BridgedLocation SILInstruction_getLocation(BridgedInstruction inst);
 BridgedMemoryBehavior SILInstruction_getMemBehavior(BridgedInstruction inst);
+bool SILInstruction_mayRelease(BridgedInstruction inst);
 
 BridgedInstruction MultiValueInstResult_getParent(BridgedMultiValueResult result);
+SwiftInt MultiValueInstResult_getIndex(BridgedMultiValueResult result);
 SwiftInt MultipleValueInstruction_getNumResults(BridgedInstruction inst);
 BridgedMultiValueResult
   MultipleValueInstruction_getResult(BridgedInstruction inst, SwiftInt index);
@@ -204,31 +291,78 @@ BridgedMultiValueResult
 BridgedArrayRef TermInst_getSuccessors(BridgedInstruction term);
 
 BridgedStringRef CondFailInst_getMessage(BridgedInstruction cfi);
+BridgedBuiltinID BuiltinInst_getID(BridgedInstruction bi);
 BridgedGlobalVar GlobalAccessInst_getGlobal(BridgedInstruction globalInst);
+BridgedFunction FunctionRefInst_getReferencedFunction(BridgedInstruction fri);
+BridgedStringRef StringLiteralInst_getValue(BridgedInstruction sli);
 SwiftInt TupleExtractInst_fieldIndex(BridgedInstruction tei);
 SwiftInt TupleElementAddrInst_fieldIndex(BridgedInstruction teai);
 SwiftInt StructExtractInst_fieldIndex(BridgedInstruction sei);
+OptionalBridgedValue StructInst_getUniqueNonTrivialFieldValue(BridgedInstruction si);
 SwiftInt StructElementAddrInst_fieldIndex(BridgedInstruction seai);
+SwiftInt ProjectBoxInst_fieldIndex(BridgedInstruction pbi);
 SwiftInt EnumInst_caseIndex(BridgedInstruction ei);
 SwiftInt UncheckedEnumDataInst_caseIndex(BridgedInstruction uedi);
+SwiftInt InitEnumDataAddrInst_caseIndex(BridgedInstruction idea);
+SwiftInt UncheckedTakeEnumDataAddrInst_caseIndex(BridgedInstruction utedi);
+SwiftInt InjectEnumAddrInst_caseIndex(BridgedInstruction ieai);
 SwiftInt RefElementAddrInst_fieldIndex(BridgedInstruction reai);
 SwiftInt PartialApplyInst_numArguments(BridgedInstruction ai);
 SwiftInt ApplyInst_numArguments(BridgedInstruction ai);
+SwiftInt PartialApply_getCalleeArgIndexOfFirstAppliedArg(BridgedInstruction pai);
+SwiftInt PartialApplyInst_isOnStack(BridgedInstruction pai);
+SwiftInt AllocRefInstBase_isObjc(BridgedInstruction arb);
+SwiftInt AllocRefInstBase_canAllocOnStack(BridgedInstruction arb);
 SwiftInt BeginApplyInst_numArguments(BridgedInstruction ai);
 SwiftInt TryApplyInst_numArguments(BridgedInstruction ai);
 BridgedBasicBlock BranchInst_getTargetBlock(BridgedInstruction bi);
 SwiftInt SwitchEnumInst_getNumCases(BridgedInstruction se);
 SwiftInt SwitchEnumInst_getCaseIndex(BridgedInstruction se, SwiftInt idx);
+SwiftInt StoreInst_getStoreOwnership(BridgedInstruction store);
+SwiftInt CopyAddrInst_isTakeOfSrc(BridgedInstruction copyAddr);
+SwiftInt CopyAddrInst_isInitializationOfDest(BridgedInstruction copyAddr);
+void RefCountingInst_setIsAtomic(BridgedInstruction rc, bool isAtomic);
+bool RefCountingInst_getIsAtomic(BridgedInstruction rc);
+SwiftInt CondBranchInst_getNumTrueArgs(BridgedInstruction cbr);
+
+BridgedSubstitutionMap ApplySite_getSubstitutionMap(BridgedInstruction inst);
+BridgedArgumentConvention
+ApplySite_getArgumentConvention(BridgedInstruction inst, SwiftInt calleeArgIdx);
+SwiftInt ApplySite_getNumArguments(BridgedInstruction inst);
 
 BridgedInstruction SILBuilder_createBuiltinBinaryFunction(
-          BridgedInstruction insertionPoint,
-          BridgedLocation loc, BridgedStringRef name,
-          BridgedType operandType, BridgedType resultType, BridgedValueArray arguments);
-BridgedInstruction SILBuilder_createCondFail(BridgedInstruction insertionPoint,
-          BridgedLocation loc, BridgedValue condition, BridgedStringRef messge);
+          BridgedBuilder builder, BridgedStringRef name,
+          BridgedType operandType, BridgedType resultType,
+          BridgedValueArray arguments);
+BridgedInstruction SILBuilder_createCondFail(BridgedBuilder builder,
+          BridgedValue condition, BridgedStringRef message);
+BridgedInstruction SILBuilder_createIntegerLiteral(BridgedBuilder builder,
+          BridgedType type, SwiftInt value);
+BridgedInstruction SILBuilder_createDeallocStackRef(BridgedBuilder builder,
+          BridgedValue operand);
+BridgedInstruction SILBuilder_createUncheckedRefCast(BridgedBuilder builder,
+          BridgedValue op, BridgedType type);
+BridgedInstruction SILBuilder_createSetDeallocating(BridgedBuilder builder,
+          BridgedValue op, bool isAtomic);
+BridgedInstruction SILBuilder_createFunctionRef(BridgedBuilder builder,
+          BridgedFunction function);
+BridgedInstruction SILBuilder_createCopyValue(BridgedBuilder builder,
+          BridgedValue op);
+BridgedInstruction SILBuilder_createDestroyValue(BridgedBuilder builder,
+          BridgedValue op);
+BridgedInstruction SILBuilder_createApply(BridgedBuilder builder,
+          BridgedValue function, BridgedSubstitutionMap subMap,
+          BridgedValueArray arguments);
+BridgedInstruction SILBuilder_createSwitchEnumInst(BridgedBuilder builder,
+          BridgedValue enumVal, OptionalBridgedBasicBlock defaultBlock,
+          const void * _Nullable enumCases, SwiftInt numEnumCases);
+BridgedInstruction SILBuilder_createUncheckedEnumData(BridgedBuilder builder,
+          BridgedValue enumVal, SwiftInt caseIdx,
+          BridgedType resultType);
+BridgedInstruction SILBuilder_createBranch(
+          BridgedBuilder builder, BridgedBasicBlock destBlock,
+          BridgedValueArray arguments);
 
-#ifdef __cplusplus
-} // extern "C"
-#endif
+SWIFT_END_NULLABILITY_ANNOTATIONS
 
 #endif

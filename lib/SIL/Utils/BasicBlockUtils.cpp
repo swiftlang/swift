@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/BasicBlockUtils.h"
+#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/Dominance.h"
@@ -143,8 +144,8 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
     case 1: {
       assert(AACI->getErrorBB());
       auto &C = AACI->getFunction()->getASTContext();
-      auto errorTy = C.getErrorDecl()->getDeclaredType();
-      auto errorSILTy = SILType::getPrimitiveObjectType(errorTy->getCanonicalType());
+      auto errorTy = C.getErrorExistentialType();
+      auto errorSILTy = SILType::getPrimitiveObjectType(errorTy);
       // error BB. this takes the error value argument
       args.push_back(
           newEdgeBB->createPhiArgument(errorSILTy, OwnershipKind::Owned));
@@ -205,16 +206,6 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
   }
   case SILInstructionKind::CheckedCastAddrBranchInst: {
     auto CBI = cast<CheckedCastAddrBranchInst>(T);
-    auto succBB = edgeIdx == 0 ? CBI->getSuccessBB() : CBI->getFailureBB();
-    if (!succBB->getNumArguments())
-      return;
-    args.push_back(newEdgeBB->createPhiArgument(
-        succBB->getArgument(0)->getType(),
-        succBB->getArgument(0)->getOwnershipKind()));
-    return;
-  }
-  case SILInstructionKind::CheckedCastValueBranchInst: {
-    auto CBI = cast<CheckedCastValueBranchInst>(T);
     auto succBB = edgeIdx == 0 ? CBI->getSuccessBB() : CBI->getFailureBB();
     if (!succBB->getNumArguments())
       return;
@@ -403,6 +394,16 @@ void DeadEndBlocks::updateForReachableBlock(SILBasicBlock *reachableBB) {
   propagateNewlyReachableBlocks(numReachable);
 }
 
+void DeadEndBlocks::updateForNewBlock(SILBasicBlock *newBB) {
+  if (!didComputeValue)
+    return;
+
+  assert(reachableBlocks.count(newBB) == 0);
+  unsigned numReachable = reachableBlocks.size();
+  reachableBlocks.insert(newBB);
+  propagateNewlyReachableBlocks(numReachable);
+}
+
 bool DeadEndBlocks::triviallyEndsInUnreachable(SILBasicBlock *block) {
   // Handle the case where a single "unreachable" block (e.g. containing a call
   // to fatalError()), is jumped to from multiple source blocks.
@@ -521,3 +522,38 @@ void swift::findJointPostDominatingSet(
     }
   }
 }
+
+//===----------------------------------------------------------------------===//
+//                          checkReachingBlockDominance
+//===----------------------------------------------------------------------===//
+
+#ifndef NDEBUG
+/// Check that \p sourceBlock dominates \p destBlock.
+///
+/// Useful for *temporary* assertions when Dominance is unavailable. This is
+/// worst case O(numberOfBlocksInFunction). It should only be used when \p
+/// sourceBlock is expected to be "close to" \p destBlock in almost all
+/// cases. Because of the potential for quadratic behavior, it should only be
+/// used during feature development, never as a permanent check.  If a dominance
+/// check is required for correctness, then DominanceInfo should be passed down
+/// to the utility function that needs this check.
+bool
+swift::checkDominates(SILBasicBlock *sourceBlock, SILBasicBlock *destBlock) {
+  SILBasicBlock *entryBlock = sourceBlock->getParent()->getEntryBlock();
+  BasicBlockWorklist worklist(destBlock);
+  bool reaches = false;
+  while (SILBasicBlock *block = worklist.pop()) {
+    if (block == sourceBlock) {
+      reaches = true;
+      continue;
+    }
+    if (block == entryBlock) {
+      return false; // does not dominate
+    }
+    for (auto *predBlock : block->getPredecessorBlocks()) {
+      worklist.pushIfNotVisited(predBlock);
+    }
+  }
+  return reaches;
+}
+#endif

@@ -11,7 +11,7 @@ import Darwin
 #endif
 import TestsUtils
 
-public var Radix2CooleyTukey = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "Radix2CooleyTukey",
     runFunction: run_Radix2CooleyTukey,
@@ -62,7 +62,7 @@ func tearDownRadix2CooleyTukey() {
   double_temp_imag?.deallocate()
 }
 
-func Radix2CooleyTukey(_ level: Int,
+func radix2CooleyTukey(_ level: Int,
   input_real: UnsafeMutablePointer<Double>,
   input_imag: UnsafeMutablePointer<Double>,
   stride: Int, output_real: UnsafeMutablePointer<Double>,
@@ -76,7 +76,7 @@ func Radix2CooleyTukey(_ level: Int,
   }
   let length = 1 << level
   let half = length >> 1
-  Radix2CooleyTukey(level - 1,
+  radix2CooleyTukey(level - 1,
     input_real: input_real,
     input_imag: input_imag,
     stride: stride << 1,
@@ -84,7 +84,7 @@ func Radix2CooleyTukey(_ level: Int,
     output_imag: temp_imag,
     temp_real: output_real,
     temp_imag: output_imag)
-  Radix2CooleyTukey(level - 1,
+  radix2CooleyTukey(level - 1,
     input_real: input_real + stride,
     input_imag: input_imag + stride,
     stride: stride << 1,
@@ -131,7 +131,7 @@ func testDouble(iter: Int) {
     memset(UnsafeMutableRawPointer(temp_real), 0, size)
     memset(UnsafeMutableRawPointer(temp_imag), 0, size)
 
-    Radix2CooleyTukey(level,
+    radix2CooleyTukey(level,
       input_real: input_real,
       input_imag: input_imag,
       stride: stride,
@@ -143,8 +143,8 @@ func testDouble(iter: Int) {
 }
 
 @inline(never)
-public func run_Radix2CooleyTukey(_ N: Int) {
-  testDouble(iter: N)
+public func run_Radix2CooleyTukey(_ n: Int) {
+  testDouble(iter: n)
 }
 
 //===----------------------------------------------------------------------===//
@@ -180,7 +180,7 @@ func tearDownRadix2CooleyTukeyf() {
   float_temp_imag?.deallocate()
 }
 
-func Radix2CooleyTukeyf(_ level: Int,
+func radix2CooleyTukeyf(_ level: Int,
   input_real: UnsafeMutablePointer<Float>,
   input_imag: UnsafeMutablePointer<Float>,
   stride: Int, output_real: UnsafeMutablePointer<Float>,
@@ -194,7 +194,7 @@ func Radix2CooleyTukeyf(_ level: Int,
   }
   let length = 1 << level
   let half = length >> 1
-  Radix2CooleyTukeyf(level - 1,
+  radix2CooleyTukeyf(level - 1,
     input_real: input_real,
     input_imag: input_imag,
     stride: stride << 1,
@@ -202,7 +202,7 @@ func Radix2CooleyTukeyf(_ level: Int,
     output_imag: temp_imag,
     temp_real: output_real,
     temp_imag: output_imag)
-  Radix2CooleyTukeyf(level - 1,
+  radix2CooleyTukeyf(level - 1,
     input_real: input_real + stride,
     input_imag: input_imag + stride,
     stride: stride << 1,
@@ -249,7 +249,7 @@ func testFloat(iter: Int) {
     memset(UnsafeMutableRawPointer(temp_real), 0, size)
     memset(UnsafeMutableRawPointer(temp_imag), 0, size)
 
-    Radix2CooleyTukeyf(level,
+    radix2CooleyTukeyf(level,
       input_real: input_real,
       input_imag: input_imag,
       stride: stride,
@@ -261,6 +261,6 @@ func testFloat(iter: Int) {
 }
 
 @inline(never)
-public func run_Radix2CooleyTukeyf(_ N: Int) {
-  testFloat(iter: N)
+public func run_Radix2CooleyTukeyf(_ n: Int) {
+  testFloat(iter: n)
 }

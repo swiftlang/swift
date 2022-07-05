@@ -1,5 +1,7 @@
-// RUN: %target-swift-frontend -emit-sil -O %s | %FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -parse-as-library -emit-sil -O %s | %FileCheck %s
 // REQUIRES: optimized_stdlib,swift_stdlib_no_asserts
+
+import Swift
 
 // Opaque, unoptimizable functions to call.
 @_silgen_name("takesConstRawPointer")
@@ -56,10 +58,8 @@ public func testMutableArray() {
   // CHECK: [[POINTER:%.+]] = struct $UnsafeMutableRawPointer (
   // CHECK-NEXT: [[DEP_POINTER:%.+]] = mark_dependence [[POINTER]] : $UnsafeMutableRawPointer on {{.*}} : $__ContiguousArrayStorageBase
   // CHECK: [[FN:%.+]] = function_ref @takesMutableRawPointer
-  // CHECK: strong_retain {{%.+}} : ${{Builtin[.]BridgeObject|__ContiguousArrayStorageBase}}
   // CHECK: apply [[FN]]([[DEP_POINTER]])
   // CHECK-NOT: {{^bb[0-9]+:}}
-  // CHECK: strong_release {{%.+}} : ${{Builtin[.]BridgeObject|__ContiguousArrayStorageBase}}
   // CHECK: strong_release {{%.+}} : ${{Builtin[.]BridgeObject|__ContiguousArrayStorageBase}}
   // CHECK: dealloc_stack {{%.+}} : $*Array<Int>
   // CHECK-NEXT: [[EMPTY:%.+]] = tuple ()
@@ -74,10 +74,8 @@ public func testMutableArrayToOptional() {
   // CHECK-NEXT: [[DEP_POINTER:%.+]] = mark_dependence [[POINTER]] : $UnsafeMutableRawPointer on {{.*}} : $__ContiguousArrayStorageBase
   // CHECK-NEXT: [[OPT_POINTER:%.+]] = enum $Optional<UnsafeMutableRawPointer>, #Optional.some!enumelt, [[DEP_POINTER]]
   // CHECK: [[FN:%.+]] = function_ref @takesOptMutableRawPointer
-  // CHECK: strong_retain {{%.+}} : ${{Builtin[.]BridgeObject|__ContiguousArrayStorageBase}}
   // CHECK: apply [[FN]]([[OPT_POINTER]])
   // CHECK-NOT: {{^bb[0-9]+:}}
-  // CHECK: strong_release {{%.+}} : ${{Builtin[.]BridgeObject|__ContiguousArrayStorageBase}}
   // CHECK: strong_release {{%.+}} : ${{Builtin[.]BridgeObject|__ContiguousArrayStorageBase}}
   // CHECK: dealloc_stack {{%.+}} : $*Array<Int>
   // CHECK-NEXT: [[EMPTY:%.+]] = tuple ()
@@ -99,3 +97,23 @@ public func arrayLiteralPromotion() {
   // CHECK: apply [[FN]]([[PTR]])
 }
 
+// Test sil verification at -O with bind_memory and rebind_memory
+// where the rebind is in a defer block.
+//
+// CHECK-LABEL: sil @$s18pointer_conversion21testWithMemoryRebound6rawPtr2to8capacity_q_Bp_xmSiq_SPyxGKXEtKr0_lF
+// CHECK: [[BIND:%.*]] = bind_memory %1 : $Builtin.RawPointer, %{{.*}} : $Builtin.Word to $*T
+// CHECK: rebind_memory %1 : $Builtin.RawPointer to [[BIND]] : $Builtin.Word
+// CHECK-LABEL: } // end sil function '$s18pointer_conversion21testWithMemoryRebound6rawPtr2to8capacity_q_Bp_xmSiq_SPyxGKXEtKr0_lF'
+public func testWithMemoryRebound<T, Result>(
+  rawPtr: Builtin.RawPointer,
+  to type: T.Type,
+  capacity count: Int,
+  _ body: (_ pointer: UnsafePointer<T>) throws -> Result
+) rethrows -> Result {
+  let binding =
+    Builtin.bindMemory(rawPtr, count._builtinWordValue, T.self)
+  defer {
+    Builtin.rebindMemory(rawPtr, binding)
+  }
+  return try body(.init(rawPtr))
+}

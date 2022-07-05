@@ -417,7 +417,7 @@ bb0(%0 : $*Optional<T>):
   %1 = load_borrow %0 : $*Optional<T>
   switch_enum %1 : $Optional<T>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
 
-bb1(%3 : $T):
+bb1(%3 : @guaranteed $T):
   end_borrow %1 : $Optional<T>
   %2 = unchecked_take_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt
   destroy_addr %2 : $*T
@@ -650,3 +650,35 @@ bb0(%0 : $Int, %1 : @guaranteed $@callee_guaranteed (@in_guaranteed (Int, ((), (
   dealloc_stack %2 : $*(Int, ((), ()))
   return %5 : $Int
 }
+
+enum Result<T1, T2>{
+  case success(T1)
+  case failure(T2)
+}
+
+sil @try_get_error : $@convention(thin) () -> @error Error
+
+sil [ossa] @test_init_enum_empty_case : $@convention(thin) () -> @error Error {
+bb0:
+  %0 = alloc_stack $Result<(), Error>
+  %1 = function_ref @try_get_error : $@convention(thin) () -> @error Error
+  try_apply %1() : $@convention(thin) () -> @error Error, normal bb1, error bb2
+
+bb1(%3 : $()):
+  inject_enum_addr %0 : $*Result<(), Error>, #Result.success!enumelt
+  br bb3
+
+bb2(%6 : @owned $Error):
+  %7 = init_enum_data_addr %0 : $*Result<(), Error>, #Result.failure!enumelt
+  store %6 to [init] %7 : $*Error
+  inject_enum_addr %0 : $*Result<(), Error>, #Result.failure!enumelt
+  br bb3
+
+bb3:
+  %11 = load [take] %0 : $*Result<(), Error>
+  destroy_value %11 : $Result<(), Error>
+  dealloc_stack %0 : $*Result<(), Error>
+  %14 = tuple ()
+  return %14 : $()
+}
+

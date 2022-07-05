@@ -51,7 +51,7 @@ struct ImmutableStoredProperties: Differentiable {
   // expected-warning @+1 {{stored property 'nondiff' has no derivative because 'Int' does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}} {{3-3=@noDerivative }}
   let nondiff: Int
 
-  // expected-warning @+1 {{synthesis of the 'Differentiable.move(by:)' requirement for 'ImmutableStoredProperties' requires all stored properties not marked with `@noDerivative` to be mutable or have a non-mutating 'move(by:)'; use 'var' instead, or add an explicit '@noDerivative' attribute}} {{3-3=@noDerivative }}
+  // expected-warning @+1 {{synthesis of the 'Differentiable.move(by:)' requirement for 'ImmutableStoredProperties' requires all stored properties not marked with '@noDerivative' to be mutable or have a non-mutating 'move(by:)'; use 'var' instead, or add an explicit '@noDerivative' attribute}} {{3-3=@noDerivative }}
   let diff: Float
 
   let nonmutatingMoveAlongStruct: EmptyWithConcreteNonmutatingMoveAlong
@@ -73,7 +73,7 @@ struct MutableStoredPropertiesWithInitialValue: Differentiable {
 }
 // Test struct with both an empty constructor and memberwise initializer.
 struct AllMixedStoredPropertiesHaveInitialValue: Differentiable {
-  // expected-warning @+1 {{synthesis of the 'Differentiable.move(by:)' requirement for 'AllMixedStoredPropertiesHaveInitialValue' requires all stored properties not marked with `@noDerivative` to be mutable or have a non-mutating 'move(by:)'; use 'var' instead, or add an explicit '@noDerivative' attribute}} {{3-3=@noDerivative }}
+  // expected-warning @+1 {{synthesis of the 'Differentiable.move(by:)' requirement for 'AllMixedStoredPropertiesHaveInitialValue' requires all stored properties not marked with '@noDerivative' to be mutable or have a non-mutating 'move(by:)'; use 'var' instead, or add an explicit '@noDerivative' attribute}} {{3-3=@noDerivative }}
   let x = Float(1)
   var y = Float(1)
   // Memberwise initializer should be `init(y:)` since `x` is immutable.
@@ -271,7 +271,7 @@ public struct TF_269: TF_269_Layer {
 // Test errors.
 
 // Test manually customizing vector space types.
-// Thees should fail. Synthesis is semantically unsupported if vector space
+// These should fail. Synthesis is semantically unsupported if vector space
 // types are customized.
 // expected-error @+1 {{type 'VectorSpaceTypeAlias' does not conform to protocol 'Differentiable'}}
 struct VectorSpaceTypeAlias: AdditiveArithmetic, Differentiable {

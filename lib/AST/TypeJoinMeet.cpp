@@ -45,6 +45,10 @@ struct TypeJoin : CanTypeVisitor<TypeJoin, CanType> {
   // For convenience, TheAnyType from ASTContext;
   CanType TheAnyType;
 
+  CanType getAnyExistentialType() {
+    return ExistentialType::get(TheAnyType)->getCanonicalType();
+  }
+
   TypeJoin(CanType First) : First(First), Unimplemented(CanType()) {
     assert(First && "Unexpected null type!");
     TheAnyType = First->getASTContext().TheAnyType;
@@ -66,6 +70,7 @@ struct TypeJoin : CanTypeVisitor<TypeJoin, CanType> {
   CanType visitBoundGenericStructType(CanType second);
   CanType visitMetatypeType(CanType second);
   CanType visitExistentialMetatypeType(CanType second);
+  CanType visitExistentialType(CanType second);
   CanType visitModuleType(CanType second);
   CanType visitDynamicSelfType(CanType second);
   CanType visitArchetypeType(CanType second);
@@ -111,10 +116,10 @@ public:
 
     // Likewise, rather than making every visitor deal with Any,
     // always dispatch to the protocol composition side of the join.
-    if (first->is<ProtocolCompositionType>())
+    if (first->is<ProtocolCompositionType>() || first->is<ExistentialType>())
       return TypeJoin(second).visit(first);
 
-    if (second->is<ProtocolCompositionType>())
+    if (second->is<ProtocolCompositionType>() || second->is<ExistentialType>())
       return TypeJoin(first).visit(second);
 
     // Otherwise the first type might be an optional (or not), so
@@ -165,7 +170,7 @@ CanType TypeJoin::visitErrorType(CanType second) {
 CanType TypeJoin::visitTupleType(CanType second) {
   assert(First != second);
 
-  return TheAnyType;
+  return getAnyExistentialType();
 }
 
 CanType TypeJoin::visitEnumType(CanType second) {
@@ -183,7 +188,7 @@ CanType TypeJoin::visitStructType(CanType second) {
 
   // FIXME: When possible we should return a protocol or protocol
   // composition.
-  return TheAnyType;
+  return getAnyExistentialType();
 }
 
 CanType TypeJoin::visitClassType(CanType second) {
@@ -239,7 +244,7 @@ CanType TypeJoin::visitMetatypeType(CanType second) {
   assert(First != second);
 
   if (First->getKind() != second->getKind())
-    return TheAnyType;
+    return getAnyExistentialType();
 
   auto firstInstance =
       First->castTo<AnyMetatypeType>()->getInstanceType()->getCanonicalType();
@@ -257,7 +262,7 @@ CanType TypeJoin::visitExistentialMetatypeType(CanType second) {
   assert(First != second);
 
   if (First->getKind() != second->getKind())
-    return TheAnyType;
+    return getAnyExistentialType();
 
   auto firstInstance =
       First->castTo<AnyMetatypeType>()->getInstanceType()->getCanonicalType();
@@ -271,10 +276,28 @@ CanType TypeJoin::visitExistentialMetatypeType(CanType second) {
   return ExistentialMetatypeType::get(joinInstance)->getCanonicalType();
 }
 
+CanType TypeJoin::visitExistentialType(CanType second) {
+  assert(First != second);
+
+  if (First->getKind() != second->getKind())
+    return getAnyExistentialType();
+
+  auto firstConstraint = First->castTo<ExistentialType>()
+      ->getConstraintType()->getCanonicalType();
+  auto secondConstraint = second->castTo<ExistentialType>()
+      ->getConstraintType()->getCanonicalType();
+
+  auto joinInstance = join(firstConstraint, secondConstraint);
+  if (!joinInstance)
+    return CanType();
+
+  return ExistentialType::get(joinInstance)->getCanonicalType();
+}
+
 CanType TypeJoin::visitModuleType(CanType second) {
   assert(First != second);
 
-  return TheAnyType;
+  return getAnyExistentialType();
 }
 
 CanType TypeJoin::visitDynamicSelfType(CanType second) {
@@ -293,7 +316,7 @@ CanType TypeJoin::visitDependentMemberType(CanType second) {
   assert(First != second);
 
   if (First->getKind() != second->getKind())
-    return TheAnyType;
+    return getAnyExistentialType();
 
   return Unimplemented;
 }
@@ -307,7 +330,7 @@ CanType TypeJoin::visitFunctionType(CanType second) {
     if (secondFnTy->getExtInfo().isNoEscape()) {
       return Nonexistent;
     } else {
-      return TheAnyType;
+      return getAnyExistentialType();
     }
   }
 
@@ -343,7 +366,7 @@ CanType TypeJoin::visitGenericFunctionType(CanType second) {
   assert(First != second);
 
   if (First->getKind() != second->getKind())
-    return TheAnyType;
+    return getAnyExistentialType();
 
   return Unimplemented;
 }
@@ -463,7 +486,7 @@ CanType TypeJoin::visitBuiltinType(CanType second) {
   assert(First != second);
 
   // BuiltinType with any non-equal type results in Any.
-  return TheAnyType;
+  return getAnyExistentialType();
 }
 
 } // namespace

@@ -352,8 +352,8 @@ private:
   /// Find the tangent space of a given canonical type.
   Optional<TangentSpace> getTangentSpace(CanType type) {
     // Use witness generic signature to remap types.
-    if (auto witnessGenSig = witness->getDerivativeGenericSignature())
-      type = witnessGenSig->getCanonicalTypeInContext(type);
+    type = witness->getDerivativeGenericSignature().getCanonicalTypeInContext(
+        type);
     return type->getAutoDiffTangentSpace(
         LookUpConformanceInModule(getModule().getSwiftModule()));
   }
@@ -702,22 +702,16 @@ public:
     extractAllElements(origResult, builder, origResults);
 
     // Get and partially apply the differential.
-    auto jvpGenericEnv = jvp->getGenericEnvironment();
-    auto jvpSubstMap = jvpGenericEnv
-                           ? jvpGenericEnv->getForwardingSubstitutionMap()
-                           : jvp->getForwardingSubstitutionMap();
+    auto jvpSubstMap = jvp->getForwardingSubstitutionMap();
     auto *differentialRef = builder.createFunctionRef(loc, &getDifferential());
     auto *differentialPartialApply = builder.createPartialApply(
         loc, differentialRef, jvpSubstMap, {diffStructVal},
         ParameterConvention::Direct_Guaranteed);
 
-    auto differentialType = jvp->getLoweredFunctionType()
-                                ->getResults()
-                                .back()
-                                .getSILStorageInterfaceType();
-    differentialType = differentialType.substGenericArgs(
-        getModule(), jvpSubstMap, TypeExpansionContext::minimal());
-    differentialType = differentialType.subst(getModule(), jvpSubstMap);
+    auto differentialType = jvp->mapTypeIntoContext(
+        jvp->getConventions().getSILType(
+            jvp->getLoweredFunctionType()->getResults().back(),
+            jvp->getTypeExpansionContext()));
     auto differentialFnType = differentialType.castTo<SILFunctionType>();
     auto differentialSubstType =
         differentialPartialApply->getType().castTo<SILFunctionType>();
@@ -1704,7 +1698,8 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
       linkage, context.getASTContext().getIdentifier(diffName).str(), diffType,
       diffGenericEnv, original->getLocation(), original->isBare(),
       IsNotTransparent, jvp->isSerialized(),
-      original->isDynamicallyReplaceable());
+      original->isDynamicallyReplaceable(),
+      original->isDistributed());
   differential->setDebugScope(
       new (module) SILDebugScope(original->getLocation(), differential));
 

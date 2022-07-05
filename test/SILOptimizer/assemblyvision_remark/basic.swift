@@ -1,4 +1,4 @@
-// RUN: %target-swiftc_driver -O -Rpass-missed=sil-assembly-vision-remark-gen -Xllvm -sil-disable-pass=FunctionSignatureOpts -Xfrontend -enable-copy-propagation -emit-sil %s -o /dev/null -Xfrontend -verify
+// RUN: %target-swiftc_driver -O -Rpass-missed=sil-assembly-vision-remark-gen -Xllvm -sil-disable-pass=FunctionSignatureOpts -Xfrontend -enable-copy-propagation -emit-sil %s -o /dev/null -Xfrontend -verify -Xfrontend -enable-lexical-borrow-scopes=false
 // REQUIRES: optimized_stdlib,swift_stdlib_no_asserts
 
 public class Klass {
@@ -142,13 +142,12 @@ public class SubKlass : Klass {
 }
 
 func lookThroughCast(x: SubKlass) -> Klass {
-    return x as Klass // expected-remark {{retain of type 'SubKlass'}}
-                      // expected-note @-2:22 {{of 'x'}}
+    return x as Klass // expected-remark {{retain of type 'Klass'}}
+                      // expected-note @-2:22 {{of 'x.upcast<$Klass>'}}
 }
 
 func lookThroughRefCast(x: Klass) -> SubKlass {
-    return x as! SubKlass // expected-remark {{retain of type 'Klass'}}
-                          // expected-note @-2:25 {{of 'x'}}
+    return x as! SubKlass // expected-remark {{retain of type 'SubKlass'}}
 }
 
 func lookThroughEnum(x: Klass?) -> Klass {

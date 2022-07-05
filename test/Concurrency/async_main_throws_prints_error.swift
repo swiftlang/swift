@@ -9,7 +9,7 @@
 // REQUIRES: OS=macosx || OS=ios
 
 // rdar://76038845
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
 enum Err : Error { case noGood }

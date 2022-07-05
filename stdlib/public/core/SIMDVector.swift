@@ -62,6 +62,7 @@ extension SIMDStorage {
 /// A type that can be used as an element in a SIMD vector.
 public protocol SIMDScalar {
   associatedtype SIMDMaskScalar: SIMDScalar & FixedWidthInteger & SignedInteger
+    where SIMDMaskScalar.SIMDMaskScalar == SIMDMaskScalar
   associatedtype SIMD2Storage: SIMDStorage where SIMD2Storage.Scalar == Self
   associatedtype SIMD4Storage: SIMDStorage where SIMD4Storage.Scalar == Self
   associatedtype SIMD8Storage: SIMDStorage where SIMD8Storage.Scalar == Self
@@ -71,11 +72,13 @@ public protocol SIMDScalar {
 }
 
 /// A SIMD vector of a fixed number of elements.
-public protocol SIMD: SIMDStorage,
-                      Codable,
-                      Hashable,
-                      CustomStringConvertible,
-                      ExpressibleByArrayLiteral {
+public protocol SIMD<Scalar>:
+  SIMDStorage,
+  Codable,
+  Hashable,
+  CustomStringConvertible,
+  ExpressibleByArrayLiteral
+{
   /// The mask type resulting from pointwise comparisons of this vector type.
   associatedtype MaskStorage: SIMD
     where MaskStorage.Scalar: FixedWidthInteger & SignedInteger
@@ -662,17 +665,17 @@ public struct SIMDMask<Storage>: SIMD
   public typealias MaskStorage = Storage
   
   public typealias Scalar = Bool
-  
-  @_transparent
-  public var scalarCount: Int {
-    return _storage.scalarCount
-  }
-  
+
   @_transparent
   public init() {
     _storage = Storage()
   }
-  
+
+  @_transparent
+  public var scalarCount: Int {
+    return _storage.scalarCount
+  }
+
   @_transparent
   public init(_ _storage: Storage) {
     self._storage = _storage
@@ -1415,7 +1418,7 @@ extension SIMDMask {
     return a .| SIMDMask(repeating: b)
   }
   
-  /// Replaces `a` with the pointwise logical conjuction of `a` and `b`.
+  /// Replaces `a` with the pointwise logical conjunction of `a` and `b`.
   ///
   /// Equivalent to:
   /// ```
@@ -1454,7 +1457,7 @@ extension SIMDMask {
     a = a .| b
   }
   
-  /// Replaces `a` with the pointwise logical conjuction of `a` and `b`.
+  /// Replaces `a` with the pointwise logical conjunction of `a` and `b`.
   ///
   /// Equivalent to:
   /// ```

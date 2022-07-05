@@ -70,7 +70,7 @@
 @Part1 # Character by character test
 # All characters not explicitly occurring in c1 of Part 1 have identical NFC, D, KC, KD forms.
 #
-00A0;00A0;00A0;0020;0020; # ( ;  ;  ;  ;  ; ) NO-BREAK SPACE
+00A0;00A0;00A0;0020;0020; # ( ;  ;  ;  ;  ; ) NO-BREAK SPACE
 00A8;00A8;00A8;0020 0308;0020 0308; # (¨; ¨; ¨;  ◌̈;  ◌̈; ) DIAERESIS
 00AA;00AA;00AA;0061;0061; # (ª; ª; ª; a; a; ) FEMININE ORDINAL INDICATOR
 00AF;00AF;00AF;0020 0304;0020 0304; # (¯; ¯; ¯;  ◌̄;  ◌̄; ) MACRON

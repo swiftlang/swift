@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -sil-partial-specialization -generic-specializer %s | %FileCheck %s
+// RUN: %target-sil-opt -parse-serialized-sil -enable-sil-verify-all -sil-partial-specialization -generic-specializer %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -611,7 +611,7 @@ sil hidden [ossa] @test_bind : $@convention(thin) <T> (Builtin.RawPointer, @thic
 bb0(%0 : $Builtin.RawPointer, %1 : $@thick T.Type):
   %4 = integer_literal $Builtin.Word, 1
   %5 = metatype $@thick T.Type
-  bind_memory %0 : $Builtin.RawPointer, %4 : $Builtin.Word to $*T
+  %6 = bind_memory %0 : $Builtin.RawPointer, %4 : $Builtin.Word to $*T
   %7 = tuple ()
   %8 = tuple ()
   return %8 : $()

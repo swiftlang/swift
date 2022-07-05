@@ -485,6 +485,10 @@ tests.test("rdar://problem/27905230") {
 }
 
 tests.test("verbatimBridged/Base/withUnsafeBufferPointer") {
+  // https://bugs.swift.org/browse/SR-14663
+  // This tests a bad precondition that was fixed in
+  // https://github.com/apple/swift/pull/37960
+  guard #available(SwiftStdlib 5.5, *) else { return }
   let a = NSArray(array: [Base(0), Base(1), Base(2), Base(3)])
   let b = a as! [Base]
   let success: Bool = b.withUnsafeBufferPointer { buffer in
@@ -499,8 +503,11 @@ tests.test("verbatimBridged/Base/withUnsafeBufferPointer") {
   expectTrue(success)
 }
 
-// https://bugs.swift.org/browse/SR-14663
 tests.test("verbatimBridged/AnyObject/withUnsafeBufferPointer") {
+  // https://bugs.swift.org/browse/SR-14663
+  // This tests a bad precondition that was fixed in
+  // https://github.com/apple/swift/pull/37960
+  guard #available(SwiftStdlib 5.5, *) else { return }
   let a = NSArray(array: [Base(0), Base(1), Base(2), Base(3)])
   let b = a as [AnyObject]
   let success: Bool = b.withUnsafeBufferPointer { buffer in

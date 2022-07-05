@@ -50,24 +50,38 @@ MOCK_CONFIG = {
             'remote': {'id': 'repo2'},
         },
     },
-    'default-branch-scheme': 'master',
+    'default-branch-scheme': 'main',
     'branch-schemes': {
-        'master': {
-            'aliases': ['master'],
+        'main': {
+            'aliases': ['main'],
             'repos': {
-                'repo1': 'master',
-                'repo2': 'master',
+                'repo1': 'main',
+                'repo2': 'main',
             }
         }
     }
 }
 
 
+class CallQuietlyException(Exception):
+    def __init__(self, command, returncode, output):
+        self.command = command
+        self.returncode = returncode
+        self.output = output
+
+    def __str__(self):
+        return f"Command returned a non-zero exit status {self.returncode}:\n"\
+               f"Command: {' '.join(self.command)}\n" \
+               f"Output: {self.output.decode('utf-8')}"
+
+
 def call_quietly(*args, **kwargs):
-    with open(os.devnull, 'w') as f:
-        kwargs['stdout'] = f
-        kwargs['stderr'] = f
-        subprocess.check_call(*args, **kwargs)
+    kwargs['stderr'] = subprocess.STDOUT
+    try:
+        subprocess.check_output(*args, **kwargs)
+    except subprocess.CalledProcessError as e:
+        raise CallQuietlyException(command=e.cmd, returncode=e.returncode,
+                                   output=e.stdout) from e
 
 
 def create_dir(d):
@@ -101,7 +115,11 @@ def setup_mock_remote(base_dir):
         create_dir(remote_repo_path)
         create_dir(local_repo_path)
         call_quietly(['git', 'init', '--bare', remote_repo_path])
+        call_quietly(['git', 'symbolic-ref', 'HEAD', 'refs/heads/main'],
+                     cwd=remote_repo_path)
         call_quietly(['git', 'clone', '-l', remote_repo_path, local_repo_path])
+        call_quietly(['git', 'symbolic-ref', 'HEAD', 'refs/heads/main'],
+                     cwd=local_repo_path)
         for (i, (filename, contents)) in enumerate(v):
             filename_path = os.path.join(local_repo_path, filename)
             with open(filename_path, 'w') as f:
@@ -109,7 +127,7 @@ def setup_mock_remote(base_dir):
             call_quietly(['git', 'add', filename], cwd=local_repo_path)
             call_quietly(['git', 'commit', '-m', 'Commit %d' % i],
                          cwd=local_repo_path)
-            call_quietly(['git', 'push', 'origin', 'master'],
+            call_quietly(['git', 'push', 'origin', 'main'],
                          cwd=local_repo_path)
 
     base_config = MOCK_CONFIG

@@ -30,7 +30,8 @@ struct D {
 // CHECK-LABEL: sil hidden [ossa] @$s19default_constructor1DV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thin D.Type) -> D
 // CHECK: [[THISBOX:%[0-9]+]] = alloc_box ${ var D }
 // CHECK: [[THIS:%[0-9]+]] = mark_uninit
-// CHECK: [[PB_THIS:%.*]] = project_box [[THIS]]
+// CHECK: [[THISLIFE:%[^,]+]] = begin_borrow [lexical] [[THIS]]
+// CHECK: [[PB_THIS:%.*]] = project_box [[THISLIFE]]
 // CHECK: [[IADDR:%[0-9]+]] = struct_element_addr [[PB_THIS]] : $*D, #D.i
 // CHECK: [[JADDR:%[0-9]+]] = struct_element_addr [[PB_THIS]] : $*D, #D.j
 // CHECK: [[INIT:%[0-9]+]] = function_ref @$s19default_constructor1DV1iSivpfi
@@ -71,7 +72,8 @@ class F : E { }
 // CHECK: bb0([[ORIGSELF:%[0-9]+]] : @owned $F)
 // CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_box ${ var F }
 // CHECK-NEXT: [[SELF:%[0-9]+]] = mark_uninitialized [derivedself] [[SELF_BOX]]
-// CHECK-NEXT: [[PB:%.*]] = project_box [[SELF]]
+// CHECK-NEXT: [[SELFLIFE:%[^,]+]] = begin_borrow [lexical] [[SELF]]
+// CHECK-NEXT: [[PB:%.*]] = project_box [[SELFLIFE]]
 // CHECK-NEXT: store [[ORIGSELF]] to [init] [[PB]] : $*F
 // CHECK-NEXT: [[SELFP:%[0-9]+]] = load [take] [[PB]] : $*F
 // CHECK-NEXT: [[E:%[0-9]]] = upcast [[SELFP]] : $F to $E
@@ -81,6 +83,7 @@ class F : E { }
 // CHECK-NEXT: [[ESELFW:%[0-9]+]] = unchecked_ref_cast [[ESELF]] : $E to $F
 // CHECK-NEXT: store [[ESELFW]] to [init] [[PB]] : $*F
 // CHECK-NEXT: [[SELFP:%[0-9]+]] = load [copy] [[PB]] : $*F
+// CHECK-NEXT: end_borrow [[SELFLIFE]]
 // CHECK-NEXT: destroy_value [[SELF]] : ${ var F }
 // CHECK-NEXT: return [[SELFP]] : $F
 

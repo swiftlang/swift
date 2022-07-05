@@ -45,8 +45,13 @@ KNOWN_SDK_TYPE_DECL(Concurrency, TaskLocal, ClassDecl, 1)
 
 // Distributed actors
 KNOWN_SDK_TYPE_DECL(Distributed, DistributedActor, ProtocolDecl, 0)
-KNOWN_SDK_TYPE_DECL(Distributed, ActorTransport, ProtocolDecl, 0)
-KNOWN_SDK_TYPE_DECL(Distributed, ActorIdentity, ProtocolDecl, 0)
-KNOWN_SDK_TYPE_DECL(Distributed, AnyActorIdentity, StructDecl, 0)
+KNOWN_SDK_TYPE_DECL(Distributed, DistributedActorSystem, ProtocolDecl, 0)
+KNOWN_SDK_TYPE_DECL(Distributed, DistributedTargetInvocationEncoder, ProtocolDecl, 0)
+KNOWN_SDK_TYPE_DECL(Distributed, DistributedTargetInvocationDecoder, ProtocolDecl, 0)
+KNOWN_SDK_TYPE_DECL(Distributed, RemoteCallTarget, StructDecl, 0)
+KNOWN_SDK_TYPE_DECL(Distributed, RemoteCallArgument, StructDecl, 1)
+
+// String processing
+KNOWN_SDK_TYPE_DECL(StringProcessing, Regex, StructDecl, 1)
 
 #undef KNOWN_SDK_TYPE_DECL

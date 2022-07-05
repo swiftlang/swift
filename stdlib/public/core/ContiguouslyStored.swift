@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 // NOTE: The below is necessary for fast String initialization from untyped
-// memory. When we add Collection.withContiguousRawStorageIfAvailabe(), we can
+// memory. When we add Collection.withContiguousRawStorageIfAvailable(), we can
 // deprecate this functionality.
 
 @usableFromInline

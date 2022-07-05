@@ -86,6 +86,7 @@ class AcceptableDynamic {
 }
 
 // mainly just some sanity checks
+// expected-error@+1 {{class 'Misc' has no initializers}}
 class Misc {
   // expected-error@+2 {{'lazy' cannot be used on a computed property}}
   // expected-error@+1 {{lazy properties must have an initializer}}

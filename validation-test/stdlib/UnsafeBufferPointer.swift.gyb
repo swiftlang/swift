@@ -179,6 +179,32 @@ ${SelfName}TestSuite.test("nilBaseAddress") {
   expectEqualSequence([], emptyBuffer)
 }
 
+% if IsMutable:
+${SelfName}TestSuite.test("copyFromEmptyBuffer") {
+  guard #available(SwiftStdlib 5.7, *) else { return }
+
+% if IsRaw:
+  var memory: UnsafeMutableRawPointer
+  let empty = UnsafeRawBufferPointer(start: nil, count: 0)
+% else:
+  var memory: UnsafeMutablePointer<Float>
+  let empty = UnsafeBufferPointer<Float>(start: nil, count: 0)
+% end
+
+  let count = 4
+  memory = allocateFor${Raw}Buffer(count: count)
+  defer { deallocateFor${Raw}Buffer(memory, count: count) }
+
+  let buffer = UnsafeMutable${Raw}BufferPointer(start: memory, count: count)
+
+% if IsRaw:
+  buffer.copyMemory(from: empty)
+% else:
+  _ = buffer.initialize(from: empty)
+% end
+}
+% end
+
 ${SelfName}TestSuite.test("nonNilButEmpty") {
   let emptyAllocated = UnsafeMutablePointer<Float>.allocate(capacity: 0)
   defer { emptyAllocated.deallocate() }
@@ -361,6 +387,31 @@ UnsafeMutableBufferPointerTestSuite.test("withContiguous(Mutable)StorageIfAvaila
   expectEqual(result1, result2)
 }
 
+UnsafeMutableRawBufferPointerTestSuite.test("withContiguous(Mutable)StorageIfAvailable") {
+  for c in [0, 1, 4] {
+    let pointer = UnsafeMutableRawPointer.allocate(byteCount: c, alignment: c)
+    defer { pointer.deallocate() }
+
+    let mutableBuffer = UnsafeMutableRawBufferPointer(start: pointer, count: c)
+    mutableBuffer.copyBytes(from: 0..<UInt8(c))
+
+    let r: ()? = mutableBuffer.withContiguousMutableStorageIfAvailable {
+      for i in $0.indices { $0[i] = 2*($0[i]+1) }
+    }
+    expectNotNil(r)
+    let s = mutableBuffer.withContiguousStorageIfAvailable {
+      $0.reduce(0, +)
+    }
+    expectEqual(s.map(Int.init), c*(c+1))
+
+    let immutableBuffer = UnsafeRawBufferPointer(mutableBuffer)
+    let t = immutableBuffer.withContiguousStorageIfAvailable {
+      $0.reduce(0, +)
+    }
+    expectEqual(s, t)
+  }
+}
+
 UnsafeMutableBufferPointerTestSuite.test("initialize(from: Slice)") {
   let o = 91
   let c = 1_000
@@ -378,7 +429,7 @@ UnsafeMutableBufferPointerTestSuite.test("initialize(from: Slice)") {
 }
 
 UnsafeMutableBufferPointerTestSuite.test("Slice.withContiguousStorageIfAvailable") {
-  guard #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) else {
+  guard #available(SwiftStdlib 5.3, *) else {
     return
   }
 
@@ -386,6 +437,7 @@ UnsafeMutableBufferPointerTestSuite.test("Slice.withContiguousStorageIfAvailable
     let c = test.collection.map { MinimalEquatableValue($0.value) }
     let buffer = UnsafeMutableBufferPointer<MinimalEquatableValue>.allocate(
       capacity: test.collection.count)
+    defer { buffer.deallocate() }
     var (it, idx) = buffer.initialize(from: c)
     expectEqual(buffer.endIndex, idx)
     expectNil(it.next())
@@ -399,6 +451,30 @@ UnsafeMutableBufferPointerTestSuite.test("Slice.withContiguousStorageIfAvailable
       expectTrue(expected.elementsEqual(b))
     }
     expectNotNil(r2)
+  }
+}
+
+UnsafeMutableRawBufferPointerTestSuite.test("Slice.withContiguousStorageIfAvailable") {
+  guard #available(SwiftStdlib 5.7, *) else { return }
+
+  for test in subscriptRangeTests {
+    let c = test.collection.map({ UInt8($0.value/1000) })
+    let buffer = UnsafeMutableRawBufferPointer.allocate(
+      byteCount: test.collection.count, alignment: 8
+    )
+    defer { buffer.deallocate() }
+    buffer.copyBytes(from: c)
+
+    let expected = test.expected.map({ UInt8($0.value/1000) })
+    let r1: ()? = buffer[test.bounds].withContiguousStorageIfAvailable {
+      expectTrue(expected.elementsEqual($0))
+    }
+    expectNotNil(r1)
+    let r2: ()? = buffer[test.bounds].withContiguousMutableStorageIfAvailable {
+      for i in $0.indices { $0[i] += 1 }
+    }
+    expectNotNil(r2)
+    expectTrue(buffer[test.bounds].elementsEqual(expected.map({ $0+1 })))
   }
 }
 
@@ -948,6 +1024,8 @@ UnsafeMutable${'Raw' if IsRaw else ''}BufferPointerTestSuite.test("subscript/${R
   if _isDebugAssertConfiguration() || isOutOfBounds() {
     if expectedValues == nil { expectCrashLater() }
   }
+%     else:
+  _ = isOutOfBounds
 %     end
   let range = test.rangeSelection.${RangeName}(in: buffer)
 
@@ -1053,5 +1131,66 @@ UnsafeMutableBufferPointerTestSuite.test("nonmutating-swapAt-withARC") {
 % end
 
 % end # SelfName
+
+% for mutable in [True, False]:
+% TypedName = 'UnsafeMutableBufferPointer' if mutable else 'UnsafeBufferPointer'
+Unsafe${'Mutable' if mutable else ''}BufferPointerTestSuite.test("withMemoryRebound") {
+  // test withMemoryRebound behaviour, post SE-0333.
+  let mutableBufferI = UnsafeMutableBufferPointer<Int>.allocate(capacity: 4)
+  defer { mutableBufferI.deallocate() }
+  let ptrI = ${'mutableBufferI' if mutable else TypedName + '(mutableBufferI)'}
+  // test rebinding to a wider type with the same alignment
+  ptrI.withMemoryRebound(to: (Int, Int).self) {
+    // Make sure the closure argument is a ${TypedName}
+    let ptrT: ${TypedName}<(Int, Int)> = $0
+    expectEqual(ptrT.count, 2)
+    // and that the element type is (Int, Int).
+    let mutablePtrT = ${'ptrT' if mutable else 'UnsafeMutableBufferPointer(mutating: ptrT)'}
+    expectType((Int, Int).self, &mutablePtrT[0])
+    // test rebinding to a narrower type
+    ptrT.withMemoryRebound(to: UInt.self) {
+      // Make sure the closure argument is a ${TypedName}
+      let ptrU: ${TypedName}<UInt> = $0
+      expectEqual(ptrU.count, 4)
+      // and that the element type is UInt.
+      let mutablePtrU = ${'ptrU' if mutable else 'UnsafeMutableBufferPointer(mutating: ptrU)'}
+      expectType(UInt.self, &mutablePtrU[0])
+    }
+  }
+}
+
+% RawName = 'UnsafeMutableRawBufferPointer' if mutable else 'UnsafeRawBufferPointer'
+Unsafe${'Mutable' if mutable else ''}RawBufferPointerTestSuite.test("withMemoryRebound") {
+  // test withMemoryRebound behaviour, post SE-0333.
+  let allocated = UnsafeMutableRawBufferPointer.allocate(byteCount: 32,  alignment: 8)
+  defer { allocated.deallocate() }
+  let ptrR = ${'allocated' if mutable else RawName + '(allocated)'}
+  ptrR.withMemoryRebound(to: Int.self) {
+    // Make sure the closure argument is a ${TypedName}
+    let ptrT: ${TypedName}<Int> = $0
+    expectEqual(ptrT.count, 32/MemoryLayout<Int>.stride)
+    // and that the element type is `Int`.
+    let mutablePtrT = ${'ptrT' if mutable else 'UnsafeMutableBufferPointer(mutating: ptrT)'}
+    expectType(Int.self, &mutablePtrT[0])
+  }
+}
+
+% end # mutable
+
+UnsafeRawBufferPointerTestSuite.test("assumingMemoryBound") {
+  let array = (0..<4).map({ $0 })
+  array.withUnsafeBytes({
+    let b: UnsafeBufferPointer = $0.assumingMemoryBound(to: Int.self)
+    expectEqual(b.count, array.count)
+    expectEqual(b[3], array[3])
+  })
+  var mutableArray = array
+  mutableArray.withUnsafeMutableBytes({
+    let b: UnsafeMutableBufferPointer = $0.assumingMemoryBound(to: Int.self)
+    expectEqual(b.count, array.count)
+    for i in b.indices { b[i] += 1 }
+  })
+  expectEqual(mutableArray[3], array[3]+1)
+}
 
 runAllTests()

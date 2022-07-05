@@ -3762,7 +3762,7 @@ SetTestSuite.test("SetAlgebra.Contains.EmptySet") {
   expectFalse(s.contains(1070))
 }
 
-// Test formItersection()
+// Test formIntersection()
 
 SetTestSuite.test("SetAlgebra.FormIntersection.SingleEntry") {
   do {
@@ -4672,7 +4672,7 @@ SetTestSuite.test("IndexValidation.RemoveAt.AfterGrow") {
 }
 
 #if _runtime(_ObjC)
-if #available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *) {
+if #available(SwiftStdlib 5.1, *) {
   // https://github.com/apple/swift/pull/23174
   SetTestSuite.test("ForcedNonverbatimBridge.Trap.String")
   .skip(.custom(
@@ -4695,7 +4695,7 @@ if #available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *) {
 #endif
 
 #if _runtime(_ObjC)
-if #available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *) {
+if #available(SwiftStdlib 5.1, *) {
   // https://github.com/apple/swift/pull/23174
   SetTestSuite.test("ForcedNonverbatimBridge.Trap.Int")
   .skip(.custom(
@@ -4827,7 +4827,7 @@ SetTestSuite.test("ForcedVerbatimDowncast.Trap.Int")
 #endif
 
 #if _runtime(_ObjC)
-if #available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *) {
+if #available(SwiftStdlib 5.1, *) {
   // https://github.com/apple/swift/pull/23174
   SetTestSuite.test("ForcedBridgingNonverbatimDowncast.Trap.String")
   .skip(.custom(
@@ -4851,7 +4851,7 @@ if #available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *) {
 #endif
 
 #if _runtime(_ObjC)
-if #available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *) {
+if #available(SwiftStdlib 5.1, *) {
   // https://github.com/apple/swift/pull/23174
   SetTestSuite.test("ForcedBridgingNonverbatimDowncast.Trap.Int")
   .skip(.custom(
@@ -4876,7 +4876,7 @@ if #available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *) {
 #endif
 
 #if _runtime(_ObjC)
-if #available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *) {
+if #available(SwiftStdlib 5.1, *) {
   // https://github.com/apple/swift/pull/23683
   SetTestSuite.test("Upcast.StringEqualityMismatch") {
     // Upcasting from NSString to String keys changes their concept of equality,

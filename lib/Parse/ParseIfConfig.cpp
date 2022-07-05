@@ -76,18 +76,18 @@ static bool isValidVersion(const version::Version &Version,
   llvm_unreachable("unsupported unary operator");
 }
 
-static llvm::VersionTuple getCanImportVersion(TupleExpr *te,
+static llvm::VersionTuple getCanImportVersion(ArgumentList *args,
                                               DiagnosticEngine *D,
                                               bool &underlyingVersion) {
   llvm::VersionTuple result;
-  if (te->getElements().size() != 2) {
+  if (args->size() != 2) {
     if (D) {
-      D->diagnose(te->getLoc(), diag::canimport_two_parameters);
+      D->diagnose(args->getLoc(), diag::canimport_two_parameters);
     }
     return result;
   }
-  auto label = te->getElementName(1);
-  auto subE = te->getElement(1);
+  auto label = args->getLabel(1);
+  auto subE = args->getExpr(1);
   if (label.str() == "_version") {
     underlyingVersion = false;
   } else if (label.str() == "_underlyingVersion") {
@@ -114,20 +114,21 @@ static llvm::VersionTuple getCanImportVersion(TupleExpr *te,
   return result;
 }
 
-static Expr *getSingleSubExp(Expr *exp, StringRef kindName,
+static Expr *getSingleSubExp(ArgumentList *args, StringRef kindName,
                              DiagnosticEngine *D) {
-  if (auto *pe = dyn_cast<ParenExpr>(exp)) {
-    return pe->getSubExpr();
-  }
+  if (args->empty())
+    return nullptr;
+
+  if (auto *unary = args->getUnlabeledUnaryExpr())
+    return unary;
+
   if (kindName == "canImport") {
-    if (auto *te = dyn_cast<TupleExpr>(exp)) {
-      bool underlyingVersion;
-      if (D) {
-        // Diagnose canImport syntax
-        (void)getCanImportVersion(te, D, underlyingVersion);
-      }
-      return te->getElement(0);
+    bool underlyingVersion;
+    if (D) {
+      // Diagnose canImport syntax
+      (void)getCanImportVersion(args, D, underlyingVersion);
     }
+    return args->getExpr(0);
   }
   return nullptr;
 }
@@ -150,6 +151,17 @@ class ValidateIfConfigCondition :
       return None;
 
     return UDRE->getName().getBaseIdentifier().str();
+  }
+
+  /// True for expressions representing either top level modules
+  /// or nested submodules.
+  bool isModulePath(Expr *E) {
+    auto UDE = dyn_cast<UnresolvedDotExpr>(E);
+    if (!UDE)
+      return getDeclRefStr(E, DeclRefKind::Ordinary).hasValue();
+
+    return UDE->getFunctionRefKind() == FunctionRefKind::Unapplied &&
+           isModulePath(UDE->getBase());
   }
 
   Expr *diagnoseUnsupportedExpr(Expr *E) {
@@ -260,37 +272,37 @@ public:
       return nullptr;
     }
 
-    Expr *Arg = getSingleSubExp(E->getArg(), *KindName, &D);
+    Expr *Arg = getSingleSubExp(E->getArgs(), *KindName, &D);
     if (!Arg) {
-      D.diagnose(E->getLoc(), diag::platform_condition_expected_one_argument);
+      if (E->getArgs()->empty()) {
+        D.diagnose(E->getLoc(), diag::platform_condition_expected_argument);
+      } else {
+        D.diagnose(E->getLoc(), diag::platform_condition_expected_one_argument);
+      }
       return nullptr;
     }
     // '_compiler_version' '(' string-literal ')'
     if (*KindName == "_compiler_version") {
-      auto SLE = dyn_cast<StringLiteralExpr>(Arg);
-      if (!SLE) {
-        D.diagnose(Arg->getLoc(),
-                   diag::unsupported_platform_condition_argument,
-                   "string literal");
-        return nullptr;
-      }
+      if (auto SLE = dyn_cast<StringLiteralExpr>(Arg)) {
+        auto ValStr = SLE->getValue();
+        if (ValStr.empty()) {
+          D.diagnose(SLE->getLoc(), diag::empty_version_string);
+          return nullptr;
+        }
 
-      auto ValStr = SLE->getValue();
-      if (ValStr.empty()) {
-        D.diagnose(SLE->getLoc(), diag::empty_version_string);
-        return nullptr;
+        auto Val = version::Version::parseCompilerVersionString(
+            SLE->getValue(), SLE->getLoc(), &D);
+        if (!Val.hasValue())
+          return nullptr;
+        return E;
       }
-
-      auto Val = version::Version::parseCompilerVersionString(
-          SLE->getValue(), SLE->getLoc(), &D);
-      if (!Val.hasValue())
-        return nullptr;
-      return E;
     }
 
     // 'swift' '(' ('>=' | '<') float-literal ( '.' integer-literal )* ')'
     // 'compiler' '(' ('>=' | '<') float-literal ( '.' integer-literal )* ')'
-    if (*KindName == "swift" || *KindName == "compiler") {
+    // '_compiler_version' '(' ('>=' | '<') float-literal ( '.' integer-literal )* ')'
+    if (*KindName == "swift" || *KindName == "compiler" ||
+        *KindName == "_compiler_version") {
       auto PUE = dyn_cast<PrefixUnaryExpr>(Arg);
       Optional<StringRef> PrefixName =
           PUE ? getDeclRefStr(PUE->getFn(), DeclRefKind::PrefixOperator) : None;
@@ -300,15 +312,24 @@ public:
             "a unary comparison '>=' or '<'; for example, '>=2.2' or '<2.2'");
         return nullptr;
       }
-      auto versionString = extractExprSource(Ctx.SourceMgr, PUE->getArg());
+      auto versionString = extractExprSource(Ctx.SourceMgr, PUE->getOperand());
       auto Val = version::Version::parseVersionString(
-          versionString, PUE->getArg()->getStartLoc(), &D);
+          versionString, PUE->getOperand()->getStartLoc(), &D);
       if (!Val.hasValue())
         return nullptr;
       return E;
     }
 
-    // ( 'os' | 'arch' | '_endian' | '_runtime' | 'canImport') '(' identifier ')''
+    if (*KindName == "canImport") {
+      if (!isModulePath(Arg)) {
+        D.diagnose(E->getLoc(), diag::unsupported_platform_condition_argument,
+                   "module name");
+        return nullptr;
+      }
+      return E;
+    }
+
+    // ( 'os' | 'arch' | '_endian' | '_runtime' ) '(' identifier ')''
     auto Kind = getPlatformConditionKind(*KindName);
     if (!Kind.hasValue()) {
       D.diagnose(E->getLoc(), diag::unsupported_platform_condition_expression);
@@ -391,7 +412,7 @@ public:
                  diag::unsupported_conditional_compilation_unary_expression);
       return nullptr;
     }
-    E->setArg(validate(E->getArg()));
+    E->setOperand(validate(E->getOperand()));
     return E;
   }
 
@@ -474,38 +495,41 @@ public:
 
   bool visitCallExpr(CallExpr *E) {
     auto KindName = getDeclRefStr(E->getFn());
-    auto *Arg = getSingleSubExp(E->getArg(), KindName, nullptr);
-    if (KindName == "_compiler_version") {
+    auto *Arg = getSingleSubExp(E->getArgs(), KindName, nullptr);
+    if (KindName == "_compiler_version" && isa<StringLiteralExpr>(Arg)) {
       auto Str = cast<StringLiteralExpr>(Arg)->getValue();
       auto Val = version::Version::parseCompilerVersionString(
           Str, SourceLoc(), nullptr).getValue();
       auto thisVersion = version::Version::getCurrentCompilerVersion();
       return thisVersion >= Val;
-    } else if ((KindName == "swift") || (KindName == "compiler")) {
+    } else if ((KindName == "swift") || (KindName == "compiler") ||
+               (KindName == "_compiler_version")) {
       auto PUE = cast<PrefixUnaryExpr>(Arg);
       auto PrefixName = getDeclRefStr(PUE->getFn());
-      auto Str = extractExprSource(Ctx.SourceMgr, PUE->getArg());
+      auto Str = extractExprSource(Ctx.SourceMgr, PUE->getOperand());
       auto Val = version::Version::parseVersionString(
           Str, SourceLoc(), nullptr).getValue();
+      version::Version thisVersion;
       if (KindName == "swift") {
-        return isValidVersion(Ctx.LangOpts.EffectiveLanguageVersion, Val,
-                              PrefixName);
+        thisVersion = Ctx.LangOpts.EffectiveLanguageVersion;
       } else if (KindName == "compiler") {
-        auto currentLanguageVersion =
-            version::Version::getCurrentLanguageVersion();
-        return isValidVersion(currentLanguageVersion, Val, PrefixName);
+        thisVersion = version::Version::getCurrentLanguageVersion();
+      } else if (KindName == "_compiler_version") {
+        thisVersion = version::Version::getCurrentCompilerVersion();
       } else {
         llvm_unreachable("unsupported version conditional");
       }
+      return isValidVersion(thisVersion, Val, PrefixName);
     } else if (KindName == "canImport") {
       auto Str = extractExprSource(Ctx.SourceMgr, Arg);
       bool underlyingModule = false;
       llvm::VersionTuple version;
-      if (auto *te = dyn_cast<TupleExpr>(E->getArg())) {
-        version = getCanImportVersion(te, nullptr, underlyingModule);
+      if (!E->getArgs()->isUnlabeledUnary()) {
+        version = getCanImportVersion(E->getArgs(), nullptr, underlyingModule);
       }
-      return Ctx.canImportModule({ Ctx.getIdentifier(Str) , E->getLoc() },
-                                 version, underlyingModule);
+      ImportPath::Module::Builder builder(Ctx, Str, /*separator=*/'.',
+                                          Arg->getStartLoc());
+      return Ctx.canImportModule(builder.get(), version, underlyingModule);
     }
 
     auto Val = getDeclRefStr(Arg);
@@ -514,7 +538,7 @@ public:
   }
 
   bool visitPrefixUnaryExpr(PrefixUnaryExpr *E) {
-    return !visit(E->getArg());
+    return !visit(E->getOperand());
   }
 
   bool visitParenExpr(ParenExpr *E) {
@@ -563,7 +587,9 @@ public:
         KindName == "compiler";
   }
 
-  bool visitPrefixUnaryExpr(PrefixUnaryExpr *E) { return visit(E->getArg()); }
+  bool visitPrefixUnaryExpr(PrefixUnaryExpr *E) {
+    return visit(E->getOperand());
+  }
   bool visitParenExpr(ParenExpr *E) { return visit(E->getSubExpr()); }
   bool visitExpr(Expr *E) { return false; }
 };
@@ -594,13 +620,11 @@ static bool isPlatformConditionDisjunction(Expr *E, PlatformConditionKind Kind,
   } else if (auto *C = dyn_cast<CallExpr>(E)) {
     if (getPlatformConditionKind(getDeclRefStr(C->getFn())) != Kind)
       return false;
-    if (auto *ArgP = dyn_cast<ParenExpr>(C->getArg())) {
-      if (auto *Arg = ArgP->getSubExpr()) {
-        auto ArgStr = getDeclRefStr(Arg);
-        for (auto V : Vals) {
-          if (ArgStr == V)
-            return true;
-        }
+    if (auto *Arg = C->getArgs()->getUnlabeledUnaryExpr()) {
+      auto ArgStr = getDeclRefStr(Arg);
+      for (auto V : Vals) {
+        if (ArgStr == V)
+          return true;
       }
     }
   }
@@ -625,7 +649,7 @@ static Expr *findAnyLikelySimulatorEnvironmentTest(Expr *Condition) {
     return nullptr;
 
   if (auto *N = dyn_cast<PrefixUnaryExpr>(Condition)) {
-    return findAnyLikelySimulatorEnvironmentTest(N->getArg());
+    return findAnyLikelySimulatorEnvironmentTest(N->getOperand());
   } else if (auto *P = dyn_cast<ParenExpr>(Condition)) {
     return findAnyLikelySimulatorEnvironmentTest(P->getSubExpr());
   }
@@ -781,8 +805,8 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
       // We shouldn't skip code if we are building syntax tree.
       // The parser will keep running and we just discard the AST part.
       DiagnosticSuppression suppression(Context.Diags);
-      SmallVector<ASTNode, 16> dropedElements;
-      parseElements(dropedElements, false);
+      SmallVector<ASTNode, 16> droppedElements;
+      parseElements(droppedElements, false);
     } else {
       DiagnosticTransaction DT(Diags);
       skipUntilConditionalBlockClose();

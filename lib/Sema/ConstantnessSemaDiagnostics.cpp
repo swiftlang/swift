@@ -119,7 +119,8 @@ static Expr *checkConstantness(Expr *expr) {
       continue;
     }
     if (BinaryExpr *binaryExpr = dyn_cast<BinaryExpr>(expr)) {
-      expressionsToCheck.push_back(binaryExpr->getArg());
+      expressionsToCheck.push_back(binaryExpr->getLHS());
+      expressionsToCheck.push_back(binaryExpr->getRHS());
       continue;
     }
     if (InjectIntoOptionalExpr *optionalExpr =
@@ -179,7 +180,8 @@ static Expr *checkConstantness(Expr *expr) {
 
     // If this is an enum case, check whether the arguments are constants.
     if (isa<EnumElementDecl>(calledValue)) {
-      expressionsToCheck.push_back(apply->getArg());
+      for (auto arg : *apply->getArgs())
+        expressionsToCheck.push_back(arg.getExpr());
       continue;
     }
 
@@ -196,7 +198,9 @@ static Expr *checkConstantness(Expr *expr) {
     // constants.
     if (!hasConstantEvaluableAttr(callee))
       return expr;
-    expressionsToCheck.push_back(apply->getArg());
+
+    for (auto arg : *apply->getArgs())
+      expressionsToCheck.push_back(arg.getExpr());
   }
   return nullptr;
 }
@@ -280,7 +284,8 @@ static void diagnoseError(Expr *errorExpr, const ASTContext &astContext,
   }
   // If this is OSLogMessage, it should be a string-interpolation literal.
   Identifier declName = nominalDecl->getName();
-  if (declName == astContext.Id_OSLogMessage) {
+  if (declName == astContext.Id_OSLogMessage ||
+      nominalDecl->hasSemanticsAttr(semantics::OSLOG_MESSAGE_TYPE)) {
     diags.diagnose(errorLoc, diag::oslog_message_must_be_string_interpolation);
     return;
   }
@@ -311,16 +316,9 @@ static void diagnoseConstantArgumentRequirementOfCall(const CallExpr *callExpr,
     return;
 
   // Check that the arguments at the constantArgumentIndices are constants.
-  Expr *argumentExpr = callExpr->getArg();
   SmallVector<Expr *, 4> arguments;
-  if (TupleExpr *tupleExpr = dyn_cast<TupleExpr>(argumentExpr)) {
-    auto elements = tupleExpr->getElements();
-    arguments.append(elements.begin(), elements.end());
-  } else if (ParenExpr *parenExpr = dyn_cast<ParenExpr>(argumentExpr)) {
-    arguments.push_back(parenExpr->getSubExpr());
-  } else {
-    arguments.push_back(argumentExpr);
-  }
+  for (auto arg : *callExpr->getArgs())
+    arguments.push_back(arg.getExpr());
 
   for (unsigned constantIndex : constantArgumentIndices) {
     assert(constantIndex < arguments.size() &&
@@ -336,9 +334,10 @@ void swift::diagnoseConstantArgumentRequirement(
     const Expr *expr, const DeclContext *declContext) {
   class ConstantReqCallWalker : public ASTWalker {
     DeclContext *DC;
+    bool insideClosure;
 
   public:
-    ConstantReqCallWalker(DeclContext *DC) : DC(DC) {}
+    ConstantReqCallWalker(DeclContext *DC) : DC(DC), insideClosure(false) {}
 
     // Descend until we find a call expressions. Note that the input expression
     // could be an assign expression or another expression that contains the
@@ -349,10 +348,15 @@ void swift::diagnoseConstantArgumentRequirement(
       if (auto *closureExpr = dyn_cast<ClosureExpr>(expr)) {
         return walkToClosureExprPre(closureExpr);
       }
+
       // Interpolated expressions' bodies will be type checked
       // separately so exit early to avoid duplicate diagnostics.
+      // The caveat is that they won't be checked inside closure
+      // bodies because we manually check all closures to avoid
+      // duplicate diagnostics. Therefore we must still descend into
+      // interpolated expressions if we are inside of a closure.
       if (!expr || isa<ErrorExpr>(expr) || !expr->getType() ||
-          isa<InterpolatedStringLiteralExpr>(expr))
+          (isa<InterpolatedStringLiteralExpr>(expr) && !insideClosure))
         return {false, expr};
       if (auto *callExpr = dyn_cast<CallExpr>(expr)) {
         diagnoseConstantArgumentRequirementOfCall(callExpr, DC->getASTContext());
@@ -361,29 +365,29 @@ void swift::diagnoseConstantArgumentRequirement(
     }
     
     std::pair<bool, Expr *> walkToClosureExprPre(ClosureExpr *closure) {
-      if (closure->hasSingleExpressionBody()) {
-        // Single expression closure bodies are not visited directly
-        // by the ASTVisitor, so we must descend into the body manually
-        // and set the DeclContext to that of the closure.
-        DC = closure;
-        return {true, closure};
-      }
-      return {false, closure};
+      DC = closure;
+      insideClosure = true;
+      return {true, closure};
     }
     
     Expr *walkToExprPost(Expr *expr) override {
       if (auto *closureExpr = dyn_cast<ClosureExpr>(expr)) {
         // Reset the DeclContext to the outer scope if we descended
-        // into a closure expr.
+        // into a closure expr and check whether or not we are still
+        // within a closure context.
         DC = closureExpr->getParent();
+        insideClosure = isa<ClosureExpr>(DC);
       }
       return expr;
     }
-    
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
-      return {true, stmt};
-    }
   };
+
+  // We manually check closure bodies from their outer contexts,
+  // so bail early if we are being called directly on expressions
+  // inside of a closure body.
+  if (isa<ClosureExpr>(declContext)) {
+    return;
+  }
 
   ConstantReqCallWalker walker(const_cast<DeclContext *>(declContext));
   const_cast<Expr *>(expr)->walk(walker);

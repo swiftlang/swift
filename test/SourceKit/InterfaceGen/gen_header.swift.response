@@ -179,9 +179,7 @@ public protocol SameNameProtocol {
         key.name: "arg",
         key.offset: 30,
         key.length: 12,
-        key.typename: "Int32",
-        key.nameoffset: 0,
-        key.namelength: 0
+        key.typename: "Int32"
       }
     ]
   },
@@ -224,9 +222,7 @@ public protocol SameNameProtocol {
             key.name: "arg",
             key.offset: 89,
             key.length: 12,
-            key.typename: "Int32",
-            key.nameoffset: 0,
-            key.namelength: 0
+            key.typename: "Int32"
           }
         ]
       }

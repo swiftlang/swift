@@ -21,11 +21,13 @@
 #ifndef SWIFT_RUNTIME_IMAGEINSPECTION_H
 #define SWIFT_RUNTIME_IMAGEINSPECTION_H
 
+#include "swift/Runtime/Config.h"
+
 #include <cstdint>
 #include <cstddef>
-#if defined(__cplusplus)
+#include <functional>
 #include <memory>
-#endif
+#include <type_traits>
 
 namespace swift {
 
@@ -73,22 +75,97 @@ void initializeTypeMetadataRecordLookup();
 /// Load the metadata from the image necessary to perform dynamic replacements.
 void initializeDynamicReplacementLookup();
 
+/// Load the metadata from the image necessary to find functions by name.
+void initializeAccessibleFunctionsLookup();
+
 // Callbacks to register metadata from an image to the runtime.
-void addImageProtocolsBlockCallback(const void *start, uintptr_t size);
-void addImageProtocolsBlockCallbackUnsafe(const void *start, uintptr_t size);
-void addImageProtocolConformanceBlockCallback(const void *start,
+void addImageProtocolsBlockCallback(const void *baseAddress,
+                                    const void *start, uintptr_t size);
+void addImageProtocolsBlockCallbackUnsafe(const void *baseAddress,
+                                          const void *start, uintptr_t size);
+void addImageProtocolConformanceBlockCallback(const void *baseAddress,
+                                              const void *start,
                                               uintptr_t size);
-void addImageProtocolConformanceBlockCallbackUnsafe(const void *start,
+void addImageProtocolConformanceBlockCallbackUnsafe(const void *baseAddress,
+                                                    const void *start,
                                                     uintptr_t size);
-void addImageTypeMetadataRecordBlockCallback(const void *start,
+void addImageTypeMetadataRecordBlockCallback(const void *baseAddress,
+                                             const void *start,
                                              uintptr_t size);
-void addImageTypeMetadataRecordBlockCallbackUnsafe(const void *start,
+void addImageTypeMetadataRecordBlockCallbackUnsafe(const void *baseAddress,
+                                                   const void *start,
                                                    uintptr_t size);
-void addImageDynamicReplacementBlockCallback(const void *start, uintptr_t size,
+void addImageDynamicReplacementBlockCallback(const void *baseAddress,
+                                             const void *start, uintptr_t size,
                                              const void *start2,
                                              uintptr_t size2);
+void addImageAccessibleFunctionsBlockCallback(const void *baseAddress,
+                                              const void *start,
+                                              uintptr_t size);
+void addImageAccessibleFunctionsBlockCallbackUnsafe(const void *baseAddress,
+                                                    const void *start,
+                                                    uintptr_t size);
 
 int lookupSymbol(const void *address, SymbolInfo *info);
+
+#if defined(_WIN32)
+/// Configure the environment to allow calling into the Debug Help library.
+///
+/// \param body A function to invoke. This function attempts to first initialize
+///   the Debug Help library. The result of that operation is passed to this
+///   function.
+/// \param context A caller-supplied value to pass to \a body.
+///
+/// On Windows, the Debug Help library (DbgHelp.lib) is not thread-safe. All
+/// calls into it from the Swift runtime and stdlib should route through this
+/// function.
+SWIFT_RUNTIME_STDLIB_SPI
+void _swift_withWin32DbgHelpLibrary(
+  void (* body)(bool isInitialized, void *context), void *context);
+
+/// Configure the environment to allow calling into the Debug Help library.
+///
+/// \param body A function to invoke. This function attempts to first initialize
+///   the Debug Help library. The result of that operation is passed to this
+///   function.
+///
+/// On Windows, the Debug Help library (DbgHelp.lib) is not thread-safe. All
+/// calls into it from the Swift runtime and stdlib should route through this
+/// function.
+static inline void _swift_withWin32DbgHelpLibrary(
+  const std::function<void(bool /*isInitialized*/)> &body) {
+  _swift_withWin32DbgHelpLibrary([](bool isInitialized, void *context) {
+    auto bodyp = reinterpret_cast<std::function<void(bool)> *>(context);
+    (* bodyp)(isInitialized);
+  }, const_cast<void *>(reinterpret_cast<const void *>(&body)));
+}
+
+/// Configure the environment to allow calling into the Debug Help library.
+///
+/// \param body A function to invoke. This function attempts to first initialize
+///   the Debug Help library. The result of that operation is passed to this
+///   function.
+///
+/// \returns Whatever is returned from \a body.
+///
+/// On Windows, the Debug Help library (DbgHelp.lib) is not thread-safe. All
+/// calls into it from the Swift runtime and stdlib should route through this
+/// function.
+template <
+  typename F,
+  typename R = typename std::result_of_t<F&(bool /*isInitialized*/)>,
+  typename = typename std::enable_if_t<!std::is_same<void, R>::value>
+>
+static inline R _swift_withWin32DbgHelpLibrary(const F& body) {
+  R result;
+
+  _swift_withWin32DbgHelpLibrary([&body, &result] (bool isInitialized) {
+    result = body(isInitialized);
+  });
+
+  return result;
+}
+#endif
 
 } // end namespace swift
 

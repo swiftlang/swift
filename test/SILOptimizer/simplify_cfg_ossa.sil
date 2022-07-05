@@ -1819,7 +1819,7 @@ bb1:
   %4 = struct $FakeBool(%3 : $Builtin.Int1)
   br bb3(%3 : $Builtin.Int1)
 
-bb2(%6 : $CompareResult):
+bb2:
   %7 = integer_literal $Builtin.Int1, 0
   %8 = struct $FakeBool(%7 : $Builtin.Int1)
   br bb3(%7 : $Builtin.Int1)

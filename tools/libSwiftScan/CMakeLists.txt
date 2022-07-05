@@ -1,6 +1,3 @@
-include(SwiftWindowsSupport)
-swift_swap_compiler_if_needed("libSwiftScan")
-
 # Use an 'internal' name, this is primarily intended for SwiftDriver to import.
 set(SWIFT_SCAN_LIB_NAME "_InternalSwiftScan")
 
@@ -9,8 +6,13 @@ set(LLVM_EXPORTED_SYMBOL_FILE
 
 add_swift_host_library(libSwiftScan SHARED
   libSwiftScan.cpp
-  c-include-check.c
-  HAS_LIBSWIFT)
+  c-include-check.c)
+
+if(${SWIFT_HOST_VARIANT_SDK} IN_LIST SWIFT_DARWIN_PLATFORMS)
+  # Workaround for a linker crash related to autolinking: rdar://77839981
+  set_property(TARGET libSwiftScan APPEND_STRING PROPERTY
+               LINK_FLAGS " -lobjc ")
+endif()
 
 add_dependencies(libSwiftScan
   clang
@@ -19,7 +21,9 @@ add_dependencies(libSwiftScan
 target_link_libraries(libSwiftScan PRIVATE
     swiftDependencyScan
     swiftDriverTool
-    libswift)
+    swiftStaticMirror
+    swiftReflection
+    swiftCompilerStub)
 
 set_target_properties(libSwiftScan
     PROPERTIES

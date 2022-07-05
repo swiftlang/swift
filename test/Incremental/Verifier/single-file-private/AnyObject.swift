@@ -16,6 +16,7 @@ import Foundation
 // expected-provides {{NSObject}}
 // expected-provides {{Selector}}
 // expected-provides {{Bool}}
+// expected-provides {{ObjCBool}}
 // expected-provides {{==}}
 // expected-provides {{Equatable}}
 // expected-provides {{Hasher}}
@@ -28,21 +29,6 @@ import Foundation
 // expected-member {{ObjectiveC.NSObject.Bool}}
 // expected-conformance {{Swift.Hashable}}
 // expected-conformance {{Swift.Equatable}}
-// expected-conformance {{Swift.CustomDebugStringConvertible}}
-// expected-conformance {{Swift.CustomStringConvertible}}
-// expected-conformance {{Swift.LosslessStringConvertible}}
-// expected-conformance {{Swift.Sequence}}
-// expected-conformance {{Swift.Comparable}}
-// expected-conformance {{Swift.ExpressibleByArrayLiteral}}
-// expected-conformance {{Swift.TextOutputStream}}
-// expected-conformance {{Swift.Encodable}}
-// expected-conformance {{Swift.Decodable}}
-// expected-conformance {{Swift.SIMDStorage}}
-// expected-conformance {{Swift.TextOutputStreamable}}
-// expected-conformance {{Swift.AdditiveArithmetic}}
-// expected-conformance {{Swift.ExpressibleByStringInterpolation}}
-// expected-conformance {{Swift.ExpressibleByExtendedGraphemeClusterLiteral}}
-// expected-conformance {{Swift.SignedNumeric}}
 // expected-member {{Swift._ExpressibleByBuiltinIntegerLiteral.init}}
 @objc private class LookupFactory: NSObject {
   // expected-provides {{AssignmentPrecedence}}
@@ -95,17 +81,10 @@ import Foundation
 // expected-member {{ObjectiveC.NSObject.Hasher}}
 // expected-member {{ObjectiveC.NSObjectProtocol.hash}}
 
+// expected-member {{Swift.Hashable.init}}
 // expected-member {{Swift.Hashable.deinit}}
+// expected-member {{Swift.Equatable.init}}
 // expected-member {{Swift.Equatable.deinit}}
-
-// expected-conformance {{Swift.Strideable}}
-// expected-conformance {{Swift.Collection}}
-// expected-conformance {{Swift.BidirectionalCollection}}
-// expected-conformance {{Swift.ExpressibleByUnicodeScalarLiteral}}
-// expected-conformance {{Swift.ExpressibleByStringLiteral}}
-// expected-conformance {{Swift.CustomReflectable}}
-// expected-conformance {{Swift.ExpressibleByIntegerLiteral}}
-// expected-conformance {{Swift.Numeric}}
 
 // expected-member {{Swift.Hashable.==}}
 // expected-member {{Swift.Equatable.hash}}

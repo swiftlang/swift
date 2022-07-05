@@ -15,39 +15,42 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if SWIFT_ENABLE_REFLECTION
+
 #include "swift/Basic/Range.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Reflection/TypeRef.h"
 #include "swift/Reflection/TypeRefBuilder.h"
+#include <iostream>
 
 using namespace swift;
 using namespace reflection;
 
 class PrintTypeRef : public TypeRefVisitor<PrintTypeRef, void> {
-  FILE *file;
+  std::ostream &stream;
   unsigned Indent;
 
-  FILE * &indent(unsigned Amount) {
+  std::ostream &indent(unsigned Amount) {
     for (unsigned i = 0; i < Amount; ++i)
-      fprintf(file, " ");
-    return file;
+      stream << " ";
+    return stream;
   }
 
-  FILE * &printHeader(std::string Name) {
-    fprintf(indent(Indent), "(%s", Name.c_str());
-    return file;
+  std::ostream &printHeader(std::string Name) {
+    indent(Indent) << "(" << Name;
+    return stream;
   }
 
-  FILE * &printField(std::string name, std::string value) {
+  std::ostream &printField(std::string name, std::string value) {
     if (!name.empty())
-      fprintf(file, " %s=%s", name.c_str(), value.c_str());
+      stream << " " << name << "=" << value;
     else
-      fprintf(file, " %s", value.c_str());
-    return file;
+      stream << " " << value;
+    return stream;
   }
 
   void printRec(const TypeRef *typeRef) {
-    fprintf(file, "\n");
+    stream << "\n";
 
     Indent += 2;
     visit(typeRef);
@@ -55,14 +58,14 @@ class PrintTypeRef : public TypeRefVisitor<PrintTypeRef, void> {
   }
 
 public:
-  PrintTypeRef(FILE *file, unsigned Indent)
-    : file(file), Indent(Indent) {}
+  PrintTypeRef(std::ostream &stream, unsigned Indent)
+      : stream(stream), Indent(Indent) {}
 
   void visitBuiltinTypeRef(const BuiltinTypeRef *B) {
     printHeader("builtin");
     auto demangled = Demangle::demangleTypeAsString(B->getMangledName());
     printField("", demangled);
-    fprintf(file, ")");
+    stream << ")";
   }
 
   void visitNominalTypeRef(const NominalTypeRef *N) {
@@ -76,8 +79,7 @@ public:
     else if (N->isProtocol()) {
       printHeader("protocol");
       mangledName = Demangle::dropSwiftManglingPrefix(mangledName);
-    }
-    else if (N->isAlias())
+    } else if (N->isAlias())
       printHeader("alias");
     else
       printHeader("nominal");
@@ -85,7 +87,7 @@ public:
     printField("", demangled);
     if (auto parent = N->getParent())
       printRec(parent);
-    fprintf(file, ")");
+    stream << ")";
   }
 
   void visitBoundGenericTypeRef(const BoundGenericTypeRef *BG) {
@@ -104,7 +106,7 @@ public:
       printRec(param);
     if (auto parent = BG->getParent())
       printRec(parent);
-    fprintf(file, ")");
+    stream << ")";
   }
 
   void visitTupleTypeRef(const TupleTypeRef *T) {
@@ -114,10 +116,10 @@ public:
     for (auto NameElement : llvm::zip_first(Labels, T->getElements())) {
       auto Label = std::get<0>(NameElement);
       if (!Label.empty())
-        fprintf(file, "%s = ", Label.str().c_str());
+        stream << Label.str() << " = ";
       printRec(std::get<1>(NameElement));
     }
-    fprintf(file, ")");
+    stream << ")";
   }
 
   void visitFunctionTypeRef(const FunctionTypeRef *F) {
@@ -159,19 +161,19 @@ public:
     }
 
     if (auto globalActor = F->getGlobalActor()) {
-      fprintf(file, "\n");
+      stream << "\n";
       Indent += 2;
       printHeader("global-actor");
       {
         Indent += 2;
         printRec(globalActor);
-        fprintf(file, ")");
+        stream << ")";
         Indent -= 2;
       }
       Indent += 2;
     }
 
-    fprintf(file, "\n");
+    stream << "\n";
     Indent += 2;
     printHeader("parameters");
 
@@ -181,7 +183,7 @@ public:
 
       if (!flags.isNone()) {
         Indent += 2;
-        fprintf(file, "\n");
+        stream << "\n";
       }
 
       switch (flags.getValueOwnership()) {
@@ -209,17 +211,17 @@ public:
 
       if (!flags.isNone()) {
         Indent -= 2;
-        fprintf(file, ")");
+        stream << ")";
       }
     }
 
     if (parameters.empty())
-      fprintf(file, ")");
+      stream << ")";
 
-    fprintf(file, "\n");
+    stream << "\n";
     printHeader("result");
     printRec(F->getResult());
-    fprintf(file, ")");
+    stream << ")";
 
     Indent -= 2;
   }
@@ -227,12 +229,21 @@ public:
   void visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC) {
     printHeader("protocol_composition");
     if (PC->hasExplicitAnyObject())
-      fprintf(file, " any_object");
+      stream << " any_object";
     if (auto superclass = PC->getSuperclass())
       printRec(superclass);
     for (auto protocol : PC->getProtocols())
       printRec(protocol);
-    fprintf(file, ")");
+    stream << ")";
+  }
+
+  void
+  visitConstrainedExistentialTypeRef(const ConstrainedExistentialTypeRef *CET) {
+    printHeader("constrained_existential_type");
+    printRec(CET->getBase());
+    for (auto req : CET->getRequirements())
+      visitTypeRefRequirement(req);
+    stream << ")";
   }
 
   void visitMetatypeTypeRef(const MetatypeTypeRef *M) {
@@ -240,20 +251,21 @@ public:
     if (M->wasAbstract())
       printField("", "was_abstract");
     printRec(M->getInstanceType());
-    fprintf(file, ")");
+    stream << ")";
   }
 
   void visitExistentialMetatypeTypeRef(const ExistentialMetatypeTypeRef *EM) {
     printHeader("existential_metatype");
     printRec(EM->getInstanceType());
-    fprintf(file, ")");
+    stream << ")";
   }
 
-  void visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP){
+  void
+  visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP) {
     printHeader("generic_type_parameter");
     printField("depth", std::to_string(GTP->getDepth()));
     printField("index", std::to_string(GTP->getIndex()));
-    fprintf(file, ")");
+    stream << ")";
   }
 
   void visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
@@ -261,41 +273,63 @@ public:
     printField("protocol", DM->getProtocol());
     printRec(DM->getBase());
     printField("member", DM->getMember());
-    fprintf(file, ")");
+    stream << ")";
   }
 
   void visitForeignClassTypeRef(const ForeignClassTypeRef *F) {
     printHeader("foreign");
     if (!F->getName().empty())
       printField("name", F->getName());
-    fprintf(file, ")");
+    stream << ")";
   }
 
   void visitObjCClassTypeRef(const ObjCClassTypeRef *OC) {
     printHeader("objective_c_class");
     if (!OC->getName().empty())
       printField("name", OC->getName());
-    fprintf(file, ")");
+    stream << ")";
   }
 
   void visitObjCProtocolTypeRef(const ObjCProtocolTypeRef *OC) {
     printHeader("objective_c_protocol");
     if (!OC->getName().empty())
       printField("name", OC->getName());
-    fprintf(file, ")");
+    stream << ")";
   }
 
-#define REF_STORAGE(Name, name, ...) \
-  void visit##Name##StorageTypeRef(const Name##StorageTypeRef *US) { \
-    printHeader(#name "_storage"); \
-    printRec(US->getType()); \
-    fprintf(file, ")"); \
+#define REF_STORAGE(Name, name, ...)                                           \
+  void visit##Name##StorageTypeRef(const Name##StorageTypeRef *US) {           \
+    printHeader(#name "_storage");                                             \
+    printRec(US->getType());                                                   \
+    stream << ")";                                                             \
   }
 #include "swift/AST/ReferenceStorage.def"
 
   void visitSILBoxTypeRef(const SILBoxTypeRef *SB) {
-    printHeader("sil_box");  printRec(SB->getBoxedType());
-    fprintf(file, ")");
+    printHeader("sil_box");
+    printRec(SB->getBoxedType());
+    stream << ")";
+  }
+
+  void visitTypeRefRequirement(const TypeRefRequirement &req) {
+    printHeader("requirement ");
+    switch (req.getKind()) {
+    case RequirementKind::Conformance:
+    case RequirementKind::Superclass:
+      printRec(req.getFirstType());
+      stream << " : ";
+      printRec(req.getSecondType());
+      break;
+    case RequirementKind::SameType:
+      printRec(req.getFirstType());
+      stream << " == ";
+      printRec(req.getSecondType());
+      break;
+    case RequirementKind::Layout:
+      stream << "layout requirement";
+      break;
+    }
+    stream << ")";
   }
 
   void visitSILBoxTypeWithLayoutTypeRef(const SILBoxTypeWithLayoutTypeRef *SB) {
@@ -306,62 +340,45 @@ public:
     for (auto &f : SB->getFields()) {
       printHeader(f.isMutable() ? "var" : "let");
       printRec(f.getType());
-      fprintf(file, ")");
+      stream << ")";
     }
     Indent -= 2;
-    fprintf(file, ")\n");
+    stream << ")\n";
     printHeader("generic_signature\n");
     Indent += 2;
     for (auto &subst : SB->getSubstitutions()) {
       printHeader("substitution");
       printRec(subst.first);
       printRec(subst.second);
-      fprintf(file, ")");
+      stream << ")";
     }
     Indent -= 2;
     for (auto &req : SB->getRequirements()) {
-      printHeader("requirement ");
-      switch (req.getKind()) {
-      case RequirementKind::Conformance:
-      case RequirementKind::Superclass:
-        printRec(req.getFirstType());
-        fprintf(file, " : ");
-        printRec(req.getSecondType());
-        break;
-      case RequirementKind::SameType:
-        printRec(req.getFirstType());
-        fprintf(file, " == ");
-        printRec(req.getSecondType());
-        break;
-      case RequirementKind::Layout:
-        fprintf(file, "layout requirement");
-        break;
-      }
-      fprintf(file, ")");
+      visitTypeRefRequirement(req);
     }
-    fprintf(file, ")");
-    fprintf(file, ")");
+    stream << ")";
+    stream << ")";
   }
 
   void visitOpaqueArchetypeTypeRef(const OpaqueArchetypeTypeRef *O) {
     printHeader("opaque_archetype");
     printField("id", O->getID().str());
     printField("description", O->getDescription().str());
-    fprintf(file, " ordinal %u ", O->getOrdinal());
+    stream << " ordinal " << O->getOrdinal() << " ";
     for (auto argList : O->getArgumentLists()) {
-      fprintf(file, "\n");
-      fprintf(indent(Indent + 2), "args: <");
+      stream << "\n";
+      indent(Indent + 2) << "args: <";
       for (auto arg : argList) {
         printRec(arg);
       }
-      fprintf(file, ">");
+      stream << ">";
     }
-    fprintf(file, ")");
+    stream << ")";
   }
 
   void visitOpaqueTypeRef(const OpaqueTypeRef *O) {
     printHeader("opaque");
-    fprintf(file, ")");
+    stream << ")";
   }
 };
 
@@ -415,6 +432,11 @@ struct TypeRefIsConcrete
       if (!visit(Superclass))
         return false;
     return true;
+  }
+
+  bool
+  visitConstrainedExistentialTypeRef(const ConstrainedExistentialTypeRef *CET) {
+    return visit(CET->getBase());
   }
 
   bool visitMetatypeTypeRef(const MetatypeTypeRef *M) {
@@ -478,13 +500,11 @@ const OpaqueTypeRef *OpaqueTypeRef::get() {
   return Singleton;
 }
 
-void TypeRef::dump() const {
-  dump(stderr);
-}
+void TypeRef::dump() const { dump(std::cerr); }
 
-void TypeRef::dump(FILE *file, unsigned Indent) const {
-  PrintTypeRef(file, Indent).visit(this);
-  fprintf(file, "\n");
+void TypeRef::dump(std::ostream &stream, unsigned Indent) const {
+  PrintTypeRef(stream, Indent).visit(this);
+  stream << "\n";
 }
 
 class DemanglingForTypeRef
@@ -543,19 +563,14 @@ public:
 
   Demangle::NodePointer
   visitBoundGenericTypeRef(const BoundGenericTypeRef *BG) {
-    Node::Kind nodeKind;
     Node::Kind genericNodeKind;
     if (BG->isStruct()) {
-      nodeKind = Node::Kind::Structure;
       genericNodeKind = Node::Kind::BoundGenericStructure;
     } else if (BG->isEnum()) {
-      nodeKind = Node::Kind::Enum;
       genericNodeKind = Node::Kind::BoundGenericEnum;
     } else if (BG->isClass()) {
-      nodeKind = Node::Kind::Class;
       genericNodeKind = Node::Kind::BoundGenericClass;
     } else {
-      nodeKind = Node::Kind::OtherNominalType;
       genericNodeKind = Node::Kind::BoundGenericOtherNominalType;
     }
     auto unspecializedType = Dem.demangleType(BG->getMangledName());
@@ -568,8 +583,35 @@ public:
     genericNode->addChild(unspecializedType, Dem);
     genericNode->addChild(genericArgsList, Dem);
 
-    if (auto parent = BG->getParent())
-      assert(false && "not implemented");
+    auto parent = BG->getParent();
+    if (!parent)
+      return genericNode;
+
+    auto parentNode = visit(parent);
+    if (!parentNode || !parentNode->hasChildren() ||
+        parentNode->getKind() != Node::Kind::Type ||
+        !unspecializedType->hasChildren())
+      return genericNode;
+
+    // Peel off the "Type" node.
+    parentNode = parentNode->getFirstChild();
+
+    auto nominalNode = unspecializedType->getFirstChild();
+
+    if (nominalNode->getNumChildren() != 2)
+      return genericNode;
+
+    // Save identifier for reinsertion later, we have to remove it
+    // so we can insert the parent node as the first child.
+    auto identifierNode = nominalNode->getLastChild();
+
+    // Remove all children.
+    nominalNode->removeChildAt(1);
+    nominalNode->removeChildAt(0);
+
+    // Add the parent we just visited back in, followed by the identifier.
+    nominalNode->addChild(parentNode, Dem);
+    nominalNode->addChild(identifierNode, Dem);
 
     return genericNode;
   }
@@ -765,6 +807,18 @@ public:
     return node;
   }
 
+  Demangle::NodePointer
+  visitConstrainedExistentialTypeRef(const ConstrainedExistentialTypeRef *CET) {
+    auto node = Dem.createNode(Node::Kind::ConstrainedExistential);
+    node->addChild(visit(CET->getBase()), Dem);
+    auto constraintList =
+        Dem.createNode(Node::Kind::ConstrainedExistentialRequirementList);
+    for (auto req : CET->getRequirements())
+      constraintList->addChild(visitTypeRefRequirement(req), Dem);
+    node->addChild(constraintList, Dem);
+    return node;
+  }
+
   Demangle::NodePointer visitMetatypeTypeRef(const MetatypeTypeRef *M) {
     auto node = Dem.createNode(Node::Kind::Metatype);
     // FIXME: This is lossy. @objc_metatype is also abstract.
@@ -784,7 +838,6 @@ public:
 
   Demangle::NodePointer
   visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP) {
-    assert(false && "not tested");
     auto node = Dem.createNode(Node::Kind::DependentGenericParamType);
     node->addChild(Dem.createNode(Node::Kind::Index, GTP->getDepth()), Dem);
     node->addChild(Dem.createNode(Node::Kind::Index, GTP->getIndex()), Dem);
@@ -793,7 +846,6 @@ public:
 
   Demangle::NodePointer
   visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
-    assert(false && "not tested");
     assert(DM->getProtocol().empty() && "not implemented");
     auto node = Dem.createNode(Node::Kind::DependentMemberType);
     node->addChild(visit(DM->getBase()), Dem);
@@ -838,6 +890,37 @@ public:
     return node;
   }
 
+  Demangle::NodePointer visitTypeRefRequirement(const TypeRefRequirement &req) {
+    switch (req.getKind()) {
+    case RequirementKind::Conformance:
+    case RequirementKind::Superclass:
+    case RequirementKind::SameType: {
+      Node::Kind kind;
+      switch (req.getKind()) {
+      case RequirementKind::Conformance:
+        kind = Node::Kind::DependentGenericConformanceRequirement;
+        break;
+      case RequirementKind::Superclass:
+        // A DependentGenericSuperclasseRequirement kind seems to be missing.
+        kind = Node::Kind::DependentGenericConformanceRequirement;
+        break;
+      case RequirementKind::SameType:
+        kind = Node::Kind::DependentGenericSameTypeRequirement;
+        break;
+      default:
+        llvm_unreachable("Unhandled requirement kind");
+      }
+      auto r = Dem.createNode(kind);
+      r->addChild(visit(req.getFirstType()), Dem);
+      r->addChild(visit(req.getSecondType()), Dem);
+      return r;
+    }
+    case RequirementKind::Layout:
+      // Not implemented.
+      return nullptr;
+    }
+  }
+
   Demangle::NodePointer
   visitSILBoxTypeWithLayoutTypeRef(const SILBoxTypeWithLayoutTypeRef *SB) {
     auto node = Dem.createNode(Node::Kind::SILBoxTypeWithLayout);
@@ -868,35 +951,10 @@ public:
         ++index;
       }
     for (auto &req : SB->getRequirements()) {
-      switch (req.getKind()) {
-      case RequirementKind::Conformance:
-      case RequirementKind::Superclass:
-      case RequirementKind::SameType: {
-        Node::Kind kind;
-        switch (req.getKind()) {
-        case RequirementKind::Conformance:
-          kind = Node::Kind::DependentGenericConformanceRequirement;
-          break;
-        case RequirementKind::Superclass:
-          // A DependentGenericSuperclasseRequirement kind seems to be missing.
-          kind = Node::Kind::DependentGenericConformanceRequirement;
-          break;
-        case RequirementKind::SameType:
-          kind = Node::Kind::DependentGenericSameTypeRequirement;
-          break;
-        default:
-          llvm_unreachable("unreachable");
-        }
-        auto r = Dem.createNode(kind);
-        r->addChild(visit(req.getFirstType()), Dem);
-        r->addChild(visit(req.getSecondType()), Dem);
-        signature->addChild(r, Dem);
-        break;
-      }
-      case RequirementKind::Layout:
-        // Not implemented.
-        break;
-      }
+      auto *r = visitTypeRefRequirement(req);
+      if (!r)
+        continue;
+      signature->addChild(r, Dem);
     }
     node->addChild(signature, Dem);
     auto list = Dem.createNode(Node::Kind::TypeList);
@@ -1041,8 +1099,12 @@ public:
     std::vector<const TypeRef *> GenericParams;
     for (auto Param : BG->getGenericParams())
       GenericParams.push_back(visit(Param));
+    auto parent = BG->getParent();
+    if (parent) {
+      parent = ThickenMetatype(Builder).visit(parent);
+    }
     return BoundGenericTypeRef::create(Builder, BG->getMangledName(),
-                                       GenericParams);
+                                       GenericParams, parent);
   }
 
   const TypeRef *visitTupleTypeRef(const TupleTypeRef *T) {
@@ -1075,6 +1137,12 @@ public:
   const TypeRef *
   visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC) {
     return PC;
+  }
+
+  const TypeRef *
+  visitConstrainedExistentialTypeRef(const ConstrainedExistentialTypeRef *CET) {
+    return ConstrainedExistentialTypeRef::create(Builder, CET->getBase(),
+                                                 CET->getRequirements());
   }
 
   const TypeRef *visitMetatypeTypeRef(const MetatypeTypeRef *M) {
@@ -1222,6 +1290,42 @@ public:
     // Existential metatypes do not contain type parameters.
     assert(EM->getInstanceType()->isConcrete());
     return EM;
+  }
+
+  llvm::Optional<TypeRefRequirement>
+  visitTypeRefRequirement(const TypeRefRequirement &req) {
+    auto newFirst = visit(req.getFirstType());
+    if (!newFirst)
+      return None;
+
+    switch (req.getKind()) {
+    case RequirementKind::Conformance:
+    case RequirementKind::Superclass:
+    case RequirementKind::SameType: {
+      auto newSecond = visit(req.getFirstType());
+      if (!newSecond)
+        return None;
+      return TypeRefRequirement(req.getKind(), newFirst, newSecond);
+    }
+    case RequirementKind::Layout:
+      return TypeRefRequirement(req.getKind(), newFirst,
+                                req.getLayoutConstraint());
+    }
+
+    llvm_unreachable("Unhandled RequirementKind in switch.");
+  }
+
+  const TypeRef *
+  visitConstrainedExistentialTypeRef(const ConstrainedExistentialTypeRef *CET) {
+    std::vector<TypeRefRequirement> constraints;
+    for (auto Req : CET->getRequirements()) {
+      auto substReq = visitTypeRefRequirement(Req);
+      if (!substReq)
+        continue;
+      constraints.emplace_back(*substReq);
+    }
+    return ConstrainedExistentialTypeRef::create(Builder, CET->getBase(),
+                                                 constraints);
   }
 
   const TypeRef *
@@ -1480,3 +1584,5 @@ bool TypeRef::deriveSubstitutions(GenericArgumentMap &Subs,
   // exactly.
   return (OrigTR == SubstTR);
 }
+
+#endif

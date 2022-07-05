@@ -22,13 +22,12 @@ public func use() -> Int {
   }
 }
 
-// CHECK: define {{.*}} @"$s31force_public_metadata_accessors3useSiyF"()
-// CHECK-NOT: define
-// CHECK: call {{.*}} %swift.metadata_response @"$s31force_public_metadata_accessors14FixedContainer{{.*}}LLOMa"
-
 // FIXME: From within LLDB, this would be a forward declaration.
 // Unfortunately this is difficult to reproduce from source alone.
 // Really this should be a check for a non-internal "declare".
 // CHECK: define{{.*}} swiftcc %swift.metadata_response @"$s31force_public_metadata_accessors14FixedContainer{{.*}}LLOMa"
 
+// CHECK: define {{.*}} @"$s31force_public_metadata_accessors3useSiyF"()
+// CHECK-NOT: define
+// CHECK: call {{.*}} %swift.metadata_response @"$s31force_public_metadata_accessors14FixedContainer{{.*}}LLOMa"
 

@@ -28,7 +28,6 @@
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Subsystems.h"
-#include "swift/Strings.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -318,23 +317,6 @@ void ImportResolver::bindImport(UnboundImport &&I) {
       ID.get()->setModule(nullptr);
     return;
   }
-  // If the imported module is a clang module, add an implicit import statement
-  // to request the SPIs from the module.
-  if (M->isNonSwiftModule() && ID &&
-      !ID.get()->getAttrs().hasAttribute<SPIAccessControlAttr>()) {
-    ImportDecl *id = ID.get();
-    auto *newId = ImportDecl::create(id->getASTContext(), id->getDeclContext(),
-      SourceLoc(), id->getImportKind(), SourceLoc(), id->getImportPath());
-    // Copy all the existing attribute from the actual import statement.
-    llvm::for_each(id->getAttrs(),
-                  [&](DeclAttribute *attr) {newId->getAttrs().add(attr);});
-    // Add SPI attribute with the default group name.
-    newId->getAttrs().add(SPIAccessControlAttr::create(id->getASTContext(),
-      SourceLoc(), SourceRange(),
-      { ctx.getIdentifier(CLANG_MODULE_DEFUALT_SPI_GROUP_NAME) }));
-    // So we'll resolve the new import.
-    unboundImports.push_back(UnboundImport(newId));
-  }
 
   auto topLevelModule = I.getTopLevelModule(M, SF);
 
@@ -448,7 +430,7 @@ static void diagnoseNoSuchModule(ModuleDecl *importingModule,
     ctx.Diags.diagnose(importLoc, diagKind, modulePathStr);
   }
 
-  if (ctx.SearchPathOpts.SDKPath.empty() &&
+  if (ctx.SearchPathOpts.getSDKPath().empty() &&
       llvm::Triple(llvm::sys::getProcessTriple()).isMacOSX()) {
     ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk);
     ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk_xcrun);
@@ -498,7 +480,8 @@ ModuleImplicitImportsRequest::evaluate(Evaluator &evaluator,
       !clangImporter->importBridgingHeader(bridgingHeaderPath, module)) {
     auto *headerModule = clangImporter->getImportedHeaderModule();
     assert(headerModule && "Didn't load bridging header?");
-    imports.emplace_back(ImportedModule(headerModule), ImportFlags::Exported);
+    imports.emplace_back(
+        ImportedModule(headerModule), SourceLoc(), ImportFlags::Exported);
   }
 
   // Implicitly import the underlying Clang half of this module if needed.
@@ -508,7 +491,7 @@ ModuleImplicitImportsRequest::evaluate(Evaluator &evaluator,
     ImportPath::Builder importPath(module->getName());
     unloadedImports.emplace_back(UnloadedImportedModule(importPath.copyTo(ctx),
                                                         /*isScoped=*/false),
-                                 ImportFlags::Exported);
+                                 SourceLoc(), ImportFlags::Exported);
   }
 
   return { ctx.AllocateCopy(imports), ctx.AllocateCopy(unloadedImports) };
@@ -541,7 +524,7 @@ UnboundImport::UnboundImport(AttributedImport<UnloadedImportedModule> implicit)
 /// Create an UnboundImport for a user-written import declaration.
 UnboundImport::UnboundImport(ImportDecl *ID)
   : import(UnloadedImportedModule(ID->getImportPath(), ID->getImportKind()),
-           {}),
+           ID->getStartLoc(), {}),
     importLoc(ID->getLoc()), importOrUnderlyingModuleDecl(ID)
 {
   if (ID->isExported())
@@ -566,6 +549,11 @@ UnboundImport::UnboundImport(ImportDecl *ID)
     spiGroups.append(attrSPIs.begin(), attrSPIs.end());
   }
   import.spiGroups = ID->getASTContext().AllocateCopy(spiGroups);
+
+  if (auto attr = ID->getAttrs().getAttribute<PreconcurrencyAttr>()) {
+    import.options |= ImportFlags::Preconcurrency;
+    import.preconcurrencyRange = attr->getRangeWithAt();
+  }
 }
 
 bool UnboundImport::checkNotTautological(const SourceFile &SF) {

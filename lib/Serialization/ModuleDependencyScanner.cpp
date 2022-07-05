@@ -32,7 +32,7 @@ std::error_code ModuleDependencyScanner::findModuleFilesInDirectory(
                                       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
                                       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
                                       std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-                                      bool IsFramework) {
+                                      bool skipBuildingInterface, bool IsFramework) {
   using namespace llvm::sys;
 
   auto &fs = *Ctx.SourceMgr.getFileSystem();
@@ -70,27 +70,23 @@ std::error_code ModuleDependencyScanner::findModuleFilesInDirectory(
   return dependencies.getError();
 }
 
-
-std::error_code PlaceholderSwiftModuleScanner::findModuleFilesInDirectory(
-    ImportPath::Element ModuleID, const SerializedModuleBaseName &BaseName,
-    SmallVectorImpl<char> *ModuleInterfacePath,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-    bool IsFramework) {
-  StringRef moduleName = ModuleID.Item.str();
+bool PlaceholderSwiftModuleScanner::findModule(
+    ImportPath::Element moduleID, SmallVectorImpl<char> *moduleInterfacePath,
+    std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
+    std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
+    std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
+    bool skipBuildingInterface, bool &isFramework, bool &isSystemModule) {
+  StringRef moduleName = Ctx.getRealModuleName(moduleID.Item).str();
   auto it = PlaceholderDependencyModuleMap.find(moduleName);
-  // If no placeholder module stub path is given matches the name, return with an
-  // error code.
   if (it == PlaceholderDependencyModuleMap.end()) {
-    return std::make_error_code(std::errc::not_supported);
+    return false;
   }
   auto &moduleInfo = it->getValue();
   auto dependencies = ModuleDependencies::forPlaceholderSwiftModuleStub(
       moduleInfo.modulePath, moduleInfo.moduleDocPath,
       moduleInfo.moduleSourceInfoPath);
   this->dependencies = std::move(dependencies);
-  return std::error_code{};
+  return true;
 }
 
 static std::vector<std::string> getCompiledCandidates(ASTContext &ctx,
@@ -106,11 +102,12 @@ ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
   // FIXME: Query the module interface loader to determine an appropriate
   // name for the module, which includes an appropriate hash.
   auto newExt = file_types::getExtension(file_types::TY_SwiftModuleFile);
-  llvm::SmallString<32> modulePath = moduleName.str();
+  auto realModuleName = Ctx.getRealModuleName(moduleName);
+  llvm::SmallString<32> modulePath = realModuleName.str();
   llvm::sys::path::replace_extension(modulePath, newExt);
   Optional<ModuleDependencies> Result;
   std::error_code code =
-    astDelegate.runInSubContext(moduleName.str(),
+    astDelegate.runInSubContext(realModuleName.str(),
                                               moduleInterfacePath.str(),
                                               StringRef(),
                                               SourceLoc(),
@@ -119,9 +116,9 @@ ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
                     ArrayRef<StringRef> PCMArgs, StringRef Hash) {
     assert(mainMod);
     std::string InPath = moduleInterfacePath.str();
-    auto compiledCandidates = getCompiledCandidates(Ctx, moduleName.str(),
+    auto compiledCandidates = getCompiledCandidates(Ctx, realModuleName.str(),
                                                     InPath);
-    Result = ModuleDependencies::forSwiftTextualModule(InPath,
+    Result = ModuleDependencies::forSwiftInterfaceModule(InPath,
                                                    compiledCandidates,
                                                    Args,
                                                    PCMArgs,
@@ -136,7 +133,7 @@ ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
 
     // Create a source file.
     unsigned bufferID = Ctx.SourceMgr.addNewSourceBuffer(std::move(interfaceBuf.get()));
-    auto moduleDecl = ModuleDecl::create(moduleName, Ctx);
+    auto moduleDecl = ModuleDecl::create(realModuleName, Ctx);
     auto sourceFile = new (Ctx) SourceFile(
         *moduleDecl, SourceFileKind::Interface, bufferID);
 
@@ -163,10 +160,15 @@ Optional<ModuleDependencies> SerializedModuleLoaderBase::getModuleDependencies(
     StringRef moduleName, ModuleDependenciesCache &cache,
     InterfaceSubContextDelegate &delegate) {
   auto currentSearchPathSet = Ctx.getAllModuleSearchPathsSet();
+
   // Check whether we've cached this result.
   if (auto found = cache.findDependencies(
            moduleName,
-           {ModuleDependenciesKind::SwiftTextual, currentSearchPathSet}))
+           {ModuleDependenciesKind::SwiftInterface, currentSearchPathSet}))
+    return found;
+  if (auto found = cache.findDependencies(
+           moduleName,
+           {ModuleDependenciesKind::SwiftSource, currentSearchPathSet}))
     return found;
   if (auto found = cache.findDependencies(
             moduleName,
@@ -177,13 +179,16 @@ Optional<ModuleDependencies> SerializedModuleLoaderBase::getModuleDependencies(
             {ModuleDependenciesKind::SwiftPlaceholder, currentSearchPathSet}))
     return found;
 
-  auto moduleId = Ctx.getIdentifier(moduleName);
+  ImportPath::Module::Builder builder(Ctx, moduleName, /*separator=*/'.');
+  auto modulePath = builder.get();
+  auto moduleId = modulePath.front().Item;
   // Instantiate dependency scanning "loaders".
   SmallVector<std::unique_ptr<ModuleDependencyScanner>, 2> scanners;
-  // Placeholder dependencies must be resolved first, to prevent the ModuleDependencyScanner
-  // from first discovering artifacts of a previous build. Such artifacts are captured
-  // as compiledModuleCandidates in the dependency graph of the placeholder dependency module
-  // itself.
+  // Placeholder dependencies must be resolved first, to prevent the
+  // ModuleDependencyScanner from first discovering artifacts of a previous
+  // build. Such artifacts are captured as compiledModuleCandidates in the
+  // dependency graph of the placeholder dependency module itself.
+  // FIXME: submodules?
   scanners.push_back(std::make_unique<PlaceholderSwiftModuleScanner>(
       Ctx, LoadMode, moduleId, Ctx.SearchPathOpts.PlaceholderDependencyModuleMap,
       delegate));
@@ -194,8 +199,7 @@ Optional<ModuleDependencies> SerializedModuleLoaderBase::getModuleDependencies(
   assert(isa<PlaceholderSwiftModuleScanner>(scanners[0].get()) &&
          "Expected PlaceholderSwiftModuleScanner as the first dependency scanner loader.");
   for (auto &scanner : scanners) {
-    if (scanner->canImportModule({moduleId, SourceLoc()},
-                                 llvm::VersionTuple(), false)) {
+    if (scanner->canImportModule(modulePath, llvm::VersionTuple(), false)) {
       // Record the dependencies.
       cache.recordDependencies(moduleName, *(scanner->dependencies));
       return std::move(scanner->dependencies);

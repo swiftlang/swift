@@ -10,7 +10,7 @@
 
 import OldActor
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension Monk {
   public func test() async {
     method()

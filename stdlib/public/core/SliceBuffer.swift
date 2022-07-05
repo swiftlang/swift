@@ -302,7 +302,8 @@ internal struct _SliceBuffer<Element>
     return count
   }
 
-  /// Returns `true` iff this buffer's storage is uniquely-referenced.
+  /// Returns `true` if this buffer's storage is uniquely-referenced;
+  /// otherwise, returns `false`.
   ///
   /// This function should only be used for internal sanity checks and for
   /// backward compatibility.
@@ -312,8 +313,9 @@ internal struct _SliceBuffer<Element>
     return isKnownUniquelyReferenced(&owner)
   }
 
-  /// Returns `true` and puts the buffer in a mutable state iff the buffer's
-  /// storage is uniquely-referenced.
+  /// Returns `true` and puts the buffer in a mutable state if the buffer's
+  /// storage is uniquely-referenced; otherwise, performs no action and returns
+  /// `false`.
   ///
   /// - Precondition: The buffer must be immutable.
   ///
@@ -325,7 +327,7 @@ internal struct _SliceBuffer<Element>
       return false
     }
     if Bool(Builtin.beginCOWMutation(&owner)) {
-#if INTERNAL_CHECKS_ENABLED
+#if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
       nativeBuffer.isImmutable = false
 #endif
       return true
@@ -342,7 +344,7 @@ internal struct _SliceBuffer<Element>
   @_alwaysEmitIntoClient
   @inline(__always)
   internal mutating func endCOWMutation() {
-#if INTERNAL_CHECKS_ENABLED
+#if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
     nativeBuffer.isImmutable = true
 #endif
     Builtin.endCOWMutation(&owner)

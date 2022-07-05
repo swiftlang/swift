@@ -27,7 +27,7 @@ GlobalConfig::update(Optional<unsigned> CompletionMaxASTContextReuseCount,
     State.CompletionOpts.CheckDependencyInterval =
         *CompletionCheckDependencyInterval;
   return State;
-};
+}
 
 GlobalConfig::Settings::CompletionOptions
 GlobalConfig::getCompletionOpts() const {
@@ -36,15 +36,17 @@ GlobalConfig::getCompletionOpts() const {
 }
 
 SourceKit::Context::Context(
-    StringRef RuntimeLibPath, StringRef DiagnosticDocumentationPath,
+    StringRef SwiftExecutablePath, StringRef RuntimeLibPath,
+    StringRef DiagnosticDocumentationPath,
     llvm::function_ref<std::unique_ptr<LangSupport>(Context &)>
         LangSupportFactoryFn,
     bool shouldDispatchNotificationsOnMain)
-    : RuntimeLibPath(RuntimeLibPath),
+    : SwiftExecutablePath(SwiftExecutablePath), RuntimeLibPath(RuntimeLibPath),
       DiagnosticDocumentationPath(DiagnosticDocumentationPath),
       NotificationCtr(
           new NotificationCenter(shouldDispatchNotificationsOnMain)),
-      Config(new GlobalConfig()) {
+      Config(new GlobalConfig()), ReqTracker(new RequestTracker()),
+      SlowRequestSim(new SlowRequestSimulator(ReqTracker)) {
   // Should be called last after everything is initialized.
   SwiftLang = LangSupportFactoryFn(*this);
 }

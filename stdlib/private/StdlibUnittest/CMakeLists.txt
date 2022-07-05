@@ -10,14 +10,19 @@ if (NOT IS_BUILD_TYPE_OPTIMIZED)
   list(APPEND swift_stdlib_unittest_compile_flags "-DSWIFT_STDLIB_DEBUG")
 endif()
 
+if(SWIFT_ENABLE_REFLECTION)
+  list(APPEND swift_stdlib_unittest_compile_flags "-DSWIFT_ENABLE_REFLECTION")
+endif()
+
+if(SWIFT_STDLIB_STATIC_PRINT)
+  list(APPEND swift_stdlib_unittest_compile_flags "-D" "SWIFT_STDLIB_STATIC_PRINT")
+endif()
+
 set(swift_stdlib_unittest_link_libraries "")
 set(swift_stdlib_unittest_modules "")
 if (SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
   list(APPEND swift_stdlib_unittest_link_libraries "swift_Concurrency")
   list(APPEND swift_stdlib_unittest_modules "_Concurrency")
-endif()
-if (SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
-  list(APPEND swift_stdlib_unittest_link_libraries "swift_Distributed")
 endif()
 
 add_swift_target_library(swiftStdlibUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
@@ -37,6 +42,7 @@ add_swift_target_library(swiftStdlibUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}
   Statistics.swift
   StdlibCoreExtras.swift
   StringConvertible.swift
+  StringTestHelpers.swift
   SymbolLookup.swift
   TestHelpers.swift
   TypeIndexed.swift
@@ -53,9 +59,8 @@ add_swift_target_library(swiftStdlibUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}
   SWIFT_MODULE_DEPENDS_CYGWIN Glibc
   SWIFT_MODULE_DEPENDS_HAIKU Glibc
   SWIFT_MODULE_DEPENDS_WINDOWS CRT WinSDK
+  C_COMPILE_FLAGS -I${SWIFT_SOURCE_DIR}/stdlib/include
   SWIFT_COMPILE_FLAGS ${swift_stdlib_unittest_compile_flags} ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
-    -Xfrontend -define-availability
-    -Xfrontend "SwiftStdlib 5.5:macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0"
   INSTALL_IN_COMPONENT stdlib-experimental
   DARWIN_INSTALL_NAME_DIR "${SWIFT_DARWIN_STDLIB_PRIVATE_INSTALL_NAME_DIR}"
   LINK_LIBRARIES ${swift_stdlib_unittest_link_libraries})

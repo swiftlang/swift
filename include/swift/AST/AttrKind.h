@@ -89,6 +89,7 @@ enum class EffectsKind : uint8_t {
   ReleaseNone,
   ReadWrite,
   Unspecified,
+  Custom,
   Last_EffectsKind = Unspecified
 };
 

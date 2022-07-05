@@ -275,15 +275,15 @@ public:
   ManagedValue project(SILGenFunction &SGF, SILLocation loc,
                        ManagedValue base) && override;
 
-  struct AccessedStorage {
+  struct AccessStorage {
     AbstractStorageDecl *Storage;
     bool IsSuper;
     const PreparedArguments *Indices;
-    Expr *IndexExprForDiagnostics;
+    ArgumentList *ArgListForDiagnostics;
   };
 
   /// Get the storage accessed by this component.
-  virtual Optional<AccessedStorage> getAccessedStorage() const = 0;
+  virtual Optional<AccessStorage> getAccessStorage() const = 0;
 
   /// Perform a writeback on the property.
   ///
@@ -313,7 +313,7 @@ protected:
   }
 
 public:
-  Optional<AccessedStorage> getAccessedStorage() const override {
+  Optional<AccessStorage> getAccessStorage() const override {
     return None;
   }
 
@@ -459,7 +459,7 @@ public:
                           AccessStrategy accessStrategy,
                           CanType formalRValueType,
                           PreparedArguments &&indices,
-                          Expr *indexExprForDiagnostics);
+                          ArgumentList *argListForDiagnostics);
 
   void addMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
                              VarDecl *var,
@@ -481,7 +481,7 @@ public:
                                    AccessStrategy accessStrategy,
                                    CanType formalRValueType,
                                    PreparedArguments &&indices,
-                                   Expr *indexExprForDiagnostics,
+                                   ArgumentList *argListForDiagnostics,
                                    bool isOnSelfParameter = false,
                                    Optional<ActorIsolation> actorIso = None);
 

@@ -1,9 +1,8 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -typecheck -emit-module-interface-path %t/MyModule.swiftinterface -enable-library-evolution %s -module-name MyModule
+// RUN: %target-swift-emit-module-interface(%t/MyModule.swiftinterface) %s -module-name MyModule
+// RUN: %target-swift-typecheck-module-from-interface(%t/MyModule.swiftinterface) -module-name MyModule
 // RUN: %FileCheck %s < %t/MyModule.swiftinterface
-
-// RUN: %target-swift-frontend -compile-module-from-interface %t/MyModule.swiftinterface -o %t/MyModule.swiftmodule
 
 // CHECK: public struct Type {
 // CHECK-NEXT: }
@@ -19,7 +18,7 @@ public func usesType(_ x: Type) {}
 // CHECK: public func genericProtocol<T>(_ x: T) where T : MyModule.`Protocol`
 public func genericProtocol<T: Protocol>(_ x: T) {}
 
-// CHECK: public func existentialProtocol(_ x: MyModule.`Protocol`)
+// CHECK: public func existentialProtocol(_ x: any MyModule.`Protocol`)
 public func existentialProtocol(_ x: Protocol) {}
 
 // CHECK: public struct Parent {

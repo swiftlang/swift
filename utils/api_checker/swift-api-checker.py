@@ -1,6 +1,4 @@
-#!/usr/bin/env python
-
-from __future__ import print_function
+#!/usr/bin/env python3
 
 import argparse
 import os
@@ -103,7 +101,7 @@ class DumpConfig:
             'macosx': 'x86_64-apple-macosx10.15',
             'appletvos': 'arm64-apple-tvos13.0',
             'watchos': 'armv7k-apple-watchos6.0',
-            'iosmac': 'x86_64-apple-ios13.0-macabi',
+            'iosmac': 'x86_64-apple-ios13.1-macabi',
         }
         self.tool_path = get_api_digester_path(tool_path)
         self.platform = platform

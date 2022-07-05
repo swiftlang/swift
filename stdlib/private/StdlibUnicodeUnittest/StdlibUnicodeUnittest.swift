@@ -70,14 +70,15 @@ public struct NormalizationTest {
   }
 }
 
-// Normalization tests are currently only avaible on Darwin, awaiting a sensible
+// Normalization tests are currently only available on Darwin, awaiting a sensible
 // file API...
 #if _runtime(_ObjC)
 import Foundation
-public let normalizationTests: [NormalizationTest] = {
+
+func readInputNormalizationTest(index: Int) -> [NormalizationTest] {
   var tests = [NormalizationTest]()
 
-  let file = CommandLine.arguments[2]
+  let file = CommandLine.arguments[index]
   let fileURL = URL(fileURLWithPath: file)
 
   let fileContents = try! String(contentsOf: fileURL) + "" // go faster
@@ -111,7 +112,13 @@ public let normalizationTests: [NormalizationTest] = {
   }
   
   return tests
-}()
+}
+
+// Older version of stdlib with ICU and supporting Unicode 11
+public let normalizationTests = readInputNormalizationTest(index: 2)
+
+// Native normalization in stdlib supporting Unicode 14
+public let normalizationTests14 = readInputNormalizationTest(index: 3)
 #endif
 
 public struct UTFTest {
@@ -771,4 +778,3 @@ public let utf16Tests = [
         [ 0xDC00, 0xD800, 0xD800, 0xDC00 ]),
   ],
 ]
-

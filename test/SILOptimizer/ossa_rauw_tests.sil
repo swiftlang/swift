@@ -778,14 +778,14 @@ bb0(%0 : @owned $Klass):
 //
 // CHECK-LABEL: sil [ossa] @interior_pointer_lifetime_extension_int_ptr_need_lifetime_ext_with_proj_2 : $@convention(thin) (@owned Klass) -> @owned Builtin.NativeObject {
 // CHECK: bb0([[ARG:%.*]] : @owned
-// CHECK-NEXT: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-// CHECK-NEXT: [[NEW_INT_PTR:%.*]] = ref_element_addr [[BORROWED_ARG]]
 // CHECK-NEXT: br bb1
 //
 // CHECK: bb1:
 // CHECK-NEXT: br bb2
 //
 // CHECK: bb2:
+// CHECK-NEXT: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK-NEXT: [[NEW_INT_PTR:%.*]] = ref_element_addr [[BORROWED_ARG]]
 // CHECK-NEXT: [[NEW_GEP:%.*]] = struct_element_addr [[NEW_INT_PTR]]
 // CHECK-NEXT: br bb3
 //
@@ -830,8 +830,6 @@ bb4:
 // CHECK: bb0([[ARG:%.*]] : @owned
 // CHECK-NEXT: [[ORIGINAL_BORROW:%.*]] = begin_borrow [[ARG]]
 // CHECK-NEXT: [[COPIED_ARG:%.*]] = copy_value [[ORIGINAL_BORROW]]
-// CHECK-NEXT: [[BORROWED_COPIED_ARG:%.*]] = begin_borrow [[COPIED_ARG]]
-// CHECK-NEXT: [[NEW_INT_PTR:%.*]] = ref_element_addr [[BORROWED_COPIED_ARG]]
 // CHECK-NEXT: br bb1
 //
 // CHECK: bb1:
@@ -843,6 +841,8 @@ bb4:
 // CHECK-NEXT: // function_ref
 // CHECK-NEXT: [[USER:%.*]] = function_ref @
 // CHECK-NEXT: apply [[USER]]([[OLD_GEP]])
+// CHECK-NEXT: [[BORROWED_COPIED_ARG:%.*]] = begin_borrow [[COPIED_ARG]]
+// CHECK-NEXT: [[NEW_INT_PTR:%.*]] = ref_element_addr [[BORROWED_COPIED_ARG]]
 // CHECK-NEXT: [[NEW_GEP:%.*]] = struct_element_addr [[NEW_INT_PTR]]
 // CHECK-NEXT: br bb3
 //

@@ -1,0 +1,97 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -enable-lexical-lifetimes %s -mem2reg | %FileCheck %s
+
+import Builtin
+import Swift
+
+// We cannot use unchecked_value_cast for conversions to trivial type.
+// Since it is forwarding, the ownersip of the src forwards, but we cannot destroy the dst because it is trivial
+
+// CHECK-LABEL: sil [ossa] @casttotrivial :
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] %0
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
+// CHECK:         [[CAST:%.*]]  = unchecked_bitwise_cast [[LIFETIME_OWNED]] : $AnyObject to $UInt8
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         destroy_value %0
+// CHECK-NEXT:    destroy_value [[LIFETIME_OWNED]]
+// CHECK-NEXT:    return [[CAST]]
+// CHECK-LABEL: } // end sil function 'casttotrivial'
+sil [ossa] @casttotrivial : $@convention(thin) (@owned AnyObject) -> @owned UInt8 {
+bb0(%0 : @owned $AnyObject):
+  %1 = alloc_stack [lexical] $AnyObject
+  store %0 to [init] %1 : $*AnyObject
+  %2 = unchecked_addr_cast %1 : $*AnyObject to $*UInt8
+  %3 = load [trivial] %2 : $*UInt8
+  %4 = load [take] %1 : $*AnyObject
+  destroy_value %4 : $AnyObject
+  dealloc_stack %1 : $*AnyObject
+  return %3 : $UInt8
+}
+
+// We cannot use unchecked_value_cast, because it is forwarding, it forwards the src, and the src can no longer be used as a RunningVal
+// To get rid of this issue we need to use a copy_value of the src, and make sure we don't generate copy_value in case of a load [copy].
+// To avoid all this spl handling, just use bitwise cast
+
+// CHECK-LABEL: sil [ossa] @casttonontrivial :
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] %0
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
+// CHECK:         [[CAST:%.*]] = unchecked_bitwise_cast [[LIFETIME_OWNED]] : $AnyObject to $String
+// CHECK:         [[COPY:%.*]] = copy_value [[CAST]]
+// CHECK-NEXT:    end_borrow [[LIFETIME]]
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    destroy_value [[LIFETIME_OWNED]]
+// CHECK-NEXT:    return [[COPY]]
+// CHECK-LABEL: } // end sil function 'casttonontrivial'
+sil [ossa] @casttonontrivial : $@convention(thin) (@owned AnyObject) -> @owned String {
+bb0(%0 : @owned $AnyObject):
+  %1 = alloc_stack [lexical] $AnyObject
+  store %0 to [init] %1 : $*AnyObject
+  %2 = unchecked_addr_cast %1 : $*AnyObject to $*String
+  %3 = load [copy] %2 : $*String
+  %4 = load [take] %1 : $*AnyObject
+  destroy_value %4 : $AnyObject
+  dealloc_stack %1 : $*AnyObject
+  return %3 : $String
+}
+
+struct Pair { var lhs: AnyObject; var rhs: AnyObject }
+
+// CHECK-LABEL: sil [ossa] @shorteningcast :
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] %0
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
+// CHECK:         [[CAST:%.*]] = unchecked_bitwise_cast [[LIFETIME_OWNED]] : $Pair to $AnyObject
+// CHECK:         [[COPY:%.*]] = copy_value [[CAST]]
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         destroy_value %0
+// CHECK-NEXT:    destroy_value [[LIFETIME_OWNED]]
+// CHECK-NEXT:    return [[COPY]]
+// CHECK-LABEL: } // end sil function 'shorteningcast'
+sil [ossa] @shorteningcast : $@convention(thin) (@owned Pair) -> @owned AnyObject {
+bb0(%0 : @owned $Pair):
+  %1 = alloc_stack [lexical] $Pair
+  store %0 to [init] %1 : $*Pair
+  %2 = unchecked_addr_cast %1 : $*Pair to $*AnyObject
+  %3 = load [copy] %2 : $*AnyObject
+  %4 = load [take] %1 : $*Pair
+  destroy_value %4 : $Pair
+  dealloc_stack %1 : $*Pair
+  return %3 : $AnyObject
+}
+
+// CHECK-LABEL: sil [ossa] @deadcast :
+// CHECK-LABEL: bb0
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] %0
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
+// CHECK-NEXT:    destroy_value [[LIFETIME_OWNED]]
+// CHECK-NEXT:    end_borrow [[LIFETIME]]
+// CHECK-NEXT:    destroy_value %0
+// CHECK-LABEL: } // end sil function 'deadcast'
+sil [ossa] @deadcast : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : @owned $AnyObject):
+  %1 = alloc_stack [lexical] $AnyObject
+  store %0 to [init] %1 : $*AnyObject
+  %2 = unchecked_addr_cast %1 : $*AnyObject to $*String
+  destroy_addr %1 : $*AnyObject
+  dealloc_stack %1 : $*AnyObject
+  %4 = tuple()
+  return %4 : $()
+}

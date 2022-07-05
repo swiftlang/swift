@@ -134,7 +134,7 @@ fileprivate struct _CapacityAndFlags {
  Tail Allocations:
 
  `__StringStorage.create` takes a requested minimum code unit capacity and a
- count (which it uses to gurantee null-termination invariant). This will
+ count (which it uses to guarantee null-termination invariant). This will
  allocate the class header and a tail allocation for the requested capacity plus
  one (for the null-terminator), plus any excess `malloc` bucket space. If
  breadcrumbs need be present, they appear at the very end of the allocation.
@@ -445,7 +445,7 @@ extension __StringStorage {
 
   // @opaque
   fileprivate var _breadcrumbsAddress: UnsafeMutablePointer<_StringBreadcrumbs?> {
-    precondition(
+    _precondition(
       hasBreadcrumbs, "Internal error: string breadcrumbs not present")
     return UnsafeMutablePointer(_realCapacityEnd)
   }
@@ -457,7 +457,7 @@ extension __StringStorage {
   // The unused capacity available for appending. Note that this excludes the
   // required nul-terminator.
   //
-  // NOTE: Callers who wish to mutate this storage should enfore nul-termination
+  // NOTE: Callers who wish to mutate this storage should enforce nul-termination
   //
   // TODO: Refactoring or removing. Excluding the last byte is awkward.
   @inline(__always)

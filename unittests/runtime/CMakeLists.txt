@@ -1,5 +1,5 @@
 # We can't currently build the runtime tests under ASAN
-# The problem is that we want to use the just-build compiler (just like the
+# The problem is that we want to use the just\build compiler (just like the
 # runtime) but ASAN will complain if we link against libgtest and LLVMSupport
 # libraries because they were compiled with the host compiler.
 if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
@@ -64,7 +64,7 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
       ${EXECINFO_LIBRARY}
       )
   elseif(SWIFT_HOST_VARIANT STREQUAL windows)
-    list(APPEND PLATFORM_TARGET_LINK_LIBRARIES DbgHelp)
+    list(APPEND PLATFORM_TARGET_LINK_LIBRARIES DbgHelp;Synchronization)
   endif()
 
   if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
@@ -89,7 +89,7 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
 #      DistributedActor.cpp
 #      )
     list(APPEND PLATFORM_TARGET_LINK_LIBRARIES
-      swift_Distributed${SWIFT_PRIMARY_VARIANT_SUFFIX}
+      swiftDistributed${SWIFT_PRIMARY_VARIANT_SUFFIX}
       )
   endif()
 
@@ -106,8 +106,8 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     CompatibilityOverrideConcurrency.cpp
     Concurrent.cpp
     Metadata.cpp
-    Mutex.cpp
     Enum.cpp
+    ExtendedExistential.cpp
     Refcounting.cpp
     Stdlib.cpp
     StackAllocator.cpp
@@ -122,20 +122,28 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     )
 
   # The local stdlib implementation provides definitions of the swiftCore
-  # interfaes to avoid pulling in swiftCore itself.  Build the SwiftRuntimeTests
+  # interfaces to avoid pulling in swiftCore itself.  Build the SwiftRuntimeTests
   # with swiftCore_EXPORTS to permit exporting the stdlib interfaces.
   target_compile_definitions(SwiftRuntimeTests
                              PRIVATE
                                swiftCore_EXPORTS
                                SWIFT_INLINE_NAMESPACE=__runtime)
 
+  if(SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT)
+    target_compile_definitions(SwiftRuntimeTests
+                               PRIVATE SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT)
+  endif()
+
   target_include_directories(SwiftRuntimeTests BEFORE PRIVATE
     ${SWIFT_SOURCE_DIR}/stdlib/include)
+  target_include_directories(SwiftRuntimeTests BEFORE PRIVATE
+    ${SWIFT_SOURCE_DIR}/stdlib/public)
 
   # FIXME: cross-compile for all variants.
   target_link_libraries(SwiftRuntimeTests
     PRIVATE
     swiftCore${SWIFT_PRIMARY_VARIANT_SUFFIX}
+    swiftThreading${SWIFT_PRIMARY_VARIANT_SUFFIX}
     ${PLATFORM_TARGET_LINK_LIBRARIES}
     )
 endif()

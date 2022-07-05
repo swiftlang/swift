@@ -15,6 +15,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
 #include <vector>
 
@@ -111,6 +112,8 @@ public:
     vector.push_back(value);
     return {index, true};
   }
+
+  bool count(const ValueT &value) const { return map.count(value); }
 
   /// Replace \p value1 with \p value2 placing \p value2 into the position in
   /// the array where value1 used to be. If \p value2 is already in the set,

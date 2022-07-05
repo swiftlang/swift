@@ -22,14 +22,14 @@ func acceptsNonConcurrent(_ fn: (Int) -> Int) { }
 
 func passingConcurrentOrNot(
   _ cfn: @Sendable (Int) -> Int,
-  ncfn: (Int) -> Int // expected-note{{parameter 'ncfn' is implicitly non-concurrent}}{{9-9=@Sendable }}
+  ncfn: (Int) -> Int // expected-note{{parameter 'ncfn' is implicitly non-sendable}}{{9-9=@Sendable }}
 ) {
   // Okay due to overloading
   f(cfn)
   f(ncfn)
 
   acceptsConcurrent(cfn) // okay
-  acceptsConcurrent(ncfn) // expected-error{{passing non-concurrent parameter 'ncfn' to function expecting a @Sendable closure}}
+  acceptsConcurrent(ncfn) // expected-warning{{passing non-sendable parameter 'ncfn' to function expecting a @Sendable closure}}
   acceptsNonConcurrent(cfn) // okay
   acceptsNonConcurrent(ncfn) // okay
 
@@ -49,8 +49,8 @@ func closures() {
       return i
     })
 
-  let closure1 = { $0 + 1 } // inferred to be non-concurrent
-  acceptsConcurrent(closure1) // expected-error{{converting non-concurrent function value to '@Sendable (Int) -> Int' may introduce data races}}
+  let closure1 = { $0 + 1 } // inferred to be non-sendable
+  acceptsConcurrent(closure1) // expected-warning{{converting non-sendable function value to '@Sendable (Int) -> Int' may introduce data races}}
 }
 
 // Mutation of captured locals from within @Sendable functions.
@@ -124,4 +124,32 @@ func testExplicitConcurrentClosure() {
     17
   }
   let _: String = fn // expected-error{{cannot convert value of type '@Sendable () -> Int' to specified type 'String'}}
+}
+
+class SuperSendable {
+  func runsInBackground(_: @Sendable () -> Void) {}
+  func runsInForeground(_: () -> Void) {} // expected-note {{overridden declaration is here}}
+  func runnableInBackground() -> @Sendable () -> Void { fatalError() } // expected-note {{overridden declaration is here}}
+  func runnableInForeground() -> () -> Void { fatalError() }
+}
+
+class SubSendable: SuperSendable {
+  override func runsInBackground(_: () -> Void) {}
+  override func runsInForeground(_: @Sendable () -> Void) {} // expected-warning {{declaration 'runsInForeground' has a type with different sendability from any potential overrides}}
+  override func runnableInBackground() -> () -> Void { fatalError() }  // expected-warning {{declaration 'runnableInBackground()' has a type with different sendability from any potential overrides}}
+  override func runnableInForeground() -> @Sendable () -> Void { fatalError() }
+}
+
+protocol AbstractSendable {
+  func runsInBackground(_: @Sendable () -> Void)
+  func runsInForeground(_: () -> Void) // expected-note {{expected sendability to match requirement here}}
+  func runnableInBackground() -> @Sendable () -> Void // expected-note {{expected sendability to match requirement here}}
+  func runnableInForeground() -> () -> Void
+}
+
+struct ConcreteSendable: AbstractSendable {
+  func runsInBackground(_: () -> Void) {}
+  func runsInForeground(_: @Sendable () -> Void) {} // expected-warning {{sendability of function types in instance method 'runsInForeground' does not match requirement in protocol 'AbstractSendable'}}
+  func runnableInBackground() -> () -> Void { fatalError() } // expected-warning {{sendability of function types in instance method 'runnableInBackground()' does not match requirement in protocol 'AbstractSendable'}}
+  func runnableInForeground() -> @Sendable () -> Void { fatalError() }
 }

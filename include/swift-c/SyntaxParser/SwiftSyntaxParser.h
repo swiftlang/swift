@@ -75,52 +75,7 @@
 
 SWIFTPARSE_BEGIN_DECLS
 
-//=== Syntax Data Types ---------------------------------------------------===//
-
-/// Offset+length in UTF8 bytes.
-typedef struct {
-  uint32_t offset;
-  uint32_t length;
-} swiftparse_range_t;
-
-typedef uint8_t swiftparse_trivia_kind_t;
-typedef uint8_t swiftparse_token_kind_t;
-typedef uint16_t swiftparse_syntax_kind_t;
-
-/// This is for the client to provide an opaque pointer that the parser will
-/// associate with a syntax node.
-typedef void *swiftparse_client_node_t;
-
-typedef struct {
-  /// The length in source this trivia piece occupies, in UTF8 bytes.
-  uint32_t length;
-  swiftparse_trivia_kind_t kind;
-} swiftparse_trivia_piece_t;
-
-typedef struct {
-  const swiftparse_trivia_piece_t *leading_trivia;
-  const swiftparse_trivia_piece_t *trailing_trivia;
-  uint16_t leading_trivia_count;
-  uint16_t trailing_trivia_count;
-  swiftparse_token_kind_t kind;
-  /// Represents the range for the node, including trivia.
-  swiftparse_range_t range;
-} swiftparse_token_data_t;
-
-typedef struct {
-  const swiftparse_client_node_t *nodes;
-  uint32_t nodes_count;
-} swiftparse_layout_data_t;
-
-typedef struct {
-  union {
-    swiftparse_token_data_t token_data;
-    swiftparse_layout_data_t layout_data;
-  };
-  /// The syntax kind. A value of '0' means this is a token node.
-  swiftparse_syntax_kind_t kind;
-  bool present;
-} swiftparse_syntax_node_t;
+#include "SwiftSyntaxCDataTypes.h"
 
 //=== Parser Functions ----------------------------------------------------===//
 
@@ -137,6 +92,15 @@ swiftparse_parser_create(void);
 
 SWIFTPARSE_PUBLIC void
 swiftparse_parser_dispose(swiftparse_parser_t);
+
+/// Set the language version that should be used to parse the Swift source file.
+SWIFTPARSE_PUBLIC void
+swiftparse_parser_set_language_version(swiftparse_parser_t c_parser,
+                                       const char *version);
+
+/// Set whether bare slash regex literals are enabled.
+SWIFTPARSE_PUBLIC void swiftparse_parser_set_enable_bare_slash_regex_literal(
+    swiftparse_parser_t c_parser, bool enabled);
 
 /// Invoked by the parser when a syntax node is parsed. The client should
 /// return a pointer to associate with that particular node.

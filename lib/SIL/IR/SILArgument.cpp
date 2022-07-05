@@ -82,7 +82,7 @@ SILParameterInfo SILFunctionArgument::getKnownParameterInfo() const {
 // expensive to call this helper instead of simply specifying phis with an
 // opcode. It results in repeated CFG traversals and repeated, unnecessary
 // switching over terminator opcodes.
-bool SILPhiArgument::isPhiArgument() const {
+bool SILPhiArgument::isPhi() const {
   // No predecessors indicates an unreachable block.
   if (getParent()->pred_empty())
     return false;
@@ -128,7 +128,7 @@ static SILValue getIncomingPhiValueForPred(const SILBasicBlock *parentBlock,
 }
 
 SILValue SILPhiArgument::getIncomingPhiValue(SILBasicBlock *predBlock) const {
-  if (!isPhiArgument())
+  if (!isPhi())
     return SILValue();
 
   const auto *parentBlock = getParent();
@@ -145,7 +145,7 @@ SILValue SILPhiArgument::getIncomingPhiValue(SILBasicBlock *predBlock) const {
 
 bool SILPhiArgument::getIncomingPhiValues(
     SmallVectorImpl<SILValue> &returnedPhiValues) const {
-  if (!isPhiArgument())
+  if (!isPhi())
     return false;
 
   const auto *parentBlock = getParent();
@@ -162,14 +162,14 @@ bool SILPhiArgument::getIncomingPhiValues(
 }
 
 Operand *SILPhiArgument::getIncomingPhiOperand(SILBasicBlock *predBlock) const {
-  if (!isPhiArgument())
+  if (!isPhi())
     return nullptr;
   return getIncomingPhiOperandForPred(getParent(), predBlock, getIndex());
 }
 
 bool SILPhiArgument::getIncomingPhiOperands(
     SmallVectorImpl<Operand *> &returnedPhiOperands) const {
-  if (!isPhiArgument())
+  if (!isPhi())
     return false;
 
   const auto *parentBlock = getParent();
@@ -187,7 +187,7 @@ bool SILPhiArgument::getIncomingPhiOperands(
 
 bool SILPhiArgument::visitIncomingPhiOperands(
     function_ref<bool(Operand *)> visitor) const {
-  if (!isPhiArgument())
+  if (!isPhi())
     return false;
 
   const auto *parentBlock = getParent();
@@ -210,7 +210,7 @@ bool SILPhiArgument::visitIncomingPhiOperands(
 bool SILPhiArgument::getIncomingPhiValues(
     SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>>
         &returnedPredBBAndPhiValuePairs) const {
-  if (!isPhiArgument())
+  if (!isPhi())
     return false;
 
   const auto *parentBlock = getParent();
@@ -253,8 +253,6 @@ getSingleTerminatorOperandForPred(const SILBasicBlock *parentBlock,
         ->getArgForDestBB(parentBlock, argIndex);
   case TermKind::CheckedCastBranchInst:
     return cast<const CheckedCastBranchInst>(predTermInst)->getOperand();
-  case TermKind::CheckedCastValueBranchInst:
-    return cast<const CheckedCastValueBranchInst>(predTermInst)->getOperand();
   case TermKind::SwitchEnumInst:
     return cast<const SwitchEnumInst>(predTermInst)->getOperand();
   }
@@ -318,8 +316,10 @@ TermInst *SILPhiArgument::getSingleTerminator() const {
 
 TermInst *SILPhiArgument::getTerminatorForResult() const {
   if (auto *termInst = getSingleTerminator()) {
-    if (!isa<BranchInst>(termInst) && !isa<CondBranchInst>(termInst))
+    if (!swift::isa<BranchInst>(termInst)
+        && !swift::isa<CondBranchInst>(termInst)) {
       return termInst;
+    }
   }
   return nullptr;
 }

@@ -11,7 +11,7 @@
 // NO_OBSERVER-NOT: willSet
 // NO_OBSERVER-NOT: didSet
 
-// WITH_GLOBAL: Decl[GlobalVar]/CurrModule{{(/TypeRelation\[Identical\])?}}: globalValue[#String#];
+// WITH_GLOBAL: Decl[GlobalVar]/CurrModule{{(/TypeRelation\[Convertible\])?}}: globalValue[#String#];
 // NO_GLOBAL-NOT: globalValue;
 
 // WITH_SELF: Decl[LocalVar]/Local:               self[#{{.+}}#]; name=self

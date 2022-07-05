@@ -57,3 +57,9 @@ extension Optional: Differentiable where Wrapped: Differentiable {
     }
   }
 }
+
+extension Optional.TangentVector: CustomReflectable {
+  public var customMirror: Mirror {
+    return value.customMirror
+  }
+}

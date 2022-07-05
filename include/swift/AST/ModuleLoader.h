@@ -200,7 +200,7 @@ public:
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
-  virtual bool canImportModule(ImportPath::Element named,
+  virtual bool canImportModule(ImportPath::Module named,
                                llvm::VersionTuple version,
                                bool underlyingVersion) = 0;
 
@@ -226,11 +226,11 @@ public:
   virtual void loadExtensions(NominalTypeDecl *nominal,
                               unsigned previousGeneration) { }
 
-  /// Load the methods within the given class that produce
+  /// Load the methods within the given type that produce
   /// Objective-C class or instance methods with the given selector.
   ///
-  /// \param classDecl The class in which we are searching for @objc methods.
-  /// The search only considers this class and its extensions; not any
+  /// \param typeDecl The type in which we are searching for @objc methods.
+  /// The search only considers this type and its extensions; not any
   /// superclasses.
   ///
   /// \param selector The selector to search for.
@@ -246,7 +246,7 @@ public:
   /// selector and are instance/class methods as requested. This list will be
   /// extended with any methods found in subsequent generations.
   virtual void loadObjCMethods(
-                 ClassDecl *classDecl,
+                 NominalTypeDecl *typeDecl,
                  ObjCSelector selector,
                  bool isInstanceMethod,
                  unsigned previousGeneration,
@@ -272,7 +272,7 @@ public:
   /// Verify all modules loaded by this loader.
   virtual void verifyAllModules() { }
 
-  /// Discover overlays declared alongside this file and add infomation about
+  /// Discover overlays declared alongside this file and add information about
   /// them to it.
   void findOverlayFiles(SourceLoc diagLoc, ModuleDecl *module, FileUnit *file);
 

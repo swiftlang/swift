@@ -4,9 +4,31 @@
 #pragma clang assume_nonnull begin
 
 #define MAIN_ACTOR __attribute__((__swift_attr__("@MainActor")))
-#define MAIN_ACTOR_UNSAFE __attribute__((__swift_attr__("@_unsafeMainActor")))
+#define UI_ACTOR __attribute__((swift_attr("@UIActor")))
 
-#define NS_EXTENSIBLE_STRING_ENUM __attribute__((swift_wrapper(struct)));
+#ifdef __SWIFT_ATTR_SUPPORTS_SENDABLE_DECLS
+  #define SENDABLE __attribute__((__swift_attr__("@Sendable")))
+  #define NONSENDABLE __attribute__((__swift_attr__("@_nonSendable")))
+  #define ASSUME_NONSENDABLE_BEGIN _Pragma("clang attribute ASSUME_NONSENDABLE.push (__attribute__((swift_attr(\"@_nonSendable(_assumed)\"))), apply_to = any(objc_interface, record, enum))")
+  #define ASSUME_NONSENDABLE_END _Pragma("clang attribute ASSUME_NONSENDABLE.pop")
+#else
+  // If we take this #else, we should see minor failures of some subtests,
+  // but not systematic failures of everything that uses this header.
+  #define SENDABLE
+  #define NONSENDABLE
+  #define ASSUME_NONSENDABLE_BEGIN
+  #define ASSUME_NONSENDABLE_END
+#endif
+
+#define NS_ENUM(_type, _name) enum _name : _type _name; \
+  enum __attribute__((enum_extensibility(open))) _name : _type
+#define NS_OPTIONS(_type, _name) enum _name : _type _name; \
+  enum __attribute__((enum_extensibility(open), flag_enum)) _name : _type
+#define NS_ERROR_ENUM(_type, _name, _domain)  \
+  enum _name : _type _name; enum __attribute__((ns_error_domain(_domain))) _name : _type
+#define NS_STRING_ENUM __attribute((swift_newtype(enum)))
+#define NS_EXTENSIBLE_STRING_ENUM __attribute__((swift_wrapper(struct)))
+
 typedef NSString *Flavor NS_EXTENSIBLE_STRING_ENUM;
 
 @protocol ServiceProvider
@@ -14,11 +36,13 @@ typedef NSString *Flavor NS_EXTENSIBLE_STRING_ENUM;
 -(void)allOperationsWithCompletionHandler:(void (^)(NSArray<NSString *> *))completion;
 @end
 
-typedef void (^CompletionHandler)(NSString * _Nullable, NSString * _Nullable_result, NSError * _Nullable);
+typedef void (^CompletionHandler)(NSString * _Nullable, NSString * _Nullable_result, NSError * _Nullable) SENDABLE;
+typedef void (^NonsendableCompletionHandler)(NSString * _Nullable, NSString * _Nullable_result, NSError * _Nullable);
 
 @interface SlowServer : NSObject <ServiceProvider>
 -(void)doSomethingSlow:(NSString *)operation completionHandler:(void (^)(NSInteger))handler;
 -(void)doSomethingDangerous:(NSString *)operation completionHandler:(void (^ _Nullable)(NSString *_Nullable, NSError * _Nullable))handler;
+-(void)doSomethingReckless:(NSString *)operation completionHandler:(void (^ _Nullable NONSENDABLE)(NSString *_Nullable, NSError * _Nullable))handler;
 -(void)checkAvailabilityWithCompletionHandler:(void (^)(BOOL isAvailable))completionHandler;
 -(void)anotherExampleWithCompletionBlock:(void (^)(NSString *))block;
 -(void)finalExampleWithReplyTo:(void (^)(NSString *))block;
@@ -27,6 +51,8 @@ typedef void (^CompletionHandler)(NSString * _Nullable, NSString * _Nullable_res
 -(BOOL)findAnswerFailinglyWithError:(NSError * _Nullable * _Nullable)error completion:(void (^)(NSString *_Nullable, NSError * _Nullable))handler __attribute__((swift_name("findAnswerFailingly(completionHandler:)")));
 -(void)findQAndAWithCompletionHandler:(void (^)(NSString *_Nullable_result, NSString *_Nullable answer, NSError * _Nullable))handler;
 -(void)findQuestionableAnswersWithCompletionHandler:(CompletionHandler)handler;
+-(void)findAnswerableQuestionsWithCompletionHandler:(NonsendableCompletionHandler)handler;
+-(void)findUnanswerableQuestionsWithCompletionHandler:(NONSENDABLE NonsendableCompletionHandler)handler;
 -(void)doSomethingFun:(NSString *)operation then:(void (^)())completionHandler;
 -(void)getFortuneAsynchronouslyWithCompletionHandler:(void (^)(NSString *_Nullable, NSError * _Nullable))handler;
 -(void)getMagicNumberAsynchronouslyWithSeed:(NSInteger)seed completionHandler:(void (^)(NSInteger, NSError * _Nullable))handler;
@@ -44,6 +70,9 @@ typedef void (^CompletionHandler)(NSString * _Nullable, NSString * _Nullable_res
 -(void)poorlyNamed:(NSString *)operation completionHandler:(void (^)(NSInteger))handler __attribute__((swift_async_name("bestName(_:)")));
 
 -(void)customizedWithString:(NSString *)operation completionHandler:(void (^)(NSInteger))handler __attribute__((swift_name("customize(with:completionHandler:)"))) __attribute__((swift_async_name("customize(_:)")));
+
+-(void)unavailableMethod __attribute__((__swift_attr__("@_unavailableFromAsync")));
+-(void)unavailableMethodWithMessage __attribute__((__swift_attr__("@_unavailableFromAsync(message: \"Blarpy!\")")));
 
 -(void)dance:(NSString *)step andThen:(void (^)(NSString *))doSomething __attribute__((swift_async(not_swift_private,2)));
 -(void)leap:(NSInteger)height andThen:(void (^)(NSString *))doSomething __attribute__((swift_async(swift_private,2)));
@@ -86,7 +115,7 @@ typedef void (^CompletionHandler)(NSString * _Nullable, NSString * _Nullable_res
 -(void)asyncImportSame:(NSString *)operation completionHandler:(void (^)(NSInteger))handler;
 -(void)asyncImportSame:(NSString *)operation replyTo:(void (^)(NSInteger))handler __attribute__((swift_async(none)));
 
--(void)overridableButRunsOnMainThreadWithCompletionHandler:(MAIN_ACTOR_UNSAFE void (^ _Nullable)(NSString *))completion;
+-(void)overridableButRunsOnMainThreadWithCompletionHandler:(MAIN_ACTOR void (^ _Nullable)(NSString *))completion;
 - (void)obtainClosureWithCompletionHandler:(void (^)(void (^_Nullable)(void),
                                                      NSError *_Nullable,
                                                      BOOL))completionHandler
@@ -157,7 +186,7 @@ typedef void ( ^ObjCErrorHandler )( NSError * _Nullable inError );
 #define MAGIC_NUMBER 42
 
 
-__attribute__((__swift_attr__("@MainActor(unsafe)")))
+__attribute__((__swift_attr__("@MainActor")))
 @interface NXView : NSObject
 -(void)onDisplay;
 @end
@@ -167,14 +196,14 @@ __attribute__((__swift_attr__("@MainActor(unsafe)")))
 @end
 
 // Do something concurrently, but without escaping.
-void doSomethingConcurrently(__attribute__((noescape)) __attribute__((swift_attr("@Sendable"))) void (^block)(void));
+void doSomethingConcurrently(__attribute__((noescape)) SENDABLE void (^block)(void));
 
 
 
-void doSomethingConcurrentlyButUnsafe(__attribute__((noescape)) __attribute__((swift_attr("@_unsafeSendable"))) void (^block)(void));
+void doSomethingConcurrentlyButUnsafe(__attribute__((noescape)) __attribute__((swift_attr("@Sendable"))) void (^block)(void));
 
 
-MAIN_ACTOR MAIN_ACTOR __attribute__((__swift_attr__("@MainActor(unsafe)"))) @protocol TripleMainActor
+MAIN_ACTOR MAIN_ACTOR __attribute__((__swift_attr__("@MainActor"))) @protocol TripleMainActor
 @end
 
 @protocol ProtocolWithAsync
@@ -184,6 +213,110 @@ MAIN_ACTOR MAIN_ACTOR __attribute__((__swift_attr__("@MainActor(unsafe)"))) @pro
 
 @interface ClassWithAsync: NSObject <ProtocolWithAsync>
 - (void)instanceMethodWithCompletionHandler:(void (^)(void))completionHandler __attribute__((swift_async_name("instanceAsync()")));
+@end
+
+SENDABLE @interface SendableClass : NSObject @end
+
+NONSENDABLE @interface NonSendableClass : NSObject @end
+
+ASSUME_NONSENDABLE_BEGIN
+
+SENDABLE @interface AuditedSendable : NSObject @end
+@interface AuditedNonSendable : NSObject @end
+NONSENDABLE SENDABLE @interface AuditedBoth : NSObject @end
+
+typedef NS_ENUM(unsigned, SendableEnum) {
+  SendableEnumFoo, SendableEnumBar
+};
+typedef NS_ENUM(unsigned, NonSendableEnum) {
+  NonSendableEnumFoo, NonSendableEnumBar
+} NONSENDABLE;
+
+typedef NS_OPTIONS(unsigned, SendableOptions) {
+  SendableOptionsFoo = 1 << 0, SendableOptionsBar = 1 << 1
+};
+typedef NS_OPTIONS(unsigned, NonSendableOptions) {
+  NonSendableOptionsFoo = 1 << 0, NonSendableOptionsBar = 1 << 1
+} NONSENDABLE;
+
+NSString *SendableErrorDomain, *NonSendableErrorDomain;
+typedef NS_ERROR_ENUM(unsigned, SendableErrorCode, SendableErrorDomain) {
+  SendableErrorCodeFoo, SendableErrorCodeBar
+};
+typedef NS_ERROR_ENUM(unsigned, NonSendableErrorCode, NonSendableErrorDomain) {
+  NonSendableErrorCodeFoo, NonSendableErrorCodeBar
+} NONSENDABLE;
+// expected-warning@-3 {{cannot make error code type 'NonSendableErrorCode' non-sendable because Swift errors are always sendable}}
+
+UI_ACTOR
+@interface PictureFrame : NSObject
+- (instancetype)initWithSize:(NSInteger)frame NS_DESIGNATED_INITIALIZER;
+- (void)rotate;
+@end
+
+@interface NotIsolatedPictureFrame : NSObject
+- (instancetype)initWithSize:(NSInteger)frame NS_DESIGNATED_INITIALIZER;
+- (void)rotate;
+@end
+
+typedef NSString *SendableStringEnum NS_STRING_ENUM;
+typedef NSString *NonSendableStringEnum NS_STRING_ENUM NONSENDABLE;
+
+typedef NSString *SendableStringStruct NS_EXTENSIBLE_STRING_ENUM;
+typedef NSString *NonSendableStringStruct NS_EXTENSIBLE_STRING_ENUM NONSENDABLE;
+
+SENDABLE
+typedef struct {
+  void *ptr;
+} SendableStructWithNonSendable;
+
+ASSUME_NONSENDABLE_END
+
+typedef id ObjectTypedef;
+typedef void(^BlockTypedef)(id);
+
+@interface NXSender : NSObject
+
+- (id)sendAny:(SENDABLE id)obj SENDABLE;
+- (nullable id)sendOptionalAny:(nullable SENDABLE id)obj SENDABLE;
+- (SendableClass *)sendSendable:(SENDABLE SendableClass *)sendable SENDABLE;
+- (NonSendableClass *)sendSendableSubclasses:(SENDABLE NonSendableClass *)sendableSubclass SENDABLE;
+- (id <LabellyProtocol>)sendProto:(SENDABLE id <LabellyProtocol>)obj SENDABLE;
+- (id <LabellyProtocol, ObjCClub>)sendProtos:(SENDABLE id <LabellyProtocol, ObjCClub>)obj SENDABLE;
+- (NSArray<id> *)sendAnyArray:(SENDABLE NSArray<id> *)array SENDABLE;
+- (GenericObject<SendableClass *> *)sendGeneric:(SENDABLE GenericObject<SendableClass *> *)generic SENDABLE;
+- (void *)sendPtr:(SENDABLE void *)val SENDABLE;    // bad
+- (NSArray<NSString *> *)sendStringArray:(SENDABLE NSArray<NSString *> *)obj SENDABLE;    // bad
+- (ObjectTypedef)sendAnyTypedef:(SENDABLE ObjectTypedef)obj SENDABLE;
+- (NSArray<ObjectTypedef> *)sendAnyTypedefs:(SENDABLE NSArray<ObjectTypedef> *)objs SENDABLE;
+- (BlockTypedef)sendBlockTypedef:(SENDABLE BlockTypedef)block SENDABLE;
+- (NSArray<BlockTypedef> *)sendBlockTypedefs:(SENDABLE NSArray<BlockTypedef> *)blocks SENDABLE;
+- (NSArray *)sendUnbound:(SENDABLE NSArray *)array SENDABLE;
+
+@property (strong) SENDABLE id sendableProp;
+
+@end
+
+SENDABLE id NXSendFunc(SENDABLE id arg);
+SENDABLE id NXSendGlobal;
+
+struct StructWithSendableContents {
+  __unsafe_unretained SENDABLE id sendableField;
+  union {
+    __unsafe_unretained SENDABLE id sendableIndirectField;
+  };
+};
+
+SENDABLE id StructWithSendableContentsGetSendableComputed(struct StructWithSendableContents contents)
+  __attribute__((swift_name("getter:StructWithSendableContents.sendableComputed(self:)")));
+
+@interface CostcoManager : NSObject
++ (instancetype)sharedManager;
+- (void)isCustomerEnrolledInExecutiveProgram:(NSObject *)customer completion:(void(^)(BOOL enrolled))completion;
+@end
+
+@interface Person : NSObject
++ (void)getAsCustomer:(void(^_Nonnull)(NSObject *device))completion;
 @end
 
 #pragma clang assume_nonnull end

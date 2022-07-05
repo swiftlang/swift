@@ -18,7 +18,9 @@
 #ifndef SWIFT_SIL_DEBUGINFOEXPRESSION_H
 #define SWIFT_SIL_DEBUGINFOEXPRESSION_H
 #include "swift/AST/Decl.h"
+#include "llvm/ADT/APInt.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/raw_ostream.h"
@@ -36,17 +38,30 @@ enum class SILDIExprOperator : unsigned {
   /// VarDecl operand pointing to the field declaration.
   /// Note that this directive can only appear at the end of an
   /// expression.
-  Fragment
+  Fragment,
+  /// Perform arithmetic addition on the top two elements of the
+  /// expression stack and push the result back to the stack.
+  Plus,
+  /// Subtract the top element in expression stack by the second
+  /// element. Then push the result back to the stack.
+  Minus,
+  /// Push an unsigned integer constant onto the stack.
+  ConstUInt,
+  /// Push a signed integer constant onto the stack.
+  ConstSInt
 };
 
 /// Represents a single component in a debug info expression.
 /// Including operator and operand.
 struct SILDIExprElement {
   enum Kind {
-    /// A di-expression operator
+    /// A di-expression operator.
     OperatorKind,
-    /// An operand that has declaration type
-    DeclKind
+    /// An operand that has declaration type.
+    DeclKind,
+    /// An integer constant value. Note that
+    /// we don't specify its signedness here.
+    ConstIntKind
   };
 
 private:
@@ -55,6 +70,7 @@ private:
   union {
     SILDIExprOperator Operator;
     Decl *Declaration;
+    uint64_t ConstantInt;
   };
 
   explicit SILDIExprElement(Kind OpK) : OpKind(OpK) {}
@@ -68,6 +84,13 @@ public:
 
   Decl *getAsDecl() const { return OpKind == DeclKind ? Declaration : nullptr; }
 
+  Optional<uint64_t> getAsConstInt() const {
+    if (OpKind == ConstIntKind)
+      return ConstantInt;
+    else
+      return {};
+  }
+
   static SILDIExprElement createOperator(SILDIExprOperator Op) {
     SILDIExprElement DIOp(OperatorKind);
     DIOp.Operator = Op;
@@ -79,7 +102,19 @@ public:
     DIOp.Declaration = D;
     return DIOp;
   }
+
+  static SILDIExprElement createConstInt(uint64_t V) {
+    SILDIExprElement DIOp(ConstIntKind);
+    DIOp.ConstantInt = V;
+    return DIOp;
+  }
 };
+
+/// Returns the hashcode for the di expr element.
+inline llvm::hash_code hash_value(const SILDIExprElement &elt) {
+  return llvm::hash_combine(elt.getKind(), elt.getAsDecl(), elt.getAsDecl(),
+                            elt.getAsConstInt());
+}
 
 /// For a given SILDIExprOperator, provides information
 /// like its textual name and operand types.
@@ -231,6 +266,25 @@ public:
 
   /// Create a op_fragment expression
   static SILDebugInfoExpression createFragment(VarDecl *Field);
+
+  /// Return true if this DIExpression starts with op_deref
+  bool startsWithDeref() const {
+    return Elements.size() &&
+           Elements[0].getAsOperator() == SILDIExprOperator::Dereference;
+  }
+
+  /// Return true if this DIExpression has op_fragment (at the end)
+  bool hasFragment() const {
+    return Elements.size() >= 2 &&
+           Elements[Elements.size() - 2].getAsOperator() ==
+            SILDIExprOperator::Fragment;
+  }
 };
+
+/// Returns the hashcode for the di expr element.
+inline llvm::hash_code hash_value(const SILDebugInfoExpression &elt) {
+  return llvm::hash_combine_range(elt.element_begin(), elt.element_end());
+}
+
 } // end namespace swift
 #endif

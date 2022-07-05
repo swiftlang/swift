@@ -74,12 +74,13 @@ bb0(%0 : $Int64, %1 : $Int64):
   return %0 : $Int64, loc "sroa.swift":11:5, scope 2
 } // end sil function 'foo'
 
-// CHECK-IR: ![[STRUCT_MD]] = !DILocalVariable(name: "my_struct"
-// CHECK-IR-SAME:                              line: 8
 // CHECK-IR: ![[ARG1_MD]] = !DILocalVariable(name: "in_x", arg: 1
 // CHECK-IR-SAME:                            line: 7
 // CHECK-IR: ![[ARG2_MD]] = !DILocalVariable(name: "in_y", arg: 2
 // CHECK-IR-SAME:                            line: 7
+
+// CHECK-IR: ![[STRUCT_MD]] = !DILocalVariable(name: "my_struct"
+// CHECK-IR-SAME:                              line: 8
 
 // CHECK-DWARF-LABEL:   DW_AT_name    ("foo")
 // CHECK-DWARF:       DW_TAG_variable

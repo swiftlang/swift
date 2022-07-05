@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 
 # Note that this test should still "pass" when no swiftinterfaces have been
 # generated.
@@ -17,8 +17,6 @@
 # Expected failures by platform
 # -----------------------------
 # (none)
-
-from __future__ import print_function
 
 import os
 import subprocess
@@ -48,13 +46,18 @@ for filename in os.listdir(sdk_overlay_dir):
         "DifferentiationUnittest",
         "Swift",
         "SwiftLang",
+        "std",  # swiftstd uses `-module-interface-preserve-types-as-written`
     ]:
         continue
 
     # swift -build-module-from-parseable-interface
     output_path = os.path.join(output_dir, module_name + ".swiftmodule")
+    compiler_args = ["-o", output_path, "-module-name", module_name,
+                     interface_file]
+    if module_name == "std":
+        compiler_args += ["-enable-experimental-cxx-interop"]
+
     status = subprocess.call(compiler_invocation +
-                             ["-o", output_path, "-module-name", module_name,
-                              interface_file])
+                             compiler_args)
     if status != 0:
         print("# " + target_os + ": " + module_name)

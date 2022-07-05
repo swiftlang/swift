@@ -5,7 +5,7 @@
 
 // REQUIRES: concurrency
 // REQUIRES: executable_test
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
 public dynamic func number() async -> Int {

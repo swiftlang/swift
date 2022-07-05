@@ -1017,7 +1017,7 @@ class SomeClass {}
 // need a test for this.
 //
 // Check that this doesn't trigger the DiagnoseStaticExclusivity
-// assert that all accesses have a valid AccessedStorage source.
+// assert that all accesses have a valid AccessStorage source.
 sil [ossa] @lldb_unsupported_markuninitialized_testcase : $@convention(thin) (UnsafeMutablePointer<Any>) -> () {
 bb0(%0 : $UnsafeMutablePointer<Any>):
   %2 = struct_extract %0 : $UnsafeMutablePointer<Any>, #UnsafeMutablePointer._rawValue
@@ -1083,7 +1083,7 @@ bb0(%0 : $Optional<UnsafePointer<Int32>>, %1 : $*Int32):
   return %v : $()
 }
 
-sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @mutatingNoescapeThunk : $@convention(thin) (UnsafePointer<Int32>, @guaranteed @callee_guaranteed (Optional<UnsafePointer<Int32>>) -> ()) -> () {
+sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @mutatingNoescapeThunk : $@convention(thin) (UnsafePointer<Int32>, @guaranteed @callee_guaranteed (Optional<UnsafePointer<Int32>>) -> ()) -> () {
 bb0(%0 : $UnsafePointer<Int32>, %1 : @guaranteed $@callee_guaranteed (Optional<UnsafePointer<Int32>>) -> ()):
   %e = enum $Optional<UnsafePointer<Int32>>, #Optional.some!enumelt, %0 : $UnsafePointer<Int32>
   %c = apply %1(%e) : $@callee_guaranteed (Optional<UnsafePointer<Int32>>) -> ()
@@ -1231,7 +1231,7 @@ bb0(%0 : $Int, %1 : $*Int):
   return %v : $()
 }
 
-sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @partialApplyPhiThunk : $@convention(thin) (@in_guaranteed Int, @guaranteed @noescape @callee_guaranteed (Int) -> (@error Error)) -> (@error Error) {
+sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @partialApplyPhiThunk : $@convention(thin) (@in_guaranteed Int, @guaranteed @noescape @callee_guaranteed (Int) -> (@error Error)) -> (@error Error) {
 bb0(%0 : $*Int, %1 : $@noescape @callee_guaranteed (Int) -> (@error Error)):
   %val = load [trivial] %0 : $*Int
   try_apply %1(%val) : $@noescape @callee_guaranteed (Int) -> (@error Error), normal bb1, error bb2
@@ -1346,8 +1346,8 @@ bb0(%0 : $*Int):
   return %14 : $()
 }
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [without_actually_escaping] [ossa] @thunkForWithoutActuallyEscapingVerify : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> () {
-sil shared [transparent] [serializable] [reabstraction_thunk] [without_actually_escaping] [ossa] @thunkForWithoutActuallyEscapingVerify : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> () {
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [without_actually_escaping] [ossa] @thunkForWithoutActuallyEscapingVerify : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> () {
+sil shared [transparent] [serialized] [reabstraction_thunk] [without_actually_escaping] [ossa] @thunkForWithoutActuallyEscapingVerify : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> () {
 bb0(%0 : @guaranteed $@callee_guaranteed () -> ()):
   %1 = apply %0() : $@callee_guaranteed () -> ()
   return %1 : $()
@@ -1400,7 +1400,7 @@ bb0(%0 : $Int):
 sil [ossa] @testWithoutActuallyEscapingBlockVerifyClosure : $@convention(thin) (@inout_aliasable Int) -> ()
 
 // thunk for @escaping @callee_guaranteed () -> ()
-sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sIeg_IeyB_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> () {
+sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sIeg_IeyB_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> () {
 // %0
 bb0(%0 : $*@block_storage @callee_guaranteed () -> ()):
   %1 = project_block_storage %0 : $*@block_storage @callee_guaranteed () -> ()
@@ -1527,7 +1527,7 @@ bb0(%0 : $Int, %1 : $*Int, %2 : $*Dictionary<Int, Int>):
 }
 
 // thunk for @callee_guaranteed () -> (@unowned Int)
-sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sSiIgd_SiIegr_TR : $@convention(thin) (@noescape @callee_guaranteed () -> Int) -> @out Int {
+sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sSiIgd_SiIegr_TR : $@convention(thin) (@noescape @callee_guaranteed () -> Int) -> @out Int {
 bb0(%0 : $*Int, %1 : $@noescape @callee_guaranteed () -> Int):
   %2 = apply %1() : $@noescape @callee_guaranteed () -> Int
   store %2 to [trivial] %0 : $*Int

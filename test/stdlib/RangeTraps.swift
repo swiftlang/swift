@@ -18,6 +18,7 @@
 // RUN: %target-run %t/a.out_Debug
 // RUN: %target-run %t/a.out_Release
 // REQUIRES: executable_test
+// UNSUPPORTED: OS=wasi
 
 
 import StdlibUnittest
@@ -116,11 +117,19 @@ RangeTraps.test("throughNaN")
   _ = ...Double.nan
 }
 
-if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
+if #available(SwiftStdlib 5.6, *) {
+  RangeTraps.test("UIntOverflow")
+    .code {
+    expectCrashLater()
+    _blackHole((0 ..< UInt.max).count)
+  }
+}
+
+if #available(SwiftStdlib 5.5, *) {
   // Debug check was introduced in https://github.com/apple/swift/pull/34961
   RangeTraps.test("UncheckedHalfOpen")
   .xfail(.custom(
-      { !_isDebugAssertConfiguration() },
+      { !_isStdlibDebugChecksEnabled() },
       reason: "assertions are disabled in Release and Unchecked mode"))
   .code {
     expectCrashLater()
@@ -129,7 +138,7 @@ if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
 
   RangeTraps.test("UncheckedClosed")
   .xfail(.custom(
-      { !_isDebugAssertConfiguration() },
+      { !_isStdlibDebugChecksEnabled() },
       reason: "assertions are disabled in Release and Unchecked mode"))
   .code {
     expectCrashLater()

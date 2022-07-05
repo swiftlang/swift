@@ -250,3 +250,25 @@ func test_passing_noescape_function_ref_to_generic_parameter() {
 func SR14784<T>(_ fs: () -> T..., a _ : Int) -> T {
   fs.first! // expected-error{{function produces expected type 'T'; did you mean to call it with '()'?}} {{11-11=()}}
 }
+
+func tuplify<Ts>(_ fn: (Ts) -> Void) {}
+
+func testInvalidTupleImplosions() {
+  func takesVargs(_ x: Int, _ y: String...) {}
+  tuplify(takesVargs) // expected-error {{cannot convert value of type '(Int, String...) -> ()' to expected argument type '(Int) -> Void'}}
+
+  func takesAutoclosure(_ x: @autoclosure () -> Int, y: String) {}
+  tuplify(takesAutoclosure) // expected-error {{cannot convert value of type '(@autoclosure () -> Int, String) -> ()' to expected argument type '(@escaping () -> Int) -> Void'}}
+
+  func takesInout(_ x: Int, _ y: inout String) {}
+  tuplify(takesInout) // expected-error {{cannot convert value of type '(Int, inout String) -> ()' to expected argument type '(Int) -> Void'}}
+}
+
+// SR-15179 
+func SR15179<Ts>(_ fn: @escaping (Ts) -> Void) {} // expected-note {{in call to function 'SR15179'}}
+func fn1(x: Int..., y: Int...) {}
+SR15179(fn1) // expected-error {{cannot convert value of type '(Int..., Int...) -> ()' to expected argument type '(Ts) -> Void'}}
+// expected-error@-1{{generic parameter 'Ts' could not be inferred}}
+
+func fn(_ x: inout Int, _ y: inout Int) {}
+SR15179(fn) // expected-error {{cannot convert value of type '(inout Int, inout Int) -> ()' to expected argument type '(Int) -> Void'}}

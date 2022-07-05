@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -12,10 +12,11 @@
 
 import TestsUtils
 
-public let RecursiveOwnedParameter = BenchmarkInfo(
-  name: "RecursiveOwnedParameter",
-  runFunction: run_RecursiveOwnedParameter,
-  tags: [.validation, .api, .Array, .refcount])
+public let benchmarks =
+  BenchmarkInfo(
+    name: "RecursiveOwnedParameter",
+    runFunction: run_RecursiveOwnedParameter,
+    tags: [.validation, .api, .Array, .refcount])
 
 // This test recursively visits each element of an array in a class and compares
 // it with every value in a different array stored in a different class. The
@@ -44,18 +45,18 @@ class ArrayWrapper {
 }
 
 @inline(never)
-public func run_RecursiveOwnedParameter(_ N: Int) {
+public func run_RecursiveOwnedParameter(_ n: Int) {
   let numElts = 1_000
 
   let a = ArrayWrapper(numElts, 0)
   let b = ArrayWrapper(numElts, 1)
 
   var result = 0
-  for _ in 0..<100*N {
+  for _ in 0..<100*n {
     if a.compare(b, 0, numElts) {
       result += 1
     }
   }
-  let refResult = 100*N
-  CheckResults(result == refResult)
+  let refResult = 100*n
+  check(result == refResult)
 }

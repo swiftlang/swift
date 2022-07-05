@@ -221,7 +221,9 @@ extension MutableCollection {
   /// After partitioning a collection, there is a pivot index `p` where
   /// no element before `p` satisfies the `belongsInSecondPartition`
   /// predicate and every element at or after `p` satisfies
-  /// `belongsInSecondPartition`.
+  /// `belongsInSecondPartition`. This operation isn't guaranteed to be
+  /// stable, so the relative ordering of elements within the partitions might
+  /// change.
   ///
   /// In the following example, an array of numbers is partitioned by a
   /// predicate that matches elements greater than 30.
@@ -240,6 +242,10 @@ extension MutableCollection {
   ///     // first == [30, 10, 20, 30, 30]
   ///     let second = numbers[p...]
   ///     // second == [60, 40]
+  ///
+  /// Note that the order of elements in both partitions changed.
+  /// That is, `40` appears before `60` in the original collection,
+  /// but, after calling `partition(by:)`, `60` appears before `40`.
   ///
   /// - Parameter belongsInSecondPartition: A predicate used to partition
   ///   the collection. All elements satisfying this predicate are ordered
@@ -285,7 +291,9 @@ extension MutableCollection where Self: BidirectionalCollection {
   /// After partitioning a collection, there is a pivot index `p` where
   /// no element before `p` satisfies the `belongsInSecondPartition`
   /// predicate and every element at or after `p` satisfies
-  /// `belongsInSecondPartition`.
+  /// `belongsInSecondPartition`. This operation isn't guaranteed to be
+  /// stable, so the relative ordering of elements within the partitions might
+  /// change.
   ///
   /// In the following example, an array of numbers is partitioned by a
   /// predicate that matches elements greater than 30.
@@ -304,6 +312,10 @@ extension MutableCollection where Self: BidirectionalCollection {
   ///     // first == [30, 10, 20, 30, 30]
   ///     let second = numbers[p...]
   ///     // second == [60, 40]
+  ///
+  /// Note that the order of elements in both partitions changed.
+  /// That is, `40` appears before `60` in the original collection,
+  /// but, after calling `partition(by:)`, `60` appears before `40`.
   ///
   /// - Parameter belongsInSecondPartition: A predicate used to partition
   ///   the collection. All elements satisfying this predicate are ordered
@@ -541,7 +553,7 @@ extension MutableCollection where Self: RandomAccessCollection {
   /// Use the `shuffle()` method to randomly reorder the elements of an array.
   ///
   ///     var names = ["Alejandro", "Camila", "Diego", "Luciana", "Luis", "Sofía"]
-  ///     names.shuffle(using: myGenerator)
+  ///     names.shuffle()
   ///     // names == ["Luis", "Camila", "Luciana", "Sofía", "Alejandro", "Diego"]
   ///
   /// This method is equivalent to calling `shuffle(using:)`, passing in the

@@ -45,7 +45,7 @@ extension A {
 // CHECK: @"$s7globals2g3Sbvp" = hidden global [[BOOL]] zeroinitializer, align 1
 // CHECK: @"$s7globals2g6Sdvp" = hidden global [[DOUBLE]] zeroinitializer, align 8
 // CHECK: @"$s7globals2g7Sfvp" = hidden global [[FLOAT]] zeroinitializer, align 4
-// CHECK: @"$s7globals1AV3fooSivpZ" = hidden global [[INT]] zeroinitializer, align 8
+// CHECK: @"$s7globals1AV3fooSivpZ" = hidden global [[INT]] <{ i64 5 }>, align 8
 
 // CHECK-NOT: g8
 // CHECK-NOT: g9
@@ -53,5 +53,3 @@ extension A {
 // CHECK: define{{( dllexport)?}}{{( protected)?}} i32 @main(i32 %0, i8** %1) {{.*}} {
 // CHECK:      store  i64 {{.*}}, i64* getelementptr inbounds ([[INT]], [[INT]]* @"$s7globals2g0Sivp", i32 0, i32 0), align 8
 
-// CHECK: define internal void @"{{.*}}WZ"() {{.*}} {
-// CHECK:      store i64 5, i64* getelementptr inbounds (%TSi, %TSi* @"$s7globals1AV3fooSivpZ", i32 0, i32 0), align 8

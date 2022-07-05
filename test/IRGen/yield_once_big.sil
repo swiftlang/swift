@@ -26,7 +26,12 @@ struct Big<T: SomeClass> {
   var h: T
 }
 
+struct BigWrapper<T : SomeClass> {
+  var big: Big<T>
+}
+
 sil @make_big : $<T: SomeClass> () -> (@owned Big<T>)
+sil @use_some_class : $<T : SomeClass> (@guaranteed T) -> ()
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { i8*, %T14yield_once_big3BigV* } @test_simple
 // CHECK-32-SAME:  (i8* noalias dereferenceable([[BUFFER_SIZE:16]]) %0, %swift.type* %C)
@@ -170,4 +175,74 @@ cont:
   // CHECK-NEXT:    ret void
   %ret = tuple ()
   return %ret : $()
+}
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { i8*, %T14yield_once_big3BigV* } @test_simple_guaranteed
+// CHECK-32-SAME:  (i8* noalias dereferenceable([[BUFFER_SIZE:16]]) %0, %T14yield_once_big10BigWrapperV* noalias nocapture dereferenceable(32) %1, %swift.type* %C)
+// CHECK-64-SAME:  (i8* noalias dereferenceable([[BUFFER_SIZE:32]]) %0, %T14yield_once_big10BigWrapperV* noalias nocapture dereferenceable(64) %1, %swift.type* %C)
+sil [ossa] @test_simple_guaranteed : $@yield_once <C: SomeClass> (@in_guaranteed BigWrapper<C>) -> (@yields @guaranteed Big<C>) {
+entry(%arg : $*BigWrapper<C>):
+  //   Allocate space for the return value of make_big.
+  // CHECK:         [[TEMP:%.*]] = alloca [[BIG:%T14yield_once_big3BigV]]
+  // CHECK-32-SAME: , align 4
+  // CHECK-64-SAME: , align 8
+
+  //   Coroutine setup.
+  // CHECK-32-NEXT: [[ID:%.*]] = call token @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:4]], i8* %0, i8* bitcast (void (i8*, i1)* @"$s14yield_once_big10BigWrapperVyxGAA0D0VyxGAA9SomeClassCRbzlIetAnYn_TC" to i8*), i8* bitcast (i8* (i32)* @malloc to i8*), i8* bitcast (void (i8*)* @free to i8*))
+  // CHECK-64-NEXT: [[ID:%.*]] = call token @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:8]], i8* %0, i8* bitcast (void (i8*, i1)* @"$s14yield_once_big10BigWrapperVyxGAA0D0VyxGAA9SomeClassCRbzlIetAnYn_TC" to i8*), i8* bitcast (i8* (i64)* @malloc to i8*), i8* bitcast (void (i8*)* @free to i8*))
+  // CHECK-NEXT:    [[BEGIN:%.*]] = call i8* @llvm.coro.begin(token [[ID]], i8* null)
+  // CHECK-NEXT:    store %swift.type*
+
+  //   Create the return temporary.  We could give this a tighter bound.
+  // CHECK-NEXT:    [[T0:%.*]] = bitcast [[BIG]]* [[TEMP]] to i8*
+  // CHECK-NEXT:    call void @llvm.lifetime.start.p0i8(i64 {{.*}}, i8* [[T0]])
+
+  // CHECK-NEXT:    call swiftcc void @marker(i32 1000)
+  %marker = function_ref @marker : $@convention(thin) (Builtin.Int32) -> ()
+  %1000 = integer_literal $Builtin.Int32, 1000
+  apply %marker(%1000) : $@convention(thin) (Builtin.Int32) -> ()
+
+  %value = load_borrow %arg : $*BigWrapper<C>
+  %field = struct_extract %value : $BigWrapper<C>, #BigWrapper.big
+
+  // Make sure that we properly convert these struct_extract to
+  // struct_element_addr while rewriting.
+  //
+  // CHECK: call swiftcc void @use_some_class(
+  %field2 = struct_extract %value : $BigWrapper<C>, #BigWrapper.big
+  %field3 = struct_extract %field2 : $Big<C>, #Big.a
+  %f = function_ref @use_some_class : $@convention(thin) <T : SomeClass> (@guaranteed T) -> ()
+  apply %f<C>(%field3) : $@convention(thin) <T : SomeClass>(@guaranteed T) -> ()
+
+  //   Suspend.
+  // CHECK-NEXT:    [[IS_UNWIND:%.*]] = call i1 (...) @llvm.coro.suspend.retcon.i1([[BIG]]* [[TEMP]])
+
+  // CHECK-NEXT:    br i1 [[IS_UNWIND]]
+  yield %field : $Big<C>, resume resume, unwind unwind
+
+resume:
+  end_borrow %value : $BigWrapper<C>
+
+  // CHECK:         call swiftcc void @marker(i32 2000)
+  %2000 = integer_literal $Builtin.Int32, 2000
+  apply %marker(%2000) : $@convention(thin) (Builtin.Int32) -> ()
+  // CHECK-NEXT:    [[T0:%.*]] = bitcast [[BIG]]* [[TEMP]] to i8*
+  // CHECK-NEXT:    call void @llvm.lifetime.end.p0i8(i64 {{.*}}, i8* [[T0]])
+  // CHECK-NEXT:    br label %coro.end
+  %ret = tuple ()
+  return %ret : $()
+
+unwind:
+  end_borrow %value : $BigWrapper<C>
+  // CHECK:         call swiftcc void @marker(i32 3000)
+  %3000 = integer_literal $Builtin.Int32, 3000
+  apply %marker(%3000) : $@convention(thin) (Builtin.Int32) -> ()
+  // CHECK-NEXT:    [[T0:%.*]] = bitcast [[BIG]]* [[TEMP]] to i8*
+  // CHECK-NEXT:    call void @llvm.lifetime.end.p0i8(i64 {{.*}}, i8* [[T0]])
+  // CHECK-NEXT:    br label %coro.end
+  unwind
+
+  // CHECK:       coro.end:
+  // CHECK:         call i1 @llvm.coro.end(i8* [[BEGIN]], i1 false)
+  // CHECK-NEXT:    unreachable
 }

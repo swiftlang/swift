@@ -6,21 +6,26 @@ target_sources(swiftSILOptimizer PRIVATE
   CanonicalizeBorrowScope.cpp
   CastOptimizer.cpp
   CheckedCastBrJumpThreading.cpp
+  CompileTimeInterpolationUtils.cpp
   ConstantFolding.cpp
   ConstExpr.cpp
   Devirtualize.cpp
   DifferentiationMangler.cpp
+  DistributedActor.cpp
   Existential.cpp
   GenericCloner.cpp
   Generics.cpp
+  InstructionDeleter.cpp
   InstOptUtils.cpp
   KeyPathProjector.cpp
+  LexicalDestroyFolding.cpp
+  LexicalDestroyHoisting.cpp
   LoadStoreOptUtils.cpp
   LoopUtils.cpp
   OptimizerStatsUtils.cpp
   PartialApplyCombiner.cpp
   PerformanceInlinerUtils.cpp
-  PrunedLiveness.cpp
+  ShrinkBorrowScope.cpp
   SILInliner.cpp
   SILSSAUpdater.cpp
   SpecializationMangler.cpp

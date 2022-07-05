@@ -150,6 +150,9 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Case("collect-var-type", SourceKitRequest::CollectVariableType)
         .Case("global-config", SourceKitRequest::GlobalConfiguration)
         .Case("dependency-updated", SourceKitRequest::DependencyUpdated)
+        .Case("diags", SourceKitRequest::Diagnostics)
+        .Case("compile", SourceKitRequest::Compile)
+        .Case("compile.close", SourceKitRequest::CompileClose)
 #define SEMANTIC_REFACTORING(KIND, NAME, ID) .Case("refactoring." #ID, SourceKitRequest::KIND)
 #include "swift/IDE/RefactoringKinds.def"
         .Default(SourceKitRequest::None);
@@ -272,6 +275,10 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
 
     case OPT_group_name:
       ModuleGroupName = InputArg->getValue();
+      break;
+
+    case OPT_id:
+      RequestId = InputArg->getValue();
       break;
 
     case OPT_interested_usr:
@@ -416,12 +423,29 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       ModuleCachePath = InputArg->getValue();
       break;
 
+    case OPT_simulate_long_request:
+      unsigned SimulatedDuration;
+      if (StringRef(InputArg->getValue()).getAsInteger(10, SimulatedDuration)) {
+        llvm::errs() << "error: expected integer for 'simulate-long-request'\n";
+        return true;
+      }
+      SimulateLongRequest = SimulatedDuration;
+      break;
+
     case OPT_shell:
       ShellExecution = true;
       break;
 
+    case OPT_cancel:
+      CancelRequest = InputArg->getValue();
+      break;
+
     case OPT_disable_implicit_concurrency_module_import:
       DisableImplicitConcurrencyModuleImport = true;
+      break;
+
+    case OPT_disable_implicit_string_processing_module_import:
+      DisableImplicitStringProcessingModuleImport = true;
       break;
 
     case OPT_UNKNOWN:
@@ -450,6 +474,6 @@ void TestOptions::printHelp(bool ShowHidden) const {
 
   TestOptTable Table;
 
-  Table.PrintHelp(llvm::outs(), "sourcekitd-test [options] <inputs>",
+  Table.printHelp(llvm::outs(), "sourcekitd-test [options] <inputs>",
                   "SourceKit Testing Tool", ShowHidden);
 }

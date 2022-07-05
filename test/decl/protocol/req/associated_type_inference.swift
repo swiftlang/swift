@@ -537,14 +537,14 @@ protocol P32 {
   var bar: B { get }
 }
 protocol P33 {
-  associatedtype A
+  associatedtype A // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
 
-  var baz: A { get } // expected-note {{protocol requires property 'baz' with type 'S31<T>.A' (aka 'Never'); do you want to add a stub?}}
+  var baz: A { get }
 }
 protocol P34 {
-  associatedtype A
+  associatedtype A  // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
 
-  func boo() -> A // expected-note {{protocol requires function 'boo()' with type '() -> S31<T>.A' (aka '() -> Never'); do you want to add a stub?}}
+  func boo() -> A
 }
 struct S31<T> {}
 extension S31: P32 where T == Int {} // OK
@@ -556,11 +556,11 @@ extension S31 where T: Equatable {
 }
 extension S31: P33 where T == Never {} // expected-error {{type 'S31<T>' does not conform to protocol 'P33'}}
 extension S31 where T == String {
-  var baz: Bool { true } // expected-note {{candidate has non-matching type 'Bool' [with A = S31<T>.A]}}
+  var baz: Bool { true }
 }
 extension S31: P34 {} // expected-error {{type 'S31<T>' does not conform to protocol 'P34'}}
 extension S31 where T: P32 {
-  func boo() -> Void {} // expected-note {{candidate has non-matching type '<T> () -> Void' [with A = S31<T>.A]}}
+  func boo() -> Void {}
 }
 
 // SR-12707
@@ -658,6 +658,12 @@ struct S39<B>: P39 {}
 
 // Test that we can handle an analogous complex case involving all kinds of
 // type witness resolution.
+//
+// FIXME: Except there's too much circularity here, and this really can't
+// work. The problem is that S40 conforms to P40c, and we can't check the
+// conformance without computing the requirement signature of P40c, but the
+// requirement signature computation depends on the conformance, via the
+// 'D == S40<Never>' requirement.
 protocol P40a {
   associatedtype A
   associatedtype B: P40a
@@ -665,15 +671,38 @@ protocol P40a {
   func foo(arg: A)
 }
 protocol P40b: P40a {
-  associatedtype C = (A, B.A, D.D, E) -> Self
-  associatedtype D: P40b
-  associatedtype E: Equatable
+  associatedtype C = (A, B.A, D.D, E) -> Self // expected-note {{protocol requires nested type 'C'; do you want to add it?}}
+  associatedtype D: P40b // expected-note {{protocol requires nested type 'D'; do you want to add it?}}
+  associatedtype E: Equatable // expected-note {{protocol requires nested type 'E'; do you want to add it?}}
 }
 protocol P40c: P40b where D == S40<Never> {}
 struct S40<E: Equatable>: P40c {
+  // expected-error@-1 {{type 'S40<E>' does not conform to protocol 'P40b'}}
+  // expected-error@-2 {{type 'S40<E>' does not conform to protocol 'P40c'}}
   func foo(arg: Never) {}
 
   typealias B = Self
+}
+
+protocol P41a {
+  associatedtype A
+  associatedtype B
+
+  func bar(_: B) -> A?
+}
+protocol P42b: P41a {
+  associatedtype A
+  associatedtype B
+
+  func foo(_: A, _: B)
+}
+extension P42b {
+  func bar(_: B) -> A? {}
+}
+do {
+  class Conformer: P42b {
+    func foo(_: Bool, _: String) {}
+  }
 }
 
 // Fails to find the fixed type witness B == FIXME_S1<A>.

@@ -1011,6 +1011,17 @@ struct SR_10899_Usage {
   @SR_10899_Wrapper var thing: Bool // expected-error{{property type 'Bool' does not match 'wrappedValue' type 'String'}}
 }
 
+// https://bugs.swift.org/browse/SR-14730
+@propertyWrapper
+struct StringWrappedValue {
+  var wrappedValue: String
+}
+
+struct SR_14730 {
+  // expected-error@+1 {{property type '() -> String' does not match 'wrappedValue' type 'String'}}
+  @StringWrappedValue var value: () -> String
+}
+
 // SR-11061 / rdar://problem/52593304 assertion with DeclContext mismatches
 class SomeValue {
 	@SomeA(closure: { $0 }) var some: Int = 100

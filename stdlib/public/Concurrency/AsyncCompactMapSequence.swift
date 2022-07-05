@@ -12,7 +12,7 @@
 
 import Swift
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncSequence {
   /// Creates an asynchronous sequence that maps the given closure over the
   /// asynchronous sequence’s elements, omitting results that don't return a
@@ -30,24 +30,25 @@ extension AsyncSequence {
   /// returns `nil` in this case, which `compactMap(_:)` omits from the
   /// transformed asynchronous sequence.
   ///
-  ///     let romanNumeralDict: [Int : String] =
+  ///     let romanNumeralDict: [Int: String] =
   ///         [1: "I", 2: "II", 3: "III", 5: "V"]
   ///         
   ///     let stream = Counter(howHigh: 5)
   ///         .compactMap { romanNumeralDict[$0] }
   ///     for await numeral in stream {
-  ///         print("\(numeral) ", terminator: " ")
+  ///         print(numeral, terminator: " ")
   ///     }
-  ///     // Prints: I  II  III  V
+  ///     // Prints "I II III V"
   ///
   /// - Parameter transform: A mapping closure. `transform` accepts an element
   ///   of this sequence as its parameter and returns a transformed value of the
   ///   same or of a different type.
   /// - Returns: An asynchronous sequence that contains, in order, the
   ///   non-`nil` elements produced by the `transform` closure.
+  @preconcurrency
   @inlinable
   public __consuming func compactMap<ElementOfResult>(
-    _ transform: @escaping (Element) async -> ElementOfResult?
+    _ transform: @Sendable @escaping (Element) async -> ElementOfResult?
   ) -> AsyncCompactMapSequence<Self, ElementOfResult> {
     return AsyncCompactMapSequence(self, transform: transform)
   }
@@ -55,8 +56,7 @@ extension AsyncSequence {
 
 /// An asynchronous sequence that maps a given closure over the asynchronous
 /// sequence’s elements, omitting results that don't return a value.
-@available(SwiftStdlib 5.5, *)
-@frozen
+@available(SwiftStdlib 5.1, *)
 public struct AsyncCompactMapSequence<Base: AsyncSequence, ElementOfResult> {
   @usableFromInline
   let base: Base
@@ -64,7 +64,7 @@ public struct AsyncCompactMapSequence<Base: AsyncSequence, ElementOfResult> {
   @usableFromInline
   let transform: (Base.Element) async -> ElementOfResult?
 
-  @inlinable
+  @usableFromInline
   init(
     _ base: Base, 
     transform: @escaping (Base.Element) async -> ElementOfResult?
@@ -74,7 +74,7 @@ public struct AsyncCompactMapSequence<Base: AsyncSequence, ElementOfResult> {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncCompactMapSequence: AsyncSequence {
   /// The type of element produced by this asynchronous sequence.
   ///
@@ -85,7 +85,6 @@ extension AsyncCompactMapSequence: AsyncSequence {
   public typealias AsyncIterator = Iterator
 
   /// The iterator that produces elements of the compact map sequence.
-  @frozen
   public struct Iterator: AsyncIteratorProtocol {
     public typealias Element = ElementOfResult
 
@@ -95,7 +94,7 @@ extension AsyncCompactMapSequence: AsyncSequence {
     @usableFromInline
     let transform: (Base.Element) async -> ElementOfResult?
 
-    @inlinable
+    @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator, 
       transform: @escaping (Base.Element) async -> ElementOfResult?
@@ -131,3 +130,15 @@ extension AsyncCompactMapSequence: AsyncSequence {
     return Iterator(base.makeAsyncIterator(), transform: transform)
   }
 }
+
+@available(SwiftStdlib 5.1, *)
+extension AsyncCompactMapSequence: @unchecked Sendable 
+  where Base: Sendable, 
+        Base.Element: Sendable, 
+        ElementOfResult: Sendable { }
+
+@available(SwiftStdlib 5.1, *)
+extension AsyncCompactMapSequence.Iterator: @unchecked Sendable 
+  where Base.AsyncIterator: Sendable, 
+        Base.Element: Sendable, 
+        ElementOfResult: Sendable { }

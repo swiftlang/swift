@@ -199,6 +199,10 @@ UID_KEYS = [
     KEY('EffectiveAccess', 'key.effective_access'),
     KEY('DeclarationLang', 'key.decl_lang'),
     KEY('SecondarySymbols', 'key.secondary_symbols'),
+    # Before executing the actual request wait x ms. The request can be canceled
+    # in this time. For cancellation testing purposes.
+    KEY('SimulateLongRequest', 'key.simulate_long_request'),
+    KEY('IsSynthesized', 'key.is_synthesized'),
 ]
 
 
@@ -259,6 +263,9 @@ UID_REQUESTS = [
     REQUEST('CollectVariableType', 'source.request.variable.type'),
     REQUEST('GlobalConfiguration', 'source.request.configuration.global'),
     REQUEST('DependencyUpdated', 'source.request.dependency_updated'),
+    REQUEST('Diagnostics', 'source.request.diagnostics'),
+    REQUEST('Compile', 'source.request.compile'),
+    REQUEST('CompileClose', 'source.request.compile.close'),
 ]
 
 
@@ -339,6 +346,8 @@ UID_KINDS = [
     KIND('DeclModule', 'source.lang.swift.decl.module'),
     KIND('DeclClass', 'source.lang.swift.decl.class'),
     KIND('RefClass', 'source.lang.swift.ref.class'),
+    KIND('DeclActor', 'source.lang.swift.decl.actor'),
+    KIND('RefActor', 'source.lang.swift.ref.actor'),
     KIND('DeclStruct', 'source.lang.swift.decl.struct'),
     KIND('RefStruct', 'source.lang.swift.ref.struct'),
     KIND('DeclEnum', 'source.lang.swift.decl.enum'),
@@ -362,6 +371,7 @@ UID_KINDS = [
     KIND('DeclGenericTypeParam', 'source.lang.swift.decl.generic_type_param'),
     KIND('RefGenericTypeParam', 'source.lang.swift.ref.generic_type_param'),
     KIND('RefModule', 'source.lang.swift.ref.module'),
+    KIND('CommentTag', 'source.lang.swift.commenttag'),
     KIND('StmtForEach', 'source.lang.swift.stmt.foreach'),
     KIND('StmtFor', 'source.lang.swift.stmt.for'),
     KIND('StmtWhile', 'source.lang.swift.stmt.while'),

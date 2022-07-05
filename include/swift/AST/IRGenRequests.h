@@ -35,13 +35,13 @@ class TBDGenDescriptor;
 
 namespace irgen {
   class IRGenModule;
-};
+}
 
 namespace Lowering {
   class TypeConverter;
-};
+}
 
-}; // namespace swift
+} // namespace swift
 
 namespace llvm {
 class GlobalVariable;
@@ -51,9 +51,9 @@ class TargetMachine;
 
 namespace orc {
 class ThreadSafeModule;
-}; // namespace orc
+} // namespace orc
 
-}; // namespace llvm
+} // namespace llvm
 
 namespace swift {
 

@@ -203,6 +203,34 @@ enum class ForeignRepresentableKind : uint8_t {
   StaticBridged,
 };
 
+/// An enum wrapper used to describe the variance position of a type within
+/// another type. For example, a function type is covariant in its result type;
+/// therefore, the result type is in covariant position relative to the function
+/// type.
+struct TypePosition final {
+  enum : uint8_t { Covariant, Contravariant, Invariant };
+
+private:
+  decltype(Covariant) kind;
+
+public:
+  TypePosition(decltype(kind) kind) : kind(kind) {}
+
+  TypePosition flipped() const {
+    switch (kind) {
+    case Invariant:
+      return *this;
+    case Covariant:
+      return Contravariant;
+    case Contravariant:
+      return Covariant;
+    }
+    llvm_unreachable("Unhandled type position!");
+  }
+
+  operator decltype(kind)() const { return kind; }
+};
+
 /// Type - This is a simple value object that contains a pointer to a type
 /// class.  This is potentially sugared.  We use this throughout the codebase
 /// instead of a raw "TypeBase*" to disable equality comparison, which is unsafe
@@ -241,46 +269,46 @@ public:
   /// its children.
   bool findIf(llvm::function_ref<bool(Type)> pred) const;
 
-  /// Transform the given type by applying the user-provided function to
-  /// each type.
+  /// Transform the given type by recursively applying the user-provided
+  /// function to each node.
   ///
-  /// This routine applies the given function to transform one type into
-  /// another. If the function leaves the type unchanged, recurse into the
-  /// child type nodes and transform those. If any child type node changes,
-  /// the parent type node will be rebuilt.
-  ///
-  /// If at any time the function returns a null type, the null will be
-  /// propagated out.
-  ///
-  /// \param fn A function object with the signature \c Type(Type), which
-  /// accepts a type and returns either a transformed type or a null type.
+  /// \param fn A function object with the signature \c Type(Type) , which
+  /// accepts a type and returns either a transformed type or a null type
+  /// (which will propagate out the null type).
   ///
   /// \returns the result of transforming the type.
   Type transform(llvm::function_ref<Type(Type)> fn) const;
 
-  /// Transform the given type by applying the user-provided function to
-  /// each type.
-  ///
-  /// This routine applies the given function to transform one type into
-  /// another. If the function leaves the type unchanged, recurse into the
-  /// child type nodes and transform those. If any child type node changes,
-  /// the parent type node will be rebuilt.
-  ///
-  /// If at any time the function returns a null type, the null will be
-  /// propagated out.
+  /// Transform the given type by recursively applying the user-provided
+  /// function to each node.
   ///
   /// If the function returns \c None, the transform operation will
   ///
-  /// \param fn A function object with the signature
-  /// \c Optional<Type>(TypeBase *), which accepts a type pointer and returns a
-  /// transformed type, a null type (which will propagate the null type to the
-  /// outermost \c transform() call), or None (to indicate that the transform
-  /// operation should recursively transform the subtypes). The function object
-  /// should use \c dyn_cast rather \c getAs, because the transform itself
-  /// handles desugaring.
+  /// \param fn A function object which accepts a type pointer and returns a
+  /// transformed type, a null type (which will propagate out the null type),
+  /// or None (to indicate that the transform operation should recursively
+  /// transform the children). The function object should use \c dyn_cast rather
+  /// than \c getAs when the transform is intended to preserve sugar
   ///
   /// \returns the result of transforming the type.
   Type transformRec(llvm::function_ref<Optional<Type>(TypeBase *)> fn) const;
+
+  /// Transform the given type by recursively applying the user-provided
+  /// function to each node.
+  ///
+  /// \param pos The variance position of the receiver.
+  ///
+  /// \param fn A function object which accepts a type pointer along with its
+  /// variance position and returns either a transformed type, a null type
+  /// (which will propagate out the null type), or \c None (to indicate that the
+  /// transform operation should recursively transform the children).
+  /// The function object should use \c dyn_cast rather than \c getAs when the
+  /// transform is intended to preserve sugar.
+  ///
+  /// \returns the result of transforming the type.
+  Type transformWithPosition(
+      TypePosition pos,
+      llvm::function_ref<Optional<Type>(TypeBase *, TypePosition)> fn) const;
 
   /// Look through the given type and its children and apply fn to them.
   void visit(llvm::function_ref<void (Type)> fn) const {
@@ -317,9 +345,6 @@ public:
              LookupConformanceFn conformances,
              SubstOptions options=None) const;
 
-  /// Replace references to substitutable types with error types.
-  Type substDependentTypesWithErrorTypes() const;
-  
   bool isPrivateStdlibType(bool treatNonBuiltinProtocolsAsPublic = true) const;
 
   SWIFT_DEBUG_DUMP;
@@ -388,11 +413,13 @@ class CanType : public Type {
 
   static bool isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
                                   bool functionsCount);
+  static bool isConstraintTypeImpl(CanType type);
   static bool isExistentialTypeImpl(CanType type);
   static bool isAnyExistentialTypeImpl(CanType type);
   static bool isObjCExistentialTypeImpl(CanType type);
   static bool isTypeErasedGenericClassTypeImpl(CanType type);
   static CanType getOptionalObjectTypeImpl(CanType type);
+  static CanType wrapInOptionalTypeImpl(CanType type);
   static CanType getReferenceStorageReferentImpl(CanType type);
   static CanType getWithoutSpecifierTypeImpl(CanType type);
 
@@ -460,6 +487,10 @@ public:
                                /*functions count*/ false);
   }
 
+  bool isConstraintType() const {
+    return isConstraintTypeImpl(*this);
+  }
+
   /// Is this type existential?
   bool isExistentialType() const {
     return isExistentialTypeImpl(*this);
@@ -491,6 +522,15 @@ public:
   NominalTypeDecl *getAnyNominal() const;
   GenericTypeDecl *getAnyGeneric() const;
 
+  bool isForeignReferenceType(); // in Types.h
+
+  /// Return this type wrapped into an Optional type. E.x.: 'T' ->
+  /// 'Optional<T>'.
+  CanType wrapInOptionalType() const {
+    return wrapInOptionalTypeImpl(*this);
+  }
+
+  /// If this is a type Optional<T>, return T. Otherwise return CanType().
   CanType getOptionalObjectType() const {
     return getOptionalObjectTypeImpl(*this);
   }

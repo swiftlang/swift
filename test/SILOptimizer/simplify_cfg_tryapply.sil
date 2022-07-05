@@ -351,7 +351,7 @@ bb3(%res : $Builtin.Int32):
 // CHECK:   [[SOME:%.*]] = enum $Optional<B>, #Optional.some!enumelt, [[ACAST]] : $B
 // CHECK:   [[BORROWSOME:%.*]] = begin_borrow [[SOME]] : $Optional<B>
 // CHECK:   br bb3([[BORROWSOME]] : $Optional<B>)
-// CHECK: bb2(%{{.*}} : $Optional<AAA>):
+// CHECK: bb2:
 // CHECK:   [[NONE:%.*]] = enum $Optional<B>, #Optional.none!enumelt
 // CHECK:   [[BORROWNONE:%.*]] = begin_borrow [[NONE]] : $Optional<B>
 // CHECK:   br bb3([[BORROWNONE]] : $Optional<B>)
@@ -390,7 +390,7 @@ bb2(%8 : @owned $Error):
 // CHECK:  [[ACAST:%.*]] = unchecked_ref_cast [[UNWRAP]] : $AAA to $B
 // CHECK:  [[SOME:%.*]] = enum $Optional<B>, #Optional.some!enumelt, [[ACAST]] : $B
 // CHECK:  br bb3([[SOME]] : $Optional<B>)
-// CHECK: bb2(%{{.*}} : $Optional<AAA>):
+// CHECK: bb2:
 // CHECK:  [[NONE:%.*]] = enum $Optional<B>, #Optional.none!enumelt
 // CHECK:  br bb3([[NONE]] : $Optional<B>)
 // CHECK: bb3([[REWRAP:%.*]] : @owned $Optional<B>):

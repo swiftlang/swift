@@ -27,10 +27,12 @@ func add(_ a: UInt, _ b: UInt) async -> UInt {
     // The actual number of chunks we'll get depends on internal implementation
     // details that we don't want this test to depend on. We'll just make sure
     // we get at least two, and ignore the details.
-    // CHECK:   Allocation block {{0x[0-9a-fA-F]*}}
-    // CHECK:     Chunk at {{0x[0-9a-fA-F]*}} length {{[0-9]*}} kind {{[0-9]*}}
-    // CHECK:   Allocation block {{0x[0-9a-fA-F]*}}
-    // CHECK:     Chunk at {{0x[0-9a-fA-F]*}} length {{[0-9]*}} kind {{[0-9]*}}
+    // CHECK:   Slab pointer {{0x[0-9a-fA-F]*}}
+    // CHECK:     Slab size {{[0-9]{2,}()}}
+    // CHECK:     Chunk at {{0x[0-9a-fA-F]*}} length {{[1-9][0-9]*}} kind {{[0-9]*}}
+    // CHECK:   Slab pointer {{0x[0-9a-fA-F]*}}
+    // CHECK:     Slab size {{[0-9]{2,}()}}
+    // CHECK:     Chunk at {{0x[0-9a-fA-F]*}} length {{[1-9[[0-9]*}} kind {{[0-9]*}}
     return a
   } else {
     return await add(a, b - 1) + 1

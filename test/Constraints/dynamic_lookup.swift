@@ -207,12 +207,17 @@ class Z4<T> where T : AnyObject { }
 
 // Don't allow one to call instance methods on the Type via
 // dynamic method lookup.
-type(of: obj).foo!(obj)(5) // expected-error{{instance member 'foo' cannot be used on type 'Id' (aka 'AnyObject')}}
+type(of: obj).foo!(obj)(5)
+// expected-error@-1 {{instance member 'foo' cannot be used on type 'Id' (aka 'AnyObject')}}
+// expected-error@-2 {{cannot force unwrap value of non-optional type '(Id) -> ((Int) -> ())?' (aka '(AnyObject) -> Optional<(Int) -> ()>')}}
+// expected-error@-3 {{value of optional type '((Int) -> ())?' must be unwrapped to a value of type '(Int) -> ()'}}
+// expected-note@-4 {{coalesce using '??'}}
+// expected-note@-5 {{force-unwrap using '!'}}
 
 // Checked casts to AnyObject
 var p: P = Y()
 var obj3 : AnyObject = (p as! AnyObject)! // expected-error{{cannot force unwrap value of non-optional type 'AnyObject'}} {{41-42=}}
-// expected-warning@-1{{forced cast from 'P' to 'AnyObject' always succeeds; did you mean to use 'as'?}} {{27-30=as}}
+// expected-warning@-1{{forced cast from 'any P' to 'AnyObject' always succeeds; did you mean to use 'as'?}} {{27-30=as}}
 
 // Implicit force of an implicitly unwrapped optional
 let uopt : AnyObject! = nil
@@ -311,6 +316,9 @@ let _: DynamicIUO = o[dyn_iuo]!
 let _: DynamicIUO = o[dyn_iuo]!!
 let _: DynamicIUO? = o[dyn_iuo]
 // FIXME: These should all produce lvalues that we can write through
+o.t = s // expected-error {{cannot assign to property: 'o' is immutable}}
+o.t! = s // expected-error {{cannot assign through '!': 'o' is immutable}}
+o.t!! = s // expected-error {{cannot assign through '!': 'o' is immutable}}
 o[dyn_iuo] = dyn_iuo // expected-error {{cannot assign through subscript: 'o' is immutable}}
 o[dyn_iuo]! = dyn_iuo // expected-error {{cannot assign through '!': 'o' is immutable}}
 o[dyn_iuo]!! = dyn_iuo // expected-error {{cannot assign through '!': 'o' is immutable}}
@@ -449,4 +457,11 @@ func test_dynamic_subscript_accepts_type_name_argument() {
     // expected-note@-1 {{add arguments after the type to construct a value of the type}} {{20-20=()}}
     // expected-note@-2 {{use '.self' to reference the type object}} {{20-20=.self}}
   }
+}
+
+func testAnyObjectConstruction(_ x: AnyObject) {
+  AnyObject() // expected-error {{type 'AnyObject' cannot be instantiated}}
+
+  // FIXME(SR-15210): This should also be rejected.
+  _ = type(of: x).init()
 }

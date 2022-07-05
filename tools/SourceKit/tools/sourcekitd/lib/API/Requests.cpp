@@ -21,6 +21,7 @@
 #include "SourceKit/Core/Context.h"
 #include "SourceKit/Core/LangSupport.h"
 #include "SourceKit/Core/NotificationCenter.h"
+#include "SourceKit/Support/CancellationToken.h"
 #include "SourceKit/Support/Concurrency.h"
 #include "SourceKit/Support/Logging.h"
 #include "SourceKit/Support/Statistic.h"
@@ -29,6 +30,8 @@
 #include "SourceKit/SwiftLang/Factory.h"
 
 #include "swift/Basic/ExponentialGrowthAppendingBinaryByteStream.h"
+#include "swift/Basic/LLVMInitialize.h"
+#include "swift/Basic/InitializeSwiftModules.h"
 #include "swift/Basic/Mangler.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/Version.h"
@@ -104,12 +107,15 @@ static void fillDictionaryForDiagnosticInfo(ResponseBuilder::Dictionary Elem,
 static SourceKit::Context *GlobalCtx = nullptr;
 
 void sourcekitd::initializeService(
-    StringRef runtimeLibPath, StringRef diagnosticDocumentationPath,
+    llvm::StringRef swiftExecutablePath, StringRef runtimeLibPath,
+    StringRef diagnosticDocumentationPath,
     std::function<void(sourcekitd_response_t)> postNotification) {
+  INITIALIZE_LLVM();
+  initializeSwiftModules();
   llvm::EnablePrettyStackTrace();
-  GlobalCtx =
-      new SourceKit::Context(runtimeLibPath, diagnosticDocumentationPath,
-                             SourceKit::createSwiftLangSupport);
+  GlobalCtx = new SourceKit::Context(swiftExecutablePath, runtimeLibPath,
+                                     diagnosticDocumentationPath,
+                                     SourceKit::createSwiftLangSupport);
   auto noteCenter = GlobalCtx->getNotificationCenter();
 
   noteCenter->addDocumentUpdateNotificationReceiver([postNotification](StringRef DocumentName) {
@@ -192,6 +198,9 @@ static sourcekitd_response_t reportDocInfo(llvm::MemoryBuffer *InputBuf,
 
 static void reportCursorInfo(const RequestResult<CursorInfoData> &Result, ResponseReceiver Rec);
 
+static void reportDiagnostics(const RequestResult<DiagnosticsResult> &Result,
+                              ResponseReceiver Rec);
+
 static void reportExpressionTypeInfo(const RequestResult<ExpressionTypesInFile> &Result,
                                      ResponseReceiver Rec);
 
@@ -203,42 +212,42 @@ static void reportRangeInfo(const RequestResult<RangeInfo> &Result, ResponseRece
 
 static void reportNameInfo(const RequestResult<NameTranslatingInfo> &Result, ResponseReceiver Rec);
 
-static void findRelatedIdents(StringRef Filename,
-                              int64_t Offset,
+static void findRelatedIdents(StringRef Filename, int64_t Offset,
                               bool CancelOnSubsequentRequest,
                               ArrayRef<const char *> Args,
+                              SourceKitCancellationToken CancellationToken,
                               ResponseReceiver Rec);
 
 static sourcekitd_response_t
 codeComplete(llvm::MemoryBuffer *InputBuf, int64_t Offset,
-             Optional<RequestDict> optionsDict,
-             ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions);
+             Optional<RequestDict> optionsDict, ArrayRef<const char *> Args,
+             Optional<VFSOptions> vfsOptions,
+             SourceKitCancellationToken CancellationToken);
 
-static sourcekitd_response_t codeCompleteOpen(StringRef name,
-                                              llvm::MemoryBuffer *InputBuf,
-                                              int64_t Offset,
-                                              Optional<RequestDict> optionsDict,
-                                              ArrayRef<const char *> Args,
-                                              Optional<VFSOptions> vfsOptions);
+static sourcekitd_response_t
+codeCompleteOpen(StringRef name, llvm::MemoryBuffer *InputBuf, int64_t Offset,
+                 Optional<RequestDict> optionsDict, ArrayRef<const char *> Args,
+                 Optional<VFSOptions> vfsOptions,
+                 SourceKitCancellationToken CancellationToken);
 
 static sourcekitd_response_t
 codeCompleteUpdate(StringRef name, int64_t Offset,
-                   Optional<RequestDict> optionsDict);
+                   Optional<RequestDict> optionsDict,
+                   SourceKitCancellationToken CancellationToken);
 
 static sourcekitd_response_t codeCompleteClose(StringRef name, int64_t Offset);
 
-static sourcekitd_response_t typeContextInfo(llvm::MemoryBuffer *InputBuf,
-                                             int64_t Offset,
-                                             Optional<RequestDict> optionsDict,
-                                             ArrayRef<const char *> Args,
-                                             Optional<VFSOptions> vfsOptions);
-
 static sourcekitd_response_t
-conformingMethodList(llvm::MemoryBuffer *InputBuf, int64_t Offset,
-                     Optional<RequestDict> optionsDict,
-                     ArrayRef<const char *> Args,
-                     ArrayRef<const char *> ExpectedTypes,
-                     Optional<VFSOptions> vfsOptions);
+typeContextInfo(llvm::MemoryBuffer *InputBuf, int64_t Offset,
+                Optional<RequestDict> optionsDict, ArrayRef<const char *> Args,
+                Optional<VFSOptions> vfsOptions,
+                SourceKitCancellationToken CancellationToken);
+
+static sourcekitd_response_t conformingMethodList(
+    llvm::MemoryBuffer *InputBuf, int64_t Offset,
+    Optional<RequestDict> optionsDict, ArrayRef<const char *> Args,
+    ArrayRef<const char *> ExpectedTypes, Optional<VFSOptions> vfsOptions,
+    SourceKitCancellationToken CancellationToken);
 
 static sourcekitd_response_t
 editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
@@ -258,10 +267,9 @@ editorOpenHeaderInterface(StringRef Name, StringRef HeaderName,
                           bool SynthesizedExtensions,
                           StringRef swiftVersion);
 
-static void
-editorOpenSwiftSourceInterface(StringRef Name, StringRef SourceName,
-                               ArrayRef<const char *> Args,
-                               ResponseReceiver Rec);
+static void editorOpenSwiftSourceInterface(
+    StringRef Name, StringRef SourceName, ArrayRef<const char *> Args,
+    SourceKitCancellationToken CancellationToken, ResponseReceiver Rec);
 
 static void
 editorOpenSwiftTypeInterface(StringRef TypeUsr, ArrayRef<const char *> Args,
@@ -376,23 +384,38 @@ public:
 } // anonymous namespace
 
 static void handleRequestImpl(sourcekitd_object_t Req,
+                              SourceKitCancellationToken CancellationToken,
                               ResponseReceiver Receiver);
 
 void sourcekitd::handleRequest(sourcekitd_object_t Req,
+                               SourceKitCancellationToken CancellationToken,
                                ResponseReceiver Receiver) {
   LOG_SECTION("handleRequest-before", InfoHighPrio) {
     sourcekitd::printRequestObject(Req, Log->getOS());
   }
 
-  handleRequestImpl(Req, [Receiver](sourcekitd_response_t Resp) {
-    LOG_SECTION("handleRequest-after", InfoHighPrio) {
-      // Responses are big, print them out with info medium priority.
-      if (Logger::isLoggingEnabledForLevel(Logger::Level::InfoMediumPrio))
-        sourcekitd::printResponse(Resp, Log->getOS());
-    }
+  handleRequestImpl(
+      Req, CancellationToken,
+      [Receiver, CancellationToken](sourcekitd_response_t Resp) {
+        LOG_SECTION("handleRequest-after", InfoHighPrio) {
+          // Responses are big, print them out with info medium priority.
+          if (Logger::isLoggingEnabledForLevel(Logger::Level::InfoMediumPrio))
+            sourcekitd::printResponse(Resp, Log->getOS());
+        }
 
-    Receiver(Resp);
-  });
+        sourcekitd::disposeCancellationToken(CancellationToken);
+
+        Receiver(Resp);
+      });
+}
+
+void sourcekitd::cancelRequest(SourceKitCancellationToken CancellationToken) {
+  getGlobalContext().getRequestTracker()->cancel(CancellationToken);
+}
+
+void sourcekitd::disposeCancellationToken(
+    SourceKitCancellationToken CancellationToken) {
+  getGlobalContext().getRequestTracker()->stopTracking(CancellationToken);
 }
 
 static std::unique_ptr<llvm::MemoryBuffer> getInputBufForRequest(
@@ -447,18 +470,33 @@ static Optional<VFSOptions> getVFSOptions(RequestDict &Req) {
   return VFSOptions{name->str(), std::move(options)};
 }
 
-static void handleSemanticRequest(
-    RequestDict Req, ResponseReceiver Receiver, sourcekitd_uid_t ReqUID,
-    Optional<StringRef> SourceFile, Optional<StringRef> SourceText,
-    ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions);
+static void handleSemanticRequest(RequestDict Req, ResponseReceiver Receiver,
+                                  sourcekitd_uid_t ReqUID,
+                                  Optional<StringRef> SourceFile,
+                                  Optional<StringRef> SourceText,
+                                  ArrayRef<const char *> Args,
+                                  Optional<VFSOptions> vfsOptions,
+                                  SourceKitCancellationToken CancellationToken);
 
-void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
+void handleRequestImpl(sourcekitd_object_t ReqObj,
+                       SourceKitCancellationToken CancellationToken,
+                       ResponseReceiver Rec) {
   // NOTE: if we had a connection context, these stats should move into it.
   static Statistic numRequests(UIdentFromSKDUID(KindStatNumRequests), "# of requests (total)");
   static Statistic numSemaRequests(UIdentFromSKDUID(KindStatNumSemaRequests), "# of semantic requests");
   ++numRequests;
 
   RequestDict Req(ReqObj);
+
+  if (auto SimulateLongRequestDuration =
+          Req.getOptionalInt64(KeySimulateLongRequest)) {
+    if (!getGlobalContext().getSlowRequestSimulator()->simulateLongRequest(
+            *SimulateLongRequestDuration, CancellationToken)) {
+      Rec(createErrorRequestCancelled());
+      return;
+    }
+  }
+
   sourcekitd_uid_t ReqUID = Req.getUID(KeyRequest);
   if (!ReqUID)
     return Rec(createErrorRequestInvalid("missing 'key.request' with UID value"));
@@ -753,7 +791,8 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     Optional<StringRef> FileName = Req.getString(KeySourceFile);
     if (!FileName.hasValue())
       return Rec(createErrorRequestInvalid("missing 'key.sourcefile'"));
-    return editorOpenSwiftSourceInterface(*Name, *FileName, Args, Rec);
+    return editorOpenSwiftSourceInterface(*Name, *FileName, Args,
+                                          CancellationToken, Rec);
   }
 
   if (ReqUID == RequestEditorOpenSwiftTypeInterface) {
@@ -938,6 +977,46 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     return;
   }
 
+  if (ReqUID == RequestCompile) {
+    Optional<StringRef> Name = Req.getString(KeyName);
+    if (!Name.hasValue())
+      return Rec(createErrorRequestInvalid("missing 'key.name'"));
+
+    LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
+    Lang.performCompile(
+        *Name, Args, std::move(vfsOptions), CancellationToken,
+        [Rec](const RequestResult<CompilationResult> &result) {
+          if (result.isCancelled())
+            return Rec(createErrorRequestCancelled());
+          if (result.isError())
+            return Rec(createErrorRequestFailed(result.getError()));
+
+          const CompilationResult &info = result.value();
+
+          ResponseBuilder builder;
+
+          builder.getDictionary().set(KeyValue, info.ResultStatus);
+          auto diagsArray = builder.getDictionary().setArray(KeyDiagnostics);
+          for (auto diagInfo : info.Diagnostics) {
+            auto elem = diagsArray.appendDictionary();
+            fillDictionaryForDiagnosticInfo(elem, diagInfo);
+          }
+          Rec(builder.createResponse());
+        });
+    return;
+  }
+
+  if (ReqUID == RequestCompileClose) {
+    Optional<StringRef> Name = Req.getString(KeyName);
+    if (!Name.hasValue())
+      return Rec(createErrorRequestInvalid("missing 'key.name'"));
+
+    LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
+    Lang.closeCompile(*Name);
+
+    return Rec(ResponseBuilder().createResponse());
+  }
+
   if (!SourceFile.hasValue() && !SourceText.hasValue() &&
       ReqUID != RequestCodeCompleteUpdate)
     return Rec(createErrorRequestInvalid(
@@ -953,11 +1032,11 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
   sourcekitd_request_retain(ReqObj);
   ++numSemaRequests;
   SemaQueue.dispatch(
-      [ReqObj, Rec, ReqUID, SourceFile, SourceText, Args] {
+      [ReqObj, Rec, ReqUID, SourceFile, SourceText, Args, CancellationToken] {
         RequestDict Req(ReqObj);
         auto vfsOptions = getVFSOptions(Req);
         handleSemanticRequest(Req, Rec, ReqUID, SourceFile, SourceText, Args,
-                              std::move(vfsOptions));
+                              std::move(vfsOptions), CancellationToken);
         sourcekitd_request_release(ReqObj);
       },
       /*isStackDeep=*/true);
@@ -966,7 +1045,8 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
 static void handleSemanticRequest(
     RequestDict Req, ResponseReceiver Rec, sourcekitd_uid_t ReqUID,
     Optional<StringRef> SourceFile, Optional<StringRef> SourceText,
-    ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions) {
+    ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions,
+    SourceKitCancellationToken CancellationToken) {
   llvm::SmallString<64> ErrBuf;
 
   if (isSemanticEditorDisabled())
@@ -982,7 +1062,7 @@ static void handleSemanticRequest(
       return Rec(createErrorRequestInvalid("missing 'key.offset'"));
     Optional<RequestDict> options = Req.getDictionary(KeyCodeCompleteOptions);
     return Rec(codeComplete(InputBuf.get(), Offset, options, Args,
-                            std::move(vfsOptions)));
+                            std::move(vfsOptions), CancellationToken));
   }
 
   if (ReqUID == RequestCodeCompleteOpen) {
@@ -998,7 +1078,7 @@ static void handleSemanticRequest(
       return Rec(createErrorRequestInvalid("missing 'key.offset'"));
     Optional<RequestDict> options = Req.getDictionary(KeyCodeCompleteOptions);
     return Rec(codeCompleteOpen(*Name, InputBuf.get(), Offset, options, Args,
-                                std::move(vfsOptions)));
+                                std::move(vfsOptions), CancellationToken));
   }
 
   if (ReqUID == RequestCodeCompleteUpdate) {
@@ -1009,7 +1089,7 @@ static void handleSemanticRequest(
     if (Req.getInt64(KeyOffset, Offset, /*isOptional=*/false))
       return Rec(createErrorRequestInvalid("missing 'key.offset'"));
     Optional<RequestDict> options = Req.getDictionary(KeyCodeCompleteOptions);
-    return Rec(codeCompleteUpdate(*Name, Offset, options));
+    return Rec(codeCompleteUpdate(*Name, Offset, options, CancellationToken));
   }
 
   if (ReqUID == RequestTypeContextInfo) {
@@ -1023,7 +1103,7 @@ static void handleSemanticRequest(
     Optional<RequestDict> options =
         Req.getDictionary(KeyTypeContextInfoOptions);
     return Rec(typeContextInfo(InputBuf.get(), Offset, options, Args,
-                               std::move(vfsOptions)));
+                               std::move(vfsOptions), CancellationToken));
   }
 
   if (ReqUID == RequestConformingMethodList) {
@@ -1039,9 +1119,9 @@ static void handleSemanticRequest(
       return Rec(createErrorRequestInvalid("invalid 'key.expectedtypes'"));
     Optional<RequestDict> options =
         Req.getDictionary(KeyConformingMethodListOptions);
-    return Rec(
-        conformingMethodList(InputBuf.get(), Offset, options, Args,
-                             ExpectedTypeNames, std::move(vfsOptions)));
+    return Rec(conformingMethodList(InputBuf.get(), Offset, options, Args,
+                                    ExpectedTypeNames, std::move(vfsOptions),
+                                    CancellationToken));
   }
 
   if (!SourceFile.hasValue())
@@ -1070,13 +1150,15 @@ static void handleSemanticRequest(
       return Lang.getCursorInfo(
           *SourceFile, Offset, Length, Actionables, SymbolGraph,
           CancelOnSubsequentRequest, Args, std::move(vfsOptions),
+          CancellationToken,
           [Rec](const RequestResult<CursorInfoData> &Result) {
             reportCursorInfo(Result, Rec);
           });
     }
     if (auto USR = Req.getString(KeyUSR)) {
       return Lang.getCursorInfoFromUSR(
-          *SourceFile, *USR, CancelOnSubsequentRequest, Args, std::move(vfsOptions),
+          *SourceFile, *USR, CancelOnSubsequentRequest, Args,
+          std::move(vfsOptions), CancellationToken,
           [Rec](const RequestResult<CursorInfoData> &Result) {
             reportCursorInfo(Result, Rec);
           });
@@ -1096,11 +1178,11 @@ static void handleSemanticRequest(
                  /*isOptional=*/true);
     if (!Req.getInt64(KeyOffset, Offset, /*isOptional=*/false)) {
       if (!Req.getInt64(KeyLength, Length, /*isOptional=*/false)) {
-        return Lang.getRangeInfo(*SourceFile, Offset, Length,
-                                 CancelOnSubsequentRequest, Args,
-          [Rec](const RequestResult<RangeInfo> &Result) {
-            reportRangeInfo(Result, Rec);
-          });
+        return Lang.getRangeInfo(
+            *SourceFile, Offset, Length, CancelOnSubsequentRequest, Args,
+            CancellationToken, [Rec](const RequestResult<RangeInfo> &Result) {
+              reportRangeInfo(Result, Rec);
+            });
       }
     }
 
@@ -1135,10 +1217,11 @@ static void handleSemanticRequest(
         Info.Line = Line;
         Info.Column = Column;
         Info.Length = Length;
-        return Lang.semanticRefactoring(*SourceFile, Info, Args,
-          [Rec](const RequestResult<ArrayRef<CategorizedEdits>> &Result) {
-            Rec(createCategorizedEditsResponse(Result));
-        });
+        return Lang.semanticRefactoring(
+            *SourceFile, Info, Args, CancellationToken,
+            [Rec](const RequestResult<ArrayRef<CategorizedEdits>> &Result) {
+              Rec(createCategorizedEditsResponse(Result));
+            });
       }
     }
     return Rec(createErrorRequestInvalid("'key.line' or 'key.column' are required"));
@@ -1152,11 +1235,11 @@ static void handleSemanticRequest(
       return Rec(createErrorRequestInvalid("invalid 'key.expectedtypes'"));
     int64_t CanonicalTy = false;
     Req.getInt64(KeyCanonicalizeType, CanonicalTy, /*isOptional=*/true);
-    return Lang.collectExpressionTypes(*SourceFile, Args, ExpectedProtocols,
-                                       CanonicalTy,
-      [Rec](const RequestResult<ExpressionTypesInFile> &Result) {
-        reportExpressionTypeInfo(Result, Rec);
-      });
+    return Lang.collectExpressionTypes(
+        *SourceFile, Args, ExpectedProtocols, CanonicalTy, CancellationToken,
+        [Rec](const RequestResult<ExpressionTypesInFile> &Result) {
+          reportExpressionTypeInfo(Result, Rec);
+        });
   }
 
   if (ReqUID == RequestCollectVariableType) {
@@ -1166,7 +1249,7 @@ static void handleSemanticRequest(
     Optional<unsigned> Length = Req.getOptionalInt64(KeyLength).map(
         [](int64_t v) -> unsigned { return v; });
     return Lang.collectVariableTypes(
-        *SourceFile, Args, Offset, Length,
+        *SourceFile, Args, Offset, Length, CancellationToken,
         [Rec](const RequestResult<VariableTypesInFile> &Result) {
           reportVariableTypeInfo(Result, Rec);
         });
@@ -1182,7 +1265,7 @@ static void handleSemanticRequest(
 
     LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
     return Lang.findLocalRenameRanges(
-        *SourceFile, Line, Column, Length, Args,
+        *SourceFile, Line, Column, Length, Args, CancellationToken,
         [Rec](const RequestResult<ArrayRef<CategorizedRenameRanges>> &Result) {
           Rec(createCategorizedRenameRangesResponse(Result));
         });
@@ -1228,10 +1311,11 @@ static void handleSemanticRequest(
                     [](const char *C) { return StringRef(C).trim('`'); });
     llvm::transform(Selectors, std::back_inserter(Input.ArgNames),
                     [](const char *C) { return StringRef(C); });
-    return Lang.getNameInfo(*SourceFile, Offset, Input, Args,
-      [Rec](const RequestResult<NameTranslatingInfo> &Result) {
-        reportNameInfo(Result, Rec);
-      });
+    return Lang.getNameInfo(
+        *SourceFile, Offset, Input, Args, CancellationToken,
+        [Rec](const RequestResult<NameTranslatingInfo> &Result) {
+          reportNameInfo(Result, Rec);
+        });
   }
 
   if (ReqUID == RequestRelatedIdents) {
@@ -1245,7 +1329,17 @@ static void handleSemanticRequest(
                  /*isOptional=*/true);
 
     return findRelatedIdents(*SourceFile, Offset, CancelOnSubsequentRequest,
-                             Args, Rec);
+                             Args, CancellationToken, Rec);
+  }
+
+  if (ReqUID == RequestDiagnostics) {
+    LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
+    Lang.getDiagnostics(*SourceFile, Args, std::move(vfsOptions),
+                        CancellationToken,
+                        [Rec](const RequestResult<DiagnosticsResult> &Result) {
+                          reportDiagnostics(Result, Rec);
+                        });
+    return;
   }
 
   {
@@ -1541,8 +1635,8 @@ static sourcekitd_response_t demangleNames(ArrayRef<const char *> MangledNames,
   return RespBuilder.createResponse();
 }
 
-static std::string mangleSimpleClass(StringRef moduleName,
-                                     StringRef className) {
+static ManglingErrorOr<std::string> mangleSimpleClass(StringRef moduleName,
+                                                      StringRef className) {
   using namespace swift::Demangle;
   Demangler Dem;
   auto moduleNode = Dem.createNode(Node::Kind::Module, moduleName);
@@ -1565,7 +1659,15 @@ mangleSimpleClassNames(ArrayRef<std::pair<StringRef, StringRef>> ModuleClassPair
   ResponseBuilder RespBuilder;
   auto Arr = RespBuilder.getDictionary().setArray(KeyResults);
   for (auto &pair : ModuleClassPairs) {
-    std::string Result = mangleSimpleClass(pair.first, pair.second);
+    auto Mangling = mangleSimpleClass(pair.first, pair.second);
+    if (!Mangling.isSuccess()) {
+      std::string message = "name mangling failed for ";
+      message += pair.first.str();
+      message += ".";
+      message += pair.second.str();
+      return createErrorRequestFailed(message);
+    }
+    std::string Result = Mangling.result();
     auto Entry = Arr.appendDictionary();
     Entry.set(KeyName, Result.c_str());
   }
@@ -1860,6 +1962,8 @@ static void addCursorSymbolInfo(const CursorSymbolInfo &Symbol,
     Elem.setBool(KeyIsSystem, true);
   if (Symbol.IsDynamic)
     Elem.setBool(KeyIsDynamic, true);
+  if (Symbol.IsSynthesized)
+    Elem.setBool(KeyIsSynthesized, true);
 
   if (Symbol.ParentNameOffset)
     Elem.set(KeyParentLoc, Symbol.ParentNameOffset.getValue());
@@ -1909,6 +2013,27 @@ static void reportCursorInfo(const RequestResult<CursorInfoData> &Result,
   }
 
   return Rec(RespBuilder.createResponse());
+}
+
+//===----------------------------------------------------------------------===//
+// ReportDiagnostics
+//===----------------------------------------------------------------------===//
+
+static void reportDiagnostics(const RequestResult<DiagnosticsResult> &Result,
+                              ResponseReceiver Rec) {
+  if (Result.isCancelled())
+    return Rec(createErrorRequestCancelled());
+  if (Result.isError())
+    return Rec(createErrorRequestFailed(Result.getError()));
+
+  auto &DiagResults = Result.value();
+
+  ResponseBuilder RespBuilder;
+  auto Dict = RespBuilder.getDictionary();
+  auto DiagArray = Dict.setArray(KeyDiagnostics);
+  for (const auto &DiagInfo : DiagResults)
+    fillDictionaryForDiagnosticInfo(DiagArray.appendDictionary(), DiagInfo);
+  Rec(RespBuilder.createResponse());
 }
 
 //===----------------------------------------------------------------------===//
@@ -2027,32 +2152,32 @@ reportVariableTypeInfo(const RequestResult<VariableTypesInFile> &Result,
 // FindRelatedIdents
 //===----------------------------------------------------------------------===//
 
-static void findRelatedIdents(StringRef Filename,
-                              int64_t Offset,
+static void findRelatedIdents(StringRef Filename, int64_t Offset,
                               bool CancelOnSubsequentRequest,
                               ArrayRef<const char *> Args,
+                              SourceKitCancellationToken CancellationToken,
                               ResponseReceiver Rec) {
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-  Lang.findRelatedIdentifiersInFile(Filename, Offset, CancelOnSubsequentRequest,
-                                    Args,
-                                    [Rec](const RequestResult<RelatedIdentsInfo> &Result) {
-  if (Result.isCancelled())
-    return Rec(createErrorRequestCancelled());
-  if (Result.isError())
-    return Rec(createErrorRequestFailed(Result.getError()));
+  Lang.findRelatedIdentifiersInFile(
+      Filename, Offset, CancelOnSubsequentRequest, Args, CancellationToken,
+      [Rec](const RequestResult<RelatedIdentsInfo> &Result) {
+        if (Result.isCancelled())
+          return Rec(createErrorRequestCancelled());
+        if (Result.isError())
+          return Rec(createErrorRequestFailed(Result.getError()));
 
-  const RelatedIdentsInfo &Info = Result.value();
+        const RelatedIdentsInfo &Info = Result.value();
 
-    ResponseBuilder RespBuilder;
-    auto Arr = RespBuilder.getDictionary().setArray(KeyResults);
-    for (auto R : Info.Ranges) {
-      auto Elem = Arr.appendDictionary();
-      Elem.set(KeyOffset, R.first);
-      Elem.set(KeyLength, R.second);
-    }
+        ResponseBuilder RespBuilder;
+        auto Arr = RespBuilder.getDictionary().setArray(KeyResults);
+        for (auto R : Info.Ranges) {
+          auto Elem = Arr.appendDictionary();
+          Elem.set(KeyOffset, R.first);
+          Elem.set(KeyLength, R.second);
+        }
 
-    Rec(RespBuilder.createResponse());
-  });
+        Rec(RespBuilder.createResponse());
+      });
 }
 
 //===----------------------------------------------------------------------===//
@@ -2065,6 +2190,7 @@ class SKCodeCompletionConsumer : public CodeCompletionConsumer {
   CodeCompletionResultsArrayBuilder ResultsBuilder;
 
   std::string ErrorDescription;
+  bool WasCancelled = false;
 
 public:
   explicit SKCodeCompletionConsumer(ResponseBuilder &RespBuilder)
@@ -2072,16 +2198,20 @@ public:
   }
 
   sourcekitd_response_t createResponse() {
-    if (!ErrorDescription.empty())
+    if (WasCancelled) {
+      return createErrorRequestCancelled();
+    } else if (!ErrorDescription.empty()) {
       return createErrorRequestFailed(ErrorDescription.c_str());
-
-    RespBuilder.getDictionary().setCustomBuffer(KeyResults,
-                                                ResultsBuilder.createBuffer());
-    return RespBuilder.createResponse();
+    } else {
+      RespBuilder.getDictionary().setCustomBuffer(
+          KeyResults, ResultsBuilder.createBuffer());
+      return RespBuilder.createResponse();
+    }
   }
 
 
   void failed(StringRef ErrDescription) override;
+  void cancelled() override;
 
   void setCompletionKind(UIdent kind) override;
   void setReusingASTContext(bool flag) override;
@@ -2092,9 +2222,9 @@ public:
 
 static sourcekitd_response_t
 codeComplete(llvm::MemoryBuffer *InputBuf, int64_t Offset,
-             Optional<RequestDict> optionsDict,
-             ArrayRef<const char *> Args,
-             Optional<VFSOptions> vfsOptions) {
+             Optional<RequestDict> optionsDict, ArrayRef<const char *> Args,
+             Optional<VFSOptions> vfsOptions,
+             SourceKitCancellationToken CancellationToken) {
   ResponseBuilder RespBuilder;
   SKCodeCompletionConsumer CCC(RespBuilder);
 
@@ -2104,13 +2234,15 @@ codeComplete(llvm::MemoryBuffer *InputBuf, int64_t Offset,
 
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.codeComplete(InputBuf, Offset, options.get(), CCC, Args,
-                    std::move(vfsOptions));
+                    std::move(vfsOptions), CancellationToken);
   return CCC.createResponse();
 }
 
 void SKCodeCompletionConsumer::failed(StringRef ErrDescription) {
   ErrorDescription = ErrDescription.str();
 }
+
+void SKCodeCompletionConsumer::cancelled() { WasCancelled = true; }
 
 void SKCodeCompletionConsumer::setCompletionKind(UIdent kind) {
   assert(kind.isValid());
@@ -2167,19 +2299,25 @@ class SKGroupedCodeCompletionConsumer : public GroupedCodeCompletionConsumer {
   ResponseBuilder::Dictionary Response;
   SmallVector<ResponseBuilder::Array, 3> GroupContentsStack;
   std::string ErrorDescription;
+  bool WasCancelled = false;
 
 public:
   explicit SKGroupedCodeCompletionConsumer(ResponseBuilder &RespBuilder)
       : RespBuilder(RespBuilder) {}
 
   sourcekitd_response_t createResponse() {
-    if (!ErrorDescription.empty())
+    if (WasCancelled) {
+      return createErrorRequestCancelled();
+    } else if (!ErrorDescription.empty()) {
       return createErrorRequestFailed(ErrorDescription.c_str());
-    assert(GroupContentsStack.empty() && "mismatched start/endGroup");
-    return RespBuilder.createResponse();
+    } else {
+      assert(GroupContentsStack.empty() && "mismatched start/endGroup");
+      return RespBuilder.createResponse();
+    }
   }
 
   void failed(StringRef ErrDescription) override;
+  void cancelled() override;
   bool handleResult(const CodeCompletionInfo &Info) override;
   void startGroup(UIdent kind, StringRef name) override;
   void endGroup() override;
@@ -2189,12 +2327,11 @@ public:
 };
 } // end anonymous namespace
 
-static sourcekitd_response_t codeCompleteOpen(StringRef Name,
-                                              llvm::MemoryBuffer *InputBuf,
-                                              int64_t Offset,
-                                              Optional<RequestDict> optionsDict,
-                                              ArrayRef<const char *> Args,
-                                              Optional<VFSOptions> vfsOptions) {
+static sourcekitd_response_t
+codeCompleteOpen(StringRef Name, llvm::MemoryBuffer *InputBuf, int64_t Offset,
+                 Optional<RequestDict> optionsDict, ArrayRef<const char *> Args,
+                 Optional<VFSOptions> vfsOptions,
+                 SourceKitCancellationToken CancellationToken) {
   ResponseBuilder RespBuilder;
   SKGroupedCodeCompletionConsumer CCC(RespBuilder);
   std::unique_ptr<SKOptionsDictionary> options;
@@ -2276,7 +2413,7 @@ static sourcekitd_response_t codeCompleteOpen(StringRef Name,
   }
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.codeCompleteOpen(Name, InputBuf, Offset, options.get(), filterRules, CCC,
-                        Args, std::move(vfsOptions));
+                        Args, std::move(vfsOptions), CancellationToken);
   return CCC.createResponse();
 }
 
@@ -2290,20 +2427,23 @@ static sourcekitd_response_t codeCompleteClose(StringRef Name, int64_t Offset) {
 
 static sourcekitd_response_t
 codeCompleteUpdate(StringRef name, int64_t offset,
-                   Optional<RequestDict> optionsDict) {
+                   Optional<RequestDict> optionsDict,
+                   SourceKitCancellationToken CancellationToken) {
   ResponseBuilder RespBuilder;
   SKGroupedCodeCompletionConsumer CCC(RespBuilder);
   std::unique_ptr<SKOptionsDictionary> options;
   if (optionsDict)
     options = std::make_unique<SKOptionsDictionary>(*optionsDict);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-  Lang.codeCompleteUpdate(name, offset, options.get(), CCC);
+  Lang.codeCompleteUpdate(name, offset, options.get(), CancellationToken, CCC);
   return CCC.createResponse();
 }
 
 void SKGroupedCodeCompletionConsumer::failed(StringRef ErrDescription) {
   ErrorDescription = ErrDescription.str();
 }
+
+void SKGroupedCodeCompletionConsumer::cancelled() { WasCancelled = true; }
 
 bool SKGroupedCodeCompletionConsumer::handleResult(const CodeCompletionInfo &R) {
   assert(!GroupContentsStack.empty() && "missing root group");
@@ -2396,17 +2536,18 @@ void SKGroupedCodeCompletionConsumer::setAnnotatedTypename(bool flag) {
 // Type Context Info
 //===----------------------------------------------------------------------===//
 
-static sourcekitd_response_t typeContextInfo(llvm::MemoryBuffer *InputBuf,
-                                             int64_t Offset,
-                                             Optional<RequestDict> optionsDict,
-                                             ArrayRef<const char *> Args,
-                                             Optional<VFSOptions> vfsOptions) {
+static sourcekitd_response_t
+typeContextInfo(llvm::MemoryBuffer *InputBuf, int64_t Offset,
+                Optional<RequestDict> optionsDict, ArrayRef<const char *> Args,
+                Optional<VFSOptions> vfsOptions,
+                SourceKitCancellationToken CancellationToken) {
   ResponseBuilder RespBuilder;
 
   class Consumer : public TypeContextInfoConsumer {
     ResponseBuilder RespBuilder;
     ResponseBuilder::Array SKResults;
     Optional<std::string> ErrorDescription;
+    bool WasCancelled = false;
 
   public:
     Consumer(ResponseBuilder Builder)
@@ -2437,6 +2578,9 @@ static sourcekitd_response_t typeContextInfo(llvm::MemoryBuffer *InputBuf,
       ErrorDescription = ErrDescription.str();
     }
 
+    void cancelled() override { WasCancelled = true; }
+
+    bool wasCancelled() const { return WasCancelled; }
     bool isError() const { return ErrorDescription.hasValue(); }
     const char *getErrorDescription() const {
       return ErrorDescription->c_str();
@@ -2448,29 +2592,34 @@ static sourcekitd_response_t typeContextInfo(llvm::MemoryBuffer *InputBuf,
     options = std::make_unique<SKOptionsDictionary>(*optionsDict);
 
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-  Lang.getExpressionContextInfo(InputBuf, Offset, options.get(), Args, Consumer,
+  Lang.getExpressionContextInfo(InputBuf, Offset, options.get(), Args,
+                                CancellationToken, Consumer,
                                 std::move(vfsOptions));
 
-  if (Consumer.isError())
+  if (Consumer.wasCancelled()) {
+    return createErrorRequestCancelled();
+  } else if (Consumer.isError()) {
     return createErrorRequestFailed(Consumer.getErrorDescription());
-  return RespBuilder.createResponse();
+  } else {
+    return RespBuilder.createResponse();
+  }
 }
 
 //===----------------------------------------------------------------------===//
 // Conforming Method List
 //===----------------------------------------------------------------------===//
 
-static sourcekitd_response_t
-conformingMethodList(llvm::MemoryBuffer *InputBuf, int64_t Offset,
-                     Optional<RequestDict> optionsDict,
-                     ArrayRef<const char *> Args,
-                     ArrayRef<const char *> ExpectedTypes,
-                     Optional<VFSOptions> vfsOptions) {
+static sourcekitd_response_t conformingMethodList(
+    llvm::MemoryBuffer *InputBuf, int64_t Offset,
+    Optional<RequestDict> optionsDict, ArrayRef<const char *> Args,
+    ArrayRef<const char *> ExpectedTypes, Optional<VFSOptions> vfsOptions,
+    SourceKitCancellationToken CancellationToken) {
   ResponseBuilder RespBuilder;
 
   class Consumer : public ConformingMethodListConsumer {
     ResponseBuilder::Dictionary SKResult;
     Optional<std::string> ErrorDescription;
+    bool WasCancelled = false;
 
   public:
     Consumer(ResponseBuilder Builder) : SKResult(Builder.getDictionary()) {}
@@ -2500,6 +2649,9 @@ conformingMethodList(llvm::MemoryBuffer *InputBuf, int64_t Offset,
       ErrorDescription = ErrDescription.str();
     }
 
+    void cancelled() override { WasCancelled = true; }
+
+    bool wasCancelled() const { return WasCancelled; }
     bool isError() const { return ErrorDescription.hasValue(); }
     const char *getErrorDescription() const {
       return ErrorDescription->c_str();
@@ -2512,11 +2664,16 @@ conformingMethodList(llvm::MemoryBuffer *InputBuf, int64_t Offset,
 
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.getConformingMethodList(InputBuf, Offset, options.get(), Args,
-                               ExpectedTypes, Consumer, std::move(vfsOptions));
+                               ExpectedTypes, CancellationToken, Consumer,
+                               std::move(vfsOptions));
 
-  if (Consumer.isError())
+  if (Consumer.wasCancelled()) {
+    return createErrorRequestCancelled();
+  } else if (Consumer.isError()) {
     return createErrorRequestFailed(Consumer.getErrorDescription());
-  return RespBuilder.createResponse();
+  } else {
+    return RespBuilder.createResponse();
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -2643,16 +2800,16 @@ editorOpenInterface(StringRef Name, StringRef ModuleName,
 
 /// Getting the interface from a swift source file differs from getting interfaces
 /// from headers or modules for its performing asynchronously.
-static void
-editorOpenSwiftSourceInterface(StringRef Name, StringRef HeaderName,
-                               ArrayRef<const char *> Args,
-                               ResponseReceiver Rec) {
+static void editorOpenSwiftSourceInterface(
+    StringRef Name, StringRef HeaderName, ArrayRef<const char *> Args,
+    SourceKitCancellationToken CancellationToken, ResponseReceiver Rec) {
   SKEditorConsumerOptions Opts;
   Opts.EnableSyntaxMap = true;
   Opts.EnableStructure = true;
   auto EditC = std::make_shared<SKEditorConsumer>(Rec, Opts);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-  Lang.editorOpenSwiftSourceInterface(Name, HeaderName, Args, EditC);
+  Lang.editorOpenSwiftSourceInterface(Name, HeaderName, Args, CancellationToken,
+                                      EditC);
 }
 
 static void

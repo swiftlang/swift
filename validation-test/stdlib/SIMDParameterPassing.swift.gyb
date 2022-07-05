@@ -9,6 +9,7 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+
 // RUN: %empty-directory(%t)
 // RUN: %gyb %s -o %t/SIMDParameterPassing.swift
 // RUN: %line-directive %t/SIMDParameterPassing.swift -- %target-build-swift %t/SIMDParameterPassing.swift -o %t/a.out_Release -O
@@ -17,7 +18,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: long_test
-// XFAIL: linux
+// XFAIL: OS=linux-gnu, OS=linux-android
 
 import StdlibUnittest
 import simd

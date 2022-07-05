@@ -329,11 +329,11 @@ static APIDiffItemKind parseDiffItemKind(StringRef Content) {
 static StringRef getScalarString(llvm::yaml::Node *N) {
   auto WithQuote = cast<llvm::yaml::ScalarNode>(N)->getRawValue();
   return WithQuote.substr(1, WithQuote.size() - 2);
-};
+}
 
 static int getScalarInt(llvm::yaml::Node *N) {
   return std::stoi(cast<llvm::yaml::ScalarNode>(N)->getRawValue().str());
-};
+}
 
 static APIDiffItem*
 serializeDiffItem(llvm::BumpPtrAllocator &Alloc,

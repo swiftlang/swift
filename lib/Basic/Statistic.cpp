@@ -251,7 +251,7 @@ public:
     SmallString<256> Path(Dirname);
     llvm::sys::path::append(Path, Filename);
     std::error_code EC;
-    raw_fd_ostream Stream(Path, EC, fs::F_Append | fs::F_Text);
+    raw_fd_ostream Stream(Path, EC, fs::OF_Append | fs::OF_Text);
     if (EC) {
       llvm::errs() << "Error opening profile file '"
                    << Path << "' for writing\n";
@@ -688,7 +688,7 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
   }
 
   std::error_code EC;
-  raw_fd_ostream ostream(StatsFilename, EC, fs::F_Append | fs::F_Text);
+  raw_fd_ostream ostream(StatsFilename, EC, fs::OF_Append | fs::OF_Text);
   if (EC) {
     llvm::errs() << "Error opening -stats-output-dir file '"
                  << StatsFilename << "' for writing\n";
@@ -726,7 +726,7 @@ UnifiedStatsReporter::flushTracesAndProfiles() {
 
   if (FrontendStatsEvents && SourceMgr) {
     std::error_code EC;
-    raw_fd_ostream tstream(TraceFilename, EC, fs::F_Append | fs::F_Text);
+    raw_fd_ostream tstream(TraceFilename, EC, fs::OF_Append | fs::OF_Text);
     if (EC) {
       llvm::errs() << "Error opening -trace-stats-events file '"
                    << TraceFilename << "' for writing\n";

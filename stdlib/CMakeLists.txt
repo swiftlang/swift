@@ -9,102 +9,42 @@ project(swift-stdlib LANGUAGES C CXX)
 list(APPEND CMAKE_MODULE_PATH
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
-if("${SWIFT_HOST_VARIANT_SDK}" MATCHES "(OSX|IOS*|TVOS*|WATCHOS*)")
-  # All Darwin platforms have ABI stability.
-  set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
-elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
-  # TODO(mracek): This should get turned off, as this is not an ABI stable platform.
-  set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
-elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "FREEBSD")
-  # TODO(mracek): This should get turned off, as this is not an ABI stable platform.
-  set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
-elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "OPENBSD")
-  # TODO(mracek): This should get turned off, as this is not an ABI stable platform.
-  set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
-elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "CYGWIN")
-  # TODO(mracek): This should get turned off, as this is not an ABI stable platform.
-  set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
-elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS")
-  # TODO(mracek): This should get turned off, as this is not an ABI stable platform.
-  set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
-elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "HAIKU")
-  # TODO(mracek): This should get turned off, as this is not an ABI stable platform.
-  set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
-elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "ANDROID")
-  # TODO(mracek): This should get turned off, as this is not an ABI stable platform.
-  set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
-else()
-  # Any new platform should have non-stable ABI to start with.
-  set(SWIFT_STDLIB_STABLE_ABI_default FALSE)
-endif()
-
 if(SWIFT_BUILD_SDK_OVERLAY OR SWIFT_INCLUDE_TESTS)
   set(SWIFT_BUILD_TEST_SUPPORT_MODULES_default TRUE)
 else()
   set(SWIFT_BUILD_TEST_SUPPORT_MODULES_default FALSE)
 endif()
 
-if("${SWIFT_HOST_VARIANT_SDK}" MATCHES "(OSX|IOS*|TVOS*|WATCHOS*)")
-  set(SWIFT_STDLIB_ENABLE_PRESPECIALIZATION_default TRUE)
-elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
-  set(SWIFT_STDLIB_ENABLE_PRESPECIALIZATION_default TRUE)
-else()
-  set(SWIFT_STDLIB_ENABLE_PRESPECIALIZATION_default FALSE)
-endif()
-
 #
 # User-configurable options for the standard library.
 #
 
+# New options should be added to stdlib/cmake/modules/StdlibOptions.cmake,
+# so that they are considered in configurations using StandaloneOverlay.cmake
+
 # NOTE: Some of these variables are also initialized in StandaloneOverlay.cmake
 # so that interfaces are emitted when overlays are separately built.
 
-option(SWIFT_STDLIB_STABLE_ABI
-       "Should stdlib be built with stable ABI (library evolution, resilience)."
-       "${SWIFT_STDLIB_STABLE_ABI_default}")
-
-option(SWIFT_ENABLE_MODULE_INTERFACES
-       "Generate .swiftinterface files alongside .swiftmodule files"
-       "${SWIFT_STDLIB_STABLE_ABI}")
-
-option(SWIFT_ENABLE_COMPATIBILITY_OVERRIDES
-       "Support back-deploying compatibility fixes for newer apps running on older runtimes."
-       TRUE)
-
-option(SWIFT_RUNTIME_MACHO_NO_DYLD
-       "Build stdlib assuming the runtime environment uses Mach-O but does not support dynamic modules."
-       FALSE)
-
-option(SWIFT_STDLIB_HAS_DARWIN_LIBMALLOC
-  "Build stdlib assuming the Darwin build of stdlib can use extended libmalloc APIs"
-  )
-
-option(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
-       "Build the standard libraries assuming that they will be used in an environment with only a single thread."
-       FALSE)
-
-option(SWIFT_STDLIB_OS_VERSIONING
-       "Build stdlib with availability based on OS versions (Darwin only)."
-       TRUE)
+# TODO: migrate this section to StdlibOptions.cmake to reduce duplication
 
 option(SWIFT_BUILD_TEST_SUPPORT_MODULES
        "Whether to build StdlibUnittest and other test support modules. Defaults to On when SWIFT_BUILD_SDK_OVERLAY is On, or when SWIFT_INCLUDE_TESTS is On."
        "${SWIFT_BUILD_TEST_SUPPORT_MODULES_default}")
 
-option(SWIFT_FREESTANDING_FLAVOR
-       "When building the FREESTANDING stdlib, which build style to use (options: apple, linux)")
-
-option(SWIFT_STDLIB_ENABLE_PRESPECIALIZATION
-       "Should stdlib be built with generic metadata prespecialization enabled. Defaults to On on Darwin and on "
-       "${SWIFT_STDLIB_ENABLE_PRESPECIALIZATION_default}")
-
-set(SWIFT_STDLIB_ENABLE_LTO OFF CACHE STRING "Build Swift stdlib with LTO. One
-    must specify the form of LTO by setting this to one of: 'full', 'thin'. This
-    option only affects the standard library and runtime, not tools.")
+# New options should be added to stdlib/cmake/modules/StdlibOptions.cmake,
+# so that they are considered in configurations using StandaloneOverlay.cmake
+include(StdlibOptions)
 
 #
 # End of user-configurable options.
 #
+
+# Remove llvm-project/llvm/include directory from -I search part when building
+# the stdlib. We have our own fork of LLVM includes (Support, ADT) in
+# stdlib/include/llvm and we don't want to silently use headers from LLVM.
+get_property(stdlib_include_directories DIRECTORY PROPERTY INCLUDE_DIRECTORIES)
+list(REMOVE_ITEM stdlib_include_directories "${LLVM_MAIN_INCLUDE_DIR}")
+set_property(DIRECTORY PROPERTY INCLUDE_DIRECTORIES ${stdlib_include_directories})
 
 include(AddSwiftStdlib)
 
@@ -233,6 +173,11 @@ function(swift_create_stdlib_targets name variant define_all_alias)
   endif()
 endfunction()
 
+if("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "singlethreaded"
+   AND NOT SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY)
+  message(SEND_ERROR "Cannot enable the single-threaded global executor without enabling SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY")
+endif()
+
 swift_create_stdlib_targets("swift-stdlib" "" TRUE)
 if(SWIFT_STDLIB_ENABLE_SIB_TARGETS)
   swift_create_stdlib_targets("swift-stdlib" "sib" TRUE)
@@ -245,5 +190,7 @@ swift_create_stdlib_targets("swift-test-stdlib" "" FALSE)
 # the clang resource directory symlink stops installing correctly.
 add_subdirectory(toolchain)
 add_subdirectory(public)
-add_subdirectory(private)
+if(SWIFT_STDLIB_BUILD_PRIVATE)
+  add_subdirectory(private)
+endif()
 add_subdirectory(tools)

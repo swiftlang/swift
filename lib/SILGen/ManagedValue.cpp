@@ -22,6 +22,25 @@
 using namespace swift;
 using namespace Lowering;
 
+ManagedValue ManagedValue::forForwardedRValue(SILGenFunction &SGF,
+                                              SILValue value) {
+  if (!value)
+    return ManagedValue();
+
+  switch (value->getOwnershipKind()) {
+  case OwnershipKind::Any:
+    llvm_unreachable("Invalid ownership for value");
+
+  case OwnershipKind::Owned:
+    return ManagedValue(value, SGF.enterDestroyCleanup(value));
+
+  case OwnershipKind::Guaranteed:
+  case OwnershipKind::None:
+  case OwnershipKind::Unowned:
+    return ManagedValue::forUnmanaged(value);
+  }
+}
+
 /// Emit a copy of this value with independent ownership.
 ManagedValue ManagedValue::copy(SILGenFunction &SGF, SILLocation loc) const {
   auto &lowering = SGF.getTypeLowering(getType());
@@ -39,20 +58,20 @@ ManagedValue ManagedValue::copy(SILGenFunction &SGF, SILLocation loc) const {
 
 // Emit an unmanaged copy of this value
 // WARNING: Callers of this API should manage the cleanup of this value!
-ManagedValue ManagedValue::unmanagedCopy(SILGenFunction &SGF,
+SILValue ManagedValue::unmanagedCopy(SILGenFunction &SGF,
                                          SILLocation loc) const {
   auto &lowering = SGF.getTypeLowering(getType());
   if (lowering.isTrivial())
-    return *this;
+    return getValue();
 
   if (getType().isObject()) {
     auto copy = SGF.B.emitCopyValueOperation(loc, getValue());
-    return ManagedValue::forUnmanaged(copy);
+    return copy;
   }
 
   SILValue buf = SGF.emitTemporaryAllocation(loc, getType());
   SGF.B.createCopyAddr(loc, getValue(), buf, IsNotTake, IsInitialization);
-  return ManagedValue::forUnmanaged(buf);
+  return buf;
 }
 
 /// Emit a copy of this value with independent ownership.
@@ -187,13 +206,21 @@ ManagedValue ManagedValue::materialize(SILGenFunction &SGF,
                                   StoreOwnershipQualifier::Init);
 
     // SEMANTIC SIL TODO: This should really be called a temporary LValue.
-    return ManagedValue::forOwnedAddressRValue(temporary,
-                                          SGF.enterDestroyCleanup(temporary));
-  } else {
-    auto object = SGF.emitManagedBeginBorrow(loc, getValue());
-    SGF.emitManagedStoreBorrow(loc, object.getValue(), temporary);
-    return ManagedValue::forBorrowedAddressRValue(temporary);
+    return ManagedValue::forOwnedAddressRValue(
+        temporary, SGF.enterDestroyCleanup(temporary));
   }
+  auto &lowering = SGF.getTypeLowering(getType());
+  if (lowering.isAddressOnly()) {
+    assert(!SGF.silConv.useLoweredAddresses());
+    auto copy = SGF.B.createCopyValue(loc, getValue());
+    SGF.B.emitStoreValueOperation(loc, copy, temporary,
+                                  StoreOwnershipQualifier::Init);
+    return ManagedValue::forOwnedAddressRValue(
+        temporary, SGF.enterDestroyCleanup(temporary));
+  }
+  auto object = SGF.emitManagedBeginBorrow(loc, getValue());
+  SGF.emitManagedStoreBorrow(loc, object.getValue(), temporary);
+  return ManagedValue::forBorrowedAddressRValue(temporary);
 }
 
 void ManagedValue::print(raw_ostream &os) const {

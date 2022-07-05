@@ -13,7 +13,6 @@
 #include "Private.h"
 #include "swift/ABI/TypeIdentity.h"
 #include "swift/Basic/Range.h"
-#include "swift/Reflection/TypeRef.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Portability.h"
 #include "swift/Strings.h"
@@ -241,6 +240,9 @@ _buildDemanglerForBuiltinType(const Metadata *type, Demangle::Demangler &Dem) {
 #define BUILTIN_TYPE(Symbol, Name) \
   if (type == &METADATA_SYM(Symbol).base) \
     return Dem.createNode(Node::Kind::BuiltinTypeName, Name);
+#if !SWIFT_STDLIB_ENABLE_VECTOR_TYPES
+#define BUILTIN_VECTOR_TYPE(ElementSymbol, ElementName, Width)
+#endif
 #include "swift/Runtime/BuiltinTypes.def"
   return nullptr;
 }
@@ -277,6 +279,11 @@ _buildDemanglingForNominalType(const Metadata *type, Demangle::Demangler &Dem) {
   }
   case MetadataKind::ForeignClass: {
     auto foreignType = static_cast<const ForeignClassMetadata *>(type);
+    description = foreignType->Description;
+    break;
+  }
+  case MetadataKind::ForeignReferenceType: {
+    auto foreignType = static_cast<const ForeignReferenceTypeMetadata *>(type);
     description = foreignType->Description;
     break;
   }
@@ -328,6 +335,7 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
   case MetadataKind::Optional:
   case MetadataKind::Struct:
   case MetadataKind::ForeignClass:
+  case MetadataKind::ForeignReferenceType:
     return _buildDemanglingForNominalType(type, Dem);
   case MetadataKind::ObjCClassWrapper: {
 #if SWIFT_OBJC_INTEROP
@@ -440,6 +448,15 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
 
     // Just a simple composition of protocols.
     return proto_list;
+  }
+  case MetadataKind::ExtendedExistential: {
+    // FIXME: Implement this by demangling the extended existential and
+    // substituting the generalization arguments into the demangle tree.
+    // For now, unconditional casts will report '<<< invalid type >>>' when
+    // they fail.
+    // TODO: for clients that need to guarantee round-tripping, demangle
+    // to a SymbolicExtendedExistentialType.
+    return nullptr;
   }
   case MetadataKind::ExistentialMetatype: {
     auto metatype = static_cast<const ExistentialMetatypeMetadata *>(type);
@@ -684,6 +701,23 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
 // NB: This function is not used directly in the Swift codebase, but is
 // exported for Xcode support and is used by the sanitizers. Please coordinate
 // before changing.
+//
+/// Demangles a Swift symbol name.
+///
+/// \param mangledName is the symbol name that needs to be demangled.
+/// \param mangledNameLength is the length of the string that should be
+/// demangled.
+/// \param outputBuffer is the user provided buffer where the demangled name
+/// will be placed. If nullptr, a new buffer will be malloced. In that case,
+/// the user of this API is responsible for freeing the returned buffer.
+/// \param outputBufferSize is the size of the output buffer. If the demangled
+/// name does not fit into the outputBuffer, the output will be truncated and
+/// the size will be updated, indicating how large the buffer should be.
+/// \param flags can be used to select the demangling style. TODO: We should
+//// define what these will be.
+/// \returns the demangled name. Returns nullptr if the input String is not a
+/// Swift mangled name.
+SWIFT_RUNTIME_EXPORT
 char *swift_demangle(const char *mangledName,
                      size_t mangledNameLength,
                      char *outputBuffer,
@@ -701,6 +735,9 @@ char *swift_demangle(const char *mangledName,
   if (!Demangle::isSwiftSymbol(mangledName))
     return nullptr; // Not a mangled name
 
+#if !SWIFT_STDLIB_HAS_TYPE_PRINTING
+  return nullptr;
+#else
   // Demangle the name.
   auto options = Demangle::DemangleOptions();
   options.DisplayDebuggerGeneratedModule = false;
@@ -724,4 +761,5 @@ char *swift_demangle(const char *mangledName,
   }
 
   return outputBuffer;
+#endif
 }

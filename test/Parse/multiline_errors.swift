@@ -126,18 +126,20 @@ _ = "hello\("""
             world
             """
             )!"
-            // expected-error@-4 {{unterminated string literal}}
-            // expected-error@-2 {{unterminated string literal}}
+            // expected-error@-4 {{cannot find ')' to match opening '(' in string interpolation}}
+            // expected-error@-5 {{unterminated string literal}}
+            // expected-error@-3 {{unterminated string literal}}
 
 _ = "hello\(
             """
             world
             """)!"
-            // expected-error@-4 {{unterminated string literal}}
-            // expected-error@-2 {{unterminated string literal}}
+            // expected-error@-4 {{cannot find ')' to match opening '(' in string interpolation}}
+            // expected-error@-5 {{unterminated string literal}}
+            // expected-error@-3 {{unterminated string literal}}
 
 _ = """
-  line one \ non-whitepace
+  line one \ non-whitespace
   line two
   """
   // expected-error@-3 {{invalid escape sequence in literal}}
@@ -190,4 +192,6 @@ let _ = """
   \("bar
   baz
   """
-  // expected-error@-3 {{unterminated string literal}}
+  // expected-error@-3 {{cannot find ')' to match opening '(' in string interpolation}}
+  // expected-error@-4 {{unterminated string literal}}
+

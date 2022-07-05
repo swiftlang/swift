@@ -1,0 +1,9 @@
+---
+Name: SomeModule
+Classes:
+- Name: NSSomeClass
+  SwiftName: SomeClass
+  Methods:
+  - Selector: 'didMoveToParentViewController:'
+    SwiftName: didMove(toParent:)
+    MethodKind: Instance

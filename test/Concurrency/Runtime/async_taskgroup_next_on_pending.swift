@@ -5,7 +5,7 @@
 // REQUIRES: libdispatch
 
 // rdar://76038845
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 
 // REQUIRES: rdar75096485
 

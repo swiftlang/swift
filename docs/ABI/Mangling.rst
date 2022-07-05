@@ -102,6 +102,11 @@ The following symbolic reference kinds are currently implemented:
      metadata-access-function ::= '\x09' .{4}  // Reference points directly to metadata access function that can be invoked to produce referenced object
    #endif
 
+   #if SWIFT_RUNTIME_VERISON >= 5.7
+     symbolic-extended-existential-type-shape ::= '\x0A' .{4} // Reference points directly to an ExtendedExistentialTypeShape
+     symbolic-extended-existential-type-shape ::= '\x0B' .{4} // Reference points directly to a NonUniqueExtendedExistentialTypeShape
+   #endif
+
 A mangled name may also include ``\xFF`` bytes, which are only used for
 alignment padding. They do not affect what the mangled name references and can
 be skipped over and ignored.
@@ -136,6 +141,14 @@ Globals
   global ::= context identifier 'MXY'    // anonymous context descriptor
   global ::= type assoc-type-list 'MXA'  // generic parameter ref (HISTORICAL)
   global ::= protocol 'Mp'               // protocol descriptor
+
+  global ::= protocol 'Hr'               // protocol descriptor runtime record
+  global ::= nominal-type 'Hn'           // nominal type descriptor runtime record
+  #if SWIFT_RUNTIME_VERSION >= 5.1
+    global ::= opaque-type 'Ho'          // opaque type descriptor runtime record
+  #endif
+  global ::= protocol-conformance 'Hc'   // protocol conformance runtime record
+  global ::= global 'HF'                 // accessible function runtime record
 
   global ::= nominal-type 'Mo'           // class metadata immediate member base offset
 
@@ -181,6 +194,8 @@ Globals
   global ::= global 'MN'                 // noncanonical specialized generic type metadata for global
   global ::= global 'Mz'                 // canonical specialized generic type metadata caching token
 
+  global ::= global 'Mq'                 // global with a uniquing prefix
+
   #if SWIFT_RUNTIME_VERSION >= 5.4
     global ::= context (decl-name '_')+ 'WZ' // global variable one-time initialization function
     global ::= context (decl-name '_')+ 'Wz' // global variable one-time initialization token
@@ -210,9 +225,13 @@ types where the metadata itself has unknown layout.)
   global ::= global 'To'                 // swift-as-ObjC thunk
   global ::= global 'TD'                 // dynamic dispatch thunk
   global ::= global 'Td'                 // direct method reference thunk
+  global ::= global 'TE'                 // distributed actor thunk
+  global ::= global 'TF'                 // distributed method accessor
   global ::= global 'TI'                 // implementation of a dynamic_replaceable function
   global ::= global 'Tu'                 // async function pointer of a function
   global ::= global 'TX'                 // function pointer of a dynamic_replaceable function
+  global ::= global 'Twb'                // back deployment thunk
+  global ::= global 'TwB'                // back deployment fallback function
   global ::= entity entity 'TV'          // vtable override thunk, derived followed by base
   global ::= type label-list? 'D'        // type mangling for the debugger with label list for function types.
   global ::= type 'TC'                   // continuation prototype (not actually used for real symbols)
@@ -291,7 +310,7 @@ witness functions for a type.
   AUTODIFF-FUNCTION-KIND ::= 'd'        // differential
   AUTODIFF-FUNCTION-KIND ::= 'p'        // pullback
 
-``<AUTODIFF-FUNCTION-KIND>`` differentiates the kinds of functions assocaited
+``<AUTODIFF-FUNCTION-KIND>`` differentiates the kinds of functions associated
 with a differentiable function used for differentiable programming.
 
 ::
@@ -335,6 +354,7 @@ Entities
   entity-spec ::= 'fE'                       // ivar destroyer; untyped
   entity-spec ::= 'fe'                       // ivar initializer; untyped
   entity-spec ::= 'Tv' NATURAL               // outlined global variable (from context function)
+  entity-spec ::= 'Tv' NATURAL 'r'           // outlined global read-only object
   entity-spec ::= 'Te' bridge-spec           // outlined objective c method call
 
   entity-spec ::= decl-name label-list function-signature generic-signature? 'F'    // function
@@ -581,8 +601,8 @@ Types
   FUNCTION-KIND ::= 'B'                      // objc block function type
   FUNCTION-KIND ::= 'zB' C-TYPE              // objc block type with non-canonical C type
   FUNCTION-KIND ::= 'L'                      // objc block function type with canonical C type (escaping) (DWARF only; otherwise use 'B' or 'zB' C-TYPE)
-  FUNCTION-KIND ::= 'C'                      // C function pointer type
-  FUNCTION-KIND ::= 'zC' C-TYPE              // C function pointer type with with non-canonical C type
+  FUNCTION-KIND ::= 'C'                      // C function pointer / C++ method type
+  FUNCTION-KIND ::= 'zC' C-TYPE              // C function pointer / C++ method type with non-canonical C type
   FUNCTION-KIND ::= 'A'                      // @auto_closure function type (escaping)
   FUNCTION-KIND ::= 'E'                      // function type (noescape)
 
@@ -611,7 +631,7 @@ Types
   type-list ::= empty-list
 
                                                   // FIXME: Consider replacing 'h' with a two-char code
-  list-type ::= type identifier? 'Yk'? 'z'? 'h'? 'n'? 'Yi'? 'd'?  // type with optional label, '@noDerivative', inout convention, shared convention, owned convention, actor 'isolated', and variadic specifier
+  list-type ::= type identifier? 'Yk'? 'z'? 'h'? 'n'? 'Yi'? 'd'? 'Yt'?  // type with optional label, '@noDerivative', inout convention, shared convention, owned convention, actor 'isolated', variadic specifier, and compile-time constant
 
   METATYPE-REPR ::= 't'                      // Thin metatype representation
   METATYPE-REPR ::= 'T'                      // Thick metatype representation
@@ -623,6 +643,7 @@ Types
   type ::= protocol-list 'p'                 // existential type
   type ::= protocol-list superclass 'Xc'     // existential type with superclass
   type ::= protocol-list 'Xl'                // existential type with AnyObject
+  type ::= protocol-list requirement* '_' 'XP'   // constrained existential type
   type ::= type-list 't'                     // tuple
   type ::= type generic-signature 'u'        // generic type
   type ::= 'x'                               // generic param, depth=0, idx=0
@@ -636,6 +657,10 @@ Types
   #if SWIFT_RUNTIME_VERSION >= 5.2
     type ::= type assoc-type-name 'Qx' // associated type relative to base `type`
     type ::= type assoc-type-list 'QX' // associated type relative to base `type`
+  #endif
+
+  #if SWIFT_RUNTIME_VERSION >= 5.7
+    type ::= symbolic-extended-existential-type-shape type* retroactive-conformance* 'Xj'
   #endif
 
   protocol-list ::= protocol '_' protocol*
@@ -727,15 +752,17 @@ implementation details of a function type.
 ::
 
   #if SWIFT_VERSION >= 5.1
-    type ::= 'Qr'                         // opaque result type (of current decl)
+    type ::= 'Qr'                         // opaque result type (of current decl, used for the first opaque type parameter only)
+    type ::= 'QR' INDEX                   // same as above, for subsequent opaque type parameters, INDEX is the ordinal -1
     type ::= opaque-type-decl-name bound-generic-args 'Qo' INDEX // opaque type
 
     opaque-type-decl-name ::= entity 'QO' // opaque result type of specified decl
   #endif
 
   #if SWIFT_VERSION >= 5.4
-    type ::= 'Qu'                         // opaque result type (of current decl)
+    type ::= 'Qu'                         // opaque result type (of current decl, first param)
                                           // used for ObjC class runtime name purposes.
+    type ::= 'QU' INDEX
   #endif
 
 Opaque return types have a special short representation in the mangling of
@@ -861,6 +888,7 @@ now codified into the ABI; the index 0 is therefore reserved.
   GENERIC-PARAM-INDEX ::= 'z'                // depth = 0,   idx = 0
   GENERIC-PARAM-INDEX ::= INDEX              // depth = 0,   idx = N+1
   GENERIC-PARAM-INDEX ::= 'd' INDEX INDEX    // depth = M+1, idx = N
+  GENERIC-PARAM-INDEX ::= 's'                // depth = 0,   idx = 0; Constrained existential 'Self' type
 
   LAYOUT-CONSTRAINT ::= 'N'  // NativeRefCountedObject
   LAYOUT-CONSTRAINT ::= 'R'  // RefCountedObject
@@ -899,6 +927,11 @@ than the module of the conforming type or the conformed-to protocol), it is
 mangled with its offset into the set of conformance requirements, the
 root protocol conformance, and the suffix 'g'.
 
+::
+
+  // No generalization signature.
+  extended-existential-shape ::= type 'Xg' // no generalization signature
+  extended-existential-shape ::= generic-signature type 'XG'
 
 Identifiers
 ~~~~~~~~~~~
@@ -1127,6 +1160,7 @@ Some kinds need arguments, which precede ``Tf``.
   CONST-PROP ::= 'i' NATURAL_ZERO            // 64-bit-integer
   CONST-PROP ::= 'd' NATURAL_ZERO            // float-as-64-bit-integer
   CONST-PROP ::= 's' ENCODING                // string literal. Consumes one identifier argument.
+  CONST-PROP ::= 'k'                         // keypath. Consumes one identifier - the SHA1 of the keypath and two types (root and value).
 
   ENCODING ::= 'b'                           // utf8
   ENCODING ::= 'w'                           // utf16

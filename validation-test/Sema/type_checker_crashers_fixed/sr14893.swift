@@ -23,7 +23,7 @@ struct Image : View {
 
 struct MyView {
   @ViewBuilder var body: some View {
-    let icon: Category! = Category.first // expected-error {{using '!' is not allowed here; perhaps '?' was intended?}} {{23-24=?}}
+    let icon: Category! = Category.first // Ok
     Image().test(icon)
   }
 }

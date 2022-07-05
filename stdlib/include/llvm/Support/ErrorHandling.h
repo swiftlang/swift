@@ -42,17 +42,18 @@ LLVM_ATTRIBUTE_NORETURN void report_fatal_error(StringRef reason,
 
 /// Reports a bad alloc error, calling any user defined bad alloc
 /// error handler. In contrast to the generic 'report_fatal_error'
-/// functions, this function is expected to return, e.g. the user
-/// defined error handler throws an exception.
+/// functions, this function might not terminate, e.g. the user
+/// defined error handler throws an exception, but it won't return.
 ///
 /// Note: When throwing an exception in the bad alloc handler, make sure that
 /// the following unwind succeeds, e.g. do not trigger additional allocations
 /// in the unwind chain.
 ///
-/// If no error handler is installed (default), then a bad_alloc exception
-/// is thrown, if LLVM is compiled with exception support, otherwise an
-/// assertion is called.
-void report_bad_alloc_error(const char *Reason, bool GenCrashDiag = true);
+/// If no error handler is installed (default), throws a bad_alloc exception
+/// if LLVM is compiled with exception support. Otherwise prints the error
+/// to standard error and calls abort().
+LLVM_ATTRIBUTE_NORETURN void report_bad_alloc_error(const char *Reason,
+                                                    bool GenCrashDiag = true);
 
 /// This function calls abort(), and prints the optional message to stderr.
 /// Use the llvm_unreachable macro (that adds location info), instead of
@@ -67,7 +68,7 @@ llvm_unreachable_internal(const char *msg = nullptr, const char *file = nullptr,
 /// In !NDEBUG builds, prints the message and location info to stderr.
 /// In NDEBUG builds, becomes an optimizer hint that the current location
 /// is not supposed to be reachable.  On compilers that don't support
-/// such hints, prints a reduced message instead.
+/// such hints, prints a reduced message instead and aborts the program.
 ///
 /// Use this instead of assert(0).  It conveys intent more clearly and
 /// allows compilers to omit some unnecessary code.

@@ -112,7 +112,7 @@ void AutoDiffConfig::print(llvm::raw_ostream &s) const {
 bool swift::isDifferentiableProgrammingEnabled(SourceFile &SF) {
   auto &ctx = SF.getASTContext();
   // Return true if differentiable programming is explicitly enabled.
-  if (ctx.LangOpts.EnableExperimentalDifferentiableProgramming)
+  if (ctx.LangOpts.hasFeature(Feature::DifferentiableProgramming))
     return true;
   // Otherwise, return true iff the `_Differentiation` module is imported in
   // the given source file.
@@ -273,12 +273,9 @@ GenericSignature autodiff::getConstrainedDerivativeGenericSignature(
       requirements.push_back(req);
     }
   }
-  return evaluateOrDefault(
-      ctx.evaluator,
-      AbstractGenericSignatureRequest{derivativeGenSig.getPointer(),
-                                      /*addedGenericParams*/ {},
-                                      std::move(requirements)},
-      nullptr);
+  return buildGenericSignature(ctx, derivativeGenSig,
+                               /*addedGenericParams*/ {},
+                               std::move(requirements));
 }
 
 // Given the rest of a `Builtin.applyDerivative_{jvp|vjp}` or

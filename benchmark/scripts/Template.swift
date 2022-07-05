@@ -17,6 +17,6 @@ public let {name} = [
 ]
 
 @inline(never)
-public func run_{name}(N: Int) {{
+public func run_{name}(n: Int) {{
     // TODO
 }}

@@ -19,9 +19,7 @@
 #define SWIFT_C_DEPENDENCY_SCAN_H
 
 #include "DependencyScanMacros.h"
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
+#include "swift-c/CommonString/CommonString.h"
 
 /// The version constants for the SwiftDependencyScan C API.
 /// SWIFTSCAN_VERSION_MINOR should increase when there are API additions.
@@ -33,22 +31,9 @@ SWIFTSCAN_BEGIN_DECLS
 
 //=== Public Scanner Data Types -------------------------------------------===//
 
-/**
- * A character string used to pass around dependency scan result metadata.
- * Lifetime of the string is strictly tied to the object whose field it
- * represents. When the owning object is released, string memory is freed.
- */
-typedef struct {
-  const void *data;
-  size_t length;
-} swiftscan_string_ref_t;
-
-typedef struct {
-  swiftscan_string_ref_t *strings;
-  size_t count;
-} swiftscan_string_set_t;
-
 typedef enum {
+  // This dependency info encodes two ModuleDependencyKind types:
+  // SwiftInterface and SwiftSource.
   SWIFTSCAN_DEPENDENCY_INFO_SWIFT_TEXTUAL = 0,
   SWIFTSCAN_DEPENDENCY_INFO_SWIFT_BINARY = 1,
   SWIFTSCAN_DEPENDENCY_INFO_SWIFT_PLACEHOLDER = 2,
@@ -201,6 +186,9 @@ swiftscan_clang_detail_get_context_hash(swiftscan_module_details_t details);
 SWIFTSCAN_PUBLIC swiftscan_string_set_t *
 swiftscan_clang_detail_get_command_line(swiftscan_module_details_t details);
 
+SWIFTSCAN_PUBLIC swiftscan_string_set_t *
+swiftscan_clang_detail_get_captured_pcm_args(swiftscan_module_details_t details);
+
 //=== Batch Scan Input Functions ------------------------------------------===//
 
 /// Create an \c swiftscan_batch_scan_input_t instance.
@@ -295,12 +283,16 @@ swiftscan_batch_scan_result_dispose(swiftscan_batch_scan_result_t *result);
 SWIFTSCAN_PUBLIC void
 swiftscan_scan_invocation_dispose(swiftscan_scan_invocation_t invocation);
 
-//=== Feature-Query Functions -----------------------------------------===//
+//=== Feature-Query Functions ---------------------------------------------===//
 SWIFTSCAN_PUBLIC swiftscan_string_set_t *
 swiftscan_compiler_supported_arguments_query();
 
 SWIFTSCAN_PUBLIC swiftscan_string_set_t *
 swiftscan_compiler_supported_features_query();
+
+//=== Target-Info Functions -----------------------------------------------===//
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
+swiftscan_compiler_target_info_query(swiftscan_scan_invocation_t invocation);
 
 //=== Scanner Functions ---------------------------------------------------===//
 

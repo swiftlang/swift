@@ -11,9 +11,6 @@
 Default option value definitions.
 """
 
-
-from __future__ import absolute_import, unicode_literals
-
 import os
 import platform
 
@@ -49,8 +46,8 @@ BUILD_VARIANT = 'Debug'
 CMAKE_GENERATOR = 'Ninja'
 
 COMPILER_VENDOR = 'none'
-SWIFT_USER_VISIBLE_VERSION = Version('5.6')
-CLANG_USER_VISIBLE_VERSION = Version('10.0.0')
+SWIFT_USER_VISIBLE_VERSION = Version('5.8')
+CLANG_USER_VISIBLE_VERSION = Version('13.0.0')
 SWIFT_ANALYZE_CODE_COVERAGE = 'false'
 
 DARWIN_XCRUN_TOOLCHAIN = 'default'

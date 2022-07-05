@@ -25,6 +25,13 @@ internal typealias _ArrayBridgeStorage
 @usableFromInline
 @frozen
 internal struct _ArrayBuffer<Element>: _ArrayBufferProtocol {
+  @usableFromInline
+  internal var _storage: _ArrayBridgeStorage
+
+  @inlinable
+  internal init(storage: _ArrayBridgeStorage) {
+    _storage = storage
+  }
 
   /// Create an empty buffer.
   @inlinable
@@ -74,15 +81,6 @@ internal struct _ArrayBuffer<Element>: _ArrayBufferProtocol {
     // NSArray's need an element typecheck when the element type isn't AnyObject
     return !_isNativeTypeChecked && !(AnyObject.self is Element.Type)
   }
-  
-  //===--- private --------------------------------------------------------===//
-  @inlinable
-  internal init(storage: _ArrayBridgeStorage) {
-    _storage = storage
-  }
-
-  @usableFromInline
-  internal var _storage: _ArrayBridgeStorage
 }
 
 extension _ArrayBuffer {
@@ -99,7 +97,8 @@ extension _ArrayBuffer {
     return _isNativeTypeChecked
   }
 
-  /// Returns `true` iff this buffer's storage is uniquely-referenced.
+  /// Returns `true` if this buffer's storage is uniquely referenced;
+  /// otherwise, returns `false`.
   ///
   /// This function should only be used for internal sanity checks.
   /// To guard a buffer mutation, use `beginCOWMutation`.
@@ -111,8 +110,9 @@ extension _ArrayBuffer {
     return _storage.isUniquelyReferencedNative()
    }
   
-  /// Returns `true` and puts the buffer in a mutable state iff the buffer's
-  /// storage is uniquely-referenced.
+  /// Returns `true` and puts the buffer in a mutable state if the buffer's
+  /// storage is uniquely-referenced; otherwise performs no action and
+  /// returns `false`.
   ///
   /// - Precondition: The buffer must be immutable.
   ///
@@ -128,7 +128,7 @@ extension _ArrayBuffer {
     } else {
       isUnique = _isNative
     }
-#if INTERNAL_CHECKS_ENABLED
+#if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
     if isUnique {
       _native.isImmutable = false
     }
@@ -145,7 +145,7 @@ extension _ArrayBuffer {
   @_alwaysEmitIntoClient
   @inline(__always)
   internal mutating func endCOWMutation() {
-#if INTERNAL_CHECKS_ENABLED
+#if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
     _native.isImmutable = true
 #endif
     _storage.endCOWMutation()
@@ -254,23 +254,29 @@ extension _ArrayBuffer {
   internal func _typeCheckSlowPath(_ index: Int) {
     if _fastPath(_isNative) {
       let element: AnyObject = cast(toBufferOf: AnyObject.self)._native[index]
-      precondition(
-        element is Element,
-        """
-        Down-casted Array element failed to match the target type
-        Expected \(Element.self) but found \(type(of: element))
-        """
-      )
+      guard element is Element else {
+        _assertionFailure(
+          "Fatal error",
+          """
+          Down-casted Array element failed to match the target type
+          Expected \(Element.self) but found \(type(of: element))
+          """,
+          flags: _fatalErrorFlags()
+        )
+      }
     }
     else {
       let element = _nonNative[index]
-      precondition(
-        element is Element,
-        """
-        NSArray element failed to match the Swift Array Element type
-        Expected \(Element.self) but found \(type(of: element))
-        """
-      )
+      guard element is Element else {
+        _assertionFailure(
+          "Fatal error",
+          """
+          NSArray element failed to match the Swift Array Element type
+          Expected \(Element.self) but found \(type(of: element))
+          """,
+          flags: _fatalErrorFlags()
+        )
+      }
     }
   }
 
@@ -493,6 +499,8 @@ extension _ArrayBuffer {
 
   @inline(never)
   @inlinable // @specializable
+  @_effects(notEscaping self.value**)
+  @_effects(escaping self.value**.class*.value** => return.value**)
   internal func _getElementSlowPath(_ i: Int) -> AnyObject {
     _internalInvariant(
       _isClassOrObjCExistential(Element.self),
@@ -505,23 +513,29 @@ extension _ArrayBuffer {
       _native._checkValidSubscript(i)
       
       element = cast(toBufferOf: AnyObject.self)._native[i]
-      precondition(
-        element is Element,
-        """
-        Down-casted Array element failed to match the target type
-        Expected \(Element.self) but found \(type(of: element))
-        """
-      )
+      guard element is Element else {
+        _assertionFailure(
+          "Fatal error",
+          """
+          Down-casted Array element failed to match the target type
+          Expected \(Element.self) but found \(type(of: element))
+          """,
+          flags: _fatalErrorFlags()
+        )
+      }
     } else {
       // ObjC arrays do their own subscript checking.
       element = _nonNative[i]
-      precondition(
-        element is Element,
-        """
-        NSArray element failed to match the Swift Array Element type
-        Expected \(Element.self) but found \(type(of: element))
-        """
-      )
+      guard element is Element else {
+        _assertionFailure(
+          "Fatal error",
+          """
+          NSArray element failed to match the Swift Array Element type
+          Expected \(Element.self) but found \(type(of: element))
+          """,
+          flags: _fatalErrorFlags()
+        )
+      }
     }
     return element
   }
@@ -681,6 +695,6 @@ extension _ArrayBuffer {
   }
 }
 
-extension _ArrayBuffer: Sendable, UnsafeSendable
+extension _ArrayBuffer: @unchecked Sendable
   where Element: Sendable { }
 #endif

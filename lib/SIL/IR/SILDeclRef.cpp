@@ -121,14 +121,19 @@ bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
   return false;
 }
 
-SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
-                       bool isForeign, bool isDistributed,
+SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind, bool isForeign,
+                       bool isDistributed, bool isKnownToBeLocal,
+                       SILDeclRef::BackDeploymentKind backDeploymentKind,
                        AutoDiffDerivativeFunctionIdentifier *derivativeId)
-    : loc(vd), kind(kind), isForeign(isForeign), isDistributed(isDistributed),
-      defaultArgIndex(0), pointer(derivativeId) {}
+    : loc(vd), kind(kind), isForeign(isForeign), 
+      isDistributed(isDistributed), isKnownToBeLocal(isKnownToBeLocal),
+      backDeploymentKind(backDeploymentKind), defaultArgIndex(0),
+      pointer(derivativeId) {}
 
-SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign, bool asDistributed)
-    : defaultArgIndex(0),
+SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign,
+                       bool asDistributed, bool asDistributedKnownToBeLocal)
+    : backDeploymentKind(SILDeclRef::BackDeploymentKind::None),
+      defaultArgIndex(0),
       pointer((AutoDiffDerivativeFunctionIdentifier *)nullptr) {
   if (auto *vd = baseLoc.dyn_cast<ValueDecl*>()) {
     if (auto *fd = dyn_cast<FuncDecl>(vd)) {
@@ -167,6 +172,7 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign, bool asDistribut
 
   isForeign = asForeign;
   isDistributed = asDistributed;
+  isKnownToBeLocal = asDistributedKnownToBeLocal;
 }
 
 SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
@@ -202,7 +208,8 @@ ASTContext &SILDeclRef::getASTContext() const {
 }
 
 bool SILDeclRef::isThunk() const {
-  return isForeignToNativeThunk() || isNativeToForeignThunk() || isDistributedThunk();
+  return isForeignToNativeThunk() || isNativeToForeignThunk() ||
+         isDistributedThunk() || isBackDeploymentThunk();
 }
 
 bool SILDeclRef::isClangImported() const {
@@ -273,6 +280,8 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   // The main entry-point is public.
   if (kind == Kind::EntryPoint)
     return SILLinkage::Public;
+  if (kind == Kind::AsyncEntryPoint)
+    return SILLinkage::Hidden;
 
   // Add External to the linkage (e.g. Public -> PublicExternal) if this is a
   // declaration not a definition.
@@ -311,6 +320,11 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
     if (isSerialized())
       return maybeAddExternal(SILLinkage::PublicNonABI);
   }
+
+  // Back deployment thunks and fallbacks are emitted into the client and
+  // therefore have PublicNonABI linkage.
+  if (backDeploymentKind != SILDeclRef::BackDeploymentKind::None)
+    return maybeAddExternal(SILLinkage::PublicNonABI);
 
   enum class Limit {
     /// No limit.
@@ -382,13 +396,20 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
     if (fn->hasForcedStaticDispatch()) {
       limit = Limit::OnDemand;
     }
+  }
 
+  if (auto fn = dyn_cast<AbstractFunctionDecl>(d)) {
     // Native-to-foreign thunks for top-level decls are created on-demand,
     // unless they are marked @_cdecl, in which case they expose a dedicated
     // entry-point with the visibility of the function.
+    //
+    // Native-to-foreign thunks for methods are always just private, since
+    // they're anchored by Objective-C metadata.
     if (isNativeToForeignThunk() && !fn->getAttrs().hasAttribute<CDeclAttr>()) {
       if (fn->getDeclContext()->isModuleScopeContext())
         limit = Limit::OnDemand;
+      else
+        return SILLinkage::Private;
     }
   }
 
@@ -410,7 +431,7 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   switch (effectiveAccess) {
   case AccessLevel::Private:
   case AccessLevel::FilePrivate:
-    return maybeAddExternal(SILLinkage::Private);
+    return SILLinkage::Private;
 
   case AccessLevel::Internal:
     if (limit == Limit::OnDemand)
@@ -448,6 +469,23 @@ SILDeclRef SILDeclRef::getMainDeclEntryPoint(ValueDecl *decl) {
   return result;
 }
 
+SILDeclRef SILDeclRef::getAsyncMainDeclEntryPoint(ValueDecl *decl) {
+  auto *file = cast<FileUnit>(decl->getDeclContext()->getModuleScopeContext());
+  assert(file->getMainDecl() == decl);
+  SILDeclRef result;
+  result.loc = decl;
+  result.kind = Kind::AsyncEntryPoint;
+  return result;
+}
+
+SILDeclRef SILDeclRef::getAsyncMainFileEntryPoint(FileUnit *file) {
+  assert(file->hasEntryPoint() && !file->getMainDecl());
+  SILDeclRef result;
+  result.loc = file;
+  result.kind = Kind::AsyncEntryPoint;
+  return result;
+}
+
 SILDeclRef SILDeclRef::getMainFileEntryPoint(FileUnit *file) {
   assert(file->hasEntryPoint() && !file->getMainDecl());
   SILDeclRef result;
@@ -479,6 +517,19 @@ AutoClosureExpr *SILDeclRef::getAutoClosureExpr() const {
 
 FuncDecl *SILDeclRef::getFuncDecl() const {
   return dyn_cast<FuncDecl>(getDecl());
+}
+
+ModuleDecl *SILDeclRef::getModuleContext() const {
+  if (hasDecl()) {
+    return getDecl()->getModuleContext();
+  } else if (hasFileUnit()) {
+    return getFileUnit()->getParentModule();
+  } else if (hasClosureExpr()) {
+    return getClosureExpr()->getParentModule();
+  } else if (hasAutoClosureExpr()) {
+    return getAutoClosureExpr()->getParentModule();
+  }
+  llvm_unreachable("Unknown declaration reference");
 }
 
 bool SILDeclRef::isSetter() const {
@@ -530,16 +581,13 @@ IsSerialized_t SILDeclRef::isSerialized() const {
   if (auto closure = getAbstractClosureExpr()) {
     // Ask the AST if we're inside an @inlinable context.
     if (closure->getResilienceExpansion() == ResilienceExpansion::Minimal) {
-      if (isForeign)
-        return IsSerializable;
-
       return IsSerialized;
     }
 
     return IsNotSerialized;
   }
 
-  if (kind == Kind::EntryPoint)
+  if (kind == Kind::EntryPoint || kind == Kind::AsyncEntryPoint)
     return IsNotSerialized;
 
   if (isIVarInitializerOrDestroyer())
@@ -596,7 +644,7 @@ IsSerialized_t SILDeclRef::isSerialized() const {
   // serializable.
   if (d->getDeclContext()->isLocalContext()) {
     if (dc->getResilienceExpansion() == ResilienceExpansion::Minimal)
-      return IsSerializable;
+      return IsSerialized;
 
     return IsNotSerialized;
   }
@@ -608,7 +656,7 @@ IsSerialized_t SILDeclRef::isSerialized() const {
   // Enum element constructors are serializable if the enum is
   // @usableFromInline or public.
   if (isEnumElement())
-    return IsSerializable;
+    return IsSerialized;
 
   // 'read' and 'modify' accessors synthesized on-demand are serialized if
   // visible outside the module.
@@ -618,16 +666,17 @@ IsSerialized_t SILDeclRef::isSerialized() const {
       return IsSerialized;
 
   if (isForeignToNativeThunk())
-    return IsSerializable;
+    return IsSerialized;
 
   // The allocating entry point for designated initializers are serialized
-  // if the class is @usableFromInline or public.
+  // if the class is @usableFromInline or public. Actors are excluded because
+  // whether the init is designated is not clearly reflected in the source code.
   if (kind == SILDeclRef::Kind::Allocator) {
     auto *ctor = cast<ConstructorDecl>(d);
-    if (ctor->isDesignatedInit() &&
-        ctor->getDeclContext()->getSelfClassDecl()) {
-      if (!ctor->hasClangNode())
-        return IsSerialized;
+    if (auto classDecl = ctor->getDeclContext()->getSelfClassDecl()) {
+      if (!classDecl->isAnyActor() && ctor->isDesignatedInit())
+        if (!ctor->hasClangNode())
+          return IsSerialized;
     }
   }
 
@@ -640,13 +689,26 @@ IsSerialized_t SILDeclRef::isSerialized() const {
     // @objc thunks for top-level functions are serializable since they're
     // referenced from @convention(c) conversions inside inlinable
     // functions.
-    return IsSerializable;
+    return IsSerialized;
   }
 
   // Declarations imported from Clang modules are serialized if
   // referenced from an inlinable context.
   if (isClangImported())
-    return IsSerializable;
+    return IsSerialized;
+
+  // Handle back deployed functions. The original back deployed function
+  // should not be serialized, but the thunk and fallback should be since they
+  // need to be emitted into the client.
+  if (isBackDeployed()) {
+    switch (backDeploymentKind) {
+      case BackDeploymentKind::None:
+        return IsNotSerialized;
+      case BackDeploymentKind::Fallback:
+      case BackDeploymentKind::Thunk:
+        return IsSerialized;
+    }
+  }
 
   // Otherwise, ask the AST if we're inside an @inlinable context.
   if (dc->getResilienceExpansion() == ResilienceExpansion::Minimal)
@@ -695,22 +757,20 @@ bool SILDeclRef::isAlwaysInline() const {
   return false;
 }
 
-bool SILDeclRef::hasEffectsAttribute() const {
+bool SILDeclRef::isBackDeployed() const {
   if (!hasDecl())
     return false;
-  return getDecl()->getAttrs().hasAttribute<EffectsAttr>();
-}
 
-EffectsKind SILDeclRef::getEffectsAttribute() const {
-  assert(hasEffectsAttribute());
-  EffectsAttr *MA = getDecl()->getAttrs().getAttribute<EffectsAttr>();
-  return MA->getKind();
+  auto *decl = getDecl();
+  if (auto afd = dyn_cast<AbstractFunctionDecl>(decl))
+    return afd->isBackDeployed();
+
+  return false;
 }
 
 bool SILDeclRef::isAnyThunk() const {
-  return isForeignToNativeThunk() ||
-    isNativeToForeignThunk() ||
-    isDistributedThunk();
+  return isForeignToNativeThunk() || isNativeToForeignThunk() ||
+         isDistributedThunk() || isBackDeploymentThunk();
 }
 
 bool SILDeclRef::isForeignToNativeThunk() const {
@@ -760,6 +820,18 @@ bool SILDeclRef::isNativeToForeignThunk() const {
 
 bool SILDeclRef::isDistributedThunk() const {
   if (!isDistributed)
+    return false;
+  return kind == Kind::Func;
+}
+
+bool SILDeclRef::isBackDeploymentFallback() const {
+  if (backDeploymentKind != BackDeploymentKind::Fallback)
+    return false;
+  return kind == Kind::Func;
+}
+
+bool SILDeclRef::isBackDeploymentThunk() const {
+  if (backDeploymentKind != BackDeploymentKind::Thunk)
     return false;
   return kind == Kind::Func;
 }
@@ -844,6 +916,10 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
         SKind = ASTMangler::SymbolKind::ObjCAsSwiftThunk;
       } else if (isDistributedThunk()) {
         SKind = ASTMangler::SymbolKind::DistributedThunk;
+      } else if (isBackDeploymentThunk()) {
+        SKind = ASTMangler::SymbolKind::BackDeploymentThunk;
+      } else if (isBackDeploymentFallback()) {
+        SKind = ASTMangler::SymbolKind::BackDeploymentFallback;
       }
       break;
     case SILDeclRef::ManglingKind::DynamicThunk:
@@ -869,6 +945,10 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
       if (isNativeToForeignThunk()) {
         return CDeclA->Name.str();
       }
+
+    if (SKind == ASTMangler::SymbolKind::DistributedThunk) {
+      return mangler.mangleDistributedThunk(cast<FuncDecl>(getDecl()));
+    }
 
     // Otherwise, fall through into the 'other decl' case.
     LLVM_FALLTHROUGH;
@@ -925,6 +1005,9 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     return mangler.mangleInitFromProjectedValueEntity(cast<VarDecl>(getDecl()),
                                                       SKind);
 
+  case SILDeclRef::Kind::AsyncEntryPoint: {
+    return "async_Main";
+  }
   case SILDeclRef::Kind::EntryPoint: {
     return getASTContext().getEntryPointFunctionName();
   }
@@ -970,7 +1053,7 @@ bool SILDeclRef::requiresNewVTableEntry() const {
       return true;
   if (!hasDecl())
     return false;
-  if (isDistributedThunk())
+  if (isBackDeploymentThunk())
     return false;
   auto fnDecl = dyn_cast<AbstractFunctionDecl>(getDecl());
   if (!fnDecl)
@@ -999,6 +1082,9 @@ SILDeclRef SILDeclRef::getOverridden() const {
 
 SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
   if (auto overridden = getOverridden()) {
+    // Back deployed methods should not be overridden.
+    assert(backDeploymentKind == SILDeclRef::BackDeploymentKind::None);
+
     // If we overrode a foreign decl or dynamic method, if this is an
     // accessor for a property that overrides an ObjC decl, or if it is an
     // @NSManaged property, then it won't be in the vtable.
@@ -1008,7 +1094,7 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
     // Distributed thunks are not in the vtable.
     if (isDistributedThunk())
       return SILDeclRef();
-    
+
     // An @objc convenience initializer can be "overridden" in the sense that
     // its selector is reclaimed by a subclass's convenience init with the
     // same name. The AST models this as an override for the purposes of
@@ -1257,7 +1343,8 @@ unsigned SILDeclRef::getParameterListCount() const {
     return 1;
 
   // Always uncurried even if the underlying function is curried.
-  if (kind == Kind::DefaultArgGenerator || kind == Kind::EntryPoint)
+  if (kind == Kind::DefaultArgGenerator || kind == Kind::EntryPoint ||
+      kind == Kind::AsyncEntryPoint)
     return 1;
 
   auto *vd = getDecl();
@@ -1289,6 +1376,8 @@ bool SILDeclRef::canBeDynamicReplacement() const {
     return false;
   if (isDistributedThunk())
     return false;
+  if (backDeploymentKind != SILDeclRef::BackDeploymentKind::None)
+    return false;
   if (kind == SILDeclRef::Kind::Destroyer ||
       kind == SILDeclRef::Kind::DefaultArgGenerator)
     return false;
@@ -1306,6 +1395,9 @@ bool SILDeclRef::isDynamicallyReplaceable() const {
     return false;
 
   if (isDistributedThunk())
+    return false;
+
+  if (backDeploymentKind != SILDeclRef::BackDeploymentKind::None)
     return false;
 
   if (kind == SILDeclRef::Kind::DefaultArgGenerator)

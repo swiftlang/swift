@@ -294,6 +294,7 @@ _$S3abc6testityySiFTm ---> merged abc.testit(Swift.Int) -> ()
 _$S4main4TestC1xACSi_tc6_PRIV_Llfc ---> main.Test.(in _PRIV_).init(x: Swift.Int) -> main.Test
 _T0SqWOy.17 ---> outlined copy of Swift.Optional with unmangled suffix ".17"
 _T03nix6testitSaySiGyFTv_ ---> outlined variable #0 of nix.testit() -> [Swift.Int]
+_T03nix6testitSaySiGyFTv_r ---> outlined read-only object #0 of nix.testit() -> [Swift.Int]
 _T03nix6testitSaySiGyFTv0_ ---> outlined variable #1 of nix.testit() -> [Swift.Int]
 _T0So11UITextFieldC4textSSSgvgToTepb_ ---> outlined bridged method (pb) of @objc __C.UITextField.text.getter : Swift.String?
 _T0So11UITextFieldC4textSSSgvgToTeab_ ---> outlined bridged method (ab) of @objc __C.UITextField.text.getter : Swift.String?
@@ -313,6 +314,10 @@ _S$s5print_9separator10terminatoryypfC ---> _S$s5print_9separator10terminatoryyp
 _T0So13GenericOptionas8HashableSCsACP9hashValueSivgTW ---> {T:} protocol witness for Swift.Hashable.hashValue.getter : Swift.Int in conformance __C.GenericOption : Swift.Hashable in __C_Synthesized
 _T0So11CrappyColorVs16RawRepresentableSCMA ---> reflection metadata associated type descriptor __C.CrappyColor : Swift.RawRepresentable in __C_Synthesized
 $S28protocol_conformance_records15NativeValueTypeVAA8RuncibleAAMc ---> protocol conformance descriptor for protocol_conformance_records.NativeValueType : protocol_conformance_records.Runcible in protocol_conformance_records
+$ss6SimpleHr ---> protocol descriptor runtime record for Swift.Simple
+$ss5OtherVs6SimplesHc ---> protocol conformance descriptor runtime record for Swift.Other : Swift.Simple in Swift
+$ss5OtherVHn ---> nominal type descriptor runtime record for Swift.Other
+$s18opaque_return_type3fooQryFQOHo ---> opaque type descriptor runtime record for <<opaque return type of opaque_return_type.foo() -> some>>
 $SSC9SomeErrorLeVD ---> __C_Synthesized.related decl 'e' for SomeError
 $s20mangling_retroactive5test0yyAA1ZVy12RetroactiveB1XVSiAE1YVAG0D1A1PAAyHCg_AiJ1QAAyHCg1_GF ---> mangling_retroactive.test0(mangling_retroactive.Z<RetroactiveB.X, Swift.Int, RetroactiveB.Y>) -> ()
 $s20mangling_retroactive5test0yyAA1ZVy12RetroactiveB1XVSiAE1YVAG0D1A1PHPyHCg_AiJ1QHPyHCg1_GF ---> mangling_retroactive.test0(mangling_retroactive.Z<RetroactiveB.X, Swift.Int, RetroactiveB.Y>) -> ()
@@ -415,3 +420,16 @@ $s1t10globalFuncyyAA7MyActorCYiF ---> t.globalFunc(isolated t.MyActor) -> ()
 $sSIxip6foobarP ---> foobar in Swift.DefaultIndices.subscript : A
 $s13__lldb_expr_110$10016c2d8yXZ1B10$10016c2e0LLC ---> __lldb_expr_1.(unknown context at $10016c2d8).(B in $10016c2e0)
 $s__TJO ---> $s__TJO
+$s6Foobar7Vector2VAASdRszlE10simdMatrix5scale6rotate9translateSo0C10_double3x3aACySdG_SdAJtFZ0D4TypeL_aySd__GD ---> MatrixType #1 in static (extension in Foobar):Foobar.Vector2<Swift.Double><A where A == Swift.Double>.simdMatrix(scale: Foobar.Vector2<Swift.Double>, rotate: Swift.Double, translate: Foobar.Vector2<Swift.Double>) -> __C.simd_double3x3
+$s17distributed_thunk2DAC1fyyFTE ---> distributed thunk distributed_thunk.DA.f() -> ()
+$s16distributed_test1XC7computeyS2iFTF ---> distributed accessor for distributed_test.X.compute(Swift.Int) -> Swift.Int
+$s27distributed_actor_accessors7MyActorC7simple2ySSSiFTETFHF ---> accessible function runtime record for distributed accessor for distributed thunk distributed_actor_accessors.MyActor.simple2(Swift.Int) -> Swift.String
+$s1A3bar1aySSYt_tF ---> A.bar(a: _const Swift.String) -> ()
+$s1t1fyyFSiAA3StrVcs7KeyPathCyADSiGcfu_SiADcfu0_33_556644b740b1b333fecb81e55a7cce98ADSiTf3npk_n ---> function signature specialization <Arg[1] = [Constant Propagated KeyPath : _556644b740b1b333fecb81e55a7cce98<t.Str,Swift.Int>]> of implicit closure #2 (t.Str) -> Swift.Int in implicit closure #1 (Swift.KeyPath<t.Str, Swift.Int>) -> (t.Str) -> Swift.Int in t.f() -> ()
+$s21back_deploy_attribute0A12DeployedFuncyyFTwb ---> back deployment thunk for back_deploy_attribute.backDeployedFunc() -> ()
+$s21back_deploy_attribute0A12DeployedFuncyyFTwB ---> back deployment fallback for back_deploy_attribute.backDeployedFunc() -> ()
+$s4test3fooyyAA1P_px1TRts_XPlF ---> test.foo<A>(any test.P<Self.T == A>) -> ()
+$s4test3fooyyAA1P_pSS1TAaCPRts_Si1UAERtsXPF ---> test.foo(any test.P<Self.test.P.T == Swift.String, Self.test.P.U == Swift.Int>) -> ()
+$s4test3FooVAAyyAA1P_pF ---> test.Foo.test(test.P) -> ()
+$sxxxIxzCXxxxesy -> $sxxxIxzCXxxxesy
+$Sxxx_x_xxIxzCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC$x -> $Sxxx_x_xxIxzCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC$x

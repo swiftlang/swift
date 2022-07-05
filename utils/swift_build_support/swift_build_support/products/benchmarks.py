@@ -52,14 +52,16 @@ class Benchmarks(product.Product):
         return self.args.test_toolchainbenchmarks
 
     def _get_test_environment(self, host_target):
+        env = {
+            "SWIFT_DETERMINISTIC_HASHING": "1"
+        }
         if platform.system() == 'Darwin':
             # the resulting binaries would search first in /usr/lib/swift,
             # we need to prefer the libraries we just built
-            return {'DYLD_LIBRARY_PATH': os.path.join(
+            env['DYLD_LIBRARY_PATH'] = os.path.join(
                 _get_toolchain_path(host_target, self, self.args),
-                'usr', 'lib', 'swift', 'macosx')}
-
-        return None
+                'usr', 'lib', 'swift', 'macosx')
+        return env
 
     def test(self, host_target):
         """Just run a single instance of the command for both .debug and
@@ -102,9 +104,7 @@ def _get_toolchain_path(host_target, product, args):
     # this logic initially was inside run_build_script_helper
     # and was factored out so it can be used in testing as well
 
-    toolchain_path = swiftpm.SwiftPM.get_install_destdir(args,
-                                                         host_target,
-                                                         product.build_dir)
+    toolchain_path = product.host_install_destdir(host_target)
     if platform.system() == 'Darwin':
         # The prefix is an absolute path, so concatenate without os.path.
         toolchain_path += \

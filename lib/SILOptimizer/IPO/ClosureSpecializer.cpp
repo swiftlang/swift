@@ -489,9 +489,8 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
 }
 
 IsSerialized_t CallSiteDescriptor::isSerialized() const {
-  if (getClosure()->getFunction()->isSerialized() &&
-      getApplyCallee()->isSerialized())
-    return IsSerializable;
+  if (getClosure()->getFunction()->isSerialized())
+    return IsSerialized;
   return IsNotSerialized;
 }
 
@@ -693,8 +692,8 @@ ClosureSpecCloner::initCloned(SILOptFunctionBuilder &FunctionBuilder,
       getSpecializedLinkage(ClosureUser, ClosureUser->getLinkage()), ClonedName,
       ClonedTy, ClosureUser->getGenericEnvironment(),
       ClosureUser->getLocation(), IsBare, ClosureUser->isTransparent(),
-      CallSiteDesc.isSerialized(), IsNotDynamic, ClosureUser->getEntryCount(),
-      ClosureUser->isThunk(),
+      CallSiteDesc.isSerialized(), IsNotDynamic, IsNotDistributed,
+      ClosureUser->getEntryCount(), ClosureUser->isThunk(),
       /*classSubclassScope=*/SubclassScope::NotApplicable,
       ClosureUser->getInlineStrategy(), ClosureUser->getEffectsKind(),
       ClosureUser, ClosureUser->getDebugScope());

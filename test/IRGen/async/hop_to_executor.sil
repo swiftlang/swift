@@ -1,6 +1,10 @@
-// RUN: %target-swift-frontend  -primary-file %s -module-name=test -disable-llvm-optzns -disable-swift-specific-llvm-optzns -emit-ir -sil-verify-all | %IRGenFileCheck %s
+// RUN: %target-swift-frontend  -primary-file %s -module-name=test -disable-llvm-optzns -disable-swift-specific-llvm-optzns -emit-ir -sil-verify-all | %IRGenFileCheck %s -check-prefix CHECK-%target-abi
 
 // REQUIRES: concurrency
+
+// WASI does not support the mandatory tail call, and needs to take the same
+// path as CHECK-WIN, but will currently go down CHECK-SYSV, failing the test.
+// XFAIL: OS=wasi
 
 sil_stage canonical
 
@@ -10,13 +14,14 @@ import _Concurrency
 
 // CHECK-LABEL: define{{.*}} void @test_simple(
 // CHECK-SAME: %swift.context* swiftasync %0, [[INT]] %1, [[INT]] %2)
-// CHECK: [[CTX:%[0-9]+]] = bitcast %swift.context* %0
-// CHECK: [[RESUME:%[0-9]+]] = call i8* @llvm.coro.async.resume()
-// CHECK-x86_64: call {{.*}} @llvm.coro.suspend.async{{.*}}(i32 0, i8* [[RESUME]], i8* bitcast (i8* (i8*)* @__swift_async_resume_get_context to i8*), i8* bitcast (void (i8*, [[INT]], [[INT]], %swift.context*)* @__swift_suspend_point to i8*), i8* [[RESUME]], [[INT]] %1, [[INT]] %2, %swift.context* {{%[0-9]+}})
-// CHECK-arm64e: call {{.*}} @llvm.coro.suspend.async{{.*}}(i32 0, i8* [[RESUME]], i8* bitcast (i8* (i8*)* @__swift_async_resume_get_context to i8*), i8* bitcast (void (i8*, [[INT]], [[INT]], %swift.context*)* @__swift_suspend_point to i8*), i8* [[RESUME]], [[INT]] %1, [[INT]] %2, %swift.context* {{%[0-9]+}})
+// CHECK-DAG: [[CTX:%[0-9]+]] = bitcast %swift.context* %0
+// CHECK-DAG: [[RESUME:%[0-9]+]] = call i8* @llvm.coro.async.resume()
+// CHECK-x86_64: call {{.*}} @llvm.coro.suspend.async{{.*}}(i32 0, i8* [[RESUME]], i8* bitcast (i8* (i8*)* @__swift_async_resume_get_context to i8*), i8* bitcast (void (i8*, [[INT]], [[INT]], %swift.context*)* @test_simple.1 to i8*), i8* [[RESUME]], [[INT]] %1, [[INT]] %2, %swift.context* {{%[0-9]+}})
+// CHECK-arm64e: call {{.*}} @llvm.coro.suspend.async{{.*}}(i32 0, i8* [[RESUME]], i8* bitcast (i8* (i8*)* @__swift_async_resume_get_context to i8*), i8* bitcast (void (i8*, [[INT]], [[INT]], %swift.context*)* @test_simple.1 to i8*), i8* [[RESUME]], [[INT]] %1, [[INT]] %2, %swift.context* {{%[0-9]+}})
 // CHECK: [[RET_CONTINUATION:%.*]] = bitcast void (%swift.context*)* {{.*}} to i8*
 // CHECK:  call i1 (i8*, i1, ...) @llvm.coro.end.async(i8* {{.*}}, i1 false, void (i8*, %swift.context*)* @[[TAIL_CALL_FUNC:.*]], i8* [[RET_CONTINUATION]]
-// CHECK: unreachable
+// CHECK-WIN: ret void
+// CHECK-SYSV: unreachable
 
 sil @test_simple : $@async (@guaranteed Optional<Builtin.Executor>) -> () {
 bb0(%0 : $Optional<Builtin.Executor>):
@@ -25,7 +30,7 @@ bb0(%0 : $Optional<Builtin.Executor>):
   return %3 : $()
 }
 
-// CHECK-LABEL: define internal swift{{(tail)?}}cc void @__swift_suspend_point
+// CHECK-LABEL: define internal swift{{(tail)?}}cc void @test_simple.1
 // CHECK-SAME:  (i8* [[RESUME_FN:%0]], [[INT]] %1, [[INT]] %2, %swift.context* [[CTXT:%[^,]+]])
 // CHECK-arm64e: [[RESUME_FN_INT:%[^,]+]] = ptrtoint i8* [[RESUME_FN]] to i64
 // CHECK-arm64e: [[PTRAUTH_SIGN:%[^,]+]] = call i64 @llvm.ptrauth.sign.i64(i64 [[RESUME_FN_INT]], i32 0, i64 0)

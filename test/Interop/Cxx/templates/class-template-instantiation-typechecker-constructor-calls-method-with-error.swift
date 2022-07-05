@@ -1,4 +1,4 @@
-// RUN: not %target-swift-emit-ir %s -I %S/Inputs -enable-cxx-interop 2>&1 | %FileCheck %s
+// RUN: not %target-swift-emit-ir %s -I %S/Inputs -enable-experimental-cxx-interop 2>&1 | %FileCheck %s
 
 import ClassTemplateInstantiationErrors
 

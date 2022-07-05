@@ -13,10 +13,11 @@
 #ifndef SWIFT_LIB_IDE_CODE_COMPLETION_RESULT_BUILDER_H
 #define SWIFT_LIB_IDE_CODE_COMPLETION_RESULT_BUILDER_H
 
-#include "swift/IDE/CodeCompletion.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/IDE/CodeCompletionResult.h"
+#include "swift/IDE/CodeCompletionResultSink.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -25,56 +26,19 @@ namespace clang {
 class Module;
 }
 
-namespace {
-class AnnotatedTypePrinter;
-}
-
 namespace swift {
 class Decl;
 class ModuleDecl;
 
 namespace ide {
 
-/// The expected contextual type(s) for code-completion.
-struct ExpectedTypeContext {
-  /// Possible types of the code completion expression.
-  llvm::SmallVector<Type, 4> possibleTypes;
-
-  /// Pre typechecked type of the expression at the completion position.
-  Type idealType;
-
-  /// Whether the `ExpectedTypes` comes from a single-expression body, e.g.
-  /// `foo({ here })`.
-  ///
-  /// Since the input may be incomplete, we take into account that the types are
-  /// only a hint.
-  bool isImplicitSingleExpressionReturn = false;
-  bool preferNonVoid = false;
-
-  bool empty() const { return possibleTypes.empty(); }
-  bool requiresNonVoid() const {
-    if (isImplicitSingleExpressionReturn)
-      return false;
-    if (preferNonVoid)
-      return true;
-    if (possibleTypes.empty())
-      return false;
-    return std::all_of(possibleTypes.begin(), possibleTypes.end(), [](Type Ty) {
-      return !Ty->isVoid();
-    });
-  }
-
-  ExpectedTypeContext() = default;
-  ExpectedTypeContext(ArrayRef<Type> types, bool isImplicitSingleExprReturn)
-      : possibleTypes(types.begin(), types.end()),
-        isImplicitSingleExpressionReturn(isImplicitSingleExprReturn) {}
-};
+class CodeCompletionStringPrinter;
 
 class CodeCompletionResultBuilder {
-  friend AnnotatedTypePrinter;
+  friend CodeCompletionStringPrinter;
   
   CodeCompletionResultSink &Sink;
-  CodeCompletionResult::ResultKind Kind;
+  CodeCompletionResultKind Kind;
   SemanticContextKind SemanticContext;
   CodeCompletionFlair Flair;
   unsigned NumBytesToErase = 0;
@@ -85,13 +49,20 @@ class CodeCompletionResultBuilder {
   SmallVector<CodeCompletionString::Chunk, 4> Chunks;
   llvm::PointerUnion<const ModuleDecl *, const clang::Module *>
       CurrentModule;
-  ExpectedTypeContext declTypeContext;
-  CodeCompletionResult::ExpectedTypeRelation ExpectedTypeRelation =
-      CodeCompletionResult::Unknown;
   bool Cancelled = false;
-  CodeCompletionResult::NotRecommendedReason NotRecReason =
-      CodeCompletionResult::NotRecommendedReason::None;
+  ContextFreeNotRecommendedReason ContextFreeNotRecReason =
+      ContextFreeNotRecommendedReason::None;
+  ContextualNotRecommendedReason ContextualNotRecReason =
+      ContextualNotRecommendedReason::None;
   StringRef BriefDocComment;
+
+  /// The result type that this completion item produces.
+  CodeCompletionResultType ResultType = CodeCompletionResultType::unknown();
+
+  /// The context in which this completion item is used. Used to compute the
+  /// type relation to \c ResultType.
+  const ExpectedTypeContext *TypeContext = nullptr;
+  const DeclContext *DC = nullptr;
 
   void addChunkWithText(CodeCompletionString::Chunk::ChunkKind Kind,
                         StringRef Text);
@@ -117,11 +88,9 @@ class CodeCompletionResultBuilder {
 
 public:
   CodeCompletionResultBuilder(CodeCompletionResultSink &Sink,
-                              CodeCompletionResult::ResultKind Kind,
-                              SemanticContextKind SemanticContext,
-                              const ExpectedTypeContext &declTypeContext)
-      : Sink(Sink), Kind(Kind), SemanticContext(SemanticContext),
-        declTypeContext(declTypeContext) {}
+                              CodeCompletionResultKind Kind,
+                              SemanticContextKind SemanticContext)
+      : Sink(Sink), Kind(Kind), SemanticContext(SemanticContext) {}
 
   ~CodeCompletionResultBuilder() {
     finishResult();
@@ -146,21 +115,38 @@ public:
 
   void setLiteralKind(CodeCompletionLiteralKind kind) { LiteralKind = kind; }
   void setKeywordKind(CodeCompletionKeywordKind kind) { KeywordKind = kind; }
-  void setNotRecommended(CodeCompletionResult::NotRecommendedReason Reason) {
-    NotRecReason = Reason;
+  void setContextFreeNotRecommended(ContextFreeNotRecommendedReason Reason) {
+    ContextFreeNotRecReason = Reason;
   }
-
-  void setSemanticContext(SemanticContextKind Kind) {
-    SemanticContext = Kind;
+  void setContextualNotRecommended(ContextualNotRecommendedReason Reason) {
+    ContextualNotRecReason = Reason;
   }
 
   void addFlair(CodeCompletionFlair Options) {
     Flair |= Options;
   }
 
-  void
-  setExpectedTypeRelation(CodeCompletionResult::ExpectedTypeRelation relation) {
-    ExpectedTypeRelation = relation;
+  /// Indicate that the code completion item does not produce something with a
+  /// sensible result type, like a keyword or a method override suggestion.
+  void setResultTypeNotApplicable() {
+    ResultType = CodeCompletionResultType::notApplicable();
+  }
+
+  /// Set the result type of this code completion item and the context that the
+  /// item may be used in.
+  /// This is not a single unique type because for code completion we consider
+  /// e.g. \c Int as producing both an \c Int metatype and an \c Int instance
+  /// type.
+  void setResultTypes(ArrayRef<Type> ResultTypes) {
+    this->ResultType = CodeCompletionResultType(ResultTypes);
+  }
+
+  /// Set context in which this code completion item occurs. Used to compute the
+  /// item's type relation.
+  void setTypeContext(const ExpectedTypeContext &TypeContext,
+                      const DeclContext *DC) {
+    this->TypeContext = &TypeContext;
+    this->DC = DC;
   }
 
   void withNestedGroup(CodeCompletionString::Chunk::ChunkKind Kind,
@@ -192,6 +178,12 @@ public:
           "open ");
       break;
     }
+  }
+
+  void addRequiredKeyword() {
+    addChunkWithTextNoCopy(
+        CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword,
+        "required ");
   }
 
   void addOverrideKeyword() {
@@ -409,14 +401,14 @@ public:
 
   void addCallArgument(Identifier Name, Identifier LocalName, Type Ty,
                        Type ContextTy, bool IsVarArg, bool IsInOut, bool IsIUO,
-                       bool isAutoClosure, bool useUnderscoreLabel,
-                       bool isLabeledTrailingClosure);
+                       bool IsAutoClosure, bool UseUnderscoreLabel,
+                       bool IsLabeledTrailingClosure, bool HasDefault);
 
   void addCallArgument(Identifier Name, Type Ty, Type ContextTy = Type()) {
     addCallArgument(Name, Identifier(), Ty, ContextTy,
-                    /*IsVarArg=*/false, /*IsInOut=*/false, /*isIUO=*/false,
-                    /*isAutoClosure=*/false, /*useUnderscoreLabel=*/false,
-                    /*isLabeledTrailingClosure=*/false);
+                    /*IsVarArg=*/false, /*IsInOut=*/false, /*IsIUO=*/false,
+                    /*IsAutoClosure=*/false, /*UseUnderscoreLabel=*/false,
+                    /*IsLabeledTrailingClosure=*/false, /*HasDefault=*/false);
   }
 
   void addGenericParameter(StringRef Name) {

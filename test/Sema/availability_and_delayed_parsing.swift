@@ -1,13 +1,20 @@
 /// Check for reliable availability checking in inlinable code even when
 /// skipping some function bodies. rdar://82269657
 
-// RUN: %target-swift-frontend -typecheck -dump-type-refinement-contexts %s -target x86_64-apple-macos10.10 2>&1 \
+/// Default build mode reading everything
+// RUN: %target-swift-frontend -typecheck -dump-type-refinement-contexts %s -target %target-cpu-apple-macos10.10 2>&1 \
 // RUN:    | %FileCheck %s --check-prefixes TRC-API,TRC-INLINABLE,TRC-WITHTYPES,TRC-FULL
-// RUN: %target-swift-frontend -typecheck -dump-type-refinement-contexts %s -target x86_64-apple-macos10.10 -experimental-skip-non-inlinable-function-bodies-without-types 2>&1 \
+
+/// Emit-module-separately mode / for LLDB
+// RUN: %target-swift-frontend -typecheck -dump-type-refinement-contexts %s -target %target-cpu-apple-macos10.10 -experimental-skip-non-inlinable-function-bodies-without-types 2>&1 \
 // RUN:    | %FileCheck %s --check-prefixes TRC-API,TRC-INLINABLE,TRC-WITHTYPES,TRC-FULL-NOT
-// RUN: %target-swift-frontend -typecheck -dump-type-refinement-contexts %s -target x86_64-apple-macos10.10 -experimental-skip-non-inlinable-function-bodies 2>&1 \
+
+/// InstallAPI mode
+// RUN: %target-swift-frontend -typecheck -dump-type-refinement-contexts %s -target %target-cpu-apple-macos10.10 -experimental-skip-non-inlinable-function-bodies 2>&1 \
 // RUN:    | %FileCheck %s --check-prefixes TRC-API,TRC-INLINABLE,TRC-WITHTYPES-NOT,TRC-FULL-NOT
-// RUN: %target-swift-frontend -typecheck -dump-type-refinement-contexts %s -target x86_64-apple-macos10.10 -experimental-skip-all-function-bodies 2>&1 \
+
+/// Index build mode
+// RUN: %target-swift-frontend -typecheck -dump-type-refinement-contexts %s -target %target-cpu-apple-macos10.10 -experimental-skip-all-function-bodies 2>&1 \
 // RUN:    | %FileCheck %s --check-prefixes TRC-API,TRC-INLINABLE-NOT,TRC-WITHTYPES-NOT,TRC-FULL-NOT
 
 // REQUIRES: OS=macosx
@@ -16,6 +23,38 @@
 public func foo() { }
 // TRC-API: (root versions=[10.10.0,+Inf)
 // TRC-API:   (decl versions=[10.12,+Inf) decl=foo()
+
+#if canImport(Swift)
+  @available(macOS 10.10, *)
+  extension String {
+    public var computedVariable: String {
+      struct SomeTypeToForceCheckingThis {}
+
+      if #available(macOS 10.12, *) {
+        foo()
+      }
+
+      fatalError()
+    }
+  }
+#endif
+// TRC-FULL:  (decl versions=[10.10,+Inf) decl=extension.String
+// TRC-WITHTYPES:    (condition_following_availability versions=[10.12,+Inf)
+// TRC-WITHTYPES:    (if_then versions=[10.12,+Inf)
+// TRC-WITHTYPES-NOT-NOT:    (condition_following_availability versions=[10.12,+Inf)
+// TRC-WITHTYPES-NOT-NOT:    (if_then versions=[10.12,+Inf)
+
+struct S {
+  fileprivate var actual: [String] = [] {
+    didSet {
+      if #available(macOS 10.15, *) {
+        foo()
+      }
+    }
+  }
+}
+// TRC-API:  (condition_following_availability versions=[10.15,+Inf)
+// TRC-API:  (if_then versions=[10.15,+Inf)
 
 @inlinable public func inlinableFunc() {
     if #available(macOS 10.12, *) {

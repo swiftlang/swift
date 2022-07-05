@@ -7,6 +7,14 @@
 
 import Builtin
 
+public struct SomeData {}
+
+// CHECK-LABEL: sil [serialized] [_specialize exported: true, kind: full, available: 10.50, where T == SomeData] @specialize_availability : $@convention(thin) <T> (@in_guaranteed T) -> ()
+sil [serialized] [_specialize exported: true, kind: full, available: 10.50, where T == SomeData] @specialize_availability : $@convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%0 : $*T):
+  return undef : $()
+}
+
 // CHECK-LABEL: sil [serialized] [weak_imported] @weak_func : $@convention(thin) () -> ()
 sil [serialized] [weak_imported] @weak_func : $@convention(thin) () -> () {
 bb0:

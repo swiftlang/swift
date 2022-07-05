@@ -12,6 +12,7 @@
 
 #include "swift/SIL/Notifications.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/PassManager/PassPipeline.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -44,10 +45,13 @@ void executePassPipelinePlan(SILModule *SM, const SILPassPipelinePlan &plan,
                              bool isMandatory = false,
                              irgen::IRGenModule *IRMod = nullptr);
 
-/// Utility class to invoke passes in libswift.
-class LibswiftPassInvocation {
+/// Utility class to invoke Swift passes.
+class SwiftPassInvocation {
   /// Backlink to the pass manager.
   SILPassManager *passManager;
+
+  /// The current transform.
+  SILTransform *transform = nullptr;
 
   /// The currently optimized function.
   SILFunction *function = nullptr;
@@ -58,21 +62,35 @@ class LibswiftPassInvocation {
   /// All slabs, allocated by the pass.
   SILModule::SlabList allocatedSlabs;
 
+  static constexpr int BlockSetCapacity = 8;
+  char blockSetStorage[sizeof(BasicBlockSet) * BlockSetCapacity];
+  bool aliveBlockSets[BlockSetCapacity];
+
+  int numBlockSetsAllocated = 0;
+
+  void endPassRunChecks();
+
 public:
-  LibswiftPassInvocation(SILPassManager *passManager, SILFunction *function,
+  SwiftPassInvocation(SILPassManager *passManager, SILFunction *function,
                          SILCombiner *silCombiner) :
     passManager(passManager), function(function), silCombiner(silCombiner) {}
 
-  LibswiftPassInvocation(SILPassManager *passManager) :
+  SwiftPassInvocation(SILPassManager *passManager) :
     passManager(passManager) {}
 
   SILPassManager *getPassManager() const { return passManager; }
+  
+  SILTransform *getTransform() const { return transform; }
 
   SILFunction *getFunction() const { return function; }
 
   FixedSizeSlab *allocSlab(FixedSizeSlab *afterSlab);
 
   FixedSizeSlab *freeSlab(FixedSizeSlab *slab);
+
+  BasicBlockSet *allocBlockSet();
+
+  void freeBlockSet(BasicBlockSet *set);
 
   /// The top-level API to erase an instruction, called from the Swift pass.
   void eraseInstruction(SILInstruction *inst);
@@ -81,10 +99,16 @@ public:
   void notifyChanges(SILAnalysis::InvalidationKind invalidationKind);
 
   /// Called by the pass manager before the pass starts running.
-  void startPassRun(SILFunction *function);
+  void startFunctionPassRun(SILFunctionTransform *transform);
+
+  /// Called by the SILCombiner before the instruction pass starts running.
+  void startInstructionPassRun(SILInstruction *inst);
 
   /// Called by the pass manager when the pass has finished.
-  void finishedPassRun();
+  void finishedFunctionPassRun();
+
+  /// Called by the SILCombiner when the instruction pass has finished.
+  void finishedInstructionPassRun();
 };
 
 /// The SIL pass manager.
@@ -124,9 +148,13 @@ class SILPassManager {
 
   /// The number of passes run so far.
   unsigned NumPassesRun = 0;
+  unsigned numSubpassesRun = 0;
 
-  /// For invoking Swift passes in libswift.
-  LibswiftPassInvocation libswiftPassInvocation;
+  unsigned maxNumPassesToRun = UINT_MAX;
+  unsigned maxNumSubpassesToRun = UINT_MAX;
+
+  /// For invoking Swift passes.
+  SwiftPassInvocation swiftPassInvocation;
 
   /// Change notifications, collected during a bridged pass run.
   SILAnalysis::InvalidationKind changeNotifications =
@@ -201,8 +229,8 @@ public:
   /// pass manager.
   irgen::IRGenModule *getIRGenModule() { return IRMod; }
 
-  LibswiftPassInvocation *getLibswiftPassInvocation() {
-    return &libswiftPassInvocation;
+  SwiftPassInvocation *getSwiftPassInvocation() {
+    return &swiftPassInvocation;
   }
 
   /// Restart the function pass pipeline on the same function
@@ -306,11 +334,7 @@ public:
   ~SILPassManager();
 
   /// Verify all analyses.
-  void verifyAnalyses() const {
-    for (auto *A : Analyses) {
-      A->verify();
-    }
-  }
+  void verifyAnalyses() const;
 
   /// Precompute all analyses.
   void forcePrecomputeAnalyses(SILFunction *F) {
@@ -325,15 +349,21 @@ public:
   /// Discussion: We leave it up to the analyses to decide how to implement
   /// this. If no override is provided the SILAnalysis should just call the
   /// normal verify method.
-  void verifyAnalyses(SILFunction *F) const {
-    for (auto *A : Analyses) {
-      A->verify(F);
-    }
-  }
+  void verifyAnalyses(SILFunction *F) const;
 
   void executePassPipelinePlan(const SILPassPipelinePlan &Plan);
 
+  bool continueWithNextSubpassRun(SILInstruction *forInst, SILFunction *function,
+                                  SILTransform *trans);
+
+  static bool isPassDisabled(StringRef passName);
+  static bool disablePassesForFunction(SILFunction *function);
+
 private:
+  bool doPrintBefore(SILTransform *T, SILFunction *F);
+
+  bool doPrintAfter(SILTransform *T, SILFunction *F, bool PassChangedSIL);
+
   void execute();
 
   /// Add a pass of a specific kind.
@@ -365,7 +395,8 @@ private:
   bool analysesUnlocked();
 
   /// Dumps information about the pass with index \p TransIdx to llvm::dbgs().
-  void dumpPassInfo(const char *Title, SILTransform *Tr, SILFunction *F);
+  void dumpPassInfo(const char *Title, SILTransform *Tr, SILFunction *F,
+                    int passIdx = -1);
 
   /// Dumps information about the pass with index \p TransIdx to llvm::dbgs().
   void dumpPassInfo(const char *Title, unsigned TransIdx,
@@ -377,7 +408,7 @@ private:
   void viewCallGraph();
 };
 
-inline void LibswiftPassInvocation::
+inline void SwiftPassInvocation::
 notifyChanges(SILAnalysis::InvalidationKind invalidationKind) {
   passManager->notifyPassChanges(invalidationKind);
 }

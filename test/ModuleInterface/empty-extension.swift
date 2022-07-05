@@ -6,7 +6,8 @@
 // RUN: %target-swift-frontend -emit-module %s -DEXPORTED_LIB -module-name IndirectLib -emit-module-path %t/IndirectLib.swiftmodule -I %t
 // RUN: %target-swift-frontend -emit-module %s -DLIB -module-name Lib -emit-module-path %t/Lib.swiftmodule -I %t
 
-// RUN: %target-swift-frontend-typecheck -emit-module-interface-path %t/out.swiftinterface %s -I %t -swift-version 5 -enable-library-evolution
+// RUN: %target-swift-emit-module-interface(%t/out.swiftinterface) %s -I %t -module-name Test
+// RUN: %target-swift-typecheck-module-from-interface(%t/out.swiftinterface) -I %t -module-name Test
 // RUN: %FileCheck %s < %t/out.swiftinterface
 
 // REQUIRES: OS=macosx

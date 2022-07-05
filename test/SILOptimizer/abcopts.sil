@@ -1,6 +1,6 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -loop-rotate -dce -jumpthread-simplify-cfg -abcopts -enable-abcopts=1 %s | %FileCheck %s
-// RUN: %target-sil-opt -enable-sil-verify-all -loop-rotate -dce -jumpthread-simplify-cfg -abcopts -dce -enable-abcopts -enable-abc-hoisting %s | %FileCheck %s --check-prefix=HOIST
-// RUN: %target-sil-opt -enable-sil-verify-all  -abcopts  %s | %FileCheck %s --check-prefix=RANGECHECK
+// RUN: %target-sil-opt -parse-serialized-sil -enable-sil-verify-all -loop-rotate -dce -jumpthread-simplify-cfg -abcopts -enable-abcopts=1 %s | %FileCheck %s
+// RUN: %target-sil-opt -parse-serialized-sil -enable-sil-verify-all -loop-rotate -dce -jumpthread-simplify-cfg -abcopts -dce -enable-abcopts -enable-abc-hoisting %s | %FileCheck %s --check-prefix=HOIST
+// RUN: %target-sil-opt -parse-serialized-sil -enable-sil-verify-all  -abcopts  %s | %FileCheck %s --check-prefix=RANGECHECK
 
 sil_stage canonical
 

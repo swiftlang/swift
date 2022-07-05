@@ -71,7 +71,7 @@ class Z : BaseZ {
 
 _ = Z().capturesSelf()
 
-// CHECK-LABEL: sil @main : $@convention(c)
+// CHECK-LABEL: sil {{.*}}@main : $@convention(c)
 // CHECK: function_ref static inline_self.C.factory(Swift.Int) -> Self
 // CHECK: [[F:%[0-9]+]] = function_ref @$s11inline_self1CC7factory{{[_0-9a-zA-Z]*}}FZ : $@convention(method) (Int, @thick C.Type) -> @owned C
 // CHECK: apply [[F]](%{{.+}}, %{{.+}}) : $@convention(method) (Int, @thick C.Type) -> @owned C
@@ -86,6 +86,6 @@ _ = Z().capturesSelf()
 // CHECK-NOT: function_ref @$s11inline_self1ZC12capturesSelfACXDyF :
 // CHECK: }
 
-// CHECK-LABEL: sil hidden @$s11inline_self1ZC20callBaseCapturesSelfACXDyF
+// CHECK-LABEL: sil hidden {{.*}}@$s11inline_self1ZC20callBaseCapturesSelfACXDyF
 // CHECK-NOT: function_ref @$s11inline_self5BaseZC16baseCapturesSelfACXDyF :
 // CHECK: }

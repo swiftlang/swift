@@ -20,9 +20,11 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILOptimizer/Utils/CastOptimizer.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/Support/Debug.h"
 
@@ -205,17 +207,17 @@ constantFoldBinaryWithOverflow(BuiltinInst *BI, llvm::Intrinsic::ID ID,
     const ApplyExpr *CE = Loc.getAsASTNode<ApplyExpr>();
     SourceRange LHSRange, RHSRange;
     if (CE) {
-      const auto *Args = dyn_cast_or_null<TupleExpr>(CE->getArg());
-      if (Args && Args->getNumElements() == 2) {
+      const auto *Args = CE->getArgs();
+      if (Args->size() == 2) {
         // Look through inout types in order to handle += well.
-        CanType LHSTy = Args->getElement(0)->getType()->getInOutObjectType()->
+        CanType LHSTy = Args->getExpr(0)->getType()->getInOutObjectType()->
                          getCanonicalType();
-        CanType RHSTy = Args->getElement(1)->getType()->getCanonicalType();
+        CanType RHSTy = Args->getExpr(1)->getType()->getCanonicalType();
         if (LHSTy == RHSTy)
-          OpType = Args->getElement(1)->getType();
+          OpType = Args->getExpr(1)->getType();
 
-        LHSRange = Args->getElement(0)->getSourceRange();
-        RHSRange = Args->getElement(1)->getSourceRange();
+        LHSRange = Args->getExpr(0)->getSourceRange();
+        RHSRange = Args->getExpr(1)->getSourceRange();
       }
     }
 
@@ -245,24 +247,23 @@ constantFoldBinaryWithOverflow(BuiltinInst *BI, llvm::Intrinsic::ID ID,
         break;
     }
 
+    SmallString<10> LhsStr;
+    SmallString<10> RhsStr;
+    LHSInt.toString(LhsStr, /*Radix*/ 10, Signed);
+    RHSInt.toString(RhsStr, /*Radix*/ 10, Signed);
     if (!OpType.isNull()) {
-      diagnose(BI->getModule().getASTContext(),
-               Loc.getSourceLoc(),
-               diag::arithmetic_operation_overflow,
-               LHSInt.toString(/*Radix*/ 10, Signed),
-               Operator,
-               RHSInt.toString(/*Radix*/ 10, Signed),
-               OpType).highlight(LHSRange).highlight(RHSRange);
+      diagnose(BI->getModule().getASTContext(), Loc.getSourceLoc(),
+               diag::arithmetic_operation_overflow, LhsStr, Operator, RhsStr,
+               OpType)
+          .highlight(LHSRange)
+          .highlight(RHSRange);
     } else {
       // If we cannot get the type info in an expected way, describe the type.
-      diagnose(BI->getModule().getASTContext(),
-               Loc.getSourceLoc(),
-               diag::arithmetic_operation_overflow_generic_type,
-               LHSInt.toString(/*Radix*/ 10, Signed),
-               Operator,
-               RHSInt.toString(/*Radix*/ 10, Signed),
-               Signed,
-               LHSInt.getBitWidth()).highlight(LHSRange).highlight(RHSRange);
+      diagnose(BI->getModule().getASTContext(), Loc.getSourceLoc(),
+               diag::arithmetic_operation_overflow_generic_type, LhsStr,
+               Operator, RhsStr, Signed, LHSInt.getBitWidth())
+          .highlight(LHSRange)
+          .highlight(RHSRange);
     }
     ResultsInError = Optional<bool>(true);
   }
@@ -476,48 +477,6 @@ static SILValue constantFoldCompare(BuiltinInst *BI, BuiltinValueKind ID) {
       return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt());
     }
   }
-
-  // Fold x < 0 into false, if x is known to be a result of an unsigned
-  // operation with overflow checks enabled.
-  BuiltinInst *BIOp;
-  if (match(BI, m_BuiltinInst(BuiltinValueKind::ICMP_SLT,
-                              m_TupleExtractOperation(m_BuiltinInst(BIOp), 0),
-                              m_Zero()))) {
-    // Check if Other is a result of an unsigned operation with overflow.
-    switch (BIOp->getBuiltinInfo().ID) {
-    default:
-      break;
-    case BuiltinValueKind::UAddOver:
-    case BuiltinValueKind::USubOver:
-    case BuiltinValueKind::UMulOver:
-      // Was it an operation with an overflow check?
-      if (match(BIOp->getOperand(2), m_One())) {
-        SILBuilderWithScope B(BI);
-        return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt());
-      }
-    }
-  }
-
-  // Fold x >= 0 into true, if x is known to be a result of an unsigned
-  // operation with overflow checks enabled.
-  if (match(BI, m_BuiltinInst(BuiltinValueKind::ICMP_SGE,
-                              m_TupleExtractOperation(m_BuiltinInst(BIOp), 0),
-                              m_Zero()))) {
-    // Check if Other is a result of an unsigned operation with overflow.
-    switch (BIOp->getBuiltinInfo().ID) {
-    default:
-      break;
-    case BuiltinValueKind::UAddOver:
-    case BuiltinValueKind::USubOver:
-    case BuiltinValueKind::UMulOver:
-      // Was it an operation with an overflow check?
-      if (match(BIOp->getOperand(2), m_One())) {
-        SILBuilderWithScope B(BI);
-        return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt(1, 1));
-      }
-    }
-  }
-
   return nullptr;
 }
 
@@ -570,12 +529,11 @@ constantFoldAndCheckDivision(BuiltinInst *BI, BuiltinValueKind ID,
 
     // Otherwise emit the diagnostic, set ResultsInError to be true, and return
     // nullptr.
-    diagnose(M.getASTContext(),
-             BI->getLoc().getSourceLoc(),
+    diagnose(M.getASTContext(), BI->getLoc().getSourceLoc(),
              diag::division_overflow,
-             NumVal.toString(/*Radix*/ 10, /*Signed*/true),
+             llvm::toString(NumVal, /*Radix*/ 10, /*Signed*/ true),
              IsRem ? "%" : "/",
-             DenomVal.toString(/*Radix*/ 10, /*Signed*/true));
+             llvm::toString(DenomVal, /*Radix*/ 10, /*Signed*/ true));
     ResultsInError = Optional<bool>(true);
     return nullptr;
   }
@@ -779,13 +737,8 @@ constantFoldAndCheckIntegerConversions(BuiltinInst *BI,
     // Eventually we might be able to use SILLocation (when it contains info
     // about inlined call chains).
     if (CE) {
-      if (const TupleType *RTy = CE->getArg()->getType()->getAs<TupleType>()) {
-        if (RTy->getNumElements() == 1) {
-          UserSrcTy = RTy->getElementType(0);
-          UserDstTy = CE->getType();
-        }
-      } else {
-        UserSrcTy = CE->getArg()->getType();
+      if (auto *unaryArg = CE->getArgs()->getUnaryExpr()) {
+        UserSrcTy = unaryArg->getType();
         UserDstTy = CE->getType();
       }
     } else if (auto *ILE = Loc.getAsASTNode<IntegerLiteralExpr>()) {
@@ -1326,7 +1279,7 @@ case BuiltinValueKind::id:
     if (VInt.isNegative() && ResultsInError.hasValue()) {
       diagnose(M.getASTContext(), BI->getLoc().getSourceLoc(),
                diag::wrong_non_negative_assumption,
-               VInt.toString(/*Radix*/ 10, /*Signed*/ true));
+               llvm::toString(VInt, /*Radix*/ 10, /*Signed*/ true));
       ResultsInError = Optional<bool>(true);
     }
     return V;
@@ -1455,6 +1408,11 @@ static bool isApplyOfBuiltin(SILInstruction &I, BuiltinValueKind kind) {
 }
 
 static bool isApplyOfKnownAvailability(SILInstruction &I) {
+  // Inlinable functions can be deserialized in other modules which can be
+  // compiled with a different deployment target.
+  if (I.getFunction()->getResilienceExpansion() != ResilienceExpansion::Maximal)
+    return false;
+
   auto apply = FullApplySite::isa(&I);
   if (!apply)
     return false;
@@ -1580,6 +1538,14 @@ void ConstantFolder::initializeWorklist(SILFunction &f) {
         continue;
       }
 
+      // Builtin.ifdef only replaced when not building the stdlib.
+      if (isApplyOfBuiltin(*inst, BuiltinValueKind::Ifdef)) {
+        if (!inst->getModule().getASTContext().SILOpts.ParseStdlib) {
+          WorkList.insert(inst);
+          continue;
+        }
+      }
+
       if (isApplyOfKnownAvailability(*inst)) {
         WorkList.insert(inst);
         continue;
@@ -1693,6 +1659,7 @@ ConstantFolder::processWorkList() {
         InvalidateInstructions = true;
         instToDelete->eraseFromParent();
       });
+  InstructionDeleter deleter(std::move(callbacks));
 
   // An out parameter array that we use to return new simplified results from
   // constantFoldInstruction.
@@ -1716,7 +1683,7 @@ ConstantFolder::processWorkList() {
           // Schedule users for constant folding.
           WorkList.insert(AssertConfInt);
           // Delete the call.
-          eliminateDeadInstruction(BI, callbacks);
+          eliminateDeadInstruction(BI, deleter.getCallbacks());
           continue;
         }
 
@@ -1725,7 +1692,7 @@ ConstantFolder::processWorkList() {
         if (isApplyOfBuiltin(*BI, BuiltinValueKind::CondUnreachable)) {
           assert(BI->use_empty() && "use of conditionallyUnreachable?!");
           recursivelyDeleteTriviallyDeadInstructions(BI, /*force*/ true,
-                                                     callbacks);
+                                                     deleter.getCallbacks());
           InvalidateInstructions = true;
           continue;
         }
@@ -1737,7 +1704,7 @@ ConstantFolder::processWorkList() {
         SILBuilderWithScope B(I);
         auto tru = B.createIntegerLiteral(apply->getLoc(), apply->getType(), 1);
         apply->replaceAllUsesWith(tru);
-        eliminateDeadInstruction(I, callbacks);
+        eliminateDeadInstruction(I, deleter.getCallbacks());
         WorkList.insert(tru);
         InvalidateInstructions = true;
       }
@@ -1785,8 +1752,8 @@ ConstantFolder::processWorkList() {
     if (isApplyOfBuiltin(*I, BuiltinValueKind::GlobalStringTablePointer)) {
       if (constantFoldGlobalStringTablePointerBuiltin(cast<BuiltinInst>(I),
                                                       EnableDiagnostics)) {
-        // Here, the bulitin instruction got folded, so clean it up.
-        eliminateDeadInstruction(I, callbacks);
+        // Here, the builtin instruction got folded, so clean it up.
+        eliminateDeadInstruction(I, deleter.getCallbacks());
       }
       continue;
     }
@@ -1802,7 +1769,7 @@ ConstantFolder::processWorkList() {
                                              sli->getValue());
           WorkList.insert(cfi);
           recursivelyDeleteTriviallyDeadInstructions(I, /*force*/ true,
-                                                     callbacks);
+                                                     deleter.getCallbacks());
         }
       }
       continue;
@@ -1810,11 +1777,34 @@ ConstantFolder::processWorkList() {
 
     if (isApplyOfBuiltin(*I, BuiltinValueKind::IsConcrete)) {
       if (constantFoldIsConcrete(cast<BuiltinInst>(I))) {
-        // Here, the bulitin instruction got folded, so clean it up.
+        // Here, the builtin instruction got folded, so clean it up.
         recursivelyDeleteTriviallyDeadInstructions(I, /*force*/ true,
-                                                   callbacks);
+                                                   deleter.getCallbacks());
       }
       continue;
+    }
+
+    // Builtin.ifdef_... is expected to stay unresolved when building the stdlib
+    // and must be only used in @_alwaysEmitIntoClient exported functions, which
+    // means we never generate IR for it (when building stdlib). Client code is
+    // then always constant-folding this builtin based on the compilation flags
+    // of the client module.
+    if (isApplyOfBuiltin(*I, BuiltinValueKind::Ifdef)) {
+      if (!I->getModule().getASTContext().SILOpts.ParseStdlib) {
+        auto *BI = cast<BuiltinInst>(I);
+        StringRef flagName = BI->getName().str().drop_front(strlen("ifdef_"));
+        const LangOptions &langOpts = I->getModule().getASTContext().LangOpts;
+        bool val = langOpts.isCustomConditionalCompilationFlagSet(flagName);
+
+        SILBuilderWithScope builder(BI);
+        auto *inst = builder.createIntegerLiteral(
+            BI->getLoc(),
+            SILType::getBuiltinIntegerType(1, builder.getASTContext()), val);
+        BI->replaceAllUsesWith(inst);
+
+        eliminateDeadInstruction(I, deleter.getCallbacks());
+        continue;
+      }
     }
 
     if (auto *bi = dyn_cast<BuiltinInst>(I)) {
@@ -1833,7 +1823,7 @@ ConstantFolder::processWorkList() {
     }
 
     // Go through all users of the constant and try to fold them.
-    InstructionDeleter deleter(callbacks);
+
     for (auto Result : I->getResults()) {
       for (auto *Use : Result->getUses()) {
         SILInstruction *User = Use->getUser();

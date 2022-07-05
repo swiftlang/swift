@@ -202,21 +202,22 @@ SILValue EscapeAnalysis::getPointerBase(SILValue value) {
   case ValueKind::RefToRawPointerInst:
   case ValueKind::RefToBridgeObjectInst:
   case ValueKind::BridgeObjectToRefInst:
+    return cast<SingleValueInstruction>(value)->getOperand(0);
+
   case ValueKind::UnconditionalCheckedCastInst:
+  case ValueKind::UncheckedAddrCastInst:
     // DO NOT use LOADABLE_REF_STORAGE because unchecked references don't have
     // retain/release instructions that trigger the 'default' case.
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
   case ValueKind::RefTo##Name##Inst:                                           \
   case ValueKind::Name##ToRefInst:
 #include "swift/AST/ReferenceStorage.def"
-    return cast<SingleValueInstruction>(value)->getOperand(0);
-
-  case ValueKind::UncheckedAddrCastInst: {
-    auto *uac = cast<UncheckedAddrCastInst>(value);
-    SILValue op = uac->getOperand();
+  {
+    auto *svi = cast<SingleValueInstruction>(value);
+    SILValue op = svi->getOperand(0);
     SILType srcTy = op->getType().getObjectType();
     SILType destTy = value->getType().getObjectType();
-    SILFunction *f = uac->getFunction();
+    SILFunction *f = svi->getFunction();
     // If the source and destination of the cast don't agree on being a pointer,
     // we bail. Otherwise we would miss important edges in the connection graph:
     // e.g. loads of non-pointers are ignored, while it could be an escape of
@@ -250,6 +251,14 @@ SILValue EscapeAnalysis::getPointerBase(SILValue value) {
     }
     return pointerOperand;
   }
+  case ValueKind::MultipleValueInstructionResult: {
+    if (auto *dt = dyn_cast<DestructureTupleInst>(value)) {
+      if (canOptimizeArrayUninitializedResult(dt))
+        return SILValue();
+      return dt->getOperand();
+    }
+    return SILValue();
+  }
   default:
     return SILValue();
   }
@@ -280,8 +289,6 @@ static bool isNonWritableMemoryAddress(SILValue V) {
   case ValueKind::ObjCSuperMethodInst:
   case ValueKind::StringLiteralInst:
   case ValueKind::ThinToThickFunctionInst:
-  case ValueKind::ThinFunctionToPointerInst:
-  case ValueKind::PointerToThinFunctionInst:
     // These instructions return pointers to memory which can't be a
     // destination of a store.
     return true;
@@ -1028,23 +1035,10 @@ EscapeAnalysis::ConnectionGraph::getOrCreateReferenceContent(SILValue refVal,
 
   // Determine whether the object that refVal refers to only contains
   // references.
-  bool contentHasReferenceOnly = false;
-  if (refVal) {
-    SILType refType = refVal->getType();
-    if (auto *C = refType.getClassOrBoundGenericClass()) {
-      PointerKind aggregateKind = NoPointer;
-      for (auto *field : C->getStoredProperties()) {
-        SILType fieldType = refType
-                                .getFieldType(field, F->getModule(),
-                                              F->getTypeExpansionContext())
-                                .getObjectType();
-        PointerKind fieldKind = EA->findCachedPointerKind(fieldType, *F);
-        if (fieldKind > aggregateKind)
-          aggregateKind = fieldKind;
-      }
-      contentHasReferenceOnly = canOnlyContainReferences(aggregateKind);
-    }
-  }
+  bool contentHasReferenceOnly =
+      refVal ? canOnlyContainReferences(
+          EA->findCachedClassPropertiesKind(refVal->getType(), *F))
+             : false;
   getOrCreateContentNode(objNode, false, contentHasReferenceOnly);
   return objNode;
 }
@@ -1939,6 +1933,11 @@ EscapeAnalysis::canOptimizeArrayUninitializedCall(ApplyInst *ai) {
         continue;
       }
     }
+    if (auto *dt = dyn_cast<DestructureTupleInst>(use->getUser())) {
+      call.arrayStruct = dt->getResult(0);
+      call.arrayElementPtr = dt->getResult(1);
+      continue;
+    }
     // If there are any other uses, such as a release_value, erase the previous
     // call info and bail out.
     call.arrayStruct = nullptr;
@@ -1957,8 +1956,9 @@ EscapeAnalysis::canOptimizeArrayUninitializedCall(ApplyInst *ai) {
 }
 
 bool EscapeAnalysis::canOptimizeArrayUninitializedResult(
-    TupleExtractInst *tei) {
-  ApplyInst *ai = dyn_cast<ApplyInst>(tei->getOperand());
+    SILInstruction *extract) {
+  assert(isa<TupleExtractInst>(extract) || isa<DestructureTupleInst>(extract));
+  ApplyInst *ai = dyn_cast<ApplyInst>(extract->getOperand(0));
   if (!ai)
     return false;
 
@@ -2097,12 +2097,13 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     }
   }
 
-  if (isa<StrongReleaseInst>(I) || isa<ReleaseValueInst>(I)) {
+  if (isa<StrongReleaseInst>(I) || isa<ReleaseValueInst>(I) ||
+      isa<DestroyValueInst>(I)) {
     // Treat the release instruction as if it is the invocation
     // of a deinit function.
     if (RecursionDepth < MaxRecursionDepth) {
       // Check if the destructor is known.
-      auto OpV = cast<RefCountingInst>(I)->getOperand(0);
+      auto OpV = I->getOperand(0);
       if (buildConnectionGraphForDestructor(OpV, I, FInfo, BottomUpOrder,
                                             RecursionDepth))
         return;
@@ -2128,6 +2129,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
   switch (I->getKind()) {
     case SILInstructionKind::AllocStackInst:
     case SILInstructionKind::AllocRefInst:
+    case SILInstructionKind::AllocRefDynamicInst:
     case SILInstructionKind::AllocBoxInst:
       ConGraph->getNode(cast<SingleValueInstruction>(I));
       return;
@@ -2147,6 +2149,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     case SILInstructionKind::InitExistentialMetatypeInst:
     case SILInstructionKind::OpenExistentialMetatypeInst:
     case SILInstructionKind::ExistentialMetatypeInst:
+    case SILInstructionKind::DeallocStackRefInst:
     case SILInstructionKind::DeallocRefInst:
     case SILInstructionKind::SetDeallocatingInst:
     case SILInstructionKind::FixLifetimeInst:
@@ -2157,10 +2160,21 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
         return isPointer(result);
       }));
       return;
-
+    case SILInstructionKind::BeginBorrowInst:
+    case SILInstructionKind::CopyValueInst: {
+      auto svi = cast<SingleValueInstruction>(I);
+      CGNode *resultNode = ConGraph->getNode(svi);
+      if (CGNode *opNode = ConGraph->getNode(svi->getOperand(0))) {
+        ConGraph->defer(resultNode, opNode);
+        return;
+      }
+      ConGraph->setEscapesGlobal(svi);
+      return;
+    }
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
     case SILInstructionKind::Name##ReleaseInst:
 #include "swift/AST/ReferenceStorage.def"
+    case SILInstructionKind::DestroyValueInst:
     case SILInstructionKind::StrongReleaseInst:
     case SILInstructionKind::ReleaseValueInst: {
       // A release instruction may deallocate the pointer operand. This may
@@ -2350,9 +2364,15 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       // This is a tuple_extract which extracts the second result of an
       // array.uninitialized call (otherwise getPointerBase should have already
       // looked through it).
-      auto *TEI = cast<TupleExtractInst>(I);
-      assert(canOptimizeArrayUninitializedResult(TEI)
+      assert(canOptimizeArrayUninitializedResult(I)
              && "tuple_extract should be handled as projection");
+      return;
+    }
+    case SILInstructionKind::DestructureTupleInst: {
+      if (canOptimizeArrayUninitializedResult(I)) {
+        return;
+      }
+      setAllEscaping(I, ConGraph);
       return;
     }
     case SILInstructionKind::UncheckedRefCastAddrInst: {
@@ -2818,7 +2838,7 @@ bool EscapeAnalysis::canPointToSameMemory(SILValue V1, SILValue V2) {
 // graph path exists from the referenced object to a global-escaping or
 // argument-escaping node.
 //
-// TODO: This API is inneffective for release hoisting, because the release
+// TODO: This API is ineffective for release hoisting, because the release
 // itself is often the only place that an object's contents may escape. We can't
 // currently determine that since the contents cannot escape prior to \p
 // releasePtr, then livePtr cannot possible point to the same memory!

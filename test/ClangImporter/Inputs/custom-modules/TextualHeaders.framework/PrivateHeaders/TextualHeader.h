@@ -1,0 +1,1 @@
+#define BOOM 42

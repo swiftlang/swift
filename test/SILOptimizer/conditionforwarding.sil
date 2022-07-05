@@ -356,3 +356,35 @@ bb7:
   %r = tuple ()
   return %r : $()
 }
+
+// CHECK-LABEL: sil @forwarding_second_enum_use : 
+// CHECK-NOT: switch_enum
+// CHECK-LABEL:} // end sil function 'forwarding_second_enum_use'
+sil @forwarding_second_enum_use : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  cond_br %0, bb1, bb2
+
+bb1:
+  %1 = enum $E, #E.A!enumelt
+  br bb3(%1 : $E)
+
+bb2:
+  %2 = enum $E, #E.B!enumelt
+  br bb3(%2 : $E)
+
+bb3(%14 : $E):
+  switch_enum %14 : $E, case #E.A!enumelt: bb4, case #E.B!enumelt: bb5
+
+bb4:
+  %15 = function_ref @use_enum : $@convention(thin) (E) -> ()
+  %16 = apply %15(%14) : $@convention(thin) (E) -> ()
+  br bb6
+
+bb5:
+  br bb6
+
+bb6:
+  %r = tuple ()
+  return %r : $()
+}
+

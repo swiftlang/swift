@@ -21,6 +21,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/InitializeSwiftModules.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
@@ -191,6 +192,12 @@ VerifySyntaxTree("verify-syntax-tree",
                  llvm::cl::cat(Category),
                  llvm::cl::init(true));
 
+static llvm::cl::opt<bool> FailOnParseError(
+    "fail-on-parse-error",
+    llvm::cl::desc("Exit with a non-zero exit code if there was a parsing "
+                   "error (including unknown syntax nodes)"),
+    llvm::cl::cat(Category), llvm::cl::init(false));
+
 static llvm::cl::opt<bool>
 Visual("v",
        llvm::cl::desc("Print visually"),
@@ -360,13 +367,13 @@ bool parseIncrementalEditArguments(SyntaxParsingCache *Cache,
                                    StringRef OldFileName) {
   // Get a source manager for the old file
   InputFile OldFile = InputFile(OldFileName, true);
-  auto OldFileBufferOrErrror = llvm::MemoryBuffer::getFileOrSTDIN(OldFileName);
-  if (!OldFileBufferOrErrror) {
+  auto OldFileBufferOrError = llvm::MemoryBuffer::getFileOrSTDIN(OldFileName);
+  if (!OldFileBufferOrError) {
     llvm::errs() << "Unable to open old source file";
     return false;
   }
   SourceManager SourceMgr;
-  unsigned BufferID = SourceMgr.addNewSourceBuffer(std::move(OldFileBufferOrErrror.get()));
+  unsigned BufferID = SourceMgr.addNewSourceBuffer(std::move(OldFileBufferOrError.get()));
 
   llvm::Regex MatchRegex("([0-9]+):([0-9]+)-([0-9]+):([0-9]+)=(.*)");
   // Parse the source edits
@@ -406,7 +413,7 @@ bool parseIncrementalEditArguments(SyntaxParsingCache *Cache,
         SourceMgr.getLocOffsetInBuffer(EditStartLoc, BufferID);
     auto EditEndOffset = SourceMgr.getLocOffsetInBuffer(EditEndLoc, BufferID);
     Cache->addEdit(EditStartOffset, EditEndOffset,
-                   /*ReplacmentLength=*/Matches[5].size());
+                   /*ReplacementLength=*/Matches[5].size());
   }
   return true;
 }
@@ -536,6 +543,8 @@ struct ParseInfo {
   SourceFile *SF;
   SyntaxParsingCache *SyntaxCache;
   std::string Diags;
+  /// Whether parsing produced any diagnostics with severity error.
+  bool DidHaveError;
 };
 
 /// Parse the given input file (incrementally if an old syntax tree was
@@ -543,6 +552,7 @@ struct ParseInfo {
 int parseFile(
     const char *MainExecutablePath, const StringRef InputFileName,
     llvm::function_ref<int(ParseInfo)> ActionSpecificCallback) {
+
   // The cache needs to be a heap allocated pointer since we construct it inside
   // an if block but need to keep it alive until the end of the function.
   SyntaxParsingCache *SyntaxCache = nullptr;
@@ -581,6 +591,8 @@ int parseFile(
   Invocation.getLangOptions().ParseForSyntaxTreeOnly = true;
   Invocation.getLangOptions().VerifySyntaxTree = options::VerifySyntaxTree;
   Invocation.getLangOptions().DisablePoundIfEvaluation = true;
+  Invocation.getLangOptions().EnableExperimentalStringProcessing = true;
+  Invocation.getLangOptions().Features.insert(Feature::BareSlashRegexLiterals);
 
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(InputFileName);
 
@@ -595,8 +607,9 @@ int parseFile(
   PrintingDiagnosticConsumer DiagConsumer(DiagOS);
   CompilerInstance Instance;
   Instance.addDiagnosticConsumer(&DiagConsumer);
-  if (Instance.setup(Invocation)) {
-    llvm::errs() << "Unable to set up compiler instance";
+  std::string InstanceSetupError;
+  if (Instance.setup(Invocation, InstanceSetupError)) {
+    llvm::errs() << InstanceSetupError << '\n';
     return EXIT_FAILURE;
   }
 
@@ -642,13 +655,32 @@ int parseFile(
     }
   }
 
-  int ActionSpecificExitCode =
-    ActionSpecificCallback({SF, SyntaxCache, DiagOS.str()});
+  int ActionSpecificExitCode = ActionSpecificCallback(
+      {SF, SyntaxCache, DiagOS.str(), DiagConsumer.didErrorOccur()});
   if (ActionSpecificExitCode != EXIT_SUCCESS) {
     return ActionSpecificExitCode;
   } else {
     return InternalExitCode;
   }
+}
+
+static bool printDiags(ParseInfo info) {
+  if (!options::DiagsOutputFilename.empty()) {
+    std::error_code errorCode;
+    llvm::raw_fd_ostream os(options::DiagsOutputFilename, errorCode,
+                            llvm::sys::fs::OF_None);
+    if (errorCode) {
+      llvm::errs() << "error opening file '" << options::DiagsOutputFilename
+                   << "': " << errorCode.message() << '\n';
+      return false;
+    }
+    if (!info.Diags.empty())
+      os << info.Diags << '\n';
+  } else {
+    if (!info.Diags.empty())
+      llvm::errs() << info.Diags << '\n';
+  }
+  return true;
 }
 
 int doFullLexRoundTrip(const StringRef InputFilename) {
@@ -710,6 +742,9 @@ int doFullParseRoundTrip(const char *MainExecutablePath,
   return parseFile(MainExecutablePath, InputFile,
     [](ParseInfo info) -> int {
     info.SF->getSyntaxRoot().print(llvm::outs(), {});
+    if (options::FailOnParseError && info.DidHaveError) {
+      return EXIT_FAILURE;
+    }
     return EXIT_SUCCESS;
   });
 }
@@ -724,7 +759,7 @@ int doSerializeRawTree(const char *MainExecutablePath,
     if (!options::OutputFilename.empty()) {
       std::error_code errorCode;
       llvm::raw_fd_ostream os(options::OutputFilename, errorCode,
-                              llvm::sys::fs::F_None);
+                              llvm::sys::fs::OF_None);
       assert(!errorCode && "Couldn't open output file");
       swift::json::Output out(os);
       out << *Root;
@@ -735,22 +770,13 @@ int doSerializeRawTree(const char *MainExecutablePath,
       llvm::outs() << "\n";
     }
 
-    if (!options::DiagsOutputFilename.empty()) {
-      std::error_code errorCode;
-      llvm::raw_fd_ostream os(options::DiagsOutputFilename, errorCode,
-                              llvm::sys::fs::F_None);
-      if (errorCode) {
-        llvm::errs() << "error opening file '" << options::DiagsOutputFilename
-          << "': " << errorCode.message() << '\n';
-        return EXIT_FAILURE;
-      }
-      if (!info.Diags.empty())
-        os << info.Diags << '\n';
-    } else {
-      if (!info.Diags.empty())
-        llvm::errs() << info.Diags << '\n';
+    if (!printDiags(info)) {
+      return EXIT_FAILURE;
     }
 
+    if (options::FailOnParseError && info.DidHaveError) {
+      return EXIT_FAILURE;
+    }
     return EXIT_SUCCESS;
   });
 }
@@ -762,7 +788,7 @@ int doDeserializeRawTree(const char *MainExecutablePath,
   auto Buffer = llvm::MemoryBuffer::getFile(InputFile);
   std::error_code errorCode;
   auto os = std::make_unique<llvm::raw_fd_ostream>(
-              OutputFileName, errorCode, llvm::sys::fs::F_None);
+              OutputFileName, errorCode, llvm::sys::fs::OF_None);
   swift::json::SyntaxDeserializer deserializer(llvm::MemoryBufferRef(*(Buffer.get())));
   deserializer.getSourceFileSyntax()->print(*os);
 
@@ -770,8 +796,13 @@ int doDeserializeRawTree(const char *MainExecutablePath,
 }
 
 int doParseOnly(const char *MainExecutablePath, const StringRef InputFile) {
-  return parseFile(MainExecutablePath, InputFile,
-    [](ParseInfo info) {
+  return parseFile(MainExecutablePath, InputFile, [](ParseInfo info) {
+    if (!printDiags(info)) {
+      return EXIT_FAILURE;
+    }
+    if (options::FailOnParseError && info.DidHaveError) {
+      return EXIT_FAILURE;
+    }
     return info.SF ? EXIT_SUCCESS : EXIT_FAILURE;
   });
 }
@@ -784,6 +815,12 @@ int dumpParserGen(const char *MainExecutablePath, const StringRef InputFile) {
     Opts.Visual = options::Visual;
     Opts.PrintTrivialNodeKind = options::PrintTrivialNodeKind;
     info.SF->getSyntaxRoot().print(llvm::outs(), Opts);
+    if (!printDiags(info)) {
+      return EXIT_FAILURE;
+    }
+    if (options::FailOnParseError && info.DidHaveError) {
+      return EXIT_FAILURE;
+    }
     return EXIT_SUCCESS;
   });
 }
@@ -801,6 +838,10 @@ int dumpEOFSourceLoc(const char *MainExecutablePath,
     auto StartLoc = SourceMgr.getLocForBufferStart(BufferId);
     auto EndLoc = SourceMgr.getLocForOffset(BufferId, AbPos.getOffset());
 
+    if (!printDiags(info)) {
+      return EXIT_FAILURE;
+    }
+
     // To ensure the correctness of position when translated to line & column
     // pair.
     if (SourceMgr.getLocOffsetInBuffer(EndLoc, BufferId) != AbPos.getOffset()) {
@@ -808,6 +849,9 @@ int dumpEOFSourceLoc(const char *MainExecutablePath,
       return EXIT_FAILURE;
     }
     llvm::outs() << CharSourceRange(SourceMgr, StartLoc, EndLoc).str();
+    if (options::FailOnParseError && info.DidHaveError) {
+      return EXIT_FAILURE;
+    }
     return EXIT_SUCCESS;
   });
 }
@@ -855,6 +899,7 @@ static int invokeCommand(const char *MainExecutablePath,
 
 int main(int argc, char *argv[]) {
   PROGRAM_START(argc, argv);
+  initializeSwiftParseModules();
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift Syntax Test\n");
 
   int ExitCode = EXIT_SUCCESS;

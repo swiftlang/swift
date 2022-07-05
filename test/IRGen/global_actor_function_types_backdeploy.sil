@@ -1,0 +1,22 @@
+// RUN: %target-swift-frontend -target %target-cpu-apple-macos12 -emit-ir -o - -primary-file %s | %FileCheck %s --check-prefix CHECK-OS
+// RUN: %target-swift-frontend -target %target-cpu-apple-macos11 -emit-ir -o - -primary-file %s | %FileCheck %s --check-prefix CHECK-BACKDEPLOY
+// REQUIRES: concurrency
+// REQUIRES: OS=macosx
+
+import Swift
+import _Concurrency
+
+func globalActorMetatype<T>(_: T.Type) -> Any.Type {
+  typealias Fn = @MainActor () -> T
+  return Fn.self
+}
+
+// CHECK-OS: call %swift.type* @swift_getFunctionTypeMetadataGlobalActor{{.*}}(i{{32|64}} 335544320, i{{32|64}} 0, %swift.type** null, i32* null, %swift.type* %T, %swift.type* {{.*}})
+// CHECK-BACKDEPLOY: call %swift.type* @swift_getFunctionTypeMetadataGlobalActorBackDeploy{{.*}}(i{{32|64}} 335544320, i{{32|64}} 0, %swift.type** null, i32* null, %swift.type* %T, %swift.type* {{.*}})
+sil [ossa] @$s4test19globalActorMetatypeyypXpxmlF : $@convention(thin) <T> (@thick T.Type) -> @thick Any.Type {
+bb0(%0 : $@thick T.Type):
+  %2 = metatype $@thin (@MainActor () -> T).Type
+  %3 = metatype $@thick (@MainActor () -> T).Type
+  %4 = init_existential_metatype %3 : $@thick (@MainActor () -> T).Type, $@thick Any.Type
+  return %4 : $@thick Any.Type
+}

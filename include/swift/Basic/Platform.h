@@ -15,8 +15,8 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Config.h"
+#include "clang/Basic/DarwinSDKInfo.h"
 #include "llvm/ADT/StringRef.h"
-#include "clang/Driver/DarwinSDKInfo.h"
 
 namespace llvm {
   class Triple;
@@ -55,9 +55,15 @@ namespace swift {
   bool triplesAreValidForZippering(const llvm::Triple &target,
                                    const llvm::Triple &targetVariant);
 
-  /// Returns true if the given triple represents an OS that ships with
-  /// ABI-stable swift libraries (eg. in /usr/lib/swift).
-  bool tripleRequiresRPathForSwiftInOS(const llvm::Triple &triple);
+  /// Returns the VersionTuple at which Swift first became available for the OS
+  /// represented by `triple`.
+  const Optional<llvm::VersionTuple>
+  minimumAvailableOSVersionForTriple(const llvm::Triple &triple);
+
+  /// Returns true if the given triple represents an OS that has all the
+  /// "built-in" ABI-stable libraries (stdlib and _Concurrency)
+  /// (eg. in /usr/lib/swift).
+  bool tripleRequiresRPathForSwiftLibrariesInOS(const llvm::Triple &triple);
 
   /// Returns the platform name for a given target triple.
   ///
@@ -104,7 +110,7 @@ namespace swift {
   getSwiftRuntimeCompatibilityVersionForTarget(const llvm::Triple &Triple);
 
   /// Retrieve the target SDK version for the given SDKInfo and target triple.
-  llvm::VersionTuple getTargetSDKVersion(clang::driver::DarwinSDKInfo &SDKInfo,
+  llvm::VersionTuple getTargetSDKVersion(clang::DarwinSDKInfo &SDKInfo,
                                          const llvm::Triple &triple);
 
   /// Get SDK build version.

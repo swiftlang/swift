@@ -14,13 +14,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if defined(__CYGWIN__) || defined(__HAIKU__) || defined(__wasi__)
-#define SWIFT_SUPPORTS_BACKTRACE_REPORTING 0
-#else
-#define SWIFT_SUPPORTS_BACKTRACE_REPORTING 1
-#endif
-
 #if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+
 #include <mutex>
 #endif
 
@@ -31,15 +29,15 @@
 #include <string.h>
 #if defined(_WIN32)
 #include <io.h>
-#else
-#include <unistd.h>
 #endif
 #include <stdarg.h>
 
 #include "ImageInspection.h"
-#include "swift/Runtime/Debug.h"
-#include "swift/Runtime/Mutex.h"
 #include "swift/Demangling/Demangle.h"
+#include "swift/Runtime/Debug.h"
+#include "swift/Runtime/Portability.h"
+#include "swift/Threading/Errors.h"
+#include "swift/Threading/Mutex.h"
 #include "llvm/ADT/StringRef.h"
 
 #if defined(_MSC_VER)
@@ -52,7 +50,7 @@
 #include <execinfo.h>
 #endif
 
-#if defined(__APPLE__)
+#if SWIFT_STDLIB_HAS_ASL
 #include <asl.h>
 #elif defined(__ANDROID__)
 #include <android/log.h>
@@ -64,6 +62,13 @@
 
 #include <inttypes.h>
 
+#ifdef SWIFT_HAVE_CRASHREPORTERCLIENT
+#include <atomic>
+#include <malloc/malloc.h>
+
+#include "swift/Runtime/Atomic.h"
+#endif // SWIFT_HAVE_CRASHREPORTERCLIENT
+
 namespace FatalErrorFlags {
 enum: uint32_t {
   ReportBacktrace = 1 << 0
@@ -72,7 +77,7 @@ enum: uint32_t {
 
 using namespace swift;
 
-#if SWIFT_SUPPORTS_BACKTRACE_REPORTING
+#if SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING && SWIFT_STDLIB_HAS_DLADDR
 static bool getSymbolNameAddr(llvm::StringRef libraryName,
                               const SymbolInfo &syminfo,
                               std::string &symbolName, uintptr_t &addrOut) {
@@ -92,10 +97,13 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName,
   // providing failure status instead of just returning the original string like
   // swift demangle.
 #if defined(_WIN32)
-  static StaticMutex mutex;
-
   char szUndName[1024];
-  DWORD dwResult = mutex.withLock([&syminfo, &szUndName]() {
+  DWORD dwResult;
+  dwResult = _swift_withWin32DbgHelpLibrary([&] (bool isInitialized) -> DWORD {
+    if (!isInitialized) {
+      return 0;
+    }
+
     DWORD dwFlags = UNDNAME_COMPLETE;
 #if !defined(_WIN64)
     dwFlags |= UNDNAME_32_BIT_DECODE;
@@ -105,7 +113,7 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName,
                                 sizeof(szUndName), dwFlags);
   });
 
-  if (dwResult == TRUE) {
+  if (dwResult) {
     symbolName += szUndName;
     return true;
   }
@@ -135,7 +143,7 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName,
 
 void swift::dumpStackTraceEntry(unsigned index, void *framePC,
                                 bool shortOutput) {
-#if SWIFT_SUPPORTS_BACKTRACE_REPORTING && !defined(SWIFT_RUNTIME_MACHO_NO_DYLD)
+#if SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING && SWIFT_STDLIB_HAS_DLADDR
   SymbolInfo syminfo;
 
   // 0 is failure for lookupSymbol
@@ -223,7 +231,7 @@ static _Unwind_Reason_Code SwiftUnwindFrame(struct _Unwind_Context *context, voi
 
 SWIFT_ALWAYS_INLINE
 static bool withCurrentBacktraceImpl(std::function<void(void **, int)> call) {
-#if SWIFT_SUPPORTS_BACKTRACE_REPORTING
+#if SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING
   constexpr unsigned maxSupportedStackDepth = 128;
   void *addrs[maxSupportedStackDepth];
 #if defined(_WIN32)
@@ -258,56 +266,38 @@ void swift::printCurrentBacktrace(unsigned framesToSkip) {
     fprintf(stderr, "<backtrace unavailable>\n");
 }
 
-#ifdef SWIFT_HAVE_CRASHREPORTERCLIENT
-#include <malloc/malloc.h>
-
-// Instead of linking to CrashReporterClient.a (because it complicates the
-// build system), define the only symbol from that static archive ourselves.
-//
-// The layout of this struct is CrashReporter ABI, so there are no ABI concerns
-// here.
-extern "C" {
-SWIFT_LIBRARY_VISIBILITY
-struct crashreporter_annotations_t gCRAnnotations
-__attribute__((__section__("__DATA," CRASHREPORTER_ANNOTATIONS_SECTION))) = {
-    CRASHREPORTER_ANNOTATIONS_VERSION, 0, 0, 0, 0, 0, 0, 0};
-}
-
 // Report a message to any forthcoming crash log.
 static void
 reportOnCrash(uint32_t flags, const char *message)
 {
-  // We must use an "unsafe" mutex in this pathway since the normal "safe"
-  // mutex calls fatalError when an error is detected and fatalError ends up
-  // calling us. In other words we could get infinite recursion if the
-  // mutex errors.
-  static swift::StaticUnsafeMutex crashlogLock;
+#ifdef SWIFT_HAVE_CRASHREPORTERCLIENT
+  char *oldMessage = nullptr;
+  char *newMessage = nullptr;
 
-  crashlogLock.lock();
+  oldMessage = std::atomic_load_explicit(
+    (volatile std::atomic<char *> *)&gCRAnnotations.message,
+    SWIFT_MEMORY_ORDER_CONSUME);
 
-  char *oldMessage = (char *)CRGetCrashLogMessage();
-  char *newMessage;
-  if (oldMessage) {
-    asprintf(&newMessage, "%s%s", oldMessage, message);
-    if (malloc_size(oldMessage)) free(oldMessage);
-  } else {
-    newMessage = strdup(message);
-  }
-  
-  CRSetCrashLogMessage(newMessage);
+  do {
+    if (newMessage) {
+      free(newMessage);
+      newMessage = nullptr;
+    }
 
-  crashlogLock.unlock();
-}
-
+    if (oldMessage) {
+      swift_asprintf(&newMessage, "%s%s", oldMessage, message);
+    } else {
+      newMessage = strdup(message);
+    }
+  } while (!std::atomic_compare_exchange_strong_explicit(
+             (volatile std::atomic<char *> *)&gCRAnnotations.message,
+             &oldMessage, newMessage,
+             std::memory_order_release,
+             SWIFT_MEMORY_ORDER_CONSUME));
 #else
-
-static void
-reportOnCrash(uint32_t flags, const char *message)
-{
   // empty
+#endif // SWIFT_HAVE_CRASHREPORTERCLIENT
 }
-
-#endif
 
 // Report a message to system console and stderr.
 static void
@@ -317,14 +307,15 @@ reportNow(uint32_t flags, const char *message)
 #define STDERR_FILENO 2
   _write(STDERR_FILENO, message, strlen(message));
 #else
-  write(STDERR_FILENO, message, strlen(message));
+  fputs(message, stderr);
+  fflush(stderr);
 #endif
-#if defined(__APPLE__)
+#if SWIFT_STDLIB_HAS_ASL
   asl_log(nullptr, nullptr, ASL_LEVEL_ERR, "%s", message);
 #elif defined(__ANDROID__)
   __android_log_print(ANDROID_LOG_FATAL, "SwiftRuntime", "%s", message);
 #endif
-#if SWIFT_SUPPORTS_BACKTRACE_REPORTING
+#if SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING
   if (flags & FatalErrorFlags::ReportBacktrace) {
     fputs("Current stack trace:\n", stderr);
     printCurrentBacktrace();
@@ -367,31 +358,9 @@ void swift::swift_reportError(uint32_t flags,
   reportOnCrash(flags, message);
 }
 
-static int swift_vasprintf(char **strp, const char *fmt, va_list ap) {
-#if defined(_WIN32)
-  int len = _vscprintf(fmt, ap);
-  if (len < 0)
-    return -1;
-  char *buffer = reinterpret_cast<char *>(malloc(len + 1));
-  if (!buffer)
-    return -1;
-  int result = vsprintf(buffer, fmt, ap);
-  if (result < 0) {
-    free(buffer);
-    return -1;
-  }
-  *strp = buffer;
-  return result;
-#else
-  return vasprintf(strp, fmt, ap);
-#endif
-}
-
 // Report a fatal error to system console, stderr, and crash logs, then abort.
-SWIFT_NORETURN void swift::fatalError(uint32_t flags, const char *format, ...) {
-  va_list args;
-  va_start(args, format);
-
+SWIFT_NORETURN void swift::fatalErrorv(uint32_t flags, const char *format,
+                                       va_list args) {
   char *log;
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wuninitialized"
@@ -400,6 +369,14 @@ SWIFT_NORETURN void swift::fatalError(uint32_t flags, const char *format, ...) {
 
   swift_reportError(flags, log);
   abort();
+}
+
+// Report a fatal error to system console, stderr, and crash logs, then abort.
+SWIFT_NORETURN void swift::fatalError(uint32_t flags, const char *format, ...) {
+  va_list args;
+  va_start(args, format);
+
+  fatalErrorv(flags, format, args);
 }
 
 // Report a warning to system console and stderr.
@@ -480,4 +457,11 @@ void swift::swift_abortDynamicReplacementDisabling() {
   swift::fatalError(FatalErrorFlags::ReportBacktrace,
                     "Fatal error: trying to disable a dynamic replacement "
                     "that is already disabled");
+}
+
+/// Halt due to trying to use unicode data on platforms that don't have it.
+void swift::swift_abortDisabledUnicodeSupport() {
+  swift::fatalError(FatalErrorFlags::ReportBacktrace,
+                    "Unicode normalization data is disabled on this platform");
+
 }

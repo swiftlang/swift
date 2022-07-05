@@ -1,6 +1,9 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
+// rdar://91405760
+// UNSUPPORTED: use_os_stdlib, back_deployment_runtime
+
 import StdlibUnittest
 defer { runAllTests() }
 
@@ -46,7 +49,7 @@ StringCreateTests.test("String(decoding:as:)") {
     "", String(decoding: UnsafeBufferPointer(_empty: ()), as: UTF32.self))
 }
 
-if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
+if #available(SwiftStdlib 5.3, *) {
   StringCreateTests.test("String(unsafeUninitializedCapacity:initializingUTF8With:)") {
     for simpleString in SimpleString.allCases {
       let expected = simpleString.rawValue
@@ -92,7 +95,7 @@ if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
   }
 }
 
-if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
+if #available(SwiftStdlib 5.3, *) {
   StringCreateTests.test("Small string unsafeUninitializedCapacity") {
     let str1 = "42"
     let str2 = String(42)

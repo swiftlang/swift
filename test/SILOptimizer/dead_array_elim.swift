@@ -57,7 +57,7 @@ func testDeadArrayElimWithAddressOnlyValues<T>(x: T, y: T) {
   _ = [x, y]
 }
 
-// CHECK-LABEL: sil hidden @$s15dead_array_elim31testDeadArrayAfterOptimizationsySiSSF
+// CHECK-LABEL: sil hidden {{.*}}@$s15dead_array_elim31testDeadArrayAfterOptimizationsySiSSF
 // CHECK:      bb0(%0 : $String):
 // CHECK-NEXT:   debug_value
 // CHECK-NEXT:   integer_literal $Builtin.Int{{[0-9]+}}, 21

@@ -56,17 +56,6 @@ Type InheritedTypeRequest::evaluate(
                                      /*unboundTyOpener*/ nullptr,
                                      /*placeholderHandler*/ nullptr);
     break;
-
-  case TypeResolutionStage::Contextual: {
-    // Compute the contextual type by mapping the interface type into context.
-    auto result =
-      evaluator(InheritedTypeRequest{decl, index,
-                                     TypeResolutionStage::Interface});
-    if (!result)
-      return Type();
-
-    return dc->mapTypeIntoContext(*result);
-  }
   }
 
   const TypeLoc &typeLoc = getInheritedTypeLocAtIndex(decl, index);
@@ -153,8 +142,8 @@ Type EnumRawTypeRequest::evaluate(Evaluator &evaluator,
     auto &inheritedType = *inheritedTypeResult;
     if (!inheritedType) continue;
 
-    // Skip existential types.
-    if (inheritedType->isExistentialType()) continue;
+    // Skip protocol conformances.
+    if (inheritedType->isConstraintType()) continue;
 
     // We found a raw type; return it.
     return inheritedType;
@@ -297,10 +286,17 @@ static Type inferResultBuilderType(ValueDecl *decl)  {
         if (witness != lookupDecl)
           continue;
 
-        // Substitute into the result builder type.
-        auto subs =
-            conformance->getSubstitutions(lookupDecl->getModuleContext());
-        Type subResultBuilderType = resultBuilderType.subst(subs);
+        // Substitute Self and associated type witnesses into the
+        // result builder type. Then, map all type parameters from
+        // the conforming type into context. We don't want type
+        // parameters to appear in the result builder type, because
+        // the result builder type will only be used inside the body
+        // of this decl; it's not part of the interface type.
+        auto subs = SubstitutionMap::getProtocolSubstitutions(
+            protocol, dc->getSelfInterfaceType(),
+            ProtocolConformanceRef(conformance));
+        Type subResultBuilderType = dc->mapTypeIntoContext(
+            resultBuilderType.subst(subs));
 
         matches.push_back(
             Match::forConformance(

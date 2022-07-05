@@ -10,13 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the ASTNode, which is a union of Stmt, Expr, and Decl.
+// This file defines the ASTNode, which is a union of Stmt, Expr, Decl,
+// Pattern, TypeRepr, StmtCondition, and CaseLabelItem.
 //
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_AST_AST_NODE_H
 #define SWIFT_AST_AST_NODE_H
 
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "swift/Basic/Debug.h"
 #include "swift/AST/TypeAlignments.h"
@@ -35,13 +37,16 @@ namespace swift {
   class SourceLoc;
   class SourceRange;
   class ASTWalker;
+  class StmtConditionElement;
+  class CaseLabelItem;
   enum class ExprKind : uint8_t;
   enum class DeclKind : uint8_t;
   enum class PatternKind : uint8_t;
   enum class StmtKind;
 
-  struct ASTNode : public llvm::PointerUnion<Expr *, Stmt *, Decl *, Pattern *,
-                                             TypeRepr *> {
+  struct ASTNode
+      : public llvm::PointerUnion<Expr *, Stmt *, Decl *, Pattern *, TypeRepr *,
+                                  StmtConditionElement *, CaseLabelItem *> {
     // Inherit the constructors from PointerUnion.
     using PointerUnion::PointerUnion;
 
@@ -73,6 +78,10 @@ namespace swift {
 
     /// Whether the AST node is implicit.
     bool isImplicit() const;
+
+    friend llvm::hash_code hash_value(ASTNode N) {
+      return llvm::hash_value(N.getOpaqueValue());
+    }
   };
 } // namespace swift
 

@@ -1,13 +1,13 @@
-// RUN: %target-run-simple-swift(%import-libdispatch -parse-as-library) | %FileCheck %s
+// RUN: %target-run-simple-swift(%import-libdispatch -Xfrontend -disable-availability-checking -parse-as-library) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 actor Number {
     var val: Int
     var task: Task<Void, Never>?
@@ -52,7 +52,7 @@ actor Number {
     }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @main struct Main {
     static func main() async {
 

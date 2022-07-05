@@ -1,0 +1,61 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -sroa %s -enable-lexical-lifetimes | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+///////////////////////////////
+// Struct with Scalar Fields //
+///////////////////////////////
+
+struct S1 {
+  var x : Builtin.Int1
+  var y : Builtin.Int32
+  var z : Builtin.Int64
+}
+
+sil [ossa] @use_int32 : $@convention(thin) (Builtin.Int32) -> ()
+
+// CHECK-LABEL: sil [ossa] @struct_with_scalar_fields : $@convention(thin) (S1) -> ()
+// CHECK: bb0([[VAR_0:%[0-9]+]] : $S1):
+
+// CHECK-NEXT:   [[VAR_1:%[0-9]+]] = alloc_stack [lexical] $Builtin.Int1
+// CHECK-NEXT:   [[VAR_2:%[0-9]+]] = alloc_stack [lexical] $Builtin.Int32
+// CHECK-NEXT:   [[VAR_3:%[0-9]+]] = alloc_stack [lexical] $Builtin.Int64
+// CHECK-NEXT:   ([[VAR_4:%[0-9]+]], [[VAR_6:%[0-9]+]], [[VAR_8:%[0-9]+]]) = destructure_struct [[VAR_0]]
+// CHECK-NEXT:   store [[VAR_4]] to [trivial] [[VAR_1]] : $*Builtin.Int1
+// CHECK-NEXT:   store [[VAR_6]] to [trivial] [[VAR_2]] : $*Builtin.Int32
+// CHECK-NEXT:   store [[VAR_8]] to [trivial] [[VAR_3]] : $*Builtin.Int64
+
+// CHECK-NEXT:   function_ref
+// CHECK-NEXT:   [[VAR_10:%[0-9]+]] = function_ref @use_int32 : $@convention(thin) (Builtin.Int32) -> ()
+// CHECK-NEXT:   [[VAR_11:%[0-9]+]] = load [trivial] [[VAR_2]] : $*Builtin.Int32
+// CHECK-NEXT:   [[VAR_12:%[0-9]+]] = apply [[VAR_10]]([[VAR_11]]) : $@convention(thin) (Builtin.Int32) -> ()
+// CHECK-NEXT:   [[VAR_13:%[0-9]+]] = load [trivial] [[VAR_1]] : $*Builtin.Int1
+// CHECK-NEXT:   [[VAR_14:%[0-9]+]] = load [trivial] [[VAR_2]] : $*Builtin.Int32
+// CHECK-NEXT:   [[VAR_15:%[0-9]+]] = load [trivial] [[VAR_3]] : $*Builtin.Int64
+// CHECK-NEXT:   [[VAR_16:%[0-9]+]] = struct $S1 ([[VAR_13]] : $Builtin.Int1, [[VAR_14]] : $Builtin.Int32, [[VAR_15]] : $Builtin.Int64)
+
+// CHECK:   dealloc_stack [[VAR_3]] : $*Builtin.Int64
+// CHECK:   dealloc_stack [[VAR_2]] : $*Builtin.Int32
+// CHECK:   dealloc_stack [[VAR_1]] : $*Builtin.Int1
+
+// CHECK:   [[VAR_20:%[0-9]+]] = tuple ()
+// CHECK:   return [[VAR_20]] : $()
+sil [ossa] @struct_with_scalar_fields : $@convention(thin) (S1) -> () {
+bb0(%0 : $S1):
+  %1 = alloc_stack [lexical] $S1
+  debug_value %1 : $*S1 // should not prevent the optimization
+  debug_value %1 : $*S1                // should not prevent the optimization
+  store %0 to [trivial] %1 : $*S1
+  %2 = function_ref @use_int32 : $@convention(thin) (Builtin.Int32) -> ()
+  %3 = struct_element_addr %1 : $*S1, #S1.y
+  %4 = load [trivial] %3 : $*Builtin.Int32
+  apply %2(%4) : $@convention(thin) (Builtin.Int32) -> ()
+  %5 = load [trivial] %1 : $*S1
+  dealloc_stack %1 : $*S1
+  %6 = tuple ()
+  return %6 : $()
+}
+

@@ -1,7 +1,7 @@
 // XFAIL: OS=windows-msvc
 
 // SR-12893
-// XFAIL: openbsd
+// XFAIL: OS=openbsd
 
 // RUN: %empty-directory(%t)
 
@@ -16,6 +16,7 @@
 // RUN: %target-swift-reflection-dump -binary-filename %t/%target-library-name(TypesToReflect) | %FileCheck %s --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-cpu
 
 // UNSUPPORTED: CPU=arm64e
+// UNSUPPORTED: OS=linux-android, OS=linux-androideabi
 
 // CHECK-32: FIELDS:
 // CHECK-32: =======

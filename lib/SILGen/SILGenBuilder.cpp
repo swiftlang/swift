@@ -12,12 +12,14 @@
 
 #include "SILGenBuilder.h"
 #include "ArgumentSource.h"
+#include "Cleanup.h"
 #include "RValue.h"
 #include "SILGenFunction.h"
 #include "Scope.h"
 #include "SwitchEnumBuilder.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/SIL/DynamicCasts.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -187,23 +189,38 @@ ManagedValue SILGenBuilder::createCopyValue(SILLocation loc,
   }
 #include "swift/AST/ReferenceStorage.def"
 
-ManagedValue SILGenBuilder::createOwnedPhiArgument(SILType type) {
-  SILPhiArgument *arg =
-      getInsertionBB()->createPhiArgument(type, OwnershipKind::Owned);
-  return SGF.emitManagedRValueWithCleanup(arg);
+ManagedValue SILGenBuilder::createForwardedTermResult(SILType type) {
+  auto *succBB = getInsertionBB();
+  auto *term = cast<OwnershipForwardingTermInst>(
+      succBB->getSinglePredecessorBlock()->getTerminator());
+  auto *arg = term->createResult(succBB, type);
+  return ManagedValue::forForwardedRValue(SGF, arg);
 }
 
-ManagedValue SILGenBuilder::createGuaranteedPhiArgument(SILType type) {
-  SILPhiArgument *arg =
-      getInsertionBB()->createPhiArgument(type, OwnershipKind::Guaranteed);
-  return SGF.emitManagedBorrowedArgumentWithCleanup(arg);
+ManagedValue SILGenBuilder::createTermResult(SILType type,
+                                             ValueOwnershipKind ownership) {
+  // Despite the name, 'arg' is a terminator result, not a phi.
+  auto *arg = getInsertionBB()->createPhiArgument(type, ownership);
+  return ManagedValue::forForwardedRValue(SGF, arg);
 }
 
-ManagedValue
-SILGenBuilder::createGuaranteedTransformingTerminatorArgument(SILType type) {
-  SILPhiArgument *arg =
-      getInsertionBB()->createPhiArgument(type, OwnershipKind::Guaranteed);
-  return ManagedValue::forUnmanaged(arg);
+ManagedValue SILGenBuilder::createPhi(SILType type,
+                                      ValueOwnershipKind ownership) {
+  SILPhiArgument *arg = getInsertionBB()->createPhiArgument(type, ownership);
+  switch (ownership) {
+  case OwnershipKind::Any:
+    llvm_unreachable("Invalid ownership for value");
+
+  case OwnershipKind::Owned:
+    return SGF.emitManagedRValueWithCleanup(arg);
+
+  case OwnershipKind::Guaranteed:
+    return SGF.emitManagedBorrowedArgumentWithCleanup(arg);
+
+  case OwnershipKind::None:
+  case OwnershipKind::Unowned:
+    return ManagedValue::forUnmanaged(arg);
+  }
 }
 
 ManagedValue SILGenBuilder::createAllocRef(
@@ -234,7 +251,7 @@ ManagedValue SILGenBuilder::createAllocRefDynamic(
                   [](ManagedValue mv) -> SILValue { return mv.getValue(); });
 
   AllocRefDynamicInst *i =
-      createAllocRefDynamic(loc, operand.getValue(), refType, objc,
+      createAllocRefDynamic(loc, operand.getValue(), refType, objc, false,
                             elementTypes, elementCountOperands);
   return SGF.emitManagedRValueWithCleanup(i);
 }
@@ -393,7 +410,8 @@ ManagedValue SILGenBuilder::createLoadTake(SILLocation loc, ManagedValue v,
       lowering.emitLoadOfCopy(*this, loc, v.forward(SGF), IsTake);
   if (lowering.isTrivial())
     return ManagedValue::forUnmanaged(result);
-  assert(!lowering.isAddressOnly() && "cannot retain an unloadable type");
+  assert((!lowering.isAddressOnly() || !SGF.silConv.useLoweredAddresses()) &&
+         "cannot retain an unloadable type");
   return SGF.emitManagedRValueWithCleanup(result, lowering);
 }
 
@@ -417,12 +435,14 @@ ManagedValue SILGenBuilder::createLoadCopy(SILLocation loc, ManagedValue v,
 
 static ManagedValue createInputFunctionArgument(SILGenBuilder &B, SILType type,
                                                 SILLocation loc,
-                                                ValueDecl *decl = nullptr) {
+                                                ValueDecl *decl = nullptr,
+                                                bool isNoImplicitCopy = false) {
   auto &SGF = B.getSILGenFunction();
   SILFunction &F = B.getFunction();
   assert((F.isBare() || decl) &&
          "Function arguments of non-bare functions must have a decl");
   auto *arg = F.begin()->createFunctionArgument(type, decl);
+  arg->setNoImplicitCopy(isNoImplicitCopy);
   switch (arg->getArgumentConvention()) {
   case SILArgumentConvention::Indirect_In_Guaranteed:
   case SILArgumentConvention::Direct_Guaranteed:
@@ -431,6 +451,9 @@ static ManagedValue createInputFunctionArgument(SILGenBuilder &B, SILType type,
   case SILArgumentConvention::Direct_Unowned:
     // Unowned parameters are only guaranteed at the instant of the call, so we
     // must retain them even if we're in a context that can accept a +0 value.
+    //
+    // NOTE: If we have a trivial value, the copy will do nothing, so this is
+    // just a convenient way to avoid writing conditional code.
     return ManagedValue::forUnmanaged(arg).copy(SGF, loc);
 
   case SILArgumentConvention::Direct_Owned:
@@ -454,8 +477,10 @@ static ManagedValue createInputFunctionArgument(SILGenBuilder &B, SILType type,
 }
 
 ManagedValue SILGenBuilder::createInputFunctionArgument(SILType type,
-                                                        ValueDecl *decl) {
-  return ::createInputFunctionArgument(*this, type, SILLocation(decl), decl);
+                                                        ValueDecl *decl,
+                                                        bool isNoImplicitCopy) {
+  return ::createInputFunctionArgument(*this, type, SILLocation(decl), decl,
+                                       isNoImplicitCopy);
 }
 
 ManagedValue
@@ -490,16 +515,6 @@ ManagedValue SILGenBuilder::createEnum(SILLocation loc, ManagedValue payload,
   return SGF.emitManagedRValueWithCleanup(result);
 }
 
-ManagedValue SILGenBuilder::createUnconditionalCheckedCastValue(
-    SILLocation loc, ManagedValue op, CanType srcFormalTy,
-    SILType destLoweredTy, CanType destFormalTy) {
-  SILValue result =
-      createUnconditionalCheckedCastValue(loc, op.forward(SGF),
-                                          srcFormalTy, destLoweredTy,
-                                          destFormalTy);
-  return SGF.emitManagedRValueWithCleanup(result);
-}
-
 ManagedValue SILGenBuilder::createUnconditionalCheckedCast(
     SILLocation loc, ManagedValue op,
     SILType destLoweredTy, CanType destFormalTy) {
@@ -517,22 +532,15 @@ void SILGenBuilder::createCheckedCastBranch(SILLocation loc, bool isExact,
                                             SILBasicBlock *falseBlock,
                                             ProfileCounter Target1Count,
                                             ProfileCounter Target2Count) {
+  // Casting a guaranteed value requires ownership preservation.
+  if (!doesCastPreserveOwnershipForTypes(SGF.SGM.M, op.getType().getASTType(),
+                                         destFormalTy)) {
+    op = op.ensurePlusOne(SGF, loc);
+  }
   createCheckedCastBranch(loc, isExact, op.forward(SGF),
                           destLoweredTy, destFormalTy,
                           trueBlock, falseBlock,
                           Target1Count, Target2Count);
-}
-
-void SILGenBuilder::createCheckedCastValueBranch(SILLocation loc,
-                                                 ManagedValue op,
-                                                 CanType srcFormalTy,
-                                                 SILType destLoweredTy,
-                                                 CanType destFormalTy,
-                                                 SILBasicBlock *trueBlock,
-                                                 SILBasicBlock *falseBlock) {
-  createCheckedCastValueBranch(loc, op.forward(SGF), srcFormalTy,
-                               destLoweredTy, destFormalTy,
-                               trueBlock, falseBlock);
 }
 
 ManagedValue SILGenBuilder::createUpcast(SILLocation loc, ManagedValue original,
@@ -854,6 +862,16 @@ void SILGenBuilder::emitDestructureValueOperation(
   }
 }
 
+void SILGenBuilder::emitDestructureValueOperation(
+    SILLocation loc, ManagedValue value,
+    SmallVectorImpl<ManagedValue> &destructuredValues) {
+  CleanupCloner cloner(*this, value);
+  emitDestructureValueOperation(
+      loc, value.forward(SGF), [&](unsigned index, SILValue subValue) {
+        destructuredValues.push_back(cloner.clone(subValue));
+      });
+}
+
 ManagedValue SILGenBuilder::createProjectBox(SILLocation loc, ManagedValue mv,
                                              unsigned index) {
   auto *pbi = createProjectBox(loc, mv.getValue(), index);
@@ -867,4 +885,39 @@ ManagedValue SILGenBuilder::createMarkDependence(SILLocation loc,
   auto *mdi = createMarkDependence(loc, value.forward(getSILGenFunction()),
                                    base.forward(getSILGenFunction()));
   return cloner.clone(mdi);
+}
+
+ManagedValue SILGenBuilder::createBeginBorrow(SILLocation loc,
+                                              ManagedValue value,
+                                              bool isLexical) {
+  auto *newValue =
+      SILBuilder::createBeginBorrow(loc, value.getValue(), isLexical);
+  SGF.emitManagedBorrowedRValueWithCleanup(newValue);
+  return ManagedValue::forUnmanaged(newValue);
+}
+
+ManagedValue SILGenBuilder::createMoveValue(SILLocation loc,
+                                            ManagedValue value) {
+  assert(value.isPlusOne(SGF) && "Must be +1 to be moved!");
+  CleanupCloner cloner(*this, value);
+  auto *mdi = createMoveValue(loc, value.forward(getSILGenFunction()));
+  return cloner.clone(mdi);
+}
+
+ManagedValue
+SILGenBuilder::createOwnedMoveOnlyWrapperToCopyableValue(SILLocation loc,
+                                                         ManagedValue value) {
+  assert(value.isPlusOne(SGF) && "Argument must be at +1!");
+  CleanupCloner cloner(*this, value);
+  auto *mdi = createOwnedMoveOnlyWrapperToCopyableValue(
+      loc, value.forward(getSILGenFunction()));
+  return cloner.clone(mdi);
+}
+
+ManagedValue SILGenBuilder::createGuaranteedMoveOnlyWrapperToCopyableValue(
+    SILLocation loc, ManagedValue value) {
+  auto *mdi =
+      createGuaranteedMoveOnlyWrapperToCopyableValue(loc, value.getValue());
+  assert(mdi->getOperand()->getType().isObject() && "Expected an object?!");
+  return ManagedValue::forUnmanaged(mdi);
 }

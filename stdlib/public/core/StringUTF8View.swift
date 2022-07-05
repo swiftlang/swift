@@ -136,28 +136,37 @@ extension String.UTF8View: BidirectionalCollection {
   /// - Precondition: The next position is representable.
   @inlinable @inline(__always)
   public func index(after i: Index) -> Index {
+    let i = _guts.ensureMatchingEncoding(i)
     if _fastPath(_guts.isFastUTF8) {
-      return i.strippingTranscoding.nextEncoded
+      // Note: deferred bounds check
+      return i.strippingTranscoding.nextEncoded._knownUTF8
     }
-
+    _precondition(i._encodedOffset < _guts.count,
+      "String index is out of bounds")
     return _foreignIndex(after: i)
   }
 
   @inlinable @inline(__always)
   public func index(before i: Index) -> Index {
-    precondition(!i.isZeroPosition)
+    let i = _guts.ensureMatchingEncoding(i)
+    _precondition(!i.isZeroPosition, "String index is out of bounds")
     if _fastPath(_guts.isFastUTF8) {
-      return i.strippingTranscoding.priorEncoded
+      return i.strippingTranscoding.priorEncoded._knownUTF8
     }
 
+    _precondition(i._encodedOffset <= _guts.count,
+      "String index is out of bounds")
     return _foreignIndex(before: i)
   }
 
   @inlinable @inline(__always)
   public func index(_ i: Index, offsetBy n: Int) -> Index {
+    let i = _guts.ensureMatchingEncoding(i)
     if _fastPath(_guts.isFastUTF8) {
-      _precondition(n + i._encodedOffset <= _guts.count)
-      return i.strippingTranscoding.encoded(offsetBy: n)
+      let offset = n + i._encodedOffset
+      _precondition(offset >= 0 && offset <= _guts.count,
+        "String index is out of bounds")
+      return Index(_encodedOffset: offset)._knownUTF8
     }
 
     return _foreignIndex(i, offsetBy: n)
@@ -167,6 +176,7 @@ extension String.UTF8View: BidirectionalCollection {
   public func index(
     _ i: Index, offsetBy n: Int, limitedBy limit: Index
   ) -> Index? {
+    let i = _guts.ensureMatchingEncoding(i)
     if _fastPath(_guts.isFastUTF8) {
       // Check the limit: ignore limit if it precedes `i` (in the correct
       // direction), otherwise must not be beyond limit (in the correct
@@ -179,6 +189,8 @@ extension String.UTF8View: BidirectionalCollection {
       } else {
         guard limitOffset > iOffset || result >= limitOffset else { return nil }
       }
+      _precondition(result >= 0 && result <= _guts.count,
+        "String index is out of bounds")
       return Index(_encodedOffset: result)
     }
 
@@ -187,9 +199,14 @@ extension String.UTF8View: BidirectionalCollection {
 
   @inlinable @inline(__always)
   public func distance(from i: Index, to j: Index) -> Int {
+    let i = _guts.ensureMatchingEncoding(i)
+    let j = _guts.ensureMatchingEncoding(j)
     if _fastPath(_guts.isFastUTF8) {
       return j._encodedOffset &- i._encodedOffset
     }
+    _precondition(
+      i._encodedOffset <= _guts.count && j._encodedOffset <= _guts.count,
+      "String index is out of bounds")
     return _foreignDistance(from: i, to: j)
   }
 
@@ -207,7 +224,14 @@ extension String.UTF8View: BidirectionalCollection {
   ///   must be less than the view's end index.
   @inlinable @inline(__always)
   public subscript(i: Index) -> UTF8.CodeUnit {
-    String(_guts)._boundsCheck(i)
+    let i = _guts.ensureMatchingEncoding(i)
+    _precondition(i._encodedOffset < _guts.count,
+      "String index is out of bounds")
+    return self[_unchecked: i]
+  }
+
+  @_alwaysEmitIntoClient @inline(__always)
+  internal subscript(_unchecked i: Index) -> UTF8.CodeUnit {
     if _fastPath(_guts.isFastUTF8) {
       return _guts.withFastUTF8 { utf8 in utf8[_unchecked: i._encodedOffset] }
     }
@@ -332,13 +356,23 @@ extension String.UTF8View.Index {
   /// - Parameters:
   ///   - sourcePosition: A position in a `String` or one of its views.
   ///   - target: The `UTF8View` in which to find the new position.
-  @inlinable
   public init?(_ idx: String.Index, within target: String.UTF8View) {
+    // Note: This method used to be inlinable until Swift 5.7.
+
+    // As a special exception, we allow `idx` to be an UTF-16 index when `self`
+    // is a UTF-8 string (or vice versa), to preserve compatibility with
+    // (broken) code that keeps using indices from a bridged string after
+    // converting the string to a native representation. Such indices are
+    // invalid, but returning nil here can break code that appeared to work fine
+    // for ASCII strings in Swift releases prior to 5.7.
+    let idx = target._guts.ensureMatchingEncoding(idx)
+    guard idx._encodedOffset <= target._guts.count else { return nil }
+
     if _slowPath(target._guts.isForeign) {
       guard idx._foreignIsWithin(target) else { return nil }
     } else {
-      // All indices, except sub-scalar UTF-16 indices pointing at trailing
-      // surrogates, are valid.
+      // All indices that are in range are valid, except sub-scalar UTF-16
+      // indices pointing at trailing surrogates.
       guard idx.transcodedOffset == 0 else { return nil }
     }
 
@@ -346,6 +380,7 @@ extension String.UTF8View.Index {
   }
 }
 
+#if SWIFT_ENABLE_REFLECTION
 // Reflection
 extension String.UTF8View: CustomReflectable {
   /// Returns a mirror that reflects the UTF-8 view of a string.
@@ -353,6 +388,7 @@ extension String.UTF8View: CustomReflectable {
     return Mirror(self, unlabeledChildren: self)
   }
 }
+#endif
 
 //===--- Slicing Support --------------------------------------------------===//
 /// In Swift 3.2, in the absence of type context,
@@ -368,6 +404,7 @@ extension String.UTF8View {
   @inlinable
   @available(swift, introduced: 4)
   public subscript(r: Range<Index>) -> String.UTF8View.SubSequence {
+    let r = _guts.validateSubscalarRange(r)
     return Substring.UTF8View(self, _bounds: r)
   }
 }
@@ -417,6 +454,7 @@ extension String.UTF8View {
   @_effects(releasenone)
   internal func _foreignIndex(after idx: Index) -> Index {
     _internalInvariant(_guts.isForeign)
+    _internalInvariant(idx._encodedOffset < _guts.count)
 
     let idx = _utf8AlignForeignIndex(idx)
 
@@ -426,29 +464,30 @@ extension String.UTF8View {
 
     if utf8Len == 1 {
       _internalInvariant(idx.transcodedOffset == 0)
-      return idx.nextEncoded._scalarAligned
+      return idx.nextEncoded._scalarAligned._knownUTF16
     }
 
     // Check if we're still transcoding sub-scalar
     if idx.transcodedOffset < utf8Len - 1 {
-      return idx.nextTranscoded
+      return idx.nextTranscoded._knownUTF16
     }
 
     // Skip to the next scalar
     _internalInvariant(idx.transcodedOffset == utf8Len - 1)
-    return idx.encoded(offsetBy: scalarLen)._scalarAligned
+    return idx.encoded(offsetBy: scalarLen)._scalarAligned._knownUTF16
   }
 
   @usableFromInline @inline(never)
   @_effects(releasenone)
   internal func _foreignIndex(before idx: Index) -> Index {
     _internalInvariant(_guts.isForeign)
+    _internalInvariant(idx._encodedOffset <= _guts.count)
 
     let idx = _utf8AlignForeignIndex(idx)
 
     if idx.transcodedOffset != 0 {
       _internalInvariant((1...3) ~= idx.transcodedOffset)
-      return idx.priorTranscoded
+      return idx.priorTranscoded._knownUTF16
     }
 
     let (scalar, scalarLen) = _guts.foreignErrorCorrectedScalar(
@@ -456,7 +495,7 @@ extension String.UTF8View {
     let utf8Len = UTF8.width(scalar)
     return idx.encoded(
       offsetBy: -scalarLen
-    ).transcoded(withOffset: utf8Len &- 1)
+    ).transcoded(withOffset: utf8Len &- 1)._knownUTF16
   }
 
   @usableFromInline @inline(never)

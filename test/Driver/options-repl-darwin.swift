@@ -22,6 +22,11 @@
 // Clean up the test executable because hard links are expensive.
 // RUN: rm -rf %t/Toolchains/Test.xctoolchain/usr/bin/swift
 
+// swift-frontend cannot be copied to another location with bootstrapping because
+// it will not find the libswiftCore library with its relative RPATH.
+// UNSUPPORTED: bootstrapping_mode
+
+// CHECK-SWIFT-INVOKES-INTERPRETER: {{.*}}/swift-frontend -frontend -interpret
 
 // INTEGRATED: swift -frontend -repl
 // INTEGRATED: -module-name REPL

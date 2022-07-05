@@ -1,23 +1,18 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-distributed
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-swift-frontend -typecheck -verify -disable-availability-checking -I %t 2>&1 %s
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
-import _Distributed
+import Distributed
+import FakeDistributedActorSystems
 
-@available(SwiftStdlib 5.5, *)
+typealias DefaultDistributedActorSystem = FakeActorSystem
+
+// ==== ----------------------------------------------------------------------------------------------------------------
+
 distributed actor Capybara { }
 
-//@available(SwiftStdlib 5.5, *)
-//protocol Wheeker: DistributedActor { }
-//@available(SwiftStdlib 5.5, *)
-//distributed actor GuineaPing: Wheeker { }
-
-@available(SwiftStdlib 5.5, *)
-func test(identity: AnyActorIdentity, transport: ActorTransport) async throws {
-  let _: Capybara = try Capybara.resolve(identity, using: transport)
-
-// TODO: implement resolve being able to be called on a distributed actor protocol
-//       (yes, normally it is not allowed to call such function... so we need to
-//        discuss and figure out how we want to expose the resolve of a protocol)
-//  let c: Wheeker = try Wheeker.resolve(.init(identity), using: transport)
+func test(id: FakeActorSystem.ActorID, system: FakeActorSystem) async throws {
+  let _: Capybara = try Capybara.resolve(id: id, using: system)
 }

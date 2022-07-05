@@ -1,4 +1,4 @@
-// RUN: %target-build-swift %s -Xfrontend -enable-objc-interop -emit-ir -o -
+// RUN: %target-build-swift %s -emit-ir -o -
 // REQUIRES: executable_test
 
 // Make sure we are not crashing here.
@@ -13,12 +13,12 @@ class Hash {
   init()
   func update()
   func hash()
-  @objc deinit
+  deinit
 }
 
 final class MD5 : Hash {
   override init()
-  @objc deinit
+  deinit
 }
 
 sil @_TFC4main4HashcfMS0_FT_S0_ : $@convention(method) (@owned Hash) -> @owned Hash

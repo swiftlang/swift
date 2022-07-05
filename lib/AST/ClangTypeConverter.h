@@ -89,7 +89,7 @@ public:
   /// \p templateArgs must be empty. \p templateParams and \p genericArgs must
   /// be equal in size.
   ///
-  /// \returns nullptr if successful. If an error occors, returns a list of
+  /// \returns nullptr if successful. If an error occurs, returns a list of
   /// types that couldn't be converted.
   std::unique_ptr<TemplateInstantiationError> getClangTemplateArguments(
       const clang::TemplateParameterList *templateParams,
@@ -122,10 +122,12 @@ private:
   clang::QualType visitEnumType(EnumType *type);
   clang::QualType visitFunctionType(FunctionType *type);
   clang::QualType visitProtocolCompositionType(ProtocolCompositionType *type);
+  clang::QualType visitExistentialType(ExistentialType *type);
   clang::QualType visitBuiltinRawPointerType(BuiltinRawPointerType *type);
   clang::QualType visitBuiltinIntegerType(BuiltinIntegerType *type);
   clang::QualType visitBuiltinFloatType(BuiltinFloatType *type);
   clang::QualType visitArchetypeType(ArchetypeType *type);
+  clang::QualType visitDependentMemberType(DependentMemberType *type);
   clang::QualType visitSILFunctionType(SILFunctionType *type);
   clang::QualType visitGenericTypeParamType(GenericTypeParamType *type);
   clang::QualType visitDynamicSelfType(DynamicSelfType *type);

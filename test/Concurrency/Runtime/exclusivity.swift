@@ -1,11 +1,12 @@
-// RUN: %target-run-simple-swift( -parse-as-library)
+// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -parse-as-library)
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 
-// rdar://76038845
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
+// UNSUPPORTED: OS=wasi
+// UNSUPPORTED: back_deploy_concurrency
 
 // This test makes sure that:
 //
@@ -45,7 +46,7 @@ public func debugLog(_ s: String) {
 #endif
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @main
 struct Runner {
     @MainActor
@@ -103,7 +104,7 @@ struct Runner {
         }
 
         // Then do a simple test with a single access to make sure that we do
-        // not hit any sccesses b/c we introduced the Task.
+        // not hit any successes b/c we introduced the Task.
         exclusivityTests.test("testDifferentTasksHaveDifferentExclusivityAccessSets") { @MainActor in
             let callee2 = { @MainActor (_ x: inout Int) -> Void in
                 debugLog("==> Enter callee2")
@@ -414,7 +415,7 @@ struct Runner {
                     await innerTaskHandle.value
                     debugLog("==> After")
                 }
-                // Accessis over. We shouldn't crash here.
+                // Access is over. We shouldn't crash here.
                 withExclusiveAccess(to: &global1) { _ in
                     debugLog("==> No crash!")
                 }

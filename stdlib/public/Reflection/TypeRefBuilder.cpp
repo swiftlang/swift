@@ -15,19 +15,26 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Reflection/TypeRefBuilder.h"
+#if SWIFT_ENABLE_REFLECTION
 
+#include "swift/Reflection/TypeRefBuilder.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Reflection/Records.h"
 #include "swift/Reflection/TypeLowering.h"
 #include "swift/Reflection/TypeRef.h"
 #include "swift/Remote/MetadataReader.h"
+#include <iomanip>
+#include <iostream>
+#include <sstream>
 
 using namespace swift;
 using namespace reflection;
+using ReadBytesResult = swift::remote::MemoryReader::ReadBytesResult;
 
-TypeRefBuilder::BuiltType TypeRefBuilder::decodeMangledType(Node *node) {
-  return swift::Demangle::decodeMangledType(*this, node).getType();
+TypeRefBuilder::BuiltType
+TypeRefBuilder::decodeMangledType(Node *node, bool forRequirement) {
+  return swift::Demangle::decodeMangledType(*this, node, forRequirement)
+      .getType();
 }
 
 RemoteRef<char> TypeRefBuilder::readTypeRef(uint64_t remoteAddr) {
@@ -96,9 +103,12 @@ TypeRefBuilder::normalizeReflectionName(RemoteRef<char> reflectionName) {
       // Symbolic references cannot be mangled, return a failure.
       return {};
     default:
-      auto result = mangleNode(node);
+      auto mangling = mangleNode(node);
       clearNodeFactory();
-      return result;
+      if (!mangling.isSuccess()) {
+        return {};
+      }
+      return std::move(mangling.result());
     }
   }
 
@@ -185,35 +195,38 @@ const TypeRef *TypeRefBuilder::lookupSuperclass(const TypeRef *TR) {
 
 RemoteRef<FieldDescriptor>
 TypeRefBuilder::getFieldTypeInfo(const TypeRef *TR) {
-  std::string MangledName;
+  const std::string *MangledName;
   if (auto N = dyn_cast<NominalTypeRef>(TR))
-    MangledName = N->getMangledName();
+    MangledName = &N->getMangledName();
   else if (auto BG = dyn_cast<BoundGenericTypeRef>(TR))
-    MangledName = BG->getMangledName();
+    MangledName = &BG->getMangledName();
   else
     return nullptr;
 
   // Try the cache.
-  auto Found = FieldTypeInfoCache.find(MangledName);
+  auto Found = FieldTypeInfoCache.find(*MangledName);
   if (Found != FieldTypeInfoCache.end())
     return Found->second;
 
-  // On failure, fill out the cache with everything we know about.
-  std::vector<std::pair<std::string, const TypeRef *>> Fields;
-  for (auto &Info : ReflectionInfos) {
+  // On failure, fill out the cache, ReflectionInfo by ReflectionInfo,
+  // until we find the field descriptor we're looking for.
+  while (FirstUnprocessedReflectionInfoIndex < ReflectionInfos.size()) {
+    auto &Info = ReflectionInfos[FirstUnprocessedReflectionInfoIndex];
     for (auto FD : Info.Field) {
       if (!FD->hasMangledTypeName())
         continue;
       auto CandidateMangledName = readTypeRef(FD, FD->MangledTypeName);
       if (auto NormalizedName = normalizeReflectionName(CandidateMangledName))
-        FieldTypeInfoCache[*NormalizedName] = FD;
+        FieldTypeInfoCache[std::move(*NormalizedName)] = FD;
     }
-  }
 
-  // We've filled the cache with everything we know about now. Try the cache again.
-  Found = FieldTypeInfoCache.find(MangledName);
-  if (Found != FieldTypeInfoCache.end())
-    return Found->second;
+    // Since we're done with the current ReflectionInfo, increment early in
+    // case we get a cache hit.
+    ++FirstUnprocessedReflectionInfoIndex;
+    Found = FieldTypeInfoCache.find(*MangledName);
+    if (Found != FieldTypeInfoCache.end())
+      return Found->second;
+  }
 
   return nullptr;
 }
@@ -297,6 +310,47 @@ TypeRefBuilder::getBuiltinTypeInfo(const TypeRef *TR) {
   return nullptr;
 }
 
+RemoteRef<MultiPayloadEnumDescriptor>
+TypeRefBuilder::getMultiPayloadEnumInfo(const TypeRef *TR) {
+  std::string MangledName;
+  if (auto B = dyn_cast<BuiltinTypeRef>(TR))
+    MangledName = B->getMangledName();
+  else if (auto N = dyn_cast<NominalTypeRef>(TR))
+    MangledName = N->getMangledName();
+  else if (auto B = dyn_cast<BoundGenericTypeRef>(TR))
+    MangledName = B->getMangledName();
+  else
+    return nullptr;
+
+  for (auto Info : ReflectionInfos) {
+    for (auto MultiPayloadEnumDescriptor : Info.MultiPayloadEnum) {
+
+      // Assert that descriptor size is sane...
+      assert(MultiPayloadEnumDescriptor->getContentsSizeInWords() >= 1);
+      // We're limited to 64k of spare bits mask...
+      assert(MultiPayloadEnumDescriptor->getContentsSizeInWords() < 16384);
+      assert(MultiPayloadEnumDescriptor->getSizeInBytes() ==
+             4 + MultiPayloadEnumDescriptor->getContentsSizeInWords() * 4);
+      // Must have a non-empty spare bits mask iff spare bits are used...
+      assert(MultiPayloadEnumDescriptor->usesPayloadSpareBits()
+             == (MultiPayloadEnumDescriptor->getPayloadSpareBitMaskByteCount() != 0));
+      // BitMask must fit within the advertised size...
+      if (MultiPayloadEnumDescriptor->usesPayloadSpareBits()) {
+        assert(MultiPayloadEnumDescriptor->getContentsSizeInWords()
+               >= 2 + (MultiPayloadEnumDescriptor->getPayloadSpareBitMaskByteCount() + 3) / 4);
+      }
+
+      auto CandidateMangledName =
+        readTypeRef(MultiPayloadEnumDescriptor, MultiPayloadEnumDescriptor->TypeName);
+      if (!reflectionNameMatches(CandidateMangledName, MangledName))
+        continue;
+      return MultiPayloadEnumDescriptor;
+    }
+  }
+
+  return nullptr;
+}
+
 RemoteRef<CaptureDescriptor>
 TypeRefBuilder::getCaptureDescriptor(uint64_t RemoteAddress) {
   for (auto Info : ReflectionInfos) {
@@ -358,150 +412,181 @@ TypeRefBuilder::getClosureContextInfo(RemoteRef<CaptureDescriptor> CD) {
 /// Dumping reflection metadata
 ///
 
-void
-TypeRefBuilder::dumpTypeRef(RemoteRef<char> MangledName,
-                            FILE *file, bool printTypeName) {
+void TypeRefBuilder::dumpTypeRef(RemoteRef<char> MangledName,
+                                 std::ostream &stream, bool printTypeName) {
   auto DemangleTree = demangleTypeRef(MangledName);
   auto TypeName = nodeToString(DemangleTree);
-  fprintf(file, "%s\n", TypeName.c_str());
+  stream << TypeName << "\n";
   auto Result = swift::Demangle::decodeMangledType(*this, DemangleTree);
   clearNodeFactory();
   if (Result.isError()) {
     auto *Error = Result.getError();
     char *ErrorStr = Error->copyErrorString();
     auto str = getTypeRefString(MangledName);
-    fprintf(file, "!!! Invalid typeref: %s - %s\n",
-            std::string(str.begin(), str.end()).c_str(), ErrorStr);
+    stream << "!!! Invalid typeref: " << str.str() << " - " << ErrorStr << "\n";
     Error->freeErrorString(ErrorStr);
     return;
   }
   auto TR = Result.getType();
-  TR->dump(file);
-  fprintf(file, "\n");
+  TR->dump(stream);
+  stream << "\n";
 }
 
-void TypeRefBuilder::dumpFieldSection(FILE *file) {
+FieldTypeCollectionResult TypeRefBuilder::collectFieldTypes(
+    llvm::Optional<std::string> forMangledTypeName) {
+  FieldTypeCollectionResult result;
   for (const auto &sections : ReflectionInfos) {
     for (auto descriptor : sections.Field) {
-      auto TypeDemangling =
-        demangleTypeRef(readTypeRef(descriptor, descriptor->MangledTypeName));
-      auto TypeName = nodeToString(TypeDemangling);
+      auto typeRef = readTypeRef(descriptor, descriptor->MangledTypeName);
+      auto typeName = nodeToString(demangleTypeRef(typeRef));
+      auto optionalMangledTypeName = normalizeReflectionName(typeRef);
       clearNodeFactory();
-      fprintf(file, "%s\n", TypeName.c_str());
-      for (size_t i = 0; i < TypeName.size(); ++i)
-        fprintf(file, "-");
-      fprintf(file, "\n");
-      for (auto &fieldRef : *descriptor.getLocalBuffer()) {
-        auto field = descriptor.getField(fieldRef);
-        auto fieldName = getTypeRefString(readTypeRef(field, field->FieldName));
-        fprintf(file, "%*s", (int)fieldName.size(), fieldName.data());
-        if (field->hasMangledTypeName()) {
-          fprintf(file, ": ");
-          dumpTypeRef(readTypeRef(field, field->MangledTypeName), file);
-        } else {
-          fprintf(file, "\n\n");
+      if (optionalMangledTypeName.hasValue()) {
+        auto mangledTypeName =
+          optionalMangledTypeName.getValue();
+        if (forMangledTypeName.hasValue()) {
+          if (mangledTypeName != forMangledTypeName.getValue())
+            continue;
         }
+
+        std::vector<PropertyTypeInfo> properties;
+        std::vector<EnumCaseInfo> enumCases;
+        for (auto &fieldRef : *descriptor.getLocalBuffer()) {
+          auto field = descriptor.getField(fieldRef);
+          auto fieldName = getTypeRefString(readTypeRef(field, field->FieldName));
+          if (field->hasMangledTypeName()) {
+            std::string mangledFieldTypeName =
+                std::string(field->MangledTypeName);
+            auto fieldTypeRef = readTypeRef(field, field->MangledTypeName);
+            auto optionalMangledfieldTypeName =
+                normalizeReflectionName(fieldTypeRef);
+            if (optionalMangledfieldTypeName.hasValue()) {
+              mangledFieldTypeName = optionalMangledfieldTypeName.getValue();
+            }
+            auto fieldTypeDemangleTree = demangleTypeRef(fieldTypeRef);
+            auto fieldTypeName = nodeToString(fieldTypeDemangleTree);
+            std::stringstream OS;
+            dumpTypeRef(fieldTypeRef, OS);
+            properties.emplace_back(PropertyTypeInfo{fieldName.str(),
+                                                     mangledFieldTypeName,
+                                                     fieldTypeName, OS.str()});
+          } else {
+            enumCases.emplace_back(EnumCaseInfo{fieldName.str()});
+          }
+        }
+        result.FieldInfos.emplace_back(FieldMetadata{
+            mangledTypeName, typeName, properties, enumCases});
       }
+    }
+  }
+
+  return result;
+}
+
+void TypeRefBuilder::dumpFieldSection(std::ostream &stream) {
+  auto fieldInfoCollectionResult =
+      collectFieldTypes(llvm::Optional<std::string>());
+  for (const auto &info : fieldInfoCollectionResult.FieldInfos) {
+    stream << info.FullyQualifiedName << "\n";
+    for (size_t i = 0; i < info.FullyQualifiedName.size(); ++i)
+      stream << "-";
+    stream << "\n";
+    for (const auto &field : info.Properties) {
+      stream << field.Label;
+      stream << ": ";
+      stream << field.TypeDiagnosticPrintName;
+    }
+    for (const auto &field : info.EnumCases) {
+      stream << field.Label;
+      stream << "\n\n";
     }
   }
 }
 
-void TypeRefBuilder::dumpAssociatedTypeSection(FILE *file) {
-  for (const auto &sections : ReflectionInfos) {
-    for (auto descriptor : sections.AssociatedType) {
-      auto conformingTypeNode = demangleTypeRef(
-                       readTypeRef(descriptor, descriptor->ConformingTypeName));
-      auto conformingTypeName = nodeToString(conformingTypeNode);
-      auto protocolNode = demangleTypeRef(
-                         readTypeRef(descriptor, descriptor->ProtocolTypeName));
-      auto protocolName = nodeToString(protocolNode);
-      clearNodeFactory();
-
-      fprintf(file, "- %s : %s", conformingTypeName.c_str(), protocolName.c_str());
-      fprintf(file, "\n");
-
-      for (const auto &associatedTypeRef : *descriptor.getLocalBuffer()) {
-        auto associatedType = descriptor.getField(associatedTypeRef);
-
-        std::string name =
-            getTypeRefString(readTypeRef(associatedType, associatedType->Name))
-                .str();
-        fprintf(file, "typealias %s = ", name.c_str());
-        dumpTypeRef(
-          readTypeRef(associatedType, associatedType->SubstitutedTypeName), file);
-      }
-    }
-  }
-}
-
-void TypeRefBuilder::dumpBuiltinTypeSection(FILE *file) {
+void TypeRefBuilder::dumpBuiltinTypeSection(std::ostream &stream) {
   for (const auto &sections : ReflectionInfos) {
     for (auto descriptor : sections.Builtin) {
-      auto typeNode = demangleTypeRef(readTypeRef(descriptor,
-                                                  descriptor->TypeName));
+      auto typeNode =
+          demangleTypeRef(readTypeRef(descriptor, descriptor->TypeName));
       auto typeName = nodeToString(typeNode);
       clearNodeFactory();
-      
-      fprintf(file, "\n- %s:\n", typeName.c_str());
-      fprintf(file, "Size: %u\n", descriptor->Size);
-      fprintf(file, "Alignment: %u:\n", descriptor->getAlignment());
-      fprintf(file, "Stride: %u:\n", descriptor->Stride);
-      fprintf(file, "NumExtraInhabitants: %u:\n", descriptor->NumExtraInhabitants);
-      fprintf(file, "BitwiseTakable: %d:\n", descriptor->isBitwiseTakable());
+
+      stream << "\n- " << typeName << ":\n";
+      stream << "Size: " << descriptor->Size << "\n";
+      stream << "Alignment: " << descriptor->getAlignment() << ":\n";
+      stream << "Stride: " << descriptor->Stride << ":\n";
+      stream << "NumExtraInhabitants: " << descriptor->NumExtraInhabitants
+             << ":\n";
+      stream << "BitwiseTakable: " << descriptor->isBitwiseTakable() << ":\n";
     }
   }
 }
 
-void ClosureContextInfo::dump() const {
-  dump(stderr);
-}
+void ClosureContextInfo::dump() const { dump(std::cerr); }
 
-void ClosureContextInfo::dump(FILE *file) const {
-  fprintf(file, "- Capture types:\n");
+void ClosureContextInfo::dump(std::ostream &stream) const {
+  stream << "- Capture types:\n";
   for (auto *TR : CaptureTypes) {
     if (TR == nullptr)
-      fprintf(file, "!!! Invalid typeref\n");
+      stream << "!!! Invalid typeref\n";
     else
-      TR->dump(file);
+      TR->dump(stream);
   }
-  fprintf(file, "- Metadata sources:\n");
+  stream << "- Metadata sources:\n";
   for (auto MS : MetadataSources) {
     if (MS.first == nullptr)
-      fprintf(file, "!!! Invalid typeref\n");
+      stream << "!!! Invalid typeref\n";
     else
-      MS.first->dump(file);
+      MS.first->dump(stream);
     if (MS.second == nullptr)
-      fprintf(file, "!!! Invalid metadata source\n");
+      stream << "!!! Invalid metadata source\n";
     else
-      MS.second->dump(file);
+      MS.second->dump(stream);
   }
-  fprintf(file, "\n");
+  stream << "\n";
 }
 
-void TypeRefBuilder::dumpCaptureSection(FILE *file) {
+void TypeRefBuilder::dumpCaptureSection(std::ostream &stream) {
   for (const auto &sections : ReflectionInfos) {
     for (const auto descriptor : sections.Capture) {
       auto info = getClosureContextInfo(descriptor);
-      info.dump(file);
+      info.dump(stream);
     }
   }
 }
 
-void TypeRefBuilder::dumpAllSections(FILE *file) {
-  fprintf(file, "FIELDS:\n");
-  fprintf(file, "=======\n");
-  dumpFieldSection(file);
-  fprintf(file, "\n");
-  fprintf(file, "ASSOCIATED TYPES:\n");
-  fprintf(file, "=================\n");
-  dumpAssociatedTypeSection(file);
-  fprintf(file, "\n");
-  fprintf(file, "BUILTIN TYPES:\n");
-  fprintf(file, "==============\n");
-  dumpBuiltinTypeSection(file);
-  fprintf(file, "\n");
-  fprintf(file, "CAPTURE DESCRIPTORS:\n");
-  fprintf(file, "====================\n");
-  dumpCaptureSection(file);
-  fprintf(file, "\n");
+void TypeRefBuilder::dumpMultiPayloadEnumSection(std::ostream &stream) {
+  for (const auto &sections : ReflectionInfos) {
+    for (const auto descriptor : sections.MultiPayloadEnum) {
+      auto typeNode =
+          demangleTypeRef(readTypeRef(descriptor, descriptor->TypeName));
+      auto typeName = nodeToString(typeNode);
+      clearNodeFactory();
+
+      stream << "\n- " << typeName << ":\n";
+      stream << "  Descriptor Size: " << descriptor->getSizeInBytes() << "\n";
+      stream << "  Flags: " << std::hex << descriptor->getFlags() << std::dec;
+      if (descriptor->usesPayloadSpareBits()) {
+        stream << " usesPayloadSpareBits";
+      }
+      stream << "\n";
+      auto maskBytes = descriptor->getPayloadSpareBitMaskByteCount();
+      auto maskOffset = descriptor->getPayloadSpareBitMaskByteOffset();
+      if (maskBytes > 0) {
+        if (maskOffset > 0) {
+          stream << "  Spare bit mask: (offset " << maskOffset << " bytes) 0x";
+        } else {
+          stream << "  Spare bit mask: 0x";
+        }
+        const uint8_t *p = descriptor->getPayloadSpareBits();
+        for (unsigned i = 0; i < maskBytes; i++) {
+          stream << std::hex << std::setw(2) << std::setfill('0') << p[i];
+        }
+        stream << std::dec << "\n";
+      }
+      stream << "\n";
+    }
+  }
 }
+
+#endif

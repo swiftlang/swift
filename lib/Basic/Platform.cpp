@@ -79,19 +79,48 @@ bool swift::triplesAreValidForZippering(const llvm::Triple &target,
   return false;
 }
 
-bool swift::tripleRequiresRPathForSwiftInOS(const llvm::Triple &triple) {
+const Optional<llvm::VersionTuple>
+swift::minimumAvailableOSVersionForTriple(const llvm::Triple &triple) {
+  if (triple.isMacOSX())
+    return llvm::VersionTuple(10, 10, 0);
+
+  // Mac Catalyst was introduced with an iOS deployment target of 13.1.
+  if (tripleIsMacCatalystEnvironment(triple))
+    return llvm::VersionTuple(13, 1);
+  
+  // Note: this must come before checking iOS since that returns true for
+  // both iOS and tvOS.
+  if (triple.isTvOS())
+    return llvm::VersionTuple(9, 0);
+
+  if (triple.isiOS())
+    return llvm::VersionTuple(8, 0);
+
+  if (triple.isWatchOS())
+    return llvm::VersionTuple(2, 0);
+
+  return None;
+}
+
+bool swift::tripleRequiresRPathForSwiftLibrariesInOS(
+    const llvm::Triple &triple) {
   if (triple.isMacOSX()) {
-    // macOS 10.14.4 contains a copy of Swift, but the linker will still use an
-    // rpath-based install name until 10.15.
-    return triple.isMacOSXVersionLT(10, 15);
+    // macOS versions before 10.14.4 don't have Swift in the OS
+    // (the linker still uses an rpath-based install name until 10.15).
+    // macOS versions before 12.0 don't have _Concurrency in the OS.
+    return triple.isMacOSXVersionLT(12, 0);
   }
 
   if (triple.isiOS()) {
-    return triple.isOSVersionLT(12, 2);
+    // iOS versions before 12.2 don't have Swift in the OS.
+    // iOS versions before 15.0 don't have _Concurrency in the OS.
+    return triple.isOSVersionLT(15, 0);
   }
 
   if (triple.isWatchOS()) {
-    return triple.isOSVersionLT(5, 2);
+    // watchOS versions before 5.2 don't have Swift in the OS.
+    // watchOS versions before 8.0 don't have _Concurrency in the OS.
+    return triple.isOSVersionLT(8, 0);
   }
 
   // Other platforms don't have Swift installed as part of the OS by default.
@@ -108,6 +137,7 @@ DarwinPlatformKind swift::getDarwinPlatformKind(const llvm::Triple &triple) {
 
     if (tripleIsiOSSimulator(triple))
       return DarwinPlatformKind::IPhoneOSSimulator;
+
     return DarwinPlatformKind::IPhoneOS;
   }
 
@@ -212,6 +242,8 @@ StringRef swift::getMajorArchitectureName(const llvm::Triple &Triple) {
       return "armv7";
     case llvm::Triple::SubArchType::ARMSubArch_v6:
       return "armv6";
+    case llvm::Triple::SubArchType::ARMSubArch_v5:
+      return "armv5";
     default:
       break;
     }
@@ -364,102 +396,107 @@ Optional<llvm::VersionTuple>
 swift::getSwiftRuntimeCompatibilityVersionForTarget(
     const llvm::Triple &Triple) {
   unsigned Major, Minor, Micro;
-
-  if (Triple.getArchName() == "arm64e")
-    return llvm::VersionTuple(5, 3);
+  #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
   if (Triple.isMacOSX()) {
     Triple.getMacOSXVersion(Major, Minor, Micro);
+
+    auto floorFor64 = [&Triple](llvm::VersionTuple v) {
+      if (!Triple.isAArch64()) return v;
+      // macOS got first arm64(e) support in 11.0, i.e. VersionTuple(5, 3)
+      return MAX(v, llvm::VersionTuple(5, 3));
+    };
+
     if (Major == 10) {
       if (Triple.isAArch64() && Minor <= 16)
-        return llvm::VersionTuple(5, 3);
+        return floorFor64(llvm::VersionTuple(5, 3));
 
       if (Minor <= 14) {
-        return llvm::VersionTuple(5, 0);
+        return floorFor64(llvm::VersionTuple(5, 0));
       } else if (Minor <= 15) {
         if (Micro <= 3) {
-          return llvm::VersionTuple(5, 1);
+          return floorFor64(llvm::VersionTuple(5, 1));
         } else {
-          return llvm::VersionTuple(5, 2);
+          return floorFor64(llvm::VersionTuple(5, 2));
         }
       }
     } else if (Major == 11) {
-      return llvm::VersionTuple(5, 3);
+      if (Minor <= 3)
+        return floorFor64(llvm::VersionTuple(5, 3));
+
+      return floorFor64(llvm::VersionTuple(5, 4));
+    } else if (Major == 12) {
+      return floorFor64(llvm::VersionTuple(5, 5));
     }
   } else if (Triple.isiOS()) { // includes tvOS
     Triple.getiOSVersion(Major, Minor, Micro);
 
-    // arm64 simulators and macCatalyst are introduced in iOS 14.0/tvOS 14.0
-    // with Swift 5.3
-    if (Triple.isAArch64() && Major <= 14 &&
-        (Triple.isSimulatorEnvironment() || Triple.isMacCatalystEnvironment()))
-      return llvm::VersionTuple(5, 3);
+    auto floorForArchitecture = [&Triple, Major](llvm::VersionTuple v) {
+      // arm64 simulators and macCatalyst are introduced in iOS 14.0/tvOS 14.0
+      // with Swift 5.3
+      if (Triple.isAArch64() && Major <= 14 &&
+          (Triple.isSimulatorEnvironment() ||
+           Triple.isMacCatalystEnvironment()))
+        return MAX(v, llvm::VersionTuple(5, 3));
+
+      if (Triple.getArchName() != "arm64e") return v;
+
+      // iOS got first arm64e support in 12.0, which has a Swift runtime version
+      // older than 5.0, so let's floor at VersionTuple(5, 0) instead.
+      return MAX(v, llvm::VersionTuple(5, 0));
+    };
 
     if (Major <= 12) {
-      return llvm::VersionTuple(5, 0);
+      return floorForArchitecture(llvm::VersionTuple(5, 0));
     } else if (Major <= 13) {
       if (Minor <= 3) {
-        return llvm::VersionTuple(5, 1);
+        return floorForArchitecture(llvm::VersionTuple(5, 1));
       } else {
-        return llvm::VersionTuple(5, 2);
+        return floorForArchitecture(llvm::VersionTuple(5, 2));
       }
+    } else if (Major <= 14) {
+      if (Minor <= 4)
+        return floorForArchitecture(llvm::VersionTuple(5, 3));
+
+      return floorForArchitecture(llvm::VersionTuple(5, 4));
+    } else if (Major <= 15) {
+      return floorForArchitecture(llvm::VersionTuple(5, 5));
     }
   } else if (Triple.isWatchOS()) {
+    auto floorFor64bits = [&Triple](llvm::VersionTuple v) {
+      if (!Triple.isArch64Bit()) return v;
+      // 64-bit watchOS was introduced with Swift 5.3
+      return MAX(v, llvm::VersionTuple(5, 3));
+    };
+
     Triple.getWatchOSVersion(Major, Minor, Micro);
     if (Major <= 5) {
-      return llvm::VersionTuple(5, 0);
+      return floorFor64bits(llvm::VersionTuple(5, 0));
     } else if (Major <= 6) {
       if (Minor <= 1) {
-        return llvm::VersionTuple(5, 1);
+        return floorFor64bits(llvm::VersionTuple(5, 1));
       } else {
-        return llvm::VersionTuple(5, 2);
+        return floorFor64bits(llvm::VersionTuple(5, 2));
       }
+    } else if (Major <= 7) {
+      if (Minor <= 4)
+        return floorFor64bits(llvm::VersionTuple(5, 3));
+
+      return floorFor64bits(llvm::VersionTuple(5, 4));
+    } else if (Major <= 8) {
+      return floorFor64bits(llvm::VersionTuple(5, 5));
     }
   }
 
   return None;
 }
 
-
-/// Remap the given version number via the version map, or produce \c None if
-/// there is no mapping for this version.
-static Optional<llvm::VersionTuple> remapVersion(
-    const llvm::StringMap<llvm::VersionTuple> &versionMap,
-    llvm::VersionTuple version) {
-  // The build number is never used in the lookup.
-  version = version.withoutBuild();
-
-  // Look for this specific version.
-  auto known = versionMap.find(version.getAsString());
-  if (known != versionMap.end())
-    return known->second;
-
-  // If an extra ".0" was specified (in the subminor version), drop that
-  // and look again.
-  if (!version.getSubminor() || *version.getSubminor() != 0)
-    return None;
-
-  version = llvm::VersionTuple(version.getMajor(), *version.getMinor());
-  known = versionMap.find(version.getAsString());
-  if (known != versionMap.end())
-    return known->second;
-
-  // If another extra ".0" wa specified (in the minor version), drop that
-  // and look again.
-  if (!version.getMinor() || *version.getMinor() != 0)
-    return None;
-
-  version = llvm::VersionTuple(version.getMajor());
-  known = versionMap.find(version.getAsString());
-  if (known != versionMap.end())
-    return known->second;
-
-  return None;
+static const llvm::VersionTuple minimumMacCatalystDeploymentTarget() {
+  return llvm::VersionTuple(13, 1);
 }
 
-llvm::VersionTuple
-swift::getTargetSDKVersion(clang::driver::DarwinSDKInfo &SDKInfo,
-                           const llvm::Triple &triple) {
+llvm::VersionTuple swift::getTargetSDKVersion(clang::DarwinSDKInfo &SDKInfo,
+                                              const llvm::Triple &triple) {
   // Retrieve the SDK version.
   auto SDKVersion = SDKInfo.getVersion();
 
@@ -467,9 +504,13 @@ swift::getTargetSDKVersion(clang::driver::DarwinSDKInfo &SDKInfo,
   // SDK version. Map that to the corresponding iOS version number to pass
   // down to the linker.
   if (tripleIsMacCatalystEnvironment(triple)) {
-    return remapVersion(
-        SDKInfo.getVersionMap().MacOS2iOSMacMapping, SDKVersion)
+    if (const auto *MacOStoMacCatalystMapping = SDKInfo.getVersionMapping(
+            clang::DarwinSDKInfo::OSEnvPair::macOStoMacCatalystPair())) {
+      return MacOStoMacCatalystMapping
+          ->map(SDKVersion, minimumMacCatalystDeploymentTarget(), None)
           .getValueOr(llvm::VersionTuple(0, 0, 0));
+    }
+    return llvm::VersionTuple(0, 0, 0);
   }
 
   return SDKVersion;

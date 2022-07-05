@@ -79,7 +79,7 @@ class ArgumentParser<U> {
     private var optionalArgsMap = [String : String]()
 
     /// Argument holds the name of the command line parameter, its help
-    /// desciption and a rule that's applied to process it.
+    /// description and a rule that's applied to process it.
     ///
     /// The the rule is typically a value processing closure used to convert it
     /// into given type and storing it in the parsing result.

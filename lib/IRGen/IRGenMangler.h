@@ -191,6 +191,10 @@ public:
   std::string mangleNominalTypeDescriptor(const NominalTypeDecl *Decl) {
     return mangleNominalTypeSymbol(Decl, "Mn");
   }
+
+  std::string mangleNominalTypeDescriptorRecord(const NominalTypeDecl *Decl) {
+    return mangleNominalTypeSymbol(Decl, "Hn");
+  }
   
   std::string mangleOpaqueTypeDescriptorAccessor(const OpaqueTypeDecl *decl) {
     beginMangling();
@@ -293,6 +297,13 @@ public:
     return finalize();
   }
 
+  std::string mangleProtocolDescriptorRecord(const ProtocolDecl *Decl) {
+    beginMangling();
+    appendProtocolName(Decl);
+    appendOperator("Hr");
+    return finalize();
+  }
+
   std::string mangleProtocolRequirementsBaseDescriptor(
                                                     const ProtocolDecl *Decl) {
     beginMangling();
@@ -358,6 +369,8 @@ public:
   }
 
   std::string mangleProtocolConformanceDescriptor(
+                                    const RootProtocolConformance *conformance);
+  std::string mangleProtocolConformanceDescriptorRecord(
                                     const RootProtocolConformance *conformance);
   std::string mangleProtocolConformanceInstantiationCache(
                                     const RootProtocolConformance *conformance);
@@ -454,6 +467,18 @@ public:
       assert(isa<GenericTypeParamType>(associatedType));
     }
   }
+
+  void appendExtendedExistentialTypeShape(CanGenericSignature genSig,
+                                          CanType shapeType);
+  void appendExtendedExistentialTypeShapeSymbol(CanGenericSignature genSig,
+                                                CanType shapeType,
+                                                bool isUnique);
+
+  /// Mangle the symbol name for an extended existential type shape.
+  std::string mangleExtendedExistentialTypeShapeSymbol(
+                                                CanGenericSignature genSig,
+                                                CanType shapeType,
+                                                bool isUnique);
 
   std::string mangleCoroutineContinuationPrototype(CanSILFunctionType type) {
     return mangleTypeSymbol(type, "TC");
@@ -572,6 +597,14 @@ public:
     return mangleTypeWithoutPrefix(type);
   }
 
+  void configureForSymbolicMangling() {
+    OptimizeProtocolNames = false;
+    UseObjCRuntimeNames = true;
+  }
+
+  SymbolicMangling mangleTypeForFlatUniqueTypeRef(CanGenericSignature sig,
+                                                  CanType ty);
+
   SymbolicMangling mangleTypeForReflection(IRGenModule &IGM,
                                            CanGenericSignature genericSig,
                                            CanType Ty);
@@ -599,6 +632,13 @@ public:
                                            CanGenericSignature genericSig,
                                            CanType type,
                                            ProtocolConformanceRef conformance);
+
+  std::string
+  mangleSymbolNameForUnderlyingTypeAccessorString(OpaqueTypeDecl *opaque,
+                                                  unsigned index);
+
+  std::string mangleSymbolNameForUnderlyingWitnessTableAccessorString(
+      OpaqueTypeDecl *opaque, const Requirement &req, ProtocolDecl *protocol);
 
   std::string mangleSymbolNameForGenericEnvironment(
                                                 CanGenericSignature genericSig);
@@ -634,10 +674,10 @@ protected:
   }
 };
 
-/// Does this type require a special minimum Swift runtime version which
-/// supports demangling it?
-Optional<llvm::VersionTuple>
-getRuntimeVersionThatSupportsDemanglingType(CanType type);
+/// Determines if the minimum deployment target's runtime demangler will not
+/// understand the mangled name for the given type.
+/// \returns true iff the target's runtime does not understand the mangled name.
+bool mangledNameIsUnknownToDeployTarget(IRGenModule &IGM, CanType type);
 
 } // end namespace irgen
 } // end namespace swift

@@ -30,6 +30,7 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
+#include "clang/AST/ASTContext.h"
 using namespace swift;
 
 #define DEBUG_TYPE "Name lookup"
@@ -80,6 +81,17 @@ ProtocolDecl *DeclContext::getExtendedProtocolDecl() const {
   if (auto decl = const_cast<Decl*>(getAsDecl()))
     if (auto ED = dyn_cast<ExtensionDecl>(decl))
       return dyn_cast_or_null<ProtocolDecl>(ED->getExtendedNominal());
+  return nullptr;
+}
+
+VarDecl *DeclContext::getNonLocalVarDecl() const {
+  if (auto *init = dyn_cast<PatternBindingInitializer>(this)) {
+    if (auto binding = init->getBinding()) {
+      if (auto *var = binding->getAnchoringVarDecl(init->getBindingIndex())) {
+        return var;
+      }
+    }
+  }
   return nullptr;
 }
 
@@ -139,7 +151,7 @@ void DeclContext::forEachGenericContext(
         if (auto *gpList = genericCtx->getGenericParams())
           fn(gpList);
     }
-  } while ((dc = dc->getParent()));
+  } while ((dc = dc->getParentForLookup()));
 }
 
 unsigned DeclContext::getGenericContextDepth() const {
@@ -310,6 +322,7 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
   case FragileFunctionKind::AlwaysEmitIntoClient:
   case FragileFunctionKind::DefaultArgument:
   case FragileFunctionKind::PropertyInitializer:
+  case FragileFunctionKind::BackDeploy:
     return ResilienceExpansion::Minimal;
   case FragileFunctionKind::None:
     return ResilienceExpansion::Maximal;
@@ -408,8 +421,13 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
                 /*allowUsableFromInline=*/true};
       }
 
-      // If a property or subscript is @inlinable or @_alwaysEmitIntoClient,
-      // the accessors are @inlinable or @_alwaysEmitIntoClient also.
+      if (AFD->getAttrs().hasAttribute<BackDeployAttr>()) {
+        return {FragileFunctionKind::BackDeploy,
+                /*allowUsableFromInline=*/true};
+      }
+
+      // Property and subscript accessors inherit @_alwaysEmitIntoClient,
+      // @_backDeploy, and @inlinable from their storage declarations.
       if (auto accessor = dyn_cast<AccessorDecl>(AFD)) {
         auto *storage = accessor->getStorage();
         if (storage->getAttrs().getAttribute<InlinableAttr>()) {
@@ -418,6 +436,10 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
         }
         if (storage->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>()) {
           return {FragileFunctionKind::AlwaysEmitIntoClient,
+                  /*allowUsableFromInline=*/true};
+        }
+        if (storage->getAttrs().hasAttribute<BackDeployAttr>()) {
+          return {FragileFunctionKind::BackDeploy,
                   /*allowUsableFromInline=*/true};
         }
       }
@@ -713,6 +735,14 @@ unsigned DeclContext::printContext(raw_ostream &OS, const unsigned indent,
   }
   }
 
+  if (auto decl = getAsDecl())
+    if (decl->getClangNode().getLocation().isValid()) {
+      auto &clangSM = getASTContext().getClangModuleLoader()
+                          ->getClangASTContext().getSourceManager();
+      OS << " clang_loc=";
+      decl->getClangNode().getLocation().print(OS, clangSM);
+    }
+
   if (!onlyAPartialLine)
     OS << "\n";
   return Depth + 1;
@@ -867,6 +897,10 @@ void IterableDeclContext::addMemberSilently(Decl *member, Decl *hint,
       if (d->isImplicit())
         return true;
 
+      // Imported decls won't have complete location info.
+      if (d->hasClangNode())
+        return true;
+
       return false;
     };
 
@@ -962,6 +996,10 @@ bool IterableDeclContext::hasUnparsedMembers() const {
   return true;
 }
 
+void IterableDeclContext::setHasLazyMembers(bool hasLazyMembers) const {
+  FirstDeclAndLazyMembers.setInt(hasLazyMembers);
+}
+
 void IterableDeclContext::loadAllMembers() const {
   ASTContext &ctx = getASTContext();
 
@@ -986,7 +1024,7 @@ void IterableDeclContext::loadAllMembers() const {
     return;
 
   // Don't try to load all members re-entrant-ly.
-  FirstDeclAndLazyMembers.setInt(false);
+  setHasLazyMembers(false);
 
   const Decl *container = getDecl();
   auto contextInfo = ctx.getOrCreateLazyIterableContextData(this,
@@ -1200,6 +1238,36 @@ bool DeclContext::isClassConstrainedProtocolExtension() const {
   return false;
 }
 
+bool DeclContext::isAsyncContext() const {
+  switch (getContextKind()) {
+  case DeclContextKind::Initializer:
+  case DeclContextKind::EnumElementDecl:
+  case DeclContextKind::ExtensionDecl:
+  case DeclContextKind::SerializedLocal:
+  case DeclContextKind::Module:
+  case DeclContextKind::GenericTypeDecl:
+    return false;
+  case DeclContextKind::FileUnit:
+    if (const SourceFile *sf = dyn_cast<SourceFile>(this))
+      return sf->isAsyncTopLevelSourceFile();
+    return false;
+  case DeclContextKind::TopLevelCodeDecl:
+    return getParent()->isAsyncContext();
+  case DeclContextKind::AbstractClosureExpr:
+    return cast<AbstractClosureExpr>(this)->isBodyAsync();
+  case DeclContextKind::AbstractFunctionDecl: {
+    const AbstractFunctionDecl *function = cast<AbstractFunctionDecl>(this);
+    return function->hasAsync();
+  }
+  case DeclContextKind::SubscriptDecl: {
+    AccessorDecl *getter =
+        cast<SubscriptDecl>(this)->getAccessor(AccessorKind::Get);
+    return getter != nullptr && getter->hasAsync();
+  }
+  }
+  llvm_unreachable("Unhandled DeclContextKind switch");
+}
+
 SourceLoc swift::extractNearestSourceLoc(const DeclContext *dc) {
   switch (dc->getContextKind()) {
   case DeclContextKind::Module:
@@ -1226,7 +1294,7 @@ SourceLoc swift::extractNearestSourceLoc(const DeclContext *dc) {
   case DeclContextKind::SerializedLocal:
     return extractNearestSourceLoc(dc->getParent());
   }
-  llvm_unreachable("Unhandled DeclCopntextKindin switch");
+  llvm_unreachable("Unhandled DeclContextKindIn switch");
 }
 
 #define DECL(Id, Parent) \

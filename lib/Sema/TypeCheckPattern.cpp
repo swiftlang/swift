@@ -84,9 +84,7 @@ filterForEnumElement(DeclContext *DC, SourceLoc UseLoc,
   for (const LookupResultEntry &result : foundElements) {
     ValueDecl *e = result.getValueDecl();
     assert(e);
-    if (e->isInvalid()) {
-      continue;
-    }
+
     // Skip if the enum element was referenced as an instance member
     if (unqualifiedLookup) {
       if (!result.getBaseDecl() ||
@@ -96,8 +94,10 @@ filterForEnumElement(DeclContext *DC, SourceLoc UseLoc,
     }
 
     if (auto *oe = dyn_cast<EnumElementDecl>(e)) {
-      // Ambiguities should be ruled out by parsing.
-      assert(!foundElement && "ambiguity in enum case name lookup?!");
+      // Note that there could be multiple elements with the same
+      // name, such results in a re-declaration error, so let's
+      // just always pick the last element, just like in `foundConstant`
+      // case.
       foundElement = oe;
       continue;
     }
@@ -274,7 +274,24 @@ public:
 
     return new (Context) ExprPattern(E, nullptr, nullptr);
   }
-  
+
+  /// Turn an argument list into a matching tuple or paren pattern.
+  Pattern *composeTupleOrParenPattern(ArgumentList *args) {
+    assert(!args->hasAnyInOutArgs());
+    if (auto *unary = args->getUnlabeledUnaryExpr()) {
+      auto *subPattern = getSubExprPattern(unary);
+      return new (Context)
+          ParenPattern(args->getLParenLoc(), subPattern, args->getRParenLoc());
+    }
+    SmallVector<TuplePatternElt, 4> elts;
+    for (auto arg : *args) {
+      auto *subPattern = getSubExprPattern(arg.getExpr());
+      elts.emplace_back(arg.getLabel(), arg.getLabelLoc(), subPattern);
+    }
+    return TuplePattern::create(Context, args->getLParenLoc(), elts,
+                                args->getRParenLoc());
+  }
+
   // Handle productions that are always leaf patterns or are already resolved.
 #define ALWAYS_RESOLVED_PATTERN(Id) \
   Pattern *visit##Id##Pattern(Id##Pattern *P) { return P; }
@@ -468,8 +485,8 @@ public:
     auto *repr = IdentTypeRepr::create(Context, components);
 
     // See if the repr resolves to a type.
-    const auto resolution = TypeResolution::forContextual(
-        DC, options,
+    const auto ty = TypeResolution::resolveContextualType(
+        repr, DC, options,
         [](auto unboundTy) {
           // FIXME: Don't let unbound generic types escape type resolution.
           // For now, just return the unbound generic type.
@@ -477,10 +494,8 @@ public:
         },
         // FIXME: Don't let placeholder types escape type resolution.
         // For now, just return the placeholder type.
-        [](auto &ctx, auto *originator) {
-          return Type();
-        });
-    const auto ty = resolution.resolveType(repr);
+        PlaceholderType::get);
+
     auto *enumDecl = dyn_cast_or_null<EnumDecl>(ty->getAnyNominal());
     if (!enumDecl)
       return nullptr;
@@ -554,7 +569,7 @@ public:
         return nullptr;
 
       auto *EEP = cast<EnumElementPattern>(P);
-      EEP->setSubPattern(getSubExprPattern(ce->getArg()));
+      EEP->setSubPattern(composeTupleOrParenPattern(ce->getArgs()));
       EEP->setUnresolvedOriginalExpr(ce);
 
       return P;
@@ -591,20 +606,17 @@ public:
       auto *prefixRepr = IdentTypeRepr::create(Context, components);
 
       // See first if the entire repr resolves to a type.
-      const Type enumTy =
-          TypeResolution::forContextual(
-              DC, options,
-              [](auto unboundTy) {
-                // FIXME: Don't let unbound generic types escape type
-                // resolution. For now, just return the unbound generic type.
-                return unboundTy;
-              },
-              // FIXME: Don't let placeholder types escape type resolution.
-              // For now, just return the placeholder type.
-              [](auto &ctx, auto *originator) {
-                return Type();
-              })
-              .resolveType(prefixRepr);
+      const Type enumTy = TypeResolution::resolveContextualType(
+          prefixRepr, DC, options,
+          [](auto unboundTy) {
+            // FIXME: Don't let unbound generic types escape type
+            // resolution. For now, just return the unbound generic type.
+            return unboundTy;
+          },
+          // FIXME: Don't let placeholder types escape type resolution.
+          // For now, just return the placeholder type.
+          PlaceholderType::get);
+
       auto *enumDecl = dyn_cast_or_null<EnumDecl>(enumTy->getAnyNominal());
       if (!enumDecl)
         return nullptr;
@@ -625,7 +637,7 @@ public:
     assert(!isa<GenericIdentTypeRepr>(tailComponent) &&
            "should be handled above");
 
-    auto *subPattern = getSubExprPattern(ce->getArg());
+    auto *subPattern = composeTupleOrParenPattern(ce->getArgs());
     return new (Context) EnumElementPattern(
         baseTE, SourceLoc(), tailComponent->getNameLoc(),
         tailComponent->getNameRef(), referencedElement, subPattern);
@@ -701,7 +713,11 @@ Pattern *TypeChecker::resolvePattern(Pattern *P, DeclContext *DC,
   return P;
 }
 
-static Type validateTypedPattern(TypedPattern *TP, TypeResolution resolution) {
+static Type
+validateTypedPattern(TypedPattern *TP, DeclContext *dc,
+                     TypeResolutionOptions options,
+                     OpenUnboundGenericTypeFn unboundTyOpener,
+                     HandlePlaceholderTypeReprFn placeholderHandler) {
   if (TP->hasType()) {
     return TP->getType();
   }
@@ -709,7 +725,7 @@ static Type validateTypedPattern(TypedPattern *TP, TypeResolution resolution) {
   // If the pattern declares an opaque type, and applies to a single
   // variable binding, then we can bind the opaque return type from the
   // property definition.
-  auto &Context = resolution.getASTContext();
+  auto &Context = dc->getASTContext();
   auto *Repr = TP->getTypeRepr();
   if (Repr && Repr->hasOpaque()) {
     auto named = dyn_cast<NamedPattern>(
@@ -734,7 +750,9 @@ static Type validateTypedPattern(TypedPattern *TP, TypeResolution resolution) {
     return named->getDecl()->getDeclContext()->mapTypeIntoContext(opaqueTy);
   }
 
-  auto ty = resolution.resolveType(Repr);
+  const auto ty = TypeResolution::resolveContextualType(
+      Repr, dc, options, unboundTyOpener, placeholderHandler);
+
   if (ty->hasError()) {
     return ErrorType::get(Context);
   }
@@ -813,14 +831,10 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
       };
       // FIXME: Don't let placeholder types escape type resolution.
       // For now, just return the placeholder type.
-      placeholderHandler = [](auto &ctx, auto *originator) {
-        return Type();
-      };
+      placeholderHandler = PlaceholderType::get;
     }
-    return validateTypedPattern(
-        cast<TypedPattern>(P),
-        TypeResolution::forContextual(dc, options, unboundTyOpener,
-                                      placeholderHandler));
+    return validateTypedPattern(cast<TypedPattern>(P), dc, options,
+                                unboundTyOpener, placeholderHandler);
   }
 
   // A wildcard or name pattern cannot appear by itself in a context
@@ -883,15 +897,14 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
         };
         // FIXME: Don't let placeholder types escape type resolution.
         // For now, just return the placeholder type.
-        placeholderHandler = [](auto &ctx, auto *originator) {
-          return Type();
-        };
+        placeholderHandler = PlaceholderType::get;
       }
-      TypedPattern *TP = cast<TypedPattern>(somePat->getSubPattern());
-      const auto type = validateTypedPattern(
-          TP, TypeResolution::forContextual(dc, options, unboundTyOpener,
-                                            placeholderHandler));
-      if (type && !type->hasError()) {
+
+      const auto type =
+          validateTypedPattern(cast<TypedPattern>(somePat->getSubPattern()), dc,
+                               options, unboundTyOpener, placeholderHandler);
+
+      if (!type->hasError()) {
         return OptionalType::get(type);
       }
     }
@@ -1070,25 +1083,20 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
   case PatternKind::Typed: {
     TypedPattern *TP = cast<TypedPattern>(P);
     Type patternType = TypeChecker::typeCheckPattern(pattern);
-    bool hadError = false;
     if (!patternType->hasError()) {
       if (!type->isEqual(patternType) && !type->hasError()) {
         if (options & TypeResolutionFlags::OverrideType) {
           TP->setType(type);
           // If the pattern type has a placeholder, we need to resolve it here.
           if (patternType->hasPlaceholder()) {
-            validateTypedPattern(
-                cast<TypedPattern>(TP),
-                TypeResolution::forContextual(dc, options, nullptr, nullptr));
+            validateTypedPattern(cast<TypedPattern>(TP), dc, options, nullptr,
+                                 nullptr);
           }
         } else {
           diags.diagnose(P->getLoc(), diag::pattern_type_mismatch_context,
                          type);
-          hadError = true;
         }
       }
-    } else {
-      hadError = true;
     }
 
     Pattern *sub = TP->getSubPattern();
@@ -1107,8 +1115,6 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
   case PatternKind::Named: {
     NamedPattern *NP = cast<NamedPattern>(P);
     VarDecl *var = NP->getDecl();
-    if (var->hasInterfaceType() && var->isInvalid())
-      type = ErrorType::get(Context);
 
     // In SIL mode, VarDecls are written as having reference storage types.
     type = type->getReferenceStorageReferent();
@@ -1263,10 +1269,10 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
   case PatternKind::Expr: {
     assert(cast<ExprPattern>(P)->isResolved()
            && "coercing unresolved expr pattern!");
+    auto *EP = cast<ExprPattern>(P);
     if (type->isBool()) {
       // The type is Bool.
       // Check if the pattern is a Bool literal
-      auto EP = cast<ExprPattern>(P);
       if (auto *BLE = dyn_cast<BooleanLiteralExpr>(
               EP->getSubExpr()->getSemanticsProvidingExpr())) {
         P = new (Context) BoolPattern(BLE->getLoc(), BLE->getValue());
@@ -1276,9 +1282,8 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
     }
 
     // case nil is equivalent to .none when switching on Optionals.
-    if (type->getOptionalObjectType()) {
-      auto EP = cast<ExprPattern>(P);
-      if (auto *NLE = dyn_cast<NilLiteralExpr>(EP->getSubExpr())) {
+    if (auto *NLE = dyn_cast<NilLiteralExpr>(EP->getSubExpr())) {
+      if (type->getOptionalObjectType()) {
         auto *NoneEnumElement = Context.getOptionalNoneDecl();
         auto *BaseTE = TypeExpr::createImplicit(type, Context);
         P = new (Context) EnumElementPattern(
@@ -1286,10 +1291,18 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
             NoneEnumElement->createNameRef(), NoneEnumElement, nullptr);
         return TypeChecker::coercePatternToType(
             pattern.forSubPattern(P, /*retainTopLevel=*/true), type, options);
+      } else {
+        // ...but for non-optional types it can never match! Diagnose it.
+        diags.diagnose(NLE->getLoc(),
+                       diag::value_type_comparison_with_nil_illegal, type)
+             .warnUntilSwiftVersion(6);
+
+        if (type->getASTContext().isSwiftVersionAtLeast(6))
+          return nullptr;
       }
     }
 
-    if (TypeChecker::typeCheckExprPattern(cast<ExprPattern>(P), dc, type))
+    if (TypeChecker::typeCheckExprPattern(EP, dc, type))
       return nullptr;
 
     return P;
@@ -1300,14 +1313,13 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
     auto IP = cast<IsPattern>(P);
 
     // Type-check the type parameter.
-    const auto castType =
-        TypeResolution::forContextual(dc, TypeResolverContext::InExpression,
-                                      // FIXME: Should we really unconditionally
-                                      // complain about unbound generics and
-                                      // placeholders here?
-                                      /*unboundTyOpener*/ nullptr,
-                                      /*placeholderHandler*/ nullptr)
-            .resolveType(IP->getCastTypeRepr());
+    const auto castType = TypeResolution::resolveContextualType(
+        IP->getCastTypeRepr(), dc, TypeResolverContext::InExpression,
+        // FIXME: Should we really unconditionally
+        // complain about unbound generics and
+        // placeholders here?
+        /*unboundTyOpener*/ nullptr,
+        /*placeholderHandler*/ nullptr);
     if (castType->hasError())
       return nullptr;
     IP->setCastType(castType);
@@ -1343,10 +1355,20 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
         type, IP->getCastType(),
         type->hasError() ? CheckedCastContextKind::None
                          : CheckedCastContextKind::IsPattern,
-        dc, IP->getLoc(), nullptr, IP->getCastTypeRepr()->getSourceRange());
+        dc);
     switch (castKind) {
     case CheckedCastKind::Unresolved:
-      return nullptr;
+      if (type->hasError()) {
+        return nullptr;
+      }
+      diags
+          .diagnose(IP->getLoc(), diag::downcast_to_unrelated, type,
+                    IP->getCastType())
+          .highlight(IP->getLoc())
+          .highlight(IP->getCastTypeRepr()->getSourceRange());
+
+      IP->setCastKind(CheckedCastKind::ValueCast);
+      break;
     case CheckedCastKind::Coercion:
     case CheckedCastKind::BridgingCoercion:
       // If this is an 'as' pattern coercing between two different types, then
@@ -1509,16 +1531,17 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
       // Otherwise, see if we can introduce a cast pattern to get from an
       // existential pattern type to the enum type.
       else if (type->isAnyExistentialType()) {
-        auto foundCastKind =
-          typeCheckCheckedCast(type, parentTy,
-                               CheckedCastContextKind::EnumElementPattern,
-                               dc,
-                               EEP->getLoc(),
-                               nullptr, SourceRange());
+        auto foundCastKind = typeCheckCheckedCast(
+            type, parentTy, CheckedCastContextKind::EnumElementPattern, dc);
         // If the cast failed, we can't resolve the pattern.
-        if (foundCastKind < CheckedCastKind::First_Resolved)
+        if (foundCastKind < CheckedCastKind::First_Resolved) {
+          diags
+              .diagnose(EEP->getLoc(), diag::downcast_to_unrelated, type,
+                        parentTy)
+              .highlight(EEP->getSourceRange());
           return nullptr;
-        
+        }
+
         // Otherwise, we can type-check as the enum type, and insert a cast
         // from the outer pattern type.
         castKind = foundCastKind;
@@ -1675,9 +1698,6 @@ void TypeChecker::coerceParameterListToType(ParameterList *P,
   // Local function to check whether type of given parameter
   // should be coerced to a given contextual type or not.
   auto shouldOverwriteParam = [&](ParamDecl *param) -> bool {
-    if (param->isInvalid())
-      return true;
-
     return !isValidType(param->getType());
   };
 

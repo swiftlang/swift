@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-forward-mode-differentiation -Xfrontend -requirement-machine=off)
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-forward-mode-differentiation)
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -229,7 +229,7 @@ ForwardModeTests.test("Generics") {
   expectEqual(2 - g, df3(2, g))
 
   // SIMDType * Scalar
-  func testMultipication<Scalar, SIMDType: SIMD>(lhs: SIMDType, rhs: Scalar)
+  func testMultiplication<Scalar, SIMDType: SIMD>(lhs: SIMDType, rhs: Scalar)
     -> SIMDType
     where SIMDType.Scalar == Scalar,
       SIMDType : Differentiable,
@@ -239,7 +239,7 @@ ForwardModeTests.test("Generics") {
     return lhs * rhs
   }
   func simd3Multiply(lhs: SIMD3<Double>, rhs: Double) -> SIMD3<Double> {
-    return testMultipication(lhs: lhs, rhs: rhs)
+    return testMultiplication(lhs: lhs, rhs: rhs)
   }
   let (val4, df4) = valueWithDifferential(at: a, 5, of: simd3Multiply)
   expectEqual(SIMD3<Double>(5, 10, 15), val4)

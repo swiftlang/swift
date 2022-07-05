@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -requirement-machine=off)
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
 // Disabled due to test failure with `-O`: SR-13250.
@@ -133,7 +133,7 @@ struct S: P {
   }
 }
 
-// MARK: - Overridding protocol method adding `@differentiable` attribute.
+// MARK: - Overriding protocol method adding `@differentiable` attribute.
 
 public protocol Distribution {
   associatedtype Value

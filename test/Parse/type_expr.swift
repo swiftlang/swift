@@ -55,7 +55,6 @@ func unqualifiedType() {
 
   _ = Foo // expected-error{{expected member name or constructor call after type name}} expected-note{{add arguments}} {{10-10=()}} expected-note{{use '.self'}} {{10-10=.self}}
   _ = Foo.dynamicType // expected-error {{type 'Foo' has no member 'dynamicType'}}
-                      // expected-error@-1 {{'.dynamicType' is deprecated. Use 'type(of: ...)' instead}} {{7-7=type(of: }} {{10-22=)}}
 
   _ = Bad // expected-error{{expected member name or constructor call after type name}}
   // expected-note@-1{{use '.self' to reference the type object}}{{10-10=.self}}
@@ -73,7 +72,6 @@ func qualifiedType() {
 
   _ = Foo.Bar // expected-error{{expected member name or constructor call after type name}} expected-note{{add arguments}} {{14-14=()}} expected-note{{use '.self'}} {{14-14=.self}}
   _ = Foo.Bar.dynamicType // expected-error {{type 'Foo.Bar' has no member 'dynamicType'}}
-                          // expected-error@-1 {{'.dynamicType' is deprecated. Use 'type(of: ...)' instead}} {{7-7=type(of: }} {{14-26=)}}
 }
 
 // We allow '.Type' in expr context
@@ -112,7 +110,6 @@ func genQualifiedType() {
                    // expected-note@-1{{add arguments after the type to construct a value of the type}}
                    // expected-note@-2{{use '.self' to reference the type object}}
   _ = Gen<Foo>.Bar.dynamicType // expected-error {{type 'Gen<Foo>.Bar' has no member 'dynamicType'}}
-                               // expected-error@-1 {{'.dynamicType' is deprecated. Use 'type(of: ...)' instead}} {{7-7=type(of: }} {{19-31=)}}
 }
 
 func typeOfShadowing() {
@@ -196,7 +193,7 @@ func meta_metatypes() {
   let _: P.Protocol = P.self
   _ = P.Type.self
   _ = P.Protocol.self
-  _ = P.Protocol.Protocol.self // expected-error{{cannot use 'Protocol' with non-protocol type 'P.Protocol'}}
+  _ = P.Protocol.Protocol.self // expected-error{{cannot use 'Protocol' with non-protocol type '(any P).Type'}}
   _ = P.Protocol.Type.self
   _ = B.Type.self
 }
@@ -265,14 +262,14 @@ protocol P2 {}
 protocol P3 {}
 func compositionType() {
   _ = P1 & P2 // expected-error {{expected member name or constructor call after type name}} expected-note{{use '.self'}} {{7-7=(}} {{14-14=).self}}
-  _ = P1 & P2.self // expected-error {{binary operator '&' cannot be applied to operands of type 'P1.Protocol' and 'P2.Protocol'}}
+  _ = P1 & P2.self // expected-error {{binary operator '&' cannot be applied to operands of type '(any P1).Type' and '(any P2).Type'}}
   _ = (P1 & P2).self // Ok.
   _ = (P1 & (P2)).self // FIXME: OK? while `typealias P = P1 & (P2)` is rejected.
-  _ = (P1 & (P2, P3)).self // expected-error {{non-protocol, non-class type '(P2, P3)' cannot be used within a protocol-constrained type}}
+  _ = (P1 & (P2, P3)).self // expected-error {{non-protocol, non-class type '(any P2, any P3)' cannot be used within a protocol-constrained type}}
   _ = (P1 & Int).self // expected-error {{non-protocol, non-class type 'Int' cannot be used within a protocol-constrained type}}
-  _ = (P1? & P2).self // expected-error {{non-protocol, non-class type 'P1?' cannot be used within a protocol-constrained type}}
+  _ = (P1? & P2).self // expected-error {{non-protocol, non-class type '(any P1)?' cannot be used within a protocol-constrained type}}
 
-  _ = (P1 & P2.Type).self // expected-error {{non-protocol, non-class type 'P2.Type' cannot be used within a protocol-constrained type}}
+  _ = (P1 & P2.Type).self // expected-error {{non-protocol, non-class type 'any P2.Type' cannot be used within a protocol-constrained type}}
 
   _ = P1 & P2 -> P3
   // expected-error @-1 {{single argument function types require parentheses}} {{7-7=(}} {{14-14=)}}

@@ -54,12 +54,12 @@ bool pointsToLocalObject(SILValue V);
 /// - an address projection based on an exclusive argument with no levels of
 /// indirection (e.g. ref_element_addr, project_box, etc.).
 ///
-/// TODO: Fold this into the AccessedStorage API. pointsToLocalObject should be
-/// performed by AccessedStorage::isUniquelyIdentified.
+/// TODO: Fold this into the AccessStorage API. pointsToLocalObject should be
+/// performed by AccessStorage::isUniquelyIdentified.
 inline bool isUniquelyIdentified(SILValue V) {
   SILValue objectRef = V;
   if (V->getType().isAddress()) {
-    auto storage = AccessedStorage::compute(V);
+    auto storage = AccessStorage::compute(V);
     if (!storage)
       return false;
 

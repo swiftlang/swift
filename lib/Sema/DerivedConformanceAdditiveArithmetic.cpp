@@ -148,15 +148,14 @@ deriveBodyMathOperator(AbstractFunctionDecl *funcDecl, MathOperator op) {
   };
 
   // Create array of member operator call expressions.
-  llvm::SmallVector<Expr *, 2> memberOpExprs;
-  llvm::SmallVector<Identifier, 2> memberNames;
+  llvm::SmallVector<Argument, 2> memberOpArgs;
   for (auto member : nominal->getStoredProperties()) {
-    memberOpExprs.push_back(createMemberOpExpr(member));
-    memberNames.push_back(member->getName());
+    memberOpArgs.emplace_back(SourceLoc(), member->getName(),
+                              createMemberOpExpr(member));
   }
   // Call memberwise initializer with member operator call expressions.
-  auto *callExpr =
-      CallExpr::createImplicit(C, initExpr, memberOpExprs, memberNames);
+  auto *argList = ArgumentList::createImplicit(C, memberOpArgs);
+  auto *callExpr = CallExpr::createImplicit(C, initExpr, argList);
   ASTNode returnStmt = new (C) ReturnStmt(SourceLoc(), callExpr, true);
   return std::pair<BraceStmt *, bool>(
       BraceStmt::create(C, SourceLoc(), returnStmt, SourceLoc(), true), false);
@@ -267,15 +266,14 @@ deriveBodyPropertyGetter(AbstractFunctionDecl *funcDecl, ProtocolDecl *proto,
   };
 
   // Create array of `member.<property>` expressions.
-  llvm::SmallVector<Expr *, 2> memberPropExprs;
-  llvm::SmallVector<Identifier, 2> memberNames;
+  llvm::SmallVector<Argument, 2> args;
   for (auto member : nominal->getStoredProperties()) {
-    memberPropExprs.push_back(createMemberPropertyExpr(member));
-    memberNames.push_back(member->getName());
+    args.emplace_back(SourceLoc(), member->getName(),
+                      createMemberPropertyExpr(member));
   }
   // Call memberwise initializer with member property expressions.
-  auto *callExpr =
-      CallExpr::createImplicit(C, initExpr, memberPropExprs, memberNames);
+  auto *callExpr = CallExpr::createImplicit(
+      C, initExpr, ArgumentList::createImplicit(C, args));
   ASTNode returnStmt = new (C) ReturnStmt(SourceLoc(), callExpr, true);
   auto *braceStmt =
       BraceStmt::create(C, SourceLoc(), returnStmt, SourceLoc(), true);
@@ -304,7 +302,8 @@ static ValueDecl *deriveAdditiveArithmetic_zero(DerivedConformance &derived) {
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
   std::tie(propDecl, pbDecl) = derived.declareDerivedProperty(
-      C.Id_zero, returnInterfaceTy, returnTy, /*isStatic*/ true,
+      DerivedConformance::SynthesizedIntroducer::Var, C.Id_zero,
+      returnInterfaceTy, returnTy, /*isStatic*/ true,
       /*isFinal*/ true);
 
   // Create property getter.

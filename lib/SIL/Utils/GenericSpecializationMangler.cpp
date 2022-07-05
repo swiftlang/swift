@@ -65,7 +65,9 @@ std::string SpecializationMangler::finalize() {
   for (NodePointer FuncChild : *FuncTopLevel) {
     TopLevel->addChild(FuncChild, D);
   }
-  std::string mangledName = Demangle::mangleNode(TopLevel);
+  auto mangling = Demangle::mangleNode(TopLevel);
+  assert(mangling.isSuccess());
+  std::string mangledName = mangling.result();
   verify(mangledName);
   return mangledName;
 }

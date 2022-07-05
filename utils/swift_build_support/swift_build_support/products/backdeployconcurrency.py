@@ -79,9 +79,19 @@ class BackDeployConcurrency(cmake_product.CMakeProduct):
         self.cmake_options.define('SWIFT_BUILD_SDK_OVERLAY:BOOL', False)
         self.cmake_options.define('SWIFT_BUILD_DYNAMIC_SDK_OVERLAY:BOOL', False)
         self.cmake_options.define('SWIFT_BUILD_STATIC_SDK_OVERLAY:BOOL', False)
+        self.cmake_options.define('SWIFT_INCLUDE_TESTS:BOOL', False)
+        self.cmake_options.define('SWIFT_BUILD_PERF_TESTSUITE:BOOL', False)
 
         self.cmake_options.define('SWIFT_HOST_VARIANT_ARCH:STRING', arch)
         self.cmake_options.define('BUILD_STANDALONE:BOOL', True)
+
+        # Propagate version information
+        if self.args.swift_user_visible_version is not None:
+            self.cmake_options.define('SWIFT_VERSION',
+                                      str(self.args.swift_user_visible_version))
+        if self.args.swift_compiler_version is not None:
+            self.cmake_options.define('SWIFT_COMPILER_VERSION',
+                                      str(self.args.swift_compiler_version))
 
         # Only install the "stdlib" component, which contains the concurrency
         # module.
@@ -128,7 +138,8 @@ class BackDeployConcurrency(cmake_product.CMakeProduct):
         self.cmake_options.define(
             'SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS:STRING', '6.0')
 
-        self.build_with_cmake(["back-deployment"], build_variant, [])
+        self.build_with_cmake(["back-deployment"], build_variant, [],
+                              prefer_just_built_toolchain=True)
 
     def should_test(self, host_target):
         return False

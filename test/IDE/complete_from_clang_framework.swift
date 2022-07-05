@@ -31,6 +31,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=TYPE_MODULE_QUALIFIER | %FileCheck %s -check-prefix=MODULE_QUALIFIER
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=EXPR_MODULE_QUALIFIER | %FileCheck %s -check-prefix=MODULE_QUALIFIER
 
+// Disabled due to CI failures on macosx-arm64 & watchsimulator-i386 (https://ci.swift.org/job/swift-PR-macos/29960/console)
+// REQUIRES: rdar85471345
+
 import Foo
 // Don't import FooHelper directly in this test!
 // import FooHelper

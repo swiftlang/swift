@@ -481,7 +481,7 @@ private func getConstantTaggedCocoaContents(_ cocoaString: _CocoaString) ->
   let length = ivarPointer.pointee.length
   let isUTF16Mask:UInt = 0x0000_0000_0000_0004 //CFStringFlags bit 4: isUnicode
   let isASCII = ivarPointer.pointee.flags & isUTF16Mask == 0
-  precondition(isASCII) // we don't currently support non-ASCII here
+  _precondition(isASCII) // we don't currently support non-ASCII here
   let contentsPtr = ivarPointer.pointee.str
   return (
     utf16Length: Int(length),
@@ -630,7 +630,7 @@ extension String {
 // Note: This function is not intended to be called from Swift.  The
 // availability information here is perfunctory; this function isn't considered
 // part of the Stdlib's Swift ABI.
-@available(macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4, *)
+@available(SwiftStdlib 5.2, *)
 @_cdecl("_SwiftCreateBridgedString")
 @usableFromInline
 internal func _SwiftCreateBridgedString_DoNotCall(
@@ -658,7 +658,7 @@ internal func _SwiftCreateBridgedString_DoNotCall(
 // This allows us to subclass an Objective-C class and use the fast Swift
 // memory allocator.
 @objc @_swift_native_objc_runtime_base(__SwiftNativeNSStringBase)
-class __SwiftNativeNSString {
+@_spi(Foundation) public class __SwiftNativeNSString {
   @objc internal init() {}
   deinit {}
 }
@@ -672,7 +672,7 @@ public func _getDescription<T>(_ x: T) -> AnyObject {
 
 @_silgen_name("swift_stdlib_NSStringFromUTF8")
 @usableFromInline //this makes the symbol available to the runtime :(
-@available(macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4, *)
+@available(SwiftStdlib 5.2, *)
 internal func _NSStringFromUTF8(_ s: UnsafePointer<UInt8>, _ len: Int)
   -> AnyObject {
   return String(

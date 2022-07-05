@@ -1,11 +1,10 @@
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library)
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library)
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
-// REQUIRES: libdispatch
 
 // rdar://76038845
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
 func fib(_ n: Int) -> Int {
@@ -19,7 +18,7 @@ func fib(_ n: Int) -> Int {
   return first
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func asyncFib(_ n: Int) async -> Int {
   if n == 0 || n == 1 {
     return n
@@ -39,7 +38,7 @@ func asyncFib(_ n: Int) async -> Int {
   return result
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func runFibonacci(_ n: Int) async {
   let result = await asyncFib(n)
 
@@ -48,7 +47,7 @@ func runFibonacci(_ n: Int) async {
   assert(result == fib(n))
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @main struct Main {
   static func main() async {
     await runFibonacci(10)

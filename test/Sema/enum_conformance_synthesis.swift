@@ -173,6 +173,12 @@ func genericNotHashable() {
   GenericNotHashable<String>.A("a").hash(into: &hasher) // expected-error {{value of type 'GenericNotHashable<String>' has no member 'hash'}}
 }
 
+enum GenericNotHashable2<T: Equatable, U: Hashable>: Hashable {
+// expected-error@-1 {{type 'GenericNotHashable2' does not conform to protocol 'Hashable'}}
+  case A(U, T) // expected-note {{associated value type 'T' does not conform to protocol 'Hashable', preventing synthesized conformance of 'GenericNotHashable2<T, U>' to 'Hashable'}}
+  case B
+}
+
 // An enum with no cases should also derive conformance.
 enum NoCases: Hashable {}
 

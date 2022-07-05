@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -module-name A -verify -emit-sil -import-objc-header %S/Inputs/Closure.h -disable-copy-propagation -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
-// RUN: %target-swift-frontend -module-name A -verify -emit-sil -import-objc-header %S/Inputs/Closure.h -disable-copy-propagation -disable-objc-attr-requires-foundation-module -Xllvm -sil-disable-convert-escape-to-noescape-switch-peephole %s | %FileCheck %s --check-prefix=NOPEEPHOLE
+// RUN: %target-swift-frontend -module-name A -verify -emit-sil -import-objc-header %S/Inputs/Closure.h -enable-copy-propagation=false -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name A -verify -emit-sil -import-objc-header %S/Inputs/Closure.h -enable-copy-propagation=false -disable-objc-attr-requires-foundation-module -Xllvm -sil-disable-convert-escape-to-noescape-switch-peephole %s | %FileCheck %s --check-prefix=NOPEEPHOLE
 //
-// Using -disable-copy-propagation to pattern match against older SIL
+// Using -enable-copy-propagation=false to pattern match against older SIL
 // output. At least until -enable-copy-propagation has been around
 // long enough in the same form to be worth rewriting CHECK lines.
 
@@ -93,13 +93,13 @@ public func returnOptionalEscape() -> (() ->())?
 // NOPEEPHOLE:  switch_enum [[V1]] : $Optional<{{.*}}>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 //
 // NOPEEPHOLE: [[SOME_BB]]([[V2:%.*]]: $@callee_guaranteed () -> ()):
-// NOPEEPHOLE-NEXT:  release_value [[NONE_2]]
 // NOPEEPHOLE-NEXT:  [[CVT:%.*]] = convert_escape_to_noescape [[V2]]
 // NOPEEPHOLE-NEXT:  [[SOME:%.*]] = enum $Optional<{{.*}}>, #Optional.some!enumelt, [[V2]]
-// NOPEEPHOLE-NEXT:  [[NOESCAPE_SOME:%.*]] = enum $Optional<{{.*}}>, #Optional.some!enumelt, [[CVT]]
-// NOPEEPHOLE-NEXT:  br bb2([[NOESCAPE_SOME]] : $Optional<{{.*}}>, [[SOME]] :
+// NOPEEPHOLE-NEXT:  [[MDI:%.*]] = mark_dependence [[CVT]] : $@noescape @callee_guaranteed () -> () on [[SOME]] : $Optional<@callee_guaranteed () -> ()>
+// NOPEEPHOLE-NEXT:  [[NOESCAPE_SOME:%.*]] = enum $Optional<{{.*}}>, #Optional.some!enumelt, [[MDI]]
+// NOPEEPHOLE-NEXT:  br bb2([[NOESCAPE_SOME]] : $Optional<{{.*}}>, [[SOME]] : $Optional<{{.*}}>, [[SOME]] : $Optional<{{.*}}>)
 //
-// NOPEEPHOLE: bb2([[NOESCAPE_SOME:%.*]] : $Optional<{{.*}}>, [[SOME:%.*]] :
+// NOPEEPHOLE: bb2([[NOESCAPE_SOME:%.*]] : $Optional<{{.*}}>, [[SOME1:%.*]] : $Optional<{{.*}}>, [[SOME:%.*]] : $Optional<{{.*}}>):
 // NOPEEPHOLE:   switch_enum [[NOESCAPE_SOME]] : $Optional<{{.*}}>, case #Optional.some!enumelt: [[SOME_BB_2:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB_2:bb[0-9]+]]
 //
 // NOPEEPHOLE: [[SOME_BB_2]](

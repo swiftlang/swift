@@ -97,7 +97,7 @@ func load_test(_ ptr: Builtin.RawPointer) -> Builtin.Int64 {
 // CHECK: define hidden {{.*}}i64 @"$s8builtins13load_raw_test{{[_0-9a-zA-Z]*}}F"
 func load_raw_test(_ ptr: Builtin.RawPointer) -> Builtin.Int64 {
   // CHECK: [[CASTPTR:%.*]] = bitcast i8* [[PTR:%.*]] to i64*
-  // CHECK-NEXT: load i64, i64* [[CASTPTR]]
+  // CHECK-NEXT: load i64, i64* [[CASTPTR]], align 1
   // CHECK: ret
   return Builtin.loadRaw(ptr)
 }
@@ -118,7 +118,7 @@ func load_object_test(_ ptr: Builtin.RawPointer) -> Builtin.NativeObject {
 
 // CHECK: define hidden {{.*}}%swift.refcounted* @"$s8builtins20load_raw_object_test{{[_0-9a-zA-Z]*}}F"
 func load_raw_object_test(_ ptr: Builtin.RawPointer) -> Builtin.NativeObject {
-  // CHECK: [[T0:%.*]] = load [[REFCOUNT]]*, [[REFCOUNT]]**
+  // CHECK: [[T0:%.*]] = load [[REFCOUNT]]*, [[REFCOUNT]]** %{{.*}}, align 1
   // CHECK: call [[REFCOUNT]]* @swift_retain([[REFCOUNT]]* returned [[T0]])
   // CHECK: ret [[REFCOUNT]]* [[T0]]
   return Builtin.loadRaw(ptr)
@@ -381,7 +381,7 @@ func testCondFail(_ b: Bool, c: Bool) {
 // CHECK:         call void @swift_once([[WORD]]* [[PRED_PTR]], i8* %1, i8* undef)
 // CHECK-objc:    br label %[[DONE]]
 
-func testOnce(_ p: Builtin.RawPointer, f: @escaping @convention(c) () -> ()) {
+func testOnce(_ p: Builtin.RawPointer, f: @escaping @convention(c) (Builtin.RawPointer) -> ()) {
   Builtin.once(p, f)
 }
 

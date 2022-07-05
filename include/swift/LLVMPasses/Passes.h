@@ -34,7 +34,7 @@ namespace swift {
     using AAResultBase::getModRefInfo;
     llvm::ModRefInfo getModRefInfo(const llvm::CallBase *Call,
                                    const llvm::MemoryLocation &Loc) {
-      llvm::AAQueryInfo AAQI;
+      llvm::SimpleAAQueryInfo AAQI;
       return getModRefInfo(Call, Loc, AAQI);
     }
     llvm::ModRefInfo getModRefInfo(const llvm::CallBase *Call,
@@ -102,7 +102,6 @@ namespace swift {
     static char ID;
     InlineTreePrinter() : llvm::ModulePass(ID) {}
   };
-
 } // end namespace swift
 
 #endif

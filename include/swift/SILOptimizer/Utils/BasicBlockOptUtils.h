@@ -26,6 +26,7 @@
 #include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 
 namespace swift {
@@ -52,6 +53,34 @@ public:
 
   /// Return true if \p bb has been visited.
   bool isVisited(SILBasicBlock *bb) const { return visited.contains(bb); }
+};
+
+/// Computes the set of blocks from which a path to the return-block exists.
+/// This does not include pathes to a throw-block.
+class ReachingReturnBlocks {
+    BasicBlockWorklist worklist;
+
+public:
+  ReachingReturnBlocks(SILFunction *function);
+
+  /// Returns true if there exists a path from \p block to the return-block.
+  bool reachesReturn(SILBasicBlock *block) const {
+    return worklist.isVisited(block);
+  }
+};
+
+/// Computes the set of blocks which are not used for error handling, i.e. not
+/// (exclusively) reachable from the error-block of a try_apply.
+class NonErrorHandlingBlocks {
+    BasicBlockWorklist worklist;
+
+public:
+  NonErrorHandlingBlocks(SILFunction *function);
+
+  /// Returns true if there exists a path from \p block to the return-block.
+  bool isNonErrorHandling(SILBasicBlock *block) const {
+    return worklist.isVisited(block);
+  }
 };
 
 /// Remove all instructions in the body of \p bb in safe manner by using

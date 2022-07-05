@@ -1,0 +1,4 @@
+module CustomSequence {
+  header "custom-sequence.h"
+  requires cplusplus
+}

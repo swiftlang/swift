@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 # ===--- Benchmark_Driver ------------------------------------------------===//
@@ -20,7 +20,7 @@ Example:
 
 Use `Benchmark_Driver -h` for help on available commands and options.
 
-class `BenchmarkDriver` runs performance tests and impements the `run` COMMAND.
+class `BenchmarkDriver` runs performance tests and implements the `run` COMMAND.
 class `BenchmarkDoctor` analyzes performance tests, implements `check` COMMAND.
 
 """
@@ -56,6 +56,11 @@ class BenchmarkDriver(object):
         """
         self.args = args
         self.run_env = os.environ.copy()
+
+        # Set a constant hash seed. Some tests are highly sensitive to
+        # fluctuations in the number of hash collisions.
+        self.run_env["SWIFT_DETERMINISTIC_HASHING"] = "1"
+
         if hasattr(args, 'libdir') and args.libdir:
             # The benchmark binaries should pick up the built swift libraries
             # automatically, because their RPATH should point to ../lib/swift
@@ -65,15 +70,13 @@ class BenchmarkDriver(object):
                 self.run_env["DYLD_LIBRARY_PATH"] = args.libdir
             elif platform.system() == "Linux":
                 self.run_env["LD_LIBRARY_PATH"] = args.libdir
+
         self._subprocess = _subprocess or subprocess
         self.all_tests = []
         self.test_number = {}
         self.tests = tests or self._get_tests()
         self.parser = parser or LogParser()
         self.results = {}
-        # Set a constant hash seed. Some tests are currently sensitive to
-        # fluctuations in the number of hash collisions.
-        os.environ["SWIFT_DETERMINISTIC_HASHING"] = "1"
 
     def _invoke(self, cmd):
         return self._subprocess.check_output(
@@ -405,12 +408,7 @@ class MarkdownReportHandler(logging.StreamHandler):
         msg = self.format(record)
         stream = self.stream
         try:
-            # In Python 2 Unicode strings have a special type
-            unicode_type = unicode
-        except NameError:
-            unicode_type = str
-        try:
-            if isinstance(msg, unicode_type) and getattr(stream, "encoding", None):
+            if isinstance(msg, str) and getattr(stream, "encoding", None):
                 stream.write(msg.encode(stream.encoding))
             else:
                 stream.write(msg)
@@ -546,7 +544,7 @@ class BenchmarkDoctor(object):
             caveat = "" if setup == 0 else " (excluding the setup overhead)"
             log("'%s' execution took at least %d μs%s.", name, runtime, caveat)
 
-            def factor(base):  # suitable divisior that's integer power of base
+            def factor(base):  # suitable divisor that's integer power of base
                 return int(
                     pow(base, math.ceil(math.log(runtime / float(threshold), base)))
                 )
@@ -720,7 +718,7 @@ class BenchmarkDoctor(object):
         return measurements
 
     def analyze(self, benchmark_measurements):
-        """Analyze whether benchmark fullfills all requirtements."""
+        """Analyze whether benchmark fulfills all requirements."""
         self.log.debug("Analyzing %s", benchmark_measurements["name"])
         for rule in self.requirements:
             rule(benchmark_measurements)

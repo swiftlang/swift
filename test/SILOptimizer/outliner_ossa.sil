@@ -1,0 +1,283 @@
+// RUN: %target-sil-opt -outliner %s -enable-sil-verify-all | %FileCheck %s
+
+// REQUIRES: OS=macosx
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import Foundation
+
+
+@objc  class MyObject {
+  @objc static func take(arg: Data?) -> Data?
+  @objc static func take_two(arg1: Data?, arg2: Data?) -> Data?
+}
+
+struct DataWrapper {
+  let data: Data
+}
+
+sil @getData : $@convention(thin) () -> @owned Data
+sil @getDataWrapper : $@convention(thin) () -> @owned DataWrapper
+sil @$s10Foundation4DataV19_bridgeToObjectiveCSo6NSDataCyF : $@convention(method) (@guaranteed Data) -> @owned NSData
+sil @$s10Foundation4DataV36_unconditionallyBridgeFromObjectiveCyACSo6NSDataCSgFZ : $@convention(method) (@guaranteed Optional<NSData>, @thin Data.Type) -> @owned Data
+
+// We used to have a use-after release failure.
+
+// CHECK-LABEL: sil [Osize] [ossa] @test1 : $@convention(thin) (@owned MyObject) -> () {
+// CHECK: bb0([[ARG:%.*]] : @owned $MyObject):
+// CHECK:  [[META:%.*]] = metatype $@objc_metatype MyObject.Type
+// CHECK:  [[FUN1:%.*]] = function_ref @getData : $@convention(thin) () -> @owned Data
+// CHECK:  [[DATA:%.*]] = apply [[FUN1]]() : $@convention(thin) () -> @owned Data
+// CHECK:  destroy_value [[ARG]] : $MyObject
+// CHECK:  [[OUTLINED:%.*]] = function_ref @$s4main8MyObjectC4take3arg10Foundation4DataVSgAI_tFZToTembnb_ : $@convention(thin) (@owned Data, @objc_metatype MyObject.Type) -> @owned Optional<Data>
+// CHECK:  [[RES:%.*]] = apply [[OUTLINED]]([[DATA]], [[META]]) : $@convention(thin) (@owned Data, @objc_metatype MyObject.Type) -> @owned Optional<Data>
+// CHECK:  br bb1
+
+// CHECK: bb1:
+// CHECK:   destroy_value [[RES]]
+// CHECK:   [[T:%.*]] = tuple ()
+// CHECK:   return [[T]] : $()
+// CHECK: } // end sil function 'test1'
+sil [Osize] [ossa] @test1 : $@convention(thin) (@owned MyObject) -> () {
+bb0(%0: @owned $MyObject):
+  %35 = metatype $@objc_metatype MyObject.Type
+  %41 = function_ref @getData : $@convention(thin) () -> @owned Data
+  %43 = apply %41() : $@convention(thin) () -> @owned Data
+  %44 = function_ref @$s10Foundation4DataV19_bridgeToObjectiveCSo6NSDataCyF : $@convention(method) (@guaranteed Data) -> @owned NSData
+  %45 = apply %44(%43) : $@convention(method) (@guaranteed Data) -> @owned NSData
+  %46 = enum $Optional<NSData>, #Optional.some!enumelt, %45 : $NSData
+  destroy_value %0 : $MyObject
+  destroy_value %43 : $Data
+  %50 = objc_method %35 : $@objc_metatype MyObject.Type, #MyObject.take!foreign : (MyObject.Type) -> (Data?) -> Data?, $@convention(objc_method) (Optional<NSData>, @objc_metatype MyObject.Type) -> @autoreleased Optional<NSData>
+  %51 = apply %50(%46, %35) : $@convention(objc_method) (Optional<NSData>, @objc_metatype MyObject.Type) -> @autoreleased Optional<NSData>
+  destroy_value %46 : $Optional<NSData>
+  switch_enum %51 : $Optional<NSData>, case #Optional.some!enumelt: bb5, case #Optional.none!enumelt: bb6
+
+bb5(%54 : @owned $NSData):
+  %55 = function_ref @$s10Foundation4DataV36_unconditionallyBridgeFromObjectiveCyACSo6NSDataCSgFZ : $@convention(method) (@guaranteed Optional<NSData>, @thin Data.Type) -> @owned Data
+  %56 = enum $Optional<NSData>, #Optional.some!enumelt, %54 : $NSData
+  %57 = metatype $@thin Data.Type
+  %58 = apply %55(%56, %57) : $@convention(method) (@guaranteed Optional<NSData>, @thin Data.Type) -> @owned Data
+  %59 = enum $Optional<Data>, #Optional.some!enumelt, %58 : $Data
+  destroy_value %56 : $Optional<NSData>
+  br bb7(%59 : $Optional<Data>)
+
+bb6:
+  %62 = enum $Optional<Data>, #Optional.none!enumelt
+  br bb7(%62 : $Optional<Data>)
+
+bb7(%64 : @owned $Optional<Data>):
+  destroy_value %64 : $Optional<Data>
+  %102 = tuple ()
+  return %102 : $()
+}
+
+// CHECK-LABEL: sil [Osize] [ossa] @test2 :
+// CHECK:  [[FUNC:%.*]] = function_ref @$s4main8MyObjectC4take3arg10Foundation4DataVSgAI_tFZToTembgnn_ :
+// CHECK:  apply [[FUNC]]
+// CHECK-LABEL: } // end sil function 'test2'
+sil [Osize] [ossa] @test2 : $@convention(thin) (@owned MyObject) -> @owned Optional<NSData> {
+bb0(%0: @owned $MyObject):
+  %35 = metatype $@objc_metatype MyObject.Type
+  %41 = function_ref @getData : $@convention(thin) () -> @owned Data
+  %43 = apply %41() : $@convention(thin) () -> @owned Data
+  %b = begin_borrow %43 : $Data
+  %44 = function_ref @$s10Foundation4DataV19_bridgeToObjectiveCSo6NSDataCyF : $@convention(method) (@guaranteed Data) -> @owned NSData
+  %45 = apply %44(%b) : $@convention(method) (@guaranteed Data) -> @owned NSData
+  %46 = enum $Optional<NSData>, #Optional.some!enumelt, %45 : $NSData
+  end_borrow %b : $Data
+  destroy_value %0 : $MyObject
+  destroy_value %43 : $Data
+  %50 = objc_method %35 : $@objc_metatype MyObject.Type, #MyObject.take!foreign : (MyObject.Type) -> (Data?) -> Data?, $@convention(objc_method) (Optional<NSData>, @objc_metatype MyObject.Type) -> @autoreleased Optional<NSData>
+  %51 = apply %50(%46, %35) : $@convention(objc_method) (Optional<NSData>, @objc_metatype MyObject.Type) -> @autoreleased Optional<NSData>
+  destroy_value %46 : $Optional<NSData>
+  return %51 : $Optional<NSData>
+}
+
+// CHECK-LABEL: sil [Osize] [ossa] @test3 :
+// CHECK:  [[FUNC:%.*]] = function_ref @$s4main8MyObjectC4take3arg10Foundation4DataVSgAI_tFZToTembgnn_ :
+// CHECK:  apply [[FUNC]]
+// CHECK-LABEL: } // end sil function 'test3'
+sil [Osize] [ossa] @test3 : $@convention(thin) (@owned MyObject, @in Data) -> @owned Optional<NSData> {
+bb0(%0: @owned $MyObject, %1 : $*Data):
+  %35 = metatype $@objc_metatype MyObject.Type
+  %b = load_borrow %1 : $*Data
+  %44 = function_ref @$s10Foundation4DataV19_bridgeToObjectiveCSo6NSDataCyF : $@convention(method) (@guaranteed Data) -> @owned NSData
+  %45 = apply %44(%b) : $@convention(method) (@guaranteed Data) -> @owned NSData
+  %46 = enum $Optional<NSData>, #Optional.some!enumelt, %45 : $NSData
+  end_borrow %b : $Data
+  destroy_value %0 : $MyObject
+  destroy_addr %1 : $*Data
+  %50 = objc_method %35 : $@objc_metatype MyObject.Type, #MyObject.take!foreign : (MyObject.Type) -> (Data?) -> Data?, $@convention(objc_method) (Optional<NSData>, @objc_metatype MyObject.Type) -> @autoreleased Optional<NSData>
+  %51 = apply %50(%46, %35) : $@convention(objc_method) (Optional<NSData>, @objc_metatype MyObject.Type) -> @autoreleased Optional<NSData>
+  destroy_value %46 : $Optional<NSData>
+  return %51 : $Optional<NSData>
+}
+
+// CHECK-LABEL: sil [Osize] [ossa] @test4 : 
+// CHECK:  [[FUNC:%.*]] = function_ref @$s4main8MyObjectC8take_two4arg14arg210Foundation4DataVSgAJ_AJtFZToTembgbgnn_ :
+// CHECK:  apply [[FUNC]]
+// CHECK-LABEL: } // end sil function 'test4'
+sil [Osize] [ossa] @test4 : $@convention(thin) (@owned MyObject) -> @owned Optional<NSData> {
+bb0(%0: @owned $MyObject):
+  %35 = metatype $@objc_metatype MyObject.Type
+  %41 = function_ref @getData : $@convention(thin) () -> @owned Data
+  %43 = apply %41() : $@convention(thin) () -> @owned Data
+  %b1 = begin_borrow %43 : $Data
+  %44 = function_ref @$s10Foundation4DataV19_bridgeToObjectiveCSo6NSDataCyF : $@convention(method) (@guaranteed Data) -> @owned NSData
+  %45 = apply %44(%b1) : $@convention(method) (@guaranteed Data) -> @owned NSData
+  %46 = enum $Optional<NSData>, #Optional.some!enumelt, %45 : $NSData
+  end_borrow %b1 : $Data
+  %41a = function_ref @getData : $@convention(thin) () -> @owned Data
+  %43a = apply %41a() : $@convention(thin) () -> @owned Data
+  %b2 = begin_borrow %43a : $Data
+  %44a = function_ref @$s10Foundation4DataV19_bridgeToObjectiveCSo6NSDataCyF : $@convention(method) (@guaranteed Data) -> @owned NSData
+  %45a = apply %44a(%b2) : $@convention(method) (@guaranteed Data) -> @owned NSData
+  %46a = enum $Optional<NSData>, #Optional.some!enumelt, %45a : $NSData
+  end_borrow %b2 : $Data
+  destroy_value %0 : $MyObject
+  destroy_value %43 : $Data
+  destroy_value %43a : $Data
+  %50 = objc_method %35 : $@objc_metatype MyObject.Type, #MyObject.take_two!foreign : (MyObject.Type) -> (Data?, Data?) -> Data?, $@convention(objc_method) (Optional<NSData>, Optional<NSData>, @objc_metatype MyObject.Type) -> @autoreleased Optional<NSData>
+  %51 = apply %50(%46, %46a, %35) : $@convention(objc_method) (Optional<NSData>, Optional<NSData>, @objc_metatype MyObject.Type) -> @autoreleased Optional<NSData>
+  destroy_value %46 : $Optional<NSData>
+  destroy_value %46a : $Optional<NSData>
+  return %51 : $Optional<NSData>
+}
+
+// This is not optimized currently
+sil [Osize] [ossa] @test5 : $@convention(thin) (@owned MyObject, @in Data, @in Data) -> @owned Optional<NSData> {
+bb0(%0: @owned $MyObject, %1 : $*Data, %2 : $*Data):
+  %35 = metatype $@objc_metatype MyObject.Type
+  %b = load_borrow %1 : $*Data
+  %44 = function_ref @$s10Foundation4DataV19_bridgeToObjectiveCSo6NSDataCyF : $@convention(method) (@guaranteed Data) -> @owned NSData
+  %45 = apply %44(%b) : $@convention(method) (@guaranteed Data) -> @owned NSData
+  %46 = enum $Optional<NSData>, #Optional.some!enumelt, %45 : $NSData
+  end_borrow %b : $Data
+  destroy_addr %1 : $*Data
+  br bb1
+
+bb1:
+  %b1 = load_borrow %2 : $*Data
+  %44a = function_ref @$s10Foundation4DataV19_bridgeToObjectiveCSo6NSDataCyF : $@convention(method) (@guaranteed Data) -> @owned NSData
+  %45a = apply %44a(%b1) : $@convention(method) (@guaranteed Data) -> @owned NSData
+  %46a = enum $Optional<NSData>, #Optional.some!enumelt, %45a : $NSData
+  end_borrow %b1 : $Data
+  destroy_addr %2 : $*Data
+  br bb3
+
+bb3:
+  destroy_value %0 : $MyObject
+  %50 = objc_method %35 : $@objc_metatype MyObject.Type, #MyObject.take_two!foreign : (MyObject.Type) -> (Data?, Data?) -> Data?, $@convention(objc_method) (Optional<NSData>, Optional<NSData>, @objc_metatype MyObject.Type) -> @autoreleased Optional<NSData>
+  %51 = apply %50(%46, %46a, %35) : $@convention(objc_method) (Optional<NSData>, Optional<NSData>, @objc_metatype MyObject.Type) -> @autoreleased Optional<NSData>
+  destroy_value %46 : $Optional<NSData>
+  destroy_value %46a : $Optional<NSData>
+  return %51 : $Optional<NSData>
+}
+
+// CHECK-LABEL: sil [Osize] [ossa] @test6 :
+// CHECK:  [[FUNC:%.*]] = function_ref @$s4main8MyObjectC4take3arg10Foundation4DataVSgAI_tFZToTembgnn_ :
+// CHECK:  apply [[FUNC]]
+// CHECK-LABEL: } // end sil function 'test6'
+sil [Osize] [ossa] @test6 : $@convention(thin) (@owned MyObject) -> @owned Optional<NSData> {
+bb0(%0: @owned $MyObject):
+  %35 = metatype $@objc_metatype MyObject.Type
+  %41 = function_ref @getDataWrapper : $@convention(thin) () -> @owned DataWrapper
+  %43 = apply %41() : $@convention(thin) () -> @owned DataWrapper
+  %b = begin_borrow %43 : $DataWrapper
+  %ex = struct_extract %b : $DataWrapper, #DataWrapper.data
+  %44 = function_ref @$s10Foundation4DataV19_bridgeToObjectiveCSo6NSDataCyF : $@convention(method) (@guaranteed Data) -> @owned NSData
+  %45 = apply %44(%ex) : $@convention(method) (@guaranteed Data) -> @owned NSData
+  %46 = enum $Optional<NSData>, #Optional.some!enumelt, %45 : $NSData
+  end_borrow %b : $DataWrapper
+  destroy_value %0 : $MyObject
+  destroy_value %43 : $DataWrapper
+  %50 = objc_method %35 : $@objc_metatype MyObject.Type, #MyObject.take!foreign : (MyObject.Type) -> (Data?) -> Data?, $@convention(objc_method) (Optional<NSData>, @objc_metatype MyObject.Type) -> @autoreleased Optional<NSData>
+  %51 = apply %50(%46, %35) : $@convention(objc_method) (Optional<NSData>, @objc_metatype MyObject.Type) -> @autoreleased Optional<NSData>
+  destroy_value %46 : $Optional<NSData>
+  return %51 : $Optional<NSData>
+}
+
+sil [Osize] [ossa] @test_dont_crash : $@convention(thin) (@owned MyObject) -> () {
+bb0(%0: @owned $MyObject):
+  %35 = metatype $@objc_metatype MyObject.Type
+  %41 = function_ref @getData : $@convention(thin) () -> @owned Data
+  %43 = apply %41() : $@convention(thin) () -> @owned Data
+  %44 = function_ref @$s10Foundation4DataV19_bridgeToObjectiveCSo6NSDataCyF : $@convention(method) (@guaranteed Data) -> @owned NSData
+  %45 = apply %44(%43) : $@convention(method) (@guaranteed Data) -> @owned NSData
+  %46 = enum $Optional<NSData>, #Optional.some!enumelt, %45 : $NSData
+  br bb4
+
+bb4:
+  destroy_value %0 : $MyObject
+  destroy_value %43 : $Data
+  %50 = objc_method %35 : $@objc_metatype MyObject.Type, #MyObject.take!foreign : (MyObject.Type) -> (Data?) -> Data?, $@convention(objc_method) (Optional<NSData>, @objc_metatype MyObject.Type) -> @autoreleased Optional<NSData>
+  %51 = apply %50(%46, %35) : $@convention(objc_method) (Optional<NSData>, @objc_metatype MyObject.Type) -> @autoreleased Optional<NSData>
+  destroy_value %46 : $Optional<NSData>
+  switch_enum %51 : $Optional<NSData>, case #Optional.some!enumelt: bb5, case #Optional.none!enumelt: bb6
+
+bb5(%54 : @owned $NSData):
+  %55 = function_ref @$s10Foundation4DataV36_unconditionallyBridgeFromObjectiveCyACSo6NSDataCSgFZ : $@convention(method) (@guaranteed Optional<NSData>, @thin Data.Type) -> @owned Data
+  %56 = enum $Optional<NSData>, #Optional.some!enumelt, %54 : $NSData
+  %57 = metatype $@thin Data.Type
+  %58 = apply %55(%56, %57) : $@convention(method) (@guaranteed Optional<NSData>, @thin Data.Type) -> @owned Data
+  %59 = enum $Optional<Data>, #Optional.some!enumelt, %58 : $Data
+  destroy_value %56 : $Optional<NSData>
+  br bb7(%59 : $Optional<Data>)
+
+bb6:
+  %62 = enum $Optional<Data>, #Optional.none!enumelt
+  br bb7(%62 : $Optional<Data>)
+
+bb7(%64 : @owned $Optional<Data>):
+  destroy_value %64 : $Optional<Data>
+  %102 = tuple ()
+  return %102 : $()
+}
+
+sil [Osize] [ossa] @test7 : $@convention(thin) (@in Data, @in Data) -> () {
+bb0(%0 : $*Data, %1 : $*Data):
+  %35 = metatype $@objc_metatype MyObject.Type
+  %b1 = load_borrow %0 : $*Data
+  %44 = function_ref @$s10Foundation4DataV19_bridgeToObjectiveCSo6NSDataCyF : $@convention(method) (@guaranteed Data) -> @owned NSData
+  %45 = apply %44(%b1) : $@convention(method) (@guaranteed Data) -> @owned NSData
+  %46 = enum $Optional<NSData>, #Optional.some!enumelt, %45 : $NSData
+  end_borrow %b1 : $Data
+  destroy_addr %0 : $*Data
+  %50 = objc_method %35 : $@objc_metatype MyObject.Type, #MyObject.take!foreign : (MyObject.Type) -> (Data?) -> Data?, $@convention(objc_method) (Optional<NSData>, @objc_metatype MyObject.Type) -> @autoreleased Optional<NSData>
+  %51 = apply %50(%46, %35) : $@convention(objc_method) (Optional<NSData>, @objc_metatype MyObject.Type) -> @autoreleased Optional<NSData>
+  destroy_value %46 : $Optional<NSData>
+  switch_enum %51 : $Optional<NSData>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%54 : @owned $NSData):
+  %55 = function_ref @$s10Foundation4DataV36_unconditionallyBridgeFromObjectiveCyACSo6NSDataCSgFZ : $@convention(method) (@guaranteed Optional<NSData>, @thin Data.Type) -> @owned Data
+  %56 = enum $Optional<NSData>, #Optional.some!enumelt, %54 : $NSData
+  %57 = metatype $@thin Data.Type
+  %58 = apply %55(%56, %57) : $@convention(method) (@guaranteed Optional<NSData>, @thin Data.Type) -> @owned Data
+  %59 = enum $Optional<Data>, #Optional.some!enumelt, %58 : $Data
+  destroy_value %56 : $Optional<NSData>
+  br bb3(%59 : $Optional<Data>)
+
+bb2:
+  %62 = enum $Optional<Data>, #Optional.none!enumelt
+  br bb3(%62 : $Optional<Data>)
+
+bb3(%64 : @owned $Optional<Data>):
+  destroy_value %64 : $Optional<Data>
+  %35a = metatype $@objc_metatype MyObject.Type
+  %b2 = load_borrow %1 : $*Data
+  %44a = function_ref @$s10Foundation4DataV19_bridgeToObjectiveCSo6NSDataCyF : $@convention(method) (@guaranteed Data) -> @owned NSData
+  %45a = apply %44a(%b2) : $@convention(method) (@guaranteed Data) -> @owned NSData
+  %46a = enum $Optional<NSData>, #Optional.some!enumelt, %45a : $NSData
+  end_borrow %b2 : $Data
+  destroy_addr %1 : $*Data
+  %50a = objc_method %35a : $@objc_metatype MyObject.Type, #MyObject.take!foreign : (MyObject.Type) -> (Data?) -> Data?, $@convention(objc_method) (Optional<NSData>, @objc_metatype MyObject.Type) -> @autoreleased Optional<NSData>
+  %51a = apply %50a(%46a, %35a) : $@convention(objc_method) (Optional<NSData>, @objc_metatype MyObject.Type) -> @autoreleased Optional<NSData>
+  destroy_value %46a : $Optional<NSData>
+  destroy_value %51a : $Optional<NSData>
+  %102 = tuple ()
+  return %102 : $()
+}
+

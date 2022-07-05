@@ -25,7 +25,6 @@
 #include "swift/AST/USRGeneration.h"
 #include "swift/Config.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
-#include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CodeCompletionCache.h"
 #include "swift/IDE/CompletionInstance.h"
 #include "swift/IDE/SyntaxModel.h"
@@ -273,7 +272,9 @@ configureCompletionInstance(std::shared_ptr<CompletionInstance> CompletionInst,
 
 SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
     : NotificationCtr(SKCtx.getNotificationCenter()),
-      CCCache(new SwiftCompletionCache) {
+      SwiftExecutablePath(SKCtx.getSwiftExecutablePath()),
+      ReqTracker(SKCtx.getRequestTracker()), CCCache(new SwiftCompletionCache),
+      CompileManager(RuntimeResourcePath, DiagnosticDocumentationPath) {
   llvm::SmallString<128> LibPath(SKCtx.getRuntimeLibPath());
   llvm::sys::path::append(LibPath, "swift");
   RuntimeResourcePath = std::string(LibPath.str());
@@ -282,10 +283,11 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
   Stats = std::make_shared<SwiftStatistics>();
   EditorDocuments = std::make_shared<SwiftEditorDocumentFileMap>();
   ASTMgr = std::make_shared<SwiftASTManager>(
-      EditorDocuments, SKCtx.getGlobalConfiguration(), Stats,
-      RuntimeResourcePath, DiagnosticDocumentationPath);
+      EditorDocuments, SKCtx.getGlobalConfiguration(), Stats, ReqTracker,
+      SwiftExecutablePath, RuntimeResourcePath, DiagnosticDocumentationPath);
 
   CompletionInst = std::make_shared<CompletionInstance>();
+
   configureCompletionInstance(CompletionInst, SKCtx.getGlobalConfiguration());
 
   // By default, just use the in-memory cache.
@@ -388,6 +390,7 @@ UIdent SwiftLangSupport::getUIDForCodeCompletionDeclKind(
     switch (Kind) {
     case CodeCompletionDeclKind::Module: return KindRefModule;
     case CodeCompletionDeclKind::Class: return KindRefClass;
+    case CodeCompletionDeclKind::Actor: return KindRefActor;
     case CodeCompletionDeclKind::Struct: return KindRefStruct;
     case CodeCompletionDeclKind::Enum: return KindRefEnum;
     case CodeCompletionDeclKind::EnumElement: return KindRefEnumElement;
@@ -415,6 +418,7 @@ UIdent SwiftLangSupport::getUIDForCodeCompletionDeclKind(
   switch (Kind) {
   case CodeCompletionDeclKind::Module: return KindDeclModule;
   case CodeCompletionDeclKind::Class: return KindDeclClass;
+  case CodeCompletionDeclKind::Actor: return KindDeclActor;
   case CodeCompletionDeclKind::Struct: return KindDeclStruct;
   case CodeCompletionDeclKind::Enum: return KindDeclEnum;
   case CodeCompletionDeclKind::EnumElement: return KindDeclEnumElement;
@@ -718,9 +722,12 @@ UIdent SwiftLangSupport::getUIDForSymbol(SymbolInfo sym, bool isRef) {
   case SymbolKind::Module:
     return KindRefModule;
 
+  case SymbolKind::CommentTag:
+    return KindCommentTag;
+
   default:
     // TODO: reconsider whether having a default case is a good idea.
-    return UIdent();
+    llvm_unreachable("unhandled symbol kind Swift doesn't use");
   }
 
 #undef SIMPLE_CASE
@@ -995,12 +1002,13 @@ SwiftLangSupport::getFileSystem(const Optional<VFSOptions> &vfsOptions,
   return llvm::vfs::getRealFileSystem();
 }
 
-bool SwiftLangSupport::performCompletionLikeOperation(
+void SwiftLangSupport::performWithParamsToCompletionLikeOperation(
     llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
     ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-    std::string &Error,
-    llvm::function_ref<void(CompilerInstance &, bool)> Callback) {
+    SourceKitCancellationToken CancellationToken,
+    llvm::function_ref<void(CancellableResult<CompletionLikeOperationParams>)>
+        PerformOperation) {
   assert(FileSystem);
 
   // Resolve symlinks for the input file; we resolve them for the input files
@@ -1040,22 +1048,33 @@ bool SwiftLangSupport::performCompletionLikeOperation(
   ForwardingDiagnosticConsumer CIDiags(Diags);
 
   CompilerInvocation Invocation;
-  bool Failed = getASTManager()->initCompilerInvocation(
-      Invocation, Args, Diags, newBuffer->getBufferIdentifier(), FileSystem,
-      Error);
-  if (Failed)
-    return false;
+  std::string CompilerInvocationError;
+  bool CreatingInvocationFailed = getASTManager()->initCompilerInvocation(
+      Invocation, Args, FrontendOptions::ActionType::Typecheck, Diags,
+      newBuffer->getBufferIdentifier(), FileSystem, CompilerInvocationError);
+  if (CreatingInvocationFailed) {
+    PerformOperation(CancellableResult<CompletionLikeOperationParams>::failure(
+        CompilerInvocationError));
+    return;
+  }
   if (!Invocation.getFrontendOptions().InputsAndOutputs.hasInputs()) {
-    Error = "no input filenames specified";
-    return false;
+    PerformOperation(CancellableResult<CompletionLikeOperationParams>::failure(
+        "no input filenames specified"));
+    return;
   }
 
   // Pin completion instance.
   auto CompletionInst = getCompletionInstance();
 
-  return CompletionInst->performOperation(Invocation, Args, FileSystem,
-                                          newBuffer.get(), Offset,
-                                          Error, &CIDiags, Callback);
+  auto CancellationFlag = std::make_shared<std::atomic<bool>>(false);
+  ReqTracker->setCancellationHandler(CancellationToken, [CancellationFlag] {
+    CancellationFlag->store(true, std::memory_order_relaxed);
+  });
+
+  CompletionLikeOperationParams Params = {Invocation, newBuffer.get(), &CIDiags,
+                                          CancellationFlag};
+  PerformOperation(
+      CancellableResult<CompletionLikeOperationParams>::success(Params));
 }
 
 CloseClangModuleFiles::~CloseClangModuleFiles() {

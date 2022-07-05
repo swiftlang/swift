@@ -17,7 +17,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if defined(__APPLE__) && defined(__MACH__)
+#if defined(__APPLE__) && defined(__MACH__) && SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT
 
 #include <Availability.h>
 #include <TargetConditionals.h>
@@ -89,4 +89,4 @@
   #error Unknown target.
 #endif
 
-#endif // defined(__APPLE__) && defined(__MACH__)
+#endif // defined(__APPLE__) && defined(__MACH__) && SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT

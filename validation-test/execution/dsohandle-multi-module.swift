@@ -8,8 +8,7 @@
 
 // REQUIRES: executable_test
 
-// UNSUPPORTED: linux
-// XFAIL: windows
+// UNSUPPORTED: OS=linux-gnu
 
 import first
 import second

@@ -74,6 +74,7 @@ Action(llvm::cl::desc("kind:"), llvm::cl::init(RefactoringKind::None),
                       "replace-bodies-with-fatalError", "Perform trailing closure refactoring"),
            clEnumValN(RefactoringKind::MemberwiseInitLocalRefactoring, "memberwise-init", "Generate member wise initializer"),
            clEnumValN(RefactoringKind::AddEquatableConformance, "add-equatable-conformance", "Add Equatable conformance"),
+           clEnumValN(RefactoringKind::AddExplicitCodableImplementation, "add-explicit-codable-implementation", "Add Explicit Codable Implementation"),
            clEnumValN(RefactoringKind::ConvertToComputedProperty,
                       "convert-to-computed-property", "Convert from field initialization to computed property"),
            clEnumValN(RefactoringKind::ConvertToSwitchStmt, "convert-to-switch-stmt", "Perform convert to switch statement"),
@@ -128,6 +129,10 @@ static llvm::cl::opt<bool> EnableExperimentalConcurrency(
     "enable-experimental-concurrency",
     llvm::cl::desc("Whether to enable experimental concurrency or not"));
 
+static llvm::cl::opt<bool> EnableExperimentalStringProcessing(
+    "enable-experimental-string-processing",
+    llvm::cl::desc("Whether to enable experimental string processing or not"));
+
 static llvm::cl::opt<std::string>
     SDK("sdk", llvm::cl::desc("Path to the SDK to build against"));
 
@@ -137,6 +142,10 @@ static llvm::cl::list<std::string>
 
 static llvm::cl::opt<std::string>
 Triple("target", llvm::cl::desc("target triple"));
+
+static llvm::cl::opt<std::string> ResourceDir(
+    "resource-dir",
+    llvm::cl::desc("The directory that holds the compiler resource files"));
 
 enum class DumpType {
   REWRITTEN,
@@ -294,8 +303,12 @@ int main(int argc, char *argv[]) {
   if (!options::Triple.empty())
     Invocation.setTargetTriple(options::Triple);
 
+  if (!options::ResourceDir.empty())
+    Invocation.setRuntimeResourcePath(options::ResourceDir);
+
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(
       options::SourceFilename);
+  Invocation.getFrontendOptions().RequestedAction = FrontendOptions::ActionType::Typecheck;
   Invocation.getLangOptions().AttachCommentsToDecls = true;
   Invocation.getLangOptions().CollectParsedToken = true;
   Invocation.getLangOptions().BuildSyntaxTree = true;
@@ -304,6 +317,9 @@ int main(int argc, char *argv[]) {
   if (options::EnableExperimentalConcurrency)
     Invocation.getLangOptions().EnableExperimentalConcurrency = true;
 
+  if (options::EnableExperimentalStringProcessing)
+    Invocation.getLangOptions().EnableExperimentalStringProcessing = true;
+
   for (auto FileName : options::InputFilenames)
     Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(FileName);
   Invocation.setModuleName(options::ModuleName);
@@ -311,8 +327,11 @@ int main(int argc, char *argv[]) {
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
-  if (CI.setup(Invocation))
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    llvm::errs() << InstanceSetupError << '\n';
     return 1;
+  }
   registerIDERequestFunctions(CI.getASTContext().evaluator);
   switch (options::Action) {
     case RefactoringKind::GlobalRename:
@@ -430,7 +449,7 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  SmallVector<std::unique_ptr<SourceEditConsumer>> Consumers;
+  SmallVector<std::unique_ptr<SourceEditConsumer>, 32> Consumers;
   if (!options::RewrittenOutputFile.empty() ||
       options::DumpIn == options::DumpType::REWRITTEN) {
     Consumers.emplace_back(new SourceEditOutputConsumer(

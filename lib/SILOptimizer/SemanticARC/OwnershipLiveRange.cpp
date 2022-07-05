@@ -14,6 +14,7 @@
 #include "OwnershipPhiOperand.h"
 
 #include "swift/SIL/BasicBlockUtils.h"
+#include "swift/SIL/OwnershipUtils.h"
 
 using namespace swift;
 using namespace swift::semanticarc;
@@ -74,13 +75,26 @@ OwnershipLiveRange::OwnershipLiveRange(SILValue value)
     auto *ti = dyn_cast<TermInst>(user);
     if ((ti && !ti->isTransformationTerminator()) ||
         !canOpcodeForwardGuaranteedValues(op) ||
-        1 != count_if(user->getOperandValues(
-                          true /*ignore type dependent operands*/),
+        1 != count_if(user->getNonTypeDependentOperandValues(),
                       [&](SILValue v) {
                         return v.getOwnershipKind() == OwnershipKind::Owned;
                       })) {
       tmpUnknownConsumingUses.push_back(op);
       continue;
+    }
+
+    // If we have a subclass of OwnershipForwardingMixin that doesnt directly
+    // forward its operand to the result, treat the use as an unknown consuming
+    // use.
+    //
+    // If we do not directly forward and we have an owned value (which we do
+    // here), we could get back a different value. Thus we can not transform
+    // such a thing from owned to guaranteed.
+    if (auto *i = OwnershipForwardingMixin::get(op->getUser())) {
+      if (!i->preservesOwnership()) {
+        tmpUnknownConsumingUses.push_back(op);
+        continue;
+      }
     }
 
     // Ok, this is a forwarding instruction whose ownership we can flip from

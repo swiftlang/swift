@@ -22,5 +22,5 @@
 // CHECK-LABEL: sil [ossa] @$s19versioned_attribute5HorseCfd : $@convention(method) (@guaranteed Horse) -> @owned Builtin.NativeObject
 // CHECK-LABEL: sil [ossa] @$s19versioned_attribute5HorseCfD : $@convention(method) (@owned Horse) -> ()
 
-// CHEKC-LABEL: sil [ossa] @$s19versioned_attribute9GiftHorseCfd : $@convention(method) (@guaranteed GiftHorse) -> @owned Builtin.NativeObject
+// CHECK-LABEL: sil [ossa] @$s19versioned_attribute9GiftHorseCfd : $@convention(method) (@guaranteed GiftHorse) -> @owned Builtin.NativeObject
 // CHECK-LABEL: sil [ossa] @$s19versioned_attribute9GiftHorseCfD : $@convention(method) (@owned GiftHorse) -> ()

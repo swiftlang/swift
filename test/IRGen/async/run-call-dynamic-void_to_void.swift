@@ -7,7 +7,7 @@
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize_none
 // REQUIRES: concurrency
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
 // Windows does not do swiftailcc

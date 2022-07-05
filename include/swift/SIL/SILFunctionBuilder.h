@@ -67,7 +67,8 @@ class SILFunctionBuilder {
                                          IsSerialized_t isSerialized,
                                          ProfileCounter entryCount,
                                          IsThunk_t isThunk,
-                                         IsDynamicallyReplaceable_t isDynamic);
+                                         IsDynamicallyReplaceable_t isDynamic,
+                                         IsDistributed_t isDistributed);
 
   /// Return the declaration of a function, or create it if it doesn't exist.
   SILFunction *getOrCreateFunction(
@@ -75,6 +76,7 @@ class SILFunctionBuilder {
       CanSILFunctionType type, IsBare_t isBareSILFunction,
       IsTransparent_t isTransparent, IsSerialized_t isSerialized,
       IsDynamicallyReplaceable_t isDynamic,
+      IsDistributed_t isDistributed,
       ProfileCounter entryCount = ProfileCounter(),
       IsThunk_t isThunk = IsNotThunk,
       SubclassScope subclassScope = SubclassScope::NotApplicable);
@@ -102,6 +104,7 @@ class SILFunctionBuilder {
                  Optional<SILLocation> loc, IsBare_t isBareSILFunction,
                  IsTransparent_t isTrans, IsSerialized_t isSerialized,
                  IsDynamicallyReplaceable_t isDynamic,
+                 IsDistributed_t isDistributed,
                  ProfileCounter entryCount = ProfileCounter(),
                  IsThunk_t isThunk = IsNotThunk,
                  SubclassScope subclassScope = SubclassScope::NotApplicable,

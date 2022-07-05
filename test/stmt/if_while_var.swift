@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift
 
-struct NonOptionalStruct {}
+struct NonOptionalStruct { let property: Any }
 enum NonOptionalEnum { case foo }
 
 func foo() -> Int? { return .none }
@@ -21,23 +21,52 @@ if var x = foo() {
   modify(&x)
 }
 
+if let x { // expected-error{{cannot find 'x' in scope}}
+  use(x)
+}
+
+if var x { // expected-error{{cannot find 'x' in scope}}
+  use(x)
+}
+
 use(x) // expected-error{{cannot find 'x' in scope}}
+
+let nonOptional = nonOptionalStruct()
 
 if let x = nonOptionalStruct() { _ = x} // expected-error{{initializer for conditional binding must have Optional type, not 'NonOptionalStruct'}}
 if let x = nonOptionalEnum() { _ = x} // expected-error{{initializer for conditional binding must have Optional type, not 'NonOptionalEnum'}}
 
+if let nonOptional { _ = nonOptional } // expected-error{{initializer for conditional binding must have Optional type, not 'NonOptionalStruct'}}
+if var nonOptional { nonOptional = nonOptionalStruct(); _ = nonOptional } // expected-error{{initializer for conditional binding must have Optional type, not 'NonOptionalStruct'}}
+
+guard let nonOptional else { _ = nonOptional; fatalError() } // expected-error{{initializer for conditional binding must have Optional type, not 'NonOptionalStruct'}}
+guard var nonOptional else { _ = nonOptional; fatalError() } // expected-error{{initializer for conditional binding must have Optional type, not 'NonOptionalStruct'}}
+
+if let nonOptional.property { } // expected-error{{unwrap condition requires a valid identifier}} expected-error{{pattern matching in a condition requires the 'case' keyword}}
+if var nonOptional.property { } // expected-error{{unwrap condition requires a valid identifier}} expected-error{{pattern matching in a condition requires the 'case' keyword}}
+
 guard let _ = nonOptionalStruct() else { fatalError() } // expected-error{{initializer for conditional binding must have Optional type, not 'NonOptionalStruct'}}
 guard let _ = nonOptionalEnum() else { fatalError() } // expected-error{{initializer for conditional binding must have Optional type, not 'NonOptionalEnum'}}
 
+let optional: String? = nil
+if case let optional? { _ = optional } // expected-error{{variable binding in a condition requires an initializer}}
+if case let .some(optional) { _ = optional } // expected-error{{variable binding in a condition requires an initializer}}
+if case .some(let optional) { _ = optional } // expected-error{{variable binding in a condition requires an initializer}}
+
 if case let x? = nonOptionalStruct() { _ = x } // expected-error{{'?' pattern cannot match values of type 'NonOptionalStruct'}}
 if case let x? = nonOptionalEnum() { _ = x } // expected-error{{'?' pattern cannot match values of type 'NonOptionalEnum'}}
+
+if let x { _ = x } // expected-error{{cannot find 'x' in scope}}
+
+if let optional: String { _ = optional }
+if let optional: Int { _ = optional } // expected-error{{cannot convert value of type 'String?' to specified type 'Int?'}}
 
 class B {} // expected-note * {{did you mean 'B'?}}
 class D : B {}// expected-note * {{did you mean 'D'?}}
 
 // TODO poor recovery in these cases
-if let {} // expected-error {{expected '{' after 'if' condition}} expected-error {{pattern matching in a condition requires the 'case' keyword}}
-if let x = { } // expected-error{{'{' after 'if'}} expected-error {{variable binding in a condition requires an initializer}} expected-error{{initializer for conditional binding must have Optional type, not '() -> ()'}}
+if let {} // expected-error {{expected '{' after 'if' condition}} expected-error {{pattern matching in a condition requires the 'case' keyword}} expected-error {{unwrap condition requires a valid identifier}}
+if let x = { } // expected-error{{'{' after 'if'}} expected-error{{initializer for conditional binding must have Optional type, not '() -> ()'}}
 // expected-warning@-1{{value 'x' was defined but never used}}
 
 if let x = foo() {
@@ -58,6 +87,16 @@ if let x = foo() {
 }
 
 var opt: Int? = .none
+
+if let opt {
+  use(opt)
+  opt = 10 // expected-error{{cannot assign to value: 'opt' is a 'let' constant}}
+}
+
+if var opt {
+  use(opt)
+  opt = 10
+}
 
 if let x = opt {} // expected-warning {{value 'x' was defined but never used; consider replacing with boolean test}} {{4-12=}} {{15-15= != nil}}
 if var x = opt {} // expected-warning {{value 'x' was defined but never used; consider replacing with boolean test}} {{4-12=}} {{15-15= != nil}}
@@ -97,7 +136,7 @@ if 1 != 2, 4 == 57, let x = opt {} // expected-warning {{immutable value 'x' was
 
 // Test that these don't cause the parser to crash.
 if true { if a == 0; {} }   // expected-error {{cannot find 'a' in scope}} expected-error {{expected '{' after 'if' condition}}
-if a == 0, where b == 0 {}  // expected-error 4{{}} expected-note {{}} {{25-25=do }}
+if a == 0, where b == 0 {}  // expected-error {{cannot find 'a' in scope}} expected-error {{expected expression in conditional}}
 
 
 
@@ -137,11 +176,24 @@ func testShadowing(_ a: Int?, b: Int?, c: Int?, d: Int?) {
   }
 }
 
+func testShadowingWithShorthand(_ a: Int?, b: Int?, c: Int?, d: Int?) {
+  guard let a, let b = a > 0 ? b : nil else { return }
+  _ = b
+
+  if let c, let d = c > 0 ? d : nil {
+    _ = d
+  }
+}
+
 func useInt(_ x: Int) {}
 
-func testWhileScoping(_ a: Int?) {// expected-note {{did you mean 'a'?}}
+func testWhileScoping(_ a: Int?) {
   while let x = a { }
   useInt(x) // expected-error{{cannot find 'x' in scope}}
+}
+
+func testWhileShorthand(_ b: Int?) {
+  while let b { _ = b }
 }
 
 // Matching a case with a single, labeled associated value.

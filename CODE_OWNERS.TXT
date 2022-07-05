@@ -37,7 +37,7 @@ E: jgroff@apple.com
 G: jckarter
 D: SIL, SILGen, everything in Swift not covered by someone else
 
-N: Argyrios Kyrzidis
+N: Argyrios Kyrtzidis
 E: kyrtzidis@apple.com
 G: akyrtzi
 D: IDE, Index, SourceKit, swift-ide-test
@@ -75,7 +75,7 @@ D: Debug info
 N: Jordan Rose
 E: jordan_rose@apple.com
 G: jrose-apple
-D: ClangImporter, Serialization, PrintAsObjC, Driver, Frontend
+D: ClangImporter, Serialization, PrintAsClang, Driver, Frontend
 
 N: Daniel Steffen
 E: dsteffen@apple.com

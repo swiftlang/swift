@@ -12,6 +12,7 @@
 
 #include "swift/IDE/CompletionInstance.h"
 
+#include "DependencyChecking.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
@@ -25,6 +26,8 @@
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
+#include "swift/IDE/CodeCompletion.h"
+#include "swift/IDE/CodeCompletionConsumer.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
@@ -169,123 +172,17 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
   return newDC;
 }
 
-/// For each dependency file in \p CI, run \p callback until the callback
-/// returns \c true. Returns \c true if any callback call returns \c true, \c
-/// false otherwise.
-static bool
-forEachDependencyUntilTrue(CompilerInstance &CI, unsigned excludeBufferID,
-                           llvm::function_ref<bool(StringRef)> callback) {
-  // Check files in the current module.
-  for (FileUnit *file : CI.getMainModule()->getFiles()) {
-    StringRef filename;
-    if (auto SF = dyn_cast<SourceFile>(file)) {
-      if (SF->getBufferID() == excludeBufferID)
-        continue;
-      filename = SF->getFilename();
-    } else if (auto LF = dyn_cast<LoadedFile>(file))
-      filename = LF->getFilename();
-    else
-      continue;
-
-    // Ignore synthesized files.
-    if (filename.empty() || filename.front() == '<')
-      continue;
-
-    if (callback(filename))
-      return true;
-  }
-
-  // Check other non-system depenencies (e.g. modules, headers).
-  for (auto &dep : CI.getDependencyTracker()->getDependencies()) {
-    if (callback(dep))
-      return true;
-  }
-  for (auto dep : CI.getDependencyTracker()->getIncrementalDependencyPaths()) {
-    if (callback(dep))
-      return true;
-  }
-
-  return false;
-}
-
-/// Collect hash codes of the dependencies into \c Map.
-static void cacheDependencyHashIfNeeded(CompilerInstance &CI,
-                                        unsigned excludeBufferID,
-                                        llvm::StringMap<llvm::hash_code> &Map) {
-  auto &FS = CI.getFileSystem();
-  forEachDependencyUntilTrue(
-      CI, excludeBufferID, [&](StringRef filename) {
-        if (Map.count(filename))
-          return false;
-
-        auto stat = FS.status(filename);
-        if (!stat)
-          return false;
-
-        // We will check the hash only if the modification time of the dependecy
-        // is zero. See 'areAnyDependentFilesInvalidated() below'.
-        if (stat->getLastModificationTime() != llvm::sys::TimePoint<>())
-          return false;
-
-        auto buf = FS.getBufferForFile(filename);
-        Map[filename] = llvm::hash_value(buf.get()->getBuffer());
-        return false;
-      });
-}
-
-/// Check if any dependent files are modified since \p timestamp.
-static bool areAnyDependentFilesInvalidated(
-    CompilerInstance &CI, llvm::vfs::FileSystem &FS,
-    unsigned excludeBufferID, llvm::sys::TimePoint<> timestamp,
-    llvm::StringMap<llvm::hash_code> &Map) {
-
-  return forEachDependencyUntilTrue(
-      CI, excludeBufferID, [&](StringRef filePath) {
-        auto stat = FS.status(filePath);
-        if (!stat)
-          // Missing.
-          return true;
-
-        auto lastModTime = stat->getLastModificationTime();
-        if (lastModTime > timestamp)
-          // Modified.
-          return true;
-
-        // If the last modification time is zero, this file is probably from a
-        // virtual file system. We need to check the content.
-        if (lastModTime == llvm::sys::TimePoint<>()) {
-          // Get the hash code of the last content.
-          auto oldHashEntry = Map.find(filePath);
-          if (oldHashEntry == Map.end())
-            // Unreachable? Not virtual in old filesystem, but virtual in new
-            // one.
-            return true;
-          auto oldHash = oldHashEntry->second;
-
-          // Calculate the hash code of the current content.
-          auto newContent = FS.getBufferForFile(filePath);
-          if (!newContent)
-            // Unreachable? stat succeeded, but coundn't get the content.
-            return true;
-
-          auto newHash = llvm::hash_value(newContent.get()->getBuffer());
-
-          if (oldHash != newHash)
-            return true;
-        }
-
-        return false;
-      });
-}
-
 } // namespace
 
 bool CompletionInstance::performCachedOperationIfPossible(
-   llvm::hash_code ArgsHash,
+    llvm::hash_code ArgsHash,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    const SearchPathOptions &SearchPathOpts,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
     DiagnosticConsumer *DiagC,
-    llvm::function_ref<void(CompilerInstance &, bool)> Callback) {
+    std::shared_ptr<std::atomic<bool>> CancellationFlag,
+    llvm::function_ref<void(CancellableResult<CompletionInstanceResult>)>
+        Callback) {
   llvm::PrettyStackTraceString trace(
       "While performing cached completion if possible");
 
@@ -314,6 +211,16 @@ bool CompletionInstance::performCachedOperationIfPossible(
     return false;
 
   if (shouldCheckDependencies()) {
+    // The passed in FileSystem does not have any overlays resolved. Make sure
+    // to do so before checking dependencies (otherwise we might decide we need
+    // to run the slow path due to a missing/different file).
+    auto ExpectedOverlay = SearchPathOpts.makeOverlayFileSystem(FileSystem);
+    if (ExpectedOverlay) {
+      FileSystem = std::move(ExpectedOverlay.get());
+    } else {
+      llvm::consumeError(ExpectedOverlay.takeError());
+    }
+
     if (areAnyDependentFilesInvalidated(
             CI, *FileSystem, *oldSF->getBufferID(),
             DependencyCheckedTimestamp, InMemoryDependencyHash))
@@ -328,16 +235,19 @@ bool CompletionInstance::performCachedOperationIfPossible(
 
   LangOptions langOpts = CI.getASTContext().LangOpts;
   TypeCheckerOptions typeckOpts = CI.getASTContext().TypeCheckerOpts;
+  SILOptions silOpts = CI.getASTContext().SILOpts;
   SearchPathOptions searchPathOpts = CI.getASTContext().SearchPathOpts;
   DiagnosticEngine tmpDiags(tmpSM);
   ClangImporterOptions clangOpts;
   symbolgraphgen::SymbolGraphOptions symbolOpts;
   std::unique_ptr<ASTContext> tmpCtx(
-      ASTContext::get(langOpts, typeckOpts, searchPathOpts, clangOpts,
+      ASTContext::get(langOpts, typeckOpts, silOpts, searchPathOpts, clangOpts,
                       symbolOpts, tmpSM, tmpDiags));
+  tmpCtx->CancellationFlag = CancellationFlag;
   registerParseRequestFunctions(tmpCtx->evaluator);
   registerIDERequestFunctions(tmpCtx->evaluator);
   registerTypeCheckerRequestFunctions(tmpCtx->evaluator);
+  registerClangImporterRequestFunctions(tmpCtx->evaluator);
   registerSILGenRequestFunctions(tmpCtx->evaluator);
   ModuleDecl *tmpM = ModuleDecl::create(Identifier(), *tmpCtx);
   SourceFile *tmpSF = new (*tmpCtx)
@@ -432,8 +342,8 @@ bool CompletionInstance::performCachedOperationIfPossible(
                              newBufferStart.getAdvancedLoc(newInfo.EndOffset));
 
     auto *AFD = cast<AbstractFunctionDecl>(DC);
+    SM.setReplacedRange(AFD->getOriginalBodySourceRange(), newBodyRange);
     AFD->setBodyToBeReparsed(newBodyRange);
-    SM.setReplacedRange({AFD->getOriginalBodySourceRange(), newBodyRange});
     oldSF->clearScope();
 
     traceDC = AFD;
@@ -498,11 +408,18 @@ bool CompletionInstance::performCachedOperationIfPossible(
     // The diagnostic engine is keeping track of state which might modify
     // parsing and type checking behaviour. Clear the flags.
     CI.getDiags().resetHadAnyError();
+    CI.getASTContext().CancellationFlag = CancellationFlag;
 
     if (DiagC)
       CI.addDiagnosticConsumer(DiagC);
 
-    Callback(CI, /*reusingASTContext=*/true);
+    if (CancellationFlag && CancellationFlag->load(std::memory_order_relaxed)) {
+      Callback(CancellableResult<CompletionInstanceResult>::cancelled());
+    } else {
+      Callback(CancellableResult<CompletionInstanceResult>::success(
+          {CI, /*reusingASTContext=*/true,
+           /*DidFindCodeCompletionToken=*/true}));
+    }
 
     if (DiagC)
       CI.removeDiagnosticConsumer(DiagC);
@@ -513,15 +430,18 @@ bool CompletionInstance::performCachedOperationIfPossible(
   return true;
 }
 
-bool CompletionInstance::performNewOperation(
+void CompletionInstance::performNewOperation(
     Optional<llvm::hash_code> ArgsHash, swift::CompilerInvocation &Invocation,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
-    std::string &Error, DiagnosticConsumer *DiagC,
-    llvm::function_ref<void(CompilerInstance &, bool)> Callback) {
+    DiagnosticConsumer *DiagC,
+    std::shared_ptr<std::atomic<bool>> CancellationFlag,
+    llvm::function_ref<void(CancellableResult<CompletionInstanceResult>)>
+        Callback) {
   llvm::PrettyStackTraceString trace("While performing new completion");
 
-  auto isCachedCompletionRequested = ArgsHash.hasValue();
+  // If ArgsHash is None we shouldn't cache the compiler instance.
+  bool ShouldCacheCompilerInstance = ArgsHash.hasValue();
 
   auto TheInstance = std::make_unique<CompilerInstance>();
 
@@ -545,33 +465,44 @@ bool CompletionInstance::performNewOperation(
 
     Invocation.setCodeCompletionPoint(completionBuffer, Offset);
 
-    if (CI.setup(Invocation)) {
-      Error = "failed to setup compiler instance";
-      return false;
+    std::string InstanceSetupError;
+    if (CI.setup(Invocation, InstanceSetupError)) {
+      Callback(CancellableResult<CompletionInstanceResult>::failure(
+          InstanceSetupError));
+      return;
     }
+    CI.getASTContext().CancellationFlag = CancellationFlag;
     registerIDERequestFunctions(CI.getASTContext().evaluator);
-
-    // If we're expecting a standard library, but there either isn't one, or it
-    // failed to load, let's bail early and hand back an empty completion
-    // result to avoid any downstream crashes.
-    if (CI.loadStdlibIfNeeded())
-      return true;
 
     CI.performParseAndResolveImportsOnly();
 
-    // If we didn't find a code completion token, bail.
-    auto *state = CI.getCodeCompletionFile()->getDelayedParserState();
-    if (!state->hasCodeCompletionDelayedDeclState())
-      return true;
+    bool DidFindCodeCompletionToken = CI.getCodeCompletionFile()
+                                          ->getDelayedParserState()
+                                          ->hasCodeCompletionDelayedDeclState();
+    ShouldCacheCompilerInstance &= DidFindCodeCompletionToken;
 
-    Callback(CI, /*reusingASTContext=*/false);
+    auto CancellationFlag = CI.getASTContext().CancellationFlag;
+    if (CancellationFlag && CancellationFlag->load(std::memory_order_relaxed)) {
+      Callback(CancellableResult<CompletionInstanceResult>::cancelled());
+      // The completion instance may be in an invalid state when it's been
+      // cancelled. Don't cache it.
+      ShouldCacheCompilerInstance = false;
+    } else {
+      Callback(CancellableResult<CompletionInstanceResult>::success(
+          {CI, /*ReuisingASTContext=*/false, DidFindCodeCompletionToken}));
+      if (CancellationFlag &&
+          CancellationFlag->load(std::memory_order_relaxed)) {
+        ShouldCacheCompilerInstance = false;
+      }
+    }
   }
 
   // Cache the compiler instance if fast completion is enabled.
-  if (isCachedCompletionRequested)
+  // If we didn't find a code compleiton token, we can't cache the instance
+  // because performCachedOperationIfPossible wouldn't have an old code
+  // completion state to compare the new one to.
+  if (ShouldCacheCompilerInstance)
     cacheCompilerInstance(std::move(TheInstance), *ArgsHash);
-
-  return true;
 }
 
 void CompletionInstance::cacheCompilerInstance(
@@ -606,20 +537,14 @@ void CompletionInstance::setOptions(CompletionInstance::Options NewOpts) {
   Opts = NewOpts;
 }
 
-bool swift::ide::CompletionInstance::performOperation(
+void swift::ide::CompletionInstance::performOperation(
     swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
-    std::string &Error, DiagnosticConsumer *DiagC,
-    llvm::function_ref<void(CompilerInstance &, bool)> Callback) {
-
-  // Disable to build syntax tree because code-completion skips some portion of
-  // source text. That breaks an invariant of syntax tree building.
-  Invocation.getLangOptions().BuildSyntaxTree = false;
-
-  // We don't need token list.
-  Invocation.getLangOptions().CollectParsedToken = false;
-
+    DiagnosticConsumer *DiagC,
+    std::shared_ptr<std::atomic<bool>> CancellationFlag,
+    llvm::function_ref<void(CancellableResult<CompletionInstanceResult>)>
+        Callback) {
   // Compute the signature of the invocation.
   llvm::hash_code ArgsHash(0);
   for (auto arg : Args)
@@ -629,16 +554,254 @@ bool swift::ide::CompletionInstance::performOperation(
   // the cached completion instance.
   std::lock_guard<std::mutex> lock(mtx);
 
-  if (performCachedOperationIfPossible(ArgsHash, FileSystem, completionBuffer,
-                                       Offset, DiagC, Callback)) {
-    return true;
+  if (performCachedOperationIfPossible(ArgsHash, FileSystem,
+                                       Invocation.getSearchPathOptions(),
+                                       completionBuffer, Offset, DiagC,
+                                       CancellationFlag, Callback)) {
+    // We were able to reuse a cached AST. Callback has already been invoked
+    // and we don't need to build a new AST. We are done.
+    return;
   }
 
-  if(performNewOperation(ArgsHash, Invocation, FileSystem, completionBuffer,
-                         Offset, Error, DiagC, Callback)) {
-    return true;
-  }
+  // Always disable source location resolutions from .swiftsourceinfo file
+  // because they're somewhat heavy operations and aren't needed for completion.
+  Invocation.getFrontendOptions().IgnoreSwiftSourceInfo = true;
 
-  assert(!Error.empty());
-  return false;
+  // Disable to build syntax tree because code-completion skips some portion of
+  // source text. That breaks an invariant of syntax tree building.
+  Invocation.getLangOptions().BuildSyntaxTree = false;
+
+  // We don't need token list.
+  Invocation.getLangOptions().CollectParsedToken = false;
+
+  performNewOperation(ArgsHash, Invocation, FileSystem, completionBuffer,
+                      Offset, DiagC, CancellationFlag, Callback);
+}
+
+void swift::ide::CompletionInstance::codeComplete(
+    swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
+    DiagnosticConsumer *DiagC, ide::CodeCompletionContext &CompletionContext,
+    std::shared_ptr<std::atomic<bool>> CancellationFlag,
+    llvm::function_ref<void(CancellableResult<CodeCompleteResult>)> Callback) {
+  using ResultType = CancellableResult<CodeCompleteResult>;
+
+  struct ConsumerToCallbackAdapter
+      : public SimpleCachingCodeCompletionConsumer {
+    SwiftCompletionInfo SwiftContext;
+    ImportDepth ImportDep;
+    std::shared_ptr<std::atomic<bool>> CancellationFlag;
+    llvm::function_ref<void(ResultType)> Callback;
+    bool HandleResultsCalled = false;
+
+    ConsumerToCallbackAdapter(
+        ImportDepth ImportDep,
+        std::shared_ptr<std::atomic<bool>> CancellationFlag,
+        llvm::function_ref<void(ResultType)> Callback)
+        : ImportDep(ImportDep), CancellationFlag(CancellationFlag),
+          Callback(Callback) {}
+
+    void setContext(swift::ASTContext *context,
+                    const swift::CompilerInvocation *invocation,
+                    swift::ide::CodeCompletionContext *completionContext) {
+      SwiftContext.swiftASTContext = context;
+      SwiftContext.invocation = invocation;
+      SwiftContext.completionContext = completionContext;
+    }
+    void clearContext() { SwiftContext = SwiftCompletionInfo(); }
+
+    void handleResults(CodeCompletionContext &context) override {
+      HandleResultsCalled = true;
+      if (CancellationFlag &&
+          CancellationFlag->load(std::memory_order_relaxed)) {
+        Callback(ResultType::cancelled());
+      } else {
+        assert(SwiftContext.swiftASTContext);
+        Callback(ResultType::success({context.getResultSink(), SwiftContext, ImportDep}));
+      }
+    }
+  };
+
+  performOperation(
+      Invocation, Args, FileSystem, completionBuffer, Offset, DiagC,
+      CancellationFlag,
+      [&](CancellableResult<CompletionInstanceResult> CIResult) {
+        CIResult.mapAsync<CodeCompleteResult>(
+            [&CompletionContext, &CancellationFlag](auto &Result,
+                                                    auto DeliverTransformed) {
+              CompletionContext.ReusingASTContext = Result.DidReuseAST;
+              CompilerInstance &CI = Result.CI;
+              ImportDepth ImportDep{CI.getASTContext(),
+                                    CI.getInvocation().getFrontendOptions()};
+              ConsumerToCallbackAdapter Consumer(ImportDep, CancellationFlag,
+                                                 DeliverTransformed);
+
+              std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
+                  ide::makeCodeCompletionCallbacksFactory(CompletionContext,
+                                                          Consumer));
+
+              if (!Result.DidFindCodeCompletionToken) {
+                SwiftCompletionInfo Info{&CI.getASTContext(),
+                                         &CI.getInvocation(),
+                                         &CompletionContext};
+                CodeCompletionResultSink ResultSink;
+                DeliverTransformed(ResultType::success({ResultSink, Info, ImportDep}));
+                return;
+              }
+
+              Consumer.setContext(&CI.getASTContext(), &CI.getInvocation(),
+                                  &CompletionContext);
+              performCodeCompletionSecondPass(*CI.getCodeCompletionFile(),
+                                              *callbacksFactory);
+              Consumer.clearContext();
+              if (!Consumer.HandleResultsCalled) {
+                // If we didn't receive a handleResult call from the second
+                // pass, we didn't receive any results. To make sure Callback
+                // gets called exactly once, call it manually with no results
+                // here.
+                SwiftCompletionInfo Info{&CI.getASTContext(),
+                                         &CI.getInvocation(),
+                                         &CompletionContext};
+                CodeCompletionResultSink ResultSink;
+                DeliverTransformed(ResultType::success({ResultSink, Info, ImportDep}));
+              }
+            },
+            Callback);
+      });
+}
+
+void swift::ide::CompletionInstance::typeContextInfo(
+    swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
+    DiagnosticConsumer *DiagC,
+    std::shared_ptr<std::atomic<bool>> CancellationFlag,
+    llvm::function_ref<void(CancellableResult<TypeContextInfoResult>)>
+        Callback) {
+  using ResultType = CancellableResult<TypeContextInfoResult>;
+
+  struct ConsumerToCallbackAdapter : public ide::TypeContextInfoConsumer {
+    bool ReusingASTContext;
+    std::shared_ptr<std::atomic<bool>> CancellationFlag;
+    llvm::function_ref<void(ResultType)> Callback;
+    bool HandleResultsCalled = false;
+
+    ConsumerToCallbackAdapter(
+        bool ReusingASTContext,
+        std::shared_ptr<std::atomic<bool>> CancellationFlag,
+        llvm::function_ref<void(ResultType)> Callback)
+        : ReusingASTContext(ReusingASTContext),
+          CancellationFlag(CancellationFlag), Callback(Callback) {}
+
+    void handleResults(ArrayRef<ide::TypeContextInfoItem> Results) override {
+      HandleResultsCalled = true;
+      if (CancellationFlag &&
+          CancellationFlag->load(std::memory_order_relaxed)) {
+        Callback(ResultType::cancelled());
+      } else {
+        Callback(ResultType::success({Results, ReusingASTContext}));
+      }
+    }
+  };
+
+  performOperation(
+      Invocation, Args, FileSystem, completionBuffer, Offset, DiagC,
+      CancellationFlag,
+      [&](CancellableResult<CompletionInstanceResult> CIResult) {
+        CIResult.mapAsync<TypeContextInfoResult>(
+            [&CancellationFlag](auto &Result, auto DeliverTransformed) {
+              ConsumerToCallbackAdapter Consumer(
+                  Result.DidReuseAST, CancellationFlag, DeliverTransformed);
+              std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
+                  ide::makeTypeContextInfoCallbacksFactory(Consumer));
+
+              if (!Result.DidFindCodeCompletionToken) {
+                // Deliver empty results if we didn't find a code completion
+                // token.
+                DeliverTransformed(
+                    ResultType::success({/*Results=*/{}, Result.DidReuseAST}));
+              }
+
+              performCodeCompletionSecondPass(
+                  *Result.CI.getCodeCompletionFile(), *callbacksFactory);
+              if (!Consumer.HandleResultsCalled) {
+                // If we didn't receive a handleResult call from the second
+                // pass, we didn't receive any results. To make sure Callback
+                // gets called exactly once, call it manually with no results
+                // here.
+                DeliverTransformed(
+                    ResultType::success({/*Results=*/{}, Result.DidReuseAST}));
+              }
+            },
+            Callback);
+      });
+}
+
+void swift::ide::CompletionInstance::conformingMethodList(
+    swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
+    DiagnosticConsumer *DiagC, ArrayRef<const char *> ExpectedTypeNames,
+    std::shared_ptr<std::atomic<bool>> CancellationFlag,
+    llvm::function_ref<void(CancellableResult<ConformingMethodListResults>)>
+        Callback) {
+  using ResultType = CancellableResult<ConformingMethodListResults>;
+
+  struct ConsumerToCallbackAdapter
+      : public swift::ide::ConformingMethodListConsumer {
+    bool ReusingASTContext;
+    std::shared_ptr<std::atomic<bool>> CancellationFlag;
+    llvm::function_ref<void(ResultType)> Callback;
+    bool HandleResultsCalled = false;
+
+    ConsumerToCallbackAdapter(
+        bool ReusingASTContext,
+        std::shared_ptr<std::atomic<bool>> CancellationFlag,
+        llvm::function_ref<void(ResultType)> Callback)
+        : ReusingASTContext(ReusingASTContext),
+          CancellationFlag(CancellationFlag), Callback(Callback) {}
+
+    void handleResult(const ide::ConformingMethodListResult &result) override {
+      HandleResultsCalled = true;
+      if (CancellationFlag &&
+          CancellationFlag->load(std::memory_order_relaxed)) {
+        Callback(ResultType::cancelled());
+      } else {
+        Callback(ResultType::success({&result, ReusingASTContext}));
+      }
+    }
+  };
+
+  performOperation(
+      Invocation, Args, FileSystem, completionBuffer, Offset, DiagC,
+      CancellationFlag,
+      [&](CancellableResult<CompletionInstanceResult> CIResult) {
+        CIResult.mapAsync<ConformingMethodListResults>(
+            [&ExpectedTypeNames, &CancellationFlag](auto &Result,
+                                                    auto DeliverTransformed) {
+              ConsumerToCallbackAdapter Consumer(
+                  Result.DidReuseAST, CancellationFlag, DeliverTransformed);
+              std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
+                  ide::makeConformingMethodListCallbacksFactory(
+                      ExpectedTypeNames, Consumer));
+
+              if (!Result.DidFindCodeCompletionToken) {
+                DeliverTransformed(
+                    ResultType::success({/*Results=*/{}, Result.DidReuseAST}));
+              }
+
+              performCodeCompletionSecondPass(
+                  *Result.CI.getCodeCompletionFile(), *callbacksFactory);
+              if (!Consumer.HandleResultsCalled) {
+                // If we didn't receive a handleResult call from the second
+                // pass, we didn't receive any results. To make sure Callback
+                // gets called exactly once, call it manually with no results
+                // here.
+                DeliverTransformed(
+                    ResultType::success({/*Results=*/{}, Result.DidReuseAST}));
+              }
+            },
+            Callback);
+      });
 }

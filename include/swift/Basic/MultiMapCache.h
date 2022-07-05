@@ -14,6 +14,7 @@
 #define SWIFT_BASIC_MULTIMAPCACHE_H
 
 #include "swift/Basic/LLVM.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 
 namespace swift {
@@ -80,7 +81,7 @@ public:
       return None;
     }
 
-    // Otherwise, compute our our length, compute our initial ArrayRef<ValueTy>,
+    // Otherwise, compute our length, compute our initial ArrayRef<ValueTy>,
     // update the map with the start, length, and return the resulting ArrayRef.
     unsigned length = data.size() - initialOffset;
     iter.first->second = std::make_tuple(initialOffset, length);

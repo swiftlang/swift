@@ -484,8 +484,8 @@ bb1(%2 : @owned $Klass1):
   destroy_value %2 : $Klass1
   br bb3
 
-bb2(%3 : @owned $Either<Klass1, Klass2>):
-  destroy_value %3 : $Either<Klass1, Klass2>
+bb2(%3 : @owned $Klass2):
+  destroy_value %3 : $Klass2
   br bb3
 
 bb3:
@@ -507,8 +507,8 @@ bb1(%2 : @owned $Klass1):
   destroy_value %2 : $Klass1
   br bb3
 
-bb2(%3 : @owned $Either<Klass1, Klass2>):
-  destroy_value %3 : $Either<Klass1, Klass2>
+bb2(%3 : @owned $Klass2):
+  destroy_value %3 : $Klass2
   br bb3
 
 bb3:

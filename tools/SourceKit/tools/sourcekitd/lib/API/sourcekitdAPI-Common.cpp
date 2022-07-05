@@ -16,6 +16,7 @@
 #include "sourcekitd/RequestResponsePrinterBase.h"
 #include "SourceKit/Support/Logging.h"
 #include "SourceKit/Support/UIdent.h"
+#include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -133,30 +134,6 @@ public:
 };
 } // end anonymous namespace
 
-void sourcekitd::writeEscaped(llvm::StringRef Str, llvm::raw_ostream &OS) {
-  for (unsigned i = 0, e = Str.size(); i != e; ++i) {
-    unsigned char c = Str[i];
-
-    switch (c) {
-    case '\\':
-      OS << '\\' << '\\';
-      break;
-    case '\t':
-      OS << '\\' << 't';
-      break;
-    case '\n':
-      OS << '\\' << 'n';
-      break;
-    case '"':
-      OS << '\\' << '"';
-      break;
-    default:
-      OS << c;
-      break;
-    }
-  }
-}
-
 static void printError(sourcekitd_response_t Err, raw_ostream &OS) {
   OS << "error response (";
   switch (sourcekitd_response_error_get_kind(Err)) {
@@ -189,12 +166,12 @@ void sourcekitd::printResponse(sourcekitd_response_t Resp, raw_ostream &OS) {
     printVariant(sourcekitd_response_get_value(Resp), OS);
 }
 
-static void fatal_error_handler(void *user_data, const std::string& reason,
+static void fatal_error_handler(void *user_data, const char *reason,
                                 bool gen_crash_diag) {
   // Write the result out to stderr avoiding errs() because raw_ostreams can
   // call report_fatal_error.
   // FIXME: Put the error message in the crash report.
-  fprintf(stderr, "SOURCEKITD FATAL ERROR: %s\n", reason.c_str());
+  fprintf(stderr, "SOURCEKITD FATAL ERROR: %s\n", reason);
   ::abort();
 }
 

@@ -5,11 +5,9 @@ RUN: %debug-remote-run -n --input-prefix %S/Inputs/ ls %S/Inputs/upload/1.txt %S
 RUN: test -z "`ls %t`"
 RUN: test ! -e %t-REMOTE
 
-CHECK-INPUT: /usr/bin/env /bin/mkdir -p {{.+}}-REMOTE/input/upload
-CHECK-INPUT-NEXT: /usr/bin/sftp
-CHECK-INPUT-DAG: -put '{{.+}}/Inputs/upload/1.txt' '{{.+}}-REMOTE/input/upload/1.txt'
-CHECK-INPUT-DAG: -put '{{.+}}/Inputs/upload/2.txt' '{{.+}}-REMOTE/input/upload/2.txt'
-CHECK-INPUT: /usr/bin/env ls
+CHECK-INPUT: /usr/bin/env /bin/mkdir -p {{.+}}-REMOTE/input
+CHECK-INPUT-NEXT: /usr/bin/rsync
+CHECK-INPUT: /usr/bin/env {{.*}}ls
 
 RUN: %empty-directory(%t)
 RUN: %empty-directory(%t/nested)
@@ -18,11 +16,8 @@ RUN: %debug-remote-run -n --output-prefix %t cp %t/nested/input %t/nested/output
 RUN: test ! -e %t-REMOTE
 
 CHECK-OUTPUT: /usr/bin/env /bin/mkdir -p {{.+}}-REMOTE/output/nested
-CHECK-OUTPUT-NEXT: /usr/bin/sftp
-CHECK-OUTPUT-DAG: -put '{{.+}}/nested/output' '{{.+}}-REMOTE/output/nested/output'
-CHECK-OUTPUT-DAG: -put '{{.+}}/nested/input' '{{.+}}-REMOTE/output/nested/input'
-CHECK-OUTPUT: /usr/bin/env cp
-CHECK-OUTPUT-NEXT: {{^}}/bin/mkdir -p {{.+}}/nested
-CHECK-OUTPUT-NEXT: /usr/bin/sftp
-CHECK-OUTPUT-DAG: -get '{{.+}}-REMOTE/output/nested/output' '{{.+}}/nested/output'
-CHECK-OUTPUT-DAG: -get '{{.+}}-REMOTE/output/nested/input' '{{.+}}/nested/input'
+CHECK-OUTPUT: /usr/bin/rsync
+CHECK-OUTPUT: /usr/bin/env {{.*}}cp
+CHECK-OUTPUT-NEXT: {{^}}/bin/mkdir -p {{.+}}
+CHECK-OUTPUT-NEXT: /usr/bin/rsync
+

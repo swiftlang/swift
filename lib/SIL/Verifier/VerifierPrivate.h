@@ -40,8 +40,7 @@ public:
 
 private:
   bool isImmutableInScope(LoadBorrowInst *lbi,
-                          ArrayRef<Operand *> endBorrowUses,
-                          AccessPath accessPath);
+                          AccessPathWithBase accessPathWithBase);
 };
 
 } // namespace silverifier

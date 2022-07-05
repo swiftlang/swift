@@ -15,7 +15,7 @@
 #include <vector>
 
 namespace swift {
-namespace dependencies {
+namespace c_string_utils {
 
 swiftscan_string_ref_t create_null() {
   swiftscan_string_ref_t str;
@@ -55,8 +55,14 @@ swiftscan_string_set_t *create_set(int count, const char **strings) {
   return set;
 }
 
+swiftscan_string_set_t *create_empty_set() {
+  swiftscan_string_set_t *set = new swiftscan_string_set_t;
+  set->count = 0;
+  return set;
+}
+
 const char *get_C_string(swiftscan_string_ref_t string) {
   return static_cast<const char *>(string.data);
 }
-} // namespace dependencies
+} // namespace c_string_utils
 } // namespace swift

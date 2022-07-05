@@ -71,7 +71,7 @@ public:
     return SC.getCloned();
   }
 
-  void fixUp(SILFunction *calleeFunction);
+  void postFixUp(SILFunction *calleeFunction);
 
   static SILFunction *createDeclaration(SILOptFunctionBuilder &FuncBuilder,
                                         SILFunction *Orig,

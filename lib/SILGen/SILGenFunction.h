@@ -15,6 +15,7 @@
 
 #include "FormalEvaluation.h"
 #include "Initialization.h"
+#include "InitializeDistActorIdentity.h"
 #include "JumpDest.h"
 #include "RValue.h"
 #include "SGFContext.h"
@@ -245,6 +246,8 @@ public:
   /// The SILModuleConventions for this SIL module.
   SILModuleConventions silConv;
 
+  bool useLoweredAddresses() const { return silConv.useLoweredAddresses(); }
+
   /// The DeclContext corresponding to the function currently being emitted.
   DeclContext * const FunctionDC;
 
@@ -252,6 +255,9 @@ public:
   /// code by #function.
   DeclName MagicFunctionName;
   std::string MagicFunctionString;
+  
+  /// The abstraction pattern against which the function is being lowered.
+  Optional<AbstractionPattern> OrigFnType;
 
   ASTContext &getASTContext() const { return SGM.M.getASTContext(); }
 
@@ -305,7 +311,7 @@ public:
   std::vector<PatternMatchContext*> SwitchStack;
   /// Keep track of our current nested scope.
   ///
-  /// The boolean tracks whether this is a 'guard' scope, which should be
+  /// The boolean tracks whether this is a binding scope, which should be
   /// popped automatically when we leave the innermost BraceStmt scope.
   std::vector<llvm::PointerIntPair<const SILDebugScope *, 1>> DebugScopeStack;
 
@@ -393,6 +399,11 @@ public:
   llvm::SmallDenseMap<std::pair<PatternBindingDecl *, unsigned>,
                       AsyncLetChildTask>
       AsyncLetChildTasks;
+
+  /// Indicates whether this function is a distributed actor's designated
+  /// initializer, providing the needed clean-up to emit an identity
+  /// assignment after initializing the actorSystem property.
+  Optional<InitializeDistActorIdentity> DistActorCtorContext;
 
   /// When rebinding 'self' during an initializer delegation, we have to be
   /// careful to preserve the object at 1 retain count during the delegation
@@ -580,19 +591,17 @@ public:
 
   /// Enter the debug scope for \p Loc, creating it if necessary.
   ///
-  /// \param isGuardScope If true, this is a scope for the bindings introduced by
-  /// a 'guard' statement. This scope ends when the next innermost BraceStmt ends.
-  void enterDebugScope(SILLocation Loc, bool isGuardScope=false) {
-    auto *Parent =
-        DebugScopeStack.size() ? DebugScopeStack.back().getPointer() : F.getDebugScope();
+  /// \param isBindingScope If true, this is a scope for the bindings introduced
+  /// by a let expression. This scope ends when the next innermost BraceStmt
+  /// ends.
+  void enterDebugScope(SILLocation Loc, bool isBindingScope = false) {
+    auto *Parent = DebugScopeStack.size() ? DebugScopeStack.back().getPointer()
+                                          : F.getDebugScope();
     auto *DS = Parent;
-    // Don't create a pointless scope for the function body's BraceStmt.
-    if (!DebugScopeStack.empty())
-      // Don't nest a scope for Loc under Parent unless it's actually different.
-      if (RegularLocation(DS->getLoc()) != RegularLocation(Loc))
-        DS = new (SGM.M)
-          SILDebugScope(RegularLocation(Loc), &getFunction(), DS);
-    DebugScopeStack.emplace_back(DS, isGuardScope);
+    // Don't nest a scope for Loc under Parent unless it's actually different.
+    if (RegularLocation(DS->getLoc()) != RegularLocation(Loc))
+      DS = new (SGM.M) SILDebugScope(RegularLocation(Loc), &getFunction(), DS);
+    DebugScopeStack.emplace_back(DS, isBindingScope);
     B.setCurrentDebugScope(DS);
   }
 
@@ -612,7 +621,8 @@ public:
   }
 
   std::unique_ptr<Initialization>
-  prepareIndirectResultInit(CanType formalResultType,
+  prepareIndirectResultInit(AbstractionPattern origResultType,
+                            CanType formalResultType,
                             SmallVectorImpl<SILValue> &directResultsBuffer,
                             SmallVectorImpl<CleanupHandle> &cleanups);
 
@@ -632,6 +642,9 @@ public:
   /// Generates code for an artificial top-level function that starts an
   /// application based on a main type and optionally a main type.
   void emitArtificialTopLevel(Decl *mainDecl);
+
+  /// Generate code into @main for starting the async main on the main thread.
+  void emitAsyncMainThreadStart(SILDeclRef entryPoint);
 
   /// Generates code for a class deallocating destructor. This
   /// calls the destroying destructor and then deallocates 'self'.
@@ -675,6 +688,24 @@ public:
   void emitClassMemberDestruction(ManagedValue selfValue, ClassDecl *cd,
                                   CleanupLocation cleanupLoc);
 
+  /// Generates code to destroy linearly recursive data structures, without
+  /// building up the call stack.
+  ///
+  /// E.x.: In the following we want to deinit next without recursing into next.
+  ///
+  /// class Node<A> {
+  ///   let value: A
+  ///   let next: Node<A>?
+  /// }
+  ///
+  /// \param selfValue The 'self' value.
+  /// \param cd The class declaration whose members are being destroyed.
+  /// \param recursiveLink The property that forms the recursive structure.
+  void emitRecursiveChainDestruction(ManagedValue selfValue,
+                                ClassDecl *cd,
+                                VarDecl* recursiveLink,
+                                CleanupLocation cleanupLoc);
+
   /// Generates a thunk from a foreign function to the native Swift convention.
   void emitForeignToNativeThunk(SILDeclRef thunk);
   /// Generates a thunk from a native function to foreign conventions.
@@ -699,7 +730,9 @@ public:
   /// Generate an ObjC-compatible destructor (-dealloc).
   void emitObjCDestructor(SILDeclRef dtor);
 
-  ManagedValue emitGlobalVariableRef(SILLocation loc, VarDecl *var);
+  /// Generate code to obtain the address of the given global variable.
+  ManagedValue emitGlobalVariableRef(SILLocation loc, VarDecl *var,
+                                     Optional<ActorIsolation> actorIso);
 
   /// Generate a lazy global initializer.
   void emitLazyGlobalInitializer(PatternBindingDecl *binding,
@@ -723,7 +756,8 @@ public:
                            SILDeclRef witness,
                            SubstitutionMap witnessSubs,
                            IsFreeFunctionWitness_t isFree,
-                           bool isSelfConformance);
+                           bool isSelfConformance,
+                           Optional<ActorIsolation> enterIsolation);
 
   /// Generates subscript arguments for keypath. This function handles lowering
   /// of all index expressions including default arguments.
@@ -731,11 +765,10 @@ public:
   /// \returns Lowered index arguments.
   /// \param subscript - The subscript decl who's arguments are being lowered.
   /// \param subs - Used to get subscript function type and to substitute generic args.
-  /// \param indexExpr - An expression holding the indices of the
-  /// subscript (either a TupleExpr or a ParenExpr).
+  /// \param argList - The argument list of the subscript.
   SmallVector<ManagedValue, 4>
   emitKeyPathSubscriptOperands(SubscriptDecl *subscript, SubstitutionMap subs,
-                               Expr *indexExpr);
+                               ArgumentList *argList);
 
   /// Convert a block to a native function with a thunk.
   ManagedValue emitBlockToFunc(SILLocation loc,
@@ -812,6 +845,7 @@ public:
   /// are created by different emissions; it's just a little
   /// counter-intuitive within a single emission.)
   SILBasicBlock *createBasicBlock();
+  SILBasicBlock *createBasicBlock(llvm::StringRef debugName);
   SILBasicBlock *createBasicBlockAfter(SILBasicBlock *afterBB);
   SILBasicBlock *createBasicBlockBefore(SILBasicBlock *beforeBB);
 
@@ -857,6 +891,10 @@ public:
   /// inside an async actor-independent function. No hop-back is expected.
   void emitHopToActorValue(SILLocation loc, ManagedValue actor);
 
+  /// Return true if the function being emitted is an async function
+  /// that unsafely inherits its executor.
+  bool unsafelyInheritsExecutor();
+
   /// A version of `emitHopToTargetActor` that is specialized to the needs
   /// of various types of ConstructorDecls, like class or value initializers,
   /// because their prolog emission is not the same as for regular functions.
@@ -868,10 +906,21 @@ public:
   void emitConstructorPrologActorHop(SILLocation loc,
                                      Optional<ActorIsolation> actorIso);
 
+  /// Set the given global actor as the isolation for this function
+  /// (generally a thunk) and hop to it.
+  void emitPrologGlobalActorHop(SILLocation loc, Type globalActor);
+
   /// Emit the executor for the given actor isolation.
   Optional<SILValue> emitExecutor(SILLocation loc,
                                   ActorIsolation isolation,
                                   Optional<ManagedValue> maybeSelf);
+
+  /// Emit the executor value that corresponds to the generic (concurrent)
+  /// executor.
+  SILValue emitGenericExecutor(SILLocation loc);
+
+  /// Emit the executor value that corresponds to the main actor.
+  SILValue emitMainExecutor(SILLocation loc);
 
   /// Emit a precondition check to ensure that the function is executing in
   /// the expected isolation context.
@@ -904,12 +953,14 @@ public:
   void emitProlog(CaptureInfo captureInfo,
                   ParameterList *paramList, ParamDecl *selfParam,
                   DeclContext *DC, Type resultType,
-                  bool throws, SourceLoc throwsLoc);
+                  bool throws, SourceLoc throwsLoc,
+                  Optional<AbstractionPattern> origClosureType = None);
   /// A simpler version of emitProlog
   /// \returns the number of variables in paramPatterns.
   uint16_t emitBasicProlog(ParameterList *paramList, ParamDecl *selfParam,
                            Type resultType, DeclContext *DC,
-                           bool throws, SourceLoc throwsLoc);
+                           bool throws, SourceLoc throwsLoc,
+                           Optional<AbstractionPattern> origClosureType = None);
 
   /// Create SILArguments in the entry block that bind a single value
   /// of the given parameter suitably for being forwarded.
@@ -924,12 +975,14 @@ public:
   /// Create (but do not emit) the epilog branch, and save the
   /// current cleanups depth as the destination for return statement branches.
   ///
-  /// \param hasDirectResults  If true, the epilog block will be created with
-  ///                    arguments for each direct result of this function.
+  /// \param directResultType  If given a value, the epilog block will be
+  ///                    created with arguments for each direct result of this
+  ///                    function, corresponding to the formal return type.
   /// \param isThrowing  If true, create an error epilog block.
   /// \param L           The SILLocation which should be associated with
   ///                    cleanup instructions.
-  void prepareEpilog(bool hasDirectResults, bool isThrowing, CleanupLocation L);
+  void prepareEpilog(Optional<Type> directResultType,
+                     bool isThrowing, CleanupLocation L);
   void prepareRethrowEpilog(CleanupLocation l);
   void prepareCoroutineUnwindEpilog(CleanupLocation l);
   
@@ -973,12 +1026,16 @@ public:
   /// emitSelfDecl - Emit a SILArgument for 'self', register it in varlocs, set
   /// up debug info, etc.  This returns the 'self' value.
   SILValue emitSelfDecl(VarDecl *selfDecl);
-  
+
   /// Emits a temporary allocation that will be deallocated automatically at the
   /// end of the current scope. Returns the address of the allocation.
+  ///
+  /// \p isLexical if set to true, this is a temporary that we are using for a
+  /// local let that we need to mark with the lexical flag.
   SILValue emitTemporaryAllocation(SILLocation loc, SILType ty,
-                                   bool hasDynamicLifetime = false);
-  
+                                   bool hasDynamicLifetime = false,
+                                   bool isLexical = false);
+
   /// Prepares a buffer to receive the result of an expression, either using the
   /// 'emit into' initialization buffer if available, or allocating a temporary
   /// allocation if not.
@@ -1057,6 +1114,16 @@ public:
   /// - The fourth argument is the line number.
   SourceLocArgs
   emitSourceLocationArgs(SourceLoc loc, SILLocation emitLoc);
+
+  /// Emit a 'String' literal for the passed 'text'.
+  ///
+  /// See also: 'emitLiteral' which works with various types of literals,
+  /// however requires an expression to base the creation on.
+  ManagedValue
+  emitStringLiteral(SILLocation loc,
+                    StringRef text,
+                    StringLiteralExpr::Encoding encoding = StringLiteralExpr::Encoding::UTF8,
+                    SGFContext ctx = SGFContext());
 
   /// Emit a call to the library intrinsic _doesOptionalHaveValue.
   ///
@@ -1361,12 +1428,13 @@ public:
   ManagedValue emitClosureValue(SILLocation loc,
                                 SILDeclRef function,
                                 CanType expectedType,
-                                SubstitutionMap subs);
+                                SubstitutionMap subs,
+                                bool alreadyConverted);
 
   PreparedArguments prepareSubscriptIndices(SubscriptDecl *subscript,
                                             SubstitutionMap subs,
                                             AccessStrategy strategy,
-                                            Expr *indices);
+                                            ArgumentList *argList);
 
   ArgumentSource prepareAccessorBaseArg(SILLocation loc, ManagedValue base,
                                         CanType baseFormalType,
@@ -1389,7 +1457,7 @@ public:
 
   ManagedValue emitAsyncLetStart(SILLocation loc,
                                  SILValue taskOptions,
-                                 Type functionType, ManagedValue taskFunction,
+                                 AbstractClosureExpr *asyncLetEntryPoint,
                                  SILValue resultBuf);
 
   void emitFinishAsyncLet(SILLocation loc, SILValue asyncLet, SILValue resultBuf);
@@ -1409,7 +1477,8 @@ public:
   ManagedValue emitAddressorAccessor(
       SILLocation loc, SILDeclRef addressor, SubstitutionMap substitutions,
       ArgumentSource &&optionalSelfValue, bool isSuper,
-      bool isDirectAccessorUse, PreparedArguments &&optionalSubscripts,
+      bool isDirectAccessorUse,
+      PreparedArguments &&optionalSubscripts,
       SILType addressType, bool isOnSelfParameter);
 
   CleanupHandle emitCoroutineAccessor(SILLocation loc, SILDeclRef accessor,
@@ -1571,7 +1640,7 @@ public:
                        SubstitutionMap subMap);
   
   SILValue emitMetatypeOfValue(SILLocation loc, Expr *baseExpr);
-  
+
   void emitReturnExpr(SILLocation loc, Expr *ret);
 
   void emitYield(SILLocation loc, MutableArrayRef<ArgumentSource> yieldValues,
@@ -1611,7 +1680,6 @@ public:
                                         ConcreteDeclRef defaultArgsOwner,
                                         unsigned destIndex,
                                         CanType resultType,
-                                        AbstractionPattern origResultType,
                                         SGFContext C = SGFContext());
 
   RValue emitApplyOfStoredPropertyInitializer(
@@ -1684,10 +1752,15 @@ public:
                                       bool isSuppressed);
 
   /// Emit a dynamic member reference.
-  RValue emitDynamicMemberRefExpr(DynamicMemberRefExpr *e, SGFContext c);
+  RValue emitDynamicMemberRef(SILLocation loc, SILValue operand,
+                              ConcreteDeclRef memberRef, CanType refTy,
+                              SGFContext C);
 
-  /// Emit a dynamic subscript.
-  RValue emitDynamicSubscriptExpr(DynamicSubscriptExpr *e, SGFContext c);
+  /// Emit a dynamic subscript getter application.
+  RValue emitDynamicSubscriptGetterApply(SILLocation loc, SILValue operand,
+                                         ConcreteDeclRef subscriptRef,
+                                         PreparedArguments &&indexArgs,
+                                         CanType resultTy, SGFContext C);
 
   /// Open up the given existential expression and emit its
   /// subexpression in a caller-specified manner.
@@ -1993,29 +2066,66 @@ public:
                                            CanSILFunctionType toType,
                                            bool reorderSelf);
 
+  //===--------------------------------------------------------------------===//
+  // Back Deployment thunks
+  //===--------------------------------------------------------------------===//
+
+  /// Invokes an original function if it is available at runtime. Otherwise,
+  /// invokes a fallback copy of the function emitted into the client.
+  void emitBackDeploymentThunk(SILDeclRef thunk);
+
   //===---------------------------------------------------------------------===//
   // Distributed Actors
   //===---------------------------------------------------------------------===//
 
-  /// Initialize the distributed actors transport and id.
-  void initializeDistributedActorImplicitStorageInit(
+  /// Initializes the implicit stored properties of a distributed actor that correspond to
+  /// its transport and identity.
+  void emitDistributedActorImplicitPropertyInits(
       ConstructorDecl *ctor, ManagedValue selfArg);
+
+  /// Initializes just the implicit identity property of a distributed actor.
+  /// \param selfVal a value corresponding to the actor's self
+  /// \param actorSystemVal a value corresponding to the actorSystem, to be used
+  /// to invoke its \p assignIdentity method.
+  void emitDistActorIdentityInit(ConstructorDecl *ctor,
+                                 SILLocation loc,
+                                 SILValue selfVal,
+                                 SILValue actorSystemVal);
 
   /// Given a function representing a distributed actor factory, emits the
   /// corresponding SIL function for it.
-  void emitDistributedActorFactory(FuncDecl *fd);
-
-  /// Generates a thunk from an actor function
-  void emitDistributedThunk(SILDeclRef thunk);
+  void emitDistributedActorFactory(
+      FuncDecl *fd); // TODO(distributed): this is the "resolve"
 
   /// Notify transport that actor has initialized successfully,
   /// and is ready to receive messages.
   void emitDistributedActorReady(
-      ConstructorDecl *ctor, ManagedValue selfArg);
-
-  /// Inject distributed actor and transport interaction code into the destructor.
-  void emitDistributedActor_resignAddress(
-      DestructorDecl *dd, SILValue selfValue, SILBasicBlock *continueBB);
+      SILLocation loc, ConstructorDecl *ctor, ManagedValue actorSelf);
+  
+  /// For a distributed actor, emits code to invoke the system's
+  /// resignID function.
+  ///
+  /// Specifically, this code emits SIL that performs the call
+  ///
+  /// \verbatim
+  ///   self.actorSystem.resignID(self.id)
+  /// \endverbatim
+  ///
+  /// using the current builder's state as the injection point.
+  ///
+  /// \param actorDecl the declaration corresponding to the actor
+  /// \param actorSelf the SIL value representing the distributed actor instance
+  void emitDistributedActorSystemResignIDCall(SILLocation loc,
+                              ClassDecl *actorDecl, ManagedValue actorSelf);
+  
+  /// Emit code that tests whether the distributed actor is local, and if so,
+  /// resigns the distributed actor's identity.
+  /// \param continueBB the target block where execution will continue after
+  ///                   the conditional call, whether actor is local or remote.
+  void emitConditionalResignIdentityCall(SILLocation loc,
+                                         ClassDecl *actorDecl,
+                                         ManagedValue actorSelf,
+                                         SILBasicBlock *continueBB);
 
   void emitDistributedActorClassMemberDestruction(
       SILLocation cleanupLoc, ManagedValue selfValue, ClassDecl *cd,

@@ -58,6 +58,9 @@ class ModuleFileSharedCore {
   /// The target the module was built for.
   StringRef TargetTriple;
 
+  /// The canonical name of the SDK the module was built with.
+  StringRef SDKName;
+
   /// The name of the module interface this module was compiled from.
   ///
   /// Empty if this module didn't come from an interface file.
@@ -81,6 +84,9 @@ class ModuleFileSharedCore {
 
   /// \c true if this module has incremental dependency information.
   bool HasIncrementalInfo = false;
+
+  /// \c true if this module was compiled with -enable-ossa-modules.
+  bool RequiresOSSAModules;
 
 public:
   /// Represents another module that has been imported as a dependency.
@@ -143,7 +149,7 @@ private:
   SmallVector<Dependency, 8> Dependencies;
 
   struct SearchPath {
-    StringRef Path;
+    std::string Path;
     bool IsFramework;
     bool IsSystem;
   };
@@ -197,8 +203,8 @@ private:
   /// Local DeclContexts referenced by this module.
   ArrayRef<RawBitOffset> LocalDeclContexts;
 
-  /// Normal protocol conformances referenced by this module.
-  ArrayRef<RawBitOffset> NormalConformances;
+  /// Protocol conformances referenced by this module.
+  ArrayRef<RawBitOffset> Conformances;
 
   /// SILLayouts referenced by this module.
   ArrayRef<RawBitOffset> SILLayouts;
@@ -324,10 +330,13 @@ private:
     unsigned ArePrivateImportsEnabled : 1;
 
     /// Whether this module file is actually a .sib file.
-    unsigned IsSIB: 1;
+    unsigned IsSIB : 1;
 
     /// Whether this module is compiled as static library.
-    unsigned IsStaticLibrary: 1;
+    unsigned IsStaticLibrary : 1;
+
+    /// Whether this module was built with -experimental-hermetic-seal-at-link.
+    unsigned HasHermeticSealAtLink : 1;
 
     /// Whether this module file is compiled with '-enable-testing'.
     unsigned IsTestable : 1;
@@ -360,10 +369,12 @@ private:
   }
 
   /// Constructs a new module and validates it.
-  ModuleFileSharedCore(std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
-                 std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
-                 std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
-                 bool isFramework, serialization::ValidationInfo &info);
+  ModuleFileSharedCore(
+      std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
+      std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
+      std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
+      bool isFramework, bool requiresOSSAModules, StringRef requiredSDK,
+      serialization::ValidationInfo &info, PathObfuscator &pathRecoverer);
 
   /// Change the status of the current module.
   Status error(Status issue) {
@@ -453,7 +464,7 @@ private:
   /// Loads data from #ModuleDocInputBuffer.
   ///
   /// Returns false if there was an error.
-  bool readModuleDocIfPresent();
+  bool readModuleDocIfPresent(PathObfuscator &pathRecoverer);
 
   /// Reads the source loc block, which contains USR to decl location mapping.
   ///
@@ -463,7 +474,7 @@ private:
   /// Loads data from #ModuleSourceInfoInputBuffer.
   ///
   /// Returns false if there was an error.
-  bool readModuleSourceInfoIfPresent();
+  bool readModuleSourceInfoIfPresent(PathObfuscator &pathRecoverer);
 
   /// Read an on-disk decl hash table stored in
   /// \c sourceinfo_block::DeclUSRSLayout format.
@@ -488,6 +499,8 @@ public:
   /// of the buffer, even if there's an error in loading.
   /// \param isFramework If true, this is treated as a framework module for
   /// linking purposes.
+  /// \param requiresOSSAModules If true, this requires dependent modules to be
+  /// compiled with -enable-ossa-modules.
   /// \param[out] theModule The loaded module.
   /// \returns Whether the module was successfully loaded, or what went wrong
   ///          if it was not.
@@ -496,12 +509,14 @@ public:
        std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
        std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
        std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
-       bool isFramework,
+       bool isFramework, bool requiresOSSAModules,
+       StringRef requiredSDK, PathObfuscator &pathRecoverer,
        std::shared_ptr<const ModuleFileSharedCore> &theModule) {
     serialization::ValidationInfo info;
     auto *core = new ModuleFileSharedCore(
         std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),
-        std::move(moduleSourceInfoInputBuffer), isFramework, info);
+        std::move(moduleSourceInfoInputBuffer), isFramework,
+        requiresOSSAModules, requiredSDK, info, pathRecoverer);
     if (!moduleInterfacePath.empty()) {
       ArrayRef<char> path;
       core->allocateBuffer(path, moduleInterfacePath);

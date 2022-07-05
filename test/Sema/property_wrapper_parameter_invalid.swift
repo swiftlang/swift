@@ -86,7 +86,7 @@ struct S {
   subscript(@Wrapper position: Int) -> Int { 0 }
 }
 
-func testInvalidArgLabel() {
+func testInvalidArgLabel(projection: Projection<Int>) {
   // expected-note@+1 2 {{parameter 'argLabel' does not have an attached property wrapper}}
   func noWrappers(argLabel: Int) {}
 
@@ -95,6 +95,11 @@ func testInvalidArgLabel() {
 
   // expected-error@+1 {{cannot use property wrapper projection argument}}
   noWrappers($argLabel: 10)
+
+  func takesWrapper(@Wrapper argLabel: Int) {}
+
+  // expected-error@+1 {{cannot convert value of type 'Projection<Int>' to expected argument type 'Int'}}
+  takesWrapper(argLabel: projection)
 }
 
 protocol P {

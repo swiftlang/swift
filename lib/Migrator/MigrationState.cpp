@@ -35,7 +35,7 @@ std::string MigrationState::getOutputText() const {
 static bool quickDumpText(StringRef OutFilename, StringRef Text) {
   std::error_code Error;
   llvm::raw_fd_ostream FileOS(OutFilename,
-                              Error, llvm::sys::fs::F_Text);
+                              Error, llvm::sys::fs::OF_Text);
   if (FileOS.has_error()) {
     return true;
   }

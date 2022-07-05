@@ -1,6 +1,7 @@
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
 include(SwiftTestUtils)
+include(Threading)
 
 function(swift_configure_lit_site_cfg source_path destination_path installed_name)
   if (CMAKE_CFG_INTDIR STREQUAL ".")
@@ -94,6 +95,7 @@ function(get_test_dependencies SDK result_var_name)
       llvm-profdata
       llvm-readelf
       llvm-readobj
+      llvm-size
       llvm-strings
       not
       split-file)
@@ -145,8 +147,12 @@ if(NOT SWIFT_INCLUDE_TOOLS)
   else()
     list(APPEND SWIFT_LIT_ARGS
       "--path=${SWIFT_NATIVE_LLVM_TOOLS_PATH}"
+      "--param" "swift_native_llvm_tools_path=${SWIFT_NATIVE_LLVM_TOOLS_PATH}"
       "--path=${SWIFT_NATIVE_CLANG_TOOLS_PATH}"
-      "--path=${SWIFT_NATIVE_SWIFT_TOOLS_PATH}")
+      "--param" "swift_native_clang_tools_path=${SWIFT_NATIVE_CLANG_TOOLS_PATH}"
+      "--path=${SWIFT_NATIVE_SWIFT_TOOLS_PATH}"
+      "--param" "swift_native_swift_tools_path=${SWIFT_NATIVE_SWIFT_TOOLS_PATH}"
+      )
   endif()
   if(SWIFT_BUILD_STDLIB)
     list(APPEND SWIFT_LIT_ARGS
@@ -159,13 +165,19 @@ if (SWIFT_TEST_USE_LEAKS)
   list(APPEND SWIFT_LIT_ARGS "--param" "leaks-all")
 endif()
 
+if (SWIFT_ENABLE_ARRAY_COW_CHECKS)
+  list(APPEND SWIFT_LIT_ARGS
+       "--param" "array_cow_checks")
+endif()
+
 if(NOT CMAKE_CFG_INTDIR STREQUAL ".")
   list(APPEND SWIFT_LIT_ARGS
        "--param" "build_mode=${CMAKE_CFG_INTDIR}")
 endif()
 
-if(SWIFT_TOOLS_ENABLE_LIBSWIFT)
-  list(APPEND SWIFT_LIT_ARGS "--param" "libswift")
+if (BOOTSTRAPPING_MODE)
+  list(APPEND SWIFT_LIT_ARGS
+       "--param" "bootstrapping_mode=${BOOTSTRAPPING_MODE}")
 endif()
 
 if (LLVM_USE_SANITIZER STREQUAL "Address")
@@ -183,14 +195,21 @@ normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
 normalize_boolean_spelling(SWIFT_BACK_DEPLOY_CONCURRENCY)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
+normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
 normalize_boolean_spelling(SWIFT_ENABLE_MACCATALYST)
 normalize_boolean_spelling(SWIFT_RUN_TESTS_WITH_HOST_COMPILER)
 normalize_boolean_spelling(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER)
 normalize_boolean_spelling(SWIFT_OPTIMIZED)
-normalize_boolean_spelling(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
+normalize_boolean_spelling(SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY)
+normalize_boolean_spelling(SWIFT_ENABLE_REFLECTION)
 normalize_boolean_spelling(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS)
+normalize_boolean_spelling(SWIFT_STDLIB_ENABLE_DEBUG_PRECONDITIONS_IN_RELEASE)
 normalize_boolean_spelling(SWIFT_HAVE_LIBXML2)
 normalize_boolean_spelling(SWIFT_INCLUDE_TOOLS)
+normalize_boolean_spelling(SWIFT_STDLIB_STATIC_PRINT)
+normalize_boolean_spelling(SWIFT_STDLIB_ENABLE_UNICODE_DATA)
+normalize_boolean_spelling(SWIFT_ENABLE_DISPATCH)
+normalize_boolean_spelling(SWIFT_STDLIB_ENABLE_OBJC_INTEROP)
 is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" SWIFT_OPTIMIZED)
 
 set(profdata_merge_worker
@@ -201,6 +220,7 @@ set(TEST_MODES
     optimize_none_with_implicit_dynamic
     optimize_with_implicit_dynamic
     only_executable only_non_executable
+    with_cxx_interop
 )
 set(TEST_SUBSETS
     primary
@@ -221,8 +241,8 @@ endif()
 foreach(SDK ${SWIFT_SDKS})
   foreach(ARCH ${SWIFT_SDK_${SDK}_ARCHITECTURES})
     # macCatalyst needs to run two sets of tests: one with the normal macosx target triple
-    # and one with the the macCatalyst ios-macabi triple.  The build_flavors list will
-    # have have only the "default" flavor for all SDKs and architectures except
+    # and one with the macCatalyst ios-macabi triple.  The build_flavors list will
+    # have only the "default" flavor for all SDKs and architectures except
     # OSX when macCatalyst support is enabled.
     get_swift_test_build_flavors(build_flavors "${SDK}")
 
@@ -278,7 +298,7 @@ foreach(SDK ${SWIFT_SDKS})
             "swift-test-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
 
         if(BUILD_FLAVOR STREQUAL "ios-like")
-          # When testing the iOS-like build flavor, use the the normal macOS
+          # When testing the iOS-like build flavor, use the normal macOS
           # swift-reflection-test-tool. That tool runs out of process so it
           # doesn't need to be build for macCatalyst.
           list(APPEND test_dependencies
@@ -293,9 +313,11 @@ foreach(SDK ${SWIFT_SDKS})
         list(APPEND test_dependencies "touch-covering-tests")
       endif()
 
-      set(validation_test_dependencies
-          "swiftStdlibCollectionUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}"
-          "swiftStdlibUnicodeUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
+      list(APPEND test_dependencies
+        "swiftStdlibCollectionUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}"
+        "swiftStdlibUnicodeUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
+
+      set(validation_test_dependencies)
 
       set(command_upload_stdlib)
       set(command_upload_swift_reflection_test)
@@ -326,13 +348,7 @@ foreach(SDK ${SWIFT_SDKS})
                 --destination "${SWIFT_ANDROID_DEPLOY_DEVICE_PATH}"
                 --destination-arch "${ARCH}"
                 # Build products like libswiftCore.so.
-                "${SWIFTLIB_DIR}/android"
-                # These two directories may contain the same libraries,
-                # but upload both to device just in case. Duplicates will be
-                # overwritten, and uploading doesn't take very long anyway.
-                "${SWIFT_ANDROID_${ARCH}_ICU_UC}"
-                "${SWIFT_ANDROID_${ARCH}_ICU_I18N}"
-                "${SWIFT_ANDROID_${ARCH}_ICU_DATA}")
+                "${SWIFTLIB_DIR}/android")
       endif()
       add_custom_target("upload-stdlib${VARIANT_SUFFIX}"
           ${command_upload_stdlib}
@@ -373,6 +389,18 @@ foreach(SDK ${SWIFT_SDKS})
 
         if(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
           list(APPEND LIT_ARGS "--param" "distributed")
+        endif()
+
+        if(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
+          list(APPEND LIT_ARGS "--param" "string_processing")
+        endif()
+
+        if("${SWIFT_SDK_${SDK}_THREADING_PACKAGE}")
+          list(APPEND LIT_ARGS "--param" "threading=${SWIFT_SDK_${SDK}_THREADING_PACKAGE}")
+        else()
+          threading_package_default("${SDK}" SWIFT_THREADING_PACKAGE)
+          list(APPEND LIT_ARGS "--param"
+            "threading=${SWIFT_THREADING_PACKAGE}")
         endif()
 
         foreach(test_subset ${TEST_SUBSETS})

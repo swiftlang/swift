@@ -12,7 +12,7 @@
 // Likewise, negative tests check for the existence of
 // Array.append(contentsOf:), so don't inline those either.
 
-// CHECK-LABEL: sil @{{.*}}testInt
+// CHECK-LABEL: sil {{.*}}@{{.*}}testInt
 // CHECK-NOT: apply
 // CHECK:        [[F:%[0-9]+]] = function_ref @$sSa6appendyyxnFSi_Tg5
 // CHECK-NOT: apply
@@ -23,7 +23,7 @@ public func testInt(_ a: inout [Int]) {
   a += [1]
 }
 
-// CHECK-LABEL: sil @{{.*}}testThreeInts
+// CHECK-LABEL: sil {{.*}}@{{.*}}testThreeInts
 // CHECK-DAG:    [[FR:%[0-9]+]] = function_ref @${{.*(reserveCapacity|_createNewBuffer)}}
 // CHECK-DAG:    apply [[FR]]
 // CHECK-DAG:    [[F:%[0-9]+]] = function_ref @$sSa6appendyyxnFSi_Tg5
@@ -35,7 +35,7 @@ public func testThreeInts(_ a: inout [Int]) {
   a += [1, 2, 3]
 }
 
-// CHECK-LABEL: sil @{{.*}}testTooManyInts
+// CHECK-LABEL: sil {{.*}}@{{.*}}testTooManyInts
 // CHECK-NOT: apply
 // CHECK:        [[F:%[0-9]+]] = function_ref  @${{.*append.*contentsOf.*}}
 // CHECK-NOT: apply
@@ -46,7 +46,7 @@ public func testTooManyInts(_ a: inout [Int]) {
   a += [1, 2, 3, 4, 5, 6, 7]
 }
 
-// CHECK-LABEL: sil @{{.*}}testString
+// CHECK-LABEL: sil {{.*}}@{{.*}}testString
 // CHECK-NOT: apply
 // CHECK:        [[F:%[0-9]+]] = function_ref @$sSa6appendyyxnFSS_Tg5
 // CHECK-NOT: apply
@@ -73,9 +73,6 @@ public func dontPropagateContiguousArray(_ a: inout ContiguousArray<UInt8>) {
 // CHECK: [[F:%[0-9]+]] = function_ref @{{.*(_consumeAndCreateNew|reserveCapacity).*}}
 // CHECK-NEXT: apply [[F]]
 // CHECK-NOT: apply
-
-// The number of basic blocks should not exceed 20 (ideally there are no more than 16 blocks in this function).
-// CHECK-NOT: bb20:
 
 // CHECK: } // end sil function '$sSa6append10contentsOfyqd__n_t7ElementQyd__RszSTRd__lFSi_SaySiGTg5
 

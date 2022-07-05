@@ -37,6 +37,10 @@ struct A {
   var i : Builtin.Int32
 }
 
+struct A2 {
+  var i : Builtin.Int32
+}
+
 struct AA {
   var a : A
   var i : Builtin.Int32
@@ -156,6 +160,22 @@ bb0(%0 : @owned $AB):
   %22 = function_ref @use_Int : $@convention(thin) (Int) -> ()
   apply %22(%3) : $@convention(thin) (Int) -> ()
   apply %22(%5) : $@convention(thin) (Int) -> ()
+  return %5 : $Int
+}
+
+// CHECK-LABEL: sil [ossa] @forward_load_of_immutable_class_property
+// CHECK:     [[L:%[0-9]+]] = load
+// CHECK:     apply %{{[0-9]+}}([[L]])
+// CHECK-NOT: load
+// CHECK:     return [[L]]
+// CHECK-LABEL: } // end sil function 'forward_load_of_immutable_class_property'
+sil [ossa] @forward_load_of_immutable_class_property : $@convention(thin) (@guaranteed AB) -> Int {
+bb0(%0 : @guaranteed $AB):
+  %1 = ref_element_addr [immutable] %0 : $AB, #AB.value
+  %2 = load [trivial] %1 : $*Int
+  %3 = function_ref @use_Int : $@convention(thin) (Int) -> ()
+  apply %3(%2) : $@convention(thin) (Int) -> ()
+  %5 = load [trivial] %1 : $*Int
   return %5 : $Int
 }
 
@@ -1344,7 +1364,90 @@ bb0:
   %5 = load [trivial] %4 : $*Int32
   end_borrow %borrow1 : $AX
   set_deallocating %1 : $AX
-  dealloc_ref [stack] %1 : $AX
+  dealloc_ref %1 : $AX
+  dealloc_stack_ref %1 : $AX
   return %5 : $Int32
 }
 
+// CHECK: sil @tbaa_class_alias_nonclass
+// CHECK: strong_retain [[RET:%[0-9]+]]
+// CHECK: strong_retain [[RET]]
+// CHECK: return
+sil @tbaa_class_alias_nonclass : $@convention(thin) (@owned B, @inout Agg1) -> () {
+bb0(%0 : $B, %1 : $*Agg1):
+  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <B>
+  %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <B>, 0
+  %3 = load %1 : $*Agg1
+  store %3 to %1 : $*Agg1
+  %5 = load %2a : $*B
+  store %3 to %1 : $*Agg1
+  %7 = load %2a : $*B
+  strong_retain %5 : $B   //%7 and %5 should really be one load.
+  strong_retain %7 : $B
+  %10 = tuple()
+  return %10 : $()
+}
+
+// TODO: When RLE uses TBAA it should remove the second load.
+//
+// CHECK: sil @tbaa_struct
+// CHECK: load
+// CHECK: store
+// CHECK: load
+// CHECK: return
+sil @tbaa_struct : $@convention(thin) (Builtin.RawPointer, A2) -> (A, A) {
+bb0(%0 : $Builtin.RawPointer, %1 : $A2):
+  %2 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*A
+  %3 = load %2 : $*A
+  %5 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*A2
+  store %1 to %5 : $*A2
+  %20 = load %2 : $*A
+  %30 = tuple(%3 : $A, %20 : $A)
+  return %30 : $(A, A)
+}
+
+// TODO: Even with TBAA, RLE should not remove the second load.
+//
+// CHECK: sil @tbaa_bind_memory
+// CHECK: load
+// CHECK: bind_memory
+// CHECK: store
+// CHECK: bind_memory
+// CHECK: load
+// CHECK: return
+sil @tbaa_bind_memory : $@convention(thin) (Builtin.RawPointer, A2) -> (A, A) {
+bb0(%0 : $Builtin.RawPointer, %1 : $A2):
+  %2 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*A
+  %3 = load %2 : $*A
+  %4 = integer_literal $Builtin.Word, 1
+  %5 = bind_memory %0 : $Builtin.RawPointer, %4 : $Builtin.Word to $A2
+  %6 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*A2
+  store %1 to %6 : $*A2
+  %8 = bind_memory %0 : $Builtin.RawPointer, %4 : $Builtin.Word to $A
+  %20 = load %2 : $*A
+  %30 = tuple(%3 : $A, %20 : $A)
+  return %30 : $(A, A)
+}
+
+// TODO: Even with TBAA, RLE should not remove the second load.
+//
+// CHECK: sil @tbaa_rebind_memory
+// CHECK: load
+// CHECK: bind_memory
+// CHECK: store
+// CHECK: bind_memory
+// CHECK: load
+// CHECK: return
+sil @tbaa_rebind_memory : $@convention(thin) (Builtin.RawPointer, A2) -> (A, A) {
+bb0(%0 : $Builtin.RawPointer, %1 : $A2):
+  %2 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*A
+  %3 = load %2 : $*A
+  %4 = integer_literal $Builtin.Word, 1
+  %5 = bind_memory %0 : $Builtin.RawPointer, %4 : $Builtin.Word to $A2
+  %6 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*A2
+  store %1 to %6 : $*A2
+  %8 = rebind_memory %0 : $Builtin.RawPointer to %5 : $Builtin.Word
+  %20 = load %2 : $*A
+  %30 = tuple(%3 : $A, %20 : $A)
+  return %30 : $(A, A)
+}

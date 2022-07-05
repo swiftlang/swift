@@ -1,6 +1,4 @@
-#!/usr/bin/env python
-from __future__ import print_function
-
+#!/usr/bin/env python3
 import argparse
 import os
 import subprocess
@@ -9,7 +7,7 @@ import sys
 
 def run_cmd(cmd, desc):
     try:
-        return subprocess.check_output(cmd)
+        return subprocess.check_output(cmd, universal_newlines=True)
     except subprocess.CalledProcessError:
         print('FAILED ' + desc + ':', file=sys.stderr)
         print(' '.join(cmd), file=sys.stderr)
@@ -33,6 +31,7 @@ def parse_args():
          - swift-refactor
          - temp-dir
          - enable-experimental-concurrency (sent to both)
+         - enable-experimental-string-processing (sent to both)
          - I (sent to both)
          - sdk (sent to both)
          - target (sent to both)
@@ -75,6 +74,14 @@ def parse_args():
         '''
     )
     parser.add_argument(
+        '-enable-experimental-string-processing',
+        action='store_true',
+        help='''
+        Whether to enable experimental string processing in both swift-refactor
+        and swift-frontend
+        '''
+    )
+    parser.add_argument(
         '-I',
         action='append',
         help='Add a directory to the import search path'
@@ -87,6 +94,9 @@ def parse_args():
         '-target',
         help='The target triple to build for'
     )
+    parser.add_argument(
+        '-resource-dir',
+        help='The resource dir where the stdlib is stored')
 
     return parser.parse_known_args()
 
@@ -100,6 +110,8 @@ def main():
     extra_both_args = []
     if args.enable_experimental_concurrency:
         extra_both_args.append('-enable-experimental-concurrency')
+    if args.enable_experimental_string_processing:
+        extra_both_args.append('-enable-experimental-string-processing')
     if args.I:
         for path in args.I:
             extra_both_args += ['-I', path]
@@ -107,6 +119,8 @@ def main():
         extra_both_args += ['-sdk', args.sdk]
     if args.target:
         extra_both_args += ['-target', args.target]
+    if args.resource_dir:
+        extra_both_args += ['-resource-dir', args.resource_dir]
 
     dump_text_output = run_cmd([
         args.swift_refactor,
@@ -114,7 +128,7 @@ def main():
         '-source-filename', args.source_filename,
         '-rewritten-output-file', temp_file_path,
         '-pos', args.pos
-    ] + extra_refactor_args + extra_both_args, desc='producing edit').decode("utf-8")
+    ] + extra_refactor_args + extra_both_args, desc='producing edit')
     sys.stdout.write(dump_text_output)
 
     run_cmd([

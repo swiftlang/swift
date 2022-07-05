@@ -835,7 +835,6 @@ func testPreserveComments2() {
 // PRESERVE-COMMENTS-ERROR-NEXT:   // f
 // PRESERVE-COMMENTS-ERROR-NEXT:   print("fun")
 // PRESERVE-COMMENTS-ERROR-NEXT:   // g
-// PRESERVE-COMMENTS-ERROR-NEXT:  {{ }}
 // PRESERVE-COMMENTS-ERROR-NEXT: }
 
 // RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=PRESERVE-TRAILING-COMMENT-FN %s

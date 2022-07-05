@@ -103,7 +103,7 @@ func test_various_situations_converting_to_double() {
 }
 
 func test_conversions_with_optionals(v: CGFloat?) {
-  // CHECK: function_ref @$s34implicit_double_cgfloat_conversion31test_conversions_with_optionals1vy12CoreGraphics7CGFloatVSg_tFAFyKXEfu_ : $@convention(thin) () -> (CGFloat, @error Error)
+  // CHECK: function_ref @$s34implicit_double_cgfloat_conversion31test_conversions_with_optionals1vy12CoreGraphics7CGFloatVSg_tFAFyKXEfu_
   // CHECK: function_ref @$sSd12CoreGraphicsEySdAA7CGFloatVcfC : $@convention(method) (CGFloat, @thin Double.Type) -> Double
   let _: Double = (v ?? 0)
 }
@@ -149,7 +149,7 @@ func test_narrowing_is_delayed(x: Double, y: CGFloat) {
   // CHECK: function_ref @$s34implicit_double_cgfloat_conversion25test_narrowing_is_delayed1x1yySd_12CoreGraphics7CGFloatVtF10overloadedL_yS2d_SdtF
   // CHECK: @$s34implicit_double_cgfloat_conversion25test_narrowing_is_delayed1x1yySd_12CoreGraphics7CGFloatVtF10overloadedL_yS2d_SdtF
   // CHECK: function_ref @$s12CoreGraphics7CGFloatVyACSdcf
-  let _: CGFloat = overloaded(x, overloaded(x, y)) // Prefers `overloaded(Double, Double) -> Double` in both occurances.
+  let _: CGFloat = overloaded(x, overloaded(x, y)) // Prefers `overloaded(Double, Double) -> Double` in both occurrences.
 
   // Calls should behave exactly the same as contextual conversions.
 
@@ -194,18 +194,25 @@ func test_no_ambiguity_with_unary_operators(width: CGFloat, height: CGFloat) {
 }
 
 func test_conversions_with_optional_promotion(d: Double, cgf: CGFloat) {
-  func test_double(_: Double??) {}
-  func test_cgfloat(_: CGFloat??) {}
+  func test_double(_: Double??, _: Double???) {}
+  func test_cgfloat(_: CGFloat??, _: CGFloat???) {}
 
   // CHECK: function_ref @$sSd12CoreGraphicsEySdAA7CGFloatVcfC
   // CHECK-NEXT: apply
   // CHECK-NEXT: enum $Optional<Double>, #Optional.some!enumelt
   // CHECK-NEXT: enum $Optional<Optional<Double>>, #Optional.some!enumelt
-  test_double(cgf)
+  test_double(cgf, cgf)
 
   // CHECK: function_ref @$s12CoreGraphics7CGFloatVyACSdcfC
   // CHECK-NEXT: apply
   // CHECK-NEXT: enum $Optional<CGFloat>, #Optional.some!enumelt
   // CHECK-NEXT: enum $Optional<Optional<CGFloat>>, #Optional.some!enumelt
-  test_cgfloat(d)
+  test_cgfloat(d, d)
+}
+
+// https://github.com/apple/swift/issues/59374
+func test_multi_argument_conversion_with_optional(d: Double, cgf: CGFloat) {
+  func test(_: Double, _: CGFloat?) {}
+
+  test(cgf, d) // Ok (CGFloat -> Double and Double? -> CGFloat?)
 }

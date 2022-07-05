@@ -1,0 +1,68 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -enable-lexical-lifetimes %s -mem2reg
+
+// Make sure we are not crashing on blocks that are not dominated by the entry block.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// CHECK-LABEL: sil [ossa] @_TF4main3fooFT1xSi1ySi_Si : 
+// CHECK-NEXT: alloc_stack
+// CHECK-LABEL: } // end sil function '_TF4main3fooFT1xSi1ySi_Si'
+sil [ossa] @_TF4main3fooFT1xSi1ySi_Si : $@convention(thin) (Int32, Int32) -> Int32 {
+bb0(%0 : $Int32, %1 : $Int32):
+  debug_value %0 : $Int32, let, name "x"
+  debug_value %1 : $Int32, let, name "y"
+  %4 = alloc_stack [lexical] $Int32, var, name "g"
+  %6 = struct_extract %1 : $Int32, #Int32._value
+  %7 = struct_extract %0 : $Int32, #Int32._value
+  %8 = builtin "cmp_sgt_Word"(%6 : $Builtin.Int32, %7 : $Builtin.Int32) : $Builtin.Int1
+  %9 = struct $Bool (%8 : $Builtin.Int1)
+  %10 = struct_extract %9 : $Bool, #Bool._value
+  br bb2
+
+// bb1 is unreachable
+// CHECK-LABEL: bb1:
+// CHECK-NEXT: br bb3
+bb1:
+  %12 = integer_literal $Builtin.Int32, 5
+  %13 = struct $Int32 (%12 : $Builtin.Int32)
+  store %13 to [trivial] %4 : $*Int32
+  br bb3
+
+bb2:
+  %16 = integer_literal $Builtin.Int32, 4
+  %17 = struct $Int32 (%16 : $Builtin.Int32)
+  store %17 to [trivial] %4 : $*Int32
+  br bb3
+
+bb3:
+  %20 = load [trivial] %4 : $*Int32
+  dealloc_stack %4 : $*Int32
+  return %20 : $Int32
+}
+
+struct S {}
+
+// CHECK-LABEL: sil hidden [ossa] @handle_unreachable :
+// CHECK-NOT: alloc_stack
+// CHECK: debug_value undef : $S, let, name "newvalue", argno 1
+// CHECK-LABEL: } // end sil function 'handle_unreachable'
+sil hidden [ossa] @handle_unreachable : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack [lexical] $S, var, name "x"
+  %1 = struct $S ()
+  store %1 to [trivial] %0 : $*S
+  unreachable
+
+bb1:
+  debug_value %0 : $*S, let, name "newvalue", argno 1, expr op_deref
+  br bb2
+
+bb2:
+  %3 = load [trivial] %0 : $*S
+  dealloc_stack %0 : $*S
+  %4 = tuple ()
+  return %4 : $()
+}

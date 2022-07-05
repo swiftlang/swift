@@ -26,6 +26,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "llvm/ADT/SmallPtrSet.h"
 
@@ -210,6 +211,9 @@ public:
 bool hasConstantEvaluableAnnotation(SILFunction *fun);
 
 bool isConstantEvaluable(SILFunction *fun);
+
+/// Return true iff the \p applySite is constant-evaluable and read-only.
+bool isReadOnlyConstantEvaluableCall(FullApplySite applySite);
 
 /// Return true if and only if the given function \p fun is specially modeled
 /// by the constant evaluator. These are typically functions in the standard

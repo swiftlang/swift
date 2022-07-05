@@ -270,6 +270,129 @@ extension X where Self : GenericClass<String> {
 }
 
 //--------------------------------------------------------------------
+// Constructor-specific ranking
+//--------------------------------------------------------------------
+
+// We have a special ranking rule that only currently applies to constructors,
+// and compares the concrete parameter types.
+
+protocol Q {
+  init()
+}
+
+struct S1<T : Q> {
+  // We want to prefer the non-optional init over the optional init here.
+  init(_ x: T = .init()) {}
+  init(_ x: T? = nil) {}
+
+  // CHECK-LABEL: sil hidden [ossa] @$s7ranking2S1V11testRankingACyxGyt_tcfC
+  init(testRanking: Void) {
+    // CHECK: function_ref @$s7ranking2S1VyACyxGxcfC : $@convention(method) <τ_0_0 where τ_0_0 : Q> (@in τ_0_0, @thin S1<τ_0_0>.Type) -> S1<τ_0_0>
+    self.init()
+  }
+
+  // CHECK-LABEL: sil hidden [ossa] @$s7ranking2S1V15testInitRankingyyF
+  func testInitRanking() {
+    // CHECK: function_ref @$s7ranking2S1VyACyxGxcfC : $@convention(method) <τ_0_0 where τ_0_0 : Q> (@in τ_0_0, @thin S1<τ_0_0>.Type) -> S1<τ_0_0>
+    _ = S1<T>()
+  }
+}
+
+protocol R {}
+extension Array : R {}
+extension Int : R {}
+
+struct S2 {
+  init(_ x: R) {}
+  init(_ x: Int...) {}
+
+  // CHECK-LABEL: sil hidden [ossa] @$s7ranking2S2V15testInitRankingyyF
+  func testInitRanking() {
+    // We currently prefer the non-variadic init due to having
+    // "less effective parameters", and we don't compare the types for ranking due
+    // to the difference in variadic-ness.
+    // CHECK: function_ref @$s7ranking2S2VyAcA1R_pcfC : $@convention(method) (@in R, @thin S2.Type) -> S2
+    _ = S2(0)
+  }
+}
+
+// Very cursed: As a holdover from how we used to represent function inputs,
+// we rank these as tuples and consider (x:x:) to be a subtype of (x:y:). Seems
+// unlikely this is being relied on in the real world, but let's at least have
+// it as a test case to track its behavior.
+struct S3 {
+  init(x _: Int = 0, y _: Int = 0) {}
+  init(x _: Int = 0, x _: Int = 0) {}
+
+  func testInitRanking() {
+    // CHECK: function_ref @$s7ranking2S3V1xAdCSi_SitcfC : $@convention(method) (Int, Int, @thin S3.Type) -> S3
+    _ = S3()
+  }
+}
+
+// Also another consequence of having ranked as tuples: we prefer the unlabeled
+// init here.
+struct S4 {
+  init(x: Int = 0, y: Int = 0) {}
+  init(_ x: Int = 0, _ y: Int = 0) {}
+
+  // CHECK-LABEL: sil hidden [ossa] @$s7ranking2S4V15testInitRankingyyF
+  func testInitRanking() {
+    // CHECK: function_ref @$s7ranking2S4VyACSi_SitcfC : $@convention(method) (Int, Int, @thin S4.Type) -> S4
+    _ = S4()
+  }
+}
+
+// rdar://84279742 – Make sure we prefer the unlabeled init here.
+struct S5 {
+  init(x: Int...) {}
+  init(_ x: Int...) {}
+
+  // CHECK-LABEL: sil hidden [ossa] @$s7ranking2S5V15testInitRankingyyF
+  func testInitRanking() {
+    // CHECK: function_ref @$s7ranking2S5VyACSid_tcfC : $@convention(method) (@owned Array<Int>, @thin S5.Type) -> S5
+    _ = S5()
+  }
+}
+
+// We should also prefer the unlabeled case here.
+struct S6 {
+  init(_: Int = 0, x: Int...) {}
+  init(_: Int = 0, _: Int...) {}
+
+  // CHECK-LABEL: sil hidden [ossa] @$s7ranking2S6V15testInitRankingyyF
+  func testInitRanking() {
+    // CHECK: function_ref @$s7ranking2S6VyACSi_SidtcfC : $@convention(method) (Int, @owned Array<Int>, @thin S6.Type) -> S6
+    _ = S6()
+  }
+}
+
+// However subtyping rules take precedence over labeling rules, so we should
+// prefer the labeled init here.
+struct S7 {
+  init(x: Int...) {}
+  init(_: Int?...) {}
+
+  // CHECK-LABEL: sil hidden [ossa] @$s7ranking2S7V15testInitRankingyyF
+  func testInitRanking() {
+    // CHECK: function_ref @$s7ranking2S7V1xACSid_tcfC : $@convention(method) (@owned Array<Int>, @thin S7.Type) -> S7
+    _ = S7()
+  }
+}
+
+// Subtyping rules also let us prefer the Int... init here.
+struct S8 {
+  init(_: Int?...) {}
+  init(_: Int...) {}
+
+  // CHECK-LABEL: sil hidden [ossa] @$s7ranking2S8V15testInitRankingyyF
+  func testInitRanking() {
+    // CHECK: function_ref @$s7ranking2S8VyACSid_tcfC : $@convention(method) (@owned Array<Int>, @thin S8.Type) -> S8
+    _ = S8()
+  }
+}
+
+//--------------------------------------------------------------------
 // Pointer conversions
 //--------------------------------------------------------------------
 
@@ -286,4 +409,34 @@ struct UnsafePointerStruct {
 func useUnsafePointerStruct<U>(_ ptr: UnsafePointer<U>) {
   // CHECK: function_ref @$s7ranking19UnsafePointerStructVyACSPyxGclufC : $@convention(method) <τ_0_0> (UnsafePointer<τ_0_0>, @thin UnsafePointerStruct.Type) -> UnsafePointerStruct
   let _: UnsafePointerStruct = UnsafePointerStruct(ptr)
+}
+
+/// Archetype vs. non-archetype (expect placeholder)
+
+protocol SignalProtocol {
+  associatedtype Element
+  associatedtype Error: Swift.Error
+}
+
+struct Signal<Element, Error: Swift.Error>: SignalProtocol {
+  init<S: Sequence>(sequence: S) where S.Iterator.Element == Element {
+  }
+}
+
+extension SignalProtocol where Element: SignalProtocol, Element.Error == Error {
+  typealias InnerElement = Element.Element
+
+  func flatten() -> Signal<InnerElement, Error> {
+    fatalError()
+  }
+}
+
+extension SignalProtocol where Element: SignalProtocol, Error == Never {
+  func flatten() -> Signal<Element.Element, Element.Error> {
+    fatalError()
+  }
+}
+
+func no_ambiguity_error_vs_never<Element, Error>(_ signals: [Signal<Element, Error>]) -> Signal<Element, Error> {
+  return Signal(sequence: signals).flatten() // Ok
 }

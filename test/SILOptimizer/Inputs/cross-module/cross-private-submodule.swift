@@ -12,6 +12,7 @@ public struct PrivateStr {
   }
 }
 
+@inline(never)
 public func privateFunc() -> Int {
   return 40
 }

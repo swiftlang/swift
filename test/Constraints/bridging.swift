@@ -308,7 +308,7 @@ func rdar20029786(_ ns: NSString?) {
 
 // Make sure more complicated cast has correct parenthesization
 func castMoreComplicated(anInt: Int?) {
-  let _: (NSObject & NSCopying)? = anInt // expected-error{{cannot convert value of type 'Int?' to specified type '(NSObject & NSCopying)?'}}{{41-41= as (NSObject & NSCopying)?}}
+  let _: (NSObject & NSCopying)? = anInt // expected-error{{cannot convert value of type 'Int?' to specified type '(any NSObject & NSCopying)?'}}{{41-41= as (any NSObject & NSCopying)?}}
 }
 
 
@@ -393,4 +393,17 @@ func rdar60501780() {
   func bar(_ v: String) {
     foo(["": "", "": v as NSString])
   }
+}
+
+// SR-15161
+func SR15161_as(e: Error?) {
+  let _ = e as? NSError // Ok
+}
+
+func SR15161_is(e: Error?) {
+  _ = e is NSError // expected-warning{{checking a value with optional type '(any Error)?' against type 'NSError' succeeds whenever the value is non-nil; did you mean to use '!= nil'?}}
+}
+
+func SR15161_as_1(e: Error?) {
+  let _ = e as! NSError // expected-warning{{forced cast from '(any Error)?' to 'NSError' only unwraps and bridges; did you mean to use '!' with 'as'?}}
 }

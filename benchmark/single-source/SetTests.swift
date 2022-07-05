@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -25,11 +25,13 @@ let setAB = Set(0 ..< size)                              //   0 ..< 400
 let setCD = Set(size ..< 2 * size)                       // 400 ..< 800
 let setBC = Set(size - quarter ..< 2 * size - quarter)   // 300 ..< 700
 let setB = Set(size - quarter ..< size)                  // 300 ..< 400
+let setCDS = Set(size ..< (size + (size/4)))             // 400 ..< 500
 
 let setOAB = Set(setAB.map(Box.init))
 let setOCD = Set(setCD.map(Box.init))
 let setOBC = Set(setBC.map(Box.init))
 let setOB = Set(setB.map(Box.init))
+let setOCDS = Set(setCDS.map(Box.init))
 
 let countA = size - quarter        // 300
 let countB = quarter               // 100
@@ -90,7 +92,7 @@ func setBox(_ size: Int) {
 }
 
 
-public let SetTests = [
+public let benchmarks = [
   // Mnemonic: number after name is percentage of common elements in input sets.
   BenchmarkInfo(
     name: "Set.isSubset.Empty.Int",
@@ -368,6 +370,16 @@ public let SetTests = [
     runFunction: { n in run_SetIsDisjointBox(setOAB, setOCD, true, 50 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setOAB, setOCD]) }),
+  BenchmarkInfo(
+    name: "Set.isDisjoint.Smaller.Int0",
+    runFunction: { n in run_SetIsDisjointIntCommutative(setAB, setCDS, true, 50 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setAB, setCDS]) }),
+  BenchmarkInfo(
+    name: "Set.isDisjoint.Smaller.Box0",
+    runFunction: { n in run_SetIsDisjointBoxCommutative(setOAB, setOCDS, true, 50 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setOAB, setOCDS]) }),
   BenchmarkInfo(
     name: "Set.isDisjoint.Int25",
     runFunction: { n in run_SetIsDisjointInt(setB, setAB, false, 5000 * n) },
@@ -743,7 +755,7 @@ public func run_SetIsSubsetInt(
   _ n: Int) {
   for _ in 0 ..< n {
     let isSubset = a.isSubset(of: identity(b))
-    CheckResults(isSubset == r)
+    check(isSubset == r)
   }
 }
 
@@ -755,7 +767,7 @@ public func run_SetIsSubsetSeqInt(
   _ n: Int) {
   for _ in 0 ..< n {
     let isSubset = a.isSubset(of: identity(b))
-    CheckResults(isSubset == r)
+    check(isSubset == r)
   }
 }
 
@@ -767,7 +779,7 @@ public func run_SetIsStrictSubsetInt(
   _ n: Int) {
   for _ in 0 ..< n {
     let isStrictSubset = a.isStrictSubset(of: identity(b))
-    CheckResults(isStrictSubset == r)
+    check(isStrictSubset == r)
   }
 }
 
@@ -779,7 +791,7 @@ public func run_SetIsStrictSubsetSeqInt(
   _ n: Int) {
   for _ in 0 ..< n {
     let isStrictSubset = a.isStrictSubset(of: identity(b))
-    CheckResults(isStrictSubset == r)
+    check(isStrictSubset == r)
   }
 }
 
@@ -791,7 +803,7 @@ public func run_SetIsSupersetSeqInt(
   _ n: Int) {
   for _ in 0 ..< n {
     let isSuperset = a.isSuperset(of: identity(b))
-    CheckResults(isSuperset == r)
+    check(isSuperset == r)
   }
 }
 
@@ -803,7 +815,7 @@ public func run_SetIsStrictSupersetSeqInt(
   _ n: Int) {
   for _ in 0 ..< n {
     let isStrictSuperset = a.isStrictSuperset(of: identity(b))
-    CheckResults(isStrictSuperset == r)
+    check(isStrictSuperset == r)
   }
 }
 
@@ -815,7 +827,7 @@ public func run_SetSymmetricDifferenceInt(
   _ n: Int) {
   for _ in 0 ..< n {
     let diff = a.symmetricDifference(identity(b))
-    CheckResults(diff.count == r)
+    check(diff.count == r)
   }
 }
 
@@ -827,7 +839,7 @@ public func run_SetUnionInt(
   _ n: Int) {
   for _ in 0 ..< n {
     let or = a.union(identity(b))
-    CheckResults(or.count == r)
+    check(or.count == r)
   }
 }
 
@@ -839,7 +851,7 @@ public func run_SetIntersectionInt(
   _ n: Int) {
   for _ in 0 ..< n {
     let and = a.intersection(identity(b))
-    CheckResults(and.count == r)
+    check(and.count == r)
   }
 }
 
@@ -851,7 +863,7 @@ public func run_SetIntersectionSeqInt(
   _ n: Int) {
   for _ in 0 ..< n {
     let and = a.intersection(identity(b))
-    CheckResults(and.count == r)
+    check(and.count == r)
   }
 }
 
@@ -863,7 +875,7 @@ public func run_SetSubtractingInt(
   _ n: Int) {
   for _ in 0 ..< n {
     let and = a.subtracting(identity(b))
-    CheckResults(and.count == r)
+    check(and.count == r)
   }
 }
 
@@ -875,7 +887,7 @@ public func run_SetSubtractingSeqInt(
   _ n: Int) {
   for _ in 0 ..< n {
     let and = a.subtracting(identity(b))
-    CheckResults(and.count == r)
+    check(and.count == r)
   }
 }
 
@@ -887,7 +899,23 @@ public func run_SetIsDisjointInt(
     _ n: Int) {
     for _ in 0 ..< n {
         let isDisjoint = a.isDisjoint(with: identity(b))
-        CheckResults(isDisjoint == r)
+        check(isDisjoint == r)
+    }
+}
+
+// Run isDisjoint Int switching the order of the two sets.  
+@inline(never)
+public func run_SetIsDisjointIntCommutative(
+    _ a: Set<Int>,
+    _ b: Set<Int>,
+    _ r: Bool,
+    _ n: Int) {
+    for _ in 0 ..< n {
+      let isDisjointA = a.isDisjoint(with: identity(b))
+      check(isDisjointA == r)
+  
+      let isDisjointB = b.isDisjoint(with: identity(a))
+      check(isDisjointB == r)
     }
 }
 
@@ -899,7 +927,7 @@ public func run_SetIsDisjointSeqInt(
     _ n: Int) {
     for _ in 0 ..< n {
         let isDisjoint = a.isDisjoint(with: identity(b))
-        CheckResults(isDisjoint == r)
+        check(isDisjoint == r)
     }
 }
 
@@ -907,7 +935,7 @@ public func run_SetIsDisjointSeqInt(
 public func run_SetFilterInt50(_ n: Int) {
   for _ in 0 ..< n {
     let half = set.filter { $0 % 2 == 0 }
-    CheckResults(set.count == half.count * 2)
+    check(set.count == half.count * 2)
   }
 }
 
@@ -915,7 +943,7 @@ public func run_SetFilterInt50(_ n: Int) {
 public func run_SetFilterInt100(_ n: Int) {
   for _ in 0 ..< n {
     let copy = set.filter { _ in true }
-    CheckResults(set.count == copy.count)
+    check(set.count == copy.count)
   }
 }
 
@@ -943,7 +971,7 @@ func run_SetIsSubsetBox(
   _ n: Int) {
   for _ in 0 ..< n {
     let isSubset = a.isSubset(of: identity(b))
-    CheckResults(isSubset == r)
+    check(isSubset == r)
   }
 }
 
@@ -955,7 +983,7 @@ func run_SetIsSubsetSeqBox(
   _ n: Int) {
   for _ in 0 ..< n {
     let isSubset = a.isSubset(of: identity(b))
-    CheckResults(isSubset == r)
+    check(isSubset == r)
   }
 }
 
@@ -967,7 +995,7 @@ func run_SetIsStrictSubsetBox(
   _ n: Int) {
   for _ in 0 ..< n {
     let isStrictSubset = a.isStrictSubset(of: identity(b))
-    CheckResults(isStrictSubset == r)
+    check(isStrictSubset == r)
   }
 }
 
@@ -979,7 +1007,7 @@ func run_SetIsStrictSubsetSeqBox(
   _ n: Int) {
   for _ in 0 ..< n {
     let isStrictSubset = a.isStrictSubset(of: identity(b))
-    CheckResults(isStrictSubset == r)
+    check(isStrictSubset == r)
   }
 }
 
@@ -991,7 +1019,7 @@ func run_SetIsSupersetSeqBox(
   _ n: Int) {
   for _ in 0 ..< n {
     let isSuperset = a.isSuperset(of: identity(b))
-    CheckResults(isSuperset == r)
+    check(isSuperset == r)
   }
 }
 
@@ -1003,7 +1031,7 @@ func run_SetIsStrictSupersetSeqBox(
   _ n: Int) {
   for _ in 0 ..< n {
     let isStrictSuperset = a.isStrictSuperset(of: identity(b))
-    CheckResults(isStrictSuperset == r)
+    check(isStrictSuperset == r)
   }
 }
 
@@ -1015,7 +1043,7 @@ func run_SetSymmetricDifferenceBox(
   _ n: Int) {
   for _ in 0 ..< n {
     let diff = a.symmetricDifference(identity(b))
-    CheckResults(diff.count == r)
+    check(diff.count == r)
   }
 }
 
@@ -1027,7 +1055,7 @@ func run_SetUnionBox(
   _ n: Int) {
   for _ in 0 ..< n {
     let or = a.union(identity(b))
-    CheckResults(or.count == r)
+    check(or.count == r)
   }
 }
 
@@ -1039,7 +1067,7 @@ func run_SetIntersectionBox(
   _ n: Int) {
   for _ in 0 ..< n {
     let and = a.intersection(b)
-    CheckResults(and.count == r)
+    check(and.count == r)
   }
 }
 
@@ -1051,7 +1079,7 @@ func run_SetIntersectionSeqBox(
   _ n: Int) {
   for _ in 0 ..< n {
     let and = a.intersection(identity(b))
-    CheckResults(and.count == r)
+    check(and.count == r)
   }
 }
 
@@ -1063,7 +1091,7 @@ func run_SetSubtractingBox(
   _ n: Int) {
   for _ in 0 ..< n {
     let and = a.subtracting(b)
-    CheckResults(and.count == r)
+    check(and.count == r)
   }
 }
 
@@ -1075,7 +1103,7 @@ func run_SetSubtractingSeqBox(
   _ n: Int) {
   for _ in 0 ..< n {
     let and = a.subtracting(identity(b))
-    CheckResults(and.count == r)
+    check(and.count == r)
   }
 }
 
@@ -1087,7 +1115,23 @@ func run_SetIsDisjointBox(
     _ n: Int) {
     for _ in 0 ..< n {
         let isDisjoint = a.isDisjoint(with: identity(b))
-        CheckResults(isDisjoint == r)
+        check(isDisjoint == r)
+    }
+}
+
+// Run isDisjoint Box switching the order of the two sets.  
+@inline(never)
+func run_SetIsDisjointBoxCommutative(
+    _ a: Set<Box<Int>>,
+    _ b: Set<Box<Int>>,
+    _ r: Bool,
+    _ n: Int) {
+    for _ in 0 ..< n {
+        let isDisjointA = a.isDisjoint(with: identity(b))
+        check(isDisjointA == r)
+  
+        let isDisjointB = b.isDisjoint(with: identity(a))
+        check(isDisjointB == r)
     }
 }
 
@@ -1099,6 +1143,6 @@ func run_SetIsDisjointSeqBox(
     _ n: Int) {
     for _ in 0 ..< n {
         let isDisjoint = a.isDisjoint(with: identity(b))
-        CheckResults(isDisjoint == r)
+        check(isDisjoint == r)
     }
 }

@@ -41,6 +41,12 @@ struct TBDGenOptions {
   /// Whether to include only symbols with public linkage.
   bool PublicSymbolsOnly = true;
 
+  /// Whether LLVM IR Virtual Function Elimination is enabled.
+  bool VirtualFunctionElimination = false;
+
+  /// Whether LLVM IR Witness Method Elimination is enabled.
+  bool WitnessMethodElimination = false;
+
   /// The install_name to use in the TBD file.
   std::string InstallName;
 
@@ -62,7 +68,7 @@ struct TBDGenOptions {
   /// For these modules, TBD gen should embed their symbols in the emitted tbd
   /// file.
   /// Typically, these modules are static linked libraries. Thus their symbols
-  /// are embeded in the current dylib.
+  /// are embedded in the current dylib.
   std::vector<std::string> embedSymbolsFromModules;
 
   friend bool operator==(const TBDGenOptions &lhs, const TBDGenOptions &rhs) {
@@ -70,6 +76,8 @@ struct TBDGenOptions {
            lhs.IsInstallAPI == rhs.IsInstallAPI &&
            lhs.LinkerDirectivesOnly == rhs.LinkerDirectivesOnly &&
            lhs.PublicSymbolsOnly == rhs.PublicSymbolsOnly &&
+           lhs.VirtualFunctionElimination == rhs.VirtualFunctionElimination &&
+           lhs.WitnessMethodElimination == rhs.WitnessMethodElimination &&
            lhs.InstallName == rhs.InstallName &&
            lhs.ModuleLinkName == rhs.ModuleLinkName &&
            lhs.CurrentVersion == rhs.CurrentVersion &&
@@ -86,7 +94,9 @@ struct TBDGenOptions {
     using namespace llvm;
     return hash_combine(
         opts.HasMultipleIGMs, opts.IsInstallAPI, opts.LinkerDirectivesOnly,
-        opts.PublicSymbolsOnly, opts.InstallName, opts.ModuleLinkName,
+        opts.PublicSymbolsOnly, opts.VirtualFunctionElimination,
+        opts.WitnessMethodElimination,
+        opts.InstallName, opts.ModuleLinkName,
         opts.CurrentVersion, opts.CompatibilityVersion,
         opts.ModuleInstallNameMapPath,
         hash_combine_range(opts.embedSymbolsFromModules.begin(),

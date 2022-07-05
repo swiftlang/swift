@@ -70,6 +70,8 @@ static inline int zeroRedeclared(void) { return innerZero(); }
 
 static int staticButNotInline(void) { return innerZero(); }
 
+static inline void ackbar(void) { __builtin_trap(); }
+
 @interface NSView : NSObject
 - (struct NSRect) convertRectFromBase: (struct NSRect) r;
 @end

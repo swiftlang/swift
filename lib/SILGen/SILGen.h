@@ -131,6 +131,11 @@ public:
   Optional<FuncDecl*> ResumeUnsafeThrowingContinuationWithError;
   Optional<FuncDecl*> CheckExpectedExecutor;
 
+  Optional<FuncDecl *> AsyncMainDrainQueue;
+  Optional<FuncDecl *> GetMainExecutor;
+  Optional<FuncDecl *> SwiftJobRun;
+  Optional<FuncDecl *> ExitFunc;
+
 public:
   SILGenModule(SILModule &M, ModuleDecl *SM);
 
@@ -260,7 +265,7 @@ public:
 
   // These are either not allowed at global scope or don't require
   // code emission.
-  void visitImportDecl(ImportDecl *d);
+  void visitImportDecl(ImportDecl *d) {}
   void visitEnumCaseDecl(EnumCaseDecl *d) {}
   void visitEnumElementDecl(EnumElementDecl *d) {}
   void visitOperatorDecl(OperatorDecl *d) {}
@@ -330,7 +335,12 @@ public:
 
   /// Emits a thunk from an actor function to a potentially distributed call.
   void emitDistributedThunk(SILDeclRef thunk);
-  
+
+  /// Emits a thunk that calls either the original function if it is available
+  /// or otherwise calls a fallback variant of the function that was emitted
+  /// into the client module.
+  void emitBackDeploymentThunk(SILDeclRef thunk);
+
   void preEmitFunction(SILDeclRef constant, SILFunction *F, SILLocation L);
   void postEmitFunction(SILDeclRef constant, SILFunction *F);
   
@@ -516,6 +526,15 @@ public:
   FuncDecl *getRunTaskForBridgedAsyncMethod();
   /// Retrieve the _Concurrency._checkExpectedExecutor intrinsic.
   FuncDecl *getCheckExpectedExecutor();
+
+  /// Retrieve the _Concurrency._asyncMainDrainQueue intrinsic.
+  FuncDecl *getAsyncMainDrainQueue();
+  /// Retrieve the _Concurrency._getMainExecutor intrinsic.
+  FuncDecl *getGetMainExecutor();
+  /// Retrieve the _Concurrency._swiftJobRun intrinsic.
+  FuncDecl *getSwiftJobRun();
+  // Retrieve the _SwiftConcurrencyShims.exit intrinsic.
+  FuncDecl *getExit();
 
   SILFunction *getKeyPathProjectionCoroutine(bool isReadAccess,
                                              KeyPathTypeKind typeKind);

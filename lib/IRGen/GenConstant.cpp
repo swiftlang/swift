@@ -23,8 +23,10 @@
 #include "TypeInfo.h"
 #include "StructLayout.h"
 #include "Callee.h"
+#include "ConstantBuilder.h"
 #include "swift/Basic/Range.h"
 #include "swift/SIL/SILModule.h"
+#include "llvm/Support/BLAKE3.h"
 
 using namespace swift;
 using namespace irgen;
@@ -276,9 +278,35 @@ llvm::Constant *irgen::emitConstantObject(IRGenModule &IGM, ObjectInst *OI,
     }
   }
   // Construct the object header.
-  llvm::Type *ObjectHeaderTy = sTy->getElementType(0);
-  assert(ObjectHeaderTy->isStructTy());
-  elts[0] = llvm::Constant::getNullValue(ObjectHeaderTy);
+  llvm::StructType *ObjectHeaderTy = cast<llvm::StructType>(sTy->getElementType(0));
+
+  if (IGM.canMakeStaticObjectsReadOnly()) {
+    if (!IGM.swiftImmortalRefCount) {
+      auto *var = new llvm::GlobalVariable(IGM.Module, IGM.Int8Ty,
+                                        /*constant*/ true, llvm::GlobalValue::ExternalLinkage,
+                                        /*initializer*/ nullptr, "_swiftImmortalRefCount");
+      IGM.swiftImmortalRefCount = var;
+    }
+    if (!IGM.swiftStaticArrayMetadata) {
+      auto *var = new llvm::GlobalVariable(IGM.Module, IGM.TypeMetadataStructTy,
+                                        /*constant*/ true, llvm::GlobalValue::ExternalLinkage,
+                                        /*initializer*/ nullptr, "_swiftStaticArrayMetadata");
+      IGM.swiftStaticArrayMetadata = var;
+    }
+    elts[0] = llvm::ConstantStruct::get(ObjectHeaderTy, {
+      IGM.swiftStaticArrayMetadata,
+      llvm::ConstantExpr::getPtrToInt(IGM.swiftImmortalRefCount, IGM.IntPtrTy)});
+  } else {
+    elts[0] = llvm::Constant::getNullValue(ObjectHeaderTy);
+  }
   insertPadding(elts, sTy);
   return llvm::ConstantStruct::get(sTy, elts);
+}
+
+void ConstantAggregateBuilderBase::addUniqueHash(StringRef data) {
+  llvm::BLAKE3 hasher;
+  hasher.update(data);
+  auto rawHash = hasher.final();
+  auto truncHash = llvm::makeArrayRef(rawHash).slice(0, NumBytes_UniqueHash);
+  add(llvm::ConstantDataArray::get(IGM().getLLVMContext(), truncHash));
 }

@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -requirement-machine=off)
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -68,7 +68,7 @@ extension Parameter : Differentiable, AdditiveArithmetic {
 }
 
 MethodTests.testWithLeakChecking(
-  "instance method with generated adjoint, called from differentated func"
+  "instance method with generated adjoint, called from differentiated func"
 ) {
   func f(_ p: Parameter) -> Tracked<Float> {
     return 100 * p.squared()
@@ -309,7 +309,7 @@ extension CustomParameter {
 }
 
 MethodTests.testWithLeakChecking(
-  "instance method with custom adjoint, called from differentated func"
+  "instance method with custom adjoint, called from differentiated func"
 ) {
   func f(_ p: CustomParameter) -> Tracked<Float> {
     return 100 * p.squared()
@@ -318,7 +318,7 @@ MethodTests.testWithLeakChecking(
   expectEqual(CustomParameter(x: 10 * 100), gradient(at: CustomParameter(x: 20), of: f))
 }
 
-MethodTests.testWithLeakChecking("instance method with generated adjoint, differentated directly") {
+MethodTests.testWithLeakChecking("instance method with generated adjoint, differentiated directly") {
   // This is our current syntax for taking gradients of instance methods
   // directly. If/when we develop nicer syntax for this, change this test.
   func g(p: CustomParameter) -> Tracked<Float> { p.squared() }
@@ -326,7 +326,7 @@ MethodTests.testWithLeakChecking("instance method with generated adjoint, differ
   expectEqual(CustomParameter(x: 10), gradient(at: CustomParameter(x: 20), of: g))
 }
 
-MethodTests.testWithLeakChecking("static method with custom adjoint, called from differentated func") {
+MethodTests.testWithLeakChecking("static method with custom adjoint, called from differentiated func") {
   func f(_ p: CustomParameter) -> Tracked<Float> {
     return 100 * CustomParameter.squared(p: p)
   }

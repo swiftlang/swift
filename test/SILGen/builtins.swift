@@ -33,7 +33,7 @@ func load_obj(_ x: Builtin.RawPointer) -> Builtin.NativeObject {
 
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins12load_raw_pod{{[_0-9a-zA-Z]*}}F
 func load_raw_pod(_ x: Builtin.RawPointer) -> Builtin.Int64 {
-  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to $*Builtin.Int64
+  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [align=1] $*Builtin.Int64
   // CHECK: [[VAL:%.*]] = load [trivial] [[ADDR]]
   // CHECK: return [[VAL]]
   return Builtin.loadRaw(x)
@@ -41,7 +41,7 @@ func load_raw_pod(_ x: Builtin.RawPointer) -> Builtin.Int64 {
 
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins12load_raw_obj{{[_0-9a-zA-Z]*}}F
 func load_raw_obj(_ x: Builtin.RawPointer) -> Builtin.NativeObject {
-  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to $*Builtin.NativeObject
+  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [align=1] $*Builtin.NativeObject
   // CHECK: [[VAL:%.*]] = load [copy] [[ADDR]]
   // CHECK: return [[VAL]]
   return Builtin.loadRaw(x)
@@ -224,7 +224,7 @@ func class_archetype_to_native_object<T : C>(_ t: T) -> Builtin.NativeObject {
 // CHECK-NEXT:   [[PTR:%[0-9]+]] = unchecked_ref_cast [[REF]] : $@opened({{.*}}) ClassProto to $Builtin.NativeObject
 // CHECK-NEXT:   return [[PTR]]
 func class_existential_to_native_object(_ t:ClassProto) -> Builtin.NativeObject {
-  return Builtin.unsafeCastToNativeObject(t)
+  return Builtin.unsafeCastToNativeObject(t as ClassProto)
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins24class_from_native_object{{[_0-9a-zA-Z]*}}F
@@ -365,7 +365,7 @@ func projectTailElems<T>(h: Header, ty: T.Type) -> Builtin.RawPointer {
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins21projectTailElemsOwned{{[_0-9a-zA-Z]*}}F
 func projectTailElemsOwned<T>(h: __owned Header, ty: T.Type) -> Builtin.RawPointer {
   // CHECK: bb0([[ARG1:%.*]] : @owned $Header
-  // CHECK:   [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG1]]
+  // CHECK:   [[BORROWED_ARG1:%.*]] = begin_borrow [lexical] [[ARG1]]
   // CHECK:   [[TA:%.*]] = ref_tail_addr [[BORROWED_ARG1]] : $Header
   //   -- Once we have passed the address through a2p, we no longer provide any guarantees.
   //   -- We still need to make sure that the a2p itself is in the borrow site though.
@@ -718,7 +718,7 @@ func refcast_class_any(_ o: A) -> AnyObject {
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins20refcast_punknown_any{{[_0-9a-zA-Z]*}}F
 // CHECK: unchecked_ref_cast_addr PUnknown in %{{.*}} : $*PUnknown to AnyObject in %{{.*}} : $*AnyObject
 func refcast_punknown_any(_ o: PUnknown) -> AnyObject {
-  return Builtin.castReference(o)
+  return Builtin.castReference(o as PUnknown)
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins18refcast_pclass_anyyyXlAA6PClass_pF :
@@ -728,7 +728,7 @@ func refcast_punknown_any(_ o: PUnknown) -> AnyObject {
 // CHECK:   return [[ARG_CAST]]
 // CHECK: } // end sil function '$s8builtins18refcast_pclass_anyyyXlAA6PClass_pF'
 func refcast_pclass_any(_ o: PClass) -> AnyObject {
-  return Builtin.castReference(o)
+  return Builtin.castReference(o as PClass)
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins20refcast_any_punknown{{[_0-9a-zA-Z]*}}F
@@ -791,11 +791,24 @@ func unsafeGuaranteedEnd(_ t: Builtin.Int8) {
 
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins10bindMemory{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0([[P:%.*]] : $Builtin.RawPointer, [[I:%.*]] : $Builtin.Word, [[T:%.*]] : $@thick T.Type):
-// CHECK: bind_memory [[P]] : $Builtin.RawPointer, [[I]] : $Builtin.Word to $*T
+// CHECK: %{{.*}} = bind_memory [[P]] : $Builtin.RawPointer, [[I]] : $Builtin.Word to $*T
 // CHECK:   return {{%.*}} : $()
 // CHECK: }
 func bindMemory<T>(ptr: Builtin.RawPointer, idx: Builtin.Word, _: T.Type) {
   Builtin.bindMemory(ptr, idx, T.self)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins12rebindMemory{{[_0-9a-zA-Z]*}}F
+// CHECK: bb0([[P:%.*]] : $Builtin.RawPointer, [[I:%.*]] : $Builtin.Word, [[T:%.*]] : $@thick T.Type):
+// CHECK: [[BIND:%.*]] = bind_memory [[P]] : $Builtin.RawPointer, [[I]] : $Builtin.Word to $*T
+// CHECK: [[REBIND:%.*]] = rebind_memory [[P]] : $Builtin.RawPointer to [[BIND]] : $Builtin.Word
+// CHECK: %{{.*}} = rebind_memory [[P]] : $Builtin.RawPointer to [[REBIND]] : $Builtin.Word
+// CHECK:   return {{%.*}} : $()
+// CHECK: }
+func rebindMemory<T>(ptr: Builtin.RawPointer, idx: Builtin.Word, _: T.Type) {
+  let previousBindings = Builtin.bindMemory(ptr, idx, T.self)
+  let genericBinding = Builtin.rebindMemory(ptr, previousBindings)
+  Builtin.rebindMemory(ptr, genericBinding)
 }
 
 //===----------------------------------------------------------------------===//
@@ -846,11 +859,11 @@ func release(ptr: Builtin.NativeObject) {
 // Other Operations
 //===----------------------------------------------------------------------===//
 
-func once_helper() {}
+func once_helper(_ context: Builtin.RawPointer) {}
 
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins4once7controlyBp_tF
-// CHECK:      [[T0:%.*]] = function_ref @$s8builtins11once_helperyyFTo : $@convention(c) () -> ()
-// CHECK-NEXT: builtin "once"(%0 : $Builtin.RawPointer, [[T0]] : $@convention(c) () -> ())
+// CHECK:      [[T0:%.*]] = function_ref @$s8builtins11once_helperyyBpFTo : $@convention(c) (Builtin.RawPointer) -> ()
+// CHECK-NEXT: builtin "once"(%0 : $Builtin.RawPointer, [[T0]] : $@convention(c) (Builtin.RawPointer) -> ())
 func once(control: Builtin.RawPointer) {
   Builtin.once(control, once_helper)
 }
@@ -872,4 +885,11 @@ func valueToBridgeObject(_ x: UInt) -> Builtin.BridgeObject {
 // CHECK: return
 func assumeTrue(_ x: Builtin.Int1) {
   Builtin.assume_Int1(x)
+}
+
+// CHECK: sil hidden [ossa] @$s8builtins15assumeAlignmentyyBp_BwtF : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> () {  
+// CHECK: builtin "assumeAlignment"(%{{.*}} : $Builtin.RawPointer, %{{.*}} : $Builtin.Word) : $Builtin.RawPointer
+// CHECK: return
+func assumeAlignment(_ p: Builtin.RawPointer, _ x: Builtin.Word) {
+  Builtin.assumeAlignment(p, x)
 }

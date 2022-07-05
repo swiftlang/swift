@@ -2,7 +2,7 @@
 // Note: Intentionally not using %target-sil-opt, because we need at least a
 //       swift 5.1 deployment target.
 
-// REQUIRES: libswift
+// REQUIRES: swift_in_compiler
 
 sil_stage canonical
 
@@ -28,7 +28,7 @@ bb0:
 }
 
 
-sil_global private @staticArray : $_ContiguousArrayStorage<Int> = {
+sil_global @staticArray : $_ContiguousArrayStorage<Int> = {
   %0 = integer_literal $Builtin.Int64, 0
   %1 = struct $UInt (%0 : $Builtin.Int64)
   %2 = struct $Int (%0 : $Builtin.Int64)
@@ -49,4 +49,15 @@ bb0:
   return %1 : $Builtin.BridgeObject
 }
 
+// CHECK-LABEL: sil [serialized] @testGlobalValueSerialized
+// CHECK:       global_value
+// CHECK:       retain
+// CHECK: } // end sil function 'testGlobalValueSerialized'
+sil [serialized] @testGlobalValueSerialized : $@convention(thin) () -> @owned Builtin.BridgeObject {
+bb0:
+  %0 = global_value @staticArray : $_ContiguousArrayStorage<Int>
+  %1 = unchecked_ref_cast %0 : $_ContiguousArrayStorage<Int> to $Builtin.BridgeObject
+  strong_retain %1 : $Builtin.BridgeObject
+  return %1 : $Builtin.BridgeObject
+}
 

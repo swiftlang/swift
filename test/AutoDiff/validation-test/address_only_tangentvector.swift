@@ -1,9 +1,7 @@
-// RUN: %target-run-simple-swift(-Xfrontend -requirement-machine=off)
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
 // Would fail due to unavailability of swift_autoDiffCreateLinearMapContext.
-// UNSUPPORTED: use_os_stdlib
-// UNSUPPORTED: back_deployment_runtime
 
 import StdlibUnittest
 import DifferentiationUnittest

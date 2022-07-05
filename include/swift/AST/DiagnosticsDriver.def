@@ -166,6 +166,18 @@ ERROR(error_darwin_only_supports_libcxx, none,
       "The only C++ standard library supported on Apple platforms is libc++",
       ())
 
+ERROR(error_wasm_doesnt_support_global_base, none,
+      "The --global-base argument is not supported when targeting WebAssembly",
+      ())
+
+ERROR(error_hermetic_seal_cannot_have_library_evolution, none,
+      "Cannot use -experimental-hermetic-seal-at-link with -enable-library-evolution",
+      ())
+
+ERROR(error_hermetic_seal_requires_lto, none,
+      "-experimental-hermetic-seal-at-link requires -lto=llvm-full or -lto=llvm-thin",
+      ())
+
 WARNING(warn_drv_darwin_sdk_invalid_settings, none,
     "SDK settings were ignored because 'SDKSettings.json' could not be parsed",
     ())
@@ -174,6 +186,6 @@ WARNING(warning_unsupported_driver_option,none,
         "option '%0' is ony supported in swift-driver", (StringRef))
 
 WARNING(old_driver_deprecated,none,
-        "legacy driver is now deprecated; consider avoiding specifying `%0`", (StringRef))
+        "legacy driver is now deprecated; consider avoiding specifying '%0'", (StringRef))
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

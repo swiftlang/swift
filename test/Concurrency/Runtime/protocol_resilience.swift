@@ -12,12 +12,8 @@
 // REQUIRES: concurrency
 
 // rdar://76038845
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
-
-// XFAIL: windows
-// UNSUPPORTED: linux
-// UNSUPPORTED: openbsd
 
 import StdlibUnittest
 import resilient_protocol
@@ -62,19 +58,23 @@ func genericWait<T : Awaitable>(orThrow: Bool, _ t: T) async throws {
 
 @main struct Main {
   static func main() async {
-    var AsyncProtocolRequirementSuite = TestSuite("ResilientProtocol")
+    let task = Task.detached {
+      var AsyncProtocolRequirementSuite = TestSuite("ResilientProtocol")
 
-    AsyncProtocolRequirementSuite.test("AsyncProtocolRequirement") {
-      let x = IntAwaitable()
+      AsyncProtocolRequirementSuite.test("AsyncProtocolRequirement") {
+        let x = IntAwaitable()
 
-      await genericWaitForNothing(x)
+        await genericWaitForNothing(x)
 
-      expectEqual(123, await genericWait(x))
-      expectEqual(321, await genericWaitForInt(x))
+        expectEqual(123, await genericWait(x))
+        expectEqual(321, await genericWaitForInt(x))
 
-      expectNil(try? await genericWait(orThrow: true, x))
-      try! await genericWait(orThrow: false, x)
+        expectNil(try? await genericWait(orThrow: true, x))
+        try! await genericWait(orThrow: false, x)
+      }
+      await runAllTestsAsync()
     }
-    await runAllTestsAsync()
+
+    await task.value
   }
 }

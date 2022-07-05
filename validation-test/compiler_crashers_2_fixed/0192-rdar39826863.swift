@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck %s
+// RUN: %target-swift-frontend -emit-ir %s
 
 protocol Tuple {
   associatedtype Head

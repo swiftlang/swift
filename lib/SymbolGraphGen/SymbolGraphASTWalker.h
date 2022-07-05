@@ -46,6 +46,8 @@ struct SymbolGraphASTWalker : public SourceEntityWalker {
 
   /// The module that this symbol graph will represent.
   const ModuleDecl &M;
+    
+  const SmallPtrSet<ModuleDecl *, 4> ExportedImportedModules;
 
   /// The symbol graph for the main module of interest.
   SymbolGraph MainGraph;
@@ -55,7 +57,9 @@ struct SymbolGraphASTWalker : public SourceEntityWalker {
 
   // MARK: - Initialization
   
-  SymbolGraphASTWalker(ModuleDecl &M, const SymbolGraphOptions &Options);
+  SymbolGraphASTWalker(ModuleDecl &M,
+                       const SmallPtrSet<ModuleDecl *, 4> ExportedImportedModules,
+                       const SymbolGraphOptions &Options);
   virtual ~SymbolGraphASTWalker() {}
 
   // MARK: - Utilities
@@ -87,6 +91,14 @@ struct SymbolGraphASTWalker : public SourceEntityWalker {
   // MARK: - SourceEntityWalker
 
   virtual bool walkToDeclPre(Decl *D, CharSourceRange Range) override;
+    
+  // MARK: - Utilities
+  
+  /// Returns whether the given declaration comes from an `@_exported import` module.
+  virtual bool isFromExportedImportedModule(const Decl *D) const;
+
+  /// Returns whether the given module is an `@_exported import` module.
+  virtual bool isExportedImportedModule(const ModuleDecl *M) const;
 };
 
 } // end namespace symbolgraphgen

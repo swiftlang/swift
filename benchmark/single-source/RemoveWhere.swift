@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -12,7 +12,7 @@
 
 import TestsUtils
 
-public let RemoveWhere = [
+public let benchmarks = [
   // tests repeated remove(at:) calls in generic code
   BenchmarkInfo(name: "RemoveWhereQuadraticStrings", runFunction: run_RemoveWhereQuadraticStrings, tags: [.validation, .api], setUpFunction: buildWorkload),
   BenchmarkInfo(name: "RemoveWhereQuadraticInts", runFunction: run_RemoveWhereQuadraticInts, tags: [.validation, .api], setUpFunction: buildWorkload),

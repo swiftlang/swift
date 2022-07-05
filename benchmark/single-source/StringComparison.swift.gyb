@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -46,51 +46,47 @@ def legacyFactor(name):
     ',\n\t\tlegacyFactor: {0}'.format(lf) if lf else
     '')
 }%
-public let StringComparison: [BenchmarkInfo] = [
+public let benchmarks: [BenchmarkInfo] = [
 % for Name in ComparisonWorkloads:
   BenchmarkInfo(
     name: "StringComparison_${Name}",
     runFunction: run_StringComparison_${Name},
     tags: [.validation, .api, .String],
-    setUpFunction: { blackHole(Workload_${Name}) }${legacyFactor(Name)}
+    setUpFunction: { blackHole(workload_${Name}) }${legacyFactor(Name)}
   ),
 % end # ComparisonWorkloads
-]
 
-public let StringHashing: [BenchmarkInfo] = [
 % for Name in HashingWorkloads:
   BenchmarkInfo(
     name: "StringHashing_${Name}",
     runFunction: run_StringHashing_${Name},
     tags: [.validation, .api, .String],
-    setUpFunction: { blackHole(Workload_${Name}) }${legacyFactor(Name)}
+    setUpFunction: { blackHole(workload_${Name}) }${legacyFactor(Name)}
   ),
 % end # HashingWorkloads
-]
 
-public let StringNormalization: [BenchmarkInfo] = [
 % for Name in NormalizationWorkloads:
   BenchmarkInfo(
     name: "NormalizedIterator_${Name}",
     runFunction: run_StringNormalization_${Name},
     tags: [.validation, .String],
-    setUpFunction: { blackHole(Workload_${Name}) }${legacyFactor(Name)}
+    setUpFunction: { blackHole(workload_${Name}) }${legacyFactor(Name)}
   ),
 % end # NormalizationWorkloads
 ]
 
 % for Name in AllWorkloads:
-let Workload_${Name}: Workload! = Workload.${Name}
+let workload_${Name}: Workload! = Workload.${Name}
 
 % end # AllWorkloads
 
 %for Name in ComparisonWorkloads:
 @inline(never)
-public func run_StringComparison_${Name}(_ N: Int) {
-  let workload: Workload = Workload_${Name}
+public func run_StringComparison_${Name}(_ n: Int) {
+  let workload: Workload = workload_${Name}
   let tripCount = workload.tripCount
   let payload = workload.payload
-  for _ in 1...tripCount*N {
+  for _ in 1...tripCount*n {
     for s1 in payload {
       for s2 in payload {
         blackHole(s1 < s2)
@@ -103,11 +99,11 @@ public func run_StringComparison_${Name}(_ N: Int) {
 
 %for Name in HashingWorkloads:
 @inline(never)
-public func run_StringHashing_${Name}(_ N: Int) {
+public func run_StringHashing_${Name}(_ n: Int) {
   let workload: Workload = Workload.${Name}
   let tripCount = workload.tripCount
   let payload = workload.payload
-  for _ in 1...tripCount*N {
+  for _ in 1...tripCount*n {
     for str in payload {
       blackHole(str.hashValue)
     }
@@ -118,11 +114,11 @@ public func run_StringHashing_${Name}(_ N: Int) {
 
 %for Name in NormalizationWorkloads:
 @inline(never)
-public func run_StringNormalization_${Name}(_ N: Int) {
+public func run_StringNormalization_${Name}(_ n: Int) {
   let workload: Workload = Workload.${Name}
   let tripCount = workload.tripCount
   let payload = workload.payload
-  for _ in 1...tripCount*N {
+  for _ in 1...tripCount*n {
     for str in payload {
       str._withNFCCodeUnits { cu in
         blackHole(cu)
@@ -135,7 +131,7 @@ public func run_StringNormalization_${Name}(_ N: Int) {
 
 
 struct Workload {
-  static let N = 100
+  static let n = 100
 
   let name: String
   let payload: [String]
@@ -148,7 +144,7 @@ struct Workload {
   }
 
   var tripCount: Int {
-    return Int(Double(Workload.N) * scaleMultiplier)
+    return Int(Double(Workload.n) * scaleMultiplier)
   }
 
   static let ascii = Workload(

@@ -68,10 +68,10 @@ func test3() {
   // CHECK-NEXT: [[STR:%[0-9]+]] = apply [[GETFN]]()
   let o = getAString()
 
+  // CHECK-NEXT: [[STR_BORROW:%.*]] = begin_borrow [lexical] [[STR]]
   // CHECK-NEXT: debug_value
   // CHECK-NOT: destroy_value
 
-  // CHECK-NEXT: [[STR_BORROW:%.*]] = begin_borrow [[STR]]
   // CHECK: [[USEFN:%[0-9]+]] = function_ref{{.*}}useAString
   // CHECK-NEXT: [[USE:%[0-9]+]] = apply [[USEFN]]([[STR_BORROW]])
   useAString(o)
@@ -233,7 +233,8 @@ struct WeirdPropertyTest {
 func test_weird_property(_ v : WeirdPropertyTest, i : Int) -> Int {
   var v = v
   // CHECK: [[VBOX:%[0-9]+]] = alloc_box ${ var WeirdPropertyTest }
-  // CHECK: [[PB:%.*]] = project_box [[VBOX]]
+  // CHECK: [[VLIFETIME:%[^,]+]] = begin_borrow [lexical] [[VBOX]]
+  // CHECK: [[PB:%.*]] = project_box [[VLIFETIME]]
   // CHECK: store %0 to [trivial] [[PB]]
 
   // The setter isn't mutating, so we need to load the box.
@@ -340,7 +341,7 @@ func testDebugValue(_ a : Int, b : SimpleProtocol) -> Int {
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}testAddressOnlyTupleArgument
 func testAddressOnlyTupleArgument(_ bounds: (start: SimpleProtocol, pastEnd: Int)) {
 // CHECK:       bb0(%0 : $*SimpleProtocol, %1 : $Int):
-// CHECK-NEXT:    %2 = alloc_stack $(start: SimpleProtocol, pastEnd: Int), let, name "bounds", argno 1
+// CHECK-NEXT:    %2 = alloc_stack [lexical] $(start: SimpleProtocol, pastEnd: Int), let, name "bounds", argno 1
 // CHECK-NEXT:    %3 = tuple_element_addr %2 : $*(start: SimpleProtocol, pastEnd: Int), 0
 // CHECK-NEXT:    copy_addr %0 to [initialization] %3 : $*SimpleProtocol
 // CHECK-NEXT:    %5 = tuple_element_addr %2 : $*(start: SimpleProtocol, pastEnd: Int), 1
@@ -398,7 +399,6 @@ struct StructMemberTest {
   // CHECK:  debug_value [[ARG]] : $StructMemberTest, let, name "self"
   // CHECK:  [[TRIVIAL_VALUE:%.*]] = struct_extract [[ARG]] : $StructMemberTest, #StructMemberTest.i
   // CHECK-NOT:  destroy_value [[ARG]] : $StructMemberTest
-  // CHECK-NOT:  destroy_value [[BORROWED_ARG]] : $StructMemberTest
   // CHECK:  return [[TRIVIAL_VALUE]] : $Int
 
   // Accessing the int member in s should not copy_value the whole struct.
@@ -454,7 +454,6 @@ struct GenericStruct<T> {
   // CHECK-NEXT: debug_value [[SELF_ADDR]] : $*GenericStruct<T>, let, name "self", {{.*}} expr op_deref
   // CHECK-NEXT: [[PROJ_ADDR:%.*]] = struct_element_addr [[SELF_ADDR]] : $*GenericStruct<T>, #GenericStruct.b
   // CHECK-NEXT: [[PROJ_VAL:%.*]] = load [trivial] [[PROJ_ADDR]] : $*Int
-  // CHECK-NOT: destroy_addr [[SELF]] : $*GenericStruct<T>
   // CHECK-NEXT: return [[PROJ_VAL]] : $Int
 }
 
@@ -467,11 +466,13 @@ struct LetPropertyStruct {
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}testLetPropertyAccessOnLValueBase
 // CHECK: bb0(%0 : $LetPropertyStruct):
 // CHECK:  [[ABOX:%[0-9]+]] = alloc_box ${ var LetPropertyStruct }
-// CHECK:  [[A:%[0-9]+]] = project_box [[ABOX]]
+// CHECK:  [[ALIFETIME:%[^,]+]] = begin_borrow [lexical] [[ABOX]]
+// CHECK:  [[A:%[0-9]+]] = project_box [[ALIFETIME]]
 // CHECK:   store %0 to [trivial] [[A]] : $*LetPropertyStruct
 // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[A]]
 // CHECK:   [[STRUCT:%[0-9]+]] = load [trivial] [[READ]] : $*LetPropertyStruct
 // CHECK:   [[PROP:%[0-9]+]] = struct_extract [[STRUCT]] : $LetPropertyStruct, #LetPropertyStruct.lp
+// CHECK:   end_borrow [[ALIFETIME]]
 // CHECK:   destroy_value [[ABOX]] : ${ var LetPropertyStruct }
 // CHECK:   return [[PROP]] : $Int
 func testLetPropertyAccessOnLValueBase(_ a : LetPropertyStruct) -> Int {
@@ -509,7 +510,7 @@ struct LetDeclInStruct {
 func test_unassigned_let_constant() {
   let string : String
 }
-// CHECK: [[S:%[0-9]+]] = alloc_stack $String, let, name "string"
+// CHECK: [[S:%[0-9]+]] = alloc_stack [lexical] $String, let, name "string"
 // CHECK-NEXT:  [[MUI:%[0-9]+]] = mark_uninitialized [var] [[S]] : $*String
 // CHECK-NEXT:  destroy_addr [[MUI]] : $*String
 // CHECK-NEXT:  dealloc_stack [[S]] : $*String

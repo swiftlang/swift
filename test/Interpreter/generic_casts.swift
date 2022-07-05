@@ -165,7 +165,7 @@ func nongenericAnyIsPAndPCSubType(type: Any.Type) -> Bool {
 func genericAnyIs<T>(type: Any.Type, to: T.Type, expected: Bool) -> Bool {
   // If we're testing against a runtime that doesn't have the fix this tests,
   // just pretend we got it right.
-  if #available(macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4, *) {
+  if #available(SwiftStdlib 5.2, *) {
     // Remember: If `T` is bound to `P`, then `T.Type` is `P.Protocol`
     return type is T.Type
   } else {
@@ -191,7 +191,7 @@ func nongenericAnyAsConditionalPAndPCSubType(type: Any.Type) -> Bool {
 func genericAnyAsConditional<T>(type: Any.Type, to: T.Type, expected: Bool) -> Bool {
   // If we're testing against a runtime that doesn't have the fix this tests,
   // just pretend we got it right.
-  if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
+  if #available(SwiftStdlib 5.3, *) {
     return (type as? T.Type) != nil
   } else {
     return expected
@@ -217,7 +217,7 @@ func nongenericAnyAsUnconditionalPAndPCSubType(type: Any.Type) -> Bool {
   return true
 }
 func genericAnyAsUnconditional<T>(type: Any.Type, to: T.Type, expected: Bool) -> Bool {
-  if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
+  if #available(SwiftStdlib 5.3, *) {
     blackhole(type as! T.Type)
   }
   return true

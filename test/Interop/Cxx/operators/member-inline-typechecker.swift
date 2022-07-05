@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -I %S/Inputs -enable-cxx-interop
+// RUN: %target-typecheck-verify-swift -I %S/Inputs -enable-experimental-cxx-interop
 
 import MemberInline
 
@@ -9,6 +9,9 @@ let resultPlus = lhs - rhs
 let resultCall0 = lhs()
 let resultCall1 = lhs(1)
 let resultCall2 = lhs(1, 2)
+
+var boolWrapper = LoadableBoolWrapper(value: true)
+let notBoolResult = !boolWrapper
 
 var addressOnly = AddressOnlyIntWrapper(42)
 
@@ -37,3 +40,12 @@ let nonTrivialValueByVal = nonTrivialIntArrayByVal[1]
 var diffTypesArrayByVal = DifferentTypesArrayByVal()
 let diffTypesResultIntByVal: Int32 = diffTypesArrayByVal[0]
 let diffTypesResultDoubleByVal: Double = diffTypesArrayByVal[0.5]
+
+let postIncrement = HasPostIncrementOperator()
+postIncrement.successor() // expected-error {{value of type 'HasPostIncrementOperator' has no member 'successor'}}
+
+let anotherReturnType = HasPreIncrementOperatorWithAnotherReturnType()
+let anotherReturnTypeResult: HasPreIncrementOperatorWithAnotherReturnType = anotherReturnType.successor()
+
+let voidReturnType = HasPreIncrementOperatorWithVoidReturnType()
+let voidReturnTypeResult: HasPreIncrementOperatorWithVoidReturnType = voidReturnType.successor()

@@ -83,11 +83,9 @@ public:
       ++begin;
 
       if (begin == end) {
-        if (entry.Value)
-          return entry.Value;
-
+        auto oldValue = entry.Value;
         entry.Value = value;
-        return None;
+        return oldValue;
       }
 
       if (entry.Children == nullptr) {

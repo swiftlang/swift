@@ -257,6 +257,8 @@ public:
   SILValue materialize(SILInstruction *Inst) {
     if (CoveringValue)
       return SILValue();
+    if (isa<SILUndef>(Base))
+      return Base;
     auto Val = Base;
     auto InsertPt = getInsertAfterPoint(Base).getValue();
     SILBuilderWithScope Builder(InsertPt);
@@ -379,21 +381,37 @@ public:
   static void reduce(LSLocation Base, SILModule *Mod,
                      TypeExpansionContext context, LSLocationList &Locs);
 
+  /// Gets the base address for `v`.
+  /// If `stopAtImmutable` is true, the base address is only calculated up to
+  /// a `ref_element_addr [immutable]` or a `ref_tail_addr [immutable]`.
+  /// Return the base address and true if such an immutable class projection
+  /// is found.
+  static std::pair<SILValue, bool>
+  getBaseAddressOrObject(SILValue v, bool stopAtImmutable);
+
   /// Enumerate the given Mem LSLocation.
-  static void enumerateLSLocation(TypeExpansionContext context, SILModule *M,
+  /// If `stopAtImmutable` is true, the base address is only calculated up to
+  /// a `ref_element_addr [immutable]` or a `ref_tail_addr [immutable]`.
+  /// Returns true if it's an immutable location.
+  static bool enumerateLSLocation(TypeExpansionContext context, SILModule *M,
                                   SILValue Mem,
                                   std::vector<LSLocation> &LSLocationVault,
                                   LSLocationIndexMap &LocToBit,
                                   LSLocationBaseMap &BaseToLoc,
-                                  TypeExpansionAnalysis *TE);
+                                  TypeExpansionAnalysis *TE,
+                                  bool stopAtImmutable);
 
   /// Enumerate all the locations in the function.
+  /// If `stopAtImmutable` is true, the base addresses are only calculated up to
+  /// a `ref_element_addr [immutable]` or a `ref_tail_addr [immutable]`.
   static void enumerateLSLocations(SILFunction &F,
                                    std::vector<LSLocation> &LSLocationVault,
                                    LSLocationIndexMap &LocToBit,
                                    LSLocationBaseMap &BaseToLoc,
                                    TypeExpansionAnalysis *TE,
-                                   std::pair<int, int> &LSCount);
+                                   bool stopAtImmutable,
+                                   int &numLoads, int &numStores,
+                                   bool &immutableLoadsFound);
 };
 
 static inline llvm::hash_code hash_value(const LSLocation &L) {

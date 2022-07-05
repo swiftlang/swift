@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=BoolEnums -I %S/Inputs -source-filename=x -enable-cxx-interop | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=BoolEnums -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
 
 // TODO: these should be enums eventually (especially the enum class).
 
@@ -29,6 +29,7 @@
 // CHECK: }
 
 // CHECK:       struct WrapperStruct {
+// CHECK-NEXT:    init()
 // TODO: where is "A" and "B"? They should be member variables.
 // CHECK-NEXT:    struct InnerBoolEnum : Equatable, RawRepresentable {
 // CHECK-NEXT:      init(_ rawValue: Bool)
@@ -36,5 +37,4 @@
 // CHECK-NEXT:      var rawValue: Bool
 // CHECK-NEXT:      typealias RawValue = Bool
 // CHECK-NEXT:    }
-// CHECK-NEXT:    init()
 // CHECK-NEXT:  }

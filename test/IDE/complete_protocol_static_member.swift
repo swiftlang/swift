@@ -59,7 +59,7 @@ func test() {
   receiver(.#^COMPLETE_GENERIC_TYPE^#)
 }
 // COMPLETE_GENERIC_TYPE: Begin completions, 2 items
-// COMPLETE_GENERIC_TYPE: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init()[#Indicator<T>#];
+// COMPLETE_GENERIC_TYPE: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init()[#Indicator<T>#];
 // COMPLETE_GENERIC_TYPE: Decl[StaticVar]/CurrNominal/TypeRelation[Convertible]: activity[#Indicator<Sr12973>#];
 // COMPLETE_GENERIC_TYPE: End completions
 
@@ -67,6 +67,6 @@ func testRecursive<T>(_ inidicator: Indicator<T>) {
   testRecursive(.#^COMPLETE_RECURSIVE_GENERIC^#)
 // FIXME: We should be suggesting `.activity` here because the call to `testRecursive` happens with new generic parameters
 // COMPLETE_RECURSIVE_GENERIC: Begin completions, 1 item
-// COMPLETE_RECURSIVE_GENERIC-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init()[#Indicator<T>#];
+// COMPLETE_RECURSIVE_GENERIC-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init()[#Indicator<T>#];
 // COMPLETE_RECURSIVE_GENERIC: End completions
 }

@@ -57,6 +57,20 @@ using namespace importer;
 using clang::CompilerInstance;
 using clang::CompilerInvocation;
 
+static const char *getOperatorName(clang::OverloadedOperatorKind Operator) {
+  switch (Operator) {
+  case clang::OO_None:
+  case clang::NUM_OVERLOADED_OPERATORS:
+    return nullptr;
+
+#define OVERLOADED_OPERATOR(Name, Spelling, Token, Unary, Binary, MemberOnly)  \
+  case clang::OO_##Name:                                                       \
+    return #Name;
+#include "clang/Basic/OperatorKinds.def"
+  }
+
+  llvm_unreachable("Invalid OverloadedOperatorKind!");
+}
 
 /// Determine whether the given Clang selector matches the given
 /// selector pieces.
@@ -416,6 +430,9 @@ namespace {
     else
       nameStr = cast<clang::ObjCPropertyDecl>(decl)->getName().str();
     for (unsigned i = 1, n = overriddenNames.size(); i != n; ++i) {
+      if (ctx.Diags.isPrettyPrintingDecl())
+        continue;
+
       ctx.Diags.diagnose(SourceLoc(), diag::inconsistent_swift_name,
                          method == nullptr,
                          nameStr,
@@ -623,6 +640,22 @@ findSwiftNameAttr(const clang::Decl *decl, ImportNameVersion version) {
     if (!activeAttr) {
       if (auto nameAttr = decl->getAttr<clang::SwiftNameAttr>())
         activeAttr = decodeAttr(nameAttr);
+    }
+
+    if (auto enumDecl = dyn_cast<clang::EnumDecl>(decl)) {
+      // Intentionally don't get the canonical type here.
+      if (auto typedefType = dyn_cast<clang::TypedefType>(enumDecl->getIntegerType().getTypePtr())) {
+        // If the typedef is available in Swift, the user will get ambiguity.
+        // It also means they may not have intended this API to be imported like this.
+        if (importer::isUnavailableInSwift(typedefType->getDecl(), nullptr, true)) {
+          if (auto asyncAttr = typedefType->getDecl()->getAttr<clang::SwiftAsyncNameAttr>())
+            activeAttr = decodeAttr(asyncAttr);
+          if (!activeAttr) {
+            if (auto nameAttr = typedefType->getDecl()->getAttr<clang::SwiftNameAttr>())
+              activeAttr = decodeAttr(nameAttr);
+          }
+        }
+      }
     }
 
     Optional<AnySwiftNameAttr> result = activeAttr;
@@ -836,16 +869,18 @@ static bool omitNeedlessWordsInFunctionName(
     StringRef argumentName;
     if (i < argumentNames.size())
       argumentName = argumentNames[i];
-    bool hasDefaultArg =
+    auto argumentAttrs =
         ClangImporter::Implementation::inferDefaultArgument(
             param->getType(),
             getParamOptionality(param, !nonNullArgs.empty() && nonNullArgs[i]),
             nameImporter.getIdentifier(baseName), argumentName, i == 0,
-            isLastParameter, nameImporter) != DefaultArgumentKind::None;
+            isLastParameter, nameImporter);
 
-    paramTypes.push_back(getClangTypeNameForOmission(clangCtx,
-                                                     param->getOriginalType())
-                            .withDefaultArgument(hasDefaultArg));
+    paramTypes.push_back(
+        (argumentAttrs.hasAlternateCXXOptionsEnumName()
+             ? OmissionTypeName(argumentAttrs.getAlternateCXXOptionsEnumName())
+             : getClangTypeNameForOmission(clangCtx, param->getOriginalType()))
+            .withDefaultArgument(argumentAttrs.hasDefaultArg()));
   }
 
   // Find the property names.
@@ -996,15 +1031,24 @@ bool NameImporter::hasNamingConflict(const clang::NamedDecl *decl,
   lookupResult.setAllowHidden(true);
   lookupResult.suppressDiagnostics();
 
-  if (clangSema.LookupName(lookupResult, /*scope=*/nullptr)) {
+  // Only force the Objective-C codepath in LookupName if clangSema.TUScope is
+  // nullptr
+  if (clangSema.LookupName(lookupResult, /*scope=*/clangSema.TUScope,
+                           /*AllowBuiltinCreation=*/false,
+                           /*ForceNoCPlusPlus=*/!clangSema.TUScope)) {
     if (std::any_of(lookupResult.begin(), lookupResult.end(), conflicts))
       return true;
   }
 
-  lookupResult.clear(clang::Sema::LookupTagName);
-  if (clangSema.LookupName(lookupResult, /*scope=*/nullptr)) {
-    if (std::any_of(lookupResult.begin(), lookupResult.end(), conflicts))
-      return true;
+  // No need to lookup tags if we are using C++ mode.
+  if (!clang::LangStandard::getLangStandardForKind(
+          clangSema.getLangOpts().LangStd)
+          .isCPlusPlus()) {
+    lookupResult.clear(clang::Sema::LookupTagName);
+    if (clangSema.LookupName(lookupResult, /*scope=*/nullptr)) {
+      if (std::any_of(lookupResult.begin(), lookupResult.end(), conflicts))
+        return true;
+    }
   }
 
   return false;
@@ -1255,7 +1299,7 @@ NameImporter::considerAsyncImport(
       }
 
       // Check whether the parameter itself has a name that indicates that
-      // it is a completion handelr.
+      // it is a completion handler.
       if (isCompletionHandlerParamName(
               params[completionHandlerParamIndex]->getName()))
         break;
@@ -1409,7 +1453,7 @@ bool NameImporter::hasErrorMethodNameCollision(
   // been marked NS_SWIFT_UNAVAILABLE, because it's actually marked unavailable,
   // or because it was deprecated before our API sunset. We can handle
   // "conflicts" where one form is unavailable.
-  return !isUnavailableInSwift(conflict, availability,
+  return !isUnavailableInSwift(conflict, &availability,
                                enableObjCInterop());
 }
 
@@ -1473,14 +1517,14 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       completionHandlerParamIndex =
           swiftAsyncAttr->getCompletionHandlerIndex().getASTIndex();
     }
-    
+
     if (const auto *asyncErrorAttr = D->getAttr<clang::SwiftAsyncErrorAttr>()) {
       switch (auto convention = asyncErrorAttr->getConvention()) {
       // No flag parameter in these cases.
       case clang::SwiftAsyncErrorAttr::NonNullError:
       case clang::SwiftAsyncErrorAttr::None:
         break;
-      
+
       // Get the flag argument index and polarity from the attribute.
       case clang::SwiftAsyncErrorAttr::NonZeroArgument:
       case clang::SwiftAsyncErrorAttr::ZeroArgument:
@@ -1670,9 +1714,88 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     }
   }
 
-  // For empty names, there is nothing to do.
-  if (D->getDeclName().isEmpty())
+  // Special case: unnamed/anonymous fields.
+  if (auto field = dyn_cast<clang::FieldDecl>(D)) {
+    static_assert((clang::Decl::lastField - clang::Decl::firstField) == 2,
+                  "update logic for new FieldDecl subclasses");
+    if (isa<clang::ObjCIvarDecl>(D) || isa<clang::ObjCAtDefsFieldDecl>(D))
+      // These are not ordinary fields and are not imported into Swift.
+      return result;
+
+    if (field->isAnonymousStructOrUnion() || field->getDeclName().isEmpty()) {
+      // Generate a field name for anonymous fields, this will be used in
+      // order to be able to expose the indirect fields injected from there
+      // as computed properties forwarding the access to the subfield.
+      std::string name;
+      llvm::raw_string_ostream nameStream(name);
+
+      nameStream << "__Anonymous_field" << field->getFieldIndex();
+      result.setDeclName(swiftCtx.getIdentifier(nameStream.str()));
+      result.setEffectiveContext(field->getDeclContext());
+      return result;
+    }
+  }
+
+  if (D->getDeclName().isEmpty()) {
+    // If the type has no name and no structure name, but is not anonymous,
+    // generate a name for it. Specifically this is for cases like:
+    //   struct a {
+    //     struct {} z;
+    //   }
+    // Where the member z is an unnamed struct, but does have a member-name
+    // and is accessible as a member of struct a.
+    if (auto recordDecl = dyn_cast<clang::RecordDecl>(
+                            D->getLexicalDeclContext())) {
+      for (auto field : recordDecl->fields()) {
+        auto fieldTagDecl = field->getType()->getAsTagDecl();
+        if (fieldTagDecl == D) {
+          // Create a name for the declaration from the field name.
+          std::string name;
+          llvm::raw_string_ostream nameStream(name);
+
+          const char *kind;
+          if (fieldTagDecl->isStruct())
+            kind = "struct";
+          else if (fieldTagDecl->isUnion())
+            kind = "union";
+          else if  (fieldTagDecl->isEnum())
+            kind = "enum";
+          else
+            llvm_unreachable("unknown decl kind");
+
+          nameStream << "__Unnamed_" << kind << "_";
+          if (field->isAnonymousStructOrUnion()) {
+            nameStream << "__Anonymous_field" << field->getFieldIndex();
+          } else {
+            assert(!field->getDeclName().isEmpty() &&
+                   "Microsoft anonymous struct extension?");
+            nameStream << field->getName();
+          }
+          result.setDeclName(swiftCtx.getIdentifier(nameStream.str()));
+          result.setEffectiveContext(D->getDeclContext());
+          return result;
+        }
+      }
+    }
+
+    // If this enum inherits from a typedef we can compute the name from the
+    // typedef (even if it's an anonymous enum).
+    if (auto enumDecl = dyn_cast<clang::EnumDecl>(D)) {
+      // Intentionally don't get the canonical type here.
+      if (auto typedefType = dyn_cast<clang::TypedefType>(enumDecl->getIntegerType().getTypePtr())) {
+        // If the typedef is available in Swift, the user will get ambiguity.
+        // It also means they may not have intended this API to be imported like this.
+        if (importer::isUnavailableInSwift(typedefType->getDecl(), nullptr, true)) {
+          result.setDeclName(swiftCtx.getIdentifier(typedefType->getDecl()->getName()));
+          result.setEffectiveContext(D->getDeclContext());
+          return result;
+        }
+      }
+    }
+
+    // Otherwise, for empty names, there is nothing to do.
     return result;
+  }
 
   /// Whether the result is a function name.
   bool isFunction = false;
@@ -1709,11 +1832,12 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   case clang::DeclarationName::CXXOperatorName: {
     auto op = D->getDeclName().getCXXOverloadedOperator();
     auto functionDecl = dyn_cast<clang::FunctionDecl>(D);
-    if (!functionDecl) {
-      // This can happen for example for templated operators functions.
-      // We don't support those, yet.
+
+    if (auto functionTemplate = dyn_cast<clang::FunctionTemplateDecl>(D))
+      functionDecl = functionTemplate->getAsFunction();
+
+    if (!functionDecl)
       return ImportedName();
-    }
 
     switch (op) {
     case clang::OverloadedOperatorKind::OO_Plus:
@@ -1721,28 +1845,29 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     case clang::OverloadedOperatorKind::OO_Star:
     case clang::OverloadedOperatorKind::OO_Slash:
     case clang::OverloadedOperatorKind::OO_Percent:
+    case clang::OverloadedOperatorKind::OO_Caret:
     case clang::OverloadedOperatorKind::OO_Amp:
     case clang::OverloadedOperatorKind::OO_Pipe:
+    case clang::OverloadedOperatorKind::OO_Exclaim:
     case clang::OverloadedOperatorKind::OO_Less:
     case clang::OverloadedOperatorKind::OO_Greater:
     case clang::OverloadedOperatorKind::OO_LessLess:
     case clang::OverloadedOperatorKind::OO_GreaterGreater:
     case clang::OverloadedOperatorKind::OO_EqualEqual:
+    case clang::OverloadedOperatorKind::OO_PlusPlus:
     case clang::OverloadedOperatorKind::OO_ExclaimEqual:
     case clang::OverloadedOperatorKind::OO_LessEqual:
     case clang::OverloadedOperatorKind::OO_GreaterEqual:
     case clang::OverloadedOperatorKind::OO_AmpAmp:
-    case clang::OverloadedOperatorKind::OO_PipePipe:
-      baseName = clang::getOperatorSpelling(op);
+    case clang::OverloadedOperatorKind::OO_PipePipe: {
+      auto operatorName = isa<clang::CXXMethodDecl>(functionDecl)
+                              ? "__operator" + std::string{getOperatorName(op)}
+                              : clang::getOperatorSpelling(op);
+      baseName = swiftCtx.getIdentifier(operatorName).str();
       isFunction = true;
-      argumentNames.resize(
-          functionDecl->param_size() +
-              // C++ operators that are implemented as non-static member functions
-              // get imported into Swift as static member functions that use an
-              // additional parameter for the left-hand side operand instead of
-              // the receiver object.
-              (isa<clang::CXXMethodDecl>(D) ? 1 : 0));
+      addEmptyArgNamesForClangFunction(functionDecl, argumentNames);
       break;
+    }
     case clang::OverloadedOperatorKind::OO_Call:
       baseName = "callAsFunction";
       isFunction = true;
@@ -2025,8 +2150,9 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       auto &astContext = classTemplateSpecDecl->getASTContext();
       // Itanium mangler produces valid Swift identifiers, use it to generate a name for
       // this instantiation.
-      clang::MangleContext *mangler = clang::ItaniumMangleContext::create(
-          astContext, astContext.getDiagnostics());
+      std::unique_ptr<clang::MangleContext> mangler{
+          clang::ItaniumMangleContext::create(astContext,
+                                              astContext.getDiagnostics())};
       llvm::SmallString<128> storage;
       llvm::raw_svector_ostream buffer(storage);
       mangler->mangleTypeName(astContext.getRecordType(classTemplateSpecDecl),
@@ -2158,10 +2284,6 @@ static bool shouldIgnoreMacro(StringRef name, const clang::MacroInfo *macro,
   if (macro->tokens_empty())
     return true;
 
-  // Currently we only convert non-function-like macros.
-  if (macro->isFunctionLike())
-    return true;
-
   // Consult the list of macros to suppress.
   auto suppressMacro = llvm::StringSwitch<bool>(name)
 #define SUPPRESS_MACRO(NAME) .Case(#NAME, true)
@@ -2204,6 +2326,17 @@ ImportedName NameImporter::importName(const clang::NamedDecl *decl,
   }
   ++ImportNameNumCacheMisses;
   auto res = importNameImpl(decl, version, givenName);
+
+  // Add information about the async version of the name to the non-async
+  // version of the name.
+  if (!version.supportsConcurrency()) {
+    if (auto importedAsyncName = importName(decl, version.withConcurrency(true),
+                                            givenName)) {
+      res.info.hasAsyncAlternateInfo = importedAsyncName.info.hasAsyncInfo;
+      res.info.asyncInfo = importedAsyncName.info.asyncInfo;
+    }
+  }
+
   if (!givenName)
     importNameCache[key] = res;
   return res;

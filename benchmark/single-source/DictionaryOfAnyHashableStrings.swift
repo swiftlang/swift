@@ -16,7 +16,7 @@ import TestsUtils
 // small ASCII String keys. Untyped NSDictionary values get imported as this
 // type, so it occurs relatively often in practice.
 
-public var DictionaryOfAnyHashableStrings = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "DictionaryOfAnyHashableStrings_insert",
     runFunction: run_DictionaryOfAnyHashableStrings_insert,
@@ -74,7 +74,7 @@ public func run_DictionaryOfAnyHashableStrings_lookup(_ n: Int) {
   for _ in 1...n {
     for i in 0 ..< keys.count {
       let key = keys[i]
-      CheckResults((workload[key] as! Int) == i)
+      check((workload[key] as! Int) == i)
     }
   }
 }

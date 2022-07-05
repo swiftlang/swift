@@ -30,3 +30,11 @@ func testActor(obj: MyActor) async {
 // ACTOR-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: receiveNonSendable({#arg: MyNonSendable#})[' async'][#Void#]; name=receiveNonSendable(arg:); diagnostics=warning:actor-isolated 'receiveNonSendable(arg:)' should only be referenced from inside the actor{{$}}
 // ACTOR: End completions
 }
+
+func testClosure(obj: (Int) async -> Void) {
+  obj(#^CLOSURE_CALL^#)
+// FIXME: Emit diagnostics
+// CLOSURE_CALL: Begin completions
+// CLOSURE_CALL-DAG: Pattern/CurrModule/Flair[ArgLabels]/NotRecommended: ['(']{#Int#}[')'][' async'][#Void#]; name={{$}}
+// CLOSURE_CALL: End completions
+}

@@ -590,7 +590,7 @@ sourcekitd_response_t
 sourcekitd_send_request_sync(sourcekitd_object_t req);
 
 /// Used to cancel a request that has been invoked asynchronously.
-typedef void *sourcekitd_request_handle_t;
+typedef const void *sourcekitd_request_handle_t;
 
 #if SOURCEKITD_HAS_BLOCKS
 /// Receives the response of an asynchronous request or notification.
@@ -626,6 +626,10 @@ sourcekitd_send_request(sourcekitd_object_t req,
 SOURCEKITD_PUBLIC
 void
 sourcekitd_cancel_request(sourcekitd_request_handle_t handle);
+
+/// Dispose a request handle returned by \c sourcekitd_send_request.
+SOURCEKITD_PUBLIC
+void sourcekitd_request_handle_dispose(sourcekitd_request_handle_t handle);
 
 #if SOURCEKITD_HAS_BLOCKS
 

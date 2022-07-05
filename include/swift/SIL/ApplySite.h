@@ -38,8 +38,10 @@ class FullApplySite;
 
 struct ApplySiteKind {
   enum innerty : std::underlying_type<SILInstructionKind>::type {
-#define APPLYSITE_INST(ID, PARENT) ID = unsigned(SILInstructionKind::ID),
-#include "swift/SIL/SILNodes.def"
+    ApplyInst = unsigned(SILInstructionKind::ApplyInst),
+    PartialApplyInst = unsigned(SILInstructionKind::PartialApplyInst),
+    TryApplyInst = unsigned(SILInstructionKind::TryApplyInst),
+    BeginApplyInst = unsigned(SILInstructionKind::BeginApplyInst),
   } value;
 
   explicit ApplySiteKind(SILInstructionKind kind) {
@@ -60,10 +62,14 @@ struct ApplySiteKind {
 private:
   static Optional<innerty> fromNodeKindHelper(SILInstructionKind kind) {
     switch (kind) {
-#define APPLYSITE_INST(ID, PARENT)                                             \
-  case SILInstructionKind::ID:                                                 \
-    return ApplySiteKind::ID;
-#include "swift/SIL/SILNodes.def"
+    case SILInstructionKind::ApplyInst:
+      return ApplySiteKind::ApplyInst;
+    case SILInstructionKind::PartialApplyInst:
+      return ApplySiteKind::PartialApplyInst;
+    case SILInstructionKind::TryApplyInst:
+      return ApplySiteKind::TryApplyInst;
+    case SILInstructionKind::BeginApplyInst:
+      return ApplySiteKind::BeginApplyInst;
     default:
       return None;
     }
@@ -163,6 +169,10 @@ public:
     FOREACH_IMPL_RETURN(getCalleeFunction());
   }
 
+  bool isCalleeDynamicallyReplaceable() const {
+    FOREACH_IMPL_RETURN(isCalleeDynamicallyReplaceable());
+  }
+
   /// Return the referenced function if the callee is a function_ref
   /// instruction.
   SILFunction *getReferencedFunctionOrNull() const {
@@ -237,6 +247,7 @@ public:
   bool isCalleeThin() const {
     switch (getSubstCalleeType()->getRepresentation()) {
     case SILFunctionTypeRepresentation::CFunctionPointer:
+    case SILFunctionTypeRepresentation::CXXMethod:
     case SILFunctionTypeRepresentation::Thin:
     case SILFunctionTypeRepresentation::Method:
     case SILFunctionTypeRepresentation::ObjCMethod:
@@ -318,7 +329,7 @@ public:
     case ApplySiteKind::PartialApplyInst:
       // The arguments to partial_apply are a suffix of the partial_apply's
       // callee. Note that getSubstCalleeConv is function type of the callee
-      // argument passed to this apply, not necessarilly the function type of
+      // argument passed to this apply, not necessarily the function type of
       // the underlying callee function (i.e. it is based on the `getCallee`
       // type, not the `getCalleeOrigin` type).
       //
@@ -496,8 +507,9 @@ public:
 
 struct FullApplySiteKind {
   enum innerty : std::underlying_type<SILInstructionKind>::type {
-#define FULLAPPLYSITE_INST(ID, PARENT) ID = unsigned(SILInstructionKind::ID),
-#include "swift/SIL/SILNodes.def"
+    ApplyInst = unsigned(SILInstructionKind::ApplyInst),
+    TryApplyInst = unsigned(SILInstructionKind::TryApplyInst),
+    BeginApplyInst = unsigned(SILInstructionKind::BeginApplyInst),
   } value;
 
   explicit FullApplySiteKind(SILInstructionKind kind) {
@@ -518,10 +530,12 @@ struct FullApplySiteKind {
 private:
   static Optional<innerty> fromNodeKindHelper(SILInstructionKind kind) {
     switch (kind) {
-#define FULLAPPLYSITE_INST(ID, PARENT)                                         \
-  case SILInstructionKind::ID:                                                 \
-    return FullApplySiteKind::ID;
-#include "swift/SIL/SILNodes.def"
+    case SILInstructionKind::ApplyInst:
+      return FullApplySiteKind::ApplyInst;
+    case SILInstructionKind::TryApplyInst:
+      return FullApplySiteKind::TryApplyInst;
+    case SILInstructionKind::BeginApplyInst:
+      return FullApplySiteKind::BeginApplyInst;
     default:
       return None;
     }
@@ -570,18 +584,19 @@ public:
     return getSubstCalleeConv().hasIndirectSILResults();
   }
 
-  /// If our apply site has a single direct result SILValue, return that
-  /// SILValue. Return SILValue() otherwise.
+  /// Get the SIL value that represents all of the given call's results. For a
+  /// single direct result, returns the actual result. For multiple results,
+  /// returns a pseudo-result tuple. The tuple has no storage of its own. The
+  /// real results must be extracted from it.
   ///
-  /// This means that:
+  /// For ApplyInst, returns the single-value instruction itself.
   ///
-  /// 1. If we have an ApplyInst, we just visit the apply.
-  /// 2. If we have a TryApplyInst, we visit the first argument of the normal
-  ///    block.
-  /// 3. If we have a BeginApplyInst, we return SILValue() since the begin_apply
-  ///    yields values instead of returning them. A returned value should only
-  ///    be valid after a full apply site has completely finished executing.
-  SILValue getSingleDirectResult() const {
+  /// For TryApplyInst returns the continuation block argument.
+  ///
+  /// For BeginApplyInst, returns an invalid value. For coroutines, there is no
+  /// single value representing all results. Yielded values are generally
+  /// handled differently since they have the convention of incoming arguments.
+  SILValue getResult() const {
     switch (getKind()) {
     case FullApplySiteKind::ApplyInst:
       return SILValue(cast<ApplyInst>(getInstruction()));

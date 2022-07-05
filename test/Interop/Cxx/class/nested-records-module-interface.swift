@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=NestedRecords -I %S/Inputs -source-filename=x -enable-cxx-interop | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=NestedRecords -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
 
 // CHECK: struct S1 {
 // CHECK:   struct S2 {
@@ -28,10 +28,10 @@
 // CHECK: }
  
 // CHECK: struct S6 {
+// CHECK:   init()
 // CHECK:   struct E3 : Equatable, RawRepresentable {
 // CHECK:     typealias RawValue = {{UInt32|Int32}}
 // CHECK:   }
-// CHECK:   init()
 // CHECK: }
  
 // CHECK: struct S7 {
@@ -57,39 +57,39 @@
 // CHECK: }
 
 // CHECK: struct HasForwardDeclaredNestedType {
+// CHECK:   init()
 // CHECK:   struct ForwardDeclaredType {
 // CHECK:     init()
 // CHECK:   }
 // CHECK:   struct NormalSubType {
 // CHECK:     init()
 // CHECK:   }
-// CHECK:   init()
 // CHECK: }
 
 // CHECK: struct HasForwardDeclaredTemplateChild {
+// CHECK:   init()
 // CHECK:   struct ForwardDeclaredClassTemplate<T> {
 // CHECK:   }
 // CHECK:   struct DeclaresForwardDeclaredClassTemplateFriend {
 // CHECK:     init()
 // CHECK:   }
-// CHECK:   init()
 // CHECK: }
 
-// CHECK: extension NestedDeclIsAFirstForwardDeclaration {
+// CHECK: enum NestedDeclIsAFirstForwardDeclaration {
 // CHECK:   struct ForwardDeclaresFriend {
 // CHECK:     init()
 // CHECK:   }
 // CHECK:   struct ForwardDeclaredFriend {
 // CHECK:     init()
 // CHECK:   }
-// CHECK:   static func takesFriend(_ b: NestedDeclIsAFirstForwardDeclaration.ForwardDeclaredFriend)
+// CHECK:   static func takesFriend(_ f: NestedDeclIsAFirstForwardDeclaration.ForwardDeclaredFriend)
 // CHECK:   struct HasNestedForwardDeclaration {
+// CHECK:     init()
 // CHECK:     struct IsNestedForwardDeclaration {
-// CHECK:       var a: Int32
 // CHECK:       init()
 // CHECK:       init(a: Int32)
+// CHECK:       var a: Int32
 // CHECK:     }
-// CHECK:     init()
 // CHECK:   }
 // CHECK:   static func takesHasNestedForwardDeclaration(_: NestedDeclIsAFirstForwardDeclaration.HasNestedForwardDeclaration)
 // CHECK: }

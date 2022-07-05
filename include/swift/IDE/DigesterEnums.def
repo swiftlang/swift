@@ -136,12 +136,14 @@ KEY_BOOL(IsExternal, isExternal)
 KEY_BOOL(IsEnumExhaustive, isEnumExhaustive)
 KEY_BOOL(HasMissingDesignatedInitializers, hasMissingDesignatedInitializers)
 KEY_BOOL(InheritsConvenienceInitializers, inheritsConvenienceInitializers)
+KEY_BOOL(IsFromExtension, isFromExtension)
 
 KEY(kind)
 
 KEY_STRING(Name, name)
 KEY_STRING(PrintedName, printedName)
 KEY_STRING(Usr, usr)
+KEY_STRING(MangledName, mangledName)
 KEY_STRING(Location, location)
 KEY_STRING(ModuleName, moduleName)
 KEY_STRING(SuperclassUsr, superclassUsr)
@@ -160,6 +162,7 @@ KEY_STRING(InitKind, init_kind)
 
 KEY_STRING_ARR(SuperclassNames, superclassNames)
 KEY_STRING_ARR(ToolArgs, tool_arguments)
+KEY_STRING_ARR(SPIGroups, spi_group_names)
 
 KEY_UINT(SelfIndex, selfIndex)
 KEY_UINT(FixedBinaryOrder, fixedbinaryorder)

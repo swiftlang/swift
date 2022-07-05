@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -typecheck -swift-version 5 -emit-module-interface-path - -module-name test %s | %FileCheck %s
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name test
+// RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name test
+// RUN: %FileCheck %s < %t.swiftinterface
 
 public class Base {
   public init(x: Int) {}

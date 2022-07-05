@@ -23,6 +23,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 
 using namespace swift;
@@ -45,8 +46,8 @@ bool swift::canBeMemberName(StringRef identifier) {
 }
 
 bool swift::isPreposition(StringRef word) {
-#define PREPOSITION(Word)                       \
-  if (word.equals_lower(#Word))                 \
+#define PREPOSITION(Word)                                                      \
+  if (word.equals_insensitive(#Word))                                          \
     return true;
 #include "PartsOfSpeech.def"
 
@@ -55,11 +56,11 @@ bool swift::isPreposition(StringRef word) {
 
 PartOfSpeech swift::getPartOfSpeech(StringRef word) {
   // FIXME: This implementation is woefully inefficient.
-#define PREPOSITION(Word)                       \
-  if (word.equals_lower(#Word))                 \
+#define PREPOSITION(Word)                                                      \
+  if (word.equals_insensitive(#Word))                                          \
     return PartOfSpeech::Preposition;
-#define VERB(Word)                              \
-  if (word.equals_lower(#Word))                 \
+#define VERB(Word)                                                             \
+  if (word.equals_insensitive(#Word))                                          \
     return PartOfSpeech::Verb;
 #include "PartsOfSpeech.def"
 
@@ -392,8 +393,8 @@ static bool matchNameWordToTypeWord(StringRef nameWord, StringRef typeWord) {
     // We can match the suffix of the type so long as everything preceding the
     // match is neither a lowercase letter nor a '_'. This ignores type
     // prefixes for acronyms, e.g., the 'NS' in 'NSURL'.
-    if (typeWord.endswith_lower(nameWord) && 
-        !clang::isLowercase(typeWord[typeWord.size()-nameWord.size()])) {
+    if (typeWord.endswith_insensitive(nameWord) &&
+        !clang::isLowercase(typeWord[typeWord.size() - nameWord.size()])) {
       // Check that everything preceding the match is neither a lowercase letter
       // nor a '_'.
       for (unsigned i = 0, n = nameWord.size(); i != n; ++i) {
@@ -405,7 +406,7 @@ static bool matchNameWordToTypeWord(StringRef nameWord, StringRef typeWord) {
 
     // We can match a prefix so long as everything following the match is
     // a number.
-    if (typeWord.startswith_lower(nameWord)) {
+    if (typeWord.startswith_insensitive(nameWord)) {
       for (unsigned i = nameWord.size(), n = typeWord.size(); i != n; ++i) {
         if (!clang::isDigit(typeWord[i])) return false;
       }
@@ -417,7 +418,7 @@ static bool matchNameWordToTypeWord(StringRef nameWord, StringRef typeWord) {
   }
 
   // Check for an exact match.
-  return nameWord.equals_lower(typeWord);
+  return nameWord.equals_insensitive(typeWord);
 }
 
 /// Match the beginning of the name to the given type name.
@@ -457,10 +458,14 @@ StringRef swift::matchLeadingTypeName(StringRef name,
   return nameMismatch.getRestOfStr();
 }
 
-StringRef StringScratchSpace::copyString(StringRef string) {
-  void *memory = Allocator.Allocate(string.size(), alignof(char));
+const char *swift::copyCString(StringRef string,
+                               llvm::BumpPtrAllocator &Allocator) {
+  if (string.empty())
+    return "";
+  char *memory = Allocator.Allocate<char>(string.size() + 1);
   memcpy(memory, string.data(), string.size());
-  return StringRef(static_cast<char *>(memory), string.size());
+  memory[string.size()] = '\0';
+  return memory;
 }
 
 void InheritedNameSet::add(StringRef name) {
@@ -671,8 +676,8 @@ static Words::iterator matchTypeNameFromBackWithSpecialCases(
 
       if (shortenedNameWord != newShortenedNameWord) {
         unsigned targetSize = newShortenedNameWord.size();
-        auto newIter = llvm::make_reverse_iterator(WordIterator(name,
-                                                                targetSize));
+        auto newIter = std::make_reverse_iterator(WordIterator(name,
+                                                               targetSize));
 #ifndef NDEBUG
         while (nameWordRevIter.base().getPosition() > targetSize)
           ++nameWordRevIter;
@@ -1387,4 +1392,28 @@ Optional<StringRef> swift::stripWithCompletionHandlerSuffix(StringRef name) {
   }
 
   return None;
+}
+
+void swift::writeEscaped(llvm::StringRef Str, llvm::raw_ostream &OS) {
+  for (unsigned i = 0, e = Str.size(); i != e; ++i) {
+    unsigned char c = Str[i];
+
+    switch (c) {
+      case '\\':
+        OS << '\\' << '\\';
+        break;
+      case '\t':
+        OS << '\\' << 't';
+        break;
+      case '\n':
+        OS << '\\' << 'n';
+        break;
+      case '"':
+        OS << '\\' << '"';
+        break;
+      default:
+        OS << c;
+        break;
+    }
+  }
 }

@@ -299,7 +299,7 @@ bb2:
 
 // CHECK: bb3([[ARG:%.*]] : @owned $@callee_owned () -> Int):
 bb3:
-// CHECK-NOT: load [[STACK]]
+// CHECK-NOT: load
   %13 = load [copy] %1 : $*@callee_owned () -> Int
 // CHECK: [[COPY:%.*]] = copy_value [[ARG]]
 // CHECK: [[RESULT:%.*]] = apply [[COPY]]
@@ -311,10 +311,10 @@ bb3:
   //       block.
 // CHECK: bb4
 bb4:
-// CHECK-NOT: destroy_addr [[STACK]]
+// CHECK-NOT: destroy_addr
 // CHECK: destroy_value [[ARG]]
   destroy_addr %1 : $*@callee_owned () -> Int
-// CHECK-NOT: dealloc_stack [[STACK]]
+// CHECK-NOT: dealloc_stack
   dealloc_stack %1 : $*@callee_owned () -> Int
   return %15 : $Int
 }
@@ -488,3 +488,53 @@ bb0:
   dealloc_stack %1 : $*((), ())
   return %16 : $((), ())
 }
+
+// CHECK-LABEL: sil [ossa] @dont_optimize_optional_in_multiple_blocks :
+// CHECK:         alloc_stack
+// CHECK:       } // end sil function 'dont_optimize_optional_in_multiple_blocks'
+sil [ossa] @dont_optimize_optional_in_multiple_blocks : $@convention(method) (@guaranteed Optional<Klass>) -> () {
+bb0(%0 : @guaranteed $Optional<Klass>):
+  %1 = copy_value %0 : $Optional<Klass>
+  %32 = alloc_stack $Optional<Klass>
+  store %1 to [init] %32 : $*Optional<Klass>
+  switch_enum %0 : $Optional<Klass>, case #Optional.some!enumelt: bb6, case #Optional.none!enumelt: bb5
+
+bb5:
+  dealloc_stack %32 : $*Optional<Klass>
+  br bb7
+
+bb6(%50 : @guaranteed $Klass):
+  %53 = load [take] %32 : $*Optional<Klass>
+  destroy_value %53 : $Optional<Klass>
+  dealloc_stack %32 : $*Optional<Klass>
+  br bb7
+
+bb7:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @optimize_optional_in_single_block :
+// CHECK-NOT:     alloc_stack
+// CHECK:       } // end sil function 'optimize_optional_in_single_block'
+sil [ossa] @optimize_optional_in_single_block : $@convention(method) (@guaranteed Optional<Klass>) -> () {
+bb0(%0 : @guaranteed $Optional<Klass>):
+  switch_enum %0 : $Optional<Klass>, case #Optional.some!enumelt: bb6, case #Optional.none!enumelt: bb5
+
+bb5:
+  br bb7
+
+bb6(%50 : @guaranteed $Klass):
+  %32 = alloc_stack $Optional<Klass>
+  %1 = copy_value %0 : $Optional<Klass>
+  store %1 to [init] %32 : $*Optional<Klass>
+  %53 = load [take] %32 : $*Optional<Klass>
+  destroy_value %53 : $Optional<Klass>
+  dealloc_stack %32 : $*Optional<Klass>
+  br bb7
+
+bb7:
+  %r = tuple ()
+  return %r : $()
+}
+

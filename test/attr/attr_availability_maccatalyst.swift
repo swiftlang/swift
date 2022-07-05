@@ -1,6 +1,6 @@
 // RUN: %swift -typecheck -verify -parse-stdlib -target x86_64-apple-ios51.0-macabi %s
 
-// REQUIRES: OS=maccatalyst
+// REQUIRES: maccatalyst_support
 
 @available(macCatalyst, introduced: 1.0, deprecated: 2.0, obsoleted: 9.0,
            message: "you don't want to do that anyway")

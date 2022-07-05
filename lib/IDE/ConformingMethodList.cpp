@@ -68,7 +68,8 @@ void ConformingMethodListCallbacks::doneParsing() {
   if (!ParsedExpr)
     return;
 
-  typeCheckContextAt(CurDeclContext, ParsedExpr->getLoc());
+  typeCheckContextAt(TypeCheckASTNodeAtLocContext::declContext(CurDeclContext),
+                     ParsedExpr->getLoc());
 
   Type T = ParsedExpr->getType();
 
@@ -171,43 +172,6 @@ void ConformingMethodListCallbacks::getMatchingMethods(
 }
 
 } // anonymous namespace.
-
-void PrintingConformingMethodListConsumer::handleResult(
-    const ConformingMethodListResult &result) {
-  OS << "-----BEGIN CONFORMING METHOD LIST-----\n";
-
-  OS << "- TypeName: ";
-  result.ExprType.print(OS);
-  OS << "\n";
-
-  OS << "- Members: ";
-  if (result.Members.empty())
-    OS << " []";
-  OS << "\n";
-  for (auto VD : result.Members) {
-    auto funcTy = cast<FuncDecl>(VD)->getMethodInterfaceType();
-    funcTy = result.ExprType->getTypeOfMember(result.DC->getParentModule(), VD,
-                                              funcTy);
-    auto resultTy = funcTy->castTo<FunctionType>()->getResult();
-
-    OS << "   - Name: ";
-    VD->getName().print(OS);
-    OS << "\n";
-
-    OS << "     TypeName: ";
-    resultTy.print(OS);
-    OS << "\n";
-
-    StringRef BriefDoc = VD->getBriefComment();
-    if (!BriefDoc.empty()) {
-      OS << "     DocBrief: \"";
-      OS << VD->getBriefComment();
-      OS << "\"\n";
-    }
-  }
-
-  OS << "-----END CONFORMING METHOD LIST-----\n";
-}
 
 CodeCompletionCallbacksFactory *
 swift::ide::makeConformingMethodListCallbacksFactory(

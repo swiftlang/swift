@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-sil -verify %s -requirement-machine=off | %FileCheck %s -check-prefix=CHECK-SIL
+// RUN: %target-swift-emit-sil -verify %s -warn-redundant-requirements | %FileCheck %s -check-prefix=CHECK-SIL
 
 import _Differentiation
 
@@ -51,12 +51,12 @@ func foo<T>(_ x: Wrapper<T>) {
 
 // Test case where associated derivative function's requirements are met.
 extension Wrapper where Scalar : Numeric {
-  @differentiable(reverse, wrt: self where Scalar : Differentiable & FloatingPoint)
+  @differentiable(reverse, wrt: self where Scalar : Differentiable & FloatingPoint) // expected-warning {{redundant conformance constraint 'Scalar' : 'Differentiable'}}
   func mean() -> Wrapper {
     return self
   }
 
-  @differentiable(reverse, wrt: self where Scalar : Differentiable & FloatingPoint)
+  @differentiable(reverse, wrt: self where Scalar : Differentiable & FloatingPoint) // expected-warning {{redundant conformance constraint 'Scalar' : 'Differentiable'}}
   func variance() -> Wrapper {
     return mean() // ok
   }

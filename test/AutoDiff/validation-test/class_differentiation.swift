@@ -1,6 +1,6 @@
-// RUN: %target-run-simple-swift(-Xfrontend -requirement-machine=off)
+// RUN: %target-run-simple-swift
 // NOTE: Verify whether forward-mode differentiation crashes. It currently does.
-// RUN: not --crash %target-swift-frontend -enable-experimental-forward-mode-differentiation -emit-sil %s -requirement-machine=off
+// RUN: not --crash %target-swift-frontend -enable-experimental-forward-mode-differentiation -emit-sil %s
 // REQUIRES: executable_test
 
 import StdlibUnittest

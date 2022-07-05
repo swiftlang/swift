@@ -15,9 +15,11 @@
 
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/Version.h"
+#include "swift/Basic/PathRemapper.h"
 #include "swift/Frontend/FrontendInputsAndOutputs.h"
 #include "swift/Frontend/InputFile.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/StringMap.h"
 
 #include <string>
 #include <vector>
@@ -47,6 +49,9 @@ public:
 
   /// An Objective-C header to import and make implicitly visible.
   std::string ImplicitObjCHeaderPath;
+
+  /// The map of aliases and underlying names of imported or referenced modules.
+  llvm::StringMap<StringRef> ModuleAliasMap;
 
   /// The name of the module that the frontend is building.
   std::string ModuleName;
@@ -94,6 +99,9 @@ public:
   /// Emit index data for imported serialized swift system modules.
   bool IndexSystemModules = false;
 
+  /// Avoid emitting index data for imported clang modules (pcms).
+  bool IndexIgnoreClangModules = false;
+
   /// If indexing system modules, don't index the stdlib.
   bool IndexIgnoreStdlib = false;
 
@@ -113,6 +121,7 @@ public:
     EmitSyntax,        ///< Parse and dump Syntax tree as JSON
     DumpAST,           ///< Parse, type-check, and dump AST
     PrintAST,          ///< Parse, type-check, and pretty-print AST
+    PrintASTDecl,      ///< Parse, type-check, and pretty-print AST declarations
 
     /// Parse and dump scope map.
     DumpScopeMaps,
@@ -177,6 +186,11 @@ public:
   /// debugger to use. When unset, the options will only be present if the
   /// module appears to not be a public module.
   Optional<bool> SerializeOptionsForDebugging;
+
+  /// When true the debug prefix map entries will be applied to debugging
+  /// options before serialization. These can be reconstructed at debug time by
+  /// applying the inverse map in SearchPathOptions.SearchPathRemapper.
+  bool DebugPrefixSerializedDebuggingOptions = false;
 
   /// When true, check if all required SwiftOnoneSupport symbols are present in
   /// the module.
@@ -324,8 +338,18 @@ public:
   /// skip nodes entirely, depending on the errors involved.
   bool AllowModuleWithCompilerErrors = false;
 
+  /// Downgrade all errors emitted in the module interface verification phase
+  /// to warnings.
+  /// TODO: remove this after we fix all project-side warnings in the interface.
+  bool DowngradeInterfaceVerificationError = false;
+
   /// True if the "-static" option is set.
   bool Static = false;
+
+  /// True if building with -experimental-hermetic-seal-at-link. Turns on
+  /// dead-stripping optimizations assuming that all users of library code
+  /// are present at LTO time.
+  bool HermeticSealAtLink = false;
 
   /// The different modes for validating TBD against the LLVM IR.
   enum class TBDValidationMode {
@@ -356,6 +380,10 @@ public:
   /// When set to `true`, the default resource folder will be set to
   /// '.../lib/swift', otherwise '.../lib/swift_static'.
   bool UseSharedResourceFolder = true;
+
+  /// Indicates whether to expose all public declarations in the generated clang
+  /// header.
+  bool ExposePublicDeclsInClangHeader = false;
 
   /// \return true if the given action only parses without doing other compilation steps.
   static bool shouldActionOnlyParse(ActionType);
@@ -418,16 +446,30 @@ public:
   /// Whether to include symbols with SPI information in the symbol graph.
   bool IncludeSPISymbolsInSymbolGraph = false;
 
+  /// Whether to reuse a frontend (i.e. compiler instance) for multiple
+  /// compilations. This prevents ASTContext being freed.
+  bool ReuseFrontendForMultipleCompilations = false;
+
+  /// This is used to obfuscate the serialized search paths so we don't have
+  /// to encode the actual paths into the .swiftmodule file.
+  PathObfuscator serializedPathObfuscator;
+
+  /// Avoid printing actual module content into the ABI descriptor file.
+  /// This should only be used as a workaround when emitting ABI descriptor files
+  /// crashes the compiler.
+  bool emptyABIDescriptor = false;
+
 private:
   static bool canActionEmitDependencies(ActionType);
   static bool canActionEmitReferenceDependencies(ActionType);
-  static bool canActionEmitObjCHeader(ActionType);
+  static bool canActionEmitClangHeader(ActionType);
   static bool canActionEmitLoadedModuleTrace(ActionType);
   static bool canActionEmitModule(ActionType);
   static bool canActionEmitModuleDoc(ActionType);
   static bool canActionEmitModuleSummary(ActionType);
   static bool canActionEmitInterface(ActionType);
   static bool canActionEmitABIDescriptor(ActionType);
+  static bool canActionEmitModuleSemanticInfo(ActionType);
 
 public:
   static bool doesActionGenerateSIL(ActionType);

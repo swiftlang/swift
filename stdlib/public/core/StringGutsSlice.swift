@@ -24,40 +24,37 @@ internal struct _StringGutsSlice {
   @inline(__always)
   internal init(_ guts: _StringGuts) {
     self._guts = guts
-    self._offsetRange = 0..<self._guts.count
+    self._offsetRange = Range(_uncheckedBounds: (0, guts.count))
   }
 
   @inline(__always)
   internal init(_ guts: _StringGuts, _ offsetRange: Range<Int>) {
+    _internalInvariant(
+      offsetRange.lowerBound >= 0 && offsetRange.upperBound <= guts.count)
     self._guts = guts
     self._offsetRange = offsetRange
   }
 
-  @inlinable
   internal var start: Int {
     @inline(__always) get { return _offsetRange.lowerBound }
   }
-  @inlinable
+
   internal var end: Int {
     @inline(__always) get { return _offsetRange.upperBound }
   }
 
-  @inlinable
   internal var count: Int {
     @inline(__always) get { return _offsetRange.count }
   }
 
-  @inlinable
   internal var isNFCFastUTF8: Bool {
     @inline(__always) get { return _guts.isNFCFastUTF8 }
   }
 
-  @inlinable
   internal var isASCII: Bool {
     @inline(__always) get { return _guts.isASCII }
   }
 
-  @inlinable
   internal var isFastUTF8: Bool {
     @inline(__always) get { return _guts.isFastUTF8 }
   }
@@ -71,11 +68,13 @@ internal struct _StringGutsSlice {
     }
   }
 
-  @inlinable
   internal var range: Range<String.Index> {
     @inline(__always) get {
-      return String.Index(_encodedOffset: _offsetRange.lowerBound)
-         ..< String.Index(_encodedOffset: _offsetRange.upperBound)
+      let lower = String.Index(_encodedOffset: _offsetRange.lowerBound)
+        ._scalarAligned
+      let higher = String.Index(_encodedOffset: _offsetRange.upperBound)
+        ._scalarAligned
+      return Range(_uncheckedBounds: (lower, higher))
     }
   }
 
@@ -95,14 +94,5 @@ internal struct _StringGutsSlice {
       return (Unicode.Scalar._replacementCharacter, 1)
     }
     return (scalar, len)
-  }
-
-  internal func foreignHasNormalizationBoundary(
-    before index: String.Index
-  ) -> Bool {
-    if index == range.lowerBound || index == range.upperBound {
-      return true
-    }
-    return _guts.foreignHasNormalizationBoundary(before: index)
   }
 }

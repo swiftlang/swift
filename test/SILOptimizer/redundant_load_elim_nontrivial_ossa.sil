@@ -258,14 +258,16 @@ bb2:
 bb3:
   br bb5
 
-bb4(%11 : $(Klass, Klass)):
-  %12 = tuple_extract %11 : $(Klass, Klass), 0
+bb4(%11 : @owned $(Klass, Klass)):
+  %12 = begin_borrow %11 : $(Klass, Klass)
+  %13 = tuple_extract %12 : $(Klass, Klass), 0
+  end_borrow  %12 : $(Klass, Klass)
   br bb5
 
 bb5:
   br bb5
 
-bb6(%15 : $Klass):
+bb6(%15 : @owned $Klass):
   br bb5
 
 bb7:
@@ -899,7 +901,8 @@ bb0(%0 : @owned $Klass):
   %5 = load [copy] %4 : $*Klass
   end_borrow %borrow1 : $AX
   set_deallocating %1 : $AX
-  dealloc_ref [stack] %1 : $AX
+  dealloc_ref %1 : $AX
+  dealloc_stack_ref %1 : $AX
   return %5 : $Klass
 }
 

@@ -87,7 +87,7 @@ public:
 protected:
   static bool convertDefIntoYAML(std::string outputPath) {
     std::error_code error;
-    llvm::raw_fd_ostream OS(outputPath, error, llvm::sys::fs::F_None);
+    llvm::raw_fd_ostream OS(outputPath, error, llvm::sys::fs::OF_None);
     if (OS.has_error() || error)
       return true;
 

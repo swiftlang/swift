@@ -1,4 +1,11 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -Onone -enable-copy-propagation | %FileCheck %s -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -Onone -enable-copy-propagation -enable-lexical-borrow-scopes=false | %FileCheck %s -DINT=i%target-ptrsize
+//
+// This test is currently disabled because mandatory copy propagation
+// is not part of the pipeline. It may be re-added to the pipeline,
+// but it isn't clear if we'll still need to emit poison references by
+// that time.
+//
+// REQUIRES: mandatory_copy_propagation
 
 // Test debug_value [poison] emission
 
@@ -78,7 +85,7 @@ public func testPoisonOptionalRef() {
 // CHECK: call %[[REFTY]]* @swift_{{unknownObjectRetain|retain}}(%[[REFTY]]* returned [[REF]])
 // CHECK: store %[[REFTY]]* [[REF]], %[[REFTY]]**
 // CHECK: call {{.*}} void @"$s12debug_poison6useAnyyyypF"(
-// CHECK: call void @swift_{{unknownObjectRelease|release}}(%[[REFTY]]* [[REF]]) #1
+// CHECK: call void @swift_{{unknownObjectRelease|release}}(%[[REFTY]]* [[REF]])
 // CHECK: [[GEP1:%.*]] = getelementptr inbounds %T12debug_poison1PP, %T12debug_poison1PP* %b.debug, i32 0, i32 0
 // CHECK: store %[[REFTY]]* inttoptr ([[INT]] 1088 to %[[REFTY]]*), %[[REFTY]]** [[GEP1]]
 // CHECK: call {{.*}} void @"$s12debug_poison7useNoneyyF"()
@@ -100,7 +107,7 @@ public func testPoisonExistential() {
 // CHECK: call %[[REFTY]]* @swift_{{unknownObjectRetain|retain}}(%[[REFTY]]* returned [[REF]])
 // CHECK: store %[[REFTY]]* [[REF]], %[[REFTY]]**
 // CHECK: call {{.*}} void @"$s12debug_poison6useAnyyyypF"(
-// CHECK: call void @swift_{{unknownObjectRelease|release}}(%[[REFTY]]* [[REF]]) #1
+// CHECK: call void @swift_{{unknownObjectRelease|release}}(%[[REFTY]]* [[REF]])
 // CHECK: [[GEP1:%.*]] = getelementptr inbounds %T12debug_poison1Q_Xl, %T12debug_poison1Q_Xl* %b.debug, i32 0, i32 0
 // CHECK: store %[[REFTY]]* inttoptr ([[INT]] 1088 to %[[REFTY]]*), %[[REFTY]]** [[GEP1]]
 // CHECK: call {{.*}} void @"$s12debug_poison7useNoneyyF"()

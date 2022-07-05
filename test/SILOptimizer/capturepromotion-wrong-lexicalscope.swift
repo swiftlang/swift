@@ -4,27 +4,28 @@
 
 // CHECK: sil hidden [ossa] @$s4null19captureStackPromoteSiycyF : $@convention(thin) () -> @owned @callee_guaranteed () -> Int {
 // CHECK: bb0:
-// CHECK:   %0 = alloc_box ${ var Int }, var, name "x", loc {{.*}}:32:7, scope 2
-// CHECK:   %1 = project_box %0 : ${ var Int }, 0, loc {{.*}}:32:7, scope 2
-// CHECK:   %2 = integer_literal $Builtin.IntLiteral, 1, loc {{.*}}:32:11, scope 2
-// CHECK:   %3 = metatype $@thin Int.Type, loc {{.*}}:32:11, scope 2
-// CHECK:   %4 = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int, loc {{.*}}:32:11, scope 2
-// CHECK:   %5 = apply %4(%2, %3) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int, loc {{.*}}:32:11, scope 2
-// CHECK:   store %5 to [trivial] %1 : $*Int, loc {{.*}}:32:11, scope 2
-// CHECK:   %7 = copy_value %0 : ${ var Int }, loc {{.*}}:33:11, scope 2
-// CHECK:   %8 = project_box %7 : ${ var Int }, 0, loc {{.*}}:33:11, scope 2
-// CHECK:   mark_function_escape %1 : $*Int, loc {{.*}}:33:11, scope 2
-// CHECK:   %10 = function_ref @$s4null19captureStackPromoteSiycyFSiycfU_Tf2i_n : $@convention(thin) (Int) -> Int, loc {{.*}}:33:11, scope 2
-// CHECK:   %11 = load [trivial] %8 : $*Int, loc {{.*}}:33:11, scope 2
-// CHECK:   destroy_value %7 : ${ var Int }, loc {{.*}}:33:11, scope 2
-// CHECK:   %13 = partial_apply [callee_guaranteed] %10(%11) : $@convention(thin) (Int) -> Int, loc {{.*}}:33:11, scope 2
-// CHECK:   debug_value %13 : $@callee_guaranteed () -> Int, let, name "f", loc {{.*}}:33:7, scope 2
-// There used to be a begin_borrow here. We leave an emptyline here to preserve line numbers.
-// CHECK:   %15 = copy_value %13 : $@callee_guaranteed () -> Int, loc {{.*}}:34:10, scope 2
+// CHECK:   [[BOX:%[^,]+]] = alloc_box ${ var Int }, var, name "x", loc {{.*}}:33:7, scope 3
+// CHECK:   [[BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[BOX]]
+// CHECK:   [[BOX_ADDR:%[^,]+]] = project_box [[BOX_LIFETIME]] : ${ var Int }, 0, loc {{.*}}:33:7, scope 3
+// CHECK:   [[ONE:%[^,]+]] = integer_literal $Builtin.IntLiteral, 1, loc {{.*}}:33:11, scope 3
+// CHECK:   [[THIN_INT_TYPE:%[^,]+]] = metatype $@thin Int.Type, loc {{.*}}:33:11, scope 3
+// CHECK:   [[INTEGER_LITERAL:%[^,]+]] = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int, loc {{.*}}:33:11, scope 3
+// CHECK:   [[ONE_INT:%[^,]+]] = apply [[INTEGER_LITERAL]]([[ONE]], [[THIN_INT_TYPE]]) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int, loc {{.*}}:33:11, scope 3
+// CHECK:   store [[ONE_INT]] to [trivial] [[BOX_ADDR]] : $*Int, loc {{.*}}:33:11, scope 3
+// CHECK:   [[BOX_COPY:%[^,]+]] = copy_value [[BOX_LIFETIME]] : ${ var Int }, loc {{.*}}:34:11, scope 3
+// CHECK:   [[BOX_COPY_ADDR:%[^,]+]] = project_box [[BOX_COPY]] : ${ var Int }, 0, loc {{.*}}:34:11, scope 3
+// CHECK:   mark_function_escape [[BOX_ADDR]] : $*Int, loc {{.*}}:34:11, scope 3
+// CHECK:   [[SPECIALIZED_F:%[^,]+]] = function_ref @$s4null19captureStackPromoteSiycyFSiycfU_Tf2i_n : $@convention(thin) (Int) -> Int, loc {{.*}}:34:11, scope 3
+// CHECK:   [[REGISTER_11:%[^,]+]] = load [trivial] [[BOX_COPY_ADDR]] : $*Int, loc {{.*}}:34:11, scope 3
+// CHECK:   destroy_value [[BOX_COPY]] : ${ var Int }, loc {{.*}}:34:11, scope 3
+// CHECK:   [[CLOSURE:%[^,]+]] = partial_apply [callee_guaranteed] [[SPECIALIZED_F]]([[REGISTER_11]]) : $@convention(thin) (Int) -> Int, loc {{.*}}:34:11, scope 3
+// CHECK:   [[BORROW:%.*]] = begin_borrow [lexical] [[CLOSURE]]
+// CHECK:   debug_value [[BORROW]] : $@callee_guaranteed () -> Int, let, name "f", loc {{.*}}:34:7, scope 3
+// CHECK:   [[CLOSURE_COPY:%[^,]+]] = copy_value [[BORROW]] : $@callee_guaranteed () -> Int, loc {{.*}}:35:10, scope 3
 // There used to be an end_borrow here. We leave an emptyline here to preserve line numbers.
-// CHECK:   destroy_value %13 : $@callee_guaranteed () -> Int, loc {{.*}}:35:1, scope 2
-// CHECK:   destroy_value %0 : ${ var Int }, loc {{.*}}:35:1, scope 2
-// CHECK:   return %15 : $@callee_guaranteed () -> Int, loc {{.*}}:34:3, scope 2
+// CHECK:   destroy_value [[CLOSURE]] : $@callee_guaranteed () -> Int, loc {{.*}}:36:1, scope 3
+// CHECK:   destroy_value [[BOX]] : ${ var Int }, loc {{.*}}:36:1, scope 3
+// CHECK:   return [[CLOSURE_COPY]] : $@callee_guaranteed () -> Int, loc {{.*}}:35:3, scope 3
 // CHECK: }
 
 

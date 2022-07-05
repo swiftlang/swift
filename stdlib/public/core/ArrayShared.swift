@@ -42,7 +42,8 @@ func _allocateUninitializedArray<Element>(_  builtinCount: Builtin.Word)
     // Doing the actual buffer allocation outside of the array.uninitialized
     // semantics function enables stack propagation of the buffer.
     let bufferObject = Builtin.allocWithTailElems_1(
-      _ContiguousArrayStorage<Element>.self, builtinCount, Element.self)
+       getContiguousArrayStorageType(for: Element.self),
+       builtinCount, Element.self)
 
     let (array, ptr) = Array<Element>._adoptStorage(bufferObject, count: count)
     return (array, ptr._rawValue)
@@ -68,6 +69,8 @@ func _deallocateUninitializedArray<Element>(
 @_alwaysEmitIntoClient
 @_semantics("array.finalize_intrinsic")
 @_effects(readnone)
+@_effects(escaping array.value** => return.value**)
+@_effects(escaping array.value**.class*.value** => return.value**.class*.value**)
 public // COMPILER_INTRINSIC
 func _finalizeUninitializedArray<Element>(
   _ array: __owned Array<Element>
@@ -98,6 +101,7 @@ extension Collection {
   internal func _makeCollectionDescription(
     withTypeName type: String? = nil
   ) -> String {
+#if !SWIFT_STDLIB_STATIC_PRINT
     var result = ""
     if let type = type {
       result += "\(type)(["
@@ -116,6 +120,9 @@ extension Collection {
     }
     result += type != nil ? "])" : "]"
     return result
+#else
+    return "(collection printing not available)"
+#endif
   }
 }
 

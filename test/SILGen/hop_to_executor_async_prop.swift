@@ -81,11 +81,12 @@ struct GlobalCat {
 
 // CHECK-LABEL: sil hidden [ossa] @$s4test015accessSweaterOfC03catAA0C0VAA3CatC_tYaF : $@convention(thin) @async (@guaranteed Cat) -> @owned Sweater {
 // CHECK:  bb0([[CAT:%[0-9]+]] : @guaranteed $Cat):
-// CHECK:    [[PREV_EXEC:%.*]] = builtin "getCurrentExecutor"
+// CHECK:    [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+// CHECK:    hop_to_executor [[GENERIC_EXEC]] :
 // CHECK:    hop_to_executor [[CAT]] : $Cat
 // CHECK:    [[CAT_GETTER:%[0-9]+]] = class_method [[CAT]] : $Cat, #Cat.computedSweater!getter : (isolated Cat) -> () -> Sweater, $@convention(method) (@guaranteed Cat) -> @owned Sweater
 // CHECK:    [[SWEATER1_REF:%[0-9]+]] = apply [[CAT_GETTER]]([[CAT]]) : $@convention(method) (@guaranteed Cat) -> @owned Sweater
-// CHECK:    hop_to_executor [[PREV_EXEC]]
+// CHECK:    hop_to_executor [[GENERIC_EXEC]]
 // CHECK:    [[SWEATER1:%[0-9]+]] = begin_borrow [[SWEATER1_REF]] : $Sweater
 // CHECK:    [[SWEATER1_OWNER:%[0-9]+]] = struct_extract [[SWEATER1]] : $Sweater, #Sweater.owner
 // CHECK:    [[CAT2_REF:%[0-9]+]] = copy_value [[SWEATER1_OWNER]] : $Cat
@@ -93,14 +94,13 @@ struct GlobalCat {
 // CHECK:    destroy_value [[SWEATER1_REF]] : $Sweater
 // CHECK:    [[CAT2:%[0-9]+]] = begin_borrow [[CAT2_REF]] : $Cat
 
-// CHECK:    [[PREV_EXEC:%.*]] = builtin "getCurrentExecutor"
 // CHECK:    hop_to_executor [[CAT2]] : $Cat
 // CHECK:    [[CAT2_FOR_LOAD:%[0-9]+]] = begin_borrow [[CAT2_REF]] : $Cat
 // CHECK:    [[CAT2_GETTER:%[0-9]+]] = class_method [[CAT2_FOR_LOAD]] : $Cat, #Cat.computedSweater!getter : (isolated Cat) -> () -> Sweater, $@convention(method) (@guaranteed Cat) -> @owned Sweater
 // CHECK:    [[SWEATER2_OWNER:%[0-9]+]] = apply [[CAT2_GETTER]]([[CAT2_FOR_LOAD]]) : $@convention(method) (@guaranteed Cat) -> @owned Sweater
 // CHECK:    end_borrow [[CAT2_FOR_LOAD]] : $Cat
 // CHECK:    end_borrow [[CAT2]] : $Cat
-// CHECK:    hop_to_executor [[PREV_EXEC]]
+// CHECK:    hop_to_executor [[GENERIC_EXEC]]
 
 // CHECK:    destroy_value [[CAT2_REF]] : $Cat
 // CHECK:    return [[SWEATER2_OWNER]] : $Sweater
@@ -112,18 +112,19 @@ func accessSweaterOfSweater(cat : Cat) async -> Sweater {
 
 // CHECK-LABEL: sil hidden [ossa] @$s4test26accessGlobalIsolatedMember3catSSAA3CatC_tYaF : $@convention(thin) @async (@guaranteed Cat) -> @owned String {
 // CHECK:  bb0([[CAT:%[0-9]+]] : @guaranteed $Cat):
+// CHECK:    [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+// CHECK:    hop_to_executor [[GENERIC_EXEC]] :
 // CHECK:    [[GLOBAL_CAT_SHARED:%[0-9]+]] = function_ref @$s4test9GlobalCatV6sharedAA0C0Cvau : $@convention(thin) () -> Builtin.RawPointer
 // CHECK:    [[GLOBAL_CAT_RAWPTR:%[0-9]+]] = apply [[GLOBAL_CAT_SHARED]]() : $@convention(thin) () -> Builtin.RawPointer
 // CHECK:    [[GLOBAL_CAT_ADDR:%[0-9]+]] = pointer_to_address [[GLOBAL_CAT_RAWPTR]] : $Builtin.RawPointer to [strict] $*Cat
 // CHECK:    [[GLOBAL_CAT_REF:%[0-9]+]] = load [copy] [[GLOBAL_CAT_ADDR]] : $*Cat
 // CHECK:    [[GLOBAL_CAT:%[0-9]+]] = begin_borrow [[GLOBAL_CAT_REF]] : $Cat
 
-// CHECK:    [[PREV_EXEC:%.*]] = builtin "getCurrentExecutor"
 // CHECK:    hop_to_executor [[GLOBAL_CAT]] : $Cat
 // CHECK:    [[GETTER:%[0-9]+]] = class_method [[CAT]] : $Cat, #Cat.leader!getter : (Cat) -> () -> String, $@convention(method) (@guaranteed Cat) -> @owned String
 // CHECK:    [[THE_STRING:%[0-9]+]] = apply [[GETTER]]([[CAT]]) : $@convention(method) (@guaranteed Cat) -> @owned String
 // CHECK:    end_borrow [[GLOBAL_CAT]] : $Cat
-// CHECK:    hop_to_executor [[PREV_EXEC]]
+// CHECK:    hop_to_executor [[GENERIC_EXEC]]
 // CHECK:    destroy_value [[GLOBAL_CAT_REF]] : $Cat
 // CHECK:    return [[THE_STRING]] : $String
 // CHECK: } // end sil function '$s4test26accessGlobalIsolatedMember3catSSAA3CatC_tYaF'
@@ -455,25 +456,29 @@ struct Container {
     @GlobalCat var isoRef: CatBox = CatBox()
 
     // CHECK-LABEL: sil hidden [ossa] @$s4test9ContainerV12accessTuple1SfyYaF : $@convention(method) @async (@guaranteed Container) -> Float {
+    // CHECK:     [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK:     hop_to_executor [[GENERIC_EXEC]] :
     // CHECK:     hop_to_executor {{%[0-9]+}} : $MainActor
     // CHECK:     [[ACCESS:%[0-9]+]] = begin_access [read] [dynamic] {{%[0-9]+}} : $*(Optional<(Int, Int)>, Float)
     // CHECK:     [[ADDR:%[0-9]+]] = tuple_element_addr [[ACCESS]] : $*(Optional<(Int, Int)>, Float), 1
     // CHECK:     {{%[0-9]+}} = load [trivial] [[ADDR]] : $*Float
     // CHECK:     end_access [[ACCESS]] : $*(Optional<(Int, Int)>, Float)
-    // CHECK:     hop_to_executor {{%[0-9]+}} : $Optional<Builtin.Executor>
+    // CHECK:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
     // CHECK: } // end sil function '$s4test9ContainerV12accessTuple1SfyYaF'
     func accessTuple1() async -> Float {
         return await globalCircle.1
     }
 
     // CHECK-LABEL: sil hidden [ossa] @$s4test9ContainerV12accessTuple2SiSgyYaFZ : $@convention(method) @async (@thin Container.Type) -> Optional<Int> {
+    // CHECK:     [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK:     hop_to_executor [[GENERIC_EXEC]] :
     // CHECK:     hop_to_executor {{%[0-9]+}} : $MainActor
     // CHECK:     [[ACCESS:%[0-9]+]] = begin_access [read] [dynamic] {{%[0-9]+}} : $*(Optional<(Int, Int)>, Float)
     // CHECK:     [[ADDR:%[0-9]+]] = tuple_element_addr [[ACCESS]] : $*(Optional<(Int, Int)>, Float), 0
     // CHECK:     switch_enum_addr [[SCRUTINEE:%[0-9]+]] : $*Optional<(Int, Int)>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[CRASH_BB:bb[0-9]+]]
 
     // CHECK: [[CRASH_BB]]:
-    // CHECK-NOT:   hop_to_executor {{%[0-9]+}}
+    // CHECK-NOT:   hop_to_executor [[GENERIC_EXEC]]
     // CHECK:       unreachable
 
     // CHECK: [[SOME_BB]]:
@@ -481,32 +486,44 @@ struct Container {
     // CHECK:     [[ELM_ADDR:%[0-9]+]] = tuple_element_addr [[TUPLE_ADDR]] : $*(Int, Int), 0
     // CHECK:     {{%[0-9]+}} = load [trivial] [[ELM_ADDR]] : $*Int
     // CHECK:     end_access [[ACCESS]] : $*(Optional<(Int, Int)>, Float)
-    // CHECK:     hop_to_executor {{%[0-9]+}} : $Optional<Builtin.Executor>
+    // CHECK:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
     // CHECK: } // end sil function '$s4test9ContainerV12accessTuple2SiSgyYaFZ'
     static func accessTuple2() async -> Int? {
         return await globalCircle.0!.0
     }
 
     // CHECK-LABEL: sil hidden [ossa] @$s4test9ContainerV12accessTuple3SfyYaF : $@convention(method) @async (@guaranteed Container) -> Float {
+    // CHECK:     [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK:     hop_to_executor [[GENERIC_EXEC]] :
+    // CHECK:     [[ADDRESS_ACCESSOR:%[0-9]+]] = function_ref @$s4test9ContainerV12staticCircleSi_SitSg_Sftvau : $@convention(thin) () -> Builtin.RawPointer
+    // CHECK:     hop_to_executor {{%[0-9]+}} : $MainActor
+    // CHECK:     = apply [[ADDRESS_ACCESSOR]]() : $@convention(thin) () -> Builtin.RawPointer
+    // CHECK:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
     // CHECK:     hop_to_executor {{%[0-9]+}} : $MainActor
     // CHECK:     [[ACCESS:%[0-9]+]] = begin_access [read] [dynamic] {{%[0-9]+}} : $*(Optional<(Int, Int)>, Float)
     // CHECK:     [[ADDR:%[0-9]+]] = tuple_element_addr [[ACCESS]] : $*(Optional<(Int, Int)>, Float), 1
     // CHECK:     {{%[0-9]+}} = load [trivial] [[ADDR]] : $*Float
     // CHECK:     end_access [[ACCESS]] : $*(Optional<(Int, Int)>, Float)
-    // CHECK:     hop_to_executor {{%[0-9]+}} : $Optional<Builtin.Executor>
+    // CHECK:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
     // CHECK: } // end sil function '$s4test9ContainerV12accessTuple3SfyYaF'
     func accessTuple3() async -> Float {
         return await Container.staticCircle.1
     }
 
     // CHECK-LABEL: sil hidden [ossa] @$s4test9ContainerV12accessTuple4SiSgyYaFZ : $@convention(method) @async (@thin Container.Type) -> Optional<Int> {
+    // CHECK:     [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK:     hop_to_executor [[GENERIC_EXEC]] :
+    // CHECK:     [[ADDRESS_ACCESSOR:%[0-9]+]] = function_ref @$s4test9ContainerV12staticCircleSi_SitSg_Sftvau : $@convention(thin) () -> Builtin.RawPointer
+    // CHECK:     hop_to_executor {{%[0-9]+}} : $MainActor
+    // CHECK:     = apply [[ADDRESS_ACCESSOR]]() : $@convention(thin) () -> Builtin.RawPointer
+    // CHECK:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
     // CHECK:     hop_to_executor {{%[0-9]+}} : $MainActor
     // CHECK:     [[ACCESS:%[0-9]+]] = begin_access [read] [dynamic] {{%[0-9]+}} : $*(Optional<(Int, Int)>, Float)
     // CHECK:     [[ADDR:%[0-9]+]] = tuple_element_addr [[ACCESS]] : $*(Optional<(Int, Int)>, Float), 0
     // CHECK:     switch_enum_addr [[SCRUTINEE:%[0-9]+]] : $*Optional<(Int, Int)>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[CRASH_BB:bb[0-9]+]]
 
     // CHECK: [[CRASH_BB]]:
-    // CHECK-NOT:   hop_to_executor {{%[0-9]+}}
+    // CHECK-NOT:   hop_to_executor [[GENERIC_EXEC]]
     // CHECK:       unreachable
 
     // CHECK: [[SOME_BB]]:
@@ -514,7 +531,7 @@ struct Container {
     // CHECK:     [[ELM_ADDR:%[0-9]+]] = tuple_element_addr [[TUPLE_ADDR]] : $*(Int, Int), 0
     // CHECK:     {{%[0-9]+}} = load [trivial] [[ELM_ADDR]] : $*Int
     // CHECK:     end_access [[ACCESS]] : $*(Optional<(Int, Int)>, Float)
-    // CHECK:     hop_to_executor {{%[0-9]+}} : $Optional<Builtin.Executor>
+    // CHECK:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
     // CHECK: } // end sil function '$s4test9ContainerV12accessTuple4SiSgyYaFZ'
     static func accessTuple4() async -> Int? {
         return await Container.staticCircle.0!.0
@@ -522,10 +539,16 @@ struct Container {
 
 
     // CHECK-LABEL: sil hidden [ossa] @$s4test9ContainerV8getCountSiyYaFZ : $@convention(method) @async (@thin Container.Type) -> Int {
+    // CHECK:     [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK:     hop_to_executor [[GENERIC_EXEC]] :
+    // CHECK:     [[ADDRESS_ACCESSOR:%[0-9]+]] = function_ref @$s4test9ContainerV7counterSivau : $@convention(thin) () -> Builtin.RawPointer
+    // CHECK:     hop_to_executor {{%[0-9]+}} : $MainActor
+    // CHECK:     = apply [[ADDRESS_ACCESSOR]]() : $@convention(thin) () -> Builtin.RawPointer
+    // CHECK:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
     // CHECK:   hop_to_executor {{%[0-9]+}} : $MainActor
     // CHECK:   {{%[0-9]+}} = begin_access [read] [dynamic] {{%[0-9]+}} : $*Int
     // CHECK:   {{%[0-9]+}} = load [trivial] {{%[0-9]+}} : $*Int
-    // CHECK:   hop_to_executor {{%[0-9]+}} : $Optional<Builtin.Executor>
+    // CHECK:   hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
     // CHECK: } // end sil function '$s4test9ContainerV8getCountSiyYaFZ'
     static func getCount() async -> Int {
         return await counter
@@ -534,8 +557,13 @@ struct Container {
 
     // CHECK-LABEL: sil hidden [ossa] @$s4test9ContainerV8getValueSiSgyYaFZ : $@convention(method) @async (@thin Container.Type) -> Optional<Int> {
     // CHECK: bb0(%0 : $@thin Container.Type):
+    // CHECK:     [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK:     hop_to_executor [[GENERIC_EXEC]] :
+    // CHECK:     [[ADDRESS_ACCESSOR:%[0-9]+]] = function_ref @$s4test9ContainerV4thisACSgvau : $@convention(thin) () -> Builtin.RawPointer
+    // CHECK:     hop_to_executor {{%[0-9]+}} : $MainActor
+    // CHECK:     = apply [[ADDRESS_ACCESSOR]]() : $@convention(thin) () -> Builtin.RawPointer
+    // CHECK:     hop_to_executor {{%[0-9]+}} : $Optional<Builtin.Executor>
     // CHECK:    [[MAIN:%[0-9]+]] = begin_borrow {{%[0-9]+}} : $MainActor
-    // CHECK:    [[PREV:%[0-9]+]] = builtin "getCurrentExecutor"() : $Optional<Builtin.Executor>
     // CHECK:    hop_to_executor [[MAIN]] : $MainActor
     // CHECK:    [[ACCESS:%[0-9]+]] = begin_access [read] [dynamic] {{%[0-9]+}} : $*Optional<Container>
     // CHECK:    cond_br {{%[0-9]+}}, [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]]
@@ -543,11 +571,11 @@ struct Container {
     // CHECK: [[TRUE_BB]]:
     // CHECK:    {{%[0-9]+}} = load [trivial] {{%[0-9]+}} : $*Int
     // CHECK:    end_access [[ACCESS]] : $*Optional<Container>
-    // CHECK:    hop_to_executor [[PREV]] : $Optional<Builtin.Executor>
+    // CHECK:    hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
     //
     // CHECK: [[FALSE_BB]]:
     // CHECK:    end_access [[ACCESS]] : $*Optional<Container>
-    // CHECK:    hop_to_executor [[PREV]] : $Optional<Builtin.Executor>
+    // CHECK:    hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
     //
     // CHECK: } // end sil function '$s4test9ContainerV8getValueSiSgyYaFZ'
     static func getValue() async -> Int? {
@@ -556,24 +584,27 @@ struct Container {
 
     // CHECK-LABEL: sil hidden [ossa] @$s4test9ContainerV10getOrCrashSfyYaFZ : $@convention(method) @async (@thin Container.Type) -> Float {
     // CHECK: bb0({{%[0-9]+}} : $@thin Container.Type):
-    // CHECK:    [[MAIN:%[0-9]+]] = begin_borrow {{%[0-9]+}} : $MainActor
-    // CHECK:    [[PREV:%[0-9]+]] = builtin "getCurrentExecutor"() : $Optional<Builtin.Executor>
-    // CHECK:    hop_to_executor [[MAIN]] : $MainActor
-    // CHECK:    [[ACCESS:%[0-9]+]] = begin_access [read] [dynamic] {{%[0-9]+}} : $*Optional<Container>
-    // CHECK:    switch_enum_addr %11 : $*Optional<Container>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[CRASH_BB:bb[0-9]+]]
+    // CHECK:     [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK:     hop_to_executor [[GENERIC_EXEC]] :
+    // CHECK:     [[ADDRESS_ACCESSOR:%[0-9]+]] = function_ref @$s4test9ContainerV4thisACSgvau : $@convention(thin) () -> Builtin.RawPointer
+    // CHECK:     hop_to_executor {{%[0-9]+}} : $MainActor
+    // CHECK:     = apply [[ADDRESS_ACCESSOR]]() : $@convention(thin) () -> Builtin.RawPointer
+    // CHECK:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
+    // CHECK:     hop_to_executor {{%.*}} : $MainActor
+    // CHECK:     [[ACCESS:%[0-9]+]] = begin_access [read] [dynamic] {{%[0-9]+}} : $*Optional<Container>
+    // CHECK:     switch_enum_addr [[ACCESS]] : $*Optional<Container>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[CRASH_BB:bb[0-9]+]]
     //
     // CHECK: [[CRASH_BB]]:
-    // CHECK-NOT:   hop_to_executor {{%[0-9]+}}
+    // CHECK-NOT:   hop_to_executor [[GENERIC_EXEC]]
     // CHECK:       unreachable
     //
     // CHECK: [[SOME_BB]]:
-    // CHECK:       [[DATA_ADDR:%[0-9]+]] = unchecked_take_enum_data_addr %11 : $*Optional<Container>, #Optional.some!enumelt
-    // CHECK:       [[ELEM_ADDR:%[0-9]+]] = struct_element_addr %22 : $*Container, #Container.iso
-    // CHECK:       [[PREV_AGAIN:%[0-9]+]] = builtin "getCurrentExecutor"() : $Optional<Builtin.Executor>
+    // CHECK:       [[DATA_ADDR:%[0-9]+]] = unchecked_take_enum_data_addr [[ACCESS]] : $*Optional<Container>, #Optional.some!enumelt
+    // CHECK:       [[ELEM_ADDR:%[0-9]+]] = struct_element_addr [[DATA_ADDR]] : $*Container, #Container.iso
     // CHECK:       hop_to_executor {{%[0-9]+}} : $Cat
     // CHECK:       {{%[0-9]+}} = load [trivial] [[ELEM_ADDR]] : $*Float
-    // CHECK:       hop_to_executor [[PREV]] : $Optional<Builtin.Executor>
-    // CHECK:       hop_to_executor [[PREV_AGAIN]] : $Optional<Builtin.Executor>
+    // CHECK:       hop_to_executor [[GENERIC_EXEC]] :
+    // CHECK:       hop_to_executor [[GENERIC_EXEC]] :
     // CHECK: } // end sil function '$s4test9ContainerV10getOrCrashSfyYaFZ'
     static func getOrCrash() async -> Float {
         return await this!.iso
@@ -581,24 +612,26 @@ struct Container {
 
     // CHECK-LABEL: sil hidden [ossa] @$s4test9ContainerV13getRefOrCrashAA6CatBoxCyYaFZ : $@convention(method) @async (@thin Container.Type) -> @owned CatBox {
     // CHECK: bb0({{%[0-9]+}} : $@thin Container.Type):
-    // CHECK:    [[MAIN:%[0-9]+]] = begin_borrow {{%[0-9]+}} : $MainActor
-    // CHECK:    [[PREV:%[0-9]+]] = builtin "getCurrentExecutor"() : $Optional<Builtin.Executor>
-    // CHECK:    hop_to_executor [[MAIN]] : $MainActor
+    // CHECK:     [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK:     hop_to_executor [[GENERIC_EXEC]] :
+    // CHECK:     [[ADDRESS_ACCESSOR:%[0-9]+]] = function_ref @$s4test9ContainerV4thisACSgvau : $@convention(thin) () -> Builtin.RawPointer
+    // CHECK:     hop_to_executor {{%[0-9]+}} : $MainActor
+    // CHECK:     = apply [[ADDRESS_ACCESSOR]]() : $@convention(thin) () -> Builtin.RawPointer
+    // CHECK:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
+    // CHECK:    hop_to_executor {{%.*}} : $MainActor
     // CHECK:    [[ACCESS:%[0-9]+]] = begin_access [read] [dynamic] {{%[0-9]+}} : $*Optional<Container>
-    // CHECK:    switch_enum_addr %11 : $*Optional<Container>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[CRASH_BB:bb[0-9]+]]
+    // CHECK:    switch_enum_addr [[ACCESS]] : $*Optional<Container>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[CRASH_BB:bb[0-9]+]]
     //
     // CHECK: [[CRASH_BB]]:
-    // CHECK-NOT:   hop_to_executor {{%[0-9]+}}
     // CHECK:       unreachable
     //
     // CHECK: [[SOME_BB]]:
-    // CHECK:       [[DATA_ADDR:%[0-9]+]] = unchecked_take_enum_data_addr %11 : $*Optional<Container>, #Optional.some!enumelt
-    // CHECK:       [[ELEM_ADDR:%[0-9]+]] = struct_element_addr %22 : $*Container, #Container.iso
-    // CHECK:       [[PREV_AGAIN:%[0-9]+]] = builtin "getCurrentExecutor"() : $Optional<Builtin.Executor>
+    // CHECK:       [[DATA_ADDR:%[0-9]+]] = unchecked_take_enum_data_addr [[ACCESS]] : $*Optional<Container>, #Optional.some!enumelt
+    // CHECK:       [[ELEM_ADDR:%[0-9]+]] = struct_element_addr [[DATA_ADDR]] : $*Container, #Container.iso
     // CHECK:       hop_to_executor {{%[0-9]+}} : $Cat
     // CHECK:       {{%[0-9]+}} = load [copy] [[ELEM_ADDR]] : $*CatBox
-    // CHECK:       hop_to_executor [[PREV]] : $Optional<Builtin.Executor>
-    // CHECK:       hop_to_executor [[PREV_AGAIN]] : $Optional<Builtin.Executor>
+    // CHECK:       hop_to_executor [[GENERIC_EXEC]] :
+    // CHECK:       hop_to_executor [[GENERIC_EXEC]] :
     // CHECK: } // end sil function '$s4test9ContainerV13getRefOrCrashAA6CatBoxCyYaFZ'
     static func getRefOrCrash() async -> CatBox {
         return await this!.isoRef
@@ -623,7 +656,9 @@ struct Blah {
     @StateObject private var coordinator = Coordinactor()
 
     // closure #1 in Blah.test()
-    // CHECK-LABEL: sil private [ossa] @$s4test4BlahVAAyyFyyYaYbcfU_ : $@convention(thin) @Sendable @async (Blah) -> () {
+    // CHECK-LABEL: sil private [ossa] @$s4test4BlahVAAyyFyyYaYbcfU_ :
+    // CHECK:       [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK:       hop_to_executor [[GENERIC_EXEC]] :
     // CHECK:       hop_to_executor {{%[0-9]+}} : $MainActor
     // CHECK:       [[ACTOR_OBJ_RAW:%[0-9]+]] = apply {{%[0-9]+}}({{%[0-9]+}}) : $@convention(method) (Blah) -> @owned Coordinactor
     // CHECK:       hop_to_executor {{%[0-9]+}} : $Optional<Builtin.Executor>
@@ -631,11 +666,11 @@ struct Blah {
     // CHECK:       [[VAL:%[0-9]+]] = ref_element_addr [[ACTOR_OBJ]] : $Coordinactor, #Coordinactor.someValue
     // CHECK:       hop_to_executor [[ACTOR_OBJ]]
     // CHECK:       [[VAL_ACCESS:%[0-9]+]] = begin_access [read] [dynamic] [[VAL]] : $*Optional<Int>
-    // CHECK:       {{%[0-9]+}} = load [trivial] %17 : $*Optional<Int>
-    // CHECK:       end_access %17 : $*Optional<Int>
-    // CHECK:       hop_to_executor {{%[0-9]+}} : $Optional<Builtin.Executor>
+    // CHECK:       {{%[0-9]+}} = load [trivial] [[VAL_ACCESS]] : $*Optional<Int>
+    // CHECK:       end_access [[VAL_ACCESS]] : $*Optional<Int>
+    // CHECK:       hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
     // CHECK: } // end sil function '$s4test4BlahVAAyyFyyYaYbcfU_'
-    @available(SwiftStdlib 5.5, *)
+    @available(SwiftStdlib 5.1, *)
     func test() {
         Task.detached {
             if await coordinator.someValue == nil {
@@ -643,4 +678,28 @@ struct Blah {
             }
         }
     }
+}
+
+@MainActor
+func getTemperature() -> Int { return 0 }
+
+@MainActor
+class Polar {
+  static var temperature: Int = getTemperature()
+}
+
+
+// CHECK-LABEL: sil hidden{{.*}} @$s4test20accessStaticIsolatedSiyYaF : $@convention(thin) @async () -> Int {
+// CHECK:        [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+// CHECK:        hop_to_executor [[GENERIC_EXEC]] :
+// CHECK:        [[ADDRESSOR:%[0-9]+]] = function_ref @$s4test5PolarC11temperatureSivau : $@convention(thin) () -> Builtin.RawPointer
+// CHECK:        hop_to_executor {{%.*}} : $MainActor
+// CHECK-NEXT:   [[RAW_ADDR:%[0-9]+]] = apply [[ADDRESSOR]]() : $@convention(thin) () -> Builtin.RawPointer
+// CHECK-NEXT:   hop_to_executor {{%.*}} : $Optional<Builtin.Executor>
+// CHECK:        [[ADDR:%[0-9]+]] = pointer_to_address [[RAW_ADDR]] : $Builtin.RawPointer to [strict] $*Int
+// CHECK:        hop_to_executor {{%.*}} : $MainActor
+// CHECK:        {{%.*}} = load [trivial] {{%.*}} : $*Int
+// CHECK:        hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
+func accessStaticIsolated() async -> Int {
+  return await Polar.temperature
 }

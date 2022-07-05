@@ -109,8 +109,8 @@ func testCallAsFunctionOverloaded(fn: Functor) {
 
   fn(h: .left, v: .#^OVERLOADED_ARG2_VALUE^#)
 //OVERLOADED_ARG2_VALUE: Begin completions, 3 items
-//OVERLOADED_ARG2_VALUE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: up[#Functor.Vertical#];
-//OVERLOADED_ARG2_VALUE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: down[#Functor.Vertical#];
+//OVERLOADED_ARG2_VALUE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: up[#Functor.Vertical#];
+//OVERLOADED_ARG2_VALUE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: down[#Functor.Vertical#];
 //OVERLOADED_ARG2_VALUE-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): Functor.Vertical#})[#(into: inout Hasher) -> Void#];
 //OVERLOADED_ARG2_VALUE: End completions
 }

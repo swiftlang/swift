@@ -14,6 +14,9 @@
 #include "../SwiftShims/MetadataSections.h"
 
 #include <cstddef>
+#include <new>
+
+extern "C" const char __dso_handle[];
 
 // Create empty sections to ensure that the start/stop symbols are synthesized
 // by the linker.  Otherwise, we may end up with undefined symbol references as
@@ -37,6 +40,8 @@ DECLARE_SWIFT_SECTION(swift5_replace)
 DECLARE_SWIFT_SECTION(swift5_replac2)
 DECLARE_SWIFT_SECTION(swift5_builtin)
 DECLARE_SWIFT_SECTION(swift5_capture)
+DECLARE_SWIFT_SECTION(swift5_mpenum)
+DECLARE_SWIFT_SECTION(swift5_accessible_functions)
 }
 
 #undef DECLARE_SWIFT_SECTION
@@ -51,9 +56,9 @@ static void swift_image_constructor() {
   { reinterpret_cast<uintptr_t>(&__start_##name),                              \
     static_cast<uintptr_t>(&__stop_##name - &__start_##name) }
 
-  sections = {
+  ::new (&sections) swift::MetadataSections {
       swift::CurrentSectionMetadataVersion,
-      0,
+      { __dso_handle },
 
       nullptr,
       nullptr,
@@ -70,6 +75,8 @@ static void swift_image_constructor() {
       SWIFT_SECTION_RANGE(swift5_replac2),
       SWIFT_SECTION_RANGE(swift5_builtin),
       SWIFT_SECTION_RANGE(swift5_capture),
+      SWIFT_SECTION_RANGE(swift5_mpenum),
+      SWIFT_SECTION_RANGE(swift5_accessible_functions),
   };
 
 #undef SWIFT_SECTION_RANGE

@@ -315,6 +315,8 @@ callbacks['dictionary_applier'] = CFUNCTYPE(
 functionList = [
     ("sourcekitd_cancel_request",
      [c_void_p]),
+    ("sourcekitd_request_handle_dispose",
+     [c_void_p]),
 
     ("sourcekitd_initialize",
      None),

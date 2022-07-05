@@ -1,0 +1,19 @@
+// First parse this and then emit a *.sib. Then read in the *.sib, then recreate
+
+// RUN: %empty-directory(%t)
+// RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name noImplicitCopy
+// RUN: %target-sil-opt %t/tmp.sib -module-name noImplicitCopy | %FileCheck %s
+
+sil_stage canonical
+
+class Klass {}
+
+// CHECK-LABEL: sil [serialized] [ossa] @noImplicitCopyTest : $@convention(thin) (@owned Klass) -> () {
+// CHECK: bb0(%0 : @noImplicitCopy @owned $Klass):
+// CHECK: } // end sil function 'noImplicitCopyTest'
+sil [serialized] [ossa] @noImplicitCopyTest : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @noImplicitCopy @owned $Klass):
+  destroy_value %0 : $Klass
+  %9999 = tuple()
+  return %9999 : $()
+}

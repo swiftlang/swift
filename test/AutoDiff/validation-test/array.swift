@@ -1,9 +1,8 @@
-// RUN: %target-run-simple-swift(-Xfrontend -requirement-machine=off)
+// RUN: %target-run-simple-swift
+
 // REQUIRES: executable_test
 
 // Would fail due to unavailability of swift_autoDiffCreateLinearMapContext.
-// UNSUPPORTED: use_os_stdlib
-// UNSUPPORTED: back_deployment_runtime
 
 import StdlibUnittest
 import _Differentiation
@@ -451,6 +450,17 @@ ArrayAutoDiffTests.test("Array.DifferentiableView.move") {
   var z: [Float] = []
   z.move(by: .zero)
   expectEqual(z, [])
+}
+
+ArrayAutoDiffTests.test("Array.DifferentiableView reflection") {
+  let tan = [Float].DifferentiableView([41, 42])
+  let children = Array(Mirror(reflecting: tan).children)
+  expectEqual(2, children.count)
+  if let child1 = expectNotNil(children[0].value as? Float),
+     let child2 = expectNotNil(children[1].value as? Float) {
+    expectEqual(41, child1)
+    expectEqual(42, child2)
+  }
 }
 
 runAllTests()

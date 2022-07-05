@@ -26,6 +26,10 @@ public:
   DeadEndBlocksAnalysis(const DeadEndBlocksAnalysis &) = delete;
   DeadEndBlocksAnalysis &operator=(const DeadEndBlocksAnalysis &) = delete;
 
+  static SILAnalysisKind getAnalysisKind() {
+    return SILAnalysisKind::DeadEndBlocks;
+  }
+
   static bool classof(const SILAnalysis *s) {
     return s->getKind() == SILAnalysisKind::DeadEndBlocks;
   }

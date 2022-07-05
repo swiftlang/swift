@@ -1,3 +1,10 @@
+# In some configurations (e.g. back deploy concurrency) we
+# configure the build from the root of the Swift repo but we skip
+# stdlib/CMakeLists.txt, with the risk of missing important parameters.
+# To account for this scenario, we include the stdlib options
+# before the guard
+include(${CMAKE_CURRENT_LIST_DIR}/../../stdlib/cmake/modules/StdlibOptions.cmake)
+
 # CMAKE_SOURCE_DIR is the directory that cmake got initially invoked on.
 # CMAKE_CURRENT_SOURCE_DIR is the current directory. If these are equal, it's
 # a top-level build of the CMAKE_SOURCE_DIR. Otherwise, define a guard variable
@@ -73,6 +80,9 @@ option(SWIFT_ENABLE_MODULE_INTERFACES
 set(SWIFT_STDLIB_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING
   "Build type for the Swift standard library and SDK overlays.")
 
+file(STRINGS "../../utils/availability-macros.def" SWIFT_STDLIB_AVAILABILITY_DEFINITIONS)
+list(FILTER SWIFT_STDLIB_AVAILABILITY_DEFINITIONS EXCLUDE REGEX "^\\s*(#.*)?$")
+
 set(SWIFT_DARWIN_SUPPORTED_ARCHS "" CACHE STRING
   "Semicolon-separated list of architectures to configure on Darwin platforms. \
 If left empty all default architectures are configured.")
@@ -81,7 +91,6 @@ set(SWIFT_DARWIN_MODULE_ARCHS "" CACHE STRING
   "Semicolon-separated list of architectures to configure Swift module-only \
 targets on Darwin platforms. These targets are in addition to the full \
 library targets.")
-
 
 # -----------------------------------------------------------------------------
 # Constants
@@ -123,7 +132,6 @@ include(SwiftConfigureSDK)
 include(SwiftComponents)
 include(DarwinSDKs)
 
-find_package(Python2 COMPONENTS Interpreter REQUIRED)
 find_package(Python3 COMPONENTS Interpreter REQUIRED)
 
 # Without this line, installing components is broken. This needs refactoring.

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -13,7 +13,7 @@ import TestsUtils
 
 let t: [BenchmarkCategory] = [.validation, .api, .algorithm, .String]
 // Sort an array of strings using an explicit sort predicate.
-public let SortStrings = [
+public let benchmarks = [
   BenchmarkInfo(name: "SortSortedStrings",
     runFunction: run_SortSortedStrings, tags: t,
     setUpFunction: { blackHole(sortedWords) }),
@@ -1038,14 +1038,14 @@ func benchSortStrings(_ words: [String]) {
   tempwords.sort(by: <)
 }
 
-public func run_SortStrings(_ N: Int) {
-  for _ in 1...5*N {
+public func run_SortStrings(_ n: Int) {
+  for _ in 1...5*n {
     benchSortStrings(words)
   }
 }
 
-public func run_SortSortedStrings(_ N: Int) {
-  for _ in 1...5*N {
+public func run_SortSortedStrings(_ n: Int) {
+  for _ in 1...5*n {
     benchSortStrings(sortedWords)
   }
 }
@@ -2053,8 +2053,8 @@ let unicodeWords: [String] = [
   "❄️overpresumptuous"
   ]
 
-public func run_SortStringsUnicode(_ N: Int) {
-  for _ in 1...N {
+public func run_SortStringsUnicode(_ n: Int) {
+  for _ in 1...n {
     benchSortStrings(unicodeWords)
   }
 }

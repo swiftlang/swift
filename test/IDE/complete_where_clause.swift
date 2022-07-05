@@ -41,6 +41,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXT_ASSOC_MEMBER_1 | %FileCheck %s -check-prefix=EXT_ASSOC_MEMBER
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXT_ASSOC_MEMBER_2 | %FileCheck %s -check-prefix=EXT_ASSOC_MEMBER
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXT_SECONDTYPE | %FileCheck %s -check-prefix=EXT_SECONDTYPE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=WHERE_CLAUSE_WITH_EQUAL | %FileCheck %s -check-prefix=WHERE_CLAUSE_WITH_EQUAL
 
 class A1<T1, T2, T3> {}
 
@@ -264,3 +265,10 @@ extension WithAssoc where Int == #^EXT_SECONDTYPE^#
 // EXT_SECONDTYPE: Begin completions
 // EXT_SECONDTYPE-DAG: Decl[AssociatedType]/CurrNominal:   T;
 // EXT_SECONDTYPE: End completions
+
+func foo<K: WithAssoc>(_ key: K.Type) where K.#^WHERE_CLAUSE_WITH_EQUAL^# == S1 {}
+
+// WHERE_CLAUSE_WITH_EQUAL: Begin completions, 2 items
+// WHERE_CLAUSE_WITH_EQUAL-DAG: Decl[AssociatedType]/CurrNominal:   T;
+// WHERE_CLAUSE_WITH_EQUAL-DAG: Keyword/None:                       Type[#K.Type#];
+// WHERE_CLAUSE_WITH_EQUAL: End completions

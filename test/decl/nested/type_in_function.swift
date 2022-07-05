@@ -135,20 +135,6 @@ func genericFunction<T>(t: T) {
   // expected-error@-2 {{'Second' inherits from itself}}
 }
 
-// Spurious "Self or associated type requirements" diagnostic.
-protocol ProtoWithAssocType {
-  associatedtype T = Int
-}
-
-func freeFunction() {
-  struct ConformingType : ProtoWithAssocType {
-    typealias T = Int
-
-    func method() -> ProtoWithAssocType {}
-    // expected-error@-1 {{can only be used as a generic constraint because it has Self or associated type requirements}}
-  }
-}
-
 // Superclass lookup archetype vs interface type mixup
 class Generic<T> {
   struct Nested {}

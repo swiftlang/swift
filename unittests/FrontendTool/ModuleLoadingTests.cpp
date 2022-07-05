@@ -96,16 +96,15 @@ protected:
     PrintingDiagnosticConsumer printingConsumer;
     DiagnosticEngine diags(sourceMgr);
     diags.addConsumer(printingConsumer);
-    TypeCheckerOptions typeckOpts;
+    TypeCheckerOptions typecheckOpts;
     LangOptions langOpts;
     langOpts.Target = llvm::Triple(llvm::sys::getDefaultTargetTriple());
     SearchPathOptions searchPathOpts;
     ClangImporterOptions clangImpOpts;
     symbolgraphgen::SymbolGraphOptions symbolGraphOpts;
     SILOptions silOpts;
-    auto ctx =
-        ASTContext::get(langOpts, typeckOpts, searchPathOpts, clangImpOpts,
-                        symbolGraphOpts, sourceMgr, diags);
+    auto ctx = ASTContext::get(langOpts, typecheckOpts, silOpts, searchPathOpts,
+                               clangImpOpts, symbolGraphOpts, sourceMgr, diags);
 
     ctx->addModuleInterfaceChecker(
       std::make_unique<ModuleInterfaceCheckerImpl>(*ctx, cacheDir,
@@ -128,7 +127,8 @@ protected:
       loader->findModuleFilesInDirectory({moduleName, SourceLoc()},
         SerializedModuleBaseName(tempDir, SerializedModuleBaseName("Library")),
         /*ModuleInterfacePath*/nullptr,
-        &moduleBuffer, &moduleDocBuffer, &moduleSourceInfoBuffer, /*IsFramework*/false);
+        &moduleBuffer, &moduleDocBuffer, &moduleSourceInfoBuffer,
+        /*skipBuildingInterface*/ false, /*IsFramework*/false);
     ASSERT_FALSE(error);
     ASSERT_FALSE(diags.hadAnyError());
 
@@ -148,7 +148,8 @@ protected:
     ASSERT_TRUE(bufOrErr);
 
     auto bufData = (*bufOrErr)->getBuffer();
-    auto validationInfo = serialization::validateSerializedAST(bufData);
+    auto validationInfo = serialization::validateSerializedAST(
+        bufData, silOpts.EnableOSSAModules, /*requiredSDK*/StringRef());
     ASSERT_EQ(serialization::Status::Valid, validationInfo.status);
     ASSERT_EQ(bufData, moduleBuffer->getBuffer());
   }

@@ -200,3 +200,157 @@ bb0(%0 : @owned $Optional<Klass>):
   return %2 : $Builtin.RawPointer
 }
 
+// -----------------------------------------------------------------------------
+// SILCombiner::optimizeAlignment
+//
+// Optimize Builtin.assumeAlignment -> pointer_to_address
+// -----------------------------------------------------------------------------
+
+// Case #1. Literal zero = natural alignment
+//    %1 = integer_literal $Builtin.Int64, 0
+//    %2 = builtin "assumeAlignment"
+//         (%0 : $Builtin.RawPointer, %1 : $Builtin.Int64) : $Builtin.RawPointer
+//    %3 = pointer_to_address %2 : $Builtin.RawPointer to [align=1] $*Int
+//
+//    Erases the `pointer_to_address` `[align=]` attribute:
+//
+// CHECK-LABEL: sil @test_zero_alignment : $@convention(thin) <T> (Builtin.RawPointer, @thick T.Type) -> @out T {
+// CHECK: bb0(%0 : $*T, %1 : $Builtin.RawPointer, %2 : $@thick T.Type):
+// CHECK-NOT: integer_literal
+// CHECK-NOT: builtin "assumeAlignment"
+// CHECK: [[PTR:%.*]] = pointer_to_address %1 : $Builtin.RawPointer to $*T
+// CHECK: copy_addr [[PTR]] to [initialization] %0 : $*T
+// CHECK-LABEL: } // end sil function 'test_zero_alignment'
+sil @test_zero_alignment : $@convention(thin) <T> (Builtin.RawPointer, @thick T.Type) -> @out T {
+bb0(%0 : $*T, %1 : $Builtin.RawPointer, %2 : $@thick T.Type):
+  debug_value %1 : $Builtin.RawPointer, let, name "rawPointer", argno 1
+  debug_value %2 : $@thick T.Type, let, name "_1", argno 2
+  %5 = integer_literal $Builtin.Word, 0
+  %6 = builtin "assumeAlignment"(%1 : $Builtin.RawPointer, %5 : $Builtin.Word) : $Builtin.RawPointer
+  debug_value %6 : $Builtin.RawPointer, let, name "alignedPointer"
+  %8 = pointer_to_address %6 : $Builtin.RawPointer to [align=1] $*T
+  copy_addr %8 to [initialization] %0 : $*T
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// Case #2. Literal nonzero = forced alignment.
+//
+//    %1 = integer_literal $Builtin.Int64, 16
+//    %2 = builtin "assumeAlignment"
+//         (%0 : $Builtin.RawPointer, %1 : $Builtin.Int64) : $Builtin.RawPointer
+//    %3 = pointer_to_address %2 : $Builtin.RawPointer to [align=1] $*Int
+//
+//    Promotes the `pointer_to_address` `[align=]` attribute to a higher value.
+//
+// CHECK-LABEL: sil @test_nonzero_alignment : $@convention(thin) <T> (Builtin.RawPointer, @thick T.Type) -> @out T {
+// CHECK: bb0(%0 : $*T, %1 : $Builtin.RawPointer, %2 : $@thick T.Type):
+// CHECK-NOT: integer_literal
+// CHECK-NOT: builtin "assumeAlignment"
+// CHECK:     [[PTR:%.*]] = pointer_to_address %1 : $Builtin.RawPointer to [align=8] $*T
+// CHECK:     copy_addr [[PTR]] to [initialization] %0 : $*T
+// CHECK-LABEL: } // end sil function 'test_nonzero_alignment'
+sil @test_nonzero_alignment : $@convention(thin) <T> (Builtin.RawPointer, @thick T.Type) -> @out T {
+bb0(%0 : $*T, %1 : $Builtin.RawPointer, %2 : $@thick T.Type):
+  debug_value %1 : $Builtin.RawPointer, let, name "rawPointer", argno 1
+  debug_value %2 : $@thick T.Type, let, name "_1", argno 2
+  %5 = integer_literal $Builtin.Word, 8
+  %6 = builtin "assumeAlignment"(%1 : $Builtin.RawPointer, %5 : $Builtin.Word) : $Builtin.RawPointer
+  debug_value %6 : $Builtin.RawPointer, let, name "alignedPointer"
+  %8 = pointer_to_address %6 : $Builtin.RawPointer to [align=1] $*T
+  copy_addr %8 to [initialization] %0 : $*T
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// Case #3. Folded dynamic alignment
+//
+//    %1 = builtin "alignof"<T>(%0 : $@thin T.Type) : $Builtin.Word
+//    %2 = builtin "assumeAlignment"
+//         (%0 : $Builtin.RawPointer, %1 : $Builtin.Int64) : $Builtin.RawPointer
+//    %3 = pointer_to_address %2 : $Builtin.RawPointer to [align=1] $*T
+//
+//    Erases the `pointer_to_address` `[align=]` attribute.
+//
+// CHECK-LABEL: sil @test_dynamic_alignment : $@convention(thin) <T> (Builtin.RawPointer, @thick T.Type) -> @out T {
+// CHECK: bb0(%0 : $*T, %1 : $Builtin.RawPointer, %2 : $@thick T.Type):
+// CHECK-NOT: metatype
+// CHECK-NOT: builtin "alignOf"
+// CHECK-NOT: builtin "assumeAlignment"
+// CHECK:     [[PTR:%.*]] = pointer_to_address %1 : $Builtin.RawPointer to $*T
+// CHECK:     copy_addr [[PTR]] to [initialization] %0 : $*T
+// CHECK-LABEL: } // end sil function 'test_dynamic_alignment'
+sil @test_dynamic_alignment : $@convention(thin) <T> (Builtin.RawPointer, @thick T.Type) -> @out T {
+bb0(%0 : $*T, %1 : $Builtin.RawPointer, %2 : $@thick T.Type):
+  debug_value %1 : $Builtin.RawPointer, let, name "rawPointer", argno 1
+  debug_value %2 : $@thick T.Type, let, name "_1", argno 2
+  %5 = metatype $@thick T.Type
+  %6 = builtin "alignof"<T>(%5 : $@thick T.Type) : $Builtin.Word
+  %7 = builtin "sextOrBitCast_Word_Int64"(%6 : $Builtin.Word) : $Builtin.Int64
+  %8 = struct $Int64 (%7 : $Builtin.Int64)
+  debug_value %8 : $Int64, let, name "align"
+  %10 = builtin "truncOrBitCast_Int64_Word"(%7 : $Builtin.Int64) : $Builtin.Word
+  %11 = builtin "assumeAlignment"(%1 : $Builtin.RawPointer, %10 : $Builtin.Word) : $Builtin.RawPointer
+  debug_value %11 : $Builtin.RawPointer, let, name "alignedPointer"
+  %13 = pointer_to_address %11 : $Builtin.RawPointer to [align=1] $*T
+  copy_addr %13 to [initialization] %0 : $*T
+  %15 = tuple ()
+  return %15 : $()
+}
+
+// Case #3b. Folded dynamic alignment; 32-bit
+//
+//    %1 = builtin "alignof"<T>(%0 : $@thin T.Type) : $Builtin.Word
+//    %2 = builtin "assumeAlignment"
+//         (%0 : $Builtin.RawPointer, %1 : $Builtin.Int64) : $Builtin.RawPointer
+//    %3 = pointer_to_address %2 : $Builtin.RawPointer to [align=1] $*T
+//
+//    Erases the `pointer_to_address` `[align=]` attribute.
+//
+// CHECK-LABEL: sil @test_dynamic_alignment32 : $@convention(thin) <T> (Builtin.RawPointer, @thick T.Type) -> @out T {
+// CHECK: bb0(%0 : $*T, %1 : $Builtin.RawPointer, %2 : $@thick T.Type):
+// CHECK-NOT: metatype
+// CHECK-NOT: builtin "alignOf"
+// CHECK-NOT: builtin "assumeAlignment"
+// CHECK:     [[PTR:%.*]] = pointer_to_address %1 : $Builtin.RawPointer to $*T
+// CHECK:     copy_addr [[PTR]] to [initialization] %0 : $*T
+// CHECK-LABEL: } // end sil function 'test_dynamic_alignment32'
+sil @test_dynamic_alignment32 : $@convention(thin) <T> (Builtin.RawPointer, @thick T.Type) -> @out T {
+bb0(%0 : $*T, %1 : $Builtin.RawPointer, %2 : $@thick T.Type):
+  debug_value %1 : $Builtin.RawPointer, let, name "rawPointer", argno 1
+  debug_value %2 : $@thick T.Type, let, name "_1", argno 2
+  %5 = metatype $@thick T.Type
+  %6 = builtin "alignof"<T>(%5 : $@thick T.Type) : $Builtin.Word
+  %7 = builtin "truncOrBitCast_Word_Int32"(%6 : $Builtin.Word) : $Builtin.Int32
+  %8 = struct $Int32 (%7 : $Builtin.Int32)
+  debug_value %8 : $Int32, let, name "align"
+  %10 = builtin "sextOrBitCast_Int32_Word"(%7 : $Builtin.Int32) : $Builtin.Word
+  %11 = builtin "assumeAlignment"(%1 : $Builtin.RawPointer, %10 : $Builtin.Word) : $Builtin.RawPointer
+  debug_value %11 : $Builtin.RawPointer, let, name "alignedPointer"
+  %13 = pointer_to_address %11 : $Builtin.RawPointer to [align=1] $*T
+  copy_addr %13 to [initialization] %0 : $*T
+  %15 = tuple ()
+  return %15 : $()
+}
+
+public protocol AnyAction {
+}
+
+public struct MyAction : AnyAction {
+}
+
+// Make sure that we do not crash on this test case!
+//
+// TODO: Maybe we could handle this?
+sil shared @cast_optimizer_metatype_crasher : $@convention(thin) (@thick MyAction.Type) -> @thick AnyAction.Type {
+bb0(%0 : $@thick MyAction.Type):
+  %1 = alloc_stack $@thick AnyAction.Type
+  %2 = alloc_stack $@thick MyAction.Type
+  store %0 to %2 : $*@thick MyAction.Type
+  unconditional_checked_cast_addr MyAction.Type in %2 : $*@thick MyAction.Type to AnyAction.Type in %1 : $*@thick AnyAction.Type
+  dealloc_stack %2 : $*@thick MyAction.Type
+  %6 = tuple ()
+  %7 = load %1 : $*@thick AnyAction.Type
+  dealloc_stack %1 : $*@thick AnyAction.Type
+  return %7 : $@thick AnyAction.Type
+}

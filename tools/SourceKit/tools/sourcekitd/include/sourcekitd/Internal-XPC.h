@@ -18,10 +18,14 @@
 namespace sourcekitd {
 namespace xpc {
 
+static const char *KeyMsg = "msg";
 static const char *KeyInternalMsg = "internal_msg";
 static const char *KeySemaEditorDelay = "semantic_editor_delay";
 static const char *KeyTracingEnabled = "tracing_enabled";
 static const char *KeyMsgResponse = "response";
+static const char *KeyCancelToken = "cancel_token";
+static const char *KeyCancelRequest = "cancel_request";
+static const char *KeyDisposeRequestHandle = "dispose_request_handle";
 
 enum class Message {
   Initialization,

@@ -516,7 +516,7 @@ extension String {
   ///     memory with room for `capacity` UTF-8 code units, initializes
   ///     that memory, and returns the number of initialized elements.
   @inline(__always)
-  @available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+  @available(SwiftStdlib 5.3, *)
   public init(
     unsafeUninitializedCapacity capacity: Int,
     initializingUTF8With initializer: (
@@ -780,8 +780,8 @@ extension String {
   internal func _uppercaseASCII(_ x: UInt8) -> UInt8 {
     /// A "table" for which ASCII characters need to be upper cased.
     /// To determine which bit corresponds to which ASCII character, subtract 1
-    /// from the ASCII value of that character and divide by 2. The bit is set iff
-    /// that character is a lower case character.
+    /// from the ASCII value of that character and divide by 2. The bit is set if
+    /// that character is a lower case character; otherwise, it's not set.
     let _lowercaseTable: UInt64 =
       0b0001_1111_1111_1111_0000_0000_0000_0000 &<< 32
 
@@ -804,8 +804,8 @@ extension String {
   internal func _lowercaseASCII(_ x: UInt8) -> UInt8 {
     /// A "table" for which ASCII characters need to be lower cased.
     /// To determine which bit corresponds to which ASCII character, subtract 1
-    /// from the ASCII value of that character and divide by 2. The bit is set iff
-    /// that character is a upper case character.
+    /// from the ASCII value of that character and divide by 2. The bit is set if
+    /// that character is a upper case character; otherwise, it's not set.
     let _uppercaseTable: UInt64 =
       0b0000_0000_0000_0000_0001_1111_1111_1111 &<< 32
 
@@ -849,41 +849,14 @@ extension String {
       }
     }
 
-    // TODO(String performance): Try out incremental case-conversion rather than
-    // make UTF-16 array beforehand
-    let codeUnits = Array(self.utf16).withUnsafeBufferPointer {
-      (uChars: UnsafeBufferPointer<UInt16>) -> Array<UInt16> in
-      var length: Int = 0
-      let result = Array<UInt16>(unsafeUninitializedCapacity: uChars.count) {
-        buffer, initializedCount in
-        var error = __swift_stdlib_U_ZERO_ERROR
-        length = Int(truncatingIfNeeded:
-          __swift_stdlib_u_strToLower(
-            buffer.baseAddress._unsafelyUnwrappedUnchecked,
-            Int32(buffer.count),
-            uChars.baseAddress._unsafelyUnwrappedUnchecked,
-            Int32(uChars.count),
-            "",
-            &error))
-        initializedCount = min(length, uChars.count)
-      }
-      if length > uChars.count {
-        var error = __swift_stdlib_U_ZERO_ERROR
-        return Array<UInt16>(unsafeUninitializedCapacity: length) {
-          buffer, initializedCount in
-          __swift_stdlib_u_strToLower(
-            buffer.baseAddress._unsafelyUnwrappedUnchecked,
-            Int32(buffer.count),
-            uChars.baseAddress._unsafelyUnwrappedUnchecked,
-            Int32(uChars.count),
-            "",
-            &error)
-          initializedCount = length
-        }
-      }
-      return result
+    var result = ""
+    result.reserveCapacity(utf8.count)
+
+    for scalar in unicodeScalars {
+      result += scalar.properties.lowercaseMapping
     }
-    return codeUnits.withUnsafeBufferPointer { String._uncheckedFromUTF16($0) }
+
+    return result
   }
 
   /// Returns an uppercase version of the string.
@@ -910,41 +883,14 @@ extension String {
       }
     }
 
-    // TODO(String performance): Try out incremental case-conversion rather than
-    // make UTF-16 array beforehand
-    let codeUnits = Array(self.utf16).withUnsafeBufferPointer {
-      (uChars: UnsafeBufferPointer<UInt16>) -> Array<UInt16> in
-      var length: Int = 0
-      let result = Array<UInt16>(unsafeUninitializedCapacity: uChars.count) {
-        buffer, initializedCount in
-        var err = __swift_stdlib_U_ZERO_ERROR
-        length = Int(truncatingIfNeeded:
-          __swift_stdlib_u_strToUpper(
-            buffer.baseAddress._unsafelyUnwrappedUnchecked,
-            Int32(buffer.count),
-            uChars.baseAddress._unsafelyUnwrappedUnchecked,
-            Int32(uChars.count),
-            "",
-            &err))
-        initializedCount = min(length, uChars.count)
-      }
-      if length > uChars.count {
-        var err = __swift_stdlib_U_ZERO_ERROR
-        return Array<UInt16>(unsafeUninitializedCapacity: length) {
-          buffer, initializedCount in
-          __swift_stdlib_u_strToUpper(
-            buffer.baseAddress._unsafelyUnwrappedUnchecked,
-            Int32(buffer.count),
-            uChars.baseAddress._unsafelyUnwrappedUnchecked,
-            Int32(uChars.count),
-            "",
-            &err)
-          initializedCount = length
-        }
-      }
-      return result
+    var result = ""
+    result.reserveCapacity(utf8.count)
+
+    for scalar in unicodeScalars {
+      result += scalar.properties.uppercaseMapping
     }
-    return codeUnits.withUnsafeBufferPointer { String._uncheckedFromUTF16($0) }
+
+    return result
   }
 
   /// Creates an instance from the description of a given
@@ -981,115 +927,107 @@ extension String {
 }
 
 extension _StringGutsSlice {
+  internal func _isScalarNFCQC(
+    _ scalar: Unicode.Scalar,
+    _ prevCCC: inout UInt8
+  ) -> Bool {
+    let normData = Unicode._NormData(scalar, fastUpperbound: 0x300)
+
+    if prevCCC > normData.ccc, normData.ccc != 0 {
+      return false
+    }
+
+    if !normData.isNFCQC {
+      return false
+    }
+
+    prevCCC = normData.ccc
+    return true
+  }
+
   internal func _withNFCCodeUnits(_ f: (UInt8) throws -> Void) rethrows {
-    var output = _FixedArray16<UInt8>(allZeros: ())
-    var icuInput = _FixedArray16<UInt16>(allZeros: ())
-    var icuOutput = _FixedArray16<UInt16>(allZeros: ())
-    if _fastPath(isFastUTF8) {
-      try withFastUTF8 {
-        return try _fastWithNormalizedCodeUnitsImpl(
-          sourceBuffer: $0,
-          outputBuffer: _castOutputBuffer(&output),
-          icuInputBuffer: _castOutputBuffer(&icuInput),
-          icuOutputBuffer: _castOutputBuffer(&icuOutput),
-          f
-        )
+    let substring = String(_guts)[range]
+    // Fast path: If we're already NFC (or ASCII), then we don't need to do
+    // anything at all.
+    if _fastPath(_guts.isNFC) {
+      try substring.utf8.forEach(f)
+      return
+    }
+
+    var isNFCQC = true
+    var prevCCC: UInt8 = 0
+
+    if _guts.isFastUTF8 {
+      _fastNFCCheck(&isNFCQC, &prevCCC)
+
+      // Because we have access to the fastUTF8, we can go through that instead
+      // of accessing the UTF8 view on String.
+      if isNFCQC {
+        try withFastUTF8 {
+          for byte in $0 {
+            try f(byte)
+          }
+        }
+
+        return
       }
     } else {
-      return try _foreignWithNormalizedCodeUnitsImpl(
-        outputBuffer: _castOutputBuffer(&output),
-        icuInputBuffer: _castOutputBuffer(&icuInput),
-        icuOutputBuffer: _castOutputBuffer(&icuOutput),
-        f
-      )
-    }
-  }
+      for scalar in substring.unicodeScalars {
+        if !_isScalarNFCQC(scalar, &prevCCC) {
+          isNFCQC = false
+          break
+        }
+      }
 
-  internal func _foreignWithNormalizedCodeUnitsImpl(
-    outputBuffer: UnsafeMutableBufferPointer<UInt8>,
-    icuInputBuffer: UnsafeMutableBufferPointer<UInt16>,
-    icuOutputBuffer: UnsafeMutableBufferPointer<UInt16>,
-    _ f: (UInt8) throws -> Void
-  ) rethrows {
-    var outputBuffer = outputBuffer
-    var icuInputBuffer = icuInputBuffer
-    var icuOutputBuffer = icuOutputBuffer
+      if isNFCQC {
+        for byte in substring.utf8 {
+          try f(byte)
+        }
 
-    var index = range.lowerBound
-    let cachedEndIndex = range.upperBound
-
-    var hasBufferOwnership = false
-
-    defer {
-      if hasBufferOwnership {
-        outputBuffer.deallocate()
-        icuInputBuffer.deallocate()
-        icuOutputBuffer.deallocate()
+        return
       }
     }
 
-    while index < cachedEndIndex {
-      let result = _foreignNormalize(
-        readIndex: index,
-        endIndex: cachedEndIndex,
-        guts: _guts,
-        outputBuffer: &outputBuffer,
-        icuInputBuffer: &icuInputBuffer,
-        icuOutputBuffer: &icuOutputBuffer
-      )
-      for i in 0..<result.amountFilled {
-        try f(outputBuffer[i])
-      }
-      _internalInvariant(result.nextReadPosition != index)
-      index = result.nextReadPosition
-      if result.allocatedBuffers {
-        _internalInvariant(!hasBufferOwnership)
-        hasBufferOwnership = true
+    for scalar in substring._internalNFC {
+      try scalar.withUTF8CodeUnits {
+        for byte in $0 {
+          try f(byte)
+        }
       }
     }
   }
-}
 
-internal func _fastWithNormalizedCodeUnitsImpl(
-  sourceBuffer: UnsafeBufferPointer<UInt8>,
-  outputBuffer: UnsafeMutableBufferPointer<UInt8>,
-  icuInputBuffer: UnsafeMutableBufferPointer<UInt16>,
-  icuOutputBuffer: UnsafeMutableBufferPointer<UInt16>,
-  _ f: (UInt8) throws -> Void
-) rethrows {
-  var outputBuffer = outputBuffer
-  var icuInputBuffer = icuInputBuffer
-  var icuOutputBuffer = icuOutputBuffer
+  internal func _fastNFCCheck(_ isNFCQC: inout Bool, _ prevCCC: inout UInt8) {
+    _guts.withFastUTF8 { utf8 in
+      var position = 0
 
-  var index = String.Index(_encodedOffset: 0)
-  let cachedEndIndex = String.Index(_encodedOffset: sourceBuffer.count)
+      while position < utf8.count {
+        // If our first byte is less than 0xCC, then it means we're under the
+        // 0x300 scalar value and everything up to 0x300 is NFC already.
+        if utf8[position] < 0xCC {
+          // If our first byte is less than 0xC0, then it means it is ASCII
+          // and only takes up a single byte.
+          if utf8[position] < 0xC0 {
+            position &+= 1
+          } else {
+            // Otherwise, this is a 2 byte < 0x300 sequence.
+            position &+= 2
+          }
+          // ASCII always has ccc of 0.
+          prevCCC = 0
 
-  var hasBufferOwnership = false
+          continue
+        }
 
-  defer {
-    if hasBufferOwnership {
-      outputBuffer.deallocate()
-      icuInputBuffer.deallocate()
-      icuOutputBuffer.deallocate()
-    }
-  }
+        let (scalar, len) = _decodeScalar(utf8, startingAt: position)
 
-  while index < cachedEndIndex {
-    let result = _fastNormalize(
-      readIndex: index,
-      sourceBuffer: sourceBuffer,
-      outputBuffer: &outputBuffer,
-      icuInputBuffer: &icuInputBuffer,
-      icuOutputBuffer: &icuOutputBuffer
-    )
-    for i in 0..<result.amountFilled {
-      try f(outputBuffer[i])
-    }
-    _internalInvariant(result.nextReadPosition != index)
-    index = result.nextReadPosition
-    if result.allocatedBuffers {
-      _internalInvariant(!hasBufferOwnership)
-      hasBufferOwnership = true
+        if !_isScalarNFCQC(scalar, &prevCCC) {
+          isNFCQC = false
+          return
+        }
+
+        position &+= len
+      }
     }
   }
 }

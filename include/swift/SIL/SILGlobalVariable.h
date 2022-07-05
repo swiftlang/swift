@@ -17,11 +17,11 @@
 #ifndef SWIFT_SIL_SILGLOBALVARIABLE_H
 #define SWIFT_SIL_SILGLOBALVARIABLE_H
 
+#include "swift/Basic/SwiftObjectHeader.h"
 #include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILType.h"
-#include "swift/SIL/SwiftObjectHeader.h"
 #include "llvm/ADT/ilist_node.h"
 #include "llvm/ADT/ilist.h"
 

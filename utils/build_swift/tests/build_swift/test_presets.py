@@ -7,17 +7,13 @@
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 
-from __future__ import unicode_literals
-
+import configparser
 import os
 import unittest
 
 from build_swift import constants
 from build_swift import presets
 from build_swift.presets import Preset, PresetParser
-
-import six
-from six.moves import configparser
 
 from .. import utils
 
@@ -113,6 +109,12 @@ ios
 ios
 """
 
+EXPAND_OPTION_NAME = """
+[preset: test]
+
+%(my_option)s
+"""
+
 
 # -----------------------------------------------------------------------------
 
@@ -152,8 +154,7 @@ class TestPresetParserMeta(type):
         return test
 
 
-@six.add_metaclass(TestPresetParserMeta)
-class TestPresetParser(unittest.TestCase):
+class TestPresetParser(unittest.TestCase, metaclass=TestPresetParserMeta):
 
     def test_read_files(self):
         parser = PresetParser()
@@ -281,3 +282,12 @@ class TestPresetParser(unittest.TestCase):
 
         self.assertEqual(set(parser.preset_names),
                          set(['foo', 'bar', 'baz']))
+
+    def test_expand_option_name(self):
+        parser = PresetParser()
+        parser.read_string(EXPAND_OPTION_NAME)
+
+        preset = parser.get_preset('test', vars={'my_option': 'macos'})
+        self.assertEqual(preset.options, [
+            ('macos', None),
+        ])

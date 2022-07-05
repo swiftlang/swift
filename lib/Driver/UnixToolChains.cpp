@@ -85,6 +85,9 @@ ToolChain::InvocationInfo toolchains::GenericUnix::constructInvocation(
 }
 
 std::string toolchains::GenericUnix::getDefaultLinker() const {
+  if (getTriple().isAndroid())
+    return "lld";
+
   switch (getTriple().getArch()) {
   case llvm::Triple::arm:
   case llvm::Triple::aarch64:
@@ -307,11 +310,11 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
   }
 
   if (!linkFilePath.empty()) {
-    auto linkFile = linkFilePath.str();
-    if (llvm::sys::fs::is_regular_file(linkFile)) {
-      Arguments.push_back(context.Args.MakeArgString(Twine("@") + linkFile));
+    if (llvm::sys::fs::is_regular_file(linkFilePath)) {
+      Arguments.push_back(
+          context.Args.MakeArgString(Twine("@") + linkFilePath));
     } else {
-      llvm::report_fatal_error(linkFile + " not found");
+      llvm::report_fatal_error(Twine(linkFilePath) + " not found");
     }
   }
 
@@ -384,9 +387,12 @@ toolchains::GenericUnix::constructInvocation(const StaticLinkJobAction &job,
 
   ArgStringList Arguments;
 
+  const char *AR;
   // Configure the toolchain.
-  const char *AR =
-      context.OI.LTOVariant != OutputInfo::LTOKind::None ? "llvm-ar" : "ar";
+  if (getTriple().isAndroid())
+    AR = "llvm-ar";
+  else
+    AR = context.OI.LTOVariant != OutputInfo::LTOKind::None ? "llvm-ar" : "ar";
   Arguments.push_back("crs");
 
   Arguments.push_back(

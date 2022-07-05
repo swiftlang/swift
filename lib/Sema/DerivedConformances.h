@@ -50,6 +50,9 @@ class VarDecl;
 
 class DerivedConformance {
 public:
+  enum class SynthesizedIntroducer : bool { Let, Var };
+
+public:
   ASTContext &Context;
   Decl *ConformanceDecl;
   NominalTypeDecl *Nominal;
@@ -67,6 +70,10 @@ public:
 
   /// Add \c children as members of the context that declares the conformance.
   void addMembersToConformanceContext(ArrayRef<Decl *> children);
+  /// Add \c member right after the \c hint member which may be the tail
+  void addMemberToConformanceContext(Decl *member, Decl* hint);
+  /// Add \c member in front of any other existing members
+  void addMemberToConformanceContext(Decl *member, bool insertAtHead);
 
   /// Get the declared type of the protocol that this is conformance is for.
   Type getProtocolType() const;
@@ -230,6 +237,23 @@ public:
   static void tryDiagnoseFailedComparableDerivation(DeclContext *DC,
                                                     NominalTypeDecl *nominal);
 
+  /// Diagnose problems, if any, preventing automatic derivation of
+  /// DistributedActor requirements
+  ///
+  /// \param nominal The nominal type for which we would like to diagnose
+  /// derivation failures
+  static void tryDiagnoseFailedDistributedActorDerivation(DeclContext *DC,
+                                                    NominalTypeDecl *nominal);
+
+  /// Diagnose problems, if any, preventing automatic derivation of
+  /// DistributedActor requirements
+  ///
+  /// \param nominal The nominal type for which we would like to diagnose
+  /// derivation failures
+  static void
+  tryDiagnoseFailedDistributedActorSystemDerivation(DeclContext *DC,
+                                                    NominalTypeDecl *nominal);
+
   /// Determine if an Equatable requirement can be derived for a type.
   ///
   /// This is implemented for enums without associated values or all-Equatable
@@ -303,13 +327,33 @@ public:
   /// \returns the derived member, which will also be added to the type.
   ValueDecl *deriveDecodable(ValueDecl *requirement);  
 
-  /// Whether we can derive the given DistributedActor requirement in the given context.
-  static bool canDeriveDistributedActor(NominalTypeDecl *nominal, DeclContext *dc);
+  /// Identifiable may need to have the `ID` type witness synthesized explicitly
+  static bool canDeriveIdentifiable(NominalTypeDecl *nominal,
+                                    DeclContext *dc);
 
-  /// Derive a DistributedActor requirement for an distributed actor.
+  /// Whether we can derive the given DistributedActor requirement in the given context.
+  static bool canDeriveDistributedActor(NominalTypeDecl *nominal,
+                                        DeclContext *dc);
+
+  /// Whether we can derive the given DistributedActorSystem requirements.
+  static bool canDeriveDistributedActorSystem(NominalTypeDecl *nominal,
+                                              DeclContext *dc);
+
+  /// Derive a 'DistributedActor' requirement for an distributed actor.
   ///
   /// \returns the derived member, which will also be added to the type.
   ValueDecl *deriveDistributedActor(ValueDecl *requirement);
+
+  /// Derive a 'DistributedActorSystem' requirement..
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  ValueDecl *deriveDistributedActorSystem(ValueDecl *requirement);
+
+  /// Derive a DistributedActor associated type for a distributed actor.
+  ///
+  /// \returns the derived type member, which will also be added to the type.
+  std::pair<Type, TypeDecl *> deriveDistributedActor(
+      AssociatedTypeDecl *assocType);
 
   /// Determine if \c Actor can be derived for the given type.
   static bool canDeriveActor(DeclContext *DC, NominalTypeDecl *NTD);
@@ -321,8 +365,9 @@ public:
 
   /// Declare a read-only property.
   std::pair<VarDecl *, PatternBindingDecl *>
-  declareDerivedProperty(Identifier name, Type propertyInterfaceType,
-                         Type propertyContextType, bool isStatic, bool isFinal);
+  declareDerivedProperty(SynthesizedIntroducer intro, Identifier name,
+                         Type propertyInterfaceType, Type propertyContextType,
+                         bool isStatic, bool isFinal);
 
   /// Add a getter to a derived property.  The property becomes read-only.
   static AccessorDecl *
@@ -405,6 +450,12 @@ public:
   static VarDecl *indexedVarDecl(char prefixChar, int index, Type type,
                                  DeclContext *varContext);
 };
+
+/// Determine whether any "memberwise" accessors, which walk through the
+/// stored properties of the given nominal type, require actor isolation
+/// because they involve mutable state.
+bool memberwiseAccessorsRequireActorIsolation(NominalTypeDecl *nominal);
+
 } // namespace swift
 
 #endif

@@ -20,9 +20,9 @@
 #include "swift/SILOptimizer/Differentiation/Common.h"
 
 #include "swift/AST/AnyFunctionRef.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/DifferentiationMangler.h"
 
@@ -36,77 +36,6 @@ namespace autodiff {
 // moved to a shared location.
 //===----------------------------------------------------------------------===//
 
-CanGenericSignature buildThunkSignature(SILFunction *fn, bool inheritGenericSig,
-                                        OpenedArchetypeType *openedExistential,
-                                        GenericEnvironment *&genericEnv,
-                                        SubstitutionMap &contextSubs,
-                                        SubstitutionMap &interfaceSubs,
-                                        ArchetypeType *&newArchetype) {
-  // If there's no opened existential, we just inherit the generic environment
-  // from the parent function.
-  if (openedExistential == nullptr) {
-    auto genericSig = fn->getLoweredFunctionType()->getSubstGenericSignature();
-    genericEnv = fn->getGenericEnvironment();
-    interfaceSubs = fn->getForwardingSubstitutionMap();
-    contextSubs = interfaceSubs;
-    return genericSig;
-  }
-
-  auto &ctx = fn->getASTContext();
-  GenericSignatureBuilder builder(ctx);
-
-  // Add the existing generic signature.
-  int depth = 0;
-  if (inheritGenericSig) {
-    if (auto genericSig =
-            fn->getLoweredFunctionType()->getSubstGenericSignature()) {
-      builder.addGenericSignature(genericSig);
-      depth = genericSig.getGenericParams().back()->getDepth() + 1;
-    }
-  }
-
-  // Add a new generic parameter to replace the opened existential.
-  auto *newGenericParam = GenericTypeParamType::get(depth, 0, ctx);
-
-  builder.addGenericParameter(newGenericParam);
-  Requirement newRequirement(RequirementKind::Conformance, newGenericParam,
-                             openedExistential->getOpenedExistentialType());
-  auto source =
-      GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
-  builder.addRequirement(newRequirement, source, nullptr);
-
-  auto genericSig = std::move(builder).computeGenericSignature(
-      /*allowConcreteGenericParams=*/true);
-  genericEnv = genericSig.getGenericEnvironment();
-
-  newArchetype =
-      genericEnv->mapTypeIntoContext(newGenericParam)->castTo<ArchetypeType>();
-
-  // Calculate substitutions to map the caller's archetypes to the thunk's
-  // archetypes.
-  if (auto calleeGenericSig =
-          fn->getLoweredFunctionType()->getSubstGenericSignature()) {
-    contextSubs = SubstitutionMap::get(
-        calleeGenericSig,
-        [&](SubstitutableType *type) -> Type {
-          return genericEnv->mapTypeIntoContext(type);
-        },
-        MakeAbstractConformanceForGenericType());
-  }
-
-  // Calculate substitutions to map interface types to the caller's archetypes.
-  interfaceSubs = SubstitutionMap::get(
-      genericSig,
-      [&](SubstitutableType *type) -> Type {
-        if (type->isEqual(newGenericParam))
-          return openedExistential;
-        return fn->mapTypeIntoContext(type);
-      },
-      MakeAbstractConformanceForGenericType());
-
-  return genericSig.getCanonicalSignature();
-}
-
 CanSILFunctionType buildThunkType(SILFunction *fn,
                                   CanSILFunctionType &sourceType,
                                   CanSILFunctionType &expectedType,
@@ -114,140 +43,12 @@ CanSILFunctionType buildThunkType(SILFunction *fn,
                                   SubstitutionMap &interfaceSubs,
                                   bool withoutActuallyEscaping,
                                   DifferentiationThunkKind thunkKind) {
-  assert(!expectedType->isPolymorphic() &&
-         !expectedType->getCombinedSubstitutions());
-  assert(!sourceType->isPolymorphic() &&
-         !sourceType->getCombinedSubstitutions());
-
-  // Cannot build a reabstraction thunk without context. Ownership semantics
-  // on the result type are required.
-  if (thunkKind == DifferentiationThunkKind::Reabstraction)
-    assert(expectedType->getExtInfo().hasContext());
-
-  // This may inherit @noescape from the expected type. The `@noescape`
-  // attribute is only stripped when using this type to materialize a new decl.
-  // Use `@convention(thin)` if:
-  // - Building a reabstraction thunk type.
-  // - Building an index subset thunk type, where the expected type has context
-  //   (i.e. is `@convention(thick)`).
-  auto extInfoBuilder = expectedType->getExtInfo().intoBuilder();
-  if (thunkKind == DifferentiationThunkKind::Reabstraction ||
-      extInfoBuilder.hasContext()) {
-    extInfoBuilder = extInfoBuilder.withRepresentation(
-        SILFunctionType::Representation::Thin);
-  }
-  if (withoutActuallyEscaping)
-    extInfoBuilder = extInfoBuilder.withNoEscape(false);
-
-  // Does the thunk type involve archetypes other than opened existentials?
-  bool hasArchetypes = false;
-  // Does the thunk type involve an open existential type?
-  CanOpenedArchetypeType openedExistential;
-  auto archetypeVisitor = [&](CanType t) {
-    if (auto archetypeTy = dyn_cast<OpenedArchetypeType>(t)) {
-      if (auto opened = dyn_cast<OpenedArchetypeType>(archetypeTy)) {
-        assert((openedExistential == CanArchetypeType() ||
-                openedExistential == opened) &&
-               "one too many open existentials");
-        openedExistential = opened;
-      } else {
-        hasArchetypes = true;
-      }
-    }
-  };
-
-  // Use the generic signature from the context if the thunk involves
-  // generic parameters.
-  CanGenericSignature genericSig;
-  SubstitutionMap contextSubs;
-  ArchetypeType *newArchetype = nullptr;
-
-  if (expectedType->hasArchetype() || sourceType->hasArchetype()) {
-    expectedType.visit(archetypeVisitor);
-    sourceType.visit(archetypeVisitor);
-    genericSig =
-        buildThunkSignature(fn, hasArchetypes, openedExistential, genericEnv,
-                            contextSubs, interfaceSubs, newArchetype);
-  }
-
-  auto substTypeHelper = [&](SubstitutableType *type) -> Type {
-    if (CanType(type) == openedExistential)
-      return newArchetype;
-    return Type(type).subst(contextSubs);
-  };
-  auto substConformanceHelper = LookUpConformanceInSubstitutionMap(contextSubs);
-
-  // Utility function to apply contextSubs, and also replace the
-  // opened existential with the new archetype.
-  auto substLoweredTypeIntoThunkContext =
-      [&](CanSILFunctionType t) -> CanSILFunctionType {
-    return SILType::getPrimitiveObjectType(t)
-        .subst(fn->getModule(), substTypeHelper, substConformanceHelper)
-        .castTo<SILFunctionType>();
-  };
-
-  sourceType = substLoweredTypeIntoThunkContext(sourceType);
-  expectedType = substLoweredTypeIntoThunkContext(expectedType);
-
-  // If our parent function was pseudogeneric, this thunk must also be
-  // pseudogeneric, since we have no way to pass generic parameters.
-  if (genericSig)
-    if (fn->getLoweredFunctionType()->isPseudogeneric())
-      extInfoBuilder = extInfoBuilder.withIsPseudogeneric();
-
-  // Add the function type as the parameter.
-  auto contextConvention =
-      SILType::getPrimitiveObjectType(sourceType).isTrivial(*fn)
-          ? ParameterConvention::Direct_Unowned
-          : ParameterConvention::Direct_Guaranteed;
-  SmallVector<SILParameterInfo, 4> params;
-  params.append(expectedType->getParameters().begin(),
-                expectedType->getParameters().end());
-  // Add reabstraction function parameter only if building a reabstraction thunk
-  // type.
-  if (thunkKind == DifferentiationThunkKind::Reabstraction)
-    params.push_back({sourceType, sourceType->getExtInfo().hasContext()
-                                      ? contextConvention
-                                      : ParameterConvention::Direct_Unowned});
-
-  auto mapTypeOutOfContext = [&](CanType type) -> CanType {
-    return type->mapTypeOutOfContext()->getCanonicalType(genericSig);
-  };
-
-  // Map the parameter and expected types out of context to get the interface
-  // type of the thunk.
-  SmallVector<SILParameterInfo, 4> interfaceParams;
-  interfaceParams.reserve(params.size());
-  for (auto &param : params) {
-    auto interfaceParam = param.map(mapTypeOutOfContext);
-    interfaceParams.push_back(interfaceParam);
-  }
-
-  SmallVector<SILYieldInfo, 4> interfaceYields;
-  for (auto &yield : expectedType->getYields()) {
-    auto interfaceYield = yield.map(mapTypeOutOfContext);
-    interfaceYields.push_back(interfaceYield);
-  }
-
-  SmallVector<SILResultInfo, 4> interfaceResults;
-  for (auto &result : expectedType->getResults()) {
-    auto interfaceResult = result.map(mapTypeOutOfContext);
-    interfaceResults.push_back(interfaceResult);
-  }
-
-  Optional<SILResultInfo> interfaceErrorResult;
-  if (expectedType->hasErrorResult()) {
-    auto errorResult = expectedType->getErrorResult();
-    interfaceErrorResult = errorResult.map(mapTypeOutOfContext);
-  }
-
-  // The type of the thunk function.
-  return SILFunctionType::get(
-      genericSig, extInfoBuilder.build(), expectedType->getCoroutineKind(),
-      ParameterConvention::Direct_Unowned, interfaceParams, interfaceYields,
-      interfaceResults, interfaceErrorResult,
-      expectedType->getPatternSubstitutions(), SubstitutionMap(),
-      fn->getASTContext());
+  CanType inputSubstType;
+  CanType outputSubstType;
+  CanType dynamicSelfType;
+  return buildSILFunctionThunkType(
+      fn, sourceType, expectedType, inputSubstType, outputSubstType, genericEnv,
+      interfaceSubs, dynamicSelfType, withoutActuallyEscaping, thunkKind);
 }
 
 /// Forward function arguments, handling ownership convention mismatches.
@@ -329,7 +130,7 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
 
   auto *thunk = fb.getOrCreateSharedFunction(
       loc, name, thunkDeclType, IsBare, IsTransparent, IsSerialized,
-      ProfileCounter(), IsReabstractionThunk, IsNotDynamic);
+      ProfileCounter(), IsReabstractionThunk, IsNotDynamic, IsNotDistributed);
   if (!thunk->empty())
     return thunk;
 
@@ -587,7 +388,7 @@ getOrCreateSubsetParametersThunkForLinearMap(
   auto loc = parentThunk->getLocation();
   auto *thunk = fb.getOrCreateSharedFunction(
       loc, thunkName, thunkType, IsBare, IsTransparent, IsSerialized,
-      ProfileCounter(), IsThunk, IsNotDynamic);
+      ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed);
 
   if (!thunk->empty())
     return {thunk, interfaceSubs};
@@ -868,7 +669,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
   auto loc = origFnOperand.getLoc();
   auto *thunk = fb.getOrCreateSharedFunction(
       loc, thunkName, thunkType, IsBare, IsTransparent, caller->isSerialized(),
-      ProfileCounter(), IsThunk, IsNotDynamic);
+      ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed);
 
   if (!thunk->empty())
     return {thunk, interfaceSubs};

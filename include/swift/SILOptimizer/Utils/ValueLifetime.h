@@ -45,9 +45,19 @@ namespace swift {
 /// lastUser or boundaryEdge. But with infinite loops, it is possible for both
 /// lastUsers and boundaryEdges to be empty even if there are uses within the
 /// loop.
+///
+/// TODO: combine this with PrunedLivenessBoundary.
 struct ValueLifetimeBoundary {
   SmallVector<SILInstruction *, 8> lastUsers;
   SmallVector<SILBasicBlock *, 8> boundaryEdges;
+
+  /// Visit the point at which a lifetime-ending instruction must be inserted,
+  /// excluding dead-end blocks. This is only useful when it is known that none
+  /// of the lastUsers ends the lifetime, for example when creating a new borrow
+  /// scope to enclose all uses.
+  void visitInsertionPoints(
+      llvm::function_ref<void(SILBasicBlock::iterator insertPt)> visitor,
+      DeadEndBlocks *deBlocks = nullptr);
 };
 
 /// Computes the lifetime frontier for a given value with respect to a
@@ -187,7 +197,8 @@ public:
            (hasUsersBeforeDef || bb != getDefValueParentBlock());
   }
 
-  /// Checks if there is a dealloc_ref inside the value's live range.
+  /// Checks if there is a dealloc_ref or dealloc_stack_ref inside the
+  /// value's live range.
   bool containsDeallocRef(const FrontierImpl &frontier);
 
   /// For debug dumping.

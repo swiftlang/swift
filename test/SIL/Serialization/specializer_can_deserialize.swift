@@ -6,7 +6,7 @@ import Swift
 
 // Make sure the specializer can deserialize code.
 
-// CHECK-LABEL: sil @main
+// CHECK-LABEL: sil {{.*}}@main
 // CHECK: bb0({{.*}}):
 // CHECK: function_ref @$ss9ContainerVAByxGycfCBi32__Tg5{{.*}}
 // CHECK: function_ref @$ss9ContainerV11doSomethingyyFBi32__Tg5{{.*}} 

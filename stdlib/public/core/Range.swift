@@ -14,7 +14,7 @@
 ///
 /// A type that conforms to `RangeExpression` can convert itself to a
 /// `Range<Bound>` of indices within a given collection.
-public protocol RangeExpression {
+public protocol RangeExpression<Bound> {
   /// The type for which the expression describes a range.
   associatedtype Bound: Comparable
 
@@ -315,6 +315,8 @@ extension Range where Bound: Strideable, Bound.Stride: SignedInteger {
   /// For example, passing a closed range with an upper bound of `Int.max`
   /// triggers a runtime error, because the resulting half-open range would
   /// require an upper bound of `Int.max + 1`, which is not representable as
+  /// an `Int`.
+  @inlinable // trivial-implementation
   public init(_ other: ClosedRange<Bound>) {
     let upperBound = other.upperBound.advanced(by: 1)
     self.init(_uncheckedBounds: (lower: other.lowerBound, upper: upperBound))
@@ -388,12 +390,14 @@ extension Range: CustomDebugStringConvertible {
   }
 }
 
+#if SWIFT_ENABLE_REFLECTION
 extension Range: CustomReflectable {
   public var customMirror: Mirror {
     return Mirror(
       self, children: ["lowerBound": lowerBound, "upperBound": upperBound])
   }
 }
+#endif
 
 extension Range: Equatable {
   /// Returns a Boolean value indicating whether two ranges are equal.
@@ -1023,3 +1027,14 @@ extension PartialRangeUpTo: Sendable where Bound: Sendable { }
 extension PartialRangeThrough: Sendable where Bound: Sendable { }
 extension PartialRangeFrom: Sendable where Bound: Sendable { }
 extension PartialRangeFrom.Iterator: Sendable where Bound: Sendable { }
+
+extension Range where Bound == String.Index {
+  @_alwaysEmitIntoClient // Swift 5.7
+  internal var _encodedOffsetRange: Range<Int> {
+    _internalInvariant(
+      (lowerBound._canBeUTF8 && upperBound._canBeUTF8)
+      || (lowerBound._canBeUTF16 && upperBound._canBeUTF16))
+    return Range<Int>(
+      _uncheckedBounds: (lowerBound._encodedOffset, upperBound._encodedOffset))
+  }
+}

@@ -2,6 +2,7 @@
 
 protocol P0 { }
 protocol P0b { }
+class Class {}
 
 struct X0 : P0 { }
 
@@ -12,6 +13,7 @@ protocol P1 {
   associatedtype A2 // expected-note {{'A2' declared here}}
   associatedtype A3 // expected-note {{'A3' declared here}}
   associatedtype A4 // expected-note {{'A4' declared here}}
+  associatedtype A5 // expected-note {{'A5' declared here}}
 }
 
 // A typealias in a subprotocol should be written as a same-type
@@ -23,14 +25,18 @@ protocol P2 : P1 {
 // A redeclaration of an associated type that adds type/layout requirements
 // should be written via a where clause.
 protocol P3a : P1 {
-  associatedtype A: P0, P0b // expected-warning{{redeclaration of associated type 'A' from protocol 'P1' is better expressed as a 'where' clause on the protocol}}{{18-18= where A: P0, A: P0b}}{{3-29=}}
+  associatedtype A: P0, P0b // expected-warning{{redeclaration of associated type 'A' from protocol 'P1' is better expressed as a 'where' clause on the protocol}}{{-1:18--1:18= where A: P0, A: P0b}}{{28:3-28:29=}}
   associatedtype A2: P0, P0b where A2.A == Never, A2: P1 // expected-warning{{redeclaration of associated type 'A2' from protocol 'P1' is better expressed as a 'where' clause on the protocol}}{{18-18= where A2: P0, A2: P0b, A2.A == Never, A2 : P1}}{{3-58=}}
   associatedtype A3 where A3: P0 // expected-warning{{redeclaration of associated type 'A3' from protocol 'P1' is better expressed as a 'where' clause on the protocol}}{{18-18= where A3 : P0}}{{3-34=}}
 
-  // expected-warning@+1 {{redeclaration of associated type 'A4' from protocol 'P1' is better expressed as a 'where' clause on the protocol}}{{18-18= where A4: P0, A4 : Collection, A4.Element == A4.Index, A4.SubSequence == A4}}{{3-52=}}
+  // expected-warning@+1 {{redeclaration of associated type 'A4' from protocol 'P1' is better expressed as a 'where' clause on the protocol}}{{27:18-27:18= where A4: P0, A4 : Collection, A4.Element == A4.Index, A4.SubSequence == A4}}{{33:3-35:51=}}
   associatedtype A4: P0 where A4: Collection,
                               A4.Element == A4.Index,
-                              A4.SubSequence == A4 // {{3-52=}} is this line, so it is correct.
+                              A4.SubSequence == A4
+
+  // expected-warning@+1 {{redeclaration of associated type 'A5' from protocol 'P1' is better expressed as a 'where' clause on the protocol}}{{27:18-27:18= where A5: P0b & Class, A5 : Collection, A5.Element : Collection}}{{+0:3-+1:62=}}
+  associatedtype A5: P0b & Class where A5: Collection,
+                                       A5.Element: Collection
 }
 
 // ... unless it has adds a default type witness

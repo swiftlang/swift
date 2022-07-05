@@ -1059,8 +1059,8 @@ private:
   // returns an instantiated array struct and unsafe pointer to the elements.
   struct ArrayUninitCall {
     SILValue arrayStorageRef;
-    TupleExtractInst *arrayStruct = nullptr;
-    TupleExtractInst *arrayElementPtr = nullptr;
+    SILValue arrayStruct = nullptr;
+    SILValue arrayElementPtr = nullptr;
 
     bool isValid() const {
       return arrayStorageRef && arrayStruct && arrayElementPtr;
@@ -1072,9 +1072,9 @@ private:
   ArrayUninitCall
   canOptimizeArrayUninitializedCall(ApplyInst *ai);
 
-  /// Return true of this tuple_extract is the result of an optimizable
+  /// Return true of this tuple_extract/destructure_tuple is the result of an optimizable
   /// @_semantics("array.uninitialized") call.
-  bool canOptimizeArrayUninitializedResult(TupleExtractInst *tei);
+  bool canOptimizeArrayUninitializedResult(SILInstruction *tei);
 
   /// Handle a call to "@_semantics(array.uninitialized") precisely by mapping
   /// each call result to a separate graph node and relating them to the

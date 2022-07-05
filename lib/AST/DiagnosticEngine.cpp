@@ -16,11 +16,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/DiagnosticEngine.h"
-#include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticSuppression.h"
+#include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrintOptions.h"
@@ -30,6 +30,8 @@
 #include "swift/Config.h"
 #include "swift/Localization/LocalizationFormat.h"
 #include "swift/Parse/Lexer.h" // bad dependency
+#include "clang/AST/ASTContext.h"
+#include "clang/AST/Decl.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/CommandLine.h"
@@ -478,7 +480,7 @@ static bool isInterestingTypealias(Type type) {
   else
     return false;
 
-  if (aliasDecl->getUnderlyingType()->isVoid())
+  if (type->isVoid())
     return false;
 
   // The 'Swift.AnyObject' typealias is not 'interesting'.
@@ -502,7 +504,7 @@ static bool isInterestingTypealias(Type type) {
   return true;
 }
 
-/// Walks the type recursivelly desugaring  types to display, but skipping
+/// Walks the type recursively desugaring  types to display, but skipping
 /// `GenericTypeParamType` because we would lose association with its original
 /// declaration and end up presenting the parameter in τ_0_0 format on
 /// diagnostic.
@@ -547,6 +549,24 @@ static bool typeSpellingIsAmbiguous(Type type,
       auto argType = arg.getAsType();
       if (argType && argType->getWithoutParens().getPointer() != type.getPointer() &&
           argType->getWithoutParens().getString(PO) == type.getString(PO)) {
+        // Currently, existential types are spelled the same way
+        // as protocols and compositions. We can remove this once
+        // existenials are printed with 'any'.
+        if (type->is<ExistentialType>() || argType->isExistentialType()) {
+          auto constraint = type;
+          if (auto existential = type->getAs<ExistentialType>())
+            constraint = existential->getConstraintType();
+
+          auto argConstraint = argType;
+          if (auto existential = argType->getAs<ExistentialType>())
+            argConstraint = existential->getConstraintType();
+
+          if (constraint.getPointer() != argConstraint.getPointer())
+            return true;
+
+          continue;
+        }
+
         return true;
       }
     }
@@ -564,6 +584,15 @@ static bool isMainActor(Type type) {
   }
 
   return false;
+}
+
+void swift::printClangDeclName(const clang::NamedDecl *ND,
+                               llvm::raw_ostream &os) {
+#if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
+  return; // not needed for the parser library.
+#endif
+
+  ND->getNameForDiagnostic(os, ND->getASTContext().getPrintingPolicy(), false);
 }
 
 /// Format a single diagnostic argument and write it to the given
@@ -641,10 +670,8 @@ static void formatDiagnosticArgument(StringRef Modifier,
     Type type;
     bool needsQualification = false;
 
-    // TODO: We should use PrintOptions::printForDiagnostic here, or we should
-    // rename that method.
-    PrintOptions printOptions{};
-
+    // Compute the appropriate print options for this argument.
+    auto printOptions = PrintOptions::forDiagnosticArguments();
     if (Arg.getKind() == DiagnosticArgumentKind::Type) {
       type = Arg.getAsType()->getWithoutParens();
       if (type.isNull()) {
@@ -680,7 +707,9 @@ static void formatDiagnosticArgument(StringRef Modifier,
       type = type->getWithoutSyntaxSugar();
     }
 
-    if (needsQualification && isa<OpaqueTypeArchetypeType>(type.getPointer())) {
+    if (needsQualification &&
+        isa<OpaqueTypeArchetypeType>(type.getPointer()) &&
+        cast<ArchetypeType>(type.getPointer())->isRoot()) {
       auto opaqueTypeDecl = type->castTo<OpaqueTypeArchetypeType>()->getDecl();
 
       llvm::SmallString<256> NamingDeclText;
@@ -708,7 +737,7 @@ static void formatDiagnosticArgument(StringRef Modifier,
         llvm::SmallString<256> AkaText;
         llvm::raw_svector_ostream OutAka(AkaText);
 
-        OutAka << getAkaTypeForDisplay(type);
+        getAkaTypeForDisplay(type)->print(OutAka, printOptions);
         Out << llvm::format(FormatOpts.AKAFormatString.c_str(),
                             typeName.c_str(), AkaText.c_str());
       } else {
@@ -801,10 +830,6 @@ static void formatDiagnosticArgument(StringRef Modifier,
       Out << "actor-isolated";
       break;
 
-    case ActorIsolation::DistributedActorInstance:
-      Out << "distributed actor-isolated";
-      break;
-
     case ActorIsolation::GlobalActor:
     case ActorIsolation::GlobalActorUnsafe: {
       Type globalActor = isolation.getGlobalActor();
@@ -832,6 +857,13 @@ static void formatDiagnosticArgument(StringRef Modifier,
                                            diagArg->FormatArgs);
     break;
   }
+
+  case DiagnosticArgumentKind::ClangDecl:
+    assert(Modifier.empty() && "Improper modifier for ClangDecl argument");
+    Out << FormatOpts.OpeningQuotationMark;
+    printClangDeclName(Arg.getAsClangDecl(), Out);
+    Out << FormatOpts.ClosingQuotationMark;
+    break;
   }
 }
 
@@ -1008,24 +1040,40 @@ DiagnosticBehavior DiagnosticState::determineBehavior(const Diagnostic &diag) {
 
 void DiagnosticEngine::flushActiveDiagnostic() {
   assert(ActiveDiagnostic && "No active diagnostic to flush");
+  handleDiagnostic(std::move(*ActiveDiagnostic));
+  ActiveDiagnostic.reset();
+}
+
+void DiagnosticEngine::handleDiagnostic(Diagnostic &&diag) {
   if (TransactionCount == 0) {
-    emitDiagnostic(*ActiveDiagnostic);
+    emitDiagnostic(diag);
     WrappedDiagnostics.clear();
     WrappedDiagnosticArgs.clear();
   } else {
-    onTentativeDiagnosticFlush(*ActiveDiagnostic);
-    TentativeDiagnostics.emplace_back(std::move(*ActiveDiagnostic));
+    onTentativeDiagnosticFlush(diag);
+    TentativeDiagnostics.emplace_back(std::move(diag));
   }
-  ActiveDiagnostic.reset();
+}
+
+void DiagnosticEngine::clearTentativeDiagnostics() {
+  TentativeDiagnostics.clear();
+  WrappedDiagnostics.clear();
+  WrappedDiagnosticArgs.clear();
 }
 
 void DiagnosticEngine::emitTentativeDiagnostics() {
   for (auto &diag : TentativeDiagnostics) {
     emitDiagnostic(diag);
   }
-  TentativeDiagnostics.clear();
-  WrappedDiagnostics.clear();
-  WrappedDiagnosticArgs.clear();
+  clearTentativeDiagnostics();
+}
+
+void DiagnosticEngine::forwardTentativeDiagnosticsTo(
+    DiagnosticEngine &targetEngine) {
+  for (auto &diag : TentativeDiagnostics) {
+    targetEngine.handleDiagnostic(std::move(diag));
+  }
+  clearTentativeDiagnostics();
 }
 
 /// Returns the access level of the least accessible PrettyPrintedDeclarations

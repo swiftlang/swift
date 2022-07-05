@@ -1,20 +1,17 @@
-// RUN: %target-run-simple-swift( %import-libdispatch -parse-as-library -sanitize=thread)
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library -sanitize=thread)
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 // REQUIRES: tsan_runtime
-// UNSUPPORTED: use_os_stdlib
 
-// REQUIRES: radar76446550
+// rdar://76038845
+// REQUIRES: concurrency_runtime
+// UNSUPPORTED: back_deployment_runtime
 
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
+// rdar://83246843 This tet is failing non-deterministically in CI.
+// REQUIRES: rdar83246843
 
-@available(SwiftStdlib 5.5, *)
 func fib(_ n: Int) -> Int {
   var first = 0
   var second = 1
@@ -26,7 +23,7 @@ func fib(_ n: Int) -> Int {
   return first
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func asyncFib(_ n: Int) async -> Int {
   if n == 0 || n == 1 {
     return n
@@ -36,17 +33,17 @@ func asyncFib(_ n: Int) async -> Int {
   async let second = await asyncFib(n-1)
 
   // Sleep a random amount of time waiting on the result producing a result.
-  await Task.sleep(UInt64.random(in: 0..<100) * 1000)
+  await Task.sleep(UInt64.random(in: 0..<100) * 1_000_000)
 
   let result = await first + second
 
   // Sleep a random amount of time before producing a result.
-  await Task.sleep(UInt64.random(in: 0..<100) * 1000)
+  await Task.sleep(UInt64.random(in: 0..<100) * 1_000_000)
 
   return result
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func runFibonacci(_ n: Int) async {
   let result = await asyncFib(n)
 
@@ -55,7 +52,7 @@ func runFibonacci(_ n: Int) async {
   assert(result == fib(n))
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @main struct Main {
   static func main() async {
     await runFibonacci(10)

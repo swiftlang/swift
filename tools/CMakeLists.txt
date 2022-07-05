@@ -2,10 +2,14 @@ include(CheckIncludeFiles)
 check_include_files("xpc/xpc.h" HAVE_XPC_H)
 
 if(HAVE_XPC_H AND SWIFT_BUILD_SOURCEKIT)
-  set(BUILD_SOURCEKIT_XPC_SERVICE TRUE)
+  set(BUILD_SOURCEKIT_XPC_SERVICE_default TRUE)
 else()
-  set(BUILD_SOURCEKIT_XPC_SERVICE FALSE)
+  set(BUILD_SOURCEKIT_XPC_SERVICE_default FALSE)
 endif()
+
+option(BUILD_SOURCEKIT_XPC_SERVICE
+  "Whether or not the SourceKit XPC service should be built"
+  ${BUILD_SOURCEKIT_XPC_SERVICE_default})
 
 # Add generated libSyntax headers to global dependencies.
 list(APPEND LLVM_COMMON_DEPENDS swift-syntax-generated-headers)
@@ -28,14 +32,15 @@ add_swift_tool_subdirectory(swift-llvm-opt)
 add_swift_tool_subdirectory(swift-ast-script)
 add_swift_tool_subdirectory(swift-refactor)
 add_swift_tool_subdirectory(libSwiftScan)
+add_swift_tool_subdirectory(libStaticMirror)
 if(SWIFT_BUILD_SYNTAXPARSERLIB)
   add_swift_tool_subdirectory(libSwiftSyntaxParser)
-  if(SWIFT_INCLUDE_TESTS OR SWIFT_BUILD_SYNTAXPARSERTEST)
+  if(SWIFT_INCLUDE_TESTS OR SWIFT_BUILD_SYNTAXPARSERTEST OR SWIFT_INCLUDE_TEST_BINARIES)
     add_swift_tool_subdirectory(swift-syntax-parser-test)
   endif()
 endif()
 
-if(SWIFT_INCLUDE_TESTS)
+if(SWIFT_INCLUDE_TESTS OR SWIFT_INCLUDE_TEST_BINARIES)
   add_swift_tool_subdirectory(swift-ide-test)
   add_swift_tool_subdirectory(swift-remoteast-test)
   add_swift_tool_subdirectory(lldb-moduleimport-test)

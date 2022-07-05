@@ -89,7 +89,8 @@ void ContextInfoCallbacks::doneParsing() {
   if (!ParsedExpr)
     return;
 
-  typeCheckContextAt(CurDeclContext, ParsedExpr->getLoc());
+  typeCheckContextAt(TypeCheckASTNodeAtLocContext::declContext(CurDeclContext),
+                     ParsedExpr->getLoc());
 
   ExprContextInfo Info(CurDeclContext, ParsedExpr);
 
@@ -171,40 +172,6 @@ void ContextInfoCallbacks::getImplicitMembers(
                            /*includeInstanceMembers=*/false,
                            /*includeDerivedRequirements*/false,
                            /*includeProtocolExtensionMembers*/true);
-}
-
-void PrintingTypeContextInfoConsumer::handleResults(
-    ArrayRef<TypeContextInfoItem> results) {
-  OS << "-----BEGIN TYPE CONTEXT INFO-----\n";
-  for (auto resultItem : results) {
-    OS << "- TypeName: ";
-    resultItem.ExpectedTy.print(OS);
-    OS << "\n";
-
-    OS << "  TypeUSR: ";
-    printTypeUSR(resultItem.ExpectedTy, OS);
-    OS << "\n";
-
-    OS << "  ImplicitMembers:";
-    if (resultItem.ImplicitMembers.empty())
-      OS << " []";
-    OS << "\n";
-    for (auto VD : resultItem.ImplicitMembers) {
-      OS << "   - ";
-
-      OS << "Name: ";
-      VD->getName().print(OS);
-      OS << "\n";
-
-      StringRef BriefDoc = VD->getBriefComment();
-      if (!BriefDoc.empty()) {
-        OS << "     DocBrief: \"";
-        OS << VD->getBriefComment();
-        OS << "\"\n";
-      }
-    }
-  }
-  OS << "-----END TYPE CONTEXT INFO-----\n";
 }
 
 CodeCompletionCallbacksFactory *swift::ide::makeTypeContextInfoCallbacksFactory(

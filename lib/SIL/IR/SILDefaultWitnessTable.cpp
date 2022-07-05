@@ -90,7 +90,8 @@ convertToDefinition(ArrayRef<Entry> entries) {
   // Bump the reference count of witness functions referenced by this table.
   for (auto entry : getEntries()) {
     if (entry.isValid() && entry.getKind() == SILWitnessTable::Method) {
-      entry.getMethodWitness().Witness->incrementRefCount();
+      if (SILFunction *f = entry.getMethodWitness().Witness)
+        f->incrementRefCount();
     }
   }
 }
@@ -105,7 +106,8 @@ SILDefaultWitnessTable::~SILDefaultWitnessTable() {
   // Drop the reference count of witness functions referenced by this table.
   for (auto entry : getEntries()) {
     if (entry.isValid() && entry.getKind() == SILWitnessTable::Method) {
-      entry.getMethodWitness().Witness->decrementRefCount();
+      if (SILFunction *f = entry.getMethodWitness().Witness)
+        f->decrementRefCount();
     }
   }
 }

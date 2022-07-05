@@ -1,0 +1,155 @@
+// RUN: %target-sil-opt %s -sil-move-kills-copyable-addresses-checker | %FileCheck %s
+
+// REQUIRES: optimized_stdlib
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+//////////////////
+// Declarations //
+//////////////////
+
+public protocol P {
+    static var value: P { get }
+    func doSomething()
+}
+
+sil @forceSplit : $@convention(thin) @async () -> ()
+sil @genericUse : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+
+enum Optional<T> {
+case some(T)
+case none
+}
+
+///////////
+// Tests //
+///////////
+
+// Make sure that when we process a move_addr on an alloc_stack/debug_value that
+// we properly put the [moved] marker on them.
+
+// CHECK-LABEL: sil [ossa] @singleBlock : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK:   [[SRC_ADDR:%.*]] = alloc_stack [lexical] [moved] $Builtin.NativeObject, let, name "[[VAR_NAME:.*]]"
+// CHECK:   [[DEST_ADDR:%.*]] = alloc_stack $Builtin.NativeObject
+// CHECK:   copy_addr [take] [[SRC_ADDR]] to [initialization] [[DEST_ADDR]]
+// CHECK-NEXT: debug_value [moved] undef
+// CHECK: } // end sil function 'singleBlock'
+sil [ossa] @singleBlock : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = alloc_stack [lexical] $Builtin.NativeObject, let, name "myName"
+  %2 = copy_value %0 : $Builtin.NativeObject
+  store %2 to [init] %1 : $*Builtin.NativeObject
+
+  %dest = alloc_stack $Builtin.NativeObject
+  mark_unresolved_move_addr %1 to %dest : $*Builtin.NativeObject
+
+  destroy_addr %dest : $*Builtin.NativeObject
+  dealloc_stack %dest : $*Builtin.NativeObject
+
+  destroy_addr %1 : $*Builtin.NativeObject
+  dealloc_stack %1 : $*Builtin.NativeObject
+
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @multipleBlock : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: bb0(
+// CHECK:   [[SRC_ADDR:%.*]] = alloc_stack [lexical] [moved] $Builtin.NativeObject, let, name "[[VAR_NAME:.*]]"
+// CHECK:   [[DEST_ADDR:%.*]] = alloc_stack $Builtin.NativeObject
+// CHECK:   cond_br undef, [[LHS:bb[0-9]+]], [[RHS:bb[0-9]+]]
+//
+// CHECK: [[LHS]]:
+// CHECK:   copy_addr [take] [[SRC_ADDR]] to [initialization] [[DEST_ADDR]]
+// CHECK:   debug_value [moved] undef : $*Builtin.NativeObject, let, name "[[VAR_NAME]]"
+// CHECK:   br bb
+//
+// CHECK: } // end sil function 'multipleBlock'
+sil [ossa] @multipleBlock : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = alloc_stack [lexical] $Builtin.NativeObject, let, name "myName"
+  %2 = copy_value %0 : $Builtin.NativeObject
+  store %2 to [init] %1 : $*Builtin.NativeObject
+  %dest = alloc_stack $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  mark_unresolved_move_addr %1 to %dest : $*Builtin.NativeObject
+  destroy_addr %dest : $*Builtin.NativeObject
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %dest : $*Builtin.NativeObject
+  destroy_addr %1 : $*Builtin.NativeObject
+  dealloc_stack %1 : $*Builtin.NativeObject
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Make sure that we insert a debug_value undef after the destroy_addr that we
+// place in block bb2.
+// CHECK-LABEL: sil [ossa] @dbg_undef_in_inserted_destroy_addr : $@convention(thin) @async <T where T : P> (@inout T) -> () {
+// CHECK: bb2:
+// CHECK-NEXT: // function_ref forceSplit
+// CHECK-NEXT: function_ref @forceSplit
+// CHECK-NEXT: apply
+// CHECK-NEXT: debug_value [moved] undef
+// CHECK-NEXT: destroy_addr
+// CHECK-NEXT: hop_to_executor
+// CHECK-NEXT: br bb3
+sil [ossa] @dbg_undef_in_inserted_destroy_addr : $@convention(thin) @async <T where T : P> (@inout T) -> () {
+bb0(%0 : $*T):
+  debug_value %0 : $*T, var, name "msg", argno 1, expr op_deref
+  %2 = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+  hop_to_executor %2 : $Optional<Builtin.Executor>
+  %4 = function_ref @forceSplit : $@convention(thin) @async () -> ()
+  %5 = apply %4() : $@convention(thin) @async () -> ()
+  hop_to_executor %2 : $Optional<Builtin.Executor>
+  cond_br undef, bb1, bb2
+
+bb1:
+  %11 = alloc_stack $T
+  %12 = begin_access [modify] [static] %0 : $*T
+  mark_unresolved_move_addr %12 to %11 : $*T
+  end_access %12 : $*T
+  %21 = function_ref @genericUse : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %22 = apply %21<T>(%11) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %11 : $*T
+  dealloc_stack %11 : $*T
+  %25 = function_ref @forceSplit : $@convention(thin) @async () -> ()
+  %26 = apply %25() : $@convention(thin) @async () -> ()
+  hop_to_executor %2 : $Optional<Builtin.Executor>
+  br bb3
+
+bb2:
+  %29 = function_ref @forceSplit : $@convention(thin) @async () -> ()
+  %30 = apply %29() : $@convention(thin) @async () -> ()
+  hop_to_executor %2 : $Optional<Builtin.Executor>
+  br bb3
+
+bb3:
+  %33 = alloc_stack $P
+  %34 = metatype $@thick T.Type
+  %35 = witness_method $T, #P.value!getter : <Self where Self : P> (Self.Type) -> () -> P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> @out P
+  %36 = apply %35<T>(%33, %34) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> @out P
+  %37 = alloc_stack $T
+  unconditional_checked_cast_addr P in %33 : $*P to T in %37 : $*T
+  %39 = begin_access [modify] [static] %0 : $*T
+  copy_addr [take] %37 to %39 : $*T
+  end_access %39 : $*T
+  dealloc_stack %37 : $*T
+  dealloc_stack %33 : $*P
+  %44 = function_ref @forceSplit : $@convention(thin) @async () -> ()
+  %45 = apply %44() : $@convention(thin) @async () -> ()
+  hop_to_executor %2 : $Optional<Builtin.Executor>
+  %47 = tuple ()
+  return %47 : $()
+}

@@ -27,7 +27,7 @@ class CMark(cmake_product.CMakeProduct):
     def is_before_build_script_impl_product(cls):
         """is_before_build_script_impl_product -> bool
 
-        Whether this product is build before any build-script-impl products.
+        Whether this product is built before any build-script-impl products.
         """
         return True
 
@@ -51,6 +51,8 @@ class CMark(cmake_product.CMakeProduct):
         """
         self.cmake_options.define('CMAKE_BUILD_TYPE:STRING',
                                   self.args.cmark_build_variant)
+
+        self.cmake_options.define('CMARK_THREADING', 'ON')
 
         (platform, arch) = host_target.split('-')
 

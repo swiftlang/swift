@@ -80,6 +80,10 @@ enum class ImportFlags {
   /// implementation detail of this file.
   SPIAccessControl = 0x10,
 
+  /// The module is imported assuming that the module itself predates
+  /// concurrency.
+  Preconcurrency = 0x20,
+
   /// Used for DenseMap.
   Reserved = 0x80
 };
@@ -221,6 +225,22 @@ namespace detail {
       }
     }
 
+    /// Parses \p text into elements separated by \p separator, with identifiers
+    /// from \p ctx starting at \p loc.
+    ///
+    /// \warning This is not very robust; for instance, it doesn't check the
+    /// validity of the identifiers.
+    ImportPathBuilder(ASTContext &ctx, StringRef text, char separator,
+                      SourceLoc loc)
+        : scratch() {
+      while (!text.empty()) {
+        StringRef next;
+        std::tie(next, text) = text.split(separator);
+        push_back({ImportPathBuilder_getIdentifierImpl(ctx, next), loc});
+        loc = loc.getAdvancedLocOrInvalid(next.size() + 1);
+      }
+    }
+
     void push_back(const ImportPathElement &elem) { scratch.push_back(elem); }
     void push_back(Identifier name, SourceLoc loc = SourceLoc()) {
       scratch.push_back({ name, loc });
@@ -352,7 +372,7 @@ public:
   /// the name of the module being imported, possibly including submodules.
   ///
   /// \c ImportPath::Module contains one or more identifiers. The first
-  /// identiifer names a top-level module. The second and subsequent
+  /// identifier names a top-level module. The second and subsequent
   /// identifiers, if present, chain together to name a specific submodule to
   /// import. (Although Swift modules cannot currently contain submodules, Swift
   /// can import Clang submodules.)
@@ -533,6 +553,9 @@ struct AttributedImport {
   /// Information about the module and access path being imported.
   ModuleInfo module;
 
+  /// The location of the 'import' keyword, for an explicit import.
+  SourceLoc importLoc;
+
   /// Flags indicating which attributes of this import are present.
   ImportOptions options;
 
@@ -543,10 +566,17 @@ struct AttributedImport {
   /// Names of explicitly imported SPI groups.
   ArrayRef<Identifier> spiGroups;
 
-  AttributedImport(ModuleInfo module, ImportOptions options = ImportOptions(),
-                   StringRef filename = {}, ArrayRef<Identifier> spiGroups = {})
-      : module(module), options(options), sourceFileArg(filename),
-        spiGroups(spiGroups) {
+  /// When the import declaration has a `@preconcurrency` annotation, this
+  /// is the source range covering the annotation.
+  SourceRange preconcurrencyRange;
+
+  AttributedImport(ModuleInfo module, SourceLoc importLoc = SourceLoc(),
+                   ImportOptions options = ImportOptions(),
+                   StringRef filename = {}, ArrayRef<Identifier> spiGroups = {},
+                   SourceRange preconcurrencyRange = {})
+      : module(module), importLoc(importLoc), options(options),
+        sourceFileArg(filename), spiGroups(spiGroups),
+        preconcurrencyRange(preconcurrencyRange) {
     assert(!(options.contains(ImportFlags::Exported) &&
              options.contains(ImportFlags::ImplementationOnly)) ||
            options.contains(ImportFlags::Reserved));
@@ -554,8 +584,9 @@ struct AttributedImport {
 
   template<class OtherModuleInfo>
   AttributedImport(ModuleInfo module, AttributedImport<OtherModuleInfo> other)
-    : AttributedImport(module, other.options, other.sourceFileArg,
-                       other.spiGroups) { }
+    : AttributedImport(module, other.importLoc, other.options,
+                       other.sourceFileArg, other.spiGroups,
+                       other.preconcurrencyRange) { }
 
   friend bool operator==(const AttributedImport<ModuleInfo> &lhs,
                          const AttributedImport<ModuleInfo> &rhs) {
@@ -705,17 +736,20 @@ struct DenseMapInfo<swift::AttributedImport<ModuleInfo>> {
   using ModuleInfoDMI = DenseMapInfo<ModuleInfo>;
   using ImportOptionsDMI = DenseMapInfo<swift::ImportOptions>;
   using StringRefDMI = DenseMapInfo<StringRef>;
+  using SourceLocDMI = DenseMapInfo<swift::SourceLoc>;
   // We can't include spiGroups in the hash because ArrayRef<Identifier> is not
   // DenseMapInfo-able, but we do check that the spiGroups match in isEqual().
 
   static inline AttributedImport getEmptyKey() {
     return AttributedImport(ModuleInfoDMI::getEmptyKey(),
+                            SourceLocDMI::getEmptyKey(),
                             ImportOptionsDMI::getEmptyKey(),
                             StringRefDMI::getEmptyKey(),
                             {});
   }
   static inline AttributedImport getTombstoneKey() {
     return AttributedImport(ModuleInfoDMI::getTombstoneKey(),
+                            SourceLocDMI::getEmptyKey(),
                             ImportOptionsDMI::getTombstoneKey(),
                             StringRefDMI::getTombstoneKey(),
                             {});
@@ -724,8 +758,8 @@ struct DenseMapInfo<swift::AttributedImport<ModuleInfo>> {
     return detail::combineHashValue(
         ModuleInfoDMI::getHashValue(import.module),
         detail::combineHashValue(
-            ImportOptionsDMI::getHashValue(import.options),
-            StringRefDMI::getHashValue(import.sourceFileArg)));
+          ImportOptionsDMI::getHashValue(import.options),
+          StringRefDMI::getHashValue(import.sourceFileArg)));
   }
   static bool isEqual(const AttributedImport &a,
                       const AttributedImport &b) {

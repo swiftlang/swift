@@ -40,12 +40,16 @@ class Inspect {
   @IBInspectable func foo() {} // expected-error {{@IBInspectable may only be used on 'var' declarations}} {{3-18=}}
   @GKInspectable func foo2() {} // expected-error {{@GKInspectable may only be used on 'var' declarations}} {{3-18=}}
 
-  @IBInspectable class var cval: Int { return 0 } // expected-error {{only instance properties can be declared @IBInspectable}} {{3-18=}}
-  @GKInspectable class var cval2: Int { return 0 } // expected-error {{only instance properties can be declared @GKInspectable}} {{3-18=}}
+  @IBInspectable class var cval: Int { return 0 } // expected-error {{only class instance properties can be declared @IBInspectable}} {{3-18=}}
+  @GKInspectable class var cval2: Int { return 0 } // expected-error {{only class instance properties can be declared @GKInspectable}} {{3-18=}}
 }
-@IBInspectable var ibinspectable_global : Int // expected-error {{only instance properties can be declared @IBInspectable}} {{1-16=}}
-@GKInspectable var gkinspectable_global : Int // expected-error {{only instance properties can be declared @GKInspectable}} {{1-16=}}
+@IBInspectable var ibinspectable_global : Int // expected-error {{only class instance properties can be declared @IBInspectable}} {{1-16=}}
+@GKInspectable var gkinspectable_global : Int // expected-error {{only class instance properties can be declared @GKInspectable}} {{1-16=}}
 
+struct inspectableWithStruct {
+  @IBInspectable var IBInspectableInStruct: Int // expected-error {{only class instance properties can be declared @IBInspectable}} {{3-18=}}
+  @GKInspectable var GKInspectableInStruct: Int // expected-error {{only class instance properties can be declared @GKInspectable}} {{3-18=}}
+}
 
 func foo(x: @convention(block) Int) {} // expected-error {{@convention attribute only applies to function types}}
 func foo(x: @convention(block) (Int) -> Int) {}
@@ -169,19 +173,19 @@ unowned var weak9 : Class = Ty0()
 // expected-note@-3 {{'weak9' declared here}}
 
 weak
-var weak10 : NonClass? = Ty0() // expected-error {{'weak' must not be applied to non-class-bound 'NonClass'; consider adding a protocol conformance that has a class bound}}
+var weak10 : NonClass? = Ty0() // expected-error {{'weak' must not be applied to non-class-bound 'any NonClass'; consider adding a protocol conformance that has a class bound}}
 unowned
-var weak11 : NonClass = Ty0() // expected-error {{'unowned' must not be applied to non-class-bound 'NonClass'; consider adding a protocol conformance that has a class bound}}
+var weak11 : NonClass = Ty0() // expected-error {{'unowned' must not be applied to non-class-bound 'any NonClass'; consider adding a protocol conformance that has a class bound}}
 
 unowned
-var weak12 : NonClass = Ty0() // expected-error {{'unowned' must not be applied to non-class-bound 'NonClass'; consider adding a protocol conformance that has a class bound}}
+var weak12 : NonClass = Ty0() // expected-error {{'unowned' must not be applied to non-class-bound 'any NonClass'; consider adding a protocol conformance that has a class bound}}
 unowned
-var weak13 : NonClass = Ty0() // expected-error {{'unowned' must not be applied to non-class-bound 'NonClass'; consider adding a protocol conformance that has a class bound}}
+var weak13 : NonClass = Ty0() // expected-error {{'unowned' must not be applied to non-class-bound 'any NonClass'; consider adding a protocol conformance that has a class bound}}
 
 weak
 var weak14 : Ty0 // expected-error {{'weak' variable should have optional type 'Ty0?'}}
 weak
-var weak15 : Class // expected-error {{'weak' variable should have optional type 'Class?'}}
+var weak15 : Class // expected-error {{'weak' variable should have optional type '(any Class)?'}}
 
 weak var weak16 : Class!
 
@@ -263,6 +267,38 @@ class C {
   @_optimize(size) var c : Int // expected-error {{'@_optimize(size)' attribute cannot be applied to stored properties}}
 }
 
+
+@exclusivity(checked) // ok
+var globalCheckedVar = 1
+
+@exclusivity(unchecked) // ok
+var globalUncheckedVar = 1
+
+@exclusivity(abc) // // expected-error {{unknown option 'abc' for attribute 'exclusivity'}}
+var globalUnknownVar = 1
+
+struct ExclusivityAttrStruct {
+  @exclusivity(unchecked) // expected-error {{@exclusivity can only be used on class properties, static properties and global variables}}
+  var instanceVar: Int = 27
+
+  @exclusivity(unchecked) // ok
+  static var staticVar: Int = 27
+
+  @exclusivity(unchecked) // expected-error {{@exclusivity can only be used on stored properties}}
+  static var staticComputedVar: Int { return 1 }
+}
+
+class ExclusivityAttrClass {
+  @exclusivity(unchecked) // ok
+  var instanceVar: Int = 27
+
+  @exclusivity(unchecked) // ok
+  static var staticVar: Int = 27
+
+  @exclusivity(unchecked) // expected-error {{@exclusivity can only be used on stored properties}}
+  static var staticComputedVar: Int { return 1 }
+}
+
 class HasStorage {
   @_hasStorage var x : Int = 42  // ok, _hasStorage is allowed here
 }
@@ -310,3 +346,5 @@ enum E1 {
 
   func foo() -> @_nonEphemeral UnsafeMutableRawPointer? { return nil } // expected-error {{attribute can only be applied to declarations, not types}}
 }
+
+@_custom func testCustomAttribute() {} // expected-error {{unknown attribute '_custom'}}

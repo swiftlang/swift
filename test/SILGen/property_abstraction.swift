@@ -1,4 +1,3 @@
-
 // RUN: %target-swift-emit-silgen -module-name property_abstraction %s | %FileCheck %s
 
 struct Int {
@@ -39,7 +38,8 @@ func inOutFunc(_ f: inout ((Int) -> Int)) { }
 // CHECK-LABEL: sil hidden [ossa] @$s20property_abstraction6inOutF{{[_0-9a-zA-Z]*}}F : 
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $Foo<Int, Int>):
 // CHECK:   [[XBOX:%.*]] = alloc_box ${ var Foo<Int, Int> }, var, name "x"
-// CHECK:   [[XBOX_PB:%.*]] = project_box [[XBOX]] : ${ var Foo<Int, Int> }, 0
+// CHECK:   [[XBOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[XBOX]]
+// CHECK:   [[XBOX_PB:%.*]] = project_box [[XBOX_LIFETIME]] : ${ var Foo<Int, Int> }, 0
 // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK:   store [[ARG_COPY]] to [init] [[XBOX_PB]]
 // CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] [[XBOX_PB]] : $*Foo<Int, Int>
@@ -57,6 +57,7 @@ func inOutFunc(_ f: inout ((Int) -> Int)) { }
 // CHECK:   [[F_ORIG:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACT_FN]]([[F_SUBST_OUT]])
 // CHECK:   [[F_CONV:%.*]] = convert_function [[F_ORIG]]
 // CHECK:   assign [[F_CONV]] to [[F_ADDR]]
+// CHECK:   end_borrow [[XBOX_LIFETIME]]
 // CHECK:   destroy_value [[XBOX]]
 // CHECK: } // end sil function '$s20property_abstraction6inOutF{{[_0-9a-zA-Z]*}}F'
 func inOutF(_ x: Foo<Int, Int>) {
@@ -140,11 +141,8 @@ func setBuilder<F: Factory>(_ factory: inout F) where F.Product == MyClass {
 }
 // CHECK: sil hidden [ossa] @$s20property_abstraction10setBuilder{{[_0-9a-zA-Z]*}}F : $@convention(thin) <F where F : Factory, F.Product == MyClass> (@inout F) -> ()
 // CHECK: bb0(%0 : $*F):
-// CHECK:   [[F0:%.*]] = function_ref @$s20property_abstraction10setBuilder{{[_0-9a-zA-Z]*}} : $@convention(thin) () -> @owned MyClass
-// CHECK:   [[F1:%.*]] = thin_to_thick_function [[F0]]
-// CHECK:   [[REABSTRACTOR:%.*]] = function_ref @$s{{.*}}TR :
-// CHECK:   [[F2:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACTOR]]([[F1]])
-// CHECK:   [[F3:%.*]] = convert_function [[F2]]
+// CHECK:   [[F0:%.*]] = function_ref @$s20property_abstraction10setBuilder{{[_0-9a-zA-Z]*}} :
+// CHECK:   [[F0_THICK:%.*]] = thin_to_thick_function [[F0]]
 // CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*F
 // CHECK:   [[SETTER:%.*]] = witness_method $F, #Factory.builder!setter
-// CHECK:   apply [[SETTER]]<F>([[F3]], [[WRITE]])
+// CHECK:   apply [[SETTER]]<F>([[F0_THICK]], [[WRITE]])

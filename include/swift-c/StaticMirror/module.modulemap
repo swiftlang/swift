@@ -1,0 +1,4 @@
+module _InternalStaticMirror {
+  header "BinaryScan.h"
+  link "_InternalStaticMirror"
+}

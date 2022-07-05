@@ -17,7 +17,7 @@ module SwiftShims {
   header "SwiftStdint.h"
   header "System.h"
   header "ThreadLocalStorage.h"
-  header "UnicodeShims.h"
+  header "UnicodeData.h"
   header "Visibility.h"
   export *
 }
@@ -29,20 +29,4 @@ module _SwiftConcurrencyShims {
 module SwiftOverlayShims {
   header "LibcOverlayShims.h"
   export *
-}
-
-
-// Obsolete overlay shims on Apple platforms.
-// Note: These deliberately do not use "export *" to avoid circularity issues
-// (overlay -> shims -> framework -> overlay)
-
-// NOTE: These are obsolete and should never be imported into any project.
-// They are going to be removed in a future compiler release.
-
-module _SwiftDispatchOverlayShims {
-  header "DispatchOverlayShims.h"
-}
-
-module _SwiftXCTestOverlayShims {
-  header "XCTestOverlayShims.h"
 }

@@ -234,9 +234,9 @@ static GenericTypeParamDecl*
 createGenericParam(ASTContext &ctx, const char *name, unsigned index) {
   ModuleDecl *M = ctx.TheBuiltinModule;
   Identifier ident = ctx.getIdentifier(name);
-  auto genericParam =
-    new (ctx) GenericTypeParamDecl(&M->getMainFile(FileUnitKind::Builtin),
-                                   ident, SourceLoc(), 0, index);
+  auto genericParam = GenericTypeParamDecl::create(
+      &M->getMainFile(FileUnitKind::Builtin), ident, SourceLoc(),
+      /*type sequence*/ false, 0, index, /*opaque type=*/false, nullptr);
   return genericParam;
 }
 
@@ -305,12 +305,10 @@ synthesizeGenericSignature(SynthesisContext &SC,
   CollectGenericParams collector(SC);
   list.Params.visit(collector);
 
-  return evaluateOrDefault(
-    SC.Context.evaluator,
-    AbstractGenericSignatureRequest{
-      nullptr, std::move(collector.GenericParamTypes),
-               std::move(collector.AddedRequirements)},
-    nullptr);
+  return buildGenericSignature(SC.Context,
+                               GenericSignature(),
+                               std::move(collector.GenericParamTypes),
+                               std::move(collector.AddedRequirements));
 }
 
 /// Build a builtin function declaration.
@@ -671,8 +669,8 @@ namespace {
     bool Async = false;
     BuiltinThrowsKind Throws = BuiltinThrowsKind::None;
 
-    // Accumulate params and requirements here, so that we can make the
-    // appropriate `AbstractGenericSignatureRequest` when `build()` is called.
+    // Accumulate params and requirements here, so that we can call
+    // `buildGenericSignature()` when `build()` is called.
     SmallVector<GenericTypeParamType *, 2> genericParamTypes;
     SmallVector<Requirement, 2> addedRequirements;
 
@@ -684,7 +682,7 @@ namespace {
       if (wantsAdditionalAnyObjectRequirement) {
         Requirement req(RequirementKind::Conformance,
                         TheGenericParamList->getParams()[0]->getInterfaceType(),
-                        ctx.getAnyObjectType());
+                        ctx.getAnyObjectConstraint());
         addedRequirements.push_back(req);
       }
       for (auto gp : TheGenericParamList->getParams()) {
@@ -727,11 +725,10 @@ namespace {
     }
 
     FuncDecl *build(Identifier name) {
-      auto GenericSig = evaluateOrDefault(
-        Context.evaluator,
-        AbstractGenericSignatureRequest{
-          nullptr, std::move(genericParamTypes), std::move(addedRequirements)},
-        nullptr);
+      auto GenericSig = buildGenericSignature(
+          Context, GenericSignature(),
+          std::move(genericParamTypes),
+          std::move(addedRequirements));
       return getBuiltinGenericFunction(name, InterfaceParams,
                                        InterfaceResult,
                                        TheGenericParamList, GenericSig,
@@ -854,6 +851,22 @@ static ValueDecl *getDestroyArrayOperation(ASTContext &ctx, Identifier id) {
                             _void);
 }
 
+static ValueDecl *getMoveOperation(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin, _generics(_unrestricted),
+                            _parameters(_owned(_typeparam(0))), _typeparam(0));
+}
+
+static ValueDecl *getCopyOperation(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin, _generics(_unrestricted),
+                            _parameters(_typeparam(0)), _typeparam(0));
+}
+
+static ValueDecl *getAssumeAlignment(ASTContext &ctx, Identifier id) {
+  // This is always "(Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer"
+  return getBuiltinFunction(ctx, id, _thin, _parameters(_rawPointer, _word),
+                            _rawPointer);
+}
+
 static ValueDecl *getTransferArrayOperation(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
                             _generics(_unrestricted),
@@ -881,12 +894,23 @@ static ValueDecl *getEndCOWMutation(ASTContext &ctx, Identifier id) {
 }
 
 static ValueDecl *getBindMemoryOperation(ASTContext &ctx, Identifier id) {
-  return getBuiltinFunction(ctx, id, _thin,
-                            _generics(_unrestricted),
-                            _parameters(_rawPointer,
-                                        _word,
-                                        _metatype(_typeparam(0))),
-                            _void);
+  FuncDecl *fd = getBuiltinFunction(ctx, id, _thin,
+                                    _generics(_unrestricted),
+                                    _parameters(_rawPointer,
+                                                _word,
+                                                _metatype(_typeparam(0))),
+                                    _word);
+  fd->getAttrs().add(new (ctx) DiscardableResultAttr(/*implicit*/true));
+  return fd;
+}
+
+static ValueDecl *getRebindMemoryOperation(ASTContext &ctx, Identifier id) {
+  FuncDecl *fd = getBuiltinFunction(ctx, id, _thin,
+                                    _parameters(_rawPointer,
+                                                _word),
+                                    _word);
+  fd->getAttrs().add(new (ctx) DiscardableResultAttr(/*implicit*/true));
+  return fd;
 }
 
 static ValueDecl *getAllocWithTailElemsOperation(ASTContext &Context,
@@ -1018,8 +1042,24 @@ static ValueDecl *getDeallocOperation(ASTContext &ctx, Identifier id) {
                             _void);
 }
 
+static ValueDecl *getStackAllocOperation(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(_word, _word, _word),
+                            _rawPointer);
+}
+
+static ValueDecl *getStackDeallocOperation(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(_rawPointer),
+                            _void);
+}
+
 static ValueDecl *getFenceOperation(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin, _parameters(), _void);
+}
+
+static ValueDecl *getIfdefOperation(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin, _parameters(), _int(1));
 }
 
 static ValueDecl *getVoidErrorOperation(ASTContext &ctx, Identifier id) {
@@ -1470,13 +1510,6 @@ static ValueDecl *getDistributedActorInitializeRemote(ASTContext &ctx,
                             _rawPointer);
 }
 
-static ValueDecl *getDistributedActorDestroy(ASTContext &ctx,
-                                                 Identifier id) {
-  return getBuiltinFunction(ctx, id, _thin,
-                            _parameters(_nativeObject),
-                            _void);
-}
-
 static ValueDecl *getResumeContinuationReturning(ASTContext &ctx,
                                                  Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
@@ -1549,6 +1582,12 @@ static ValueDecl *getBuildDefaultActorExecutorRef(ASTContext &ctx,
                                       _layout(_typeparam(0), _classLayout())),
                             _parameters(_typeparam(0)),
                             _executor);
+}
+
+static ValueDecl *getTargetOSVersionAtLeast(ASTContext &Context,
+                                            Identifier Id) {
+  auto int32Type = BuiltinIntegerType::get(32, Context);
+  return getBuiltinFunction(Id, {int32Type, int32Type, int32Type}, int32Type);
 }
 
 static ValueDecl *getBuildOrdinarySerialExecutorRef(ASTContext &ctx,
@@ -1795,17 +1834,14 @@ static ValueDecl *getUnreachableOperation(ASTContext &Context,
 static ValueDecl *getOnceOperation(ASTContext &Context,
                                    Identifier Id,
                                    bool withContext) {
-  // (RawPointer, @convention(c) ([Context]) -> ()[, Context]) -> ()
+  // (RawPointer, @convention(c) (Context) -> ()[, Context]) -> ()
   
   auto HandleTy = Context.TheRawPointerType;
   auto VoidTy = Context.TheEmptyTupleType;
   SmallVector<AnyFunctionType::Param, 1> CFuncParams;
-  swift::CanType ContextTy;
-  if (withContext) {
-    ContextTy = Context.TheRawPointerType;
-    auto ContextArg = FunctionType::Param(ContextTy);
-    CFuncParams.push_back(ContextArg);
-  }
+  swift::CanType ContextTy = Context.TheRawPointerType;
+  auto ContextArg = FunctionType::Param(ContextTy);
+  CFuncParams.push_back(ContextArg);
   auto Rep = FunctionTypeRepresentation::CFunctionPointer;
   auto ClangType = Context.getClangFunctionType(CFuncParams, VoidTy, Rep);
   auto Thin =
@@ -2169,18 +2205,17 @@ getSwiftFunctionTypeForIntrinsic(llvm::Intrinsic::ID ID,
       return false;
     ArgElts.push_back(ArgTy);
   }
-  
+
   // Translate LLVM function attributes to Swift function attributes.
   IntrinsicInfo II;
   II.ID = ID;
   auto attrs = II.getOrCreateAttributes(Context);
-  if (attrs.hasAttribute(llvm::AttributeList::FunctionIndex,
-                         llvm::Attribute::NoReturn)) {
+  if (attrs.hasFnAttr(llvm::Attribute::NoReturn)) {
     ResultTy = Context.getNeverType();
     if (!ResultTy)
       return false;
   }
-  
+
   return true;
 }
 
@@ -2273,6 +2308,14 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     Type ResultTy;
     if (getSwiftFunctionTypeForIntrinsic(ID, Types, Context, ArgElts, ResultTy))
       return getBuiltinFunction(Id, ArgElts, ResultTy);
+  }
+
+  // If this starts with fence, we have special suffixes to handle.
+  if (OperationName.startswith("ifdef_")) {
+    OperationName = OperationName.drop_front(strlen("ifdef_"));
+    if (!Types.empty()) return nullptr;
+    if (OperationName.empty()) return nullptr;
+    return getIfdefOperation(Context, Id);
   }
   
   // If this starts with fence, we have special suffixes to handle.
@@ -2463,6 +2506,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   switch (BV) {
   case BuiltinValueKind::Fence:
+  case BuiltinValueKind::Ifdef:
   case BuiltinValueKind::CmpXChg:
   case BuiltinValueKind::AtomicRMW:
   case BuiltinValueKind::AtomicLoad:
@@ -2499,6 +2543,21 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::EndUnpairedAccess:
     if (!Types.empty()) return nullptr;
     return getEndUnpairedAccessOperation(Context, Id);
+
+  case BuiltinValueKind::Move:
+    if (!Types.empty())
+      return nullptr;
+    return getMoveOperation(Context, Id);
+
+  case BuiltinValueKind::Copy:
+    if (!Types.empty())
+      return nullptr;
+    return getCopyOperation(Context, Id);
+
+  case BuiltinValueKind::AssumeAlignment:
+    if (!Types.empty())
+      return nullptr;
+    return getAssumeAlignment(Context, Id);
 
 #define BUILTIN(id, name, Attrs)
 #define BUILTIN_BINARY_OPERATION(id, name, attrs)
@@ -2594,6 +2653,10 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     if (!Types.empty()) return nullptr;
     return getBindMemoryOperation(Context, Id);
 
+  case BuiltinValueKind::RebindMemory:
+    if (!Types.empty()) return nullptr;
+    return getRebindMemoryOperation(Context, Id);
+
   case BuiltinValueKind::ProjectTailElems:
     if (!Types.empty()) return nullptr;
     return getProjectTailElemsOperation(Context, Id);
@@ -2623,6 +2686,11 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::DeallocRaw:
     return getDeallocOperation(Context, Id);
+
+  case BuiltinValueKind::StackAlloc:
+    return getStackAllocOperation(Context, Id);
+  case BuiltinValueKind::StackDealloc:
+    return getStackDeallocOperation(Context, Id);
 
   case BuiltinValueKind::CastToNativeObject:
   case BuiltinValueKind::UnsafeCastToNativeObject:
@@ -2770,6 +2838,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::CreateAsyncTaskInGroup:
     return getCreateAsyncTaskInGroup(Context, Id);
 
+  case BuiltinValueKind::TargetOSVersionAtLeast:
+    return getTargetOSVersionAtLeast(Context, Id);
+
   case BuiltinValueKind::ConvertTaskToJob:
     return getConvertTaskToJob(Context, Id);
 
@@ -2817,9 +2888,6 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::InitializeDistributedRemoteActor:
     return getDistributedActorInitializeRemote(Context, Id);
-
-  case BuiltinValueKind::DestroyDistributedActor:
-    return getDistributedActorDestroy(Context, Id);
 
   case BuiltinValueKind::StartAsyncLet:
   case BuiltinValueKind::StartAsyncLetWithLocalBuffer:

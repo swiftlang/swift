@@ -1,13 +1,14 @@
-// RUN: %target-swift-frontend -emit-ir %s -swift-version 5 -enable-experimental-distributed | %IRGenFileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s -swift-version 5 -disable-availability-checking | %IRGenFileCheck %s
+// UNSUPPORTED: back_deploy_concurrency
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
-import _Distributed
+import Distributed
 
 // Type descriptor.
-// CHECK-LABEL: @"$s17distributed_actor7MyActorC0B9Transport12_Distributed0dE0_pvpWvd"
-
-@available(SwiftStdlib 5.5, *)
+// CHECK-LABEL: @"$s17distributed_actor7MyActorC2id11Distributed012LocalTestingD2IDVvpWvd"
+@available(SwiftStdlib 5.6, *)
 public distributed actor MyActor {
-    // nothing
+  public typealias ActorSystem = LocalTestingDistributedActorSystem
+  // nothing
 }

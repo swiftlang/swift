@@ -15,7 +15,7 @@ public struct Foo {
   public init() { self.prop = "boop" }
 }
 
-@available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+@available(SwiftStdlib 5.3, *)
 extension OSLogInterpolation {
   @_optimize(none)
   @_transparent
@@ -30,7 +30,7 @@ extension OSLogInterpolation {
 import os
 import Lib
 
-if #available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
+if #available(SwiftStdlib 5.3, *) {
   let logger = Logger()
   logger.log("Log a foo: \(Foo())")
 }

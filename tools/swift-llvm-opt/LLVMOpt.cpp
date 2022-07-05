@@ -51,6 +51,7 @@
 #include "llvm/LinkAllIR.h"
 #include "llvm/LinkAllPasses.h"
 #include "llvm/MC/SubtargetFeature.h"
+#include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Host.h"
@@ -60,7 +61,6 @@
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/SystemUtils.h"
-#include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Target/TargetMachine.h"
@@ -283,7 +283,7 @@ int main(int argc, char **argv) {
 
   std::error_code EC;
   Out.reset(
-      new llvm::ToolOutputFile(OutputFilename, EC, llvm::sys::fs::F_None));
+      new llvm::ToolOutputFile(OutputFilename, EC, llvm::sys::fs::OF_None));
   if (EC) {
     llvm::errs() << EC.message() << '\n';
     return 1;

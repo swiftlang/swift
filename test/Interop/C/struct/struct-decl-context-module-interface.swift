@@ -5,16 +5,16 @@
 // nested in other C structs.
 
 // CHECK: struct StructRegular {
-// CHECK-NEXT:   var complete_immediately: StructNestedComplete1
-// CHECK-NEXT:   var completed_later: UnsafeMutablePointer<StructNestedCompletedLater1>!
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   init(complete_immediately: StructNestedComplete1, completed_later: UnsafeMutablePointer<StructNestedCompletedLater1>!)
+// CHECK-NEXT:   var complete_immediately: StructNestedComplete1
+// CHECK-NEXT:   var completed_later: UnsafeMutablePointer<StructNestedCompletedLater1>!
 // CHECK-NEXT: }
 // CHECK-NEXT: struct StructNestedComplete1 {
-// CHECK-NEXT:   var complete_immediately_nested: StructNestedNestedComplete1
-// CHECK-NEXT:   var completed_later_nested: UnsafeMutablePointer<StructNestedNestedCompletedLater1>!
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   init(complete_immediately_nested: StructNestedNestedComplete1, completed_later_nested: UnsafeMutablePointer<StructNestedNestedCompletedLater1>!)
+// CHECK-NEXT:   var complete_immediately_nested: StructNestedNestedComplete1
+// CHECK-NEXT:   var completed_later_nested: UnsafeMutablePointer<StructNestedNestedCompletedLater1>!
 // CHECK-NEXT: }
 // CHECK-NEXT: struct StructNestedNestedComplete1 {
 // CHECK-NEXT:   init()
@@ -26,10 +26,10 @@
 // CHECK-NEXT:   init()
 // CHECK-NEXT: }
 // CHECK-NEXT: struct StructTypedefTag2 {
-// CHECK-NEXT:   var complete_immediately: StructNestedComplete2
-// CHECK-NEXT:   var completed_later: UnsafeMutablePointer<StructNestedCompletedLater2>!
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   init(complete_immediately: StructNestedComplete2, completed_later: UnsafeMutablePointer<StructNestedCompletedLater2>!)
+// CHECK-NEXT:   var complete_immediately: StructNestedComplete2
+// CHECK-NEXT:   var completed_later: UnsafeMutablePointer<StructNestedCompletedLater2>!
 // CHECK-NEXT: }
 // CHECK-NEXT: struct StructNestedComplete2 {
 // CHECK-NEXT:   init()
@@ -39,10 +39,10 @@
 // CHECK-NEXT:   init()
 // CHECK-NEXT: }
 // CHECK-NEXT: struct StructTypedefName3 {
-// CHECK-NEXT:   var complete_immediately: StructNestedComplete3
-// CHECK-NEXT:   var completed_later: UnsafeMutablePointer<StructNestedCompletedLater3>!
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   init(complete_immediately: StructNestedComplete3, completed_later: UnsafeMutablePointer<StructNestedCompletedLater3>!)
+// CHECK-NEXT:   var complete_immediately: StructNestedComplete3
+// CHECK-NEXT:   var completed_later: UnsafeMutablePointer<StructNestedCompletedLater3>!
 // CHECK-NEXT: }
 // CHECK-NEXT: struct StructNestedComplete3 {
 // CHECK-NEXT:   init()
@@ -51,10 +51,10 @@
 // CHECK-NEXT:   init()
 // CHECK-NEXT: }
 // CHECK-NEXT: struct StructTypedefTag4 {
-// CHECK-NEXT:   var complete_immediately: StructNestedComplete4
-// CHECK-NEXT:   var completed_later: UnsafeMutablePointer<StructNestedCompletedLater4>!
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   init(complete_immediately: StructNestedComplete4, completed_later: UnsafeMutablePointer<StructNestedCompletedLater4>!)
+// CHECK-NEXT:   var complete_immediately: StructNestedComplete4
+// CHECK-NEXT:   var completed_later: UnsafeMutablePointer<StructNestedCompletedLater4>!
 // CHECK-NEXT: }
 // CHECK-NEXT: struct StructNestedComplete4 {
 // CHECK-NEXT:   init()
@@ -71,10 +71,10 @@
 // CHECK-NEXT:   init()
 // CHECK-NEXT: }
 // CHECK-NEXT: struct StructTypedefName6 {
-// CHECK-NEXT:   var complete_immediately: StructNestedComplete6
-// CHECK-NEXT:   var completed_later: UnsafeMutablePointer<StructNestedCompletedLater6>!
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   init(complete_immediately: StructNestedComplete6, completed_later: UnsafeMutablePointer<StructNestedCompletedLater6>!)
+// CHECK-NEXT:   var complete_immediately: StructNestedComplete6
+// CHECK-NEXT:   var completed_later: UnsafeMutablePointer<StructNestedCompletedLater6>!
 // CHECK-NEXT: }
 // CHECK-NEXT: struct StructNestedComplete6 {
 // CHECK-NEXT:   init()
@@ -84,10 +84,10 @@
 // CHECK-NEXT:   init()
 // CHECK-NEXT: }
 // CHECK-NEXT: struct StructTypedefName7 {
-// CHECK-NEXT:   var complete_immediately: StructNestedComplete7
-// CHECK-NEXT:   var completed_later: UnsafeMutablePointer<StructNestedCompletedLater7>!
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   init(complete_immediately: StructNestedComplete7, completed_later: UnsafeMutablePointer<StructNestedCompletedLater7>!)
+// CHECK-NEXT:   var complete_immediately: StructNestedComplete7
+// CHECK-NEXT:   var completed_later: UnsafeMutablePointer<StructNestedCompletedLater7>!
 // CHECK-NEXT: }
 // CHECK-NEXT: struct StructNestedComplete7 {
 // CHECK-NEXT:   init()
@@ -97,10 +97,10 @@
 // CHECK-NEXT:   init()
 // CHECK-NEXT: }
 // CHECK-NEXT: struct StructTypedefName8 {
-// CHECK-NEXT:   var complete_immediately: StructNestedComplete8
-// CHECK-NEXT:   var completed_later: UnsafeMutablePointer<StructNestedCompletedLater8>!
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   init(complete_immediately: StructNestedComplete8, completed_later: UnsafeMutablePointer<StructNestedCompletedLater8>!)
+// CHECK-NEXT:   var complete_immediately: StructNestedComplete8
+// CHECK-NEXT:   var completed_later: UnsafeMutablePointer<StructNestedCompletedLater8>!
 // CHECK-NEXT: }
 // CHECK-NEXT: struct StructNestedComplete8 {
 // CHECK-NEXT:   init()

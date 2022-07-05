@@ -33,7 +33,7 @@ typealias DS<T> = MyType<String, T>
 typealias BadA<T : Int> = MyType<String, T>  // expected-error {{type 'T' constrained to non-protocol, non-class type 'Int'}}
 
 typealias BadB<T where T == Int> = MyType<String, T>  // expected-error {{associated types must not have a generic parameter list}}
-// expected-error@-1 {{same-type requirement makes generic parameter 'T' non-generic}}
+// expected-warning@-1 {{same-type requirement makes generic parameter 'T' non-generic}}
 
 typealias BadC<T,T> = MyType<String, T>  // expected-error {{invalid redeclaration of 'T'}}
 // expected-note @-1 {{'T' previously declared here}}
@@ -131,6 +131,11 @@ func f(a : MyTypeWithHashable<Int, Int>) {
 class GenericClass<T> {
   typealias TA<U> = MyType<T, U>
   typealias TAI<U> = MyType<Int, U>
+
+  func testNestedUnbound(t: T) {
+    typealias Nested<X, Y> = MyType<X, Y>
+    _ = Nested(a: t, b: t)
+  }
 
   func testCapture<S>(s: S, t: T) -> TA<S> {
     return TA<S>(a: t, b: s)

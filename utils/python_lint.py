@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # This source file is part of the Swift.org open source project
 #
@@ -15,8 +15,6 @@ Utility script used to run the flake8 linter over all the project Python
 sources.
 """
 
-
-from __future__ import absolute_import, print_function, unicode_literals
 
 import os
 import subprocess
@@ -45,8 +43,8 @@ but these were not found on your system.
 
 You can install these using:
 
-    python -m pip install flake8
-    python -m pip install flake8-import-order
+    python3 -m pip install flake8
+    python3 -m pip install flake8-import-order
 
 For more help, see http://flake8.pycqa.org.
 """

@@ -20,6 +20,7 @@
 #include "swift/AST/Effects.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ASTPrinter.h"
+#include "swift/Frontend/FrontendOptions.h"
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/Parse/Token.h"
 #include "llvm/ADT/StringRef.h"
@@ -85,8 +86,10 @@ SourceCompleteResult isSourceInputComplete(StringRef Text, SourceFileKind SFKind
 
 bool initCompilerInvocation(
     CompilerInvocation &Invocation, ArrayRef<const char *> OrigArgs,
-    DiagnosticEngine &Diags, StringRef UnresolvedPrimaryFile,
+    FrontendOptions::ActionType Action, DiagnosticEngine &Diags,
+    StringRef UnresolvedPrimaryFile,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    const std::string &swiftExecutablePath,
     const std::string &runtimeResourcePath,
     const std::string &diagnosticDocumentationPath, time_t sessionTimestamp,
     std::string &Error);
@@ -149,6 +152,14 @@ struct ResolvedCursorInfo {
   ValueDecl *ValueD = nullptr;
   TypeDecl *CtorTyRef = nullptr;
   ExtensionDecl *ExtTyRef = nullptr;
+  /// Declarations that were shadowed by \c ValueD using a shorthand syntax that
+  /// names both the newly declared variable and the referenced variable by the
+  /// same identifier in the source text. This includes shorthand closure
+  /// captures (`[foo]`) and shorthand if captures
+  /// (`if let foo {`).
+  /// Decls that are shadowed using shorthand syntax should be reported as
+  /// additional cursor info results.
+  SmallVector<ValueDecl *, 2> ShorthandShadowedDecls;
   ModuleEntity Mod;
   bool IsRef = true;
   bool IsKeywordArgument = false;
@@ -156,9 +167,9 @@ struct ResolvedCursorInfo {
   Type ContainerType;
   Stmt *TrailingStmt = nullptr;
   Expr *TrailingExpr = nullptr;
-  /// If this is a call, whether it is "dynamic", see ide::isDynamicCall.
+  /// It this is a ref, whether it is "dynamic". See \c ide::isDynamicRef.
   bool IsDynamic = false;
-  /// If this is a call, the types of the base (multiple in the case of
+  /// If this is a dynamic ref, the types of the base (multiple in the case of
   /// protocol composition).
   SmallVector<NominalTypeDecl *, 1> ReceiverTypes;
 
@@ -244,9 +255,9 @@ class NameMatcher: public ASTWalker {
   std::vector<ResolvedLoc> ResolvedLocs;
   ArrayRef<Token> TokensToCheck;
 
-  /// The \c Expr argument of a parent \c CustomAttr (if one exists) and
+  /// The \c ArgumentList of a parent \c CustomAttr (if one exists) and
   /// the \c SourceLoc of the type name it applies to.
-  llvm::Optional<Located<Expr *>> CustomAttrArg;
+  llvm::Optional<Located<ArgumentList *>> CustomAttrArgList;
   unsigned InactiveConfigRegionNestings = 0;
   unsigned SelectorNestings = 0;
 
@@ -265,12 +276,13 @@ class NameMatcher: public ASTWalker {
   bool shouldSkip(SourceRange Range);
   bool shouldSkip(CharSourceRange Range);
   bool tryResolve(ASTWalker::ParentTy Node, SourceLoc NameLoc);
-  bool tryResolve(ASTWalker::ParentTy Node, DeclNameLoc NameLoc, Expr *Arg);
+  bool tryResolve(ASTWalker::ParentTy Node, DeclNameLoc NameLoc,
+                  ArgumentList *Args);
   bool tryResolve(ASTWalker::ParentTy Node, SourceLoc NameLoc, LabelRangeType RangeType,
                   ArrayRef<CharSourceRange> LabelLocs,
                   Optional<unsigned> FirstTrailingLabel);
   bool handleCustomAttrs(Decl *D);
-  Expr *getApplicableArgFor(Expr* E);
+  ArgumentList *getApplicableArgsFor(Expr* E);
 
   std::pair<bool, Expr*> walkToExprPre(Expr *E) override;
   Expr* walkToExprPost(Expr *E) override;
@@ -282,6 +294,9 @@ class NameMatcher: public ASTWalker {
   bool walkToTypeReprPost(TypeRepr *T) override;
   std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override;
   bool shouldWalkIntoGenericParams() override { return true; }
+
+  std::pair<bool, ArgumentList *>
+  walkToArgumentListPre(ArgumentList *ArgList) override;
 
   // FIXME: Remove this
   bool shouldWalkAccessorsTheOldWay() override { return true; }
@@ -568,13 +583,14 @@ struct CallArgInfo {
 };
 
 std::vector<CallArgInfo>
-getCallArgInfo(SourceManager &SM, Expr *Arg, LabelRangeEndAt EndKind);
+getCallArgInfo(SourceManager &SM, ArgumentList *Args, LabelRangeEndAt EndKind);
 
 // Get the ranges of argument labels from an Arg, either tuple or paren, and
 // the index of the first trailing closure argument, if any. This includes empty
 // ranges for any unlabelled arguments, including the first trailing closure.
 std::pair<std::vector<CharSourceRange>, Optional<unsigned>>
-getCallArgLabelRanges(SourceManager &SM, Expr *Arg, LabelRangeEndAt EndKind);
+getCallArgLabelRanges(SourceManager &SM, ArgumentList *Args,
+                      LabelRangeEndAt EndKind);
 
 /// Whether a decl is defined from clang source.
 bool isFromClang(const Decl *D);
@@ -600,11 +616,22 @@ bool isBeingCalled(ArrayRef<Expr*> ExprStack);
 /// stack in eg. the case of a `DotSyntaxCallExpr`).
 Expr *getBase(ArrayRef<Expr *> ExprStack);
 
-/// Assuming that we have a call, returns whether or not it is "dynamic" based
-/// on its base expression and decl of the callee. Note that this is not
-/// Swift's "dynamic" modifier (`ValueDecl::isDynamic`), but rathar "can call a
-/// function in a conformance/subclass".
-bool isDynamicCall(Expr *Base, ValueDecl *D);
+/// Returns whether or not \p D could be overridden, eg. it's a member of a
+/// protocol, a non-final method in a class, etc.
+bool isDeclOverridable(ValueDecl *D);
+
+/// Given a reference to a member \p D and its \p Base expression, return
+/// whether that declaration could be dynamic, ie. may resolve to some other
+/// declaration. Note that while the decl itself itself may be overridable, a
+/// reference to it is not necessarily "dynamic". Furthermore,  is *not* the
+/// `dynamic` keyword.
+///
+/// A simple example is `SomeType.classMethod()`. `classMethod`
+/// is itself overridable, but that particular reference to it *has* to be the
+/// one in `SomeType`. Contrast that to `type(of: foo).classMethod()` where
+/// `classMethod` could be any `classMethod` up or down the hierarchy from the
+/// type of the \p Base expression.
+bool isDynamicRef(Expr *Base, ValueDecl *D);
 
 /// Adds the resolved nominal types of \p Base to \p Types.
 void getReceiverType(Expr *Base,

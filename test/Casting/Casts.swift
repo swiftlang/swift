@@ -102,7 +102,7 @@ CastsTests.test("Optional<T>.none can be casted to Optional<U>.none in generic c
 #if _runtime(_ObjC)
 protocol P2 {}
 CastsTests.test("Cast from ObjC existential to Protocol (SR-3871)") {
-  if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
+  if #available(SwiftStdlib 5.3, *) {
     struct S: P2 {}
 
     class ObjCWrapper {
@@ -167,7 +167,7 @@ CastsTests.test("Dynamic casts of CF types to protocol existentials (SR-2289)")
     reason: "This test behaves unpredictably in optimized mode."))
 .code {
   expectTrue(isP(10 as Int))
-  if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
+  if #available(SwiftStdlib 5.5, *) {
     expectTrue(isP(CFBitVector.makeImmutable(from: [10, 20])))
     expectTrue(isP(CFMutableBitVector.makeMutable(from: [10, 20])))
   }
@@ -195,7 +195,7 @@ CastsTests.test("Casting struct -> Obj-C -> Protocol fails (SR-3871, SR-5590, SR
 
 
 protocol P4552 {}
-if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
+if #available(SwiftStdlib 5.5, *) {
 CastsTests.test("Casting Any(Optional(T)) -> Protocol fails (SR-4552)") {
   struct S: P4552 {
     let tracker = LifetimeTracked(13)
@@ -257,7 +257,7 @@ CastsTests.test("Store Swift metatype in ObjC property and cast back to Any.Type
   let sValue2 = a.sVar as? Any.Type
   let objcValue2 = a.objcVar as? Any.Type
   expectTrue(sValue2 == b)
-  if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
+  if #available(SwiftStdlib 5.5, *) {
     expectTrue(sValue2 == objcValue2)
     expectTrue(objcValue2 == b)
   }
@@ -303,7 +303,7 @@ CastsTests.test("Casts from @objc Type") {
   let user = User(name: "Kermit")
   let exporter: Exporter = UserExporter()
 
-  if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
+  if #available(SwiftStdlib 5.5, *) {
     expectTrue(exporter.type is User.Type)
   }
   expectNotNil(exporter.export(item: user))
@@ -319,7 +319,7 @@ CastsTests.test("Conditional NSNumber -> Bool casts") {
 #endif
 
 // rdar://45217461 ([dynamic casting] [SR-8964]: Type check operator (is) fails for Any! variable holding an Error (struct) value)
-if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
+if #available(SwiftStdlib 5.5, *) {
 CastsTests.test("Casts from Any(struct) to Error (SR-8964)") {
   struct MyError: Error { }
 
@@ -393,7 +393,7 @@ CastsTests.test("Swift Protocol Metatypes don't self-conform") {
   let a = SwiftProtocol.self
   // `is P.Protocol` tests whether the argument is a subtype of P.
   // In particular, the protocol identifier `P.self` is such a subtype.
-  if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
+  if #available(SwiftStdlib 5.5, *) {
     expectNotNil(runtimeCast(a, to: SwiftProtocol.Protocol.self)) // Fixed by rdar://58991956
   }
   expectNotNil(a as? SwiftProtocol.Protocol)
@@ -446,7 +446,7 @@ CastsTests.test("Self-conformance for Error.self")
 @objc protocol ObjCProtocol {}
 CastsTests.test("ObjC Protocol Metatypes self-conform") {
   let a = ObjCProtocol.self
-  if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
+  if #available(SwiftStdlib 5.5, *) {
     expectNotNil(runtimeCast(a, to: ObjCProtocol.Protocol.self))
   }
   expectNotNil(a as? ObjCProtocol.Protocol)
@@ -472,7 +472,7 @@ CastsTests.test("String/NSString extension compat") {
 #endif
 
 protocol P1999 {}
-if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
+if #available(SwiftStdlib 5.5, *) {
 CastsTests.test("Cast Any(Optional(class)) to Protocol type (SR-1999)") {
   class Foo: P1999 { }
 
@@ -956,7 +956,15 @@ CastsTests.test("Recursive AnyHashable") {
 
 // SR-14635 (aka rdar://78224322)
 #if _runtime(_ObjC)
-CastsTests.test("Do not overuse __SwiftValue") {
+CastsTests.test("Do not overuse __SwiftValue")
+.skip(.osxAny("SR-14635 not yet fully enabled for Apple OSes"))
+.skip(.iOSAny("SR-14635 not yet fully enabled for Apple OSes"))
+.skip(.iOSSimulatorAny("SR-14635 not yet fully enabled for Apple OSes"))
+.skip(.tvOSAny("SR-14635 not yet fully enabled for Apple OSes"))
+.skip(.tvOSSimulatorAny("SR-14635 not yet fully enabled for Apple OSes"))
+.skip(.watchOSAny("SR-14635 not yet fully enabled for Apple OSes"))
+.skip(.watchOSSimulatorAny("SR-14635 not yet fully enabled for Apple OSes"))
+.code {
   struct Bar {}
   // This used to succeed because of overeager __SwiftValue
   // boxing (and __SwiftValue does satisfy NSCopying)

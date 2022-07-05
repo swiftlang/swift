@@ -118,7 +118,7 @@ public func anchor() -> Bool {
 }
 
 class ObjCTest {
-  // CHECK-LABEL: define hidden %0* @"$s7newtype8ObjCTestC19optionalPassThroughySo14SNTErrorDomainaSgAGFTo"
+  // CHECK-LABEL: define internal %0* @"$s7newtype8ObjCTestC19optionalPassThroughySo14SNTErrorDomainaSgAGFTo"
   // CHECK: [[CASTED:%.+]] = ptrtoint %0* %2 to [[INT]]
   // CHECK: [[RESULT:%.+]] = call swiftcc [[INT]] @"$s7newtype8ObjCTestC19optionalPassThroughySo14SNTErrorDomainaSgAGF"([[INT]] [[CASTED]], %T7newtype8ObjCTestC* swiftself {{%.+}})
   // CHECK: [[CAST_RESULT:%.+]] = inttoptr [[INT]] [[RESULT]] to i8*
@@ -128,24 +128,22 @@ class ObjCTest {
   // CHECK: ret %0* [[OPAQUE_RESULT]]
   // CHECK: {{^}$}}
 
-  // OPT-LABEL: define hidden %0* @"$s7newtype8ObjCTestC19optionalPassThroughySo14SNTErrorDomainaSgAGFTo"
-  // OPT: [[ARG_CASTED:%.*]] = bitcast %0* %2 to %objc_object*
-  // OPT: [[ARG_RECASTED:%.*]] = bitcast %objc_object* [[ARG_CASTED]] to i8*
+  // OPT-LABEL: define internal %0* @"$s7newtype8ObjCTestC19optionalPassThroughySo14SNTErrorDomainaSgAGFTo"
   // OPT: [[ARG_CASTED2:%.*]] = bitcast %0* %2 to i8*
-  // OPT: tail call i8* @llvm.objc.retainAutoreleaseReturnValue(i8* [[ARG_RECASTED]])
-  // OPT: [[CAST_FOR_RETURN:%.*]] = bitcast i8* [[ARG_CASTED2]] to %0*
+  // OPT: [[RES:%.*]] = tail call i8* @llvm.objc.retainAutoreleaseReturnValue(i8* [[ARG_CASTED2]])
+  // OPT: [[CAST_FOR_RETURN:%.*]] = bitcast i8* [[RES]] to %0*
   // OPT: ret %0* [[CAST_FOR_RETURN]]
   // OPT: {{^}$}}
   @objc func optionalPassThrough(_ ed: ErrorDomain?) -> ErrorDomain? {
     return ed
   }
 
-  // CHECK-LABEL: define hidden i32 @"$s7newtype8ObjCTestC18integerPassThroughySo5MyIntaAFFTo"
+  // CHECK-LABEL: define internal i32 @"$s7newtype8ObjCTestC18integerPassThroughySo5MyIntaAFFTo"
   // CHECK: [[RESULT:%.+]] = call swiftcc i32 @"$s7newtype8ObjCTestC18integerPassThroughySo5MyIntaAFF"(i32 %2, %T7newtype8ObjCTestC* swiftself {{%.+}})
   // CHECK: ret i32 [[RESULT]]
   // CHECK: {{^}$}}
 
-  // OPT-LABEL: define hidden i32 @"$s7newtype8ObjCTestC18integerPassThroughySo5MyIntaAFFTo"
+  // OPT-LABEL: define internal i32 @"$s7newtype8ObjCTestC18integerPassThroughySo5MyIntaAFFTo"
   // OPT: ret i32 %2
   // OPT: {{^}$}}
   @objc func integerPassThrough(_ num: MyInt) -> MyInt {

@@ -87,14 +87,12 @@ func testParamsSingle() async throws {
   // BOUND-COMMENT-NEXT: // l
   // BOUND-COMMENT-NEXT: print("after")
   // BOUND-COMMENT-NEXT: // m
-  // BOUND-COMMENT-NEXT: {{ }}
   // BOUND-COMMENT-NEXT: } catch let bad {
   // BOUND-COMMENT-NEXT: // d
   // BOUND-COMMENT-NEXT: // e
   // BOUND-COMMENT-NEXT: print("got error \(bad)")
   // BOUND-COMMENT-NEXT: // f
   // BOUND-COMMENT-NEXT: // g
-  // BOUND-COMMENT-NEXT: {{ }}
   // BOUND-COMMENT-NEXT: }
 
 
@@ -488,7 +486,7 @@ func testParamsSingle() async throws {
 
   // Note this transform results in invalid code as str.count.bitWidth is no
   // longer optional, but arguably it's more useful than leaving str as a
-  // placeholder. In general, the tranform we perform here is locally valid
+  // placeholder. In general, the transform we perform here is locally valid
   // within the optional chain, but may change the type of the overall chain.
   // UNWRAPPING-NEXT: _ = (str.count.bitWidth)!
 
