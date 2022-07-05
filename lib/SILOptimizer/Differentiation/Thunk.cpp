@@ -541,8 +541,17 @@ getOrCreateSubsetParametersThunkForLinearMap(
       arguments.push_back(indirectResult);
     }
     // Forward all actual non-indirect-result arguments.
-    arguments.append(thunk->getArgumentsWithoutIndirectResults().begin(),
-                     thunk->getArgumentsWithoutIndirectResults().end() - 1);
+    auto thunkArgs = thunk->getArgumentsWithoutIndirectResults();
+    // Slice out the function to be called
+    thunkArgs = thunkArgs.slice(0, thunkArgs.size() - 1);
+    unsigned thunkArg = 0;
+    for (unsigned idx : *actualConfig.resultIndices) {
+      // Forward result argument in case we do not need to thunk it away
+      if (desiredConfig.resultIndices->contains(idx))
+        arguments.push_back(thunkArgs[thunkArg++]);
+      else // otherwise, zero it out
+        buildZeroArgument(linearMapType->getParameters()[arguments.size()]);
+    }
     break;
   }
   }
@@ -552,10 +561,33 @@ getOrCreateSubsetParametersThunkForLinearMap(
   auto *ai = builder.createApply(loc, linearMap, SubstitutionMap(), arguments);
 
   // If differential thunk, deallocate local allocations and directly return
-  // `apply` result.
+  // `apply` result (if it is desired).
   if (kind == AutoDiffDerivativeFunctionKind::JVP) {
+    SmallVector<SILValue, 8> differentialDirectResults;
+    extractAllElements(ai, builder, differentialDirectResults);
+    SmallVector<SILValue, 8> allResults;
+    collectAllActualResultsInTypeOrder(ai, differentialDirectResults, allResults);
+    unsigned numResults = thunk->getConventions().getNumDirectSILResults() +
+     thunk->getConventions().getNumDirectSILResults();
+    SmallVector<SILValue, 8> results;
+    for (unsigned idx : *actualConfig.resultIndices) {
+      if (idx >= numResults)
+        break;
+
+      auto result = allResults[idx];
+      if (desiredConfig.isWrtResult(idx))
+        results.push_back(result);
+      else {
+        if (result->getType().isAddress())
+          builder.emitDestroyAddrAndFold(loc, result);
+        else
+          builder.emitDestroyValueOperation(loc, result);
+      }
+    }
+
     cleanupValues();
-    builder.createReturn(loc, ai);
+    auto result = joinElements(results, builder, loc);
+    builder.createReturn(loc, result);
     return {thunk, interfaceSubs};
   }
 
