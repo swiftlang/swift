@@ -2923,7 +2923,7 @@ llvm::CallInst *IRBuilder::CreateCall(const FunctionPointer &fn,
   if (auto func = dyn_cast<llvm::Function>(fn.getRawPointer())) {
     for (unsigned argIndex = 0; argIndex < func->arg_size(); ++argIndex) {
       if (func->hasParamAttribute(argIndex, llvm::Attribute::StructRet)) {
-        llvm::AttrBuilder builder;
+        llvm::AttrBuilder builder(func->getContext());
         builder.addStructRetAttr(nullptr);
         attrs = attrs.addParamAttributes(func->getContext(), argIndex, builder);
       }
