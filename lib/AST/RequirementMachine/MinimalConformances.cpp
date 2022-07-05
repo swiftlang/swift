@@ -266,11 +266,13 @@ RewriteSystem::decomposeTermIntoConformanceRuleLeftHandSides(
 
   const auto &step = *steps.begin();
 
-#ifndef NDEBUG
   const auto &rule = getRule(step.getRuleID());
   assert(rule.isAnyConformanceRule());
-  assert(!rule.isIdentityConformanceRule());
-#endif
+
+  // The identity conformance ([P].[P] => [P]) decomposes to an empty
+  // conformance path.
+  if (rule.isIdentityConformanceRule())
+    return;
 
   assert(step.Kind == RewriteStep::Rule);
   assert(step.EndOffset == 0);
