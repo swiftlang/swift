@@ -592,4 +592,3 @@ final class _AsyncStreamCriticalStorage<Contents>: @unchecked Sendable {
     return storage
   }
 }
-

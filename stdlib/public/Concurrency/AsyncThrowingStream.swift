@@ -107,11 +107,11 @@ import Swift
 ///
 ///     do {
 ///         for try await quake in quakeStream {
-///             print ("Quake: \(quake.date)")
+///             print("Quake: \(quake.date)")
 ///         }
-///         print ("Stream done.")
+///         print("Stream done.")
 ///     } catch {
-///         print ("Error: \(error)")
+///         print("Error: \(error)")
 ///     }
 ///
 @available(SwiftStdlib 5.1, *)
@@ -297,28 +297,28 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   ///
   ///     let stream = AsyncThrowingStream<Int, Error>(Int.self,
   ///                                                  bufferingPolicy: .bufferingNewest(5)) { continuation in
-  ///             Task.detached {
-  ///                 for _ in 0..<100 {
-  ///                     await Task.sleep(1 * 1_000_000_000)
-  ///                     let random = Int.random(in: 1...10)
-  ///                     if (random % 5 == 0) {
-  ///                         continuation.finish(throwing: MyRandomNumberError())
-  ///                         return
-  ///                     } else {
-  ///                         continuation.yield(random)
-  ///                     }
+  ///         Task.detached {
+  ///             for _ in 0..<100 {
+  ///                 await Task.sleep(1 * 1_000_000_000)
+  ///                 let random = Int.random(in: 1...10)
+  ///                 if random % 5 == 0 {
+  ///                     continuation.finish(throwing: MyRandomNumberError())
+  ///                     return
+  ///                 } else {
+  ///                     continuation.yield(random)
   ///                 }
-  ///                 continuation.finish()
   ///             }
+  ///             continuation.finish()
   ///         }
+  ///     }
   ///
   ///     // Call point:
   ///     do {
   ///         for try await random in stream {
-  ///             print ("\(random)")
+  ///             print(random)
   ///         }
   ///     } catch {
-  ///         print ("\(error)")
+  ///         print(error)
   ///     }
   ///
   public init(
@@ -351,21 +351,21 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   /// `MyRandomNumberError`.
   ///
   ///     let stream = AsyncThrowingStream<Int, Error> {
-  ///             await Task.sleep(1 * 1_000_000_000)
-  ///             let random = Int.random(in: 1...10)
-  ///             if (random % 5 == 0) {
-  ///                 throw MyRandomNumberError()
-  ///             }
-  ///             return random
+  ///         await Task.sleep(1 * 1_000_000_000)
+  ///         let random = Int.random(in: 1...10)
+  ///         if random % 5 == 0 {
+  ///             throw MyRandomNumberError()
   ///         }
+  ///         return random
+  ///     }
   ///
   ///     // Call point:
   ///     do {
   ///         for try await random in stream {
-  ///             print ("\(random)")
+  ///             print(random)
   ///         }
   ///     } catch {
-  ///         print ("\(error)")
+  ///         print(error)
   ///     }
   ///
   public init(

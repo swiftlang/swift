@@ -39,12 +39,12 @@ extension AsyncSequence {
   ///                 return Counter(howHigh: value)
   ///             }
   ///         for try await number in stream {
-  ///             print ("\(number)", terminator: " ")
+  ///             print(number, terminator: " ")
   ///         }
   ///     } catch {
   ///         print(error)
   ///     }
-  ///     // Prints: 1 1 2 1 2 3 MyError()
+  ///     // Prints "1 1 2 1 2 3 MyError()"
   ///
   /// - Parameter transform: An error-throwing mapping closure. `transform`
   ///   accepts an element of this sequence as its parameter and returns an
@@ -185,4 +185,3 @@ extension AsyncThrowingFlatMapSequence.Iterator: @unchecked Sendable
         SegmentOfResult: Sendable, 
         SegmentOfResult.Element: Sendable, 
         SegmentOfResult.AsyncIterator: Sendable { }
-
