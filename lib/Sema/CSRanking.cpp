@@ -1405,6 +1405,10 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
 Optional<unsigned>
 ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
                                    bool minimize) {
+  // Don't spend time filtering solutions if we already hit a threshold.
+  if (isTooComplex(viable))
+    return None;
+
   if (viable.empty())
     return None;
   if (viable.size() == 1)
