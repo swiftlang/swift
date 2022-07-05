@@ -413,14 +413,11 @@ private:
       os << "  inline operator cases() const {\n";
       os << "    switch (_getEnumTag()) {\n";
       for (const auto &pair : elementTagMapping) {
-        if (pair == *elementTagMapping.crbegin()) {
-          os << "      case " << pair.second << ": default: return cases::";
-        } else {
-          os << "      case " << pair.second << ": return cases::";
-        }
+        os << "      case " << pair.second << ": return cases::";
         syntaxPrinter.printIdentifier(pair.first->getNameStr());
         os << ";\n";
       }
+      os << "      default: abort();\n";
       os << "    }\n"; // switch's closing bracket
       os << "  }\n";   // operator cases()'s closing bracket
 

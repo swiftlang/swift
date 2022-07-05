@@ -169,7 +169,8 @@ public func checkIntDoubleOrBignum(_ x: IntDoubleOrBignum, tag: Int) -> Bool {
 // CHECK-NEXT:   switch (_getEnumTag()) {
 // CHECK-NEXT:     case 0: return cases::one;
 // CHECK-NEXT:     case 1: return cases::two;
-// CHECK-NEXT:     case 2: default: return cases::three;
+// CHECK-NEXT:     case 2: return cases::three;
+// CHECK-NEXT:     default: abort();
 // CHECK-NEXT:   }
 // CHECK-NEXT: }
 // CHECK-NEXT: inline bool isOne() const {
@@ -194,7 +195,8 @@ public func checkIntDoubleOrBignum(_ x: IntDoubleOrBignum, tag: Int) -> Bool {
 // CHECK-NEXT:   switch (_getEnumTag()) {
 // CHECK-NEXT:     case 1: return cases::Paragraph;
 // CHECK-NEXT:     case 0: return cases::Char;
-// CHECK-NEXT:     case 2: default: return cases::Chapter;
+// CHECK-NEXT:     case 2: return cases::Chapter;
+// CHECK-NEXT:     default: abort();
 // CHECK-NEXT:   }
 // CHECK-NEXT: }
 // CHECK-NEXT: inline bool isParagraph() const {
@@ -217,7 +219,8 @@ public func checkIntDoubleOrBignum(_ x: IntDoubleOrBignum, tag: Int) -> Bool {
 
 // CHECK:      inline operator cases() const {
 // CHECK-NEXT:   switch (_getEnumTag()) {
-// CHECK-NEXT:     case 0: default: return cases::one;
+// CHECK-NEXT:     case 0: return cases::one;
+// CHECK-NEXT:     default: abort();
 // CHECK-NEXT:   }
 // CHECK-NEXT: }
 // CHECK-NEXT: inline bool isOne() const {
@@ -236,7 +239,8 @@ public func checkIntDoubleOrBignum(_ x: IntDoubleOrBignum, tag: Int) -> Bool {
 // CHECK-NEXT:   switch (_getEnumTag()) {
 // CHECK-NEXT:     case 0: return cases::Int;
 // CHECK-NEXT:     case 1: return cases::Double;
-// CHECK-NEXT:     case 2: default: return cases::Bignum;
+// CHECK-NEXT:     case 2: return cases::Bignum;
+// CHECK-NEXT:     default: abort();
 // CHECK-NEXT:   }
 // CHECK-NEXT: }
 // CHECK-NEXT: inline bool isInt() const {
@@ -261,7 +265,8 @@ public func checkIntDoubleOrBignum(_ x: IntDoubleOrBignum, tag: Int) -> Bool {
 // CHECK-NEXT:   switch (_getEnumTag()) {
 // CHECK-NEXT:     case 1: return cases::NegInfinity;
 // CHECK-NEXT:     case 0: return cases::Int;
-// CHECK-NEXT:     case 2: default: return cases::PosInfinity;
+// CHECK-NEXT:     case 2: return cases::PosInfinity;
+// CHECK-NEXT:     default: abort();
 // CHECK-NEXT:   }
 // CHECK-NEXT: }
 // CHECK-NEXT: inline bool isNegInfinity() const {
@@ -289,7 +294,8 @@ public func checkIntDoubleOrBignum(_ x: IntDoubleOrBignum, tag: Int) -> Bool {
 // CHECK-NEXT:     case 1: return cases::Bold;
 // CHECK-NEXT:     case 2: return cases::Underline;
 // CHECK-NEXT:     case 3: return cases::Blink;
-// CHECK-NEXT:     case 5: default: return cases::Empty;
+// CHECK-NEXT:     case 5: return cases::Empty;
+// CHECK-NEXT:     default: abort();
 // CHECK-NEXT:   }
 // CHECK-NEXT: }
 // CHECK-NEXT: inline bool isCursor() const {
