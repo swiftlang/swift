@@ -3035,10 +3035,6 @@ static bool usesFeatureTypeWitnessSystemInference(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureBoundGenericExtensions(Decl *decl) {
-  return false;
-}
-
 static bool usesFeatureDifferentiableProgramming(Decl *decl) {
   return false;
 }

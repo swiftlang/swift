@@ -10,8 +10,7 @@ import FakeDistributedActorSystems
 struct NotCodable {}
 
 protocol NoSerializationRequirementYet: DistributedActor {
-  distributed func test() -> NotCodable // FIXME(distributed): rdar://95949498 currently we are limited to explicitly 'async throws' protocol requirements that are distributed funcs
-  // expected-error@-1{{'distributed' protocol requirement 'test()' must currently be declared explicitly 'async throws'}}
+  distributed func test() -> NotCodable
 
   // OK, no serialization requirement yet
   distributed func testAT() async throws -> NotCodable

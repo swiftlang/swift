@@ -16,6 +16,8 @@
 /// In Swift 6, it's an error.
 // RUN: %target-swift-frontend -emit-module %t/clientFileA-Swift6.swift %t/clientFileB.swift -module-name client -o %t/client.swiftmodule -I %t -verify -swift-version 6
 
+// REQUIRES: asserts
+
 // BEGIN empty.swift
 
 // BEGIN libA.swift

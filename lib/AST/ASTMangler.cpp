@@ -243,6 +243,7 @@ std::string ASTMangler::mangleWitnessThunk(
       appendOperator("TW");
     }
   }
+
   return finalize();
 }
 
