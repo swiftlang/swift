@@ -1181,6 +1181,9 @@ public:
     }
     llvm_unreachable("invalid statement kind");
   }
+
+  SWIFT_DEBUG_DUMP;
+  void dump(raw_ostream &OS) const LLVM_ATTRIBUTE_USED;
 };
 
 /// Describes the arguments to which a parameter binds.

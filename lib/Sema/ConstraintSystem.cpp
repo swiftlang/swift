@@ -5996,6 +5996,50 @@ ValueDecl *ConstraintSystem::findResolvedMemberRef(ConstraintLocator *locator) {
   return choice.getDecl();
 }
 
+void SolutionApplicationTargetsKey::dump() const { dump(llvm::errs()); }
+
+void SolutionApplicationTargetsKey::dump(raw_ostream &OS) const {
+  switch (kind) {
+  case Kind::empty:
+    OS << "<empty>\n";
+    return;
+
+  case Kind::tombstone:
+    OS << "<tombstone>\n";
+    return;
+    
+  case Kind::stmtCondElement:
+    // TODO: Implement a proper dump function for StmtConditionElement
+    OS << "statement condition element\n";
+    return;
+
+  case Kind::expr:
+  case Kind::closure:
+    storage.expr->dump(OS);
+    return;
+
+  case Kind::stmt:
+    storage.stmt->dump(OS);
+    return;
+
+  case Kind::pattern:
+    storage.pattern->dump(OS);
+    return;
+
+  case Kind::patternBindingEntry:
+    OS << "pattern binding entry " << storage.patternBindingEntry.index
+       << " in\n";
+    storage.patternBindingEntry.patternBinding->dump(OS);
+    return;
+
+  case Kind::varDecl:
+    storage.varDecl->dump(OS);
+    return;
+
+  }
+  llvm_unreachable("invalid statement kind");
+}
+
 SolutionApplicationTarget::SolutionApplicationTarget(
     Expr *expr, DeclContext *dc, ContextualTypePurpose contextualPurpose,
     TypeLoc convertType, bool isDiscarded) {
