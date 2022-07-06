@@ -1,3 +1,5 @@
-public struct StructOne {}
+public struct StructOne {
+    public init() {}
+}
 
 public struct StructTwo {}

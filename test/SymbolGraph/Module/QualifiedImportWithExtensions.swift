@@ -19,8 +19,13 @@ extension A.StructTwo {
     public struct InnerStruct {}
 }
 
-// CHECK: ExtendedStruct
+// Make sure that the `ExtendedStruct` type is present, and also that `StructOne`'s initializer is
+// present as well. The `InnerStruct` type should not be present since it's extending a type
+// that's not being re-exported.
+
 // CHECK-NOT: InnerStruct
+// CHECK-DAG: ExtendedStruct
+// CHECK-DAG: "precise":"s:1A9StructOneVACycfc"
 
 // EXT: InnerStruct
 // EXT-NOT: ExtendedStruct

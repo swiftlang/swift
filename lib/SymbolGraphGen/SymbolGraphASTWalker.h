@@ -96,6 +96,10 @@ struct SymbolGraphASTWalker : public SourceEntityWalker {
   virtual bool walkToDeclPre(Decl *D, CharSourceRange Range) override;
     
   // MARK: - Utilities
+
+  /// Returns whether the given declaration was itself imported via an `@_exported import`
+  /// statement, or if it is an extension or child symbol of something else that was.
+  virtual bool isConsideredExportedImported(const Decl *D) const;
   
   /// Returns whether the given declaration comes from an `@_exported import` module.
   virtual bool isFromExportedImportedModule(const Decl *D) const;
