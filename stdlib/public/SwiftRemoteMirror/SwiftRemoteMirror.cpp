@@ -238,14 +238,15 @@ swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
   }
 
   ReflectionInfo ContextInfo{
-    sectionFromInfo<FieldDescriptorIterator>(Info, Info.field),
-    sectionFromInfo<AssociatedTypeIterator>(Info, Info.associated_types),
-    sectionFromInfo<BuiltinTypeDescriptorIterator>(Info, Info.builtin_types),
-    sectionFromInfo<CaptureDescriptorIterator>(Info, Info.capture),
-    sectionFromInfo<const void *>(Info, Info.type_references),
-    sectionFromInfo<const void *>(Info, Info.reflection_strings),
-    ReflectionSection<const void *>(nullptr, 0),
-    ReflectionSection<MultiPayloadEnumDescriptorIterator>(0, 0)};
+      sectionFromInfo<FieldDescriptorIterator>(Info, Info.field),
+      sectionFromInfo<AssociatedTypeIterator>(Info, Info.associated_types),
+      sectionFromInfo<BuiltinTypeDescriptorIterator>(Info, Info.builtin_types),
+      sectionFromInfo<CaptureDescriptorIterator>(Info, Info.capture),
+      sectionFromInfo<const void *>(Info, Info.type_references),
+      sectionFromInfo<const void *>(Info, Info.reflection_strings),
+      ReflectionSection<const void *>(nullptr, 0),
+      ReflectionSection<MultiPayloadEnumDescriptorIterator>(0, 0),
+      {}};
 
   Context->addReflectionInfo(ContextInfo);
 }
@@ -264,10 +265,11 @@ void swift_reflection_addReflectionMappingInfo(
       reflectionSectionFromLocalAndRemote<CaptureDescriptorIterator>(
           Info.capture),
       reflectionSectionFromLocalAndRemote<const void *>(Info.type_references),
-      reflectionSectionFromLocalAndRemote<const void *>(Info.reflection_strings),
+      reflectionSectionFromLocalAndRemote<const void *>(
+          Info.reflection_strings),
       ReflectionSection<const void *>(nullptr, 0),
-      MultiPayloadEnumSection(0, 0)
-  };
+      MultiPayloadEnumSection(0, 0),
+      {}};
 
   Context->addReflectionInfo(ContextInfo);
 }

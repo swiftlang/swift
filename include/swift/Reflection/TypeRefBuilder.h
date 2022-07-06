@@ -24,6 +24,7 @@
 #include "swift/Reflection/TypeLowering.h"
 #include "swift/Reflection/TypeRef.h"
 #include "llvm/ADT/Optional.h"
+#include "llvm/ADT/SmallVector.h"
 #include <iomanip>
 #include <iostream>
 #include <ostream>
@@ -264,6 +265,7 @@ struct ReflectionInfo {
   GenericSection ReflectionString;
   GenericSection Conformance;
   MultiPayloadEnumSection MultiPayloadEnum;
+  llvm::SmallVector<llvm::StringRef, 1> PotentialModuleNames;
 };
 
 struct ClosureContextInfo {
@@ -834,13 +836,15 @@ public:
 private:
   std::vector<ReflectionInfo> ReflectionInfos;
 
-  /// Index of the next Reflection Info that should be processed.
-  /// This assumes that Reflection Infos are never removed from the vector.
-  size_t FirstUnprocessedReflectionInfoIndex = 0;
-    
+  /// Indexes of Reflection Infos we've already processed.
+  llvm::DenseSet<size_t> ProcessedReflectionInfoIndexes;
+
   llvm::Optional<std::string> normalizeReflectionName(RemoteRef<char> name);
   bool reflectionNameMatches(RemoteRef<char> reflectionName,
                              StringRef searchName);
+  void populateFieldTypeInfoCacheWithReflectionAtIndex(size_t Index);
+  llvm::Optional<RemoteRef<FieldDescriptor>>
+  findFieldDescriptorAtIndex(size_t Index, const std::string &MangledName);
 
 public:
   RemoteRef<char> readTypeRef(uint64_t remoteAddr);
@@ -1779,7 +1783,6 @@ private:
                                      mangledTypeName};
     }
   };
-
 public:
   template <template <typename Runtime> class ObjCInteropKind,
             unsigned PointerSize>
