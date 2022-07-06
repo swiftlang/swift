@@ -101,13 +101,6 @@ EXPERIMENTAL_FEATURE(MoveOnly)
 EXPERIMENTAL_FEATURE(OneWayClosureParameters)
 EXPERIMENTAL_FEATURE(TypeWitnessSystemInference)
 
-/// Enable extensions of (sugared) bound generic types
-///
-/// \code
-/// extension [Int] { /**/ }
-/// \endcode
-EXPERIMENTAL_FEATURE(BoundGenericExtensions)
-
 /// Whether to enable experimental differentiable programming features:
 /// `@differentiable` declaration attribute, etc.
 EXPERIMENTAL_FEATURE(DifferentiableProgramming)
