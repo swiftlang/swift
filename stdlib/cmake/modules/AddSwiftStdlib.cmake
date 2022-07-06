@@ -1348,10 +1348,10 @@ function(add_swift_target_library_single target name)
     endif()
 
     # In the past, we relied on unsetting globally
-    # CMAKE_OSX_ARCHITECTURES to ensure that CMake would
-    # not add the -arch flag
-    # This is no longer the case when running on Apple Silicon,
-    # when CMake will enforce a default (see
+    # CMAKE_OSX_ARCHITECTURES to ensure that CMake
+    # would# not add the -arch flag. This is no longer
+    # the case  when running on Apple Silicon, when
+    # CMake will enforce a default (see
     # https://gitlab.kitware.com/cmake/cmake/-/merge_requests/5291)
     set_property(TARGET ${target} PROPERTY OSX_ARCHITECTURES "${SWIFTLIB_SINGLE_ARCHITECTURE}")
     if(TARGET "${target_static}")
