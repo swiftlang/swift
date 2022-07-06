@@ -145,6 +145,18 @@ public:
     return Protocol;
   }
 
+  /// Retreive the raw value of the Protocol requirement pointer.
+  int32_t getUnresolvedProtocolAddress() const {
+    assert(getKind() == GenericRequirementKind::Protocol);
+    return Protocol.getUnresolvedProtocolAddress();
+  }
+
+  /// Retreive the offset to the Protocol field
+  constexpr inline auto
+  getProtocolOffset() const -> typename Runtime::StoredSize {
+    return offsetof(typename std::remove_reference<decltype(*this)>::type, Protocol);
+  }
+
   /// Retrieve the right-hand type for a SameType or BaseClass requirement.
   llvm::StringRef getMangledTypeName() const {
     assert(getKind() == GenericRequirementKind::SameType ||
@@ -301,7 +313,8 @@ public:
   }
 };
 
-using GenericEnvironmentDescriptor = TargetGenericEnvironment<InProcess>;
+using GenericEnvironmentDescriptor =
+TargetGenericEnvironment<InProcess>;
 
 /// CRTP class for a context descriptor that includes trailing generic
 /// context description.
