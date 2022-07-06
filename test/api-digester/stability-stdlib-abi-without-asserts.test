@@ -94,4 +94,11 @@ Func UnsafePointer.withMemoryRebound(to:capacity:_:) has been removed
 Func UnsafeMutableRawBufferPointer.storeBytes(of:toByteOffset:as:) has been removed
 Func UnsafeMutableRawPointer.storeBytes(of:toByteOffset:as:) has been removed
 
+// These haven't actually been removed; they are simply marked unavailable.
+// This seems to be a false positive in the ABI checker. This is not an ABI
+// break because the symbols are still present.
+Var _StringGuts._isContiguousUTF16 has been removed
+Var _StringGuts.startUTF16 has been removed
+Func _persistCString(_:) has been removed
+
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
