@@ -105,5 +105,9 @@ module ForwardDeclaredCxxRecord {
 
 module ReturnsLargeClass {
   header "returns-large-class.h"
+}
+
+module ForwardDeclaredInNamespace {
+  header "forward-declared-in-namespace.h"
   requires cplusplus
 }
