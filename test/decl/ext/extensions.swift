@@ -40,8 +40,6 @@ func nestingTest6() {
 extension Array {
   func foo() {
     extension Array { // expected-error {{declaration is only valid at file scope}}
-    // FIXME: Confusing error
-    // expected-error@-2 {{constrained extension must be declared on the unspecialized generic type 'Array' with constraints specified by a 'where' clause}}
     }
   }
 }
@@ -347,7 +345,8 @@ extension Tree.LimbContent.Contents {
 }
 
 extension Tree.BoughPayload.Contents {
- // expected-error@-1 {{constrained extension must be declared on the unspecialized generic type 'Nest'}}
+  // expected-error@-1 {{extension of type 'Tree.BoughPayload.Contents' (aka 'Nest<Int>') must be declared as an extension of 'Nest<Int>'}}
+  // expected-note@-2 {{did you mean to extend 'Nest<Int>' instead?}}
 }
 
 // SR-10466 Check 'where' clause when referencing type defined inside extension
