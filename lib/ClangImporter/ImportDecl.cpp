@@ -2116,6 +2116,15 @@ namespace {
           continue;
         }
 
+        if (auto friendDecl = dyn_cast<clang::FriendDecl>(m)) {
+          if (friendDecl->getFriendDecl()) {
+            m = friendDecl->getFriendDecl();
+            auto lookupTable = Impl.findLookupTable(m->getOwningModule());
+            addEntryToLookupTable(*lookupTable, friendDecl->getFriendDecl(),
+                                  Impl.getNameImporter());
+          }
+        }
+
         auto nd = dyn_cast<clang::NamedDecl>(m);
         if (!nd) {
           // We couldn't import the member, so we can't reference it in Swift.
@@ -2145,6 +2154,7 @@ namespace {
         }
 
         Decl *member = Impl.importDecl(nd, getActiveSwiftVersion());
+
         if (!member) {
           if (!isa<clang::TypeDecl>(nd) && !isa<clang::FunctionDecl>(nd)) {
             // We don't know what this member is.
@@ -4761,12 +4771,6 @@ namespace {
     }
 
     Decl *VisitAccessSpecDecl(const clang::AccessSpecDecl *decl) {
-      return nullptr;
-    }
-
-    Decl *VisitFriendDecl(const clang::FriendDecl *decl) {
-      // Friends are not imported; Swift has a different access control
-      // mechanism.
       return nullptr;
     }
 
