@@ -61,6 +61,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
+#include "PropertyMap.h"
 #include "RewriteContext.h"
 #include "RewriteSystem.h"
 
@@ -452,7 +453,7 @@ void RewriteSystem::performHomotopyReduction(
 /// is deleted.
 ///
 /// Redundant rules are mutated to set their isRedundant() bit.
-void RewriteSystem::minimizeRewriteSystem() {
+void RewriteSystem::minimizeRewriteSystem(const PropertyMap &map) {
   if (Debug.contains(DebugFlags::HomotopyReduction)) {
     llvm::dbgs() << "-----------------------------\n";
     llvm::dbgs() << "- Minimizing rewrite system -\n";
@@ -538,7 +539,7 @@ void RewriteSystem::minimizeRewriteSystem() {
   // compute conformance access paths, instead of the current "brute force"
   // algorithm used for that purpose.
   llvm::DenseSet<unsigned> redundantConformances;
-  computeMinimalConformances(redundantConformances);
+  computeMinimalConformances(map, redundantConformances);
 
   // Third pass: Eliminate all non-minimal conformance rules.
   if (Debug.contains(DebugFlags::HomotopyReduction)) {
