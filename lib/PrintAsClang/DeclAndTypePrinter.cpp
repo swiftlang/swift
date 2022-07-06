@@ -395,6 +395,10 @@ private:
       ClangSyntaxPrinter syntaxPrinter(os);
       auto elementTagMapping =
           owningPrinter.interopContext.getIrABIDetails().getEnumTagMapping(ED);
+      // Sort cases based on their assigned tag indices
+      llvm::stable_sort(elementTagMapping, [](const auto &p1, const auto &p2) {
+        return p1.second < p2.second;
+      });
 
       if (elementTagMapping.empty()) {
         os << "\n";
@@ -417,6 +421,7 @@ private:
         syntaxPrinter.printIdentifier(pair.first->getNameStr());
         os << ";\n";
       }
+      // TODO: change to Swift's fatalError when it's available in C++
       os << "      default: abort();\n";
       os << "    }\n"; // switch's closing bracket
       os << "  }\n";   // operator cases()'s closing bracket

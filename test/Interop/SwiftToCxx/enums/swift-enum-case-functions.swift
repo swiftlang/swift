@@ -193,17 +193,17 @@ public func checkIntDoubleOrBignum(_ x: IntDoubleOrBignum, tag: Int) -> Bool {
 
 // CHECK:      inline operator cases() const {
 // CHECK-NEXT:   switch (_getEnumTag()) {
-// CHECK-NEXT:     case 1: return cases::Paragraph;
 // CHECK-NEXT:     case 0: return cases::Char;
+// CHECK-NEXT:     case 1: return cases::Paragraph;
 // CHECK-NEXT:     case 2: return cases::Chapter;
 // CHECK-NEXT:     default: abort();
 // CHECK-NEXT:   }
 // CHECK-NEXT: }
-// CHECK-NEXT: inline bool isParagraph() const {
-// CHECK-NEXT:   return *this == cases::Paragraph;
-// CHECK-NEXT: }
 // CHECK-NEXT: inline bool isChar() const {
 // CHECK-NEXT:   return *this == cases::Char;
+// CHECK-NEXT: }
+// CHECK-NEXT: inline bool isParagraph() const {
+// CHECK-NEXT:   return *this == cases::Paragraph;
 // CHECK-NEXT: }
 // CHECK-NEXT: inline bool isChapter() const {
 // CHECK-NEXT:   return *this == cases::Chapter;
@@ -263,17 +263,17 @@ public func checkIntDoubleOrBignum(_ x: IntDoubleOrBignum, tag: Int) -> Bool {
 
 // CHECK:      inline operator cases() const {
 // CHECK-NEXT:   switch (_getEnumTag()) {
-// CHECK-NEXT:     case 1: return cases::NegInfinity;
 // CHECK-NEXT:     case 0: return cases::Int;
+// CHECK-NEXT:     case 1: return cases::NegInfinity;
 // CHECK-NEXT:     case 2: return cases::PosInfinity;
 // CHECK-NEXT:     default: abort();
 // CHECK-NEXT:   }
 // CHECK-NEXT: }
-// CHECK-NEXT: inline bool isNegInfinity() const {
-// CHECK-NEXT:   return *this == cases::NegInfinity;
-// CHECK-NEXT: }
 // CHECK-NEXT: inline bool isInt() const {
 // CHECK-NEXT:   return *this == cases::Int;
+// CHECK-NEXT: }
+// CHECK-NEXT: inline bool isNegInfinity() const {
+// CHECK-NEXT:   return *this == cases::NegInfinity;
 // CHECK-NEXT: }
 // CHECK-NEXT: inline bool isPosInfinity() const {
 // CHECK-NEXT:   return *this == cases::PosInfinity;
@@ -289,17 +289,14 @@ public func checkIntDoubleOrBignum(_ x: IntDoubleOrBignum, tag: Int) -> Bool {
 
 // CHECK:      inline operator cases() const {
 // CHECK-NEXT:   switch (_getEnumTag()) {
-// CHECK-NEXT:     case 4: return cases::Cursor;
 // CHECK-NEXT:     case 0: return cases::Plain;
 // CHECK-NEXT:     case 1: return cases::Bold;
 // CHECK-NEXT:     case 2: return cases::Underline;
 // CHECK-NEXT:     case 3: return cases::Blink;
+// CHECK-NEXT:     case 4: return cases::Cursor;
 // CHECK-NEXT:     case 5: return cases::Empty;
 // CHECK-NEXT:     default: abort();
 // CHECK-NEXT:   }
-// CHECK-NEXT: }
-// CHECK-NEXT: inline bool isCursor() const {
-// CHECK-NEXT:   return *this == cases::Cursor;
 // CHECK-NEXT: }
 // CHECK-NEXT: inline bool isPlain() const {
 // CHECK-NEXT:   return *this == cases::Plain;
@@ -312,6 +309,9 @@ public func checkIntDoubleOrBignum(_ x: IntDoubleOrBignum, tag: Int) -> Bool {
 // CHECK-NEXT: }
 // CHECK-NEXT: inline bool isBlink() const {
 // CHECK-NEXT:   return *this == cases::Blink;
+// CHECK-NEXT: }
+// CHECK-NEXT: inline bool isCursor() const {
+// CHECK-NEXT:   return *this == cases::Cursor;
 // CHECK-NEXT: }
 // CHECK-NEXT: inline bool isEmpty() const {
 // CHECK-NEXT:   return *this == cases::Empty;

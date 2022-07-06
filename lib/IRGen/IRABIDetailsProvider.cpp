@@ -123,8 +123,8 @@ public:
     return {returnTy, {paramTy}};
   }
 
-  std::map<EnumElementDecl *, unsigned> getEnumTagMapping(EnumDecl *ED) {
-    std::map<EnumElementDecl *, unsigned> elements;
+  llvm::MapVector<EnumElementDecl *, unsigned> getEnumTagMapping(EnumDecl *ED) {
+    llvm::MapVector<EnumElementDecl *, unsigned> elements;
     auto &enumImplStrat = getEnumImplStrategy(
         IGM, ED->getDeclaredType()->getCanonicalType());
 
@@ -177,7 +177,7 @@ IRABIDetailsProvider::getTypeMetadataAccessFunctionSignature() {
   return impl->getTypeMetadataAccessFunctionSignature();
 }
 
-std::map<EnumElementDecl *, unsigned>
+llvm::MapVector<EnumElementDecl *, unsigned>
 IRABIDetailsProvider::getEnumTagMapping(EnumDecl *ED) {
   return impl->getEnumTagMapping(ED);
 }
