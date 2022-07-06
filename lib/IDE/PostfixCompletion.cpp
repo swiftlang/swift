@@ -60,7 +60,7 @@ void PostfixCompletionCallback::sawSolutionImpl(
   auto *Locator = CS.getConstraintLocator(SemanticExpr);
   Type ExpectedTy = getTypeForCompletion(S, CompletionExpr);
   Expr *ParentExpr = CS.getParentExpr(CompletionExpr);
-  if (!ParentExpr)
+  if (!ParentExpr && !ExpectedTy)
     ExpectedTy = CS.getContextualType(CompletionExpr, /*forConstraint=*/false);
 
   auto *CalleeLocator = S.getCalleeLocator(Locator);
@@ -75,10 +75,19 @@ void PostfixCompletionCallback::sawSolutionImpl(
   if (Ret.second) {
     bool ISDMT = S.isStaticallyDerivedMetatype(ParsedExpr);
     bool ImplicitReturn = isImplicitSingleExpressionReturn(CS, CompletionExpr);
-    bool DisallowVoid = ExpectedTy
-                            ? !ExpectedTy->isVoid()
-                            : !ParentExpr && CS.getContextualTypePurpose(
-                                                 CompletionExpr) != CTP_Unused;
+    bool DisallowVoid = false;
+    DisallowVoid |= ExpectedTy && !ExpectedTy->isVoid();
+    DisallowVoid |= !ParentExpr &&
+                    CS.getContextualTypePurpose(CompletionExpr) != CTP_Unused;
+    for (auto SAT : S.solutionApplicationTargets) {
+      if (DisallowVoid) {
+        // DisallowVoid is already set. No need to iterate further.
+        break;
+      }
+      if (SAT.second.getAsExpr() == CompletionExpr) {
+        DisallowVoid |= SAT.second.getExprContextualTypePurpose() != CTP_Unused;
+      }
+    }
 
     Results.push_back({BaseTy, ReferencedDecl,
                        /*ExpectedTypes=*/{}, DisallowVoid, ISDMT,
