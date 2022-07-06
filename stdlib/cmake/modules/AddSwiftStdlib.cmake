@@ -1354,7 +1354,7 @@ function(add_swift_target_library_single target name)
     # when CMake will enforce a default (see
     # https://gitlab.kitware.com/cmake/cmake/-/merge_requests/5291)
     set_property(TARGET ${target} PROPERTY OSX_ARCHITECTURES "${SWIFTLIB_SINGLE_ARCHITECTURE}")
-    if (target_static)
+    if(TARGET "${target_static}")
       set_property(TARGET ${target_static} PROPERTY OSX_ARCHITECTURES "${SWIFTLIB_SINGLE_ARCHITECTURE}")
     endif()
 
