@@ -322,7 +322,7 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   llvm_unreachable("Unhandled ConstraintKind in switch.");
 }
 
-void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
+void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm, bool skipLocator) const {
   // Print all type variables as $T0 instead of _ here.
   PrintOptions PO;
   PO.PrintTypesForDebugging = true;
@@ -343,8 +343,21 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
       Out << "]]";
     }
     Out << ":\n";
+    
+    // Sort constraints by favored, unmarked, disabled
+    // for printing only.
+    std::vector<Constraint *> sortedConstraints(getNestedConstraints().begin(),
+                                                getNestedConstraints().end());
+    llvm::sort(sortedConstraints,
+               [](const Constraint *lhs, const Constraint *rhs) {
+                 if (lhs->isFavored() != rhs->isFavored())
+                   return lhs->isFavored();
+                 if (lhs->isDisabled() != rhs->isDisabled())
+                   return rhs->isDisabled();
+                 return false;
+               });
 
-    interleave(getNestedConstraints(),
+    interleave(sortedConstraints,
                [&](Constraint *constraint) {
                  if (constraint->isDisabled())
                    Out << ">  [disabled] ";
@@ -352,7 +365,8 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
                    Out << ">  [favored]  ";
                  else
                    Out << ">             ";
-                 constraint->print(Out, sm);
+                 constraint->print(Out, sm,
+                   /*skipLocator=*/constraint->getLocator() == Locator);
                },
                [&] { Out << "\n"; });
     return;
@@ -522,7 +536,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
     fix->print(Out);
   }
 
-  if (Locator) {
+  if (Locator && !skipLocator) {
     Out << " [[";
     Locator->dump(sm, Out);
     Out << "]];";
