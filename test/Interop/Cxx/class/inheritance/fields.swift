@@ -6,6 +6,7 @@
 // UNSUPPORTED: OS=windows-msvc
 
 import StdlibUnittest
+import CxxShim
 import Fields
 
 var FieldsTestSuite = TestSuite("Getting and setting fields in base classes")

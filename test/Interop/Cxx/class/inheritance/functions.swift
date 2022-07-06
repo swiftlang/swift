@@ -1,8 +1,11 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-experimental-cxx-interop)
 //
 // REQUIRES: executable_test
+// TODO: Fix CxxShim for Windows.
+// XFAIL: OS=windows-msvc
 
 import StdlibUnittest
+import CxxShim
 import Functions
 
 var FunctionsTestSuite = TestSuite("Calling functions in base classes")
