@@ -1841,6 +1841,8 @@ bool ModuleDecl::registerEntryPointFile(FileUnit *file, SourceLoc diagLoc,
       if (existingDiagLoc.isValid()) {
         getASTContext().Diags.diagnose(existingDiagLoc,
                            diag::attr_ApplicationMain_script_here);
+        getASTContext().Diags.diagnose(existingDiagLoc,
+                           diag::attr_ApplicationMain_parse_as_library);
       }
     }
   }

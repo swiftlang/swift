@@ -3255,6 +3255,10 @@ ERROR(attr_ApplicationMain_with_script,none,
       "%" SELECT_APPLICATION_MAIN "0 attribute cannot be used in a module that contains "
       "top-level code",
       (unsigned))
+
+NOTE(attr_ApplicationMain_parse_as_library,none,
+     "pass '-parse-as-library' to compiler invocation if this is intentional",
+     ())
 NOTE(attr_ApplicationMain_script_here,none,
      "top-level code defined in this source file",
      ())
