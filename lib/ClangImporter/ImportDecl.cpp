@@ -2117,8 +2117,7 @@ namespace {
         }
 
         if (auto friendDecl = dyn_cast<clang::FriendDecl>(m)) {
-          if (friendDecl->getFriendDecl() &&
-              isa<clang::FunctionDecl>(friendDecl->getFriendDecl())) {
+          if (friendDecl->getFriendDecl()) {
             m = friendDecl->getFriendDecl();
             auto lookupTable = Impl.findLookupTable(m->getOwningModule());
             addEntryToLookupTable(*lookupTable, friendDecl->getFriendDecl(),
