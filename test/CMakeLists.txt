@@ -1,7 +1,6 @@
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
 include(SwiftTestUtils)
-include(Threading)
 
 function(swift_configure_lit_site_cfg source_path destination_path installed_name)
   if (CMAKE_CFG_INTDIR STREQUAL ".")
@@ -395,14 +394,7 @@ foreach(SDK ${SWIFT_SDKS})
           list(APPEND LIT_ARGS "--param" "string_processing")
         endif()
 
-        if("${SWIFT_SDK_${SDK}_THREADING_PACKAGE}")
-          list(APPEND LIT_ARGS "--param" "threading=${SWIFT_SDK_${SDK}_THREADING_PACKAGE}")
-        else()
-          threading_package_default("${SDK}" SWIFT_THREADING_PACKAGE)
-          list(APPEND LIT_ARGS "--param"
-            "threading=${SWIFT_THREADING_PACKAGE}")
-        endif()
-
+        list(APPEND LIT_ARGS "--param" "threading=${SWIFT_SDK_${SDK}_THREADING_PACKAGE}")
         foreach(test_subset ${TEST_SUBSETS})
           set(directories)
           set(dependencies ${test_dependencies})
