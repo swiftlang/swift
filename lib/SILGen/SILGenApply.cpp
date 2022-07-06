@@ -5826,13 +5826,15 @@ SILDeclRef SILGenModule::getAccessorDeclRef(AccessorDecl *accessor) {
 }
 
 /// Emit a call to a getter.
-RValue SILGenFunction::emitGetAccessor(SILLocation loc, SILDeclRef get,
-                                       SubstitutionMap substitutions,
-                                       ArgumentSource &&selfValue, bool isSuper,
-                                       bool isDirectUse,
-                                       PreparedArguments &&subscriptIndices,
-                                       SGFContext c,
-                                       bool isOnSelfParameter) {
+RValue SILGenFunction::emitGetAccessor(
+    SILLocation loc, SILDeclRef get,
+    SubstitutionMap substitutions,
+    ArgumentSource &&selfValue, bool isSuper,
+    bool isDirectUse,
+    PreparedArguments &&subscriptIndices,
+    SGFContext c,
+    bool isOnSelfParameter,
+    Optional<ImplicitActorHopTarget> implicitActorHopTarget) {
   // Scope any further writeback just within this operation.
   FormalEvaluationScope writebackScope(*this);
 
@@ -5843,6 +5845,9 @@ RValue SILGenFunction::emitGetAccessor(SILLocation loc, SILDeclRef get,
   CanAnyFunctionType accessType = getter.getSubstFormalType();
 
   CallEmission emission(*this, std::move(getter), std::move(writebackScope));
+  if (implicitActorHopTarget)
+    emission.setImplicitlyAsync(implicitActorHopTarget);
+
   // Self ->
   if (hasSelf) {
     emission.addSelfParam(loc, std::move(selfValue),
