@@ -2486,8 +2486,16 @@ namespace {
       // deep/complex template, or we've run into an infinite loop. In either
       // case, its not worth the compile time, so bail.
       // TODO: this could be configurable at some point.
-      if (llvm::size(decl->getSpecializedTemplate()->specializations()) > 10000)
+      if (llvm::size(decl->getSpecializedTemplate()->specializations()) >
+          1000) {
+        std::string name;
+        llvm::raw_string_ostream os(name);
+        decl->printQualifiedName(os);
+        // Emit a warning if we haven't warned about this decl yet.
+        if (Impl.tooDeepTemplateSpecializations.insert(name).second)
+          Impl.diagnose({}, diag::too_many_class_template_instantiations, name);
         return nullptr;
+      }
 
       // `Sema::isCompleteType` will try to instantiate the class template as a
       // side-effect and we rely on this here. `decl->getDefinition()` can
