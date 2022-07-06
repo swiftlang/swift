@@ -247,7 +247,7 @@ OptionalBridgedOperand SILValue_firstUse(BridgedValue value);
 BridgedType SILValue_getType(BridgedValue value);
 BridgedOwnership SILValue_getOwnership(BridgedValue value);
 
-BridgedStringRef SILType_debugDescription(BridgedType);
+std::string SILType_debugDescription(BridgedType);
 SwiftInt SILType_isAddress(BridgedType);
 SwiftInt SILType_isTrivial(BridgedType, BridgedFunction);
 SwiftInt SILType_isReferenceCounted(BridgedType type, BridgedFunction);

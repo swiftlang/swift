@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/BridgingUtils.h"
-#include "swift/Basic/LLVM.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -23,9 +22,4 @@ using namespace swift;
 void OStream_write(BridgedOStream os, BridgedStringRef str) {
   static_cast<raw_ostream *>(os.streamAddr)
       ->write((const char *)(str.data), str.length);
-}
-
-/// Frees a string which was allocated by getCopiedBridgedStringRef.
-void freeBridgedStringRef(BridgedStringRef str) {
-  llvm::MallocAllocator().Deallocate(str.data, str.length);
 }
