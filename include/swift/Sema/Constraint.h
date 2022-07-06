@@ -852,7 +852,10 @@ public:
   /// Clone the given constraint.
   Constraint *clone(ConstraintSystem &cs) const;
 
-  void print(llvm::raw_ostream &Out, SourceManager *sm) const;
+  /// Print constraint placed on type and constraint properties.
+  ///
+  /// \c skipLocator skips printing of locators.
+  void print(llvm::raw_ostream &Out, SourceManager *sm, bool skipLocator = false) const;
 
   SWIFT_DEBUG_DUMPER(dump(SourceManager *SM));
 
