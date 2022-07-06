@@ -164,10 +164,20 @@ ResolveAsSymbolicReference::operator()(SymbolicReferenceKind kind,
   case Demangle::SymbolicReferenceKind::UniqueExtendedExistentialTypeShape:
     nodeKind = Node::Kind::UniqueExtendedExistentialTypeShapeSymbolicReference;
     isType = false;
+#if SWIFT_PTRAUTH
+    ptr = (uintptr_t)ptrauth_sign_unauthenticated((void*)ptr,
+      ptrauth_key_process_independent_data,
+      SpecialPointerAuthDiscriminators::ExtendedExistentialTypeShape);
+#endif
     break;
   case Demangle::SymbolicReferenceKind::NonUniqueExtendedExistentialTypeShape:
     nodeKind = Node::Kind::NonUniqueExtendedExistentialTypeShapeSymbolicReference;
     isType = false;
+#if SWIFT_PTRAUTH
+    ptr = (uintptr_t)ptrauth_sign_unauthenticated((void*)ptr,
+      ptrauth_key_process_independent_data,
+      SpecialPointerAuthDiscriminators::NonUniqueExtendedExistentialTypeShape);
+#endif
     break;
   }
   
