@@ -151,7 +151,7 @@ public:
 
   /// Returns the \p Category variant of this type.
   SILType getCategoryType(SILValueCategory Category) const {
-    return SILType(getASTType(), Category);
+    return SILType(getRawASTType(), Category);
   }
 
   /// Returns the variant of this type that matches \p Ty.getCategory()
