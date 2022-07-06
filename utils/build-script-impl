@@ -206,7 +206,7 @@ KNOWN_SETTINGS=(
     swift-stdlib-has-dladdr                       "1"               "whether to build stdlib assuming the runtime environment provides dladdr API"
     swift-stdlib-supports-backtrace-reporting     ""                "whether to build stdlib assuming the runtime environment provides the backtrace(3) API, if not set defaults to true on all platforms except for Cygwin, Haiku and wasm"
     swift-runtime-static-image-inspection         "0"               "whether to build stdlib assuming the runtime environment only supports a single runtime image with Swift code"
-    swift-threading-package                       ""                "which threading package to use for Swift; valid values are empty string (default based on platform), 'pthreads', 'darwin', 'linux', 'win32', 'c11', 'none'"
+    swift-threading-package                       ""                "override the threading package for the host build; this is either a single package or a semicolon-separated list of sdk:package pairs.  Valid packages are empty string (no override), 'pthreads', 'darwin', 'linux', 'win32', 'c11', 'none'"
     swift-stdlib-single-threaded-concurrency      "0"               "build Swift concurrency in single-threaded mode"
     swift-stdlib-concurrency-tracing              ""                "whether to enable tracing signposts for concurrency; default is 1 on Darwin platforms, 0 otherwise"
     swift-stdlib-os-versioning                    "1"               "whether to build stdlib with availability based on OS versions (Darwin only)"
@@ -2228,15 +2228,34 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
-                if [[ "${SWIFT_THREADING_PACKAGE}" ]] ; then
-                    case "${SWIFT_THREADING_PACKAGE}" in
+                # SWIFT_THREADING_PACKAGE can be:
+                #
+                #    - Empty
+                #    - A single package name
+                #    - A semicolon separated sequence of sdk:package pairs
+                #
+                OFS=$IFS
+                IFS=';'
+                for elt in $SWIFT_THREADING_PACKAGE; do
+                    if [[ $elt == *:* ]]; then
+                        sdk=${elt/:*/}
+                        package=${elt/*:/}
+                    else
+                        sdk='<any>'
+                        package=$elt
+                    fi
+
+                    case $package in
                         "" | pthreads | darwin | linux | win32 | c11 | none) ;;
                         *)
-                            echo "build-script: unknown threading package ${SWIFT_THREADING_PACKAGE}; must be one of 'pthreads', 'darwin', 'linux', 'win32', 'c11', 'none', or empty for platform default" >&2
-                            exit 1
-                            ;;
+                        echo "build-script: unknown threading package $package for sdk $sdk; must be one of 'pthreads', 'darwin', 'linux', 'win32', 'c11', 'none', or empty for sdk default"
+                        exit 1
+                        ;;
                     esac
+                done
+                IFS=$OFS
 
+                if [[ "$SWIFT_THREADING_PACKAGE" ]] ; then
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DSWIFT_THREADING_PACKAGE:STRING="${SWIFT_THREADING_PACKAGE}"

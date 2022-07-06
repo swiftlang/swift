@@ -1,6 +1,5 @@
 
 include(AddSwift)
-include(Threading)
 
 add_custom_target(SwiftUnitTests)
 
@@ -54,7 +53,8 @@ function(add_swift_unittest test_dirname)
     target_compile_definitions("${test_dirname}" PRIVATE
       SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY)
   endif()
-  threading_package_name("${SWIFT_HOST_VARIANT_SDK}" _threading_package)
+
+  string(TOUPPER "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_THREADING_PACKAGE}" _threading_package)
   target_compile_definitions("${test_dirname}" PRIVATE
     "SWIFT_THREADING_${_threading_package}")
 
