@@ -336,7 +336,8 @@ func f1(x: String, y: Whichever) {
         break
     case Whichever.buzz: // expected-error {{type 'Whichever' has no member 'buzz'}}
         break
-    case Whichever.alias: // expected-error {{referencing operator function '~=' on 'RegexComponent' requires that 'Whichever' conform to 'RegexComponent'}}
+    case Whichever.alias: // expected-error {{expression pattern of type 'Whichever' cannot match values of type 'String'}}
+    // expected-note@-1 {{overloads for '~=' exist}}
         break
     default:
       break
