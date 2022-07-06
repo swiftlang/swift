@@ -1,8 +1,11 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
-
+//
 // REQUIRES: executable_test
+// TODO: Fix CxxShim for Windows.
+// XFAIL: OS=windows-msvc
 
 import MemberInline
+import CxxShim
 import StdlibUnittest
 
 var OperatorsTestSuite = TestSuite("Operators")

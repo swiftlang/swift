@@ -11,3 +11,4 @@ add_swift_target_library(swiftCxx ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVE
     INSTALL_IN_COMPONENT sdk-overlay)
 
 add_subdirectory(std)
+add_subdirectory(cxxshim)

@@ -10,9 +10,6 @@ inline void *operator new(size_t, void *p) { return p; }
 
 #include "visibility.h"
 
-template <class From, class To>
-To __swift_interopStaticCast(From from) { return from; }
-
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 struct __attribute__((swift_attr("import_as_ref"))) Empty {
