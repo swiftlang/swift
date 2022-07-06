@@ -4310,9 +4310,12 @@ namespace {
     Expr *visitAssignExpr(AssignExpr *expr) {
       // Convert the source to the simplified destination type.
       auto destTy = simplifyType(cs.getType(expr->getDest()));
-      auto locator =
-        ConstraintLocatorBuilder(cs.getConstraintLocator(expr->getSrc()));
-      Expr *src = coerceToType(expr->getSrc(), destTy->getRValueType(), locator);
+      // Conversion is recorded as anchored on an assignment itself by
+      // constraint generator and that has to be preserved here in case
+      // anything depends on the locator (i.e. Double<->CGFloat implicit
+      // conversion).
+      Expr *src = coerceToType(expr->getSrc(), destTy->getRValueType(),
+                               cs.getConstraintLocator(expr));
       if (!src)
         return nullptr;
 
@@ -6756,6 +6759,11 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
       auto *argExpr = locator.trySimplifyToExpr();
       assert(argExpr);
+
+      // Source requires implicit conversion to match destination
+      // type but the conversion itself is recorded on assignment.
+      if (auto *assignment = dyn_cast<AssignExpr>(argExpr))
+        argExpr = assignment->getSrc();
 
       // Load the value for conversion.
       argExpr = cs.coerceToRValue(argExpr);

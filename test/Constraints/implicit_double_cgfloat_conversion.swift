@@ -247,3 +247,16 @@ func test_collection_literals_as_call_arguments() {
     cont.prop = .test_dict_nested(["": ["": point.x]]) // Ok
   }
 }
+
+func assignments_with_and_without_optionals() {
+  class C {
+    var prop: CGFloat = 0
+  }
+
+  func test(c: C?, v: Double) {
+    c?.prop = v / 2.0 // Ok
+
+    let copy = c!
+    copy.prop = Optional(v) ?? 0 // Ok
+  }
+}
