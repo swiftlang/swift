@@ -1346,6 +1346,18 @@ function(add_swift_target_library_single target name)
       target_link_options(${target} PRIVATE
         "LINKER:-current_version,${SWIFT_COMPILER_VERSION}")
     endif()
+
+    # In the past, we relied on unsetting globally
+    # CMAKE_OSX_ARCHITECTURES to ensure that CMake would
+    # not add the -arch flag
+    # This is no longer the case when running on Apple Silicon,
+    # when CMake will enforce a default (see
+    # https://gitlab.kitware.com/cmake/cmake/-/merge_requests/5291)
+    set_property(TARGET ${target} PROPERTY OSX_ARCHITECTURES "${SWIFTLIB_SINGLE_ARCHITECTURE}")
+    if (target_static)
+      set_property(TARGET ${target_static} PROPERTY OSX_ARCHITECTURES "${SWIFTLIB_SINGLE_ARCHITECTURE}")
+    endif()
+
     # Include LLVM Bitcode slices for iOS, Watch OS, and Apple TV OS device libraries.
     if(SWIFT_EMBED_BITCODE_SECTION AND NOT SWIFTLIB_SINGLE_DONT_EMBED_BITCODE)
       if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "IOS" OR
@@ -2186,19 +2198,6 @@ function(add_swift_target_library name)
         if(arch IN_LIST SWIFT_SDK_${sdk}_ARCHITECTURES)
           # Note this thin library.
           list(APPEND THIN_INPUT_TARGETS ${VARIANT_NAME})
-        endif()
-      endif()
-
-      if(sdk IN_LIST SWIFT_APPLE_PLATFORMS)
-        # In the past, we relied on unsetting globally
-        # CMAKE_OSX_ARCHITECTURES to ensure that CMake would
-        # not add the -arch flag
-        # This is no longer the case when running on Apple Silicon,
-        # when CMake will enforce a default (see
-        # https://gitlab.kitware.com/cmake/cmake/-/merge_requests/5291)
-        set_property(TARGET ${VARIANT_NAME} PROPERTY OSX_ARCHITECTURES "${arch}")
-        if (SWIFTLIB_IS_STDLIB AND SWIFTLIB_STATIC)
-          set_property(TARGET ${VARIANT_NAME}-static PROPERTY OSX_ARCHITECTURES "${arch}")
         endif()
       endif()
     endforeach()
