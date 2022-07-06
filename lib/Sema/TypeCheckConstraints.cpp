@@ -1416,14 +1416,23 @@ void ConstraintSystem::print(raw_ostream &out) const {
   for (auto tv : typeVariables) {
     out.indent(2);
     Type(tv).print(out, PO);
+    SmallVector<TypeVariableOptions, 4> bindingOptions;
     if (tv->getImpl().canBindToLValue())
-      out << " [lvalue allowed]";
+      bindingOptions.push_back(TypeVariableOptions::TVO_CanBindToLValue);
     if (tv->getImpl().canBindToInOut())
-      out << " [inout allowed]";
+      bindingOptions.push_back(TypeVariableOptions::TVO_CanBindToInOut);
     if (tv->getImpl().canBindToNoEscape())
-      out << " [noescape allowed]";
+      bindingOptions.push_back(TypeVariableOptions::TVO_CanBindToNoEscape);
     if (tv->getImpl().canBindToHole())
-      out << " [hole allowed]";
+      bindingOptions.push_back(TypeVariableOptions::TVO_CanBindToHole);
+    if (!bindingOptions.empty()) {
+      out << " [allows bindings to: ";
+      interleave(bindingOptions, out,
+                 [&](TypeVariableOptions option) {
+                    (out << tv->getImpl().getTypeVariableOptions(option));},
+                 ", ");
+                 out << "]";
+    }
     auto rep = getRepresentative(tv);
     if (rep == tv) {
       if (auto fixed = getFixedType(tv)) {
