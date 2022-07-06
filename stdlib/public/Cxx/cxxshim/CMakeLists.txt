@@ -1,5 +1,10 @@
+is_sdk_requested(WINDOWS swift_build_windows)
 set(libcxxshim_modulemap_target_list)
 foreach(sdk ${SWIFT_SDKS})
+  if(swift_build_windows)
+    continue()
+  endif()
+
   foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
     set(arch_suffix "${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
     set(arch_subdir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}")
