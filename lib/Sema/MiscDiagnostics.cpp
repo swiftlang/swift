@@ -2809,6 +2809,8 @@ public:
   // There is no clear winner here since there are candidates within
   // limited availability contexts.
   void finalizeOpaque(const Candidate &universallyAvailable) {
+    using AvailabilityCondition = OpaqueTypeDecl::AvailabilityCondition;
+
     SmallVector<OpaqueTypeDecl::ConditionallyAvailableSubstitutions *, 4>
         conditionalSubstitutions;
 
@@ -2819,12 +2821,14 @@ public:
       if (!availabilityContext)
         continue;
 
-      SmallVector<VersionRange, 4> conditions;
+      SmallVector<AvailabilityCondition, 4> conditions;
 
       llvm::transform(availabilityContext->getCond(),
                       std::back_inserter(conditions),
                       [&](const StmtConditionElement &elt) {
-                        return elt.getAvailability()->getAvailableRange();
+                        auto condition = elt.getAvailability();
+                        return std::make_pair(condition->getAvailableRange(),
+                                              condition->isUnavailability());
                       });
 
       conditionalSubstitutions.push_back(
@@ -2836,7 +2840,7 @@ public:
     // Add universally available choice as the last one.
     conditionalSubstitutions.push_back(
         OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
-            Ctx, {VersionRange::empty()},
+            Ctx, {{VersionRange::empty(), /*unavailable=*/false}},
             std::get<1>(universallyAvailable)
                 .mapReplacementTypesOutOfContext()));
 

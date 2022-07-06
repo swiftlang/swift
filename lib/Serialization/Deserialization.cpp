@@ -3549,7 +3549,7 @@ public:
   }
 
   void deserializeConditionalSubstitutionConditions(
-      SmallVectorImpl<VersionRange> &conditions) {
+      SmallVectorImpl<OpaqueTypeDecl::AvailabilityCondition> &conditions) {
     using namespace decls_block;
 
     SmallVector<uint64_t, 4> scratch;
@@ -3577,7 +3577,8 @@ public:
       llvm::VersionTuple condition;
       DECODE_VER_TUPLE(condition);
 
-      conditions.push_back(VersionRange::allGTE(condition));
+      conditions.push_back(std::make_pair(VersionRange::allGTE(condition),
+                                          isUnavailability));
     }
   }
 
@@ -3604,7 +3605,7 @@ public:
       decls_block::ConditionalSubstitutionLayout::readRecord(
           scratch, substitutionMapRef);
 
-      SmallVector<VersionRange, 2> conditions;
+      SmallVector<OpaqueTypeDecl::AvailabilityCondition, 2> conditions;
       deserializeConditionalSubstitutionConditions(conditions);
 
       if (conditions.empty())
@@ -3684,7 +3685,8 @@ public:
       } else {
         limitedAvailability.push_back(
             OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
-                ctx, VersionRange::empty(), subMapOrError.get()));
+                ctx, {{VersionRange::empty(), /*unavailability=*/false}},
+                subMapOrError.get()));
 
         opaqueDecl->setConditionallyAvailableSubstitutions(limitedAvailability);
       }

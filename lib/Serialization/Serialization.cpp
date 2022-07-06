@@ -3953,9 +3953,10 @@ public:
             S.DeclTypeAbbrCodes[ConditionalSubstitutionConditionLayout::Code];
         for (const auto &condition : subs->getAvailability()) {
           ENCODE_VER_TUPLE(osVersion, llvm::Optional<llvm::VersionTuple>(
-                                          condition.getLowerEndpoint()));
+                                          condition.first.getLowerEndpoint()));
           ConditionalSubstitutionConditionLayout::emitRecord(
-              S.Out, S.ScratchRecord, condAbbrCode, /*isUnavailable=*/false,
+              S.Out, S.ScratchRecord, condAbbrCode,
+              /*isUnavailable=*/condition.second,
               LIST_VER_TUPLE_PIECES(osVersion));
         }
       }

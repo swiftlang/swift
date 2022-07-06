@@ -2952,9 +2952,12 @@ public:
     return false;
   }
 
+  using AvailabilityCondition = std::pair<VersionRange, bool>;
+
   class ConditionallyAvailableSubstitutions final
-      : private llvm::TrailingObjects<ConditionallyAvailableSubstitutions,
-                                      VersionRange> {
+      : private llvm::TrailingObjects<
+            ConditionallyAvailableSubstitutions,
+            AvailabilityCondition> {
     friend TrailingObjects;
 
     unsigned NumAvailabilityConditions;
@@ -2964,25 +2967,25 @@ public:
     /// A type with limited availability described by the provided set
     /// of availability conditions (with `and` relationship).
     ConditionallyAvailableSubstitutions(
-        ArrayRef<VersionRange> availabilityContext,
+        ArrayRef<AvailabilityCondition> availabilityContext,
         SubstitutionMap substitutions)
         : NumAvailabilityConditions(availabilityContext.size()),
           Substitutions(substitutions) {
       assert(!availabilityContext.empty());
       std::uninitialized_copy(availabilityContext.begin(),
                               availabilityContext.end(),
-                              getTrailingObjects<VersionRange>());
+                              getTrailingObjects<AvailabilityCondition>());
     }
 
   public:
-    ArrayRef<VersionRange> getAvailability() const {
-      return {getTrailingObjects<VersionRange>(), NumAvailabilityConditions};
+    ArrayRef<AvailabilityCondition> getAvailability() const {
+      return {getTrailingObjects<AvailabilityCondition>(), NumAvailabilityConditions};
     }
 
     SubstitutionMap getSubstitutions() const { return Substitutions; }
 
     static ConditionallyAvailableSubstitutions *
-    get(ASTContext &ctx, ArrayRef<VersionRange> availabilityContext,
+    get(ASTContext &ctx, ArrayRef<AvailabilityCondition> availabilityContext,
         SubstitutionMap substitutions);
   };
 };
