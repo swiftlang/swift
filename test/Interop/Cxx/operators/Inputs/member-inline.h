@@ -21,6 +21,16 @@ struct LoadableIntWrapper {
     value++;
     return *this;
   }
+
+  // Friend functions
+  friend bool operator==(const LoadableIntWrapper lhs,
+                         const LoadableIntWrapper &rhs) {
+    return lhs.value == rhs.value;
+  }
+
+  friend LoadableIntWrapper operator-(const LoadableIntWrapper& obj) {
+    return LoadableIntWrapper{.value = -obj.value};
+  }
 };
 
 struct LoadableBoolWrapper {
