@@ -139,6 +139,18 @@ func callFuncWithMetatypeArg() {
   metatypeArg(Int.self, false)                // expected-note {{called from here}}
 }
 
+@_noAllocation
+func intConversion() {
+  let x = 42
+  _ = UInt(x)
+}
+
+@_noAllocation
+func integerRange() {
+  for _ in 0 ..< 10 {
+  }
+}
+
 struct GenStruct<A> {
   var a: A
 }
