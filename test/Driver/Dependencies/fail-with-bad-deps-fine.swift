@@ -1,5 +1,7 @@
 /// main ==> depends-on-main | bad ==> depends-on-bad
 
+// REQUIRES: rdar92463233
+
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/fail-with-bad-deps-fine/* %t
 // RUN: touch -t 201401240005 %t/*
