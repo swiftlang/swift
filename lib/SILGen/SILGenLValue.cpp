@@ -1641,26 +1641,26 @@ namespace {
       assert(getAccessorDecl()->isGetter());
 
       SILDeclRef getter = Accessor;
-      ExecutorBreadcrumb prevExecutor;
       RValue rvalue;
-      {
-        FormalEvaluationScope scope(SGF);
+      FormalEvaluationScope scope(SGF);
 
-        // If the 'get' is in the context of the target's actor, do a hop first.
-        prevExecutor = SGF.emitHopToTargetActor(loc, ActorIso, base);
+      // FIXME: This somewhat silly, because the original expression should
+      // already have one of these.
+      Optional<ImplicitActorHopTarget> implicitActorHopTarget;
+      if (ActorIso) {
+        implicitActorHopTarget = ActorIso->isGlobalActor()
+            ? ImplicitActorHopTarget::forGlobalActor(
+              ActorIso->getGlobalActor())
+            : ImplicitActorHopTarget::forInstanceSelf();
+      }
 
-        auto args =
-            std::move(*this).prepareAccessorArgs(SGF, loc, base, getter);
+      auto args =
+          std::move(*this).prepareAccessorArgs(SGF, loc, base, getter);
 
-        rvalue = SGF.emitGetAccessor(
-            loc, getter, Substitutions, std::move(args.base), IsSuper,
-            IsDirectAccessorUse, std::move(args.Indices), c,
-            IsOnSelfParameter);
-
-      } // End the evaluation scope before any hop back to the current executor.
-
-      // If we hopped to the target's executor, then we need to hop back.
-      prevExecutor.emit(SGF, loc);
+      rvalue = SGF.emitGetAccessor(
+          loc, getter, Substitutions, std::move(args.base), IsSuper,
+          IsDirectAccessorUse, std::move(args.Indices), c,
+          IsOnSelfParameter, implicitActorHopTarget);
 
       return rvalue;
     }
