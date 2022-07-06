@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend -experimental-performance-annotations -emit-sil %s -o /dev/null -verify
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
-// REQUIRES: rdar90495704
 
 protocol P {
   func protoMethod(_ a: Int) -> Int
@@ -32,6 +31,8 @@ struct AllocatingStr : P {
   }
 }
 
+/* Currently disabled: rdar://90495704
+
 func noRTCallsForArrayGet(_ a: [Str], _ i: Int) -> Int {
   return a[i].x
 }
@@ -40,6 +41,7 @@ func noRTCallsForArrayGet(_ a: [Str], _ i: Int) -> Int {
 func callArrayGet(_ a: [Str]) -> Int {
   return noRTCallsForArrayGet(a, 0)
 }
+*/
 
 @_noLocks
 func arcOperations(_ x: Cl) -> Cl {
