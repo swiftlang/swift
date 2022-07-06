@@ -120,8 +120,12 @@ swift::createDecrementBefore(SILValue ptr, SILInstruction *insertPt) {
   return builder.createReleaseValue(loc, ptr, builder.getDefaultAtomicity());
 }
 
-static bool isOSSAEndScopeWithNoneOperand(SILInstruction *i) {
+/// Returns true if OSSA scope ending instructions end_borrow/destroy_value can
+/// be deleted trivially
+static bool canTriviallyDeleteOSSAEndScopeInst(SILInstruction *i) {
   if (!isa<EndBorrowInst>(i) && !isa<DestroyValueInst>(i))
+    return false;
+  if (isa<StoreBorrowInst>(i->getOperand(0)))
     return false;
   return i->getOperand(0)->getOwnershipKind() == OwnershipKind::None;
 }
@@ -172,7 +176,7 @@ bool swift::isInstructionTriviallyDead(SILInstruction *inst) {
   //
   // Examples of ossa end_scope instructions: end_borrow, destroy_value.
   if (inst->getFunction()->hasOwnership() &&
-      isOSSAEndScopeWithNoneOperand(inst))
+      canTriviallyDeleteOSSAEndScopeInst(inst))
     return true;
 
   if (!inst->mayHaveSideEffects())
