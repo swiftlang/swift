@@ -382,8 +382,14 @@ public:
       MutableTerm term, unsigned ruleID,
       SmallVectorImpl<unsigned> &result) const;
 
+  void computeCandidateConformancePaths(
+      const PropertyMap &map,
+      llvm::MapVector<unsigned,
+                      std::vector<SmallVector<unsigned, 2>>> &paths) const;
+
 private:
   void computeMinimalConformances(
+      const PropertyMap &map,
       llvm::DenseSet<unsigned> &redundantConformances) const;
 
 public:
@@ -398,7 +404,7 @@ public:
     return Loops;
   }
 
-  void minimizeRewriteSystem();
+  void minimizeRewriteSystem(const PropertyMap &map);
 
   GenericSignatureErrors getErrors() const;
 

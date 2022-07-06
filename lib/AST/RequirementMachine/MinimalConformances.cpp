@@ -192,6 +192,7 @@ class MinimalConformances {
   // minimization domain.
   llvm::DenseSet<unsigned> &RedundantConformances;
 
+  bool NewAlgorithm;
 
   bool isConformanceRuleRecoverable(
     llvm::SmallDenseSet<unsigned, 4> &visited,
@@ -218,15 +219,17 @@ class MinimalConformances {
 
 public:
   explicit MinimalConformances(const RewriteSystem &system,
-                               llvm::DenseSet<unsigned> &redundantConformances)
+                               llvm::DenseSet<unsigned> &redundantConformances,
+                               bool newAlgorithm)
     : System(system),
       Context(system.getRewriteContext()),
       Debug(system.getDebugOptions()),
-      RedundantConformances(redundantConformances) {}
+      RedundantConformances(redundantConformances),
+      NewAlgorithm(newAlgorithm) {}
 
   void collectConformanceRules();
 
-  void computeCandidateConformancePaths();
+  void computeCandidateConformancePaths(const PropertyMap &map);
 
   void dumpMinimalConformanceEquations(llvm::raw_ostream &out) const;
 
@@ -442,6 +445,224 @@ void MinimalConformances::collectConformanceRules() {
   Context.ConformanceRulesHistogram.add(ConformanceRules.size());
 }
 
+void RewriteSystem::computeCandidateConformancePaths(
+    const PropertyMap &map,
+    llvm::MapVector<unsigned, std::vector<SmallVector<unsigned, 2>>> &paths) const {
+  // For every rule, look for other rules that overlap with this rule.
+  for (unsigned i = FirstLocalRule, e = Rules.size(); i < e; ++i) {
+    const auto &lhs = getRule(i);
+
+    if (lhs.isRHSSimplified() ||
+        lhs.isSubstitutionSimplified() ||
+        lhs.isIdentityConformanceRule() ||
+        lhs.containsUnresolvedSymbols())
+      continue;
+
+    if (!lhs.isAnyConformanceRule() &&
+        lhs.isLHSSimplified())
+      continue;
+
+    // A rule of the form ([P].[P:X] => [P:X]) overlaps will all
+    // conformance rules ([P:X].T.[Q] => [P:X].T), and simply
+    // produces the equation
+    //
+    //     ([P:X].T.[Q]) := ([P:X].T.[Q])
+    //
+    // So we can just ignore them.
+    if (lhs.getLHS().size() == 2 &&
+        lhs.getLHS()[0].getKind() == Symbol::Kind::Protocol &&
+        lhs.getLHS()[1].getKind() == Symbol::Kind::AssociatedType &&
+        lhs.getLHS()[0].getProtocol() == lhs.getLHS()[1].getProtocol()) {
+      if (Debug.contains(DebugFlags::MinimalConformancesDetail)) {
+        llvm::dbgs() << "Skipping " << lhs << "\n";
+      }
+      continue;
+    }
+
+    if (lhs.isAnyConformanceRule() &&
+        lhs.getLHS().back().getKind() == Symbol::Kind::ConcreteConformance) {
+      MutableTerm t(lhs.getLHS().begin(), lhs.getLHS().end() - 1);
+      t.add(Symbol::forProtocol(lhs.getLHS().back().getProtocol(), Context));
+
+      if (Debug.contains(DebugFlags::MinimalConformancesDetail)) {
+        llvm::dbgs() << "Concrete conformance rule has abstract path\n";
+        llvm::dbgs() << "LHS: " << lhs << "\n";
+        llvm::dbgs() << "T: " << t << "\n";
+      }
+
+      SmallVector<unsigned, 2> path;
+      decomposeTermIntoConformanceRuleLeftHandSides(t, path);
+
+      paths[i].push_back(path);
+
+      if (path.size() == 1) {
+        SmallVector<unsigned, 2> otherPath;
+        otherPath.push_back(i);
+
+        if (Debug.contains(DebugFlags::MinimalConformancesDetail)) {
+          llvm::dbgs() << "Conformance rule has concrete path\n";
+          llvm::dbgs() << "LHS: " << lhs << "\n";
+          llvm::dbgs() << "T: " << t << "\n";
+        }
+
+        paths[path[0]].push_back(otherPath);
+      }
+    }
+
+    // Look up every suffix of this rule in the trie using findAll(). This
+    // will find both kinds of overlap:
+    //
+    // 1) rules whose left hand side is fully contained in [from,to)
+    // 2) rules whose left hand side has a prefix equal to [from,to)
+    auto from = lhs.getLHS().begin();
+    auto to = lhs.getLHS().end();
+    while (from < to) {
+      Trie.findAll(from, to, [&](unsigned j) {
+        const auto &rhs = getRule(j);
+
+        if (rhs.isRHSSimplified() ||
+            rhs.isSubstitutionSimplified() ||
+            rhs.isIdentityConformanceRule() ||
+            rhs.containsUnresolvedSymbols())
+          return;
+
+        if (!rhs.isAnyConformanceRule() &&
+            rhs.isLHSSimplified())
+          return;
+
+        // Case 1: (U.V.[P] => U.V) vs (V.[P] => V) with |U| > 0.
+        //
+        // This records the equation:
+        //
+        //   (U.V.[P]) := (U.[domain(V)]) * (V.[P] => V)
+        if (lhs.isAnyConformanceRule() &&
+            from != lhs.getLHS().begin() &&
+            (from - lhs.getLHS().begin() + rhs.getLHS().size() ==
+             lhs.getLHS().size())) {
+          if (Debug.contains(DebugFlags::MinimalConformancesDetail)) {
+            llvm::dbgs() << "Case 1: suffix\n";
+            llvm::dbgs() << "LHS: " << lhs << "\n";
+            llvm::dbgs() << "RHS: " << rhs << "\n";
+          }
+
+          // If the LHS rule is a conformance rule and the RHS rule is
+          // a suffix of the LHS rule, the RHS rule must also be a
+          // conformance rule.
+          assert(rhs.isAnyConformanceRule());
+
+          // Build the term U.
+          MutableTerm u(lhs.getLHS().begin(), from);
+          if (Debug.contains(DebugFlags::MinimalConformancesDetail)) {
+            llvm::dbgs() << "- U := " << u << "\n";
+          }
+
+          // Get the conformance path for (U.[domain(V)] => U).
+          SmallVector<unsigned, 2> path;
+          decomposeTermIntoConformanceRuleLeftHandSides(u, j, path);
+
+          // Record the equation (U.V.[P]) := (U.[domain(V)]) * (V.[P]).
+          paths[i].push_back(path);
+
+        // Case 2: (U.V => X) vs (V.W.[P] => V.W), with |U| > 0 and
+        // |V| > 0. W may be empty.
+        //
+        // This records the equation:
+        //
+        //   (Y.[P]) := (U.[domain(V)]) * (V.W.[P])
+        //
+        // where Y is the simplified form of X.W.
+        } else if (rhs.isAnyConformanceRule() &&
+                   (unsigned)(lhs.getLHS().end() - from) < rhs.getLHS().size()) {
+          if (Debug.contains(DebugFlags::MinimalConformancesDetail)) {
+            llvm::dbgs() << "Case 2: same-type suffix\n";
+            llvm::dbgs() << "LHS: " << lhs << "\n";
+            llvm::dbgs() << "RHS: " << rhs << "\n";
+          }
+
+          // Build the term U.
+          MutableTerm u(lhs.getLHS().begin(), from);
+          if (Debug.contains(DebugFlags::MinimalConformancesDetail)) {
+            llvm::dbgs() << "- U := " << u << "\n";
+          }
+
+          // Build the term X.W.
+          MutableTerm xw(lhs.getRHS());
+          xw.append(rhs.getRHS().begin() + (lhs.getLHS().end() - from),
+                    rhs.getRHS().end());
+
+          if (Debug.contains(DebugFlags::MinimalConformancesDetail)) {
+            llvm::dbgs() << "- X.W := " << xw << "\n";
+          }
+
+          // Simplify X.W to Y.
+          MutableTerm y(xw);
+          (void) simplify(y);
+
+          if (Debug.contains(DebugFlags::MinimalConformancesDetail)) {
+            llvm::dbgs() << "- Y := " << y << "\n";
+          }
+
+          // Get the symbol [P].
+          auto p = rhs.getLHS().back();
+          if (p.getKind() == Symbol::Kind::ConcreteConformance) {
+            if (Debug.contains(DebugFlags::MinimalConformancesDetail)) {
+              llvm::dbgs() << "- P is a concrete conformance: " << p << "\n";
+              llvm::dbgs() << "- Prepending U := " << u << "\n";
+            }
+            p = p.prependPrefixToConcreteSubstitutions(u, Context);
+
+            auto simplified = const_cast<RewriteSystem *>(this)
+                ->simplifySubstitutions(Term::get(y, Context), p, &map);
+            if (simplified) {
+              p = getTypeDifference(*simplified).RHS;
+              if (Debug.contains(DebugFlags::MinimalConformancesDetail)) {
+                llvm::dbgs() << "- Simplified P := " << p << "\n";
+              }
+            }
+          }
+
+          // Build the term Y.[P].
+          MutableTerm yp(y);
+          yp.add(p);
+
+          // Simplify Y.[P] to Y. It must simplify to Y via a single
+          // rewrite step, but possibly via some other rule (Z.[P] => Z)
+          // where Z is a suffix of Y. In this case, no equation
+          // is recorded.
+          RewritePath rewritePath;
+          bool result = simplify(yp, &rewritePath);
+          if (!result) {
+            llvm::errs() << "Does not conform to protocol: " << yp << "\n";
+            dump(llvm::errs());
+            abort();
+          }
+
+          if (rewritePath.size() != 1) {
+            llvm::errs() << "Funny rewrite path: ";
+
+            yp = y;
+            yp.add(rhs.getLHS().back());
+            rewritePath.dump(llvm::errs(), yp, *this);
+            llvm::errs() << "\n";
+            abort();
+          }
+
+          if (rewritePath.begin()->StartOffset == 0) {
+            // Get the conformance path for (U.[domain(V)] => U).
+            SmallVector<unsigned, 2> path;
+            decomposeTermIntoConformanceRuleLeftHandSides(u, j, path);
+
+            // Record the equation (Y.[P]) := (U.[domain(V)]) * (V.W.[P]).
+            paths[rewritePath.begin()->getRuleID()].push_back(path);
+          }
+        }
+      });
+
+      ++from;
+    }
+  }
+}
+
 /// Use homotopy information to discover all ways of writing the left hand side
 /// of each conformance rule as a product of left hand sides of other conformance
 /// rules.
@@ -486,7 +707,13 @@ void MinimalConformances::collectConformanceRules() {
 ///
 /// That is, we can choose to eliminate <X>.[P], but not <Y>.[P], or vice
 /// versa; but it is never valid to eliminate both.
-void MinimalConformances::computeCandidateConformancePaths() {
+void MinimalConformances::computeCandidateConformancePaths(
+    const PropertyMap &map) {
+  if (NewAlgorithm) {
+    System.computeCandidateConformancePaths(map, ConformancePaths);
+    return;
+  }
+
   for (unsigned loopID : indices(System.getLoops())) {
     const auto &loop = System.getLoops()[loopID];
 
@@ -501,7 +728,7 @@ void MinimalConformances::computeCandidateConformancePaths() {
     if (result.empty())
       continue;
 
-    if (Debug.contains(DebugFlags::MinimalConformances)) {
+    if (Debug.contains(DebugFlags::MinimalConformancesDetail)) {
       llvm::dbgs() << "Candidate homotopy generator: (#" << loopID << ") ";
       loop.dump(llvm::dbgs(), System);
       llvm::dbgs() << "\n";
@@ -517,7 +744,7 @@ void MinimalConformances::computeCandidateConformancePaths() {
       if (inEmptyContext.empty())
         continue;
 
-      if (Debug.contains(DebugFlags::MinimalConformances)) {
+      if (Debug.contains(DebugFlags::MinimalConformancesDetail)) {
         llvm::dbgs() << "* Protocol " << proto->getName() << ":\n";
         llvm::dbgs() << "** Conformance rules not in context:\n";
         for (unsigned ruleID : inEmptyContext) {
@@ -868,7 +1095,7 @@ void MinimalConformances::computeMinimalConformances() {
       // Only consider a protocol refinement rule to be redundant if it is
       // witnessed by a composition of other protocol refinement rules.
       if (isProtocolRefinement && !isValidRefinementPath(path)) {
-        if (Debug.contains(DebugFlags::MinimalConformances)) {
+        if (Debug.contains(DebugFlags::MinimalConformancesDetail)) {
           llvm::dbgs() << "Not a refinement path: ";
           dumpConformancePath(llvm::errs(), path);
           llvm::dbgs() << "\n";
@@ -880,7 +1107,7 @@ void MinimalConformances::computeMinimalConformances() {
       visited.insert(ruleID);
 
       if (isValidConformancePath(visited, path)) {
-        if (Debug.contains(DebugFlags::MinimalConformances)) {
+        if (Debug.contains(DebugFlags::MinimalConformancesDetail)) {
           llvm::dbgs() << "Redundant rule: ";
           llvm::dbgs() << rule.getLHS();
           llvm::dbgs() << "\n";
@@ -944,21 +1171,59 @@ void MinimalConformances::dumpMinimalConformances(
 /// already eliminated all redundant rewrite rules that are not
 /// conformance rules.
 void RewriteSystem::computeMinimalConformances(
+    const PropertyMap &map,
     llvm::DenseSet<unsigned> &redundantConformances) const {
-  MinimalConformances builder(*this, redundantConformances);
+  {
+    MinimalConformances builder(*this, redundantConformances, false);
 
-  builder.collectConformanceRules();
-  builder.computeCandidateConformancePaths();
+    builder.collectConformanceRules();
+    builder.computeCandidateConformancePaths(map);
 
-  if (Debug.contains(DebugFlags::MinimalConformances)) {
-    builder.dumpMinimalConformanceEquations(llvm::dbgs());
+    if (Debug.contains(DebugFlags::MinimalConformances)) {
+      builder.dumpMinimalConformanceEquations(llvm::dbgs());
+    }
+
+    builder.verifyMinimalConformanceEquations();
+    builder.computeMinimalConformances();
+    builder.verifyMinimalConformances();
+
+    if (Debug.contains(DebugFlags::MinimalConformances)) {
+      builder.dumpMinimalConformances(llvm::dbgs());
+    }
   }
 
-  builder.verifyMinimalConformanceEquations();
-  builder.computeMinimalConformances();
-  builder.verifyMinimalConformances();
+  llvm::DenseSet<unsigned> redundantConformancesNew;
+  {
+    MinimalConformances builder(*this, redundantConformancesNew, true);
 
-  if (Debug.contains(DebugFlags::MinimalConformances)) {
-    builder.dumpMinimalConformances(llvm::dbgs());
+    builder.collectConformanceRules();
+    builder.computeCandidateConformancePaths(map);
+
+    if (Debug.contains(DebugFlags::MinimalConformances)) {
+      builder.dumpMinimalConformanceEquations(llvm::dbgs());
+    }
+
+    builder.verifyMinimalConformanceEquations();
+    builder.computeMinimalConformances();
+    builder.verifyMinimalConformances();
+
+    if (Debug.contains(DebugFlags::MinimalConformances)) {
+      builder.dumpMinimalConformances(llvm::dbgs());
+    }
+  }
+
+  if (redundantConformances != redundantConformancesNew) {
+    llvm::errs() << "Mismatch\n";
+    llvm::errs() << "Old:\n";
+    for (unsigned x : redundantConformances) {
+      llvm::errs() << "- " << getRule(x) << "\n";
+    }
+    llvm::errs() << "New:\n";
+    for (unsigned x : redundantConformancesNew) {
+      llvm::errs() << "- " << getRule(x) << "\n";
+    }
+    llvm::errs() << "\n\n";
+    dump(llvm::errs());
+    abort();
   }
 }
