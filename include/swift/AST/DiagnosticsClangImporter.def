@@ -124,6 +124,10 @@ WARNING(libstdcxx_not_found, none,
         "libstdc++ not found for '%0'; C++ stdlib may be unavailable",
         (StringRef))
 
+WARNING(too_many_class_template_instantiations, none,
+        "template instantiation for '%0' not imported: too many instantiations",
+        (StringRef))
+
 NOTE(macro_not_imported_unsupported_operator, none, "operator not supported in macro arithmetic", ())
 NOTE(macro_not_imported_unsupported_named_operator, none, "operator '%0' not supported in macro arithmetic", (StringRef))
 NOTE(macro_not_imported_invalid_string_literal, none, "invalid string literal", ())

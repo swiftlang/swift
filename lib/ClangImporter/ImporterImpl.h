@@ -626,6 +626,10 @@ public:
   llvm::DenseMap<clang::FunctionDecl *, ValueDecl *>
       specializedFunctionTemplates;
 
+  /// Stores qualified names of C++ template specializations that were too deep
+  /// to import into Swift.
+  llvm::StringSet<> tooDeepTemplateSpecializations;
+
   /// Keeps track of the Clang functions that have been turned into
   /// properties.
   llvm::DenseMap<const clang::FunctionDecl *, VarDecl *> FunctionsAsProperties;
