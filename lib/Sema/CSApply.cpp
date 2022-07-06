@@ -3528,9 +3528,12 @@ namespace {
       expr->setInitializer(witness);
 
       auto elementType = expr->getElementType();
-      for (auto &element : expr->getElements()) {
-        element = coerceToType(element, elementType,
-                               cs.getConstraintLocator(element));
+
+      for (unsigned i = 0, n = expr->getNumElements(); i != n; ++i) {
+        expr->setElement(
+            i, coerceToType(expr->getElement(i), elementType,
+                            cs.getConstraintLocator(
+                                expr, {LocatorPathElt::TupleElement(i)})));
       }
 
       return expr;

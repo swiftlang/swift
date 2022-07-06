@@ -217,9 +217,17 @@ func test_multi_argument_conversion_with_optional(d: Double, cgf: CGFloat) {
   test(cgf, d) // Ok (CGFloat -> Double and Double? -> CGFloat?)
 }
 
-func test_array_literal_as_call_argument() {
+extension CGFloat: Hashable {
+  public func hash(into hasher: inout Hasher) { fatalError() }
+}
+
+func test_collection_literals_as_call_arguments() {
   enum E {
     case test_arr([CGFloat])
+    case test_dict_key([CGFloat: String])
+    case test_dict_value([String: CGFloat])
+    case test_arr_nested([String: [[CGFloat]: String]])
+    case test_dict_nested([String: [String: CGFloat]])
   }
 
   struct Container {
@@ -233,5 +241,9 @@ func test_array_literal_as_call_argument() {
 
   func test(cont: inout Container, point: Point) {
     cont.prop = .test_arr([point.x]) // Ok
+    cont.prop = .test_dict_key([point.y: ""]) // Ok
+    cont.prop = .test_dict_value(["": point.y]) // Ok
+    cont.prop = .test_arr_nested(["": [[point.x]: ""]]) // Ok
+    cont.prop = .test_dict_nested(["": ["": point.x]]) // Ok
   }
 }
