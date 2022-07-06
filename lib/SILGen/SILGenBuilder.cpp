@@ -921,3 +921,23 @@ ManagedValue SILGenBuilder::createGuaranteedMoveOnlyWrapperToCopyableValue(
   assert(mdi->getOperand()->getType().isObject() && "Expected an object?!");
   return ManagedValue::forUnmanaged(mdi);
 }
+
+ManagedValue
+SILGenBuilder::createCopyableToMoveOnlyWrapperValue(SILLocation loc,
+                                                    ManagedValue value) {
+  assert(value.isPlusOne(SGF) && "Argument must be at +1!");
+  CleanupCloner cloner(*this, value);
+  auto *mdi = SILBuilder::createCopyableToMoveOnlyWrapperValue(
+      loc, value.forward(getSILGenFunction()));
+  return cloner.clone(mdi);
+}
+
+ManagedValue
+SILGenBuilder::createMarkMustCheckInst(SILLocation loc, ManagedValue value,
+                                       MarkMustCheckInst::CheckKind kind) {
+  assert(value.isPlusOne(SGF) && "Argument must be at +1!");
+  CleanupCloner cloner(*this, value);
+  auto *mdi = SILBuilder::createMarkMustCheckInst(
+      loc, value.forward(getSILGenFunction()), kind);
+  return cloner.clone(mdi);
+}

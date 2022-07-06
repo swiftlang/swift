@@ -28,6 +28,7 @@
 #include "RValue.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILLocation.h"
 
 namespace swift {
@@ -414,6 +415,17 @@ public:
   ManagedValue
   createGuaranteedMoveOnlyWrapperToCopyableValue(SILLocation loc,
                                                  ManagedValue value);
+
+  using SILBuilder::createCopyableToMoveOnlyWrapperValue;
+  /// Create a copyable_to_moveonlywrapper. This expects a +1 value and returns
+  /// a +1 value. Semantically though the two things are different entities so
+  /// we are not forwarding ownership in the sense of the word.
+  ManagedValue createCopyableToMoveOnlyWrapperValue(SILLocation loc,
+                                                    ManagedValue value);
+
+  using SILBuilder::createMarkMustCheckInst;
+  ManagedValue createMarkMustCheckInst(SILLocation loc, ManagedValue value,
+                                       MarkMustCheckInst::CheckKind kind);
 };
 
 } // namespace Lowering
