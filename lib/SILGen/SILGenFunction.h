@@ -1440,12 +1440,14 @@ public:
                                         CanType baseFormalType,
                                         SILDeclRef accessor);
 
-  RValue emitGetAccessor(SILLocation loc, SILDeclRef getter,
-                         SubstitutionMap substitutions,
-                         ArgumentSource &&optionalSelfValue, bool isSuper,
-                         bool isDirectAccessorUse,
-                         PreparedArguments &&optionalSubscripts, SGFContext C,
-                         bool isOnSelfParameter);
+  RValue emitGetAccessor(
+      SILLocation loc, SILDeclRef getter,
+      SubstitutionMap substitutions,
+      ArgumentSource &&optionalSelfValue, bool isSuper,
+      bool isDirectAccessorUse,
+      PreparedArguments &&optionalSubscripts, SGFContext C,
+      bool isOnSelfParameter,
+      Optional<ImplicitActorHopTarget> implicitActorHopTarget = None);
 
   void emitSetAccessor(SILLocation loc, SILDeclRef setter,
                        SubstitutionMap substitutions,
