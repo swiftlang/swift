@@ -2886,12 +2886,10 @@ public:
         return {true, S};
       }
 
-      // If this is `if #available` statement with no other dynamic
+      // If this is `if #(un)available` statement with no other dynamic
       // conditions, let's check if it returns opaque type directly.
       if (llvm::all_of(If->getCond(), [&](const auto &condition) {
-            return condition.getKind() ==
-                       StmtConditionElement::CK_Availability &&
-                   !condition.getAvailability()->isUnavailability();
+            return condition.getKind() == StmtConditionElement::CK_Availability;
           })) {
         // Check return statement directly with availability context set.
         if (auto *Then = dyn_cast<BraceStmt>(If->getThenStmt())) {

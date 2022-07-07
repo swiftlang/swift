@@ -2335,6 +2335,7 @@ namespace {
 
               assert(condition.first.hasLowerEndpoint());
 
+              bool isUnavailability = condition.second;
               auto version = condition.first.getLowerEndpoint();
               auto *major = getInt32Constant(version.getMajor());
               auto *minor = getInt32Constant(version.getMinor());
@@ -2347,6 +2348,13 @@ namespace {
 
               auto success = IGF.Builder.CreateICmpNE(
                   isAtLeast, llvm::Constant::getNullValue(IGM.Int32Ty));
+
+              if (isUnavailability) {
+                // Invert the result of "at least" check by xor'ing resulting
+                // boolean with `-1`.
+                success =
+                    IGF.Builder.CreateXor(success, IGF.Builder.getIntN(1, -1));
+              }
 
               auto nextCondOrRet = condIndex == conditions.size() - 1
                                        ? returnTypeBB
