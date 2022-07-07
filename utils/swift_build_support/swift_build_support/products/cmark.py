@@ -12,6 +12,7 @@
 
 from . import cmake_product
 from . import earlyswiftdriver
+from .. import shell
 
 
 class CMark(cmake_product.CMakeProduct):
@@ -94,8 +95,17 @@ class CMark(cmake_product.CMakeProduct):
             # Xcode generator uses "RUN_TESTS" instead of "test".
             results_targets = ['RUN_TESTS']
 
-        self.test_with_cmake(executable_target, results_targets,
-                             self.args.cmark_build_variant, [])
+        test_env = {
+            "CTEST_OUTPUT_ON_FAILURE": "ON"
+        }
+
+        # The environment is passed with pushenv to avoid giving a general
+        # mechanism for test environments - this is because lit.cfg filters out
+        # environment variables. However, since `test_with_cmake` calls cmake
+        # (and thus ctest) directly, we can pass the environment along like this.
+        with shell.pushenv(test_env):
+            self.test_with_cmake(executable_target, results_targets,
+                                 self.args.cmark_build_variant, [])
 
     def should_install(self, host_target):
         """should_install() -> Bool
