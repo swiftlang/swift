@@ -496,6 +496,7 @@ private:
     case Node::Kind::SILBoxMutableField:
     case Node::Kind::SILBoxImmutableField:
     case Node::Kind::IsSerialized:
+    case Node::Kind::MetatypeParamsRemoved:
     case Node::Kind::SpecializationPassID:
     case Node::Kind::Static:
     case Node::Kind::Subscript:
@@ -1127,7 +1128,8 @@ void NodePrinter::printSpecializationPrefix(NodePointer node,
   for (NodePointer child : *node) {
     switch (child->getKind()) {
       case Node::Kind::SpecializationPassID:
-        // We skip the SpecializationPassID since it does not contain any
+      case Node::Kind::MetatypeParamsRemoved:
+        // We skip those nodes since it does not contain any
         // information that is useful to our users.
         break;
 
@@ -1548,6 +1550,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   case Node::Kind::IsSerialized:
     Printer << "serialized";
+    return nullptr;
+  case Node::Kind::MetatypeParamsRemoved:
+    Printer << "metatypes-removed";
     return nullptr;
   case Node::Kind::GenericSpecializationParam:
     print(Node->getChild(0), depth + 1);

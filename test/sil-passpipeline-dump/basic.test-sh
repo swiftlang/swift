@@ -10,5 +10,5 @@
 // CHECK-NEXT:               "ownership-model-eliminator" ]
 // CHECK: ---
 // CHECK: name:            Rest of Onone
-// CHECK: passes:          [ "use-prespecialized", "sil-debuginfo-gen" ]
+// CHECK: passes:          [ "use-prespecialized", "target-constant-folding", "sil-debuginfo-gen" ]
 // CHECK: ...
