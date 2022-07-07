@@ -2719,7 +2719,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   }
 
   /// The behavior limit to apply to a concurrency check.
-  auto getConcurrencyDiagnosticBehavior = [&](bool forSendable) {
+  auto getConcurrencyFixBehavior = [&](bool forSendable) {
     // We can only handle the downgrade for conversions.
     switch (kind) {
     case ConstraintKind::Conversion:
@@ -2727,20 +2727,20 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       break;
 
     default:
-      return DiagnosticBehavior::Unspecified;
+      return FixBehavior::Error;
     }
 
     // For a @preconcurrency callee outside of a strict concurrency context,
     // ignore.
     if (hasPreconcurrencyCallee(this, locator) &&
         !contextRequiresStrictConcurrencyChecking(DC, GetClosureType{*this}))
-      return DiagnosticBehavior::Ignore;
+      return FixBehavior::Suppress;
 
     // Otherwise, warn until Swift 6.
     if (!getASTContext().LangOpts.isSwiftVersionAtLeast(6))
-      return DiagnosticBehavior::Warning;
+      return FixBehavior::DowngradeToWarning;
 
-    return DiagnosticBehavior::Unspecified;
+    return FixBehavior::Error;
   };
 
   // A @Sendable function can be a subtype of a non-@Sendable function.
@@ -2752,7 +2752,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
       auto *fix = AddSendableAttribute::create(
           *this, func1, func2, getConstraintLocator(locator),
-          getConcurrencyDiagnosticBehavior(true));
+          getConcurrencyFixBehavior(true));
       if (recordFix(fix))
         return getTypeMatchFailure(locator);
     }
@@ -2787,7 +2787,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
       auto *fix = MarkGlobalActorFunction::create(
           *this, func1, func2, getConstraintLocator(locator),
-          getConcurrencyDiagnosticBehavior(false));
+          getConcurrencyFixBehavior(false));
 
       if (recordFix(fix))
         return getTypeMatchFailure(locator);
@@ -12705,9 +12705,8 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
 
   // Record the fix.
 
-  // If this is just a warning, it shouldn't affect the solver. Otherwise,
-  // increase the score.
-  if (!fix->isWarning())
+  // If this should affect the solution score, do so.
+  if (fix->affectsSolutionScore())
     increaseScore(SK_Fix, impact);
 
   // If we've made the current solution worse than the best solution we've seen
@@ -12728,10 +12727,10 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
   // its sub-expressions.
   llvm::SmallDenseSet<ASTNode> anchors;
   for (const auto *fix : Fixes) {
-    // Warning fixes shouldn't be considered because even if
-    // such fix is recorded at that anchor this should not
+    // Fixes that don't affect the score shouldn't be considered because even
+    // if such a fix is recorded at that anchor this should not
     // have any affect in the recording of any other fix.
-    if (fix->isWarning())
+    if (!fix->affectsSolutionScore())
       continue;
 
     anchors.insert(fix->getAnchor());
