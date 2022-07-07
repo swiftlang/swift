@@ -68,9 +68,6 @@ private:
     // Scan all instructions in the module for constant foldable instructions.
     for (SILFunction &function : *module) {
     
-      if (!function.shouldOptimize())
-        continue;
-    
       bool changed = false;
       for (SILBasicBlock &block : function) {
         InstructionDeleter deleter;

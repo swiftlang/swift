@@ -550,8 +550,9 @@ bool ReabstractionInfo::canBeSpecialized(ApplySite Apply, SILFunction *Callee,
 ReabstractionInfo::ReabstractionInfo(
     ModuleDecl *targetModule, bool isWholeModule, ApplySite Apply,
     SILFunction *Callee, SubstitutionMap ParamSubs, IsSerialized_t Serialized,
-    bool ConvertIndirectToDirect, OptRemark::Emitter *ORE)
+    bool ConvertIndirectToDirect, bool dropMetatypeArgs, OptRemark::Emitter *ORE)
     : ConvertIndirectToDirect(ConvertIndirectToDirect),
+      dropMetatypeArgs(dropMetatypeArgs),
       TargetModule(targetModule), isWholeModule(isWholeModule),
       Serialized(Serialized) {
   if (!prepareAndCheck(Apply, Callee, ParamSubs, ORE))
@@ -683,6 +684,7 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
     SubstitutedType->getParameters().size();
   Conversions.resize(NumArgs);
   TrivialArgs.resize(NumArgs);
+  droppedMetatypeArgs.resize(NumArgs);
 
   SILFunctionConventions substConv(SubstitutedType, M);
   TypeExpansionContext resilienceExp = getResilienceExpansion();
@@ -737,10 +739,16 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
     case ParameterConvention::Indirect_In_Constant:
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
+      break;
+      
     case ParameterConvention::Direct_Owned:
     case ParameterConvention::Direct_Unowned:
-    case ParameterConvention::Direct_Guaranteed:
+    case ParameterConvention::Direct_Guaranteed: {
+      CanType ty = PI.getInterfaceType();
+      if (dropMetatypeArgs && isa<MetatypeType>(ty) && !ty->hasArchetype())
+        droppedMetatypeArgs.set(IdxToInsert);
       break;
+    }
     }
   }
 
@@ -852,11 +860,16 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
     // No conversion: re-use the original, substituted result info.
     SpecializedResults.push_back(RI);
   }
-  unsigned ParamIdx = 0;
+  unsigned idx = 0;
   for (SILParameterInfo PI : SubstFTy->getParameters()) {
+    unsigned paramIdx = idx++;
     PI = PI.getUnsubstituted(M, SubstFTy, context);
-    bool isTrivial = TrivialArgs.test(param2ArgIndex(ParamIdx));
-    if (!isParamConverted(ParamIdx++)) {
+
+    if (isDroppedMetatypeArg(param2ArgIndex(paramIdx)))
+      continue;
+
+    bool isTrivial = TrivialArgs.test(param2ArgIndex(paramIdx));
+    if (!isParamConverted(paramIdx)) {
       // No conversion: re-use the original, substituted parameter info.
       SpecializedParams.push_back(PI);
       continue;
@@ -1854,7 +1867,8 @@ GenericFuncSpecializer::GenericFuncSpecializer(
       ClonedName = Mangler.manglePrespecialized(ParamSubs);
     } else {
       ClonedName = Mangler.mangleReabstracted(ParamSubs,
-                                              ReInfo.needAlternativeMangling());
+                                              ReInfo.needAlternativeMangling(),
+                                              ReInfo.hasDroppedMetatypeArgs());
     }
   }
   LLVM_DEBUG(llvm::dbgs() << "    Specialized function " << ClonedName << '\n');
@@ -1994,6 +2008,9 @@ prepareCallArguments(ApplySite AI, SILBuilder &Builder,
       StoreResultTo = InputValue;
       return true;
     }
+
+    if (ReInfo.isDroppedMetatypeArg(ArgIdx))
+      return true;
 
     // Handle arguments for formal parameters.
     unsigned paramIdx = ArgIdx - substConv.getSILArgIndexOfFirstParam();
@@ -2418,7 +2435,7 @@ static bool createPrespecialized(StringRef UnspecializedName,
   ReabstractionInfo ReInfo(M.getSwiftModule(), M.isWholeModule(), ApplySite(),
                            UnspecFunc, Apply.getSubstitutionMap(),
                            IsNotSerialized,
-                           /*ConvertIndirectToDirect=*/true, nullptr);
+                           /*ConvertIndirectToDirect=*/true);
 
   if (!ReInfo.canBeSpecialized())
     return false;
@@ -2599,7 +2616,9 @@ void swift::trySpecializeApplyOfGeneric(
   ReabstractionInfo ReInfo(FuncBuilder.getModule().getSwiftModule(),
                            FuncBuilder.getModule().isWholeModule(), Apply, RefF,
                            Apply.getSubstitutionMap(), Serialized,
-                           /*ConvertIndirectToDirect=*/true, &ORE);
+                           /*ConvertIndirectToDirect=*/ true,
+                           /*dropMetatypeArgs=*/ isMandatory,
+                           &ORE);
   if (!ReInfo.canBeSpecialized())
     return;
 

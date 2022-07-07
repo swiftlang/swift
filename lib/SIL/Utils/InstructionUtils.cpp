@@ -596,6 +596,8 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::AllocGlobalInst: {
     SILType glTy = cast<AllocGlobalInst>(inst)->getReferencedGlobal()->
                       getLoweredType();
+    if (glTy.isLoadable(*inst->getFunction()))
+      return RuntimeEffect::NoEffect;
     if (glTy.hasOpaqueArchetype()) {
       impactType = glTy;
       return RuntimeEffect::Allocating | RuntimeEffect::MetaData;
