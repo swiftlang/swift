@@ -25,6 +25,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Sema/ConstraintLocator.h"
+#include "swift/Sema/FixBehavior.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -410,13 +411,12 @@ class ConstraintFix {
   ConstraintLocator *Locator;
 
   /// The behavior limit to apply to the diagnostics emitted.
-  DiagnosticBehavior behaviorLimit;
+  FixBehavior fixBehavior;
 
 public:
   ConstraintFix(ConstraintSystem &cs, FixKind kind, ConstraintLocator *locator,
-                DiagnosticBehavior behaviorLimit =
-                    DiagnosticBehavior::Unspecified)
-      : CS(cs), Kind(kind), Locator(locator), behaviorLimit(behaviorLimit) {}
+                FixBehavior fixBehavior = FixBehavior::Error)
+      : CS(cs), Kind(kind), Locator(locator), fixBehavior(fixBehavior) {}
 
   virtual ~ConstraintFix();
 
@@ -427,14 +427,36 @@ public:
 
   FixKind getKind() const { return Kind; }
 
-  bool isWarning() const {
-    return behaviorLimit == DiagnosticBehavior::Warning ||
-           behaviorLimit == DiagnosticBehavior::Ignore;
+  /// Whether it is still possible to "apply" a solution containing this kind
+  /// of fix to get a usable AST.
+  bool canApplySolution() const {
+    switch (fixBehavior) {
+    case FixBehavior::AlwaysWarning:
+    case FixBehavior::DowngradeToWarning:
+    case FixBehavior::Suppress:
+      return true;
+
+    case FixBehavior::Error:
+      return false;
+    }
+  }
+
+  /// Whether this kind of fix affects the solution score.
+  bool affectsSolutionScore() const {
+    switch (fixBehavior) {
+    case FixBehavior::AlwaysWarning:
+    case FixBehavior::DowngradeToWarning:
+    case FixBehavior::Suppress:
+      return false;
+
+    case FixBehavior::Error:
+      return true;
+    }
   }
 
   /// The diagnostic behavior limit that will be applied to any emitted
   /// diagnostics.
-  DiagnosticBehavior diagBehaviorLimit() const { return behaviorLimit; }
+  FixBehavior diagfixBehavior() const { return fixBehavior; }
 
   virtual std::string getName() const = 0;
 
@@ -680,16 +702,15 @@ class ContextualMismatch : public ConstraintFix {
 
   ContextualMismatch(ConstraintSystem &cs, Type lhs, Type rhs,
                      ConstraintLocator *locator,
-                     DiagnosticBehavior behaviorLimit)
-      : ConstraintFix(cs, FixKind::ContextualMismatch, locator, behaviorLimit),
+                     FixBehavior fixBehavior)
+      : ConstraintFix(cs, FixKind::ContextualMismatch, locator, fixBehavior),
         LHS(lhs), RHS(rhs) {}
 
 protected:
   ContextualMismatch(ConstraintSystem &cs, FixKind kind, Type lhs, Type rhs,
                      ConstraintLocator *locator,
-                     DiagnosticBehavior behaviorLimit =
-                         DiagnosticBehavior::Unspecified)
-      : ConstraintFix(cs, kind, locator, behaviorLimit), LHS(lhs), RHS(rhs) {}
+                     FixBehavior fixBehavior = FixBehavior::Error)
+      : ConstraintFix(cs, kind, locator, fixBehavior), LHS(lhs), RHS(rhs) {}
 
 public:
   std::string getName() const override { return "fix contextual mismatch"; }
@@ -777,9 +798,9 @@ public:
 class MarkGlobalActorFunction final : public ContextualMismatch {
   MarkGlobalActorFunction(ConstraintSystem &cs, Type lhs, Type rhs,
                           ConstraintLocator *locator,
-                          DiagnosticBehavior behaviorLimit)
+                          FixBehavior fixBehavior)
       : ContextualMismatch(cs, FixKind::MarkGlobalActorFunction, lhs, rhs,
-                           locator, behaviorLimit) {
+                           locator, fixBehavior) {
   }
 
 public:
@@ -789,7 +810,7 @@ public:
 
   static MarkGlobalActorFunction *create(ConstraintSystem &cs, Type lhs,
                                          Type rhs, ConstraintLocator *locator,
-                                         DiagnosticBehavior behaviorLimit);
+                                         FixBehavior fixBehavior);
 
   static bool classof(ConstraintFix *fix) {
     return fix->getKind() == FixKind::MarkGlobalActorFunction;
@@ -825,9 +846,9 @@ public:
 class AddSendableAttribute final : public ContextualMismatch {
   AddSendableAttribute(ConstraintSystem &cs, FunctionType *fromType,
                        FunctionType *toType, ConstraintLocator *locator,
-                       DiagnosticBehavior behaviorLimit)
+                       FixBehavior fixBehavior)
       : ContextualMismatch(cs, FixKind::AddSendableAttribute, fromType, toType,
-                           locator, behaviorLimit) {
+                           locator, fixBehavior) {
     assert(fromType->isSendable() != toType->isSendable());
   }
 
@@ -840,7 +861,7 @@ public:
                                       FunctionType *fromType,
                                       FunctionType *toType,
                                       ConstraintLocator *locator,
-                                      DiagnosticBehavior behaviorLimit);
+                                      FixBehavior fixBehavior);
 
   static bool classof(ConstraintFix *fix) {
     return fix->getKind() == FixKind::AddSendableAttribute;
@@ -1403,11 +1424,14 @@ public:
 };
 
 class AllowInvalidPartialApplication final : public ConstraintFix {
+  bool isWarning;
+
   AllowInvalidPartialApplication(bool isWarning, ConstraintSystem &cs,
                                  ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::AllowInvalidPartialApplication, locator,
-                      isWarning ? DiagnosticBehavior::Warning
-                                : DiagnosticBehavior::Unspecified) {}
+                      isWarning ? FixBehavior::AlwaysWarning
+                                : FixBehavior::Error),
+        isWarning(isWarning) {}
 
 public:
   std::string getName() const override {
@@ -2141,10 +2165,9 @@ protected:
 
   AllowArgumentMismatch(ConstraintSystem &cs, FixKind kind, Type argType,
                         Type paramType, ConstraintLocator *locator,
-                        DiagnosticBehavior behaviorLimit =
-                            DiagnosticBehavior::Unspecified)
+                        FixBehavior fixBehavior = FixBehavior::Error)
       : ContextualMismatch(
-            cs, kind, argType, paramType, locator, behaviorLimit) {}
+            cs, kind, argType, paramType, locator, fixBehavior) {}
 
 public:
   std::string getName() const override {
@@ -2292,9 +2315,9 @@ class TreatEphemeralAsNonEphemeral final : public AllowArgumentMismatch {
   TreatEphemeralAsNonEphemeral(ConstraintSystem &cs, ConstraintLocator *locator,
                                Type srcType, Type dstType,
                                ConversionRestrictionKind conversionKind,
-                               DiagnosticBehavior behaviorLimit)
+                               FixBehavior fixBehavior)
       : AllowArgumentMismatch(cs, FixKind::TreatEphemeralAsNonEphemeral,
-                              srcType, dstType, locator, behaviorLimit),
+                              srcType, dstType, locator, fixBehavior),
         ConversionKind(conversionKind) {}
 
 public:
@@ -2458,7 +2481,7 @@ class AllowCoercionToForceCast final : public ContextualMismatch {
   AllowCoercionToForceCast(ConstraintSystem &cs, Type fromType, Type toType,
                            ConstraintLocator *locator)
       : ContextualMismatch(cs, FixKind::AllowCoercionToForceCast, fromType,
-                           toType, locator, DiagnosticBehavior::Warning) {}
+                           toType, locator, FixBehavior::AlwaysWarning) {}
 
 public:
   std::string getName() const override {
@@ -2572,7 +2595,7 @@ class SpecifyLabelToAssociateTrailingClosure final : public ConstraintFix {
   SpecifyLabelToAssociateTrailingClosure(ConstraintSystem &cs,
                                          ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::SpecifyLabelToAssociateTrailingClosure,
-                      locator, DiagnosticBehavior::Warning) {}
+                      locator, FixBehavior::AlwaysWarning) {}
 
 public:
   std::string getName() const override {
@@ -2742,7 +2765,7 @@ class SpecifyBaseTypeForOptionalUnresolvedMember final : public ConstraintFix {
                                              DeclNameRef memberName,
                                              ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::SpecifyBaseTypeForOptionalUnresolvedMember,
-                      locator, DiagnosticBehavior::Warning),
+                      locator, FixBehavior::AlwaysWarning),
         MemberName(memberName) {}
   DeclNameRef MemberName;
 
@@ -2773,7 +2796,7 @@ protected:
                                        CheckedCastKind kind,
                                        ConstraintLocator *locator)
       : ContextualMismatch(cs, fixKind, fromType, toType, locator,
-                           DiagnosticBehavior::Warning),
+                           FixBehavior::AlwaysWarning),
         CastKind(kind) {}
   CheckedCastKind CastKind;
 };
@@ -2932,7 +2955,7 @@ class AllowTupleLabelMismatch final : public ContextualMismatch {
   AllowTupleLabelMismatch(ConstraintSystem &cs, Type fromType, Type toType,
                           ConstraintLocator *locator)
       : ContextualMismatch(cs, FixKind::AllowTupleLabelMismatch, fromType,
-                           toType, locator, DiagnosticBehavior::Warning) {}
+                           toType, locator, FixBehavior::AlwaysWarning) {}
 
 public:
   std::string getName() const override { return "allow tuple label mismatch"; }
