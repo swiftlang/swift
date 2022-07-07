@@ -263,10 +263,14 @@ internal func zeroTrailingBytes(
     storage.0 = 0
     storage.1 = 0
   } else if len <= 8 {
-    storage.0 &= ((~0) &>> (8 &* (8 &- len)))
+    let mask0 = (UInt64(bitPattern: ~0) &>> (8 &* (8 &- len)))
+    //FIXME: Verify this on big-endian architecture
+    storage.0 &= mask0.littleEndian
     storage.1 = 0
   } else {
-    storage.1 &= ((~0) &>> (8 &* (16 &- len)))
+    let mask1 = (UInt64(bitPattern: ~0) &>> (8 &* (16 &- len)))
+    //FIXME: Verify this on big-endian architecture
+    storage.1 &= mask1.littleEndian
   }
 }
 
