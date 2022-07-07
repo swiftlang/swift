@@ -4341,23 +4341,37 @@ static void addUnavailableAttrs(ExtensionDecl *ext, NominalTypeDecl *nominal) {
   ASTContext &ctx = nominal->getASTContext();
   llvm::VersionTuple noVersion;
 
-  // Add platform-version-specific @available attributes.
-  for (auto available : nominal->getAttrs().getAttributes<AvailableAttr>()) {
-    if (available->Platform == PlatformKind::none)
-      continue;
+  // Add platform-version-specific @available attributes. Search from nominal
+  // type declaration through its enclosing declarations to find the first one
+  // with platform-specific attributes.
+  for (Decl *enclosing = nominal;
+       enclosing;
+       enclosing = enclosing->getDeclContext()
+           ? enclosing->getDeclContext()->getAsDecl()
+           : nullptr) {
+    bool anyPlatformSpecificAttrs = false;
+    for (auto available: enclosing->getAttrs().getAttributes<AvailableAttr>()) {
+      if (available->Platform == PlatformKind::none)
+        continue;
 
-    auto attr = new (ctx) AvailableAttr(
-        SourceLoc(), SourceRange(),
-        available->Platform,
-        available->Message,
-        "", nullptr,
-        available->Introduced.getValueOr(noVersion), SourceRange(),
-        available->Deprecated.getValueOr(noVersion), SourceRange(),
-        available->Obsoleted.getValueOr(noVersion), SourceRange(),
-        PlatformAgnosticAvailabilityKind::Unavailable,
-        /*implicit=*/true,
-        available->IsSPI);
-    ext->getAttrs().add(attr);
+      auto attr = new (ctx) AvailableAttr(
+          SourceLoc(), SourceRange(),
+          available->Platform,
+          available->Message,
+          "", nullptr,
+          available->Introduced.getValueOr(noVersion), SourceRange(),
+          available->Deprecated.getValueOr(noVersion), SourceRange(),
+          available->Obsoleted.getValueOr(noVersion), SourceRange(),
+          PlatformAgnosticAvailabilityKind::Unavailable,
+          /*implicit=*/true,
+          available->IsSPI);
+      ext->getAttrs().add(attr);
+      anyPlatformSpecificAttrs = true;
+    }
+
+    // If we found any platform-specific availability attributes, we're done.
+    if (anyPlatformSpecificAttrs)
+      break;
   }
 
   // Add the blanket "unavailable".
