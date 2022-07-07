@@ -1720,7 +1720,8 @@ namespace {
         return forceUnwrapIfExpected(result, memberLocator);
       }
 
-      if (member->getInterfaceType()->hasDynamicSelfType()) {
+      auto *func = dyn_cast<FuncDecl>(member);
+      if (func && func->getResultInterfaceType()->hasDynamicSelfType()) {
         refTy = refTy->replaceCovariantResultType(containerTy, 2);
         adjustedRefTy = adjustedRefTy->replaceCovariantResultType(
             containerTy, 2);
