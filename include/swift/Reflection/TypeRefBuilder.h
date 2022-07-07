@@ -312,12 +312,17 @@ struct ConformanceCollectionResult {
   std::vector<std::string> Errors;
 };
 
-struct AssociatedType {
+struct TypeAliasInfo {
   std::string TypeAliasName;
   std::string SubstitutedTypeMangledName;
   std::string SubstitutedTypeFullyQualifiedName;
   std::string SubstitutedTypeDiagnosticPrintName;
+};
+
+struct AssociatedType {
+  TypeAliasInfo SubstitutionInfo;
   std::vector<std::string> OpaqueTypeProtocolConformanceRequirements;
+  std::vector<TypeAliasInfo> OpaqueTypeSameTypeRequirements;
 };
 
 /// Info about all of a given type's associated types, as read out from an Image
@@ -1078,18 +1083,21 @@ public:
                                 /* useOpaqueTypeSymbolicReferences */ true);
 
             // If the substituted type is an opaque type, also gather info
-            // about which protocols it is required to conform to
-            std::vector<std::string> OpaqueTypeConformanceRequirements;
-            gatherConformanceRequirementsIfOpaque<ObjCInteropKind, PointerSize>(
-                substitutedDemangleTree, OpaqueTypeConformanceRequirements);
+            // about which protocols it is required to conform to and the corresponding
+            // same-type requirements
+            std::vector<std::string> opaqueTypeConformanceRequirements;
+            std::vector<TypeAliasInfo> sameTypeRequirements;
+            gatherOpaqueTypeRequirements<ObjCInteropKind, PointerSize>(
+                substitutedDemangleTree, opaqueTypeConformanceRequirements,
+                sameTypeRequirements);
 
             auto substitutedTypeName = nodeToString(substitutedDemangleTree);
             std::stringstream OS;
             dumpTypeRef(substitutedTypeRef, OS);
-            associatedTypes.emplace_back(
-                AssociatedType{typealiasTypeName, mangledSubstitutedTypeName,
-                               substitutedTypeName, OS.str(),
-                               OpaqueTypeConformanceRequirements});
+            associatedTypes.emplace_back(AssociatedType{
+                TypeAliasInfo{typealiasTypeName, mangledSubstitutedTypeName,
+                              substitutedTypeName, OS.str()},
+                opaqueTypeConformanceRequirements, sameTypeRequirements});
           }
           result.AssociatedTypeInfos.emplace_back(AssociatedTypeInfo{
               mangledTypeName, typeName, protocolName, associatedTypes});
@@ -1101,9 +1109,10 @@ public:
 
   template <template <typename Runtime> class ObjCInteropKind,
             unsigned PointerSize>
-  void gatherConformanceRequirementsIfOpaque(
+  void gatherOpaqueTypeRequirements(
       Demangle::Node *substitutedTypeDemangleTree,
-      std::vector<std::string> &OpaqueTypeConformanceRequirements) {
+      std::vector<std::string> &opaqueTypeConformanceRequirements,
+      std::vector<TypeAliasInfo> &sameTypeRequirements) {
     // With unresolved opaque symbolic references, the demangle tree we
     // extract the opaque type descriptor's address from is of the form:
     // kind=Type
@@ -1117,9 +1126,10 @@ public:
         auto opaqueTypeChildDemangleTree = childDemangleTree->getFirstChild();
         if (opaqueTypeChildDemangleTree->getKind() ==
             Node::Kind::OpaqueTypeDescriptorSymbolicReference) {
-          OpaqueTypeConformanceRequirements =
-              collectOpaqueTypeConformanceNames<ObjCInteropKind, PointerSize>(
-                  opaqueTypeChildDemangleTree->getIndex());
+          extractOpaqueTypeProtocolRequirements<ObjCInteropKind, PointerSize>(
+            opaqueTypeChildDemangleTree->getIndex(),
+            opaqueTypeConformanceRequirements,
+            sameTypeRequirements);
         }
       }
     }
@@ -1536,14 +1546,26 @@ private:
       stream << "- " << info.FullyQualifiedName << " : "
              << info.ProtocolFullyQualifiedName << "\n";
       for (const auto &typeAlias : info.AssociatedTypes) {
-        stream << "typealias " << typeAlias.TypeAliasName << " = "
-               << typeAlias.SubstitutedTypeFullyQualifiedName << "\n";
-        stream << typeAlias.SubstitutedTypeDiagnosticPrintName;
+        stream << "typealias " << typeAlias.SubstitutionInfo.TypeAliasName << " = "
+               << typeAlias.SubstitutionInfo.SubstitutedTypeFullyQualifiedName << "\n";
+        stream << typeAlias.SubstitutionInfo.SubstitutedTypeDiagnosticPrintName;
         if (!typeAlias.OpaqueTypeProtocolConformanceRequirements.empty()) {
-          stream << "opaque type conformance requirements: \n";
+          stream << "-------------------------\n";
+          stream << "conformance requirements: \n";
           for (const auto &protocolName :
                typeAlias.OpaqueTypeProtocolConformanceRequirements) {
             stream << protocolName << "\n";
+          }
+        }
+        if (!typeAlias.OpaqueTypeSameTypeRequirements.empty()) {
+          stream << "-----------------------\n";
+          stream << "same-type requirements: \n";
+          for (const auto &sameTypeRequirementInfo :
+               typeAlias.OpaqueTypeSameTypeRequirements) {
+            stream << sameTypeRequirementInfo.TypeAliasName << " = "
+                   << sameTypeRequirementInfo.SubstitutedTypeMangledName << " ("
+                   << sameTypeRequirementInfo.SubstitutedTypeFullyQualifiedName
+                   << ")\n";
           }
         }
       }
@@ -1553,14 +1575,15 @@ private:
 
   template <template <typename Runtime> class ObjCInteropKind,
             unsigned PointerSize>
-  std::vector<std::string>
-  collectOpaqueTypeConformanceNames(uintptr_t opaqueTypeDescriptorAddress) {
-    std::vector<std::string> result;
+  void extractOpaqueTypeProtocolRequirements(
+      uintptr_t opaqueTypeDescriptorAddress,
+      std::vector<std::string> &protocolRequirements,
+      std::vector<TypeAliasInfo> &sameTypeRequirements) {
     auto opaqueTypeDescriptorBytes = OpaqueByteReader(
         remote::RemoteAddress(opaqueTypeDescriptorAddress),
         sizeof(ExternalOpaqueTypeDescriptor<ObjCInteropKind, PointerSize>));
     if (!opaqueTypeDescriptorBytes.get()) {
-      return result;
+      return;
     }
     const ExternalOpaqueTypeDescriptor<ObjCInteropKind, PointerSize>
         *opaqueTypeDescriptor =
@@ -1568,8 +1591,25 @@ private:
                 opaqueTypeDescriptorBytes.get();
 
     if (!opaqueTypeDescriptor) {
-      return result;
+      return;
     }
+
+    // Given that at a given offset from the opaque type descriptor base there
+    // is an offset to a TypeRef string, read it.
+    auto readRequirementTypeRefAddress =
+        [&](uintptr_t offsetFromOpaqueDescBase,
+            uintptr_t requirementAddress) -> uint32_t {
+      std::string typeRefString = "";
+      auto fieldOffsetOffset = requirementAddress + offsetFromOpaqueDescBase -
+                               (uintptr_t)opaqueTypeDescriptor;
+      auto fieldOffsetAddress = opaqueTypeDescriptorAddress + fieldOffsetOffset;
+      auto fieldOffsetBytes = OpaqueByteReader(
+          remote::RemoteAddress(fieldOffsetAddress), sizeof(uint32_t));
+      auto fieldOffset = (const int32_t *)fieldOffsetBytes.get();
+      auto fieldAddress = detail::applyRelativeOffset(
+          (const char *)fieldOffsetAddress, *fieldOffset);
+      return fieldAddress;
+    };
 
     for (const auto &req : opaqueTypeDescriptor->getGenericRequirements()) {
       if (req.getKind() == GenericRequirementKind::Protocol) {
@@ -1596,10 +1636,32 @@ private:
         auto conformanceRequirementProtocolName =
             nameReader.readFullyQualifiedProtocolName(
                 protocolDescriptorAddress);
-        result.push_back(*conformanceRequirementProtocolName);
+        protocolRequirements.push_back(*conformanceRequirementProtocolName);
+      }
+      if (req.getKind() == GenericRequirementKind::SameType) {
+        // Read Param Name
+        auto paramAddress = readRequirementTypeRefAddress(req.getParamOffset(),
+                                                          (uintptr_t)(&req));
+        std::string demangledParamName =
+            nodeToString(demangleTypeRef(readTypeRef(paramAddress)));
+
+        // Read the substituted Type Name
+        auto typeAddress = readRequirementTypeRefAddress(
+            req.getSameTypeNameOffset(), (uintptr_t)(&req));
+        auto typeTypeRef = readTypeRef(typeAddress);
+        std::string demangledTypeName =
+            nodeToString(demangleTypeRef(typeTypeRef));
+        std::string mangledTypeName;
+        auto typeMangling = Demangle::mangleNode(demangleTypeRef(typeTypeRef));
+        if (!typeMangling.isSuccess())
+          mangledTypeName = "";
+        else
+          mangledTypeName = typeMangling.result();
+        sameTypeRequirements.push_back(TypeAliasInfo{
+            demangledParamName, mangledTypeName, demangledTypeName, ""});
       }
     }
-    return result;
+    return;
   }
 
   ///
@@ -1667,8 +1729,10 @@ private:
           (const char *)contextDescriptorFieldAddress,
           *contextDescriptorOffset);
 
-      // Instead of a type descriptor this may just be a reference to an external, check that first
-      if (auto symbol = OpaqueDynamicSymbolResolver(remote::RemoteAddress(contextTypeDescriptorAddress))) {
+      // Instead of a type descriptor this may just be a reference to an
+      // external, check that first
+      if (auto symbol = OpaqueDynamicSymbolResolver(
+              remote::RemoteAddress(contextTypeDescriptorAddress))) {
         if (!symbol->isResolved()) {
           Demangle::Context Ctx;
           auto demangledRoot =

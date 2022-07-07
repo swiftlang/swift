@@ -10,16 +10,19 @@
 // RUN: %target-swift-reflection-dump -binary-filename %t/AssociatedTypeRequirements | %FileCheck %s
 
 // CHECK: ASSOCIATED TYPES:
-// CHECK-NEXT: =============
-// CHECK-NEXT: - AssociatedTypeRequirements.Foo : AssociatedTypeRequirements.myProto
+// CHECK: - AssociatedTypeRequirements.Foo : AssociatedTypeRequirements.myProto
 // CHECK-NEXT: typealias PerformReturn = opaque type symbolic reference
 // CHECK-NEXT: opaque type symbolic reference
-// CHECK-NEXT: (struct AssociatedTypeRequirements.Bar)
+// CHECK-NEXT: (bound_generic_struct AssociatedTypeRequirements.Bar
 
-// CHECK: opaque type conformance requirements:
+// CHECK: conformance requirements:
 // CHECK-NEXT: AssociatedTypeRequirements.protoA
 // CHECK-NEXT: AssociatedTypeRequirements.protoB
 // CHECK-NEXT: testModB.testModBProtocol
+
+// CHECK: same-type requirements:
+// CHECK-NEXT: A.AssociatedTypeRequirements.protoB.K = Sf (Swift.Float)
+// CHECK-NEXT: A.AssociatedTypeRequirements.protoA.T = 8testModB0aB7BStructV (testModB.testModBStruct)
 
 import testModB
 
@@ -27,13 +30,20 @@ public protocol myProto {
     associatedtype PerformReturn
     func perform() -> PerformReturn
 }
-public protocol protoA {}
-public protocol protoB {}
-
-public struct Bar : protoA, protoB, testModBProtocol {}
-
-public struct Foo : myProto {
-    public func perform() -> some protoA & protoB & testModBProtocol { return baz() }
+public protocol protoA<T> {
+    associatedtype T
+}
+public protocol protoB<K> {
+    associatedtype K
 }
 
-private func baz() -> some protoA & protoB & testModBProtocol { return Bar() }
+public struct Bar<M, N> : protoA, protoB, testModBProtocol {
+    public typealias T = M
+    public typealias K = N
+}
+
+public struct Foo : myProto {
+    public func perform() -> some protoA<testModBStruct> & protoB<Float> & testModBProtocol { return baz() }
+}
+
+private func baz() -> some protoA<testModBStruct> & protoB<Float> & testModBProtocol { return Bar<testModBStruct, Float>() }
