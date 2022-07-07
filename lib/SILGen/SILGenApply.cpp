@@ -1282,7 +1282,10 @@ public:
     CanType superFormalType = arg->getType()->getCanonicalType();
 
     // The callee for a super call has to be either a method or constructor.
+    // There might be one level of conversion in between.
     Expr *fn = apply->getFn();
+    if (auto fnConv = dyn_cast<FunctionConversionExpr>(fn))
+      fn = fnConv->getSubExpr();
     SubstitutionMap substitutions;
     SILDeclRef constant;
     if (auto *ctorRef = dyn_cast<OtherConstructorDeclRefExpr>(fn)) {
