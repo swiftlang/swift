@@ -2442,6 +2442,9 @@ RestrictedImportKind SourceFile::getRestrictedImportKind(const ModuleDecl *modul
   auto &imports = getASTContext().getImportCache();
   RestrictedImportKind importKind = RestrictedImportKind::Implicit;
 
+  if (module->getName().str() == CLANG_HEADER_MODULE_NAME)
+    return RestrictedImportKind::None;
+
   // Look at the imports of this source file.
   for (auto &desc : *Imports) {
     // Ignore implementation-only imports.
