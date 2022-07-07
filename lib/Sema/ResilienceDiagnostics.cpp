@@ -146,16 +146,7 @@ TypeChecker::diagnoseDeclRefExportability(SourceLoc loc,
 
     D->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
   } else {
-    // Only implicitly imported decls should be reported as a warning,
-    // and only for language versions below Swift 6.
-    assert(downgradeToWarning == DowngradeToWarning::No ||
-           originKind == DisallowedOriginKind::ImplicitlyImported &&
-           "Only implicitly imported decls should be reported as a warning.");
-    auto errorOrWarning = downgradeToWarning == DowngradeToWarning::Yes?
-                              diag::inlinable_decl_ref_from_hidden_module_warn:
-                              diag::inlinable_decl_ref_from_hidden_module;
-
-    ctx.Diags.diagnose(loc, errorOrWarning,
+    ctx.Diags.diagnose(loc, diag::inlinable_decl_ref_from_hidden_module,
                        D->getDescriptiveKind(), D->getName(),
                        fragileKind.getSelector(), definingModule->getName(),
                        static_cast<unsigned>(originKind));

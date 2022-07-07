@@ -2442,18 +2442,14 @@ bool SourceFile::hasTestableOrPrivateImport(
 
 RestrictedImportKind SourceFile::getRestrictedImportKind(const ModuleDecl *module) const {
   auto &imports = getASTContext().getImportCache();
-  RestrictedImportKind importKind = RestrictedImportKind::Implicit;
 
   // Look at the imports of this source file.
   for (auto &desc : *Imports) {
     // Ignore implementation-only imports.
-    if (desc.options.contains(ImportFlags::ImplementationOnly)) {
-      if (imports.isImportedBy(module, desc.module.importedModule))
-        importKind = RestrictedImportKind::ImplementationOnly;
+    if (desc.options.contains(ImportFlags::ImplementationOnly))
       continue;
-    }
 
-    // If the module is imported publicly, it's not imported
+    // If the module is imported this way, it's not imported
     // implementation-only.
     if (imports.isImportedBy(module, desc.module.importedModule))
       return RestrictedImportKind::None;
@@ -2463,7 +2459,7 @@ RestrictedImportKind SourceFile::getRestrictedImportKind(const ModuleDecl *modul
   if (imports.isImportedBy(module, getParentModule()))
     return RestrictedImportKind::None;
 
-  return importKind;
+  return RestrictedImportKind::ImplementationOnly;
 }
 
 bool ModuleDecl::isImportedImplementationOnly(const ModuleDecl *module) const {
