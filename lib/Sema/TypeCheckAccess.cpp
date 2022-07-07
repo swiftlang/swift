@@ -1540,12 +1540,9 @@ swift::getDisallowedOriginKind(const Decl *decl,
             continue;
           }
         }
-        auto owningModule = redecl->getOwningModule();
-        if (!owningModule)
-          continue;
         auto moduleWrapper =
             decl->getASTContext().getClangModuleLoader()->getWrapperForModule(
-                owningModule);
+                redecl->getOwningModule());
         auto visibleAccessPath =
             find_if(sfImportedModules, [&moduleWrapper](auto importedModule) {
               return importedModule.importedModule == moduleWrapper ||
