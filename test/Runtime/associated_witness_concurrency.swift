@@ -3,6 +3,7 @@
 // RUN: %target-run %t
 // REQUIRES: libdispatch
 // REQUIRES: executable_test
+// UNSUPPORTED: threading_none
 
 import Dispatch
 
