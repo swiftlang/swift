@@ -2901,7 +2901,7 @@ ERROR(decl_from_hidden_module,none,
       "%select{%3 has been imported as implementation-only|"
       "it is an SPI imported from %3|"
       "it is SPI|"
-      "%3 was not imported by this file}4",
+      "%3 was implicitly imported}4",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
 WARNING(decl_from_hidden_module_warn,none,
       "cannot use %0 %1 %select{here|as property wrapper here|"
@@ -2910,7 +2910,7 @@ WARNING(decl_from_hidden_module_warn,none,
       "in an extension with conditional conformances}2; "
       "%select{%3 has been imported as implementation-only|"
       "<<ERROR>>|<<ERROR>>|"
-      "%3 was not imported by this file}4",
+      "%3 was implicitly imported}4",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
 ERROR(conformance_from_implementation_only_module,none,
       "cannot use conformance of %0 to %1 %select{here|as property wrapper here|"
@@ -5786,13 +5786,13 @@ ERROR(inlinable_decl_ref_from_hidden_module,
       "because %select{%3 was imported implementation-only|"
       "it is an SPI imported from %3|"
       "it is SPI|"
-      "%3 was not imported by this file}4",
+      "%3 was implicitly imported}4",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
 
 WARNING(inlinable_decl_ref_from_hidden_module_warn,
       none, "%0 %1 cannot be used in " FRAGILE_FUNC_KIND "2 "
       "because %select{<<ERROR>>|<<ERROR>>|<<ERROR>>|"
-      "%3 was not imported by this file}4"
+      "%3 was implicitly imported}4"
       "; this is an error in Swift 6",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
 
