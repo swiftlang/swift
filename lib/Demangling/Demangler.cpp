@@ -3040,6 +3040,7 @@ NodePointer Demangler::addFuncSpecParamNumber(NodePointer Param,
 }
 
 NodePointer Demangler::demangleSpecAttributes(Node::Kind SpecKind) {
+  bool metatypeParamsRemoved = nextIf('m');
   bool isSerialized = nextIf('q');
 
   int PassID = (int)nextChar() - '0';
@@ -3047,6 +3048,10 @@ NodePointer Demangler::demangleSpecAttributes(Node::Kind SpecKind) {
     return nullptr;
 
   NodePointer SpecNd = createNode(SpecKind);
+
+  if (metatypeParamsRemoved)
+    SpecNd->addChild(createNode(Node::Kind::MetatypeParamsRemoved), *this);
+
   if (isSerialized)
     SpecNd->addChild(createNode(Node::Kind::IsSerialized),
                      *this);
