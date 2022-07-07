@@ -2903,8 +2903,8 @@ ERROR(decl_from_hidden_module,none,
       "it is SPI}4",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
 WARNING(decl_from_hidden_module_warn,none,
-      "cannot use %0 %1 %select{here|as property wrapper here|"
-      "as result builder here|"
+      "cannot use %0 %1 %select{in SPI|as property wrapper in SPI|"
+      "as result builder in SPI|"
       "in an extension with public or '@usableFromInline' members|"
       "in an extension with conditional conformances}2; "
       "%select{%3 has been imported as implementation-only}4",
