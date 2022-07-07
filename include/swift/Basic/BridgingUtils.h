@@ -46,22 +46,6 @@ getBridgedCharSourceRange(const CharSourceRange &range) {
   return {range.getStart(), range.getByteLength()};
 }
 
-/// Copies the string in an malloc'ed memory and the caller is responsible for
-/// freeing it. 'freeBridgedStringRef()' is available in 'BasicBridging.h'
-inline BridgedStringRef
-getCopiedBridgedStringRef(std::string str, bool removeTrailingNewline = false) {
-  // A couple of mallocs are needed for passing a std::string to Swift. But
-  // it's currently only used or debug descriptions. So, its' maybe not so bad -
-  // for now.
-  // TODO: find a better way to pass std::strings to Swift.
-  llvm::StringRef strRef(str);
-  if (removeTrailingNewline)
-    strRef.consume_back("\n");
-  llvm::MallocAllocator allocator;
-  llvm::StringRef copy = strRef.copy(allocator);
-  return getBridgedStringRef(copy);
-}
-
 } // namespace swift
 
 #endif
