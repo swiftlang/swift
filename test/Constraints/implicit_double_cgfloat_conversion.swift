@@ -253,10 +253,12 @@ func assignments_with_and_without_optionals() {
     var prop: CGFloat = 0
   }
 
-  func test(c: C?, v: Double) {
+  func test(c: C?, v: Double, cgf: CGFloat) {
     c?.prop = v / 2.0 // Ok
+    c?.prop = (false ? cgf : v)
 
     let copy = c!
     copy.prop = Optional(v) ?? 0 // Ok
+    copy.prop = (true ? cgf : (false ? v : cgf))
   }
 }

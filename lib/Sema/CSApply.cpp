@@ -3735,10 +3735,12 @@ namespace {
       expr->setCondExpr(cond);
 
       // Coerce the then/else branches to the common type.
-      expr->setThenExpr(coerceToType(expr->getThenExpr(), resultTy,
-                               cs.getConstraintLocator(expr->getThenExpr())));
-      expr->setElseExpr(coerceToType(expr->getElseExpr(), resultTy,
-                                 cs.getConstraintLocator(expr->getElseExpr())));
+      expr->setThenExpr(coerceToType(
+          expr->getThenExpr(), resultTy,
+          cs.getConstraintLocator(expr, LocatorPathElt::TernaryBranch(true))));
+      expr->setElseExpr(coerceToType(
+          expr->getElseExpr(), resultTy,
+          cs.getConstraintLocator(expr, LocatorPathElt::TernaryBranch(false))));
 
       return expr;
     }
