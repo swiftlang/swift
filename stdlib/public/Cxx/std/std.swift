@@ -12,3 +12,5 @@
 
 @_exported import std // Clang module
 @_exported import Cxx // Swift module
+
+public var dummy: Int = 1
