@@ -157,6 +157,18 @@ public:
     return offsetof(typename std::remove_reference<decltype(*this)>::type, Protocol);
   }
 
+  /// Retreive the offset to the Type field
+  constexpr inline auto
+  getSameTypeNameOffset() const -> typename Runtime::StoredSize {
+    return offsetof(typename std::remove_reference<decltype(*this)>::type, Type);
+  }
+
+  /// Retreive the offset to the Type field
+  constexpr inline auto
+  getParamOffset() const -> typename Runtime::StoredSize {
+    return offsetof(typename std::remove_reference<decltype(*this)>::type, Param);
+  }
+
   /// Retrieve the right-hand type for a SameType or BaseClass requirement.
   llvm::StringRef getMangledTypeName() const {
     assert(getKind() == GenericRequirementKind::SameType ||

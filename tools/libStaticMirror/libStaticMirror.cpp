@@ -176,13 +176,13 @@ convertAssociatedTypeQueryResult(
       swift_static_mirror_type_alias_s *typeAliasDetails =
           new swift_static_mirror_type_alias_s;
       typeAliasDetails->type_alias_name = swift::c_string_utils::create_clone(
-          typeAliasInfo.TypeAliasName.c_str());
+          typeAliasInfo.SubstitutionInfo.TypeAliasName.c_str());
       typeAliasDetails->substituted_type_name =
           swift::c_string_utils::create_clone(
-              typeAliasInfo.SubstitutedTypeFullyQualifiedName.c_str());
+              typeAliasInfo.SubstitutionInfo.SubstitutedTypeFullyQualifiedName.c_str());
       typeAliasDetails->substituted_type_mangled_name =
           swift::c_string_utils::create_clone(
-              typeAliasInfo.SubstitutedTypeMangledName.c_str());
+              typeAliasInfo.SubstitutionInfo.SubstitutedTypeMangledName.c_str());
       info->type_alias_set->type_aliases[typealiasIndex] = typeAliasDetails;
       typealiasIndex += 1;
       typeAliasDetails->opaque_requirements_set =
