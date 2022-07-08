@@ -440,66 +440,6 @@ ClangImporter::~ClangImporter() {
 
 #pragma mark Module loading
 
-static Optional<StringRef> getModuleMapFilePath(StringRef name,
-                                                SearchPathOptions &Opts,
-                                                llvm::Triple triple,
-                                                SmallVectorImpl<char> &buffer) {
-  StringRef platform = swift::getPlatformNameForTriple(triple);
-  StringRef arch = swift::getMajorArchitectureName(triple);
-
-  StringRef SDKPath = Opts.getSDKPath();
-  if (!SDKPath.empty()) {
-    buffer.clear();
-    buffer.append(SDKPath.begin(), SDKPath.end());
-    llvm::sys::path::append(buffer, "usr", "lib", "swift");
-    llvm::sys::path::append(buffer, platform, arch, name);
-
-    // Only specify the module map if that file actually exists.  It may not;
-    // for example in the case that `swiftc -target x86_64-unknown-linux-gnu
-    // -emit-ir` is invoked using a Swift compiler not built for Linux targets.
-    if (llvm::sys::fs::exists(buffer))
-      return StringRef(buffer.data(), buffer.size());
-  }
-
-  if (!Opts.RuntimeResourcePath.empty()) {
-    buffer.clear();
-    buffer.append(Opts.RuntimeResourcePath.begin(),
-                  Opts.RuntimeResourcePath.end());
-    llvm::sys::path::append(buffer, platform, arch, name);
-
-    // Only specify the module map if that file actually exists.  It may not;
-    // for example in the case that `swiftc -target x86_64-unknown-linux-gnu
-    // -emit-ir` is invoked using a Swift compiler not built for Linux targets.
-    if (llvm::sys::fs::exists(buffer))
-      return StringRef(buffer.data(), buffer.size());
-  }
-
-  return None;
-}
-
-/// Finds the glibc.modulemap file relative to the provided resource dir.
-///
-/// Note that the module map used for Glibc depends on the target we're
-/// compiling for, and is not included in the resource directory with the other
-/// implicit module maps. It's at {freebsd|linux}/{arch}/glibc.modulemap.
-static Optional<StringRef>
-getGlibcModuleMapPath(SearchPathOptions &Opts, llvm::Triple triple,
-                      SmallVectorImpl<char> &buffer) {
-  return getModuleMapFilePath("glibc.modulemap", Opts, triple, buffer);
-}
-
-static Optional<StringRef>
-getLibStdCxxModuleMapPath(SearchPathOptions &opts, llvm::Triple triple,
-                          SmallVectorImpl<char> &buffer) {
-  return getModuleMapFilePath("libstdcxx.modulemap", opts, triple, buffer);
-}
-
-static Optional<StringRef>
-getLibShimCxxModuleMapPath(SearchPathOptions &Opts, llvm::Triple triple,
-                           SmallVectorImpl<char> &buffer) {
-  return getModuleMapFilePath("libcxxshim.modulemap", Opts, triple, buffer);
-}
-
 static bool clangSupportsPragmaAttributeWithSwiftAttr() {
   clang::AttributeCommonInfo swiftAttrInfo(clang::SourceRange(),
      clang::AttributeCommonInfo::AT_SwiftAttr,
@@ -613,8 +553,7 @@ importer::getNormalInvocationArguments(
     });
   }
 
-  SmallString<128> buffer;
-  if (auto path = getLibShimCxxModuleMapPath(searchPathOpts, triple, buffer)) {
+  if (auto path = getCxxShimModuleMapPath(searchPathOpts, triple)) {
     invocationArgStrs.push_back((Twine("-fmodule-map-file=") + *path).str());
   }
 

@@ -91,6 +91,12 @@ getLibStdCxxModuleMapPath(SearchPathOptions &opts, const llvm::Triple &triple) {
   return getActualModuleMapPath("libstdcxx.modulemap", opts, triple);
 }
 
+Optional<SmallString<128>>
+swift::getCxxShimModuleMapPath(SearchPathOptions &opts,
+                               const llvm::Triple &triple) {
+  return getActualModuleMapPath("libcxxshim.modulemap", opts, triple);
+}
+
 static llvm::opt::InputArgList
 parseClangDriverArgs(const clang::driver::Driver &clangDriver,
                      const ArrayRef<const char *> args) {
