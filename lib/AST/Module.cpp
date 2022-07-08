@@ -792,15 +792,33 @@ bool ModuleDecl::shouldCollectDisplayDecls() const {
   return true;
 }
 
-void swift::collectParsedExportedImports(const ModuleDecl *M, SmallPtrSetImpl<ModuleDecl *> &Imports) {
+void swift::collectParsedExportedImports(const ModuleDecl *M,
+                                         SmallPtrSetImpl<ModuleDecl *> &Imports,
+                                         llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> &QualifiedImports) {
   for (const FileUnit *file : M->getFiles()) {
     if (const SourceFile *source = dyn_cast<SourceFile>(file)) {
       if (source->hasImports()) {
         for (auto import : source->getImports()) {
           if (import.options.contains(ImportFlags::Exported) &&
-              !Imports.contains(import.module.importedModule) &&
               import.module.importedModule->shouldCollectDisplayDecls()) {
-            Imports.insert(import.module.importedModule);
+            auto *TheModule = import.module.importedModule;
+
+            if (import.module.getAccessPath().size() > 0) {
+              if (QualifiedImports.find(TheModule) == QualifiedImports.end()) {
+                QualifiedImports.try_emplace(TheModule);
+              }
+              auto collectDecls = [&](ValueDecl *VD,
+                                      DeclVisibilityKind reason) {
+                if (reason == DeclVisibilityKind::VisibleAtTopLevel)
+                  QualifiedImports[TheModule].insert(VD);
+              };
+              auto consumer = makeDeclConsumer(std::move(collectDecls));
+              TheModule->lookupVisibleDecls(
+                  import.module.getAccessPath(), consumer,
+                  NLKind::UnqualifiedLookup);
+            } else if (!Imports.contains(TheModule)) {
+              Imports.insert(TheModule);
+            }
           }
         }
       }
@@ -956,7 +974,12 @@ SourceFile::getExternalRawLocsForDecl(const Decl *D) const {
 void ModuleDecl::getDisplayDecls(SmallVectorImpl<Decl*> &Results, bool Recursive) const {
   if (Recursive && isParsedModule(this)) {
     SmallPtrSet<ModuleDecl *, 4> Modules;
-    collectParsedExportedImports(this, Modules);
+    llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> QualifiedImports;
+    collectParsedExportedImports(this, Modules, QualifiedImports);
+    for (const auto &QI : QualifiedImports) {
+      auto &Decls = QI.getSecond();
+      Results.append(Decls.begin(), Decls.end());
+    }
     for (const ModuleDecl *import : Modules) {
       import->getDisplayDecls(Results, Recursive);
     }
