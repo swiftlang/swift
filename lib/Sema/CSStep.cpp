@@ -486,23 +486,6 @@ StepResult ComponentStep::finalize(bool isSuccess) {
 
 void TypeVariableStep::setup() {
   ++CS.solverState->NumTypeVariablesBound;
-  if (CS.isDebugMode()) {
-    PrintOptions PO;
-    PO.PrintTypesForDebugging = true;
-    auto &log = getDebugLogger();
-
-    auto initialBindings = Producer.getCurrentBindings();
-    log << "Initial bindings: ";
-    interleave(
-        initialBindings.begin(), initialBindings.end(),
-        [&](const Binding &binding) {
-          log << TypeVar->getString(PO)
-              << " := " << binding.BindingType->getString(PO);
-        },
-        [&log] { log << ", "; });
-
-    log << '\n';
-  }
 }
 
 bool TypeVariableStep::attempt(const TypeVariableBinding &choice) {
