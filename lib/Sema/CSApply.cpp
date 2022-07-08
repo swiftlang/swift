@@ -5638,25 +5638,22 @@ static bool hasCurriedSelf(ConstraintSystem &cs, ConcreteDeclRef callee,
 
 /// Apply the contextually Sendable flag to the given expression,
 static void applyContextualClosureFlags(
-      Expr *expr, bool implicitSelfCapture, bool inheritActorContext,
-      bool isolatedByPreconcurrency) {
+      Expr *expr, bool implicitSelfCapture, bool inheritActorContext) {
   if (auto closure = dyn_cast<ClosureExpr>(expr)) {
     closure->setAllowsImplicitSelfCapture(implicitSelfCapture);
     closure->setInheritsActorContext(inheritActorContext);
-    closure->setIsolatedByPreconcurrency(isolatedByPreconcurrency);
     return;
   }
 
   if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
     applyContextualClosureFlags(
         captureList->getClosureBody(), implicitSelfCapture,
-        inheritActorContext, isolatedByPreconcurrency);
+        inheritActorContext);
   }
 
   if (auto identity = dyn_cast<IdentityExpr>(expr)) {
     applyContextualClosureFlags(
-        identity->getSubExpr(), implicitSelfCapture, inheritActorContext,
-        isolatedByPreconcurrency);
+        identity->getSubExpr(), implicitSelfCapture, inheritActorContext);
   }
 }
 
@@ -5683,8 +5680,6 @@ ArgumentList *ExprRewriter::coerceCallArguments(
   // Determine the parameter bindings.
   ParameterListInfo paramInfo(params, callee.getDecl(), skipCurriedSelf);
 
-  bool preconcurrency = callee && callee.getDecl()->preconcurrency();
-
   // If this application is an init(wrappedValue:) call that needs an injected
   // wrapped value placeholder, the first non-defaulted argument must be
   // wrapped in an OpaqueValueExpr.
@@ -5707,14 +5702,6 @@ ArgumentList *ExprRewriter::coerceCallArguments(
   auto matches = args->matches(params, [&](Expr *E) { return cs.getType(E); });
   if (matches && !shouldInjectWrappedValuePlaceholder &&
       !paramInfo.anyContextualInfo()) {
-    // Propagate preconcurrency to any closure arguments.
-    if (preconcurrency) {
-      for (const auto &arg : *args) {
-        Expr *argExpr = arg.getExpr();
-        applyContextualClosureFlags(argExpr, false, false, preconcurrency);
-      }
-    }
-
     return args;
   }
 
@@ -5865,7 +5852,7 @@ ArgumentList *ExprRewriter::coerceCallArguments(
     bool isImplicitSelfCapture = paramInfo.isImplicitSelfCapture(paramIdx);
     bool inheritsActorContext = paramInfo.inheritsActorContext(paramIdx);
     applyContextualClosureFlags(
-        argExpr, isImplicitSelfCapture, inheritsActorContext, preconcurrency);
+        argExpr, isImplicitSelfCapture, inheritsActorContext);
 
     // If the types exactly match, this is easy.
     auto paramType = param.getOldType();
