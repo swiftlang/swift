@@ -819,7 +819,7 @@ public:
 
 /// Describes an aspect of a solution that affects its overall score, i.e., a
 /// user-defined conversions.
-enum ScoreKind {
+enum ScoreKind: unsigned int {
   // These values are used as indices into a Score value.
 
   /// A fix needs to be applied to the source.
@@ -1319,6 +1319,10 @@ public:
 
   /// The set of parameters that have been inferred to be 'isolated'.
   llvm::SmallVector<ParamDecl *, 2> isolatedParams;
+
+  /// The set of closures that have been inferred to be "isolated by
+  /// preconcurrency".
+  llvm::SmallVector<const ClosureExpr *, 2> preconcurrencyClosures;
 
   /// The set of functions that have been transformed by a result builder.
   llvm::MapVector<AnyFunctionRef, AppliedBuilderTransform>
@@ -2519,6 +2523,13 @@ struct GetClosureType {
   Type operator()(const AbstractClosureExpr *expr) const;
 };
 
+/// Retrieve the closure type from the constraint system.
+struct ClosureIsolatedByPreconcurrency {
+  ConstraintSystem &cs;
+
+  bool operator()(const ClosureExpr *expr) const;
+};
+
 /// Describes the type produced when referencing a declaration.
 struct DeclReferenceType {
   /// The "opened" type, which is the type of the declaration where any
@@ -2573,6 +2584,7 @@ public:
   friend class ConjunctionElement;
   friend class RequirementFailure;
   friend class MissingMemberFailure;
+  friend struct ClosureIsolatedByPreconcurrency;
 
   class SolverScope;
 
@@ -2702,6 +2714,10 @@ private:
 
   /// The set of parameters that have been inferred to be 'isolated'.
   llvm::SmallSetVector<ParamDecl *, 2> isolatedParams;
+
+  /// The set of closures that have been inferred to be "isolated by
+  /// preconcurrency".
+  llvm::SmallSetVector<const ClosureExpr *, 2> preconcurrencyClosures;
 
   /// Maps closure parameters to type variables.
   llvm::DenseMap<const ParamDecl *, TypeVariableType *>
@@ -3272,6 +3288,9 @@ public:
 
     /// The length of \c isolatedParams.
     unsigned numIsolatedParams;
+
+    /// The length of \c PreconcurrencyClosures.
+    unsigned numPreconcurrencyClosures;
 
     /// The length of \c ImplicitValueConversions.
     unsigned numImplicitValueConversions;
@@ -4553,6 +4572,10 @@ public:
       llvm::function_ref<Type(const AbstractClosureExpr *)> getClosureType =
         [](const AbstractClosureExpr *) {
           return Type();
+        },
+      llvm::function_ref<bool(const ClosureExpr *)> isolatedByPreconcurrency =
+        [](const ClosureExpr *closure) {
+          return closure->isIsolatedByPreconcurrency();
         });
 
   /// Given the opened type and a pile of information about a member reference,

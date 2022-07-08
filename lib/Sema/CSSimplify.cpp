@@ -2717,42 +2717,47 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   }
 
   /// The behavior limit to apply to a concurrency check.
-  auto getConcurrencyDiagnosticBehavior = [&](bool forSendable) {
-    // We can only handle the downgrade for conversions.
-    switch (kind) {
-    case ConstraintKind::Conversion:
-    case ConstraintKind::ArgumentConversion:
-      break;
+  auto getConcurrencyFixBehavior = [&](
+        bool forSendable
+      ) -> Optional<FixBehavior> {
+        // We can only handle the downgrade for conversions.
+        switch (kind) {
+        case ConstraintKind::Conversion:
+        case ConstraintKind::ArgumentConversion:
+          break;
 
-    default:
-      return DiagnosticBehavior::Unspecified;
-    }
+        default:
+          if (!shouldAttemptFixes())
+            return None;
 
-    // For a @preconcurrency callee outside of a strict concurrency context,
-    // ignore.
-    if (hasPreconcurrencyCallee(this, locator) &&
-        !contextRequiresStrictConcurrencyChecking(DC, GetClosureType{*this}))
-      return DiagnosticBehavior::Ignore;
+          return FixBehavior::Error;
+        }
 
-    // Otherwise, warn until Swift 6.
-    if (!getASTContext().LangOpts.isSwiftVersionAtLeast(6))
-      return DiagnosticBehavior::Warning;
+        // For a @preconcurrency callee outside of a strict concurrency
+        // context, ignore.
+        if (hasPreconcurrencyCallee(this, locator) &&
+            !contextRequiresStrictConcurrencyChecking(DC, GetClosureType{*this}, ClosureIsolatedByPreconcurrency{*this}))
+          return FixBehavior::Suppress;
 
-    return DiagnosticBehavior::Unspecified;
+        // Otherwise, warn until Swift 6.
+        if (!getASTContext().LangOpts.isSwiftVersionAtLeast(6))
+          return FixBehavior::DowngradeToWarning;
+
+        return FixBehavior::Error;
   };
 
   // A @Sendable function can be a subtype of a non-@Sendable function.
   if (func1->isSendable() != func2->isSendable()) {
     // Cannot add '@Sendable'.
     if (func2->isSendable() || kind < ConstraintKind::Subtype) {
-      if (!shouldAttemptFixes())
+      if (auto fixBehavior = getConcurrencyFixBehavior(true)) {
+        auto *fix = AddSendableAttribute::create(
+            *this, func1, func2, getConstraintLocator(locator), *fixBehavior);
+        if (recordFix(fix))
+          return getTypeMatchFailure(locator);
+      } else {
         return getTypeMatchFailure(locator);
-
-      auto *fix = AddSendableAttribute::create(
-          *this, func1, func2, getConstraintLocator(locator),
-          getConcurrencyDiagnosticBehavior(true));
-      if (recordFix(fix))
-        return getTypeMatchFailure(locator);
+      }
     }
   }
 
@@ -2780,15 +2785,16 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
         return getTypeMatchFailure(locator);
     } else if (func1->getGlobalActor() && !func2->isAsync()) {
       // Cannot remove a global actor from a synchronous function.
-      if (!shouldAttemptFixes())
-        return getTypeMatchFailure(locator);
+      if (auto fixBehavior = getConcurrencyFixBehavior(false)) {
+        auto *fix = MarkGlobalActorFunction::create(
+            *this, func1, func2, getConstraintLocator(locator),
+            *fixBehavior);
 
-      auto *fix = MarkGlobalActorFunction::create(
-          *this, func1, func2, getConstraintLocator(locator),
-          getConcurrencyDiagnosticBehavior(false));
-
-      if (recordFix(fix))
+        if (recordFix(fix))
+          return getTypeMatchFailure(locator);
+      } else {
         return getTypeMatchFailure(locator);
+      }
     } else if (kind < ConstraintKind::Subtype) {
       return getTypeMatchFailure(locator);
     }
@@ -9832,6 +9838,10 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   auto *closure = castToExpr<ClosureExpr>(closureLocator->getAnchor());
   auto *inferredClosureType = getClosureType(closure);
 
+  // Note if this closure is isolated by preconcurrency.
+  if (hasPreconcurrencyCallee(this, locator))
+    preconcurrencyClosures.insert(closure);
+
   // Let's look through all optionals associated with contextual
   // type to make it possible to infer parameter/result type of
   // the closure faster e.g.:
@@ -12700,10 +12710,9 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
 
   // Record the fix.
 
-  // If this is just a warning, it shouldn't affect the solver. Otherwise,
-  // increase the score.
-  if (!fix->isWarning())
-    increaseScore(SK_Fix, impact);
+  // If this should affect the solution score, do so.
+  if (auto scoreKind = fix->affectsSolutionScore())
+    increaseScore(*scoreKind, impact);
 
   // If we've made the current solution worse than the best solution we've seen
   // already, stop now.
@@ -12723,10 +12732,10 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
   // its sub-expressions.
   llvm::SmallDenseSet<ASTNode> anchors;
   for (const auto *fix : Fixes) {
-    // Warning fixes shouldn't be considered because even if
-    // such fix is recorded at that anchor this should not
+    // Fixes that don't affect the score shouldn't be considered because even
+    // if such a fix is recorded at that anchor this should not
     // have any affect in the recording of any other fix.
-    if (fix->isWarning())
+    if (!fix->affectsSolutionScore())
       continue;
 
     anchors.insert(fix->getAnchor());

@@ -1229,6 +1229,12 @@ Type GetClosureType::operator()(const AbstractClosureExpr *expr) const {
   return Type();
 }
 
+bool
+ClosureIsolatedByPreconcurrency::operator()(const ClosureExpr *expr) const {
+  return expr->isIsolatedByPreconcurrency() ||
+      cs.preconcurrencyClosures.count(expr);
+}
+
 Type ConstraintSystem::getUnopenedTypeOfReference(
     VarDecl *value, Type baseType, DeclContext *UseDC,
     ConstraintLocator *memberLocator, bool wantInterfaceType) {
@@ -1244,20 +1250,22 @@ Type ConstraintSystem::getUnopenedTypeOfReference(
 
         return wantInterfaceType ? var->getInterfaceType() : var->getType();
       },
-      memberLocator, wantInterfaceType, GetClosureType{*this});
+      memberLocator, wantInterfaceType, GetClosureType{*this},
+      ClosureIsolatedByPreconcurrency{*this});
 }
 
 Type ConstraintSystem::getUnopenedTypeOfReference(
     VarDecl *value, Type baseType, DeclContext *UseDC,
     llvm::function_ref<Type(VarDecl *)> getType,
     ConstraintLocator *memberLocator, bool wantInterfaceType,
-    llvm::function_ref<Type(const AbstractClosureExpr *)> getClosureType) {
+    llvm::function_ref<Type(const AbstractClosureExpr *)> getClosureType,
+    llvm::function_ref<bool(const ClosureExpr *)> isolatedByPreconcurrency) {
   Type requestedType =
       getType(value)->getWithoutSpecifierType()->getReferenceStorageReferent();
 
   // Adjust the type for concurrency.
   requestedType = adjustVarTypeForConcurrency(
-      requestedType, value, UseDC, getClosureType);
+      requestedType, value, UseDC, getClosureType, isolatedByPreconcurrency);
 
   // If we're dealing with contextual types, and we referenced this type from
   // a different context, map the type.
@@ -1436,7 +1444,8 @@ AnyFunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
     unsigned numApplies, bool isMainDispatchQueue,
     OpenedTypeMap &replacements) {
   return swift::adjustFunctionTypeForConcurrency(
-      fnType, decl, dc, numApplies, isMainDispatchQueue, GetClosureType{*this},
+      fnType, decl, dc, numApplies, isMainDispatchQueue,
+      GetClosureType{*this}, ClosureIsolatedByPreconcurrency{*this},
       [&](Type type) {
         if (replacements.empty())
           return type;
@@ -2527,7 +2536,8 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
         type = withDynamicSelfResultReplaced(type, /*uncurryLevel=*/0);
       }
       type = adjustVarTypeForConcurrency(
-          type, var, useDC, GetClosureType{*this});
+          type, var, useDC, GetClosureType{*this},
+          ClosureIsolatedByPreconcurrency{*this});
     } else if (isa<AbstractFunctionDecl>(decl) || isa<EnumElementDecl>(decl)) {
       if (decl->isInstanceMember() &&
           (!overload.getBaseType() ||
@@ -4611,7 +4621,7 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
   // let's diagnose this as regular ambiguity.
   if (llvm::all_of(solutions, [](const Solution &solution) {
         return llvm::all_of(solution.Fixes, [](const ConstraintFix *fix) {
-          return fix->isWarning();
+          return fix->canApplySolution();
         });
       })) {
     return diagnoseAmbiguity(solutions);
@@ -4629,9 +4639,11 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
   llvm::SmallSetVector<FixInContext, 4> fixes;
   for (auto &solution : solutions) {
     for (auto *fix : solution.Fixes) {
+      // If the fix doesn't affect the solution score, it is not the
+      // source of ambiguity or failures.
       // Ignore warnings in favor of actual error fixes,
       // because they are not the source of ambiguity/failures.
-      if (fix->isWarning())
+      if (!fix->affectsSolutionScore())
         continue;
 
       fixes.insert({&solution, fix});

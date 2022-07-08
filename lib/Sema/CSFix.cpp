@@ -37,6 +37,22 @@ using namespace constraints;
 
 ConstraintFix::~ConstraintFix() {}
 
+Optional<ScoreKind> ConstraintFix::affectsSolutionScore() const {
+  switch (fixBehavior) {
+  case FixBehavior::AlwaysWarning:
+    return None;
+
+  case FixBehavior::Error:
+    return SK_Fix;
+
+  case FixBehavior::DowngradeToWarning:
+    return SK_DisfavoredOverload;
+
+  case FixBehavior::Suppress:
+    return None;
+  }
+}
+
 ASTNode ConstraintFix::getAnchor() const { return getLocator()->getAnchor(); }
 
 void ConstraintFix::print(llvm::raw_ostream &Out) const {
@@ -227,27 +243,27 @@ MarkExplicitlyEscaping::create(ConstraintSystem &cs, Type lhs, Type rhs,
 bool MarkGlobalActorFunction::diagnose(const Solution &solution,
                                        bool asNote) const {
   DroppedGlobalActorFunctionAttr failure(
-      solution, getFromType(), getToType(), getLocator(), diagBehaviorLimit());
+      solution, getFromType(), getToType(), getLocator(), diagfixBehavior());
   return failure.diagnose(asNote);
 }
 
 MarkGlobalActorFunction *
 MarkGlobalActorFunction::create(ConstraintSystem &cs, Type lhs, Type rhs,
                                 ConstraintLocator *locator,
-                                DiagnosticBehavior behaviorLimit) {
+                                FixBehavior fixBehavior) {
   if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>())
     locator = cs.getConstraintLocator(
         locator, LocatorPathElt::ArgumentAttribute::forGlobalActor());
 
   return new (cs.getAllocator()) MarkGlobalActorFunction(
-      cs, lhs, rhs, locator, behaviorLimit);
+      cs, lhs, rhs, locator, fixBehavior);
 }
 
 bool AddSendableAttribute::diagnose(const Solution &solution,
                                       bool asNote) const {
   AttributedFuncToTypeConversionFailure failure(
       solution, getFromType(), getToType(), getLocator(),
-      AttributedFuncToTypeConversionFailure::Concurrent, diagBehaviorLimit());
+      AttributedFuncToTypeConversionFailure::Concurrent, diagfixBehavior());
   return failure.diagnose(asNote);
 }
 
@@ -256,13 +272,13 @@ AddSendableAttribute::create(ConstraintSystem &cs,
                              FunctionType *fromType,
                              FunctionType *toType,
                              ConstraintLocator *locator,
-                             DiagnosticBehavior behaviorLimit) {
+                             FixBehavior fixBehavior) {
   if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>())
     locator = cs.getConstraintLocator(
         locator, LocatorPathElt::ArgumentAttribute::forConcurrent());
 
   return new (cs.getAllocator()) AddSendableAttribute(
-      cs, fromType, toType, locator, behaviorLimit);
+      cs, fromType, toType, locator, fixBehavior);
 }
 bool RelabelArguments::diagnose(const Solution &solution, bool asNote) const {
   LabelingFailure failure(solution, getLocator(), getLabels());
@@ -431,7 +447,7 @@ ContextualMismatch *ContextualMismatch::create(ConstraintSystem &cs, Type lhs,
                                                Type rhs,
                                                ConstraintLocator *locator) {
   return new (cs.getAllocator()) ContextualMismatch(
-      cs, lhs, rhs, locator, DiagnosticBehavior::Unspecified);
+      cs, lhs, rhs, locator, FixBehavior::Error);
 }
 
 bool AllowWrappedValueMismatch::diagnose(const Solution &solution, bool asError) const {
@@ -837,7 +853,7 @@ AllowTypeOrInstanceMember::create(ConstraintSystem &cs, Type baseType,
 
 bool AllowInvalidPartialApplication::diagnose(const Solution &solution,
                                               bool asNote) const {
-  PartialApplicationFailure failure(isWarning(), solution, getLocator());
+  PartialApplicationFailure failure(isWarning, solution, getLocator());
   return failure.diagnose(asNote);
 }
 
@@ -1192,7 +1208,7 @@ NotCompileTimeConst::NotCompileTimeConst(ConstraintSystem &cs, Type paramTy,
                                          ConstraintLocator *locator):
   ContextualMismatch(cs, FixKind::NotCompileTimeConst, paramTy,
                      cs.getASTContext().TheEmptyTupleType, locator,
-                     DiagnosticBehavior::Warning) {}
+                     FixBehavior::AlwaysWarning) {}
 
 NotCompileTimeConst *
 NotCompileTimeConst::create(ConstraintSystem &cs, Type paramTy,
@@ -1623,7 +1639,7 @@ bool TreatEphemeralAsNonEphemeral::diagnose(const Solution &solution,
                                             bool asNote) const {
   NonEphemeralConversionFailure failure(solution, getLocator(), getFromType(),
                                         getToType(), ConversionKind,
-                                        diagBehaviorLimit());
+                                        diagfixBehavior());
   return failure.diagnose(asNote);
 }
 
@@ -1633,8 +1649,8 @@ TreatEphemeralAsNonEphemeral *TreatEphemeralAsNonEphemeral::create(
     bool downgradeToWarning) {
   return new (cs.getAllocator()) TreatEphemeralAsNonEphemeral(
       cs, locator, srcType, dstType, conversionKind,
-      downgradeToWarning ? DiagnosticBehavior::Warning
-                         : DiagnosticBehavior::Unspecified);
+      downgradeToWarning ? FixBehavior::DowngradeToWarning
+                         : FixBehavior::Error);
 }
 
 std::string TreatEphemeralAsNonEphemeral::getName() const {
