@@ -47,3 +47,37 @@ struct TestInitSubscript {
   @Wrapper(wrappedValue: Color.allCases[0])
   var color: Color
 }
+
+@propertyWrapper
+public class SR_15940Bar<Value> {
+  private var _value: Value
+
+  public var wrappedValue: Value {
+    get { _value }
+    set {
+      _value = newValue
+    }
+  }
+
+  public init(wrappedValue value: @autoclosure @escaping () -> Value) {
+    self._value = value()
+  }
+}
+
+// CHECK-LABEL: struct_decl{{.*}}SR_15940_A
+struct SR_15940_A {
+  // CHECK:      argument_list implicit labels=wrappedValue:
+  // CHECK-NEXT:   argument label=wrappedValue
+  // CHECK-NEXT:     autoclosure_expr implicit type='() -> Bool?' discriminator=0 captures=(<opaque_value> ) escaping
+  // CHECK:            autoclosure_expr implicit type='() -> Bool?' discriminator=1 escaping
+  @SR_15940Bar var a: Bool?
+}
+
+// CHECK-LABEL: struct_decl{{.*}}SR_15940_B
+struct SR_15940_B {
+  // CHECK:      argument_list implicit labels=wrappedValue:
+  // CHECK-NEXT:   argument label=wrappedValue
+  // CHECK-NEXT:     autoclosure_expr implicit type='() -> Bool' location={{.*}}.swift:[[@LINE+2]]:30 range=[{{.+}}] discriminator=0 captures=(<opaque_value> ) escaping
+  // CHECK:            autoclosure_expr implicit type='() -> Bool' location={{.*}}.swift:[[@LINE+1]]:30 range=[{{.+}}] discriminator=1 escaping
+  @SR_15940Bar var b: Bool = false
+}

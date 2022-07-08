@@ -415,12 +415,13 @@ actor WrapperActorBad2<Wrapped: Sendable> {
 struct WrapperWithMainActorDefaultInit {
   var wrappedValue: Int { fatalError() }
 
-  @MainActor init() {} // expected-note {{calls to initializer 'init()' from outside of its actor context are implicitly asynchronous}}
+  @MainActor init() {} // expected-note 2 {{calls to initializer 'init()' from outside of its actor context are implicitly asynchronous}}
 }
 
 actor ActorWithWrapper {
   @WrapperOnActor var synced: Int = 0
   // expected-note@-1 3{{property declared here}}
+  @WrapperWithMainActorDefaultInit var property: Int // expected-error {{call to main actor-isolated initializer 'init()' in a synchronous actor-isolated context}}
   func f() {
     _ = synced // expected-error{{main actor-isolated property 'synced' can not be referenced on a different actor instance}}
     _ = $synced // expected-error{{global actor 'SomeGlobalActor'-isolated property '$synced' can not be referenced on a different actor instance}}
