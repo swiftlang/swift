@@ -621,8 +621,12 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
     auto assocTypes = protoDecl->getPrimaryAssociatedTypes();
     if (assocTypes.empty()) {
       diags.diagnose(loc, diag::protocol_does_not_have_primary_assoc_type,
-                     protoType);
-
+                     protoType)
+           .fixItRemove(generic->getAngleBrackets());
+      if (!protoDecl->isImplicit()) {
+        diags.diagnose(protoDecl, diag::decl_declared_here,
+                       protoDecl->getName());
+      }
       return ErrorType::get(ctx);
     }
 
