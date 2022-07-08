@@ -9129,7 +9129,7 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
     for (const auto fix : solution.Fixes) {
       if (fix->isFatal())
         canApplySolution = false;
-      if (fix->affectsSolutionScore() == SK_Fix && !fix->isFatal())
+      if (fix->impact() == SK_Fix && !fix->isFatal())
         ++numResolvableFixes;
     }
 

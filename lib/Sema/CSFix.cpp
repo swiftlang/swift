@@ -37,7 +37,7 @@ using namespace constraints;
 
 ConstraintFix::~ConstraintFix() {}
 
-Optional<ScoreKind> ConstraintFix::affectsSolutionScore() const {
+Optional<ScoreKind> ConstraintFix::impact() const {
   switch (fixBehavior) {
   case FixBehavior::AlwaysWarning:
     return None;

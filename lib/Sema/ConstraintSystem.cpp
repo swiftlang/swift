@@ -4638,7 +4638,7 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
       // source of ambiguity or failures.
       // Ignore warnings in favor of actual error fixes,
       // because they are not the source of ambiguity/failures.
-      if (!fix->affectsSolutionScore())
+      if (!fix->impact())
         continue;
 
       fixes.insert({&solution, fix});

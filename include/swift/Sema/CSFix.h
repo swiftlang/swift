@@ -442,9 +442,8 @@ public:
     }
   }
 
-  /// Whether this kind of fix affects the solution score, and which score
-  /// it affects.
-  Optional<ScoreKind> affectsSolutionScore() const;
+  /// Determine the impact of this fix on the solution score, if any.
+  Optional<ScoreKind> impact() const;
 
   /// The diagnostic behavior limit that will be applied to any emitted
   /// diagnostics.

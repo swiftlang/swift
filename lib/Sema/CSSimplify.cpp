@@ -12711,8 +12711,8 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
   // Record the fix.
 
   // If this should affect the solution score, do so.
-  if (auto scoreKind = fix->affectsSolutionScore())
-    increaseScore(*scoreKind, impact);
+  if (auto impactScoreKind = fix->impact())
+    increaseScore(*impactScoreKind, impact);
 
   // If we've made the current solution worse than the best solution we've seen
   // already, stop now.
@@ -12735,7 +12735,7 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
     // Fixes that don't affect the score shouldn't be considered because even
     // if such a fix is recorded at that anchor this should not
     // have any affect in the recording of any other fix.
-    if (!fix->affectsSolutionScore())
+    if (!fix->impact())
       continue;
 
     anchors.insert(fix->getAnchor());
