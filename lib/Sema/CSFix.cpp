@@ -46,8 +46,10 @@ Optional<ScoreKind> ConstraintFix::affectsSolutionScore() const {
     return SK_Fix;
 
   case FixBehavior::DowngradeToWarning:
-  case FixBehavior::Suppress:
     return SK_DisfavoredOverload;
+
+  case FixBehavior::Suppress:
+    return None;
   }
 }
 
