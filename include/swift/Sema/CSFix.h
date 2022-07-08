@@ -428,17 +428,17 @@ public:
 
   FixKind getKind() const { return Kind; }
 
-  /// Whether it is still possible to "apply" a solution containing this kind
-  /// of fix to get a usable AST.
-  bool canApplySolution() const {
+  /// Whether this fix fatal for the constraint solver, meaning that it cannot
+  /// produce a usable type-checked AST.
+  bool isFatal() const {
     switch (fixBehavior) {
     case FixBehavior::AlwaysWarning:
     case FixBehavior::DowngradeToWarning:
     case FixBehavior::Suppress:
-      return true;
+      return false;
 
     case FixBehavior::Error:
-      return false;
+      return true;
     }
   }
 

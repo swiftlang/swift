@@ -4616,7 +4616,7 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
   // let's diagnose this as regular ambiguity.
   if (llvm::all_of(solutions, [](const Solution &solution) {
         return llvm::all_of(solution.Fixes, [](const ConstraintFix *fix) {
-          return fix->canApplySolution();
+          return !fix->isFatal();
         });
       })) {
     return diagnoseAmbiguity(solutions);
