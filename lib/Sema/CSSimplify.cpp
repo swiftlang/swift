@@ -2717,42 +2717,47 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   }
 
   /// The behavior limit to apply to a concurrency check.
-  auto getConcurrencyFixBehavior = [&](bool forSendable) {
-    // We can only handle the downgrade for conversions.
-    switch (kind) {
-    case ConstraintKind::Conversion:
-    case ConstraintKind::ArgumentConversion:
-      break;
+  auto getConcurrencyFixBehavior = [&](
+        bool forSendable
+      ) -> Optional<FixBehavior> {
+        // We can only handle the downgrade for conversions.
+        switch (kind) {
+        case ConstraintKind::Conversion:
+        case ConstraintKind::ArgumentConversion:
+          break;
 
-    default:
-      return FixBehavior::Error;
-    }
+        default:
+          if (!shouldAttemptFixes())
+            return None;
 
-    // For a @preconcurrency callee outside of a strict concurrency context,
-    // ignore.
-    if (hasPreconcurrencyCallee(this, locator) &&
-        !contextRequiresStrictConcurrencyChecking(DC, GetClosureType{*this}))
-      return FixBehavior::Suppress;
+          return FixBehavior::Error;
+        }
 
-    // Otherwise, warn until Swift 6.
-    if (!getASTContext().LangOpts.isSwiftVersionAtLeast(6))
-      return FixBehavior::DowngradeToWarning;
+        // For a @preconcurrency callee outside of a strict concurrency
+        // context, ignore.
+        if (hasPreconcurrencyCallee(this, locator) &&
+            !contextRequiresStrictConcurrencyChecking(DC, GetClosureType{*this}))
+          return FixBehavior::Suppress;
 
-    return FixBehavior::Error;
+        // Otherwise, warn until Swift 6.
+        if (!getASTContext().LangOpts.isSwiftVersionAtLeast(6))
+          return FixBehavior::DowngradeToWarning;
+
+        return FixBehavior::Error;
   };
 
   // A @Sendable function can be a subtype of a non-@Sendable function.
   if (func1->isSendable() != func2->isSendable()) {
     // Cannot add '@Sendable'.
     if (func2->isSendable() || kind < ConstraintKind::Subtype) {
-      if (!shouldAttemptFixes())
+      if (auto fixBehavior = getConcurrencyFixBehavior(true)) {
+        auto *fix = AddSendableAttribute::create(
+            *this, func1, func2, getConstraintLocator(locator), *fixBehavior);
+        if (recordFix(fix))
+          return getTypeMatchFailure(locator);
+      } else {
         return getTypeMatchFailure(locator);
-
-      auto *fix = AddSendableAttribute::create(
-          *this, func1, func2, getConstraintLocator(locator),
-          getConcurrencyFixBehavior(true));
-      if (recordFix(fix))
-        return getTypeMatchFailure(locator);
+      }
     }
   }
 
@@ -2780,15 +2785,16 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
         return getTypeMatchFailure(locator);
     } else if (func1->getGlobalActor() && !func2->isAsync()) {
       // Cannot remove a global actor from a synchronous function.
-      if (!shouldAttemptFixes())
-        return getTypeMatchFailure(locator);
+      if (auto fixBehavior = getConcurrencyFixBehavior(false)) {
+        auto *fix = MarkGlobalActorFunction::create(
+            *this, func1, func2, getConstraintLocator(locator),
+            *fixBehavior);
 
-      auto *fix = MarkGlobalActorFunction::create(
-          *this, func1, func2, getConstraintLocator(locator),
-          getConcurrencyFixBehavior(false));
-
-      if (recordFix(fix))
+        if (recordFix(fix))
+          return getTypeMatchFailure(locator);
+      } else {
         return getTypeMatchFailure(locator);
+      }
     } else if (kind < ConstraintKind::Subtype) {
       return getTypeMatchFailure(locator);
     }
