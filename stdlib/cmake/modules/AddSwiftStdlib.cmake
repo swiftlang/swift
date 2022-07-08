@@ -1371,6 +1371,20 @@ function(add_swift_target_library_single target name)
     # emitting warnings about global initializers when it compiles the code.
     list(APPEND swiftlib_link_flags_all "-Xlinker -no_warn_inits")
   endif()
+
+  if(${SWIFTLIB_SINGLE_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
+    # In the past, we relied on unsetting globally
+    # CMAKE_OSX_ARCHITECTURES to ensure that CMake
+    # would not add the -arch flag. This is no longer
+    # the case  when running on Apple Silicon, when
+    # CMake will enforce a default (see
+    # https://gitlab.kitware.com/cmake/cmake/-/merge_requests/5291)
+    set_property(TARGET ${target} PROPERTY OSX_ARCHITECTURES "${SWIFTLIB_SINGLE_ARCHITECTURE}")
+    if(TARGET "${target_static}")
+      set_property(TARGET ${target_static} PROPERTY OSX_ARCHITECTURES "${SWIFTLIB_SINGLE_ARCHITECTURE}")
+    endif()
+  endif()
+
   target_link_libraries(${target} PRIVATE
     ${link_libraries})
   target_link_directories(${target} PRIVATE
@@ -2186,19 +2200,6 @@ function(add_swift_target_library name)
         if(arch IN_LIST SWIFT_SDK_${sdk}_ARCHITECTURES)
           # Note this thin library.
           list(APPEND THIN_INPUT_TARGETS ${VARIANT_NAME})
-        endif()
-      endif()
-
-      if(sdk IN_LIST SWIFT_APPLE_PLATFORMS)
-        # In the past, we relied on unsetting globally
-        # CMAKE_OSX_ARCHITECTURES to ensure that CMake would
-        # not add the -arch flag
-        # This is no longer the case when running on Apple Silicon,
-        # when CMake will enforce a default (see
-        # https://gitlab.kitware.com/cmake/cmake/-/merge_requests/5291)
-        set_property(TARGET ${VARIANT_NAME} PROPERTY OSX_ARCHITECTURES "${arch}")
-        if (SWIFTLIB_IS_STDLIB AND SWIFTLIB_STATIC)
-          set_property(TARGET ${VARIANT_NAME}-static PROPERTY OSX_ARCHITECTURES "${arch}")
         endif()
       endif()
     endforeach()
