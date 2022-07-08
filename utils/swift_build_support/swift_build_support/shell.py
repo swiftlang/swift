@@ -164,17 +164,26 @@ def pushd(path, dry_run=None, echo=True):
 
 @contextmanager
 def pushenv(env, dry_run=None, echo=True):
+    saved_env = {}
     for name in env.keys():
         if dry_run or echo:
             _echo_command(dry_run, ['export', name + '=' + env[name]])
         if not dry_run:
+            if name in os.environ:
+                saved_env[name] = os.environ[name]
             os.environ[name] = env[name]
     yield
     for name in env.keys():
-        if dry_run or echo:
-            _echo_command(dry_run, ['unset', name])
-        if not dry_run:
-            del os.environ[key]
+        if name in saved_env:
+            if dry_run or echo:
+                _echo_command(dry_run, ['export', name + '=' + saved_env[name]])
+            if not dry_run:
+                os.environ[name] = saved_env[name]
+        else:
+            if dry_run or echo:
+                _echo_command(dry_run, ['unset', name])
+            if not dry_run:
+                del os.environ[name]
 
 
 def makedirs(path, dry_run=None, echo=True):
