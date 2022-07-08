@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "CSDiagnostics.h"
+#include "TypeCheckConcurrency.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Type.h"
@@ -247,6 +248,38 @@ bool MarkGlobalActorFunction::diagnose(const Solution &solution,
   return failure.diagnose(asNote);
 }
 
+/// The fix behavior to apply to a concurrency-related diagnostic.
+static Optional<FixBehavior>
+getConcurrencyFixBehavior(
+    ConstraintSystem &cs, ConstraintKind constraintKind,
+    ConstraintLocatorBuilder locator, bool forSendable) {
+  // We can only handle the downgrade for conversions.
+  switch (constraintKind) {
+  case ConstraintKind::Conversion:
+  case ConstraintKind::ArgumentConversion:
+    break;
+
+  default:
+    if (!cs.shouldAttemptFixes())
+      return None;
+
+    return FixBehavior::Error;
+  }
+
+  // For a @preconcurrency callee outside of a strict concurrency
+  // context, ignore.
+  if (cs.hasPreconcurrencyCallee(locator) &&
+      !contextRequiresStrictConcurrencyChecking(
+          cs.DC, GetClosureType{cs}, ClosureIsolatedByPreconcurrency{cs}))
+    return FixBehavior::Suppress;
+
+  // Otherwise, warn until Swift 6.
+  if (!cs.getASTContext().LangOpts.isSwiftVersionAtLeast(6))
+    return FixBehavior::DowngradeToWarning;
+
+  return FixBehavior::Error;
+}
+
 MarkGlobalActorFunction *
 MarkGlobalActorFunction::create(ConstraintSystem &cs, Type lhs, Type rhs,
                                 ConstraintLocator *locator,
@@ -257,6 +290,23 @@ MarkGlobalActorFunction::create(ConstraintSystem &cs, Type lhs, Type rhs,
 
   return new (cs.getAllocator()) MarkGlobalActorFunction(
       cs, lhs, rhs, locator, fixBehavior);
+}
+
+bool MarkGlobalActorFunction::attempt(ConstraintSystem &cs,
+                                      ConstraintKind constraintKind,
+                                      FunctionType *fromType,
+                                      FunctionType *toType,
+                                      ConstraintLocatorBuilder locator) {
+  auto fixBehavior = getConcurrencyFixBehavior(
+      cs, constraintKind, locator, /*forSendable=*/false);
+  if (!fixBehavior)
+    return true;
+
+  auto *fix = MarkGlobalActorFunction::create(
+      cs, fromType, toType, cs.getConstraintLocator(locator),
+      *fixBehavior);
+
+  return cs.recordFix(fix);
 }
 
 bool AddSendableAttribute::diagnose(const Solution &solution,
@@ -280,6 +330,22 @@ AddSendableAttribute::create(ConstraintSystem &cs,
   return new (cs.getAllocator()) AddSendableAttribute(
       cs, fromType, toType, locator, fixBehavior);
 }
+
+bool AddSendableAttribute::attempt(ConstraintSystem &cs,
+                                   ConstraintKind constraintKind,
+                                   FunctionType *fromType,
+                                   FunctionType *toType,
+                                   ConstraintLocatorBuilder locator) {
+  auto fixBehavior = getConcurrencyFixBehavior(
+      cs, constraintKind, locator, /*forSendable=*/true);
+  if (!fixBehavior)
+    return true;
+
+  auto *fix = AddSendableAttribute::create(
+      cs, fromType, toType, cs.getConstraintLocator(locator), *fixBehavior);
+  return cs.recordFix(fix);
+}
+
 bool RelabelArguments::diagnose(const Solution &solution, bool asNote) const {
   LabelingFailure failure(solution, getLocator(), getLabels());
   return failure.diagnose(asNote);

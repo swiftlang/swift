@@ -2655,14 +2655,10 @@ static bool fixExtraneousArguments(ConstraintSystem &cs,
       /*impact=*/numExtraneous * 2);
 }
 
-bool hasPreconcurrencyCallee(ConstraintSystem *cs,
-                             ConstraintLocatorBuilder locator) {
-  if (cs->getASTContext().isSwiftVersionAtLeast(6))
-    // Swift 6 mode does not reduce errors to warnings.
-    return false;
-
-  auto calleeLocator = cs->getCalleeLocator(cs->getConstraintLocator(locator));
-  auto calleeOverload = cs->findSelectedOverloadFor(calleeLocator);
+bool ConstraintSystem::hasPreconcurrencyCallee(
+    ConstraintLocatorBuilder locator) {
+  auto calleeLocator = getCalleeLocator(getConstraintLocator(locator));
+  auto calleeOverload = findSelectedOverloadFor(calleeLocator);
   if (!calleeOverload || !calleeOverload->choice.isDecl())
     return false;
 
@@ -2716,48 +2712,12 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       increaseScore(SK_SyncInAsync);
   }
 
-  /// The behavior limit to apply to a concurrency check.
-  auto getConcurrencyFixBehavior = [&](
-        bool forSendable
-      ) -> Optional<FixBehavior> {
-        // We can only handle the downgrade for conversions.
-        switch (kind) {
-        case ConstraintKind::Conversion:
-        case ConstraintKind::ArgumentConversion:
-          break;
-
-        default:
-          if (!shouldAttemptFixes())
-            return None;
-
-          return FixBehavior::Error;
-        }
-
-        // For a @preconcurrency callee outside of a strict concurrency
-        // context, ignore.
-        if (hasPreconcurrencyCallee(this, locator) &&
-            !contextRequiresStrictConcurrencyChecking(DC, GetClosureType{*this}, ClosureIsolatedByPreconcurrency{*this}))
-          return FixBehavior::Suppress;
-
-        // Otherwise, warn until Swift 6.
-        if (!getASTContext().LangOpts.isSwiftVersionAtLeast(6))
-          return FixBehavior::DowngradeToWarning;
-
-        return FixBehavior::Error;
-  };
-
   // A @Sendable function can be a subtype of a non-@Sendable function.
   if (func1->isSendable() != func2->isSendable()) {
     // Cannot add '@Sendable'.
     if (func2->isSendable() || kind < ConstraintKind::Subtype) {
-      if (auto fixBehavior = getConcurrencyFixBehavior(true)) {
-        auto *fix = AddSendableAttribute::create(
-            *this, func1, func2, getConstraintLocator(locator), *fixBehavior);
-        if (recordFix(fix))
-          return getTypeMatchFailure(locator);
-      } else {
+      if (AddSendableAttribute::attempt(*this, kind, func1, func2, locator))
         return getTypeMatchFailure(locator);
-      }
     }
   }
 
@@ -2785,16 +2745,8 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
         return getTypeMatchFailure(locator);
     } else if (func1->getGlobalActor() && !func2->isAsync()) {
       // Cannot remove a global actor from a synchronous function.
-      if (auto fixBehavior = getConcurrencyFixBehavior(false)) {
-        auto *fix = MarkGlobalActorFunction::create(
-            *this, func1, func2, getConstraintLocator(locator),
-            *fixBehavior);
-
-        if (recordFix(fix))
-          return getTypeMatchFailure(locator);
-      } else {
+      if (MarkGlobalActorFunction::attempt(*this, kind, func1, func2, locator))
         return getTypeMatchFailure(locator);
-      }
     } else if (kind < ConstraintKind::Subtype) {
       return getTypeMatchFailure(locator);
     }
@@ -9839,7 +9791,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   auto *inferredClosureType = getClosureType(closure);
 
   // Note if this closure is isolated by preconcurrency.
-  if (hasPreconcurrencyCallee(this, locator))
+  if (hasPreconcurrencyCallee(locator))
     preconcurrencyClosures.insert(closure);
 
   // Let's look through all optionals associated with contextual

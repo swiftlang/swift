@@ -799,6 +799,16 @@ public:
                                          Type rhs, ConstraintLocator *locator,
                                          FixBehavior fixBehavior);
 
+  /// Try to apply this fix to the given types.
+  ///
+  /// \returns \c true if the fix cannot be applied and the solver must fail,
+  /// or \c false if the fix has been applied and the solver can continue.
+  static bool attempt(ConstraintSystem &cs,
+                      ConstraintKind constraintKind,
+                      FunctionType *fromType,
+                      FunctionType *toType,
+                      ConstraintLocatorBuilder locator);
+
   static bool classof(ConstraintFix *fix) {
     return fix->getKind() == FixKind::MarkGlobalActorFunction;
   }
@@ -849,6 +859,16 @@ public:
                                       FunctionType *toType,
                                       ConstraintLocator *locator,
                                       FixBehavior fixBehavior);
+
+  /// Try to apply this fix to the given types.
+  ///
+  /// \returns \c true if the fix cannot be applied and the solver must fail,
+  /// or \c false if the fix has been applied and the solver can continue.
+  static bool attempt(ConstraintSystem &cs,
+                      ConstraintKind constraintKind,
+                      FunctionType *fromType,
+                      FunctionType *toType,
+                      ConstraintLocatorBuilder locator);
 
   static bool classof(ConstraintFix *fix) {
     return fix->getKind() == FixKind::AddSendableAttribute;

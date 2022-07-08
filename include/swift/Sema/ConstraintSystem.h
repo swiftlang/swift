@@ -3820,6 +3820,10 @@ public:
         });
   }
 
+  /// Determine whether the callee for the given locator is marked as
+  /// `@preconcurrency`.
+  bool hasPreconcurrencyCallee(ConstraintLocatorBuilder locator);
+
   /// Determine whether the given declaration is unavailable from the
   /// current context.
   bool isDeclUnavailable(const Decl *D,
