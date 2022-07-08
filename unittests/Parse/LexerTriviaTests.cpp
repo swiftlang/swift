@@ -109,7 +109,7 @@ TEST_F(LexerTriviaTest, TriviaHashbang) {
   ASSERT_EQ(LeadingTrivia, "#!/bin/swift\n");
   ASSERT_EQ(TrailingTrivia, "");
   ASSERT_EQ(LeadingTriviaPieces, (ParsedTrivia{{
-    ParsedTriviaPiece(TriviaKind::GarbageText, strlen("#!/bin/swift")),
+    ParsedTriviaPiece(TriviaKind::Shebang, strlen("#!/bin/swift")),
     ParsedTriviaPiece(TriviaKind::Newline, 1)}}));
   ASSERT_EQ(TrailingTriviaPieces, ParsedTrivia());
 }
@@ -140,7 +140,7 @@ TEST_F(LexerTriviaTest, TriviaHashbangAfterBOM) {
   ASSERT_EQ(TrailingTrivia, "");
   ASSERT_EQ(LeadingTriviaPieces, (ParsedTrivia{{
     ParsedTriviaPiece(TriviaKind::GarbageText, strlen("\xEF\xBB\xBF")),
-    ParsedTriviaPiece(TriviaKind::GarbageText, strlen("#!/bin/swift")),
+    ParsedTriviaPiece(TriviaKind::Shebang, strlen("#!/bin/swift")),
     ParsedTriviaPiece(TriviaKind::Newline, 1)}}));
   ASSERT_EQ(TrailingTriviaPieces, ParsedTrivia());
 }
