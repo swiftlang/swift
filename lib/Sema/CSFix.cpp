@@ -243,7 +243,7 @@ MarkExplicitlyEscaping::create(ConstraintSystem &cs, Type lhs, Type rhs,
 bool MarkGlobalActorFunction::diagnose(const Solution &solution,
                                        bool asNote) const {
   DroppedGlobalActorFunctionAttr failure(
-      solution, getFromType(), getToType(), getLocator(), diagfixBehavior());
+      solution, getFromType(), getToType(), getLocator(), fixBehavior);
   return failure.diagnose(asNote);
 }
 
@@ -263,7 +263,7 @@ bool AddSendableAttribute::diagnose(const Solution &solution,
                                       bool asNote) const {
   AttributedFuncToTypeConversionFailure failure(
       solution, getFromType(), getToType(), getLocator(),
-      AttributedFuncToTypeConversionFailure::Concurrent, diagfixBehavior());
+      AttributedFuncToTypeConversionFailure::Concurrent, fixBehavior);
   return failure.diagnose(asNote);
 }
 
@@ -1639,7 +1639,7 @@ bool TreatEphemeralAsNonEphemeral::diagnose(const Solution &solution,
                                             bool asNote) const {
   NonEphemeralConversionFailure failure(solution, getLocator(), getFromType(),
                                         getToType(), ConversionKind,
-                                        diagfixBehavior());
+                                        fixBehavior);
   return failure.diagnose(asNote);
 }
 
@@ -2233,7 +2233,7 @@ IgnoreDefaultExprTypeMismatch::create(ConstraintSystem &cs, Type argType,
 bool AddExplicitExistentialCoercion::diagnose(const Solution &solution,
                                               bool asNote) const {
   MissingExplicitExistentialCoercion failure(solution, ErasedResultType,
-                                             getLocator(), diagfixBehavior());
+                                             getLocator(), fixBehavior);
   return failure.diagnose(asNote);
 }
 

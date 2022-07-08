@@ -411,10 +411,10 @@ class ConstraintFix {
   FixKind Kind;
   ConstraintLocator *Locator;
 
-  /// The behavior limit to apply to the diagnostics emitted.
-  FixBehavior fixBehavior;
-
 public:
+  /// The behavior limit to apply to the diagnostics emitted.
+  const FixBehavior fixBehavior;
+
   ConstraintFix(ConstraintSystem &cs, FixKind kind, ConstraintLocator *locator,
                 FixBehavior fixBehavior = FixBehavior::Error)
       : CS(cs), Kind(kind), Locator(locator), fixBehavior(fixBehavior) {}
@@ -444,10 +444,6 @@ public:
 
   /// Determine the impact of this fix on the solution score, if any.
   Optional<ScoreKind> impact() const;
-
-  /// The diagnostic behavior limit that will be applied to any emitted
-  /// diagnostics.
-  FixBehavior diagfixBehavior() const { return fixBehavior; }
 
   virtual std::string getName() const = 0;
 
