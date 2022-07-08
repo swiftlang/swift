@@ -36,16 +36,6 @@ inline llvm::ArrayRef<T> getArrayRef(BridgedArrayRef bridged) {
   return {static_cast<const T *>(bridged.data), bridged.numElements};
 }
 
-inline CharSourceRange
-getCharSourceRange(const BridgedCharSourceRange &bridged) {
-  return CharSourceRange(bridged.start, bridged.byteLength);
-}
-
-inline BridgedCharSourceRange
-getBridgedCharSourceRange(const CharSourceRange &range) {
-  return {range.getStart(), range.getByteLength()};
-}
-
 } // namespace swift
 
 #endif
