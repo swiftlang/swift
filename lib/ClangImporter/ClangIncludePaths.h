@@ -23,6 +23,9 @@ namespace swift {
 SmallVector<std::pair<std::string, std::string>, 2>
 getClangInvocationFileMapping(ASTContext &ctx);
 
+Optional<SmallString<128>> getCxxShimModuleMapPath(SearchPathOptions &opts,
+                                                   const llvm::Triple &triple);
+
 } // namespace swift
 
 #endif // SWIFT_CLANG_INCLUDE_PATHS_H
