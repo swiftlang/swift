@@ -68,7 +68,7 @@ typedef struct {
 // FIXME: Can we bridge InFlightDiagnostic?
 void DiagnosticEngine_diagnose(BridgedDiagnosticEngine, swift::SourceLoc loc,
                                BridgedDiagID diagID, BridgedArrayRef arguments,
-                               BridgedCharSourceRange highlight,
+                               swift::CharSourceRange highlight,
                                BridgedArrayRef fixIts);
 
 bool DiagnosticEngine_hadAnyError(BridgedDiagnosticEngine);

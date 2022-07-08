@@ -41,7 +41,7 @@ void DiagnosticEngine_diagnose(
     BridgedDiagnosticEngine bridgedEngine, SourceLoc loc,
     BridgedDiagID bridgedDiagID,
     BridgedArrayRef /*BridgedDiagnosticArgument*/ bridgedArguments,
-    BridgedCharSourceRange bridgedHighlight,
+    CharSourceRange highlight,
     BridgedArrayRef /*BridgedDiagnosticFixIt*/ bridgedFixIts) {
   auto *D = getDiagnosticEngine(bridgedEngine);
 
@@ -54,7 +54,6 @@ void DiagnosticEngine_diagnose(
   auto inflight = D->diagnose(loc, diagID, arguments);
 
   // Add highlight.
-  auto highlight = getCharSourceRange(bridgedHighlight);
   if (highlight.isValid()) {
     inflight.highlightChars(highlight.getStart(), highlight.getEnd());
   }
