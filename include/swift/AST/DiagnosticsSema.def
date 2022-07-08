@@ -3762,7 +3762,8 @@ ERROR(protocol_declares_unknown_primary_assoc_type,none,
 ERROR(protocol_declares_duplicate_primary_assoc_type,none,
       "duplicate primary associated type name %0", (Identifier))
 ERROR(protocol_does_not_have_primary_assoc_type,none,
-      "cannot specialize protocol type %0", (Type))
+      "protocol %0 does not have primary associated types that can be "
+      "constrained", (Type))
 ERROR(parameterized_protocol_type_argument_count_mismatch,none,
       "protocol type %0 specialized with %select{too many|too few}3 type arguments "
       "(got %1, but expected %2)",
