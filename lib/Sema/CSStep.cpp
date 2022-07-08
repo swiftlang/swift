@@ -346,8 +346,31 @@ StepResult ComponentStep::take(bool prevFailed) {
 
   /// Try to figure out what this step is going to be,
   /// after the scope has been established.
-  auto *disjunction = CS.selectDisjunction();
   auto bestBindings = CS.determineBestBindings();
+  auto *disjunction = CS.selectDisjunction();
+  auto *conjunction = CS.selectConjunction();
+
+  if (CS.isDebugMode()) {
+    PrintOptions PO;
+    PO.PrintTypesForDebugging = true;
+
+    if (disjunction) {
+      auto &log = getDebugLogger();
+      log.indent(2);
+      log << "Disjunction(s) = [";
+      auto constraints = disjunction->getNestedConstraints();
+      log << constraints[0]->getFirstType()->getString(PO);
+      log << "])\n";
+    }
+    if (conjunction) {
+      auto &log = getDebugLogger();
+      log.indent(2);
+      log << "Conjunction(s) = [";
+      auto constraints = conjunction->getNestedConstraints();
+      log << constraints[0]->getFirstType()->getString(PO);
+      log << "])\n";
+    }
+  }
 
   if (CS.shouldAttemptFixes()) {
     if ((bestBindings &&
