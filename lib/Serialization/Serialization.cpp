@@ -80,10 +80,6 @@ using llvm::BCBlockRAII;
 
 ASTContext &SerializerBase::getASTContext() const { return M->getASTContext(); }
 
-static StringRef withNullAsEmptyStringRef(const char *data) {
-  return StringRef(data ? data : "");
-}
-
 /// Used for static_assert.
 static constexpr bool declIDFitsIn32Bits() {
   using Int32Info = std::numeric_limits<uint32_t>;
