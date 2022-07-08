@@ -652,7 +652,7 @@ TEST(DeclSyntaxTests, ProtocolMakeAPIs) {
     auto MyCollection = Factory.makeIdentifier("MyCollection", "", "");
     auto ElementName = Factory.makeIdentifier("Element", "", "");
     auto ElementParam =
-        Factory.makePrimaryAssociatedType(None, ElementName, None, None, None, None);
+        Factory.makePrimaryAssociatedType(ElementName, None);
     auto LeftAngle = Factory.makeLeftAngleToken("", "");
     auto RightAngle = Factory.makeRightAngleToken("", " ");
     auto PrimaryAssocs = PrimaryAssociatedTypeClauseSyntaxBuilder(Arena)
