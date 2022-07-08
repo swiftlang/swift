@@ -46,6 +46,7 @@ class ConstraintSystem;
 class ConstraintLocator;
 class ConstraintLocatorBuilder;
 enum class ConversionRestrictionKind;
+enum ScoreKind: unsigned int;
 class Solution;
 struct MemberLookupResult;
 
@@ -433,18 +434,9 @@ public:
     }
   }
 
-  /// Whether this kind of fix affects the solution score.
-  bool affectsSolutionScore() const {
-    switch (fixBehavior) {
-    case FixBehavior::AlwaysWarning:
-    case FixBehavior::DowngradeToWarning:
-    case FixBehavior::Suppress:
-      return false;
-
-    case FixBehavior::Error:
-      return true;
-    }
-  }
+  /// Whether this kind of fix affects the solution score, and which score
+  /// it affects.
+  Optional<ScoreKind> affectsSolutionScore() const;
 
   /// The diagnostic behavior limit that will be applied to any emitted
   /// diagnostics.

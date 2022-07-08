@@ -12706,8 +12706,8 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
   // Record the fix.
 
   // If this should affect the solution score, do so.
-  if (fix->affectsSolutionScore())
-    increaseScore(SK_Fix, impact);
+  if (auto scoreKind = fix->affectsSolutionScore())
+    increaseScore(*scoreKind, impact);
 
   // If we've made the current solution worse than the best solution we've seen
   // already, stop now.

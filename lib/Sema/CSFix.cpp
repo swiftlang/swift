@@ -37,6 +37,20 @@ using namespace constraints;
 
 ConstraintFix::~ConstraintFix() {}
 
+Optional<ScoreKind> ConstraintFix::affectsSolutionScore() const {
+  switch (fixBehavior) {
+  case FixBehavior::AlwaysWarning:
+    return None;
+
+  case FixBehavior::Error:
+    return SK_Fix;
+
+  case FixBehavior::DowngradeToWarning:
+  case FixBehavior::Suppress:
+    return SK_DisfavoredOverload;
+  }
+}
+
 ASTNode ConstraintFix::getAnchor() const { return getLocator()->getAnchor(); }
 
 void ConstraintFix::print(llvm::raw_ostream &Out) const {
