@@ -2736,7 +2736,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
         // For a @preconcurrency callee outside of a strict concurrency
         // context, ignore.
         if (hasPreconcurrencyCallee(this, locator) &&
-            !contextRequiresStrictConcurrencyChecking(DC, GetClosureType{*this}))
+            !contextRequiresStrictConcurrencyChecking(DC, GetClosureType{*this}, ClosureIsolatedByPreconcurrency{*this}))
           return FixBehavior::Suppress;
 
         // Otherwise, warn until Swift 6.
@@ -9837,6 +9837,10 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   auto *closureLocator = typeVar->getImpl().getLocator();
   auto *closure = castToExpr<ClosureExpr>(closureLocator->getAnchor());
   auto *inferredClosureType = getClosureType(closure);
+
+  // Note if this closure is isolated by preconcurrency.
+  if (hasPreconcurrencyCallee(this, locator))
+    preconcurrencyClosures.insert(closure);
 
   // Let's look through all optionals associated with contextual
   // type to make it possible to infer parameter/result type of
