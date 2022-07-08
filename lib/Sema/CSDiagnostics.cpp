@@ -103,6 +103,22 @@ template <typename... ArgTypes>
 InFlightDiagnostic
 FailureDiagnostic::emitDiagnosticAt(ArgTypes &&... Args) const {
   auto &DE = getASTContext().Diags;
+  DiagnosticBehavior behaviorLimit;
+  switch (fixBehavior) {
+  case FixBehavior::Error:
+  case FixBehavior::AlwaysWarning:
+    behaviorLimit = DiagnosticBehavior::Unspecified;
+    break;
+
+  case FixBehavior::DowngradeToWarning:
+    behaviorLimit = DiagnosticBehavior::Warning;
+    break;
+
+  case FixBehavior::Suppress:
+    behaviorLimit = DiagnosticBehavior::Ignore;
+    break;
+  }
+
   return std::move(DE.diagnose(std::forward<ArgTypes>(Args)...)
                      .limitBehavior(behaviorLimit));
 }

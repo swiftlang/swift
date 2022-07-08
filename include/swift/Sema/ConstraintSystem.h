@@ -775,7 +775,7 @@ public:
 
 /// Describes an aspect of a solution that affects its overall score, i.e., a
 /// user-defined conversions.
-enum ScoreKind {
+enum ScoreKind: unsigned int {
   // These values are used as indices into a Score value.
 
   /// A fix needs to be applied to the source.

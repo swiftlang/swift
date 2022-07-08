@@ -8480,7 +8480,7 @@ bool ConstraintSystem::applySolutionFixes(const Solution &solution) {
 
         auto diagnosed =
             primaryFix->coalesceAndDiagnose(solution, secondaryFixes);
-        if (primaryFix->isWarning()) {
+        if (primaryFix->canApplySolution()) {
           assert(diagnosed && "warnings should always be diagnosed");
           (void)diagnosed;
         } else {
@@ -9105,16 +9105,23 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
     Solution &solution, SolutionApplicationTarget target) {
   // If any fixes needed to be applied to arrive at this solution, resolve
   // them to specific expressions.
+  unsigned numResolvableFixes = 0;
   if (!solution.Fixes.empty()) {
     if (shouldSuppressDiagnostics())
       return None;
 
     bool diagnosedErrorsViaFixes = applySolutionFixes(solution);
+    bool canApplySolution = true;
+    for (const auto fix : solution.Fixes) {
+      if (!fix->canApplySolution())
+        canApplySolution = false;
+      if (fix->affectsSolutionScore() == SK_Fix && fix->canApplySolution())
+        ++numResolvableFixes;
+    }
+
     // If all of the available fixes would result in a warning,
     // we can go ahead and apply this solution to AST.
-    if (!llvm::all_of(solution.Fixes, [](const ConstraintFix *fix) {
-          return fix->isWarning();
-        })) {
+    if (!canApplySolution) {
       // If we already diagnosed any errors via fixes, that's it.
       if (diagnosedErrorsViaFixes)
         return None;
@@ -9131,7 +9138,7 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
   // produce a fallback diagnostic to highlight the problem.
   {
     const auto &score = solution.getFixedScore();
-    if (score.Data[SK_Fix] > 0 || score.Data[SK_Hole] > 0) {
+    if (score.Data[SK_Fix] > numResolvableFixes || score.Data[SK_Hole] > 0) {
       maybeProduceFallbackDiagnostic(target);
       return None;
     }
