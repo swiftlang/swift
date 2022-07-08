@@ -152,3 +152,30 @@ func testStringPlacement() {
   let fn2 = StringPlacement.position(before:)
   let _: Int = fn2 // expected-error{{cannot convert value of type '(String) -> ([String]) -> Int' to specified type 'Int'}}
 }
+
+// @preconcurrency in an outer closure
+// (https://github.com/apple/swift/issues/59910)
+struct Scheduled<T> { }
+
+@preconcurrency
+func doPreconcurrency(_: @Sendable () -> Void) { }
+
+class EventLoop {
+  @discardableResult
+  @preconcurrency
+  func scheduleTask<T>(deadline: Int, _ task: @escaping @Sendable () throws -> T) -> Scheduled<T> { fatalError("") }
+}
+
+class C {
+  var ev: EventLoop? = nil
+
+  func test(i: Int) {
+    func doNext() {
+      doPreconcurrency {
+        self.ev?.scheduleTask(deadline: i, doNext)
+        return
+      }
+    }
+  }
+}
+
