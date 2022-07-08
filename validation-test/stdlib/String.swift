@@ -2347,4 +2347,26 @@ if #available(SwiftStdlib 5.6, *) {
   }
 }
 
+StringTests.test("SmallString.zeroTrailingBytes") {
+  if #available(SwiftStdlib 5.8, *) {
+    let full: _SmallString.RawBitPattern = (.max, .max)
+    withUnsafeBytes(of: full) {
+      expectTrue($0.allSatisfy({ $0 == 0xff }))
+    }
+
+    let testIndices = [1, 7, 8, _SmallString.capacity]
+    for i in testIndices {
+      // The internal invariants in `zeroTrailingBytes(of:from:)`
+      expectTrue(0 < i && i <= _SmallString.capacity)
+      var bits = full
+      zeroTrailingBytes(of: &bits, from: i)
+      withUnsafeBytes(of: bits) {
+        expectTrue($0[..<i].allSatisfy({ $0 == 0xff }))
+        expectTrue($0[i...].allSatisfy({ $0 == 0 }))
+      }
+      bits = (0, 0)
+    }
+  }
+}
+
 runAllTests()

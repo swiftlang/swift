@@ -253,8 +253,8 @@ extension _SmallString {
   }
 }
 
-@inline(__always)
-private func zeroTrailingBytes(
+@inlinable @inline(__always)
+internal func zeroTrailingBytes(
   of storage: inout _SmallString.RawBitPattern, from len: Int
 ) {
   _internalInvariant(len > 0)
