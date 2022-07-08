@@ -12,6 +12,7 @@
 
 from . import cmake_product
 from . import earlyswiftdriver
+from .. import shell
 
 
 class CMark(cmake_product.CMakeProduct):
@@ -98,8 +99,9 @@ class CMark(cmake_product.CMakeProduct):
             "CTEST_OUTPUT_ON_FAILURE": "ON"
         }
 
-        self.test_with_cmake(executable_target, results_targets,
-                             self.args.cmark_build_variant, [], test_env=test_env)
+        with shell.pushenv(test_env):
+            self.test_with_cmake(executable_target, results_targets,
+                                 self.args.cmark_build_variant, [])
 
     def should_install(self, host_target):
         """should_install() -> Bool
