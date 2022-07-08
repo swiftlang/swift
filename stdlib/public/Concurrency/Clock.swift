@@ -51,6 +51,7 @@ extension Clock {
   ///          someWork()
   ///       }
   @available(SwiftStdlib 5.7, *)
+  @_unsafeInheritExecutor
   public func measure(_ work: () throws -> Void) rethrows -> Instant.Duration {
     let start = now
     try work()
@@ -65,6 +66,7 @@ extension Clock {
   ///          await someWork()
   ///       }
   @available(SwiftStdlib 5.7, *)
+  @_unsafeInheritExecutor
   public func measure(
     _ work: () async throws -> Void
   ) async rethrows -> Instant.Duration {
